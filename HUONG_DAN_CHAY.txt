@@ -1,0 +1,132 @@
+
+=== HƯỚNG DẪN SỬ DỤNG HỆ THỐNG QUẢN LÝ HỒ SƠ ===
+
+YÊU CẦU: Máy tính phải cài đặt Node.js trước (Tải tại nodejs.org).
+
+BƯỚC 1: CÀI ĐẶT LẦN ĐẦU (Chỉ chạy 1 lần khi mới tải về)
+- Chạy file "1_Cai_Dat.bat"
+- Chờ đến khi báo "DA CAI DAT XONG" thì tắt đi.
+
+BƯỚC 2: CHẠY ỨNG DỤNG HÀNG NGÀY
+
+A. Nếu bạn dùng máy cá nhân (Vừa làm máy chủ, vừa làm việc):
+- Chạy file "2_Chay_Ung_Dung.bat".
+
+B. Nếu triển khai Mạng LAN (1 Máy chủ, nhiều máy con):
+
+1. Tại MÁY CHỦ (Máy lưu dữ liệu):
+   - Chạy file "3_Chay_Server_LAN.bat".
+   - Cửa sổ đen hiện lên sẽ hiển thị IP (Ví dụ: 192.168.1.15).
+   - KHÔNG ĐƯỢC TẮT cửa sổ này trong quá trình làm việc.
+
+2. Tại MÁY NHÂN VIÊN (Máy con):
+   - Chạy file "2_Chay_Ung_Dung.bat".
+   - Bấm nút "Cấu hình kết nối" -> Nhập IP máy chủ (VD: 192.168.1.15:3005).
+
+=== HƯỚNG DẪN SAO LƯU & CẬP NHẬT ===
+
+1. SAO LƯU DỮ LIỆU:
+   - Chạy file "4_Sao_Luu_Du_Lieu.bat".
+   - File dữ liệu `db.json` sẽ được copy ra một file riêng có kèm ngày tháng.
+   - Ngoài ra, mỗi khi bạn bật Server, hệ thống cũng TỰ ĐỘNG sao lưu vào thư mục `server/backups`.
+
+2. CẬP NHẬT HỆ THỐNG (Khi có phiên bản code mới):
+   - Bước 1: Chạy "4_Sao_Luu_Du_Lieu.bat" để cho chắc chắn.
+   - Bước 2: Copy đè các file Code mới vào thư mục (trừ file `server/db.json` nếu bạn muốn giữ dữ liệu cũ, nhưng hệ thống code mới đã có cơ chế bảo vệ file này).
+   - Bước 3: Chạy file "5_Cap_Nhat_Thu_Vien.bat". 
+     (Lệnh này chạy `npm install` để cập nhật thư viện, KHÔNG XÓA DỮ LIỆU).
+
+=== HƯỚNG DẪN TẠO FILE CÀI ĐẶT (BUILD EXE) ===
+Dùng khi bạn muốn đóng gói ứng dụng thành file .exe để gửi cho người khác hoặc update.
+
+- Chạy file "6_Tao_File_Exe.bat".
+- Chờ khoảng 3-5 phút (tùy cấu hình máy).
+- File cài đặt (Setup.exe) sẽ nằm trong thư mục `release/`.
+
+================================================================
+NỘI DUNG CÁC FILE CHẠY (.BAT) - TỰ TẠO NẾU MẤT
+
+--- FILE 1: 1_Cai_Dat.bat ---
+@echo off
+title CAI DAT HE THONG
+color 0A
+echo ==========================================
+echo   DANG CAI DAT THU VIEN CAN THIET...
+echo   (Qua trinh nay khong anh huong du lieu cu)
+echo ==========================================
+call npm install
+echo.
+echo DA CAI DAT XONG!
+pause
+
+--- FILE 2: 2_Chay_Ung_Dung.bat ---
+@echo off
+title QUAN LY HO SO - CLIENT
+color 0B
+echo ==========================================
+echo   DANG KHOI DONG UNG DUNG...
+echo ==========================================
+call npm run dev
+pause
+
+--- FILE 3: 3_Chay_Server_LAN.bat ---
+@echo off
+title SERVER QUAN LY HO SO (LUU DU LIEU)
+color 0C
+echo ==========================================
+echo   DANG KHOI DONG SERVER NOI BO...
+echo ==========================================
+echo.
+echo DUOI DAY LA DIA CHI IP MAY CUA BAN:
+ipconfig | findstr "IPv4"
+echo.
+call npm run server
+pause
+
+--- FILE 4: 4_Sao_Luu_Du_Lieu.bat ---
+@echo off
+title SAO LUU DU LIEU
+color 0E
+echo ==========================================
+echo   DANG SAO LUU DU LIEU (BACKUP)...
+echo ==========================================
+if exist "server\db.json" (
+    copy "server\db.json" "server\db_backup_thu_cong.json"
+    echo.
+    echo [OK] Da sao luu thanh cong thanh file: server\db_backup_thu_cong.json
+    echo Ban co the doi ten file nay de luu tru lau dai.
+) else (
+    echo [LOI] Khong tim thay file du lieu server\db.json
+)
+echo.
+pause
+
+--- FILE 5: 5_Cap_Nhat_Thu_Vien.bat ---
+@echo off
+title CAP NHAT THU VIEN
+color 0D
+echo ==========================================
+echo   DANG CAP NHAT THU VIEN (NPM INSTALL)...
+echo   Lenh nay KHONG XOA du lieu cua ban.
+echo ==========================================
+call npm install
+echo.
+echo DA CAP NHAT XONG!
+pause
+
+--- FILE 6: 6_Tao_File_Exe.bat ---
+@echo off
+title TAO FILE CAI DAT (BUILD EXE)
+color 0F
+echo ==========================================
+echo   DANG DONG GOI UNG DUNG THANH FILE .EXE
+echo   Qua trinh nay co the mat 3-5 phut...
+echo   Vui long khong tat cua so nay.
+echo ==========================================
+call npm run electron:build
+echo.
+echo ==========================================
+echo   DA XONG!
+echo   Kiem tra file cai dat tai thu muc: release/
+echo ==========================================
+pause

@@ -1,0 +1,6 @@
+{
+  "name": "HQ-01",
+  "description": "Ứng dụng theo dõi quy trình hồ sơ hành chính, lập danh sách kiểm tra và tự động tạo báo cáo tuần/tháng bằng AI.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
