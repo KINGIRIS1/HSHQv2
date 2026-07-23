@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Contract, User, Employee, UserRole } from '../../types';
 import { fetchContracts } from '../../services/api';
-import { Search, RotateCcw, Edit, Printer, FileCheck, Trash2, Loader2, DollarSign, ExternalLink } from 'lucide-react';
+import { Search, RotateCcw, Edit, Printer, FileCheck, Trash2, Loader2, DollarSign, ExternalLink, ChevronLeft, ChevronRight } from 'lucide-react';
 import { confirmAction } from '../../utils/appHelpers';
 
 interface ContractListProps {
@@ -20,6 +20,10 @@ const ContractList: React.FC<ContractListProps> = ({ onEdit, onDelete, onPrint, 
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
   const loadContracts = async () => {
       setLoading(true);
       const data = await fetchContracts();
@@ -28,6 +32,11 @@ const ContractList: React.FC<ContractListProps> = ({ onEdit, onDelete, onPrint, 
   };
 
   useEffect(() => { loadContracts(); }, []);
+
+  // Reset page to 1 when search or viewMode changes
+  useEffect(() => {
+      setCurrentPage(1);
+  }, [searchTerm, viewMode]);
 
   const filtered = useMemo(() => {
       let list = contracts;
@@ -46,7 +55,36 @@ const ContractList: React.FC<ContractListProps> = ({ onEdit, onDelete, onPrint, 
           (c.customerName || '').toLowerCase().includes(lower) ||
           (c.ward || '').toLowerCase().includes(lower)
       );
-  }, [contracts, searchTerm]);
+  }, [contracts, searchTerm, viewMode]);
+
+  const totalPages = Math.ceil(filtered.length / itemsPerPage);
+
+  const paginatedList = useMemo(() => {
+      const startIndex = (currentPage - 1) * itemsPerPage;
+      return filtered.slice(startIndex, startIndex + itemsPerPage);
+  }, [filtered, currentPage]);
+
+  const getPageNumbers = () => {
+      const pages = [];
+      const maxVisible = 5;
+      if (totalPages <= maxVisible) {
+          for (let i = 1; i <= totalPages; i++) pages.push(i);
+      } else {
+          let start = Math.max(1, currentPage - 2);
+          let end = Math.min(totalPages, currentPage + 2);
+          
+          if (start === 1) {
+              end = maxVisible;
+          } else if (end === totalPages) {
+              start = totalPages - maxVisible + 1;
+          }
+          
+          for (let i = start; i <= end; i++) {
+              pages.push(i);
+          }
+      }
+      return pages;
+  };
 
   const isLiquidationMode = viewMode === 'liquidation';
 
@@ -97,10 +135,10 @@ const ContractList: React.FC<ContractListProps> = ({ onEdit, onDelete, onPrint, 
                                 </div>
                             </td>
                         </tr>
-                    ) : filtered.length > 0 ? (
-                        filtered.map((c, index) => (
+                    ) : paginatedList.length > 0 ? (
+                        paginatedList.map((c, index) => (
                             <tr key={c.id} className={`transition-colors group ${isLiquidationMode ? 'hover:bg-orange-50/50' : 'hover:bg-purple-50/50'}`}>
-                                <td className="p-4 text-center text-gray-400 align-middle">{index + 1}</td>
+                                <td className="p-4 text-center text-gray-400 align-middle">{(currentPage - 1) * itemsPerPage + index + 1}</td>
                                 <td className={`p-4 font-medium truncate align-middle ${isLiquidationMode ? 'text-orange-700' : 'text-purple-700'}`} title={c.code}>{c.code}</td>
                                 <td className="p-4 font-medium truncate align-middle" title={c.customerName}>{c.customerName}</td>
                                 <td className="p-4 align-middle"> 
@@ -149,6 +187,60 @@ const ContractList: React.FC<ContractListProps> = ({ onEdit, onDelete, onPrint, 
                 </tbody>
             </table>
         </div>
+
+        {totalPages > 1 && (
+            <div className="p-4 border-t border-gray-200 bg-gray-50 flex flex-col sm:flex-row justify-between items-center gap-4 shrink-0 text-sm">
+                <div className="text-gray-500 font-medium">
+                    Hiển thị <strong>{(currentPage - 1) * itemsPerPage + 1}</strong> - <strong>{Math.min(currentPage * itemsPerPage, filtered.length)}</strong> trong tổng số <strong className={isLiquidationMode ? "text-orange-700" : "text-purple-700"}>{filtered.length}</strong> bản ghi
+                </div>
+                <div className="flex items-center gap-1.5">
+                    <button 
+                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                        disabled={currentPage === 1}
+                        className={`p-2 border rounded-lg bg-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                            isLiquidationMode 
+                                ? 'text-orange-700 hover:bg-orange-50 hover:text-orange-800 disabled:hover:bg-white' 
+                                : 'text-purple-700 hover:bg-purple-50 hover:text-purple-800 disabled:hover:bg-white'
+                        }`}
+                        title="Trang trước"
+                    >
+                        <ChevronLeft size={16} />
+                    </button>
+                    {getPageNumbers().map(page => {
+                        const isActive = page === currentPage;
+                        return (
+                            <button
+                                key={page}
+                                onClick={() => setCurrentPage(page)}
+                                className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-all min-w-[36px] border ${
+                                    isActive 
+                                        ? isLiquidationMode 
+                                            ? 'bg-orange-600 border-orange-600 text-white shadow-md shadow-orange-100' 
+                                            : 'bg-purple-600 border-purple-600 text-white shadow-md shadow-purple-100'
+                                        : isLiquidationMode
+                                            ? 'bg-white border-gray-300 text-gray-700 hover:border-orange-300 hover:text-orange-600 hover:bg-orange-50/30'
+                                            : 'bg-white border-gray-300 text-gray-700 hover:border-purple-300 hover:text-purple-600 hover:bg-purple-50/30'
+                                }`}
+                            >
+                                {page}
+                            </button>
+                        );
+                    })}
+                    <button 
+                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                        disabled={currentPage === totalPages}
+                        className={`p-2 border rounded-lg bg-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                            isLiquidationMode 
+                                ? 'text-orange-700 hover:bg-orange-50 hover:text-orange-800 disabled:hover:bg-white' 
+                                : 'text-purple-700 hover:bg-purple-50 hover:text-purple-800 disabled:hover:bg-white'
+                        }`}
+                        title="Trang sau"
+                    >
+                        <ChevronRight size={16} />
+                    </button>
+                </div>
+            </div>
+        )}
     </div>
   );
 };

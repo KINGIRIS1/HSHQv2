@@ -2,8 +2,8 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { BarChart3, FileSpreadsheet, Loader2, Sparkles, Download, CalendarDays, Printer, Layout, FileText, ListFilter, CheckCircle2, Clock, AlertTriangle, Settings, Key, X, Save, MapPin, UserCheck, ChevronLeft, ChevronRight, PieChart, CheckCircle, Ruler, FolderArchive, CalendarRange } from 'lucide-react';
 import { RecordFile, RecordStatus, Employee, User } from '../types';
-import { getNormalizedWard, STATUS_LABELS } from '../constants';
-import { isRecordOverdue, removeVietnameseTones, isRecordApproaching } from '../utils/appHelpers';
+import { getNormalizedWard, STATUS_LABELS, getShortRecordType, isArchiveRecordType } from '../constants';
+import { isRecordOverdue, removeVietnameseTones, isRecordApproaching, parseSafeDate } from '../utils/appHelpers';
 import { saveGeminiKey, getGeminiKey } from '../services/geminiService';
 import { fetchArchiveRecords } from '../services/apiArchive';
 import EmployeeStatsView from './report/EmployeeStatsView';
@@ -81,6 +81,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
 
     const [mainTab, setMainTab] = useState<'measurement' | 'archive'>('measurement');
     const [archiveRecords, setArchiveRecords] = useState<RecordFile[]>([]);
+    const [isArchiveLoading, setIsArchiveLoading] = useState<boolean>(false);
 
     // Tự động chuyển tab chính nếu người dùng bị giới hạn quyền theo tổ
     useEffect(() => {
@@ -100,8 +101,9 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
     }, [fromDate, toDate, selectedWard, mainTab]);
 
     useEffect(() => {
-        if (mainTab === 'archive' && archiveRecords.length === 0) {
+        if (mainTab === 'archive') {
             const loadArchive = async () => {
+                setIsArchiveLoading(true);
                 try {
                     const [saoluc, vaoso, congvan] = await Promise.all([
                         fetchArchiveRecords('saoluc'),
@@ -122,38 +124,49 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                         }
                     };
 
-                    const mapped: RecordFile[] = all.map(r => ({
-                        id: r.id,
-                        code: r.so_hieu,
-                        customerName: r.noi_nhan_gui,
-                        ward: r.data?.xa_phuong,
-                        mapSheet: r.data?.to_ban_do || r.data?.so_to,
-                        landPlot: r.data?.thua_dat || r.data?.so_thua,
-                        receivedDate: r.ngay_thang,
-                        deadline: r.data?.hen_tra,
-                        status: mapStatus(r.status),
-                        assignedTo: r.data?.assigned_to,
-                        notes: r.trich_yeu,
-                        recordType: r.data?.recordType || (r.type === 'saoluc' ? 'Sao lục' : r.type === 'vaoso' ? 'Vào sổ' : 'Công văn'),
-                        address: r.data?.xa_phuong,
-                        phoneNumber: '',
-                        content: r.trich_yeu
-                    } as RecordFile));
+                    const mapped: RecordFile[] = all.map(r => {
+                        const rawWard = r.data?.xa_phuong || r.data?.dia_danh || '';
+                        const rawCode = r.data?.ma_ho_so || r.so_hieu || '';
+                        const rawCustomer = r.data?.ten_chu_su_dung || r.noi_nhan_gui || '';
+                        
+                        return {
+                            id: r.id,
+                            code: rawCode,
+                            customerName: String(rawCustomer).replace(/\n/g, ' '),
+                            ward: rawWard,
+                            mapSheet: r.data?.to_ban_do || r.data?.so_to || '',
+                            landPlot: r.data?.thua_dat || r.data?.so_thua || '',
+                            receivedDate: r.data?.ngay_nhan || r.ngay_thang || r.created_at,
+                            deadline: r.data?.hen_tra || '',
+                            status: mapStatus(r.status),
+                            assignedTo: r.data?.assigned_to || '',
+                            notes: r.trich_yeu || r.data?.loai_bien_dong || '',
+                            recordType: r.data?.recordType || (r.type === 'saoluc' ? 'Sao lục' : r.type === 'vaoso' ? 'Vào sổ' : 'Công văn'),
+                            address: rawWard,
+                            phoneNumber: '',
+                            content: r.trich_yeu || r.data?.loai_bien_dong || ''
+                        } as RecordFile;
+                    });
                     
-                    const cungCapRecordsFromMain = records.filter(r => r.recordType === 'Cung cấp tài liệu đất đai');
+                    const cungCapRecordsFromMain = records.filter(r => isArchiveRecordType(r.recordType));
 
                     setArchiveRecords([...mapped, ...cungCapRecordsFromMain]);
                 } catch (e) {
                     console.error("Error loading archive records for report", e);
+                } finally {
+                    setIsArchiveLoading(false);
                 }
             };
             loadArchive();
         }
-    }, [mainTab]);
+    }, [mainTab, records]);
 
     const activeRecords = useMemo(() => {
         return mainTab === 'measurement' 
-            ? records.filter(r => r.recordType !== 'Cung cấp tài liệu đất đai') 
+            ? records.filter(r => {
+                const shortType = getShortRecordType(r.recordType);
+                return !isArchiveRecordType(r.recordType) && !['CMD', 'Tòa án', 'Thi hành án'].includes(shortType);
+            }) 
             : archiveRecords;
     }, [records, mainTab, archiveRecords]);
 
@@ -185,12 +198,13 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
 
     // --- LOGIC TÍNH TOÁN DỮ LIỆU CHUNG (Theo ngày & xã) ---
     const filteredData = useMemo(() => {
-        const start = new Date(fromDate); start.setHours(0,0,0,0);
-        const end = new Date(toDate); end.setHours(23,59,59,999);
+        const start = parseSafeDate(fromDate) || new Date(fromDate); start.setHours(0,0,0,0);
+        const end = parseSafeDate(toDate) || new Date(toDate); end.setHours(23,59,59,999);
 
         return activeRecords.filter(r => {
-            if (!r.receivedDate) return false;
-            const rDate = new Date(r.receivedDate);
+            const rDate = parseSafeDate(r.receivedDate);
+            if (!rDate) return false;
+            rDate.setHours(12,0,0,0); // Dùng giữa ngày để tránh lệch múi giờ
             const matchDate = rDate >= start && rDate <= end;
             
             let matchWard = true;
@@ -228,9 +242,11 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
             if (cardFilter === 'overdue_completed') {
                 const isDone = r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED || r.status === RecordStatus.SIGNED || !!r.exportBatch;
                 if (!isDone) return false;
-                if (!r.deadline || !r.completedDate) return false;
-                const d = new Date(r.deadline); d.setHours(0,0,0,0);
-                const c = new Date(r.completedDate); c.setHours(0,0,0,0);
+                const d = parseSafeDate(r.deadline);
+                const c = parseSafeDate(r.completedDate);
+                if (!d || !c) return false;
+                d.setHours(0,0,0,0);
+                c.setHours(0,0,0,0);
                 return c > d;
             }
             return true;
@@ -285,9 +301,11 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
         const overdueCompleted = sourceData.filter(r => {
             const isDone = r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED || r.status === RecordStatus.SIGNED || !!r.exportBatch;
             if (!isDone) return false;
-            if (!r.deadline || !r.completedDate) return false;
-            const d = new Date(r.deadline); d.setHours(0,0,0,0);
-            const c = new Date(r.completedDate); c.setHours(0,0,0,0);
+            const d = parseSafeDate(r.deadline);
+            const c = parseSafeDate(r.completedDate);
+            if (!d || !c) return false;
+            d.setHours(0,0,0,0);
+            c.setHours(0,0,0,0);
             return c > d;
         }).length;
 

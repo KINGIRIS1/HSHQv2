@@ -24,7 +24,6 @@ import {
   ClipboardList,
   FileDown,
   Undo,
-  RotateCcw,
   FileX,
 } from "lucide-react";
 import * as XLSX from "xlsx-js-style";
@@ -654,60 +653,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
     setReturnModalConfig({ isOpen: false, record: null, type: "return_record" });
   };
 
-  const handleRecallRecord = async (record: RecordFile) => {
-    let targetStatus = RecordStatus.COMPLETED_WORK;
-    let targetArchiveStatus = "executed";
-    let stepName = "";
 
-    if (record.status === RecordStatus.PENDING_CHECK) {
-      // Chỉ nhân viên đã được giao xử lý trực tiếp mới được thu hồi ở bước Chờ kiểm tra
-      if (record.assignedTo !== user.employeeId) {
-        alert("Bạn không có quyền thu hồi hồ sơ này ở bước Chờ kiểm tra!");
-        return;
-      }
-      targetStatus = RecordStatus.COMPLETED_WORK;
-      targetArchiveStatus = "executed";
-      stepName = "Đã thực hiện";
-    } else if (record.status === RecordStatus.PENDING_SIGN) {
-      // Chỉ kiểm tra viên đã trình ký mới được thu hồi ở bước Chờ ký duyệt
-      if (record.checkedBy !== user.employeeId) {
-        alert("Bạn không có quyền thu hồi hồ sơ này ở bước Chờ ký duyệt!");
-        return;
-      }
-      // Nếu đang Chờ ký duyệt, thu hồi về bước kiểm tra trước
-      // Nếu có thông tin kiểm tra trước đó, thu hồi về CHECKED hoặc PENDING_CHECK, nếu không có thì về COMPLETED_WORK.
-      // Để thống nhất và dễ cho nhân viên sửa, ta thu hồi về COMPLETED_WORK (Đã thực hiện) hoặc PENDING_CHECK
-      targetStatus = record.checkedBy ? RecordStatus.PENDING_CHECK : RecordStatus.COMPLETED_WORK;
-      targetArchiveStatus = "executed";
-      stepName = record.checkedBy ? "Chờ kiểm tra" : "Đã thực hiện";
-    } else {
-      return;
-    }
-
-    if (
-      await confirmAction(
-        `Bạn có chắc chắn muốn thu hồi hồ sơ ${record.code} về bước trước (${stepName}) để sửa chữa?`
-      )
-    ) {
-      const localNow = new Date();
-      const hh = String(localNow.getHours()).padStart(2, "0");
-      const mm = String(localNow.getMinutes()).padStart(2, "0");
-      const day = String(localNow.getDate()).padStart(2, "0");
-      const month = String(localNow.getMonth() + 1).padStart(2, "0");
-      const year = localNow.getFullYear();
-      const displayTime = `${hh}:${mm} ${day}/${month}/${year}`;
-
-      const logEntry = `[Thu hồi - ${displayTime}] Thu hồi hồ sơ về sửa chữa`;
-
-      await handleUpdateRecordAndNotes(
-        record,
-        targetStatus,
-        logEntry,
-        targetArchiveStatus,
-        "Thu hồi"
-      );
-    }
-  };
 
   const handleMarkAsDone = async (record: RecordFile) => {
     if (
@@ -1423,18 +1369,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                                   </button>
                                 ))}
 
-                              {/* Nút Thu hồi trong tab Chờ kiểm tra */}
-                              {activeTab === "pending_check" &&
-                                r.status === RecordStatus.PENDING_CHECK &&
-                                r.assignedTo === user.employeeId && (
-                                  <button
-                                    onClick={() => handleRecallRecord(r)}
-                                    title="Thu hồi hồ sơ về bước trước"
-                                    className="px-2 py-1.5 bg-yellow-50 text-yellow-700 border border-yellow-200 rounded-md hover:bg-yellow-100 hover:text-yellow-800 text-xs font-bold flex items-center gap-1 shadow-sm transition-all"
-                                  >
-                                    <RotateCcw size={14} /> Thu hồi
-                                  </button>
-                                )}
+
 
                               {/* Nút Trả về trong tab Chờ kiểm tra (Cho kiểm tra viên) */}
                               {activeTab === "pending_check" &&
@@ -1463,18 +1398,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                                   </button>
                                 )}
 
-                              {/* Nút Thu hồi trong tab Chờ ký duyệt */}
-                              {activeTab === "pending_sign" &&
-                                r.status === RecordStatus.PENDING_SIGN &&
-                                r.checkedBy === user.employeeId && (
-                                  <button
-                                    onClick={() => handleRecallRecord(r)}
-                                    title="Thu hồi hồ sơ về bước trước"
-                                    className="px-2 py-1.5 bg-yellow-50 text-yellow-700 border border-yellow-200 rounded-md hover:bg-yellow-100 hover:text-yellow-800 text-xs font-bold flex items-center gap-1 shadow-sm transition-all"
-                                  >
-                                    <RotateCcw size={14} /> Thu hồi
-                                  </button>
-                                )}
+
 
                               {/* Nút Trả về trong tab Chờ ký duyệt (Cho Giám đốc) */}
                               {activeTab === "pending_sign" &&
@@ -1616,17 +1540,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                               </button>
                             ))}
 
-                          {activeTab === "pending_check" &&
-                            r.status === RecordStatus.PENDING_CHECK &&
-                            r.assignedTo === user.employeeId && (
-                              <button
-                                onClick={() => handleRecallRecord(r)}
-                                className="p-1.5 bg-yellow-50 text-yellow-700 border border-yellow-200 rounded-lg text-xs"
-                                title="Thu hồi"
-                              >
-                                <RotateCcw size={14} />
-                              </button>
-                            )}
+
 
                           {activeTab === "pending_check" &&
                             (r.status === RecordStatus.PENDING_CHECK ||
@@ -1649,17 +1563,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                               </>
                             )}
 
-                          {activeTab === "pending_sign" &&
-                            r.status === RecordStatus.PENDING_SIGN &&
-                            r.checkedBy === user.employeeId && (
-                              <button
-                                onClick={() => handleRecallRecord(r)}
-                                className="p-1.5 bg-yellow-50 text-yellow-700 border border-yellow-200 rounded-lg text-xs"
-                                title="Thu hồi"
-                              >
-                                <RotateCcw size={14} />
-                              </button>
-                            )}
+
 
                           {activeTab === "pending_sign" &&
                             r.status === RecordStatus.PENDING_SIGN &&

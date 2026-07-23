@@ -57,7 +57,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     { id: 'archive_records', label: 'Hồ sơ lưu trữ', icon: FolderArchive, visible: true },
     { id: 'congvan_records', label: 'Công văn', icon: Send, visible: false },
     { id: 'excerpt_management', label: 'Số TL/TĐ', icon: BookOpen, visible: false },
-    { id: 'utilities', label: 'Tiện ích', icon: PenTool, visible: false },
+    { id: 'utilities', label: 'Tiện ích', icon: PenTool, visible: true },
     // Đã xóa menu "DS Ký kiểm tra" và "DS Giao 1 cửa" để đưa vào làm tab con của "Hồ sơ đo đạc"
     { id: 'reports', label: 'Báo cáo & Thống kê', icon: BarChart3, visible: !isOneDoor },
     { id: 'account_settings', label: 'Cài đặt tài khoản', icon: UserCog, visible: true },

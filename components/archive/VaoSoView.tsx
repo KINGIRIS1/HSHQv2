@@ -46,7 +46,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
     
     // Pagination State
     const [currentPage, setCurrentPage] = useState(1);
-    const itemsPerPage = 50;
+    const itemsPerPage = 10;
 
     // Batch Modal State
     const [showBatchModal, setShowBatchModal] = useState(false);

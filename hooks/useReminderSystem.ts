@@ -207,10 +207,13 @@ export const useReminderSystem = (
                             );
 
                             if (isAssignedToCurrentUser || isPrivilegedUser) {
+                                // Tắt chế độ thông báo khi hồ sơ hết hạn giải quyết theo yêu cầu người dùng
+                                /*
                                 triggerSystemNotification(
                                     `Cảnh báo quá hạn: ${r.code}`,
                                     `Hồ sơ của khách hàng ${r.customerName} đã trễ hạn giải quyết vào ngày ${deadlineDate.toLocaleDateString('vi-VN')}.`
                                 );
+                                */
 
                                 // Đánh dấu đã nhắc nhở quá hạn (nhắc duy nhất 1 lần)
                                 const updatedRecord = { ...r, deadlineReminded: true };

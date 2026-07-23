@@ -208,7 +208,9 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setNotification(null);
-    if (!formData.code || !formData.customerName || !formData.deadline || !formData.recordType) { 
+    const isCongVan = formData.recordType ? getShortRecordType(formData.recordType) === '1.2 Công văn' : false;
+    const isDeadlineRequired = !isCongVan;
+    if (!formData.code || !formData.customerName || (isDeadlineRequired && !formData.deadline) || !formData.recordType) { 
         setNotification({ type: 'error', message: "Vui lòng điền các trường bắt buộc (*) và chọn Loại hồ sơ." });
         return; 
     }
@@ -284,9 +286,14 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
                     <div className="absolute top-0 left-0 w-1 h-full bg-purple-500"></div>
                     <h3 className="text-sm font-bold text-slate-800 uppercase mb-5 flex items-center gap-2"><span className="p-1.5 bg-purple-100 text-purple-600 rounded-lg"><Calendar size={16} /></span> Thời gian & Mã</h3>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className={`grid grid-cols-1 ${isCongVan ? 'md:grid-cols-2' : 'md:grid-cols-3'} gap-4`}>
                         <div><label className={labelClass}>Ngày nhận</label><input type="date" required className={inputClass} value={dateVal(formData.receivedDate)} onChange={(e) => handleChange('receivedDate', e.target.value)} /></div>
-                        <div><label className={`${labelClass} text-purple-600`}>{isCongVan ? 'Hạn xử lý' : 'Hẹn trả'} <span className="text-red-500">*</span></label><input type="date" required className={`${inputClass} bg-purple-50 border-purple-200 text-purple-700 font-bold`} value={dateVal(formData.deadline)} onChange={(e) => handleChange('deadline', e.target.value)} /></div>
+                        {!isCongVan && (
+                            <div>
+                                <label className={`${labelClass} text-purple-600`}>Hẹn trả <span className="text-red-500">*</span></label>
+                                <input type="date" required className={`${inputClass} bg-purple-50 border-purple-200 text-purple-700 font-bold`} value={dateVal(formData.deadline)} onChange={(e) => handleChange('deadline', e.target.value)} />
+                            </div>
+                        )}
                         <div><label className={labelClass}>Mã hồ sơ</label><input type="text" readOnly={!initialData} className={`${inputClass} font-mono ${initialData ? 'bg-white font-bold text-blue-700' : 'bg-slate-100 text-slate-500 cursor-not-allowed'}`} value={formData.code || ''} onChange={(e) => initialData && handleChange('code', e.target.value)} /></div>
                     </div>
 
@@ -315,7 +322,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div>
                                 <label className={labelClass}>Số, ký hiệu Công văn <span className="text-red-500">*</span></label>
-                                <input type="text" required className={inputClass} placeholder="VD: 123/UBND-TH..." value={formData.issueNumber || ''} onChange={(e) => handleChange('issueNumber', e.target.value)} />
+                                <input type="text" required className={inputClass} placeholder="VD: 123/UBND-TH..." value={formData.customerName || ''} onChange={(e) => handleChange('customerName', e.target.value)} />
                             </div>
                             <div>
                                 <label className={labelClass}>Nơi nhận / Đơn vị xử lý</label>
@@ -353,8 +360,8 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
                     {isCongVan ? (
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div>
-                                <label className={labelClass}>Cơ quan ban hành / Nơi gửi <span className="text-red-500">*</span></label>
-                                <input type="text" required className={inputClass} placeholder="VD: UBND huyện, Tòa án..." value={formData.customerName || ''} onChange={(e) => handleChange('customerName', e.target.value)} />
+                                <label className={labelClass}>Cơ quan ban hành / Nơi gửi</label>
+                                <input type="text" className={inputClass} placeholder="VD: UBND huyện, Tòa án..." value={formData.issueNumber || ''} onChange={(e) => handleChange('issueNumber', e.target.value)} />
                             </div>
                             <div>
                                 <label className={labelClass}>Ngày Công văn / Ngày ban hành</label>

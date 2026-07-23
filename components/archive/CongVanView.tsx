@@ -55,7 +55,7 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
     
     // Pagination
     const [currentPage, setCurrentPage] = useState(1);
-    const itemsPerPage = 50;
+    const itemsPerPage = 10;
 
     useArchiveRealtime('congvan', setRecords);
 

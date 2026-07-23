@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { getNormalizedWard, STATUS_LABELS } from '../../constants';
 import { exportDailyStatsToExcel } from '../../utils/excelExport';
+import { parseSafeDate } from '../../utils/appHelpers';
 
 interface DailyStatsViewProps {
     records: RecordFile[];
@@ -62,47 +63,47 @@ const DailyStatsView: React.FC<DailyStatsViewProps> = ({ records, employees, war
             // 1. Lọc theo khoảng ngày tương ứng của từng Tab
             let matchDate = true;
             if (openModalType === 'received') {
-                if (!r.receivedDate) {
+                const rDate = parseSafeDate(r.receivedDate);
+                if (!rDate) {
                     matchDate = false;
                 } else {
-                    const rDate = new Date(r.receivedDate);
                     rDate.setHours(0,0,0,0);
                     if (modalFromDate) {
-                        const from = new Date(modalFromDate); from.setHours(0,0,0,0);
+                        const from = parseSafeDate(modalFromDate) || new Date(modalFromDate); from.setHours(0,0,0,0);
                         if (rDate < from) matchDate = false;
                     }
                     if (modalToDate) {
-                        const to = new Date(modalToDate); to.setHours(23,59,59,999);
+                        const to = parseSafeDate(modalToDate) || new Date(modalToDate); to.setHours(23,59,59,999);
                         if (rDate > to) matchDate = false;
                     }
                 }
             } else if (openModalType === 'assigned') {
-                if (!r.assignedDate) {
+                const rDate = parseSafeDate(r.assignedDate);
+                if (!rDate) {
                     matchDate = false;
                 } else {
-                    const rDate = new Date(r.assignedDate);
                     rDate.setHours(0,0,0,0);
                     if (modalFromDate) {
-                        const from = new Date(modalFromDate); from.setHours(0,0,0,0);
+                        const from = parseSafeDate(modalFromDate) || new Date(modalFromDate); from.setHours(0,0,0,0);
                         if (rDate < from) matchDate = false;
                     }
                     if (modalToDate) {
-                        const to = new Date(modalToDate); to.setHours(23,59,59,999);
+                        const to = parseSafeDate(modalToDate) || new Date(modalToDate); to.setHours(23,59,59,999);
                         if (rDate > to) matchDate = false;
                     }
                 }
             } else if (openModalType === 'handover') {
-                if (!r.completedDate) {
+                const rDate = parseSafeDate(r.completedDate);
+                if (!rDate) {
                     matchDate = false;
                 } else {
-                    const rDate = new Date(r.completedDate);
                     rDate.setHours(0,0,0,0);
                     if (modalFromDate) {
-                        const from = new Date(modalFromDate); from.setHours(0,0,0,0);
+                        const from = parseSafeDate(modalFromDate) || new Date(modalFromDate); from.setHours(0,0,0,0);
                         if (rDate < from) matchDate = false;
                     }
                     if (modalToDate) {
-                        const to = new Date(modalToDate); to.setHours(23,59,59,999);
+                        const to = parseSafeDate(modalToDate) || new Date(modalToDate); to.setHours(23,59,59,999);
                         if (rDate > to) matchDate = false;
                     }
                 }
@@ -177,7 +178,10 @@ const DailyStatsView: React.FC<DailyStatsViewProps> = ({ records, employees, war
         }
     };
 
-    const formatDate = (d?: string | null) => d ? new Date(d).toLocaleDateString('vi-VN') : '-';
+    const formatDate = (d?: string | null) => {
+        const parsed = parseSafeDate(d);
+        return parsed ? parsed.toLocaleDateString('vi-VN') : '-';
+    };
 
     // Get Title of Modal
     const getModalTitle = () => {

@@ -467,6 +467,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
   };
   const displayStatus = getDisplayStatus(record);
   const recordTypeLower = (record?.recordType || '').toLowerCase();
+  const isCongVan = record?.recordType ? getShortRecordType(record.recordType) === '1.2 Công văn' : false;
 
   // LOGIC CHECK NẾU ĐÃ THỰC HIỆN XONG (Để hiển thị bước "Đã thực hiện")
   const isWorkDone = [
@@ -572,15 +573,19 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                     {/* KHÁCH HÀNG */}
                     <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
                         <h3 className="text-xs font-bold text-blue-600 uppercase mb-4 flex items-center gap-2 border-l-4 border-blue-600 pl-2">
-                            <UserIcon size={16}/> Thông tin chủ hồ sơ
+                            <UserIcon size={16}/> {isCongVan ? 'Thông tin nơi gửi / nhận' : 'Thông tin chủ hồ sơ'}
                         </h3>
                         <div className="grid grid-cols-1 gap-4">
                             <div>
-                                <label className="text-[10px] text-gray-400 uppercase font-bold block mb-1">Chủ sử dụng</label>
+                                <label className="text-[10px] text-gray-400 uppercase font-bold block mb-1">
+                                    {isCongVan ? 'Số, ký hiệu Công văn' : 'Chủ sử dụng'}
+                                </label>
                                 <p className="text-base font-bold text-gray-800">{record.customerName}</p>
                             </div>
                             <div>
-                                <label className="text-[10px] text-gray-400 uppercase font-bold block mb-1">Số điện thoại</label>
+                                <label className="text-[10px] text-gray-400 uppercase font-bold block mb-1">
+                                    {isCongVan ? 'Số điện thoại liên hệ' : 'Số điện thoại'}
+                                </label>
                                 <p className="text-base font-bold text-gray-800">{record.phoneNumber || '---'}</p>
                             </div>
                             {record.customerAddress && (
@@ -618,27 +623,50 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                     {/* ĐỊA CHÍNH */}
                     <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
                         <h3 className="text-xs font-bold text-green-600 uppercase mb-4 flex items-center gap-2 border-l-4 border-green-600 pl-2">
-                            <MapPin size={16}/> Thông tin địa chính
+                            <MapPin size={16}/> {isCongVan ? 'Văn bản Công văn' : 'Thông tin địa chính'}
                         </h3>
-                        <div className="grid grid-cols-3 gap-4 mb-4">
-                            <div>
-                                <label className="text-[10px] text-gray-400 uppercase font-bold block mb-1">Xã/Phường</label>
-                                <p className="font-bold text-gray-800 text-sm">{getNormalizedWard(record.ward)}</p>
+                        {isCongVan ? (
+                            <div className="grid grid-cols-1 gap-4">
+                                {record.issueNumber && (
+                                    <div>
+                                        <label className="text-[10px] text-gray-400 uppercase font-bold block mb-1">Cơ quan ban hành / Nơi gửi</label>
+                                        <p className="text-sm font-bold text-gray-800">{record.issueNumber}</p>
+                                    </div>
+                                )}
+                                {record.issueDate && (
+                                    <div>
+                                        <label className="text-[10px] text-gray-400 uppercase font-bold block mb-1">Ngày Công văn</label>
+                                        <p className="text-sm font-bold text-gray-800">{formatDate(record.issueDate)}</p>
+                                    </div>
+                                )}
+                                <div>
+                                    <label className="text-[10px] text-gray-400 uppercase font-bold block mb-1">Xã / Phường liên quan</label>
+                                    <p className="font-bold text-gray-800 text-sm">{getNormalizedWard(record.ward)}</p>
+                                </div>
                             </div>
-                            <div>
-                                <label className="text-[10px] text-gray-400 uppercase font-bold block mb-1">Tờ bản đồ</label>
-                                <p className="font-bold text-gray-800 bg-gray-50 px-2 py-1 rounded border border-gray-200 text-center">{record.mapSheet || '-'}</p>
-                            </div>
-                            <div>
-                                <label className="text-[10px] text-gray-400 uppercase font-bold block mb-1">Thửa đất</label>
-                                <p className="font-bold text-gray-800 bg-gray-50 px-2 py-1 rounded border border-gray-200 text-center">{record.landPlot || '-'}</p>
-                            </div>
-                        </div>
-                        {record.address && (
-                            <div>
-                                <label className="text-[10px] text-gray-400 uppercase font-bold block mb-1">Địa chỉ chi tiết</label>
-                                <p className="text-sm font-bold text-gray-800">{record.address}</p>
-                            </div>
+                        ) : (
+                            <>
+                                <div className="grid grid-cols-3 gap-4 mb-4">
+                                    <div>
+                                        <label className="text-[10px] text-gray-400 uppercase font-bold block mb-1">Xã/Phường</label>
+                                        <p className="font-bold text-gray-800 text-sm">{getNormalizedWard(record.ward)}</p>
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] text-gray-400 uppercase font-bold block mb-1">Tờ bản đồ</label>
+                                        <p className="font-bold text-gray-800 bg-gray-50 px-2 py-1 rounded border border-gray-200 text-center">{record.mapSheet || '-'}</p>
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] text-gray-400 uppercase font-bold block mb-1">Thửa đất</label>
+                                        <p className="font-bold text-gray-800 bg-gray-50 px-2 py-1 rounded border border-gray-200 text-center">{record.landPlot || '-'}</p>
+                                    </div>
+                                </div>
+                                {record.address && (
+                                    <div>
+                                        <label className="text-[10px] text-gray-400 uppercase font-bold block mb-1">Địa chỉ chi tiết</label>
+                                        <p className="text-sm font-bold text-gray-800">{record.address}</p>
+                                    </div>
+                                )}
+                            </>
                         )}
                     </div>
 

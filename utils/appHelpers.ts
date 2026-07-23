@@ -104,10 +104,10 @@ export const isRecordOverdue = (record: RecordFile): boolean => {
       return false;
   }
   
-  if (!record.deadline) return false;
+  const deadline = parseSafeDate(record.deadline);
+  if (!deadline) return false;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const deadline = new Date(record.deadline);
   deadline.setHours(0, 0, 0, 0);
   return deadline < today;
 };
@@ -130,10 +130,10 @@ export const isRecordApproaching = (record: RecordFile): boolean => {
 
   if (isRecordOverdue(record)) return false;
   
-  if (!record.deadline) return false;
+  const deadline = parseSafeDate(record.deadline);
+  if (!deadline) return false;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const deadline = new Date(record.deadline);
   deadline.setHours(0, 0, 0, 0);
   const diffTime = deadline.getTime() - today.getTime();
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -277,4 +277,32 @@ export function matchDepartmentKey(key: string, empDept: string): boolean {
     
     return false;
 }
+
+export function parseSafeDate(dateStr: any): Date | null {
+    if (!dateStr) return null;
+    if (dateStr instanceof Date) return isNaN(dateStr.getTime()) ? null : dateStr;
+    const s = String(dateStr).trim();
+    if (!s) return null;
+
+    // Check if it's already ISO format or YYYY-MM-DD
+    if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+        const d = new Date(s);
+        return isNaN(d.getTime()) ? null : d;
+    }
+
+    // Check if it's DD/MM/YYYY or DD-MM-YYYY or similar
+    const dmyRegex = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/;
+    const match = s.match(dmyRegex);
+    if (match) {
+        const day = parseInt(match[1], 10);
+        const month = parseInt(match[2], 10) - 1; // 0-indexed
+        const year = parseInt(match[3], 10);
+        const d = new Date(year, month, day);
+        return isNaN(d.getTime()) ? null : d;
+    }
+
+    const d = new Date(s);
+    return isNaN(d.getTime()) ? null : d;
+}
+
 
