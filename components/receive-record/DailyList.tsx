@@ -72,10 +72,11 @@ const DailyList: React.FC<DailyListProps> = ({ records, wards, currentUser, empl
           if (selectedDept !== 'Tất cả') {
               const typeLower = (r.recordType || '').toLowerCase();
               if (selectedDept === 'Tổ Đo đạc') {
-                  const isMeasurement = typeLower.includes('trích đo') || typeLower.includes('đo đạc') || typeLower.includes('cắm mốc') || typeLower.includes('tách') || typeLower.includes('hợp') || typeLower.startsWith('2.3') || typeLower.startsWith('2.4') || typeLower.startsWith('2.5');
+                  const isMeasurement = typeLower.includes('trích đo') || typeLower.includes('đo đạc') || typeLower.includes('cắm mốc') || typeLower.includes('tách') || typeLower.includes('hợp') || typeLower.startsWith('2.3') || typeLower.startsWith('2.4') || typeLower.startsWith('2.5') || typeLower.startsWith('2.6') || typeLower.includes('số thửa');
                   if (!isMeasurement) return false;
               } else if (selectedDept === 'Tổ Thông tin lưu trữ') {
-                  const isArchive = typeLower.includes('cung cấp') || typeLower.includes('trích lục') || typeLower.includes('số thửa') || typeLower.startsWith('1.1') || typeLower.startsWith('2.1') || typeLower.startsWith('2.2') || typeLower.startsWith('2.6');
+                  const isArchive = (typeLower.includes('cung cấp') || typeLower.includes('trích lục') || typeLower.includes('số thửa') || typeLower.startsWith('1.1') || typeLower.startsWith('2.1') || typeLower.startsWith('2.2') || typeLower.startsWith('2.6')) && 
+                                    !typeLower.startsWith('2.6') && !typeLower.includes('số thửa');
                   if (!isArchive) return false;
               }
           }
