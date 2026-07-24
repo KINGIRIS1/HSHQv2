@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Calendar, Play, CheckCircle2, AlertTriangle, FileText, Info, CheckCircle, HelpCircle, Loader2, ArrowRight } from 'lucide-react';
 import { RecordFile, NotifyFunction } from '../../types';
 import { calculateDeadlineHelper } from '../../utils/appHelpers';
+import { updateRecordsBatchById } from '../../services/api';
 
 interface Props {
     records: RecordFile[];
@@ -146,14 +147,9 @@ export const DienNgayThangTab: React.FC<Props> = ({ records, onSaveRecord, holid
     };
 
     const handleExecuteUpdates = async () => {
-        if (!onSaveRecord) {
-            notify('Lỗi hệ thống: Không tìm thấy tính năng cập nhật hồ sơ.', 'error');
-            return;
-        }
-        
         const selectedProposals = proposals.filter(p => p.selected);
         if (selectedProposals.length === 0) {
-            notify('Vui lòng chọn nhất một hồ sơ để tiến hành cập nhật!', 'error');
+            notify('Vui lòng chọn ít nhất một hồ sơ để tiến hành cập nhật!', 'error');
             return;
         }
 
@@ -165,37 +161,41 @@ export const DienNgayThangTab: React.FC<Props> = ({ records, onSaveRecord, holid
         setIsUpdating(true);
         setProgress({ current: 0, total: selectedProposals.length });
 
-        let successCount = 0;
-        
-        for (let i = 0; i < selectedProposals.length; i++) {
-            const prop = selectedProposals[i];
-            try {
-                // Keep other properties and update only the missing receivedDate and/or deadline
-                // If existing has values, keep them, but here we specifically target missing ones
-                const originalRecord = records.find(r => r.id === prop.id);
-                if (originalRecord) {
-                    const cleanReceived = sanitizeDateString(originalRecord.receivedDate || prop.proposedReceivedDate);
-                    const cleanDeadline = sanitizeDateString(originalRecord.deadline || prop.proposedDeadline);
-                    const cleanAssigned = sanitizeDateString(originalRecord.assignedDate || originalRecord.receivedDate || prop.proposedReceivedDate);
+        // Chuẩn bị toàn bộ dữ liệu cập nhật
+        const updates: any[] = [];
+        selectedProposals.forEach(prop => {
+            const originalRecord = records.find(r => r.id === prop.id);
+            if (originalRecord) {
+                const cleanReceived = sanitizeDateString(originalRecord.receivedDate || prop.proposedReceivedDate);
+                const cleanDeadline = sanitizeDateString(originalRecord.deadline || prop.proposedDeadline);
+                const cleanAssigned = sanitizeDateString(originalRecord.assignedDate || originalRecord.receivedDate || prop.proposedReceivedDate);
 
-                    const updatedData = {
-                        ...originalRecord,
-                        receivedDate: cleanReceived,
-                        deadline: cleanDeadline,
-                        // Synchronize assignedDate with receivedDate if it was also missing
-                        assignedDate: cleanAssigned
-                    };
-                    const savedRecord = await onSaveRecord(updatedData);
-                    if (savedRecord) {
-                        successCount++;
-                    } else {
-                        console.error(`Không thể lưu hồ sơ ${prop.code} thông qua API`);
-                    }
+                updates.push({
+                    id: originalRecord.id,
+                    receivedDate: cleanReceived,
+                    deadline: cleanDeadline,
+                    assignedDate: cleanAssigned
+                });
+            }
+        });
+
+        let successCount = 0;
+        const CHUNK_SIZE = 100; // Chia nhỏ thành các lô 100 dòng để tối ưu hóa và hiển thị tiến trình mượt mà
+
+        for (let i = 0; i < updates.length; i += CHUNK_SIZE) {
+            const chunk = updates.slice(i, i + CHUNK_SIZE);
+            try {
+                // Sử dụng hàm upsert hàng loạt đã tối ưu của hệ thống
+                const res = await updateRecordsBatchById(chunk);
+                if (res && res.success) {
+                    successCount += chunk.length;
+                } else {
+                    console.error(`Lỗi cập nhật lô hồ sơ tại vị trí ${i}`);
                 }
             } catch (err) {
-                console.error(`Lỗi cập nhật hồ sơ ${prop.code}:`, err);
+                console.error(`Lỗi thực thi cập nhật lô hồ sơ tại vị trí ${i}:`, err);
             }
-            setProgress(prev => ({ ...prev, current: i + 1 }));
+            setProgress(prev => ({ ...prev, current: Math.min(i + chunk.length, updates.length) }));
         }
 
         setIsUpdating(false);
