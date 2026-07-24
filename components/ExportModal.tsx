@@ -170,19 +170,6 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
         
     const displayDate = `Ngày ${exportDateParts[2]} tháng ${exportDateParts[1]} năm ${exportDateParts[0]}`;
 
-    // Chỉ giữ lại ngày giờ lập danh sách giao 1 cửa thể hiện ngay dưới nội dung "DANH SÁCH BÀN GIAO HỒ SƠ 1 CỬA"
-    // Định dạng ví dụ: "20 giờ 44 phút NGÀY 15 THÁNG 07 NĂM 2027"
-    let displayGenerationTime = displayDate.toUpperCase();
-    if (type === 'handover') {
-        const now = new Date();
-        const currentHour = now.getHours();
-        const currentMinute = String(now.getMinutes()).padStart(2, '0');
-        const currentDay = String(now.getDate()).padStart(2, '0');
-        const currentMonth = String(now.getMonth() + 1).padStart(2, '0');
-        const currentYear = now.getFullYear();
-        displayGenerationTime = `${currentHour} giờ ${currentMinute} phút NGÀY ${currentDay} THÁNG ${currentMonth} NĂM ${currentYear}`;
-    }
-
     // --- CẤU HÌNH CỘT ĐỘNG ---
     const isHandover = type === 'handover';
     const isSpecificWard = selectedWard !== 'all';
@@ -253,22 +240,32 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
     const ws = XLSX.utils.aoa_to_sheet([]); 
 
     // Header Quốc Hiệu
-    XLSX.utils.sheet_add_aoa(ws, [
+    const headerRows = [
         ["CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM"],
         ["Độc lập - Tự do - Hạnh phúc"],
         [""],
         [title],
-        [displayGenerationTime],
+        [displayDate.toUpperCase()],
         [subTitle],
-        [""],
-        tableHeader
-    ], { origin: "A1" });
+    ];
+
+    let handoverNoteRowIndex: number | null = null;
+    if (type === 'handover') {
+        handoverNoteRowIndex = headerRows.length;
+        headerRows.push(["Kèm theo đầy đủ hồ sơ gốc"]);
+    }
+    headerRows.push([""]);
+    const tableHeaderRowIndex = headerRows.length;
+    headerRows.push(tableHeader);
+
+    XLSX.utils.sheet_add_aoa(ws, headerRows, { origin: "A1" });
 
     // Data
-    XLSX.utils.sheet_add_aoa(ws, dataRows, { origin: "A9" });
+    const dataOriginRow = headerRows.length + 1;
+    XLSX.utils.sheet_add_aoa(ws, dataRows, { origin: `A${dataOriginRow}` });
 
     const totalCols = tableHeader.length;
-    const lastDataRow = 8 + dataRows.length;
+    const lastDataRow = (dataOriginRow - 1) + dataRows.length;
     const footerStartRow = lastDataRow + 2;
 
     // Thêm Footer (Canh đều 2 bên - Justify)
@@ -329,8 +326,8 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
     // Đây là phần quan trọng để tăng chiều cao dòng cho việc ký tên
     const wsrows = [];
     
-    // 8 dòng đầu (Tiêu đề, Header bảng): Cao 30px
-    for(let i=0; i<8; i++) {
+    // Các dòng tiêu đề và header bảng: Cao 30px
+    for(let i=0; i <= tableHeaderRowIndex; i++) {
         wsrows.push({ hpx: 30 }); 
     }
     
@@ -351,19 +348,28 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
     ws['!rows'] = wsrows;
 
     // Merge Config
-    ws['!merges'] = [
+    const merges = [
         { s: { r: 0, c: 0 }, e: { r: 0, c: totalCols - 1 } },
         { s: { r: 1, c: 0 }, e: { r: 1, c: totalCols - 1 } },
         { s: { r: 3, c: 0 }, e: { r: 3, c: totalCols - 1 } },
         { s: { r: 4, c: 0 }, e: { r: 4, c: totalCols - 1 } },
         { s: { r: 5, c: 0 }, e: { r: 5, c: totalCols - 1 } },
-        // Footer Merges
+    ];
+
+    if (handoverNoteRowIndex !== null) {
+        merges.push({ s: { r: handoverNoteRowIndex, c: 0 }, e: { r: handoverNoteRowIndex, c: totalCols - 1 } });
+    }
+
+    // Footer Merges
+    merges.push(
         { s: { r: footerStartRow, c: leftStart }, e: { r: footerStartRow, c: leftEnd } },     
         { s: { r: footerStartRow + 1, c: leftStart }, e: { r: footerStartRow + 1, c: leftEnd } }, 
         
         { s: { r: footerStartRow, c: rightStart }, e: { r: footerStartRow, c: rightEnd } },    
-        { s: { r: footerStartRow + 1, c: rightStart }, e: { r: footerStartRow + 1, c: rightEnd } },
-    ];
+        { s: { r: footerStartRow + 1, c: rightStart }, e: { r: footerStartRow + 1, c: rightEnd } }
+    );
+
+    ws['!merges'] = merges;
 
     // Styles
     const borderStyle = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
@@ -385,12 +391,17 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
     if(ws['A5']) ws['A5'].s = styles.reportSubTitle;
     if(ws['A6']) ws['A6'].s = styles.reportSubTitle;
 
+    if (handoverNoteRowIndex !== null) {
+        const handoverNoteCell = XLSX.utils.encode_cell({ r: handoverNoteRowIndex, c: 0 });
+        if (ws[handoverNoteCell]) ws[handoverNoteCell].s = styles.reportSubTitle;
+    }
+
     for (let c = 0; c < totalCols; c++) {
-        const headerCell = XLSX.utils.encode_cell({ r: 7, c: c });
+        const headerCell = XLSX.utils.encode_cell({ r: tableHeaderRowIndex, c: c });
         if (!ws[headerCell]) ws[headerCell] = { v: "", t: "s" };
         ws[headerCell].s = styles.tableHeader;
 
-        for (let r = 8; r < lastDataRow; r++) {
+        for (let r = tableHeaderRowIndex + 1; r < lastDataRow; r++) {
             const cellRef = XLSX.utils.encode_cell({ r: r, c: c });
             if (!ws[cellRef]) ws[cellRef] = { v: "", t: "s" };
             

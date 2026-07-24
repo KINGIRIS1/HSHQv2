@@ -196,13 +196,14 @@ export const sanitizeData = (data: any, allowedColumns: string[]) => {
         }
     });
     
-    // DateTime fields: Giữ nguyên ngày và giờ (như ngày tiếp nhận & ngày trả kết quả)
+    // DateTime fields: Giữ nguyên ngày và giờ (những trường thực sự cần lưu đầy đủ timestamp)
     const dateTimeFields = [
-        'receivedDate', 'resultReturnedDate', 'lastRemindedAt', 'createdDate'
+        'lastRemindedAt', 'createdDate'
     ];
 
     // Date-only fields: Chỉ lấy phần ngày YYYY-MM-DD, loại bỏ hoàn toàn phần giờ
     const dateOnlyFields = [
+        'receivedDate', 'resultReturnedDate',
         'deadline', 'assignedDate', 
         'submissionDate', 'approvalDate', 'completedDate', 
         'exportDate', 'issueDate',

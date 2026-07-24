@@ -185,8 +185,12 @@ export const DienNgayThangTab: React.FC<Props> = ({ records, onSaveRecord, holid
                         // Synchronize assignedDate with receivedDate if it was also missing
                         assignedDate: cleanAssigned
                     };
-                    await onSaveRecord(updatedData);
-                    successCount++;
+                    const savedRecord = await onSaveRecord(updatedData);
+                    if (savedRecord) {
+                        successCount++;
+                    } else {
+                        console.error(`Không thể lưu hồ sơ ${prop.code} thông qua API`);
+                    }
                 }
             } catch (err) {
                 console.error(`Lỗi cập nhật hồ sơ ${prop.code}:`, err);
@@ -199,7 +203,11 @@ export const DienNgayThangTab: React.FC<Props> = ({ records, onSaveRecord, holid
         setHasScanned(false);
         setProposals([]);
         
-        notify(`Đã điền thành công ngày tiếp nhận & ngày hẹn cho ${successCount}/${selectedProposals.length} hồ sơ!`, 'success');
+        if (successCount > 0) {
+            notify(`Đã điền thành công ngày tiếp nhận & ngày hẹn cho ${successCount}/${selectedProposals.length} hồ sơ!`, 'success');
+        } else {
+            notify(`Không có hồ sơ nào được cập nhật thành công. Vui lòng kiểm tra lại cấu hình hoặc thử lại!`, 'error');
+        }
 
         if (onRefreshData) {
             try {
