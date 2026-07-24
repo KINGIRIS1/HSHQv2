@@ -171,7 +171,7 @@ const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, e
       if (type.includes('2.1') || type.includes('2.2') || type.includes('trích lục')) {
           return 'Tổ Đăng ký cấp giấy';
       }
-      if (type.includes('2.3') || type.includes('2.4') || type.includes('2.5') || type.includes('trích đo') || type.includes('đo đạc')) {
+      if (type.includes('2.3') || type.includes('2.4') || type.includes('2.5') || type.includes('2.6') || type.includes('số thửa') || type.includes('trích đo') || type.includes('đo đạc')) {
           return 'Tổ Đo đạc';
       }
 

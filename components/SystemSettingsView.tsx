@@ -1,12 +1,14 @@
 
 import React, { useState, useEffect } from 'react';
-import { Database, AlertTriangle, Cloud, Loader2, CheckCircle, Save, Globe, Calendar, Plus, Trash2, ShieldAlert, Key, FileSignature, FolderArchive, Upload, Download, RefreshCw, FolderOpen, LayoutDashboard, SlidersHorizontal, Eye, EyeOff, ArrowLeft, ArrowRight, ChevronUp, ChevronDown } from 'lucide-react';
+import { Database, AlertTriangle, Cloud, Loader2, CheckCircle, Save, Globe, Calendar, Plus, Trash2, ShieldAlert, Key, FileSignature, FolderArchive, Upload, Download, RefreshCw, FolderOpen, LayoutDashboard, SlidersHorizontal, Eye, EyeOff, ArrowLeft, ArrowRight, ChevronUp, ChevronDown, Search } from 'lucide-react';
 import { Holiday, UserRole, RolePermissions, DepartmentPermissions, DEFAULT_ROLE_PERMISSIONS, AVAILABLE_PERMISSIONS, Employee } from '../types';
 import { fetchHolidays, saveHolidays, testDatabaseConnection, saveUpdateInfo, fetchUpdateInfo, getSystemSetting, saveSystemSetting } from '../services/api';
 import { APP_VERSION } from '../constants';
-import { confirmAction } from '../utils/appHelpers';
+import { confirmAction, calculateDeadlineHelper } from '../utils/appHelpers';
 import { createFullBackupData, downloadBackupAsFile, saveBackupToServer, restoreFullBackupToSupabase } from '../services/backupService';
 import { isConfigured } from '../services/supabaseClient';
+import { fetchRecords, updateRecordsBatchById } from '../services/apiRecords';
+import { auditRecordsDates, normalizeRecordsDatesApi, AuditReport, DateAuditIssue } from '../services/apiAudit';
 
 const PERMISSION_DEPARTMENTS = [
   { id: 'Tổ Đăng ký cấp giấy', name: 'Tổ Cấp giấy', label: 'Tổ Đăng ký cấp giấy (Tổ Cấp giấy)', desc: 'Bộ phận tiếp nhận đăng ký, xử lý biến động và cấp giấy chứng nhận' },
@@ -26,10 +28,154 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
   onHolidaysChanged,
   employees
 }) => {
-  const [activeTab, setActiveTab] = useState<'general' | 'holidays' | 'permissions' | 'data'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'holidays' | 'permissions' | 'data' | 'audit'>('general');
   const [isDeletingData, setIsDeletingData] = useState(false);
   const [dbTestStatus, setDbTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [dbTestMsg, setDbTestMsg] = useState('');
+  
+  // Audit States
+  const [records, setRecords] = useState<any[]>([]);
+  const [auditReport, setAuditReport] = useState<AuditReport | null>(null);
+  const [isAuditing, setIsAuditing] = useState(false);
+  const [isNormalizing, setIsNormalizing] = useState(false);
+  const [auditSearchQuery, setAuditSearchQuery] = useState('');
+  const [selectedIssueTypeFilter, setSelectedIssueTypeFilter] = useState<string>('all');
+  
+  // Trạng thái lưu trữ các giá trị đang chỉnh sửa tạm thời trong danh sách sửa nhanh
+  const [editingDates, setEditingDates] = useState<Record<string, { receivedDate: string, deadline: string }>>({});
+  // Trạng thái đang lưu cho từng hồ sơ cụ thể
+  const [savingRecordId, setSavingRecordId] = useState<string | null>(null);
+  // Trạng thái xử lý hàng loạt
+  const [isBatchFixing, setIsBatchFixing] = useState(false);
+
+  const loadAndAuditData = async () => {
+      try {
+          setIsAuditing(true);
+          const data = await fetchRecords();
+          setRecords(data);
+          
+          let activeHolidays = holidays;
+          if (!activeHolidays || activeHolidays.length === 0) {
+              const hData = await fetchHolidays();
+              setHolidays(hData);
+              activeHolidays = hData;
+          }
+          
+          const report = auditRecordsDates(data, activeHolidays);
+          setAuditReport(report);
+          
+          // Khởi tạo/cập nhật editingDates cho các hồ sơ có vấn đề
+          const initialEditing: Record<string, { receivedDate: string, deadline: string }> = {};
+          report.issues.forEach(issue => {
+              if (issue.record && !initialEditing[issue.recordId]) {
+                  initialEditing[issue.recordId] = {
+                      receivedDate: issue.record.receivedDate || '',
+                      deadline: issue.record.deadline || ''
+                  };
+              }
+          });
+          setEditingDates(prev => ({ ...initialEditing, ...prev }));
+      } catch (err) {
+          console.error("Error running audit:", err);
+      } finally {
+          setIsAuditing(false);
+      }
+  };
+
+  const handleSaveSingleRecordDates = async (recordId: string) => {
+      const editVal = editingDates[recordId];
+      if (!editVal) return;
+      
+      try {
+          setSavingRecordId(recordId);
+          const res = await updateRecordsBatchById([{
+              id: recordId,
+              receivedDate: editVal.receivedDate || null,
+              deadline: editVal.deadline || null
+          }]);
+          
+          if (res.success) {
+              await loadAndAuditData();
+          } else {
+              alert("Không thể cập nhật ngày tháng cho hồ sơ này.");
+          }
+      } catch (error: any) {
+          alert("Lỗi: " + error.message);
+      } finally {
+          setSavingRecordId(null);
+      }
+  };
+
+  const handleBatchFixMismatchedDeadlines = async () => {
+      if (!auditReport || auditReport.issues.length === 0) return;
+      
+      const mismatchIssues = auditReport.issues.filter(i => 
+          (i.issueType === 'mismatched_deadline' || (i.issueType === 'missing' && i.field === 'deadline')) && 
+          i.record && i.record.receivedDate
+      );
+      
+      if (mismatchIssues.length === 0) {
+          alert("Không tìm thấy hồ sơ nào có hạn giải quyết lệch chuẩn hoặc thiếu hạn giải quyết để tự động sửa.");
+          return;
+      }
+      
+      const confirmRun = await confirmAction(
+          `Hệ thống phát hiện ${mismatchIssues.length} hồ sơ có hạn giải quyết chưa chuẩn xác hoặc đang bị thiếu.\n\nBạn có muốn tự động tính toán lại hạn giải quyết chuẩn và cập nhật hàng loạt cho tất cả ${mismatchIssues.length} hồ sơ này không?`
+      );
+      if (!confirmRun) return;
+      
+      try {
+          setIsBatchFixing(true);
+          const updates = mismatchIssues.map(issue => {
+              const rec = issue.record!;
+              const suggested = calculateDeadlineHelper(rec.recordType || '', rec.receivedDate || '', holidays);
+              return {
+                  id: rec.id,
+                  deadline: suggested
+              };
+          });
+          
+          const res = await updateRecordsBatchById(updates);
+          if (res.success) {
+              alert(`Tự động sửa hàng loạt thành công!\nĐã cập nhật hạn giải quyết chuẩn cho ${res.count} hồ sơ.`);
+              await loadAndAuditData();
+          } else {
+              alert("Có lỗi xảy ra trong quá trình cập nhật hàng loạt.");
+          }
+      } catch (error: any) {
+          alert("Lỗi: " + error.message);
+      } finally {
+          setIsBatchFixing(false);
+      }
+  };
+
+  const handleRunNormalization = async () => {
+      const confirmRun = await confirmAction(
+          "Bạn có chắc chắn muốn chuẩn hóa tất cả các trường ngày tháng (Ngày nhận và Hạn giải quyết) hiện có về định dạng chuẩn ISO YYYY-MM-DD không?\n\nHệ thống sẽ loại bỏ mọi thông tin giờ/phút/giây thừa và đưa dữ liệu về dạng chuẩn duy nhất."
+      );
+      if (!confirmRun) return;
+
+      try {
+          setIsNormalizing(true);
+          const result = await normalizeRecordsDatesApi(records);
+          if (result.success) {
+              alert(`Chuẩn hóa dữ liệu ngày tháng thành công!\nĐã cập nhật ${result.count} hồ sơ.`);
+              await loadAndAuditData();
+          } else {
+              alert("Gặp lỗi trong quá trình chuẩn hóa dữ liệu ngày tháng.");
+          }
+      } catch (err: any) {
+          alert("Lỗi: " + err.message);
+      } finally {
+          setIsNormalizing(false);
+      }
+  };
+
+  useEffect(() => {
+      if (activeTab === 'audit') {
+          loadAndAuditData();
+      }
+  }, [activeTab]);
   
   // Update State (Manual Config)
   const [manualVersion, setManualVersion] = useState('');
@@ -456,6 +602,12 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
             >
                 <AlertTriangle size={16} /> Dữ liệu
             </button>
+            <button 
+                onClick={() => setActiveTab('audit')}
+                className={`px-4 py-3 text-xs md:text-sm font-black uppercase tracking-widest flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'audit' ? 'border-teal-600 text-teal-700 bg-white' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
+            >
+                <FileSignature size={16} /> Kiểm tra ngày tháng
+            </button>
         </div>
 
         <div className="p-4 md:p-6 overflow-y-auto flex-1 bg-slate-50/30">
@@ -754,6 +906,464 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                             </div>
                         </div>
                     </div>
+                </div>
+            )}
+
+            {activeTab === 'audit' && (
+                <div className="max-w-6xl mx-auto space-y-6">
+                    {/* Header Action Card */}
+                    <div className="bg-white border border-teal-100 rounded-2xl p-6 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4 animate-fade-in-up">
+                        <div className="space-y-1">
+                            <h3 className="font-black text-teal-800 text-lg flex items-center gap-2 tracking-tight">
+                                <FileSignature size={22} className="text-teal-600" />
+                                Kiểm tra & Chuẩn hóa Dữ liệu Ngày tháng
+                            </h3>
+                            <p className="text-xs text-teal-600 font-medium">
+                                Thực hiện kiểm tra tính toàn vẹn và chạy một lần để chuẩn hóa tất cả các giá trị về định dạng ISO YYYY-MM-DD, loại bỏ giờ/phút/giây thừa.
+                            </p>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                            <button
+                                onClick={loadAndAuditData}
+                                disabled={isAuditing || isNormalizing}
+                                className="px-4 py-2.5 bg-white border border-gray-200 text-gray-700 font-bold text-xs uppercase tracking-wider rounded-xl hover:bg-gray-50 flex items-center justify-center gap-2 shadow-sm transition-all disabled:opacity-50"
+                            >
+                                <RefreshCw size={14} className={isAuditing ? 'animate-spin' : ''} />
+                                {isAuditing ? 'Đang kiểm tra...' : 'Chạy lại kiểm tra'}
+                            </button>
+                            <button
+                                onClick={handleRunNormalization}
+                                disabled={isAuditing || isNormalizing || !auditReport || auditReport.issues.filter((i: any) => i.issueType === 'has_time' || i.issueType === 'invalid_format').length === 0}
+                                className="px-5 py-2.5 bg-teal-600 text-white font-black text-xs uppercase tracking-widest rounded-xl hover:bg-teal-700 flex items-center justify-center gap-2 shadow-md shadow-teal-100 transition-all disabled:opacity-40 disabled:cursor-not-allowed active:scale-95"
+                                title="Chạy hàm chuẩn hóa một lần trên toàn bộ các giá trị ngày tháng có giờ/phút/giây thừa hoặc sai định dạng."
+                            >
+                                {isNormalizing ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                                {isNormalizing ? 'Đang chuẩn hóa...' : 'Chạy chuẩn hóa ngay'}
+                            </button>
+                        </div>
+                    </div>
+
+                    {isAuditing && !auditReport ? (
+                        <div className="bg-white border border-gray-100 rounded-2xl p-12 flex flex-col items-center justify-center text-center shadow-sm">
+                            <Loader2 className="animate-spin text-teal-600 mb-4" size={40} />
+                            <h4 className="font-bold text-gray-700 text-sm">Đang tải và kiểm tra toàn bộ cơ sở dữ liệu...</h4>
+                            <p className="text-xs text-gray-400 mt-1">Hệ thống đang quét các trường receivedDate và deadline của các hồ sơ.</p>
+                        </div>
+                    ) : auditReport ? (
+                        <>
+                            {/* Dashboard Stats */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                {/* Scanned */}
+                                <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+                                    <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Tổng hồ sơ quét</div>
+                                    <div className="text-3xl font-black text-slate-800 tracking-tight">{auditReport.totalRecords}</div>
+                                    <div className="text-[11px] text-gray-400 mt-2 font-medium">Toàn bộ hồ sơ trong hệ thống</div>
+                                </div>
+                                {/* Issues */}
+                                <div className={`bg-white border rounded-2xl p-5 shadow-sm ${auditReport.issueRecordsCount > 0 ? 'border-red-100' : 'border-green-100'}`}>
+                                    <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Hồ sơ có vấn đề</div>
+                                    <div className={`text-3xl font-black tracking-tight ${auditReport.issueRecordsCount > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                        {auditReport.issueRecordsCount}
+                                    </div>
+                                    <div className="text-[11px] text-gray-400 mt-2 font-medium">Cần chuẩn hóa hoặc chỉnh sửa thủ công</div>
+                                </div>
+                                {/* Cleanliness Rate */}
+                                <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+                                    <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Tỷ lệ dữ liệu sạch</div>
+                                    <div className="text-3xl font-black text-teal-600 tracking-tight">
+                                        {auditReport.totalRecords > 0 
+                                            ? `${((auditReport.cleanRecordsCount / auditReport.totalRecords) * 100).toFixed(1)}%`
+                                            : '100%'}
+                                    </div>
+                                    <div className="w-full bg-gray-100 h-1.5 rounded-full mt-3 overflow-hidden">
+                                        <div 
+                                            className="bg-teal-500 h-full rounded-full transition-all duration-500" 
+                                            style={{ width: `${auditReport.totalRecords > 0 ? (auditReport.cleanRecordsCount / auditReport.totalRecords) * 100 : 100}%` }}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Detailed Statistics Grid */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {/* Received Date Metrics */}
+                                <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm space-y-4">
+                                    <h4 className="font-black text-slate-700 text-sm border-b border-gray-100 pb-3 flex items-center justify-between">
+                                        <span>Ngày tiếp nhận (receivedDate)</span>
+                                        <span className="px-2 py-0.5 text-[10px] font-bold bg-slate-100 text-slate-600 rounded">Thống kê</span>
+                                    </h4>
+                                    <div className="space-y-3">
+                                        <div className="flex justify-between items-center text-xs">
+                                            <span className="text-gray-500 font-medium">Bị thiếu hoặc rỗng:</span>
+                                            <span className={`font-black ${auditReport.receivedDateMissing > 0 ? 'text-amber-600' : 'text-slate-700'}`}>
+                                                {auditReport.receivedDateMissing} hồ sơ
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between items-center text-xs">
+                                            <span className="text-gray-500 font-medium">Có chứa giờ/phút/giây thừa (Cần dọn dẹp):</span>
+                                            <span className={`font-black ${auditReport.receivedDateHasTime > 0 ? 'text-indigo-600' : 'text-slate-700'}`}>
+                                                {auditReport.receivedDateHasTime} hồ sơ
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between items-center text-xs">
+                                            <span className="text-gray-500 font-medium">Sai định dạng hoặc lỗi phân tích:</span>
+                                            <span className={`font-black ${auditReport.receivedDateInvalid > 0 ? 'text-red-600' : 'text-slate-700'}`}>
+                                                {auditReport.receivedDateInvalid} hồ sơ
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Deadline Metrics */}
+                                <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm space-y-4">
+                                    <h4 className="font-black text-slate-700 text-sm border-b border-gray-100 pb-3 flex items-center justify-between">
+                                        <span>Hạn giải quyết (deadline)</span>
+                                        <span className="px-2 py-0.5 text-[10px] font-bold bg-slate-100 text-slate-600 rounded">Thống kê</span>
+                                    </h4>
+                                    <div className="space-y-3">
+                                        <div className="flex justify-between items-center text-xs">
+                                            <span className="text-gray-500 font-medium">Bị thiếu hoặc rỗng:</span>
+                                            <span className="font-black text-slate-700">
+                                                {auditReport.deadlineMissing} hồ sơ
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between items-center text-xs">
+                                            <span className="text-gray-500 font-medium">Có chứa giờ/phút/giây thừa (Cần dọn dẹp):</span>
+                                            <span className={`font-black ${auditReport.deadlineHasTime > 0 ? 'text-indigo-600' : 'text-slate-700'}`}>
+                                                {auditReport.deadlineHasTime} hồ sơ
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between items-center text-xs">
+                                            <span className="text-gray-500 font-medium">Sai định dạng hoặc lỗi phân tích:</span>
+                                            <span className={`font-black ${auditReport.deadlineInvalid > 0 ? 'text-red-600' : 'text-slate-700'}`}>
+                                                {auditReport.deadlineInvalid} hồ sơ
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between items-center text-xs border-t border-dashed border-gray-100 pt-2">
+                                            <span className="text-gray-500 font-medium flex items-center gap-1">
+                                                <AlertTriangle size={12} className="text-amber-500" />
+                                                Hạn giải quyết trước ngày nhận:
+                                            </span>
+                                            <span className={`font-black ${auditReport.logicalErrors > 0 ? 'text-red-600' : 'text-slate-700'}`}>
+                                                {auditReport.logicalErrors} lỗi logic
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between items-center text-xs border-t border-dashed border-gray-100 pt-2">
+                                            <span className="text-gray-500 font-medium flex items-center gap-1">
+                                                <Calendar size={12} className="text-teal-500" />
+                                                Hạn lệch so với quy quy chuẩn (thủ tục):
+                                            </span>
+                                            <span className={`font-black ${auditReport.mismatchedDeadlines > 0 ? 'text-amber-600' : 'text-slate-700'}`}>
+                                                {auditReport.mismatchedDeadlines} hồ sơ
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Chức năng Phân tích & Sửa nhanh ngày trả lệch chuẩn */}
+                            <div className="bg-white border border-teal-100 rounded-2xl p-6 shadow-sm space-y-4">
+                                <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 border-b border-gray-100 pb-4">
+                                    <div>
+                                        <h4 className="font-black text-slate-800 text-base flex items-center gap-2">
+                                            <SlidersHorizontal size={18} className="text-teal-600" />
+                                            Công cụ Phân tích & Sửa nhanh Ngày tháng / Hạn giải quyết
+                                        </h4>
+                                        <p className="text-xs text-gray-500 mt-1">
+                                            Phân tích hồ sơ sai lệch so với thời gian xử lý quy định của từng thủ tục và hỗ trợ sửa nhanh hoặc áp dụng tự động hàng loạt.
+                                        </p>
+                                    </div>
+                                    <button
+                                        onClick={handleBatchFixMismatchedDeadlines}
+                                        disabled={isBatchFixing}
+                                        className="px-4 py-2 bg-teal-600 hover:bg-teal-700 disabled:bg-teal-300 text-white font-bold rounded-xl text-xs uppercase tracking-wider flex items-center gap-2 transition-colors shrink-0"
+                                    >
+                                        {isBatchFixing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                                        Tự động sửa toàn bộ ngày hẹn lệch chuẩn
+                                    </button>
+                                </div>
+
+                                {/* Danh sách hồ sơ lệch chuẩn để sửa nhanh */}
+                                <div className="space-y-4 max-h-[450px] overflow-y-auto pr-2">
+                                    {auditReport.issues.filter(i => 
+                                        i.issueType === 'mismatched_deadline' || 
+                                        (i.issueType === 'missing' && i.field === 'deadline') ||
+                                        i.issueType === 'logical_error'
+                                    ).length === 0 ? (
+                                        <div className="text-center py-8 text-gray-400 italic text-xs font-semibold">
+                                            🎉 Tuyệt vời! Không phát hiện hồ sơ nào bị lệch hạn giải quyết hoặc sai logic thời gian.
+                                        </div>
+                                    ) : (
+                                        auditReport.issues
+                                            .filter(i => 
+                                                i.issueType === 'mismatched_deadline' || 
+                                                (i.issueType === 'missing' && i.field === 'deadline') ||
+                                                i.issueType === 'logical_error'
+                                            )
+                                            .map((issue, idx) => {
+                                                const rec = issue.record;
+                                                if (!rec) return null;
+                                                
+                                                const currentEdit = editingDates[issue.recordId] || {
+                                                    receivedDate: rec.receivedDate || '',
+                                                    deadline: rec.deadline || ''
+                                                };
+                                                
+                                                const suggested = calculateDeadlineHelper(rec.recordType || '', currentEdit.receivedDate, holidays);
+                                                const isMismatch = currentEdit.deadline !== suggested;
+
+                                                return (
+                                                    <div 
+                                                        key={`quick-fix-${issue.recordId}-${idx}`} 
+                                                        className="border border-slate-100 bg-slate-50/40 rounded-xl p-4 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 hover:border-teal-200 transition-colors"
+                                                    >
+                                                         {/* Thông tin hồ sơ */}
+                                                         <div className="space-y-1.5 flex-1 min-w-0">
+                                                             <div className="flex flex-wrap items-center gap-2">
+                                                                 <span className="font-mono font-black text-slate-800 text-[11px] bg-slate-100 px-2 py-0.5 rounded">
+                                                                     {rec.code || 'KHÔNG MÃ'}
+                                                                 </span>
+                                                                 <span className="font-bold text-slate-700 text-xs truncate">
+                                                                     {rec.customerName || 'Chưa rõ tên'}
+                                                                 </span>
+                                                                 <span className="text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded font-bold">
+                                                                     {rec.ward || 'Chưa rõ xã'}
+                                                                 </span>
+                                                             </div>
+                                                             <p className="text-[11px] text-gray-500 font-medium">
+                                                                 <span className="font-bold text-teal-700">Thủ tục:</span> {rec.recordType || 'Chưa phân loại'}
+                                                             </p>
+                                                             <p className="text-[11px] text-amber-600 font-bold flex items-center gap-1 leading-relaxed">
+                                                                 <AlertTriangle size={12} className="shrink-0" />
+                                                                 {issue.description}
+                                                             </p>
+                                                         </div>
+
+                                                         {/* Các ô nhập ngày tháng chỉnh sửa nhanh */}
+                                                         <div className="flex flex-wrap items-center gap-3 shrink-0">
+                                                             {/* Ngày nhận */}
+                                                             <div className="flex flex-col gap-1">
+                                                                 <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Ngày nhận</label>
+                                                                 <input 
+                                                                     type="date" 
+                                                                     value={currentEdit.receivedDate}
+                                                                     onChange={(e) => setEditingDates(prev => ({
+                                                                         ...prev,
+                                                                         [issue.recordId]: {
+                                                                             receivedDate: e.target.value,
+                                                                             deadline: prev[issue.recordId]?.deadline || ''
+                                                                         }
+                                                                     }))}
+                                                                     className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-semibold focus:ring-1 focus:ring-teal-500 outline-none bg-white"
+                                                                 />
+                                                             </div>
+
+                                                             {/* Hạn giải quyết */}
+                                                             <div className="flex flex-col gap-1">
+                                                                 <div className="flex justify-between items-center">
+                                                                     <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Hạn giải quyết</label>
+                                                                     {suggested && isMismatch && (
+                                                                         <button 
+                                                                             onClick={() => setEditingDates(prev => ({
+                                                                                 ...prev,
+                                                                                 [issue.recordId]: {
+                                                                                     receivedDate: prev[issue.recordId]?.receivedDate || '',
+                                                                                     deadline: suggested
+                                                                                 }
+                                                                             }))}
+                                                                             className="text-[10px] text-teal-600 hover:text-teal-800 font-extrabold flex items-center gap-0.5 ml-2 hover:underline"
+                                                                             title="Áp dụng hạn đề xuất theo quy định"
+                                                                         >
+                                                                             Áp dụng đề xuất
+                                                                         </button>
+                                                                     )}
+                                                                 </div>
+                                                                 <div className="relative">
+                                                                     <input 
+                                                                         type="date" 
+                                                                         value={currentEdit.deadline}
+                                                                         onChange={(e) => setEditingDates(prev => ({
+                                                                             ...prev,
+                                                                             [issue.recordId]: {
+                                                                                 receivedDate: prev[issue.recordId]?.receivedDate || '',
+                                                                                 deadline: e.target.value
+                                                                             }
+                                                                         }))}
+                                                                         className={`border rounded-lg px-2 py-1.5 text-xs font-semibold focus:ring-1 focus:ring-teal-500 outline-none bg-white ${
+                                                                             isMismatch ? 'border-amber-300 bg-amber-50/10 text-amber-700' : 'border-gray-200'
+                                                                        }`}
+                                                                     />
+                                                                 </div>
+                                                             </div>
+
+                                                             {/* Hạn đề xuất nhãn */}
+                                                             {suggested && (
+                                                                 <div className="flex flex-col gap-1 justify-center">
+                                                                     <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Đề xuất</span>
+                                                                     <span className="px-2 py-1.5 bg-teal-50 text-teal-700 border border-teal-100 rounded-lg text-xs font-bold font-mono">
+                                                                         {suggested}
+                                                                     </span>
+                                                                 </div>
+                                                             )}
+
+                                                             {/* Hành động Cập nhật */}
+                                                             <div className="flex items-end h-[46px]">
+                                                                 <button
+                                                                     onClick={() => handleSaveSingleRecordDates(issue.recordId)}
+                                                                     disabled={savingRecordId === issue.recordId}
+                                                                     className="px-3 py-1.5 bg-slate-800 hover:bg-slate-900 disabled:bg-slate-400 text-white rounded-lg text-xs font-bold transition-colors flex items-center gap-1 h-[32px] self-end"
+                                                                 >
+                                                                     {savingRecordId === issue.recordId ? (
+                                                                         <Loader2 size={12} className="animate-spin" />
+                                                                     ) : (
+                                                                         <Save size={12} />
+                                                                     )}
+                                                                     Lưu
+                                                                 </button>
+                                                             </div>
+                                                         </div>
+                                                     </div>
+                                                 );
+                                             })
+                                     )}
+                                 </div>
+                             </div>
+
+                             {/* Detailed Issues Table Card */}
+                            <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
+                                <div className="p-5 border-b border-gray-100 bg-gray-50/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                                    <div>
+                                        <h4 className="font-black text-slate-800 text-sm">Danh sách các phát hiện bất thường</h4>
+                                        <p className="text-xs text-gray-400 mt-1">Hiển thị {
+                                            auditReport.issues.filter((issue: DateAuditIssue) => {
+                                                if (selectedIssueTypeFilter !== 'all' && issue.issueType !== selectedIssueTypeFilter) return false;
+                                                if (auditSearchQuery.trim() !== '') {
+                                                    const q = auditSearchQuery.toLowerCase();
+                                                    return (
+                                                        issue.recordCode.toLowerCase().includes(q) ||
+                                                        issue.customerName.toLowerCase().includes(q) ||
+                                                        issue.description.toLowerCase().includes(q)
+                                                    );
+                                                }
+                                                return true;
+                                            }).length
+                                        } kết quả phù hợp với bộ lọc hiện tại.</p>
+                                    </div>
+                                    
+                                    {/* Filters Row */}
+                                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
+                                        {/* Search Box */}
+                                        <div className="relative w-full sm:w-64">
+                                            <Search size={14} className="absolute left-3 top-3 text-gray-400" />
+                                            <input 
+                                                type="text" 
+                                                className="w-full border border-gray-200 rounded-xl pl-9 pr-4 py-2 text-xs focus:ring-2 focus:ring-teal-500 outline-none transition-all"
+                                                placeholder="Tìm mã hồ sơ, tên chủ..."
+                                                value={auditSearchQuery}
+                                                onChange={e => setAuditSearchQuery(e.target.value)}
+                                            />
+                                        </div>
+                                        {/* Issue Type Select */}
+                                        <select
+                                            className="border border-gray-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-teal-500 outline-none bg-white font-bold text-gray-600"
+                                            value={selectedIssueTypeFilter}
+                                            onChange={e => setSelectedIssueTypeFilter(e.target.value)}
+                                        >
+                                            <option value="all">Tất cả loại vấn đề</option>
+                                            <option value="missing">Thiếu thông tin</option>
+                                            <option value="has_time">Chứa giờ/phút/giây</option>
+                                            <option value="invalid_format">Định dạng không hợp lệ</option>
+                                            <option value="logical_error">Lỗi logic (Hạn trước nhận)</option>
+                                            <option value="mismatched_deadline">Hạn giải quyết lệch chuẩn</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left text-xs divide-y divide-gray-100">
+                                        <thead className="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
+                                            <tr>
+                                                <th className="p-4">Mã hồ sơ</th>
+                                                <th className="p-4">Tên khách hàng</th>
+                                                <th className="p-4 text-center">Trường lỗi</th>
+                                                <th className="p-4">Giá trị thô</th>
+                                                <th className="p-4 text-center">Phân loại</th>
+                                                <th className="p-4">Mô tả chi tiết</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-50">
+                                            {auditReport.issues
+                                                .filter((issue: DateAuditIssue) => {
+                                                    if (selectedIssueTypeFilter !== 'all' && issue.issueType !== selectedIssueTypeFilter) return false;
+                                                    if (auditSearchQuery.trim() !== '') {
+                                                        const q = auditSearchQuery.toLowerCase();
+                                                        return (
+                                                            issue.recordCode.toLowerCase().includes(q) ||
+                                                            issue.customerName.toLowerCase().includes(q) ||
+                                                            issue.description.toLowerCase().includes(q)
+                                                        );
+                                                    }
+                                                    return true;
+                                                })
+                                                .map((issue: DateAuditIssue, idx: number) => (
+                                                    <tr key={`${issue.recordId}-${idx}`} className="hover:bg-slate-50/50 transition-colors">
+                                                        <td className="p-4 font-mono font-bold text-slate-800">{issue.recordCode}</td>
+                                                        <td className="p-4 font-semibold text-slate-700">{issue.customerName}</td>
+                                                        <td className="p-4 text-center">
+                                                            <span className="px-2 py-1 rounded bg-slate-100 text-slate-600 font-mono text-[10px]">
+                                                                {issue.field}
+                                                            </span>
+                                                        </td>
+                                                        <td className="p-4 text-slate-500 font-mono">{issue.originalValue || <span className="italic text-gray-300">Rỗng (null)</span>}</td>
+                                                        <td className="p-4 text-center">
+                                                            <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${
+                                                                issue.issueType === 'missing' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                                                                issue.issueType === 'has_time' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' :
+                                                                issue.issueType === 'invalid_format' ? 'bg-red-50 text-red-700 border-red-200' :
+                                                                issue.issueType === 'logical_error' ? 'bg-rose-50 text-rose-700 border-rose-200' :
+                                                                'bg-amber-100 text-amber-800 border-amber-300'
+                                                            }`}>
+                                                                {issue.issueType === 'missing' ? 'Thiếu dữ liệu' :
+                                                                 issue.issueType === 'has_time' ? 'Chứa giờ' :
+                                                                 issue.issueType === 'invalid_format' ? 'Sai định dạng' :
+                                                                 issue.issueType === 'logical_error' ? 'Lỗi logic' :
+                                                                 'Lệnh hạn chuẩn'}
+                                                            </span>
+                                                        </td>
+                                                        <td className="p-4 text-slate-600 font-medium">{issue.description}</td>
+                                                    </tr>
+                                                ))}
+                                            {auditReport.issues.filter((issue: DateAuditIssue) => {
+                                                if (selectedIssueTypeFilter !== 'all' && issue.issueType !== selectedIssueTypeFilter) return false;
+                                                if (auditSearchQuery.trim() !== '') {
+                                                    const q = auditSearchQuery.toLowerCase();
+                                                    return (
+                                                        issue.recordCode.toLowerCase().includes(q) ||
+                                                        issue.customerName.toLowerCase().includes(q) ||
+                                                        issue.description.toLowerCase().includes(q)
+                                                    );
+                                                }
+                                                return true;
+                                            }).length === 0 && (
+                                                <tr>
+                                                    <td colSpan={6} className="p-8 text-center text-gray-400 italic font-semibold">
+                                                        Không tìm thấy bất kỳ hồ sơ lỗi nào trùng khớp với bộ lọc.
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </>
+                    ) : (
+                        <div className="bg-white border border-gray-100 rounded-2xl p-8 text-center shadow-sm">
+                            <p className="text-sm font-semibold text-gray-400">Không có báo cáo kiểm tra được tải.</p>
+                            <button onClick={loadAndAuditData} className="mt-3 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-colors">
+                                Quét toàn bộ hệ thống
+                            </button>
+                        </div>
+                    )}
                 </div>
             )}
         </div>
