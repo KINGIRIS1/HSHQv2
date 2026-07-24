@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { RecordFile, RecordStatus, User, UserRole } from '../types';
-import { updateRecordApi } from '../services/api';
+import { updateRecordFieldsApi } from '../services/api';
 
 const REMINDER_INTERVAL = 60000; // Kiểm tra mỗi 1 phút
 const REPEAT_HOURS = 2; // Nhắc lại mỗi 2 giờ
@@ -22,7 +22,7 @@ const triggerSystemNotification = (title: string, body: string) => {
 
 export const useReminderSystem = (
     records: RecordFile[], 
-    onUpdateRecord: (r: RecordFile) => void,
+    onUpdateRecord: (id: string, fields: Partial<RecordFile>) => void,
     currentUser: User | null
 ) => {
     const [activeRemindersCount, setActiveRemindersCount] = useState(0);
@@ -165,15 +165,15 @@ export const useReminderSystem = (
                             );
 
                             // Cập nhật lastRemindedAt để không spam
-                            const updatedRecord = { ...r, lastRemindedAt: new Date().toISOString() };
+                            const nextLastRemindedAt = new Date().toISOString();
                             // Gọi update local trước thông qua ref để luôn lấy hàm mới nhất
-                            onUpdateRef.current(updatedRecord);
+                            onUpdateRef.current(r.id, { lastRemindedAt: nextLastRemindedAt });
                             // Cập nhật recordsRef ngay để tránh vòng lặp
-                            recordsRef.current = recordsRef.current.map(rec => rec.id === updatedRecord.id ? updatedRecord : rec);
+                            recordsRef.current = recordsRef.current.map(rec => rec.id === r.id ? { ...rec, lastRemindedAt: nextLastRemindedAt } : rec);
                             
                             // Gọi API update DB
                             try {
-                                await updateRecordApi(updatedRecord);
+                                await updateRecordFieldsApi(r.id, { lastRemindedAt: nextLastRemindedAt });
                             } catch (err) {
                                 console.error('Failed to update reminder state', err);
                             }
@@ -216,12 +216,11 @@ export const useReminderSystem = (
                                 */
 
                                 // Đánh dấu đã nhắc nhở quá hạn (nhắc duy nhất 1 lần)
-                                const updatedRecord = { ...r, deadlineReminded: true };
-                                onUpdateRef.current(updatedRecord);
-                                recordsRef.current = recordsRef.current.map(rec => rec.id === updatedRecord.id ? updatedRecord : rec);
+                                onUpdateRef.current(r.id, { deadlineReminded: true });
+                                recordsRef.current = recordsRef.current.map(rec => rec.id === r.id ? { ...rec, deadlineReminded: true } : rec);
 
                                 try {
-                                    await updateRecordApi(updatedRecord);
+                                    await updateRecordFieldsApi(r.id, { deadlineReminded: true });
                                 } catch (err) {
                                     console.error('Failed to update deadline reminder state', err);
                                 }

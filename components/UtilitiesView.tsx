@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { FolderCog, ExternalLink, Loader2, Download, CheckCircle, AlertCircle, X, Calculator, FileText, Gavel, Info, Table2, Grid, FileSpreadsheet, RefreshCw, BookOpen } from 'lucide-react';
+import { FolderCog, ExternalLink, Loader2, Download, CheckCircle, AlertCircle, X, Calculator, FileText, Gavel, Info, Table2, Grid, FileSpreadsheet, RefreshCw, BookOpen, Calendar } from 'lucide-react';
 import { User as UserType, RecordFile, NotifyFunction, NotifyType } from '../types';
 import SoanBienBanTab from './utilities/SoanBienBanTab';
 import CungCapThongTinTab from './utilities/CungCapThongTinTab';
@@ -9,7 +9,7 @@ import SaiSoTab from './utilities/SaiSoTab';
 import ChinhLyBienDongTab from './utilities/ChinhLyBienDongTab';
 import HoSoTachThuaTab from './utilities/HoSoTachThuaTab';
 import ChuyenDoiToBanDoTab from './utilities/ChuyenDoiToBanDoTab';
-import ChuyenDoiThuTucTab from './utilities/ChuyenDoiThuTucTab';
+import DienNgayThangTab from './utilities/DienNgayThangTab';
 import ExcerptManagement from './ExcerptManagement';
 
 interface UtilitiesViewProps {
@@ -21,6 +21,8 @@ interface UtilitiesViewProps {
     onAddWard?: (ward: string) => void;
     onDeleteWard?: (ward: string) => void;
     onResetWards?: () => void;
+    onSaveRecord?: (record: any) => Promise<any>;
+    holidays?: any[];
 }
 
 const UtilitiesView: React.FC<UtilitiesViewProps> = ({ 
@@ -31,9 +33,11 @@ const UtilitiesView: React.FC<UtilitiesViewProps> = ({
     wards,
     onAddWard,
     onDeleteWard,
-    onResetWards
+    onResetWards,
+    onSaveRecord,
+    holidays
 }) => {
-  const [activeTab, setActiveTab] = useState<'bienban' | 'thongtin' | 'vphc' | 'saiso' | 'chinhly' | 'tachthua' | 'chuyendoi' | 'chuyendoithutuc' | 'sotltd'>('bienban');
+  const [activeTab, setActiveTab] = useState<'bienban' | 'thongtin' | 'vphc' | 'saiso' | 'chinhly' | 'tachthua' | 'chuyendoi' | 'dienngaythang' | 'sotltd'>('bienban');
   const [defaultExportPath, setDefaultExportPath] = useState('');
   
   // State cho thông báo Custom (Toast)
@@ -151,10 +155,10 @@ const UtilitiesView: React.FC<UtilitiesViewProps> = ({
                   <FileSpreadsheet size={16} /> Chuyển đổi tờ bản đồ
               </button>
               <button 
-                  onClick={() => setActiveTab('chuyendoithutuc')}
-                  className={`px-4 py-2 text-sm font-bold rounded-md transition-all whitespace-nowrap flex items-center gap-2 ${activeTab === 'chuyendoithutuc' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                  onClick={() => setActiveTab('dienngaythang')}
+                  className={`px-4 py-2 text-sm font-bold rounded-md transition-all whitespace-nowrap flex items-center gap-2 ${activeTab === 'dienngaythang' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
               >
-                  <RefreshCw size={16} /> Chuyển đổi thủ tục
+                  <Calendar size={16} /> Điền ngày tháng
               </button>
               <button 
                   onClick={() => setActiveTab('sotltd')}
@@ -164,7 +168,7 @@ const UtilitiesView: React.FC<UtilitiesViewProps> = ({
               </button>
           </div>
           
-          {activeTab !== 'saiso' && activeTab !== 'chinhly' && activeTab !== 'tachthua' && activeTab !== 'chuyendoi' && activeTab !== 'chuyendoithutuc' && activeTab !== 'sotltd' && (
+          {activeTab !== 'saiso' && activeTab !== 'chinhly' && activeTab !== 'tachthua' && activeTab !== 'chuyendoi' && activeTab !== 'dienngaythang' && activeTab !== 'sotltd' && (
             <div className="flex-1 flex justify-end items-center gap-3 pr-4">
                 <button 
                     onClick={handleConfigurePath}
@@ -220,9 +224,14 @@ const UtilitiesView: React.FC<UtilitiesViewProps> = ({
               <ChuyenDoiToBanDoTab notify={notify} />
           </div>
 
-          {/* TAB 8: CHUYỂN ĐỔI THỦ TỤC TIẾP NHẬN */}
-          <div className={`w-full h-full flex flex-col bg-[#f1f5f9] ${activeTab === 'chuyendoithutuc' ? 'block' : 'hidden'}`}>
-              <ChuyenDoiThuTucTab notify={notify} />
+          {/* TAB 8: TỰ ĐỘNG ĐIỀN NGÀY TIẾP NHẬN VÀ HẸN TRẢ */}
+          <div className={`w-full h-full flex flex-col bg-[#f1f5f9] ${activeTab === 'dienngaythang' ? 'block' : 'hidden'}`}>
+              <DienNgayThangTab 
+                  records={records || []} 
+                  onSaveRecord={onSaveRecord}
+                  holidays={holidays}
+                  notify={notify} 
+              />
           </div>
 
           {/* TAB 9: SỐ TL/TĐ */}

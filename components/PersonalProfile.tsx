@@ -122,7 +122,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
   const [returnModalConfig, setReturnModalConfig] = useState<{
     isOpen: boolean;
     record: RecordFile | null;
-    type: "return_record" | "send_back";
+    type: "return_record";
   }>({
     isOpen: false,
     record: null,
@@ -578,21 +578,8 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
     });
   };
 
-  const handleOpenSendBackModal = (record: RecordFile) => {
-    const localNow = new Date(Date.now() - new Date().getTimezoneOffset() * 60000)
-      .toISOString()
-      .slice(0, 16);
-    setReturnDateTime(localNow);
-    setReturnReason("");
-    setReturnModalConfig({
-      isOpen: true,
-      record: record,
-      type: "send_back",
-    });
-  };
-
   const handleConfirmReturnModal = async () => {
-    const { record, type } = returnModalConfig;
+    const { record } = returnModalConfig;
     if (!record) return;
     if (!returnReason.trim()) {
       alert("Vui lòng nhập lý do.");
@@ -613,42 +600,15 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
       }
     }
 
-    if (type === "return_record") {
-      // 1. Trả hồ sơ (chỉ ghi chú nội dung, giữ nguyên trạng thái cũ vì hồ sơ phải hoàn thiện quy trình như trình kiểm tra trình ký rồi mới chuyển 1 cửa)
-      const logEntry = `[Trả hồ sơ - ${displayTime}] Lý do: ${returnReason.trim()}`;
-      await handleUpdateRecordAndNotes(
-        record,
-        record.status,
-        logEntry,
-        undefined,
-        "Ghi chú trả hồ sơ"
-      );
-    } else {
-      // 2. Trả về bước trước (cho người duyệt trả về người trình)
-      const logEntry = `[Trả về - ${displayTime}] Lý do: ${returnReason.trim()}`;
-      
-      let targetStatus = RecordStatus.COMPLETED_WORK;
-      let targetArchiveStatus = "executed";
-
-      if (record.status === RecordStatus.PENDING_SIGN) {
-        // Nếu đang ở Chờ ký, trả về Chờ kiểm tra hoặc Đã kiểm tra (hoặc COMPLETED_WORK tùy thiết lập)
-        // Chúng ta sẽ trả về PENDING_CHECK (Chờ kiểm tra) để bộ phận kiểm tra và thực hiện có thể phối hợp sửa chữa
-        targetStatus = RecordStatus.PENDING_CHECK;
-        targetArchiveStatus = "assigned";
-      } else {
-        // Nếu đang ở Chờ kiểm tra, trả về Đã thực hiện (COMPLETED_WORK)
-        targetStatus = RecordStatus.COMPLETED_WORK;
-        targetArchiveStatus = "executed";
-      }
-
-      await handleUpdateRecordAndNotes(
-        record,
-        targetStatus,
-        logEntry,
-        targetArchiveStatus,
-        "Trả về"
-      );
-    }
+    // 1. Trả hồ sơ (chỉ ghi chú nội dung, giữ nguyên trạng thái cũ vì hồ sơ phải hoàn thiện quy trình như trình kiểm tra trình ký rồi mới chuyển 1 cửa)
+    const logEntry = `[Trả hồ sơ - ${displayTime}] Lý do: ${returnReason.trim()}`;
+    await handleUpdateRecordAndNotes(
+      record,
+      record.status,
+      logEntry,
+      undefined,
+      "Ghi chú trả hồ sơ"
+    );
 
     setReturnModalConfig({ isOpen: false, record: null, type: "return_record" });
   };
@@ -1371,20 +1331,6 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
 
 
 
-                              {/* Nút Trả về trong tab Chờ kiểm tra (Cho kiểm tra viên) */}
-                              {activeTab === "pending_check" &&
-                                (r.status === RecordStatus.PENDING_CHECK ||
-                                  r.status === RecordStatus.CHECKED) &&
-                                isChecker && (
-                                  <button
-                                    onClick={() => handleOpenSendBackModal(r)}
-                                    title="Trả lại hồ sơ cho người làm trước đó"
-                                    className="px-2 py-1.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-md hover:bg-amber-100 hover:text-amber-800 text-xs font-bold flex items-center gap-1 shadow-sm transition-all"
-                                  >
-                                    <Undo size={14} /> Trả về
-                                  </button>
-                                )}
-
                               {activeTab === "pending_check" &&
                                 (r.status === RecordStatus.PENDING_CHECK ||
                                   r.status === RecordStatus.CHECKED) &&
@@ -1395,21 +1341,6 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                                     className="px-3 py-1.5 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-xs font-bold flex items-center gap-2 shadow-sm transition-all"
                                   >
                                     <Send size={14} /> Trình ký
-                                  </button>
-                                )}
-
-
-
-                              {/* Nút Trả về trong tab Chờ ký duyệt (Cho Giám đốc) */}
-                              {activeTab === "pending_sign" &&
-                                r.status === RecordStatus.PENDING_SIGN &&
-                                isDirector && (
-                                  <button
-                                    onClick={() => handleOpenSendBackModal(r)}
-                                    title="Trả lại hồ sơ cho người trình/kiểm tra trước đó"
-                                    className="px-2 py-1.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-md hover:bg-amber-100 hover:text-amber-800 text-xs font-bold flex items-center gap-1 shadow-sm transition-all"
-                                  >
-                                    <Undo size={14} /> Trả về
                                   </button>
                                 )}
                             </div>
@@ -1540,40 +1471,15 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                               </button>
                             ))}
 
-
-
                           {activeTab === "pending_check" &&
                             (r.status === RecordStatus.PENDING_CHECK ||
                               r.status === RecordStatus.CHECKED) &&
                             isChecker && (
-                              <>
-                                <button
-                                  onClick={() => handleOpenSendBackModal(r)}
-                                  className="p-1.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-lg text-xs"
-                                  title="Trả về"
-                                >
-                                  <Undo size={14} />
-                                </button>
-                                <button
-                                  onClick={() => handleForwardToSign(r)}
-                                  className="px-2.5 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold flex items-center gap-1"
-                                >
-                                  <Send size={12} /> Trình ký
-                                </button>
-                              </>
-                            )}
-
-
-
-                          {activeTab === "pending_sign" &&
-                            r.status === RecordStatus.PENDING_SIGN &&
-                            isDirector && (
                               <button
-                                onClick={() => handleOpenSendBackModal(r)}
-                                className="p-1.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-lg text-xs"
-                                title="Trả về"
+                                onClick={() => handleForwardToSign(r)}
+                                className="px-2.5 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold flex items-center gap-1"
                               >
-                                <Undo size={14} />
+                                <Send size={12} /> Trình ký
                               </button>
                             )}
                         </div>

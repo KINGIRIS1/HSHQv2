@@ -48,33 +48,37 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
 
   useEffect(() => {
       if (initialData) {
-          // Update Form Data
-          setFormData(prev => ({
-              ...initialData,
-              // Logic fallback: Nếu vào chế độ Thanh lý và chưa có dữ liệu thanh lý, lấy dữ liệu hợp đồng
-              liquidationArea: (mode === 'liquidation' && !initialData.liquidationArea) ? initialData.area : initialData.liquidationArea,
-              liquidationAmount: (mode === 'liquidation' && !initialData.liquidationAmount) ? initialData.totalAmount : initialData.liquidationAmount
-          }));
+          // Update Form Data with deep guard
+          setFormData(prev => {
+              const nextState = {
+                  ...initialData,
+                  liquidationArea: (mode === 'liquidation' && !initialData.liquidationArea) ? initialData.area : initialData.liquidationArea,
+                  liquidationAmount: (mode === 'liquidation' && !initialData.liquidationAmount) ? initialData.totalAmount : initialData.liquidationAmount
+              };
+              const hasChanged = Object.keys(nextState).some(key => prev[key as keyof typeof prev] !== nextState[key as keyof typeof nextState]);
+              if (hasChanged) return nextState;
+              return prev;
+          });
           
-          // Update Split Items (Chi tiết tính phí/Tách thửa/Đo đạc nhiều thửa)
+          // Update Split Items (Chi tiết tính phí/Tách thửa/Đo đạc nhiều thửa) with strict reference safety
           if (initialData.splitItems && initialData.splitItems.length > 0) {
               if (initialData.contractType === 'Đo đạc') {
                   setDoDacItems(initialData.splitItems);
-                  setTachThuaItems([]);
+                  setTachThuaItems(prev => prev.length === 0 ? prev : []);
               } else {
                   setTachThuaItems(initialData.splitItems);
-                  setDoDacItems([]);
+                  setDoDacItems(prev => prev.length === 0 ? prev : []);
               }
           } else {
-              setTachThuaItems([]);
-              setDoDacItems([]);
+              setTachThuaItems(prev => prev.length === 0 ? prev : []);
+              setDoDacItems(prev => prev.length === 0 ? prev : []);
           }
 
           // Update Active Tab based on Contract Type
-          if (initialData.contractType === 'Tách thửa') setActiveTab('tt');
-          else if (initialData.contractType === 'Cắm mốc') setActiveTab('cm');
-          else if (initialData.contractType === 'Trích lục') setActiveTab('tl');
-          else setActiveTab('dd');
+          const targetTab = initialData.contractType === 'Tách thửa' ? 'tt' : 
+                            initialData.contractType === 'Cắm mốc' ? 'cm' : 
+                            initialData.contractType === 'Trích lục' ? 'tl' : 'dd';
+          setActiveTab(prev => prev === targetTab ? prev : targetTab);
           
           // Kiểm tra xem hồ sơ này đã có hợp đồng hay chưa
           if (mode === 'contract' && initialData.customerAddress && contracts) {
@@ -84,24 +88,28 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
                   c.id !== initialData.id
               );
               if (duplicateContract) {
-                  setNotification({
-                      type: 'error',
-                      message: `CẢNH BÁO: Hồ sơ ${initialData.customerAddress} đã có hợp đồng trước đó với Số Hợp Đồng: ${duplicateContract.code}! Tránh lập trùng 1 bộ hồ sơ 2 số hợp đồng.`
+                  setNotification(prev => {
+                      const msg = `CẢNH BÁO: Hồ sơ ${initialData.customerAddress} đã có hợp đồng trước đó với Số Hợp Đồng: ${duplicateContract.code}! Tránh lập trùng 1 bộ hồ sơ 2 số hợp đồng.`;
+                      if (prev?.type === 'error' && prev.message === msg) return prev;
+                      return { type: 'error', message: msg };
                   });
               } else {
-                  setNotification(null);
+                  setNotification(prev => prev === null ? null : null);
               }
           } else {
-              setNotification(null);
+              setNotification(prev => prev === null ? null : null);
           }
       } else {
           const fetchCode = async () => {
               const code = await generateCode('Đo đạc');
-              setFormData(prev => ({ ...prev, code }));
+              setFormData(prev => {
+                  if (prev.code === code) return prev;
+                  return { ...prev, code };
+              });
           };
           fetchCode();
-          setTachThuaItems([]);
-          setDoDacItems([]);
+          setTachThuaItems(prev => prev.length === 0 ? prev : []);
+          setDoDacItems(prev => prev.length === 0 ? prev : []);
       }
   }, [initialData, mode, contracts]); 
 
@@ -249,17 +257,32 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
       let calculatedVatAmount = 0;
       const vatRate = 8; // Mặc định
 
+      // Helper function to safely check if object values have actually changed (preventing NaN-induced loops)
+      const applySafeUpdates = (updates: any) => {
+          setFormData(prev => {
+              const hasChanged = Object.keys(updates).some(key => {
+                  const valA = prev[key as keyof typeof prev];
+                  const valB = updates[key];
+                  if (Number.isNaN(valA) && Number.isNaN(valB)) return false;
+                  return valA !== valB;
+              });
+              if (hasChanged) {
+                  return { ...prev, ...updates };
+              }
+              return prev;
+          });
+      };
+
       // 2. Logic Trích Lục
       if (activeTab === 'tl') {
           calculatedUnitPrice = 49225;
-          const qty = formData.quantity || 1;
+          const qty = Number(formData.quantity) || 1;
           const baseAmount = calculatedUnitPrice * qty;
           calculatedVatAmount = Math.round(baseAmount * (vatRate / 100));
+          if (Number.isNaN(calculatedVatAmount)) calculatedVatAmount = 0;
           calculatedTotal = baseAmount + calculatedVatAmount;
+          if (Number.isNaN(calculatedTotal)) calculatedTotal = 0;
           
-          // Logic quan trọng:
-          // Nếu mode = contract -> Cập nhật totalAmount
-          // Nếu mode = liquidation -> Cập nhật liquidationAmount
           const updates: any = {
               serviceType: 'Trích lục bản đồ địa chính',
               unitPrice: calculatedUnitPrice,
@@ -274,13 +297,7 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
               updates.totalAmount = calculatedTotal;
           }
           
-          setFormData(prev => {
-              const hasChanged = Object.keys(updates).some(key => prev[key as keyof typeof prev] !== updates[key]);
-              if (hasChanged) {
-                  return { ...prev, ...updates };
-              }
-              return prev;
-          });
+          applySafeUpdates(updates);
           return;
       }
 
@@ -288,12 +305,15 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
       if (activeTab === 'tt') {
           let totalBase = 0;
           tachThuaItems.forEach(item => {
-              const price = getDynamicPrice(item.serviceName);
-              totalBase += (price * item.quantity);
+              const price = getDynamicPrice(item.serviceName) || 0;
+              const q = Number(item.quantity) || 1;
+              totalBase += (price * q);
           });
           
           calculatedVatAmount = Math.round(totalBase * (vatRate / 100));
+          if (Number.isNaN(calculatedVatAmount)) calculatedVatAmount = 0;
           calculatedTotal = totalBase + calculatedVatAmount;
+          if (Number.isNaN(calculatedTotal)) calculatedTotal = 0;
 
           const updates: any = {
               unitPrice: 0, 
@@ -308,13 +328,7 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
               updates.totalAmount = calculatedTotal;
           }
 
-          setFormData(prev => {
-              const hasChanged = Object.keys(updates).some(key => prev[key as keyof typeof prev] !== updates[key]);
-              if (hasChanged) {
-                  return { ...prev, ...updates };
-              }
-              return prev;
-          });
+          applySafeUpdates(updates);
           return;
       }
 
@@ -322,12 +336,15 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
       if (activeTab === 'dd' && doDacItems.length > 0) {
           let totalBase = 0;
           doDacItems.forEach(item => {
-              const price = getDynamicPrice(item.serviceName);
-              totalBase += (price * (item.quantity || 1));
+              const price = getDynamicPrice(item.serviceName) || 0;
+              const q = Number(item.quantity) || 1;
+              totalBase += (price * q);
           });
           
           calculatedVatAmount = Math.round(totalBase * (vatRate / 100));
+          if (Number.isNaN(calculatedVatAmount)) calculatedVatAmount = 0;
           calculatedTotal = totalBase + calculatedVatAmount;
+          if (Number.isNaN(calculatedTotal)) calculatedTotal = 0;
 
           const updates: any = {
               unitPrice: 0, 
@@ -342,23 +359,17 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
               updates.totalAmount = calculatedTotal;
           }
 
-          setFormData(prev => {
-              const hasChanged = Object.keys(updates).some(key => prev[key as keyof typeof prev] !== updates[key]);
-              if (hasChanged) {
-                  return { ...prev, ...updates };
-              }
-              return prev;
-          });
+          applySafeUpdates(updates);
           return;
       }
 
       if (!formData.serviceType) return;
-      calculatedUnitPrice = getDynamicPrice(formData.serviceType);
+      calculatedUnitPrice = getDynamicPrice(formData.serviceType) || 0;
       
       const matchedItem = priceList.find(p => _nd(p.serviceName) === _nd(formData.serviceType));
       const vatIsPercent = matchedItem ? matchedItem.vatIsPercent : true;
 
-      const qty = activeTab === 'cm' ? (formData.markerCount || 1) : (formData.plotCount || 1);
+      const qty = activeTab === 'cm' ? (Number(formData.markerCount) || 1) : (Number(formData.plotCount) || 1);
       const baseAmount = calculatedUnitPrice * qty;
       
       if (vatIsPercent) {
@@ -366,8 +377,10 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
       } else {
           calculatedVatAmount = vatRate * qty;
       }
+      if (Number.isNaN(calculatedVatAmount)) calculatedVatAmount = 0;
       
       calculatedTotal = baseAmount + calculatedVatAmount;
+      if (Number.isNaN(calculatedTotal)) calculatedTotal = 0;
 
       const updates: any = {
           unitPrice: calculatedUnitPrice, 
@@ -382,13 +395,7 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
           updates.totalAmount = calculatedTotal;
       }
 
-      setFormData(prev => {
-          const hasChanged = Object.keys(updates).some(key => prev[key as keyof typeof prev] !== updates[key]);
-          if (hasChanged) {
-              return { ...prev, ...updates };
-              }
-          return prev;
-      });
+      applySafeUpdates(updates);
       
   }, [formData.area, formData.serviceType, formData.ward, formData.areaType, formData.plotCount, formData.markerCount, formData.quantity, tachThuaItems, doDacItems, activeTab, priceList, mode]);
 

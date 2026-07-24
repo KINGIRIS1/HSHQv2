@@ -246,6 +246,30 @@ export const updateRecordApi = async (record: RecordFile): Promise<RecordFile | 
     }
 };
 
+export const updateRecordFieldsApi = async (id: string, fields: Partial<RecordFile>): Promise<RecordFile | null> => {
+    if (!isConfigured) return null;
+    try {
+        const payload = sanitizeData({ id, ...fields } as any, RECORD_DB_COLUMNS);
+        delete payload.id;
+        const { data, error } = await supabase.from('land_records').update(payload).eq('id', id).select();
+        
+        if (error && (error.code === 'PGRST204' || String(error.code) === '42703' || (error.message && String(error.message).includes('does not exist')))) {
+            console.warn("⚠️ [Fallback] Database is missing columns. Retrying without new columns...");
+            const fallbackPayload = { ...payload };
+            OPTIONAL_NEW_COLUMNS.forEach(col => delete fallbackPayload[col]);
+            const { data: fallbackData, error: fallbackError } = await supabase.from('land_records').update(fallbackPayload).eq('id', id).select();
+            if (fallbackError) throw fallbackError;
+            return mapRecordFromDb({ id, ...fields, ...(fallbackData?.[0] || {}) }) as RecordFile;
+        }
+        
+        if (error) throw error;
+        return mapRecordFromDb(data?.[0]) as RecordFile;
+    } catch (error) {
+        logError("updateRecordFieldsApi", error);
+        return null;
+    }
+};
+
 export const deleteRecordApi = async (id: string): Promise<boolean> => {
     if (!isConfigured) return true;
     try {

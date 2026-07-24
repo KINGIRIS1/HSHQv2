@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, CheckCircle, AlertCircle, FileSignature } from 'lucide-react';
 import { RecordFile, UserRole, User, Employee } from '../../types';
+import { isArchiveRecordType } from '../../constants';
 
 interface SubmitModalProps {
     isOpen: boolean;
@@ -22,14 +23,22 @@ const SubmitModal: React.FC<SubmitModalProps> = ({ isOpen, onClose, records, onC
         if (!emp) return false;
         
         if (isCheckMode) {
-            // Chế độ trình kiểm tra: CHỈ Tổ trưởng, Tổ phó của Tổ đo đạc
+            // Chế độ trình kiểm tra:
+            // - Nếu là hồ sơ lưu trữ: CHỈ Tổ trưởng, Tổ phó của Tổ Thông tin lưu trữ (Lưu trữ)
+            // - Ngược lại (hồ sơ khác): CHỈ Tổ trưởng, Tổ phó của Tổ đo đạc
             const dept = emp.department?.toLowerCase() || '';
             const pos = emp.position?.toLowerCase() || '';
             
-            const isDoDac = dept.includes('đo đạc');
+            const isArchiveType = records.some(r => isArchiveRecordType(r.recordType));
             const isLeader = pos.includes('tổ trưởng') || pos.includes('tổ phó');
             
-            return isDoDac && isLeader;
+            if (isArchiveType) {
+                const isLuuTru = dept.includes('lưu trữ') || dept.includes('thông tin');
+                return isLuuTru && isLeader;
+            } else {
+                const isDoDac = dept.includes('đo đạc');
+                return isDoDac && isLeader;
+            }
         } else {
             // Chế độ trình ký: CHỈ Giám đốc, Phó giám đốc
             const pos = emp.position?.toLowerCase() || '';

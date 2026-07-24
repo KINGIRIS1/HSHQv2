@@ -34,30 +34,7 @@ function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [backupNotification, setBackupNotification] = useState<{ show: boolean, filePath?: string, backupData?: any } | null>(null);
 
-  // Tự động kiểm tra và thực hiện sao lưu hàng tuần cho admin
-  useEffect(() => {
-    if (currentUser && (currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.SUBADMIN)) {
-      const runCheck = async () => {
-        try {
-          const result = await checkAndTriggerWeeklyBackup(currentUser);
-          if (result && result.triggered && result.success && result.backupData) {
-            setBackupNotification({
-              show: true,
-              filePath: result.filePath,
-              backupData: result.backupData
-            });
-          }
-        } catch (error) {
-          console.error("Lỗi khi chạy sao lưu tự động hàng tuần:", error);
-        }
-      };
-      // Đợi 3 giây sau khi tải app để không ảnh hưởng hiệu năng khởi động
-      const timer = setTimeout(() => {
-        runCheck();
-      }, 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [currentUser]);
+  // Tự động kiểm tra và thực hiện sao lưu hàng tuần cho admin đã tắt theo yêu cầu
 
   const [currentView, setCurrentView] = useState('dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -183,13 +160,17 @@ function App() {
   }, [rawRecords]);
 
   // Reminder System
-  const handleUpdateRecordState = useCallback((updatedRecord: RecordFile) => {
-      setRecords(prev => prev.map(r => r.id === updatedRecord.id ? updatedRecord : r));
+  const handleUpdateRecordState = useCallback((id: string, fields: Partial<RecordFile>) => {
+      setRecords(prev => prev.map(r => r.id === id ? { ...r, ...fields } : r));
   }, [setRecords]);
   const { activeRemindersCount } = useReminderSystem(records, handleUpdateRecordState, currentUser);
 
   // Filtering Logic
   const recordFilterProps = useRecordFilter(records, currentUser, currentView, employees);
+
+  const selectedRecordsForBulk = useMemo(() => {
+      return records.filter(r => selectedRecordIds.has(r.id));
+  }, [records, selectedRecordIds]);
 
   // Tự động hủy các lựa chọn (deselect) hoặc bỏ tích (uncheck) các hồ sơ đã chọn khi chuyển tab/view
   useEffect(() => {
@@ -254,12 +235,26 @@ function App() {
       }, 600000);
   };
 
+  const autoSwitchedHandoverRef = useRef(false);
+
+  useEffect(() => {
+      if (currentView !== 'handover_list') {
+          autoSwitchedHandoverRef.current = false;
+      }
+  }, [currentView]);
+
   // --- LOGIC TỰ ĐỘNG CHUYỂN TAB CHO 1 CỬA ---
   useEffect(() => {
-      if (currentView === 'handover_list' && currentUser?.role === UserRole.ONEDOOR && recordFilterProps.handoverTab === 'today') {
+      if (
+          currentView === 'handover_list' && 
+          currentUser?.role === UserRole.ONEDOOR && 
+          recordFilterProps.handoverTab === 'today' &&
+          !autoSwitchedHandoverRef.current
+      ) {
+          autoSwitchedHandoverRef.current = true;
           recordFilterProps.setHandoverTab('history');
       }
-  }, [currentView, currentUser, recordFilterProps.handoverTab]);
+  }, [currentView, currentUser?.role, recordFilterProps.handoverTab]);
 
   // --- HANDLERS (Business Logic) ---
 
@@ -797,7 +792,7 @@ function App() {
             records={records}
             selectedCount={selectedRecordIds.size}
             canPerformAction={canPerformAction}
-            selectedRecordsForBulk={records.filter(r => selectedRecordIds.has(r.id))}
+            selectedRecordsForBulk={selectedRecordsForBulk}
             currentView={currentView}
         />
 
@@ -1000,7 +995,7 @@ function App() {
             records={records}
             selectedCount={selectedRecordIds.size}
             canPerformAction={canPerformAction}
-            selectedRecordsForBulk={records.filter(r => selectedRecordIds.has(r.id))}
+            selectedRecordsForBulk={selectedRecordsForBulk}
             currentView={currentView}
         />
 
