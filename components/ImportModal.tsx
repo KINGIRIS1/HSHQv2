@@ -40,25 +40,56 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
   const parseExcelDate = (input: any): string | undefined => {
       if (input === undefined || input === null || input === '') return undefined;
       
-      const num = parseFloat(input);
-      if (!isNaN(num) && num > 20000) {
+      // If it is already a Date object
+      if (input instanceof Date) {
+          if (!isNaN(input.getTime())) {
+              return formatDateKey(input);
+          }
+          return undefined;
+      }
+
+      // Check for Excel serial number
+      const num = Number(input);
+      if (!isNaN(num) && num > 20000 && typeof input !== 'string') {
           const excelEpoch = new Date(1899, 11, 30);
           const totalMilliseconds = Math.round(num * 86400 * 1000); 
           const date = new Date(excelEpoch.getTime() + totalMilliseconds);
-          return formatDateKey(date);
+          if (!isNaN(date.getTime())) {
+              return formatDateKey(date);
+          }
       }
 
       if (typeof input === 'string') {
           const cleanStr = input.trim();
-          if (cleanStr.match(/^\d{1,2}[\/-]\d{1,2}[\/-]\d{4}$/)) {
-              const parts = cleanStr.split(/[\/-]/);
-              return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+          if (cleanStr === '') return undefined;
+          
+          // Try parse via regex for DD/MM/YYYY
+          const dmyRegex = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/;
+          const match = cleanStr.match(dmyRegex);
+          if (match) {
+              const day = match[1].padStart(2, '0');
+              const month = match[2].padStart(2, '0');
+              const year = match[3];
+              return `${year}-${month}-${day}`;
           }
-          if (cleanStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
-              return cleanStr;
+
+          // Try match YYYY-MM-DD
+          const ymdRegex = /^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/;
+          const matchYmd = cleanStr.match(ymdRegex);
+          if (matchYmd) {
+              const year = matchYmd[1];
+              const month = matchYmd[2].padStart(2, '0');
+              const day = matchYmd[3].padStart(2, '0');
+              return `${year}-${month}-${day}`;
+          }
+
+          // Native Date fallback
+          const date = new Date(cleanStr);
+          if (!isNaN(date.getTime())) {
+              return formatDateKey(date);
           }
       }
-      return '';
+      return undefined;
   };
 
   const calculateDeadline = (type: string, receivedDateStr: string) => {

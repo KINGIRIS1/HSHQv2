@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Contract, PriceItem, SplitItem, RecordFile } from '../../types';
 import { Save, Calculator, Search, Plus, Trash2, Printer, FileCheck, CheckCircle, AlertCircle, X, RotateCcw, MapPin, Ruler, Grid, Banknote, User, FileText, Calendar, Wand2, ChevronDown, ChevronUp, Copy, ExternalLink } from 'lucide-react';
 import { confirmAction } from '../../utils/appHelpers';
@@ -61,12 +61,13 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
           });
           
           // Update Split Items (Chi tiết tính phí/Tách thửa/Đo đạc nhiều thửa) with strict reference safety
-          if (initialData.splitItems && initialData.splitItems.length > 0) {
+          const items = initialData.splitItems;
+          if (items && items.length > 0) {
               if (initialData.contractType === 'Đo đạc') {
-                  setDoDacItems(initialData.splitItems);
+                  setDoDacItems(prev => JSON.stringify(prev) === JSON.stringify(items) ? prev : items);
                   setTachThuaItems(prev => prev.length === 0 ? prev : []);
               } else {
-                  setTachThuaItems(initialData.splitItems);
+                  setTachThuaItems(prev => JSON.stringify(prev) === JSON.stringify(items) ? prev : items);
                   setDoDacItems(prev => prev.length === 0 ? prev : []);
               }
           } else {
@@ -161,25 +162,10 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
       }
   }, [mode]);
 
-  // Helper tìm giá động theo AreaType hiện tại
-  const getDynamicPrice = (serviceName: string) => {
-      const currentAreaType = formData.areaType;
-      const matchedRow = priceList.find(row => 
-          _nd(row.serviceName) === _nd(serviceName) && 
-          (!row.areaType || !currentAreaType || _nd(row.areaType) === _nd(currentAreaType))
-      );
-      
-      if (matchedRow && matchedRow.price > 0) return matchedRow.price;
-      if (_nd(serviceName).includes('trich luc')) return 49225;
-
-      return 0;
-  };
-
-
-
-  // Tự động cập nhật Khu vực theo Xã/Phường
-  useEffect(() => {
-      if (formData.ward) {
+  // Derived AreaType based on ward and manual choice
+  const derivedAreaType = useMemo(() => {
+      let currentAreaType = formData.areaType;
+      if (!currentAreaType && formData.ward) {
           const wardNorm = _nd(formData.ward);
           const isUrban = wardNorm.includes('tan khai') || 
                           wardNorm.includes('minh hung') || 
@@ -190,90 +176,64 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
                           wardNorm.includes('thi tran') || 
                           wardNorm.includes('tt.') ||
                           wardNorm.includes('chon thanh');
-          const newAreaType = isUrban ? 'Đất đô thị' : 'Đất nông thôn';
-          setFormData(prev => {
-              if (prev.areaType !== newAreaType) {
-                  return { ...prev, areaType: newAreaType };
-              }
-              return prev;
-          });
+          return isUrban ? 'Đất đô thị' : 'Đất nông thôn';
       }
-  }, [formData.ward]);
+      return currentAreaType || 'Đất nông thôn';
+  }, [formData.areaType, formData.ward]);
 
-  // Tự động cập nhật Loại dịch vụ (serviceType) theo diện tích thửa đất (formData.area)
-  useEffect(() => {
+  // Helper tìm giá động theo AreaType hiện tại (using useCallback for performance and stability)
+  const getDynamicPrice = useCallback((serviceName: string) => {
+      const currentAreaType = derivedAreaType;
+      const matchedRow = priceList.find(row => 
+          _nd(row.serviceName) === _nd(serviceName) && 
+          (!row.areaType || !currentAreaType || _nd(row.areaType) === _nd(currentAreaType))
+      );
+      
+      if (matchedRow && matchedRow.price > 0) return matchedRow.price;
+      if (_nd(serviceName).includes('trich luc')) return 49225;
+
+      return 0;
+  }, [priceList, derivedAreaType]);
+
+  // Derived ServiceType based on area when activeTab is 'dd'
+  const derivedServiceType = useMemo(() => {
+      if (formData.serviceType) return formData.serviceType;
+
       if (activeTab === 'dd' && formData.area && formData.area > 0) {
           const area = formData.area;
-          const currentAreaType = formData.areaType || '';
-          
-          if (lastAutoUpdatedAreaRef.current !== area || lastAutoUpdatedAreaTypeRef.current !== currentAreaType) {
-              lastAutoUpdatedAreaRef.current = area;
-              lastAutoUpdatedAreaTypeRef.current = currentAreaType;
+          const currentAreaType = derivedAreaType;
 
-              // Lọc danh sách dịch vụ đo đạc phù hợp với diện tích và khu vực
-              const matchedPriceItems = priceList.filter(row => {
-                  const nameLower = _nd(row.serviceName);
-                  const isMatchTab = !nameLower.includes('tach thua') && 
-                                     !nameLower.includes('cam moc') && 
-                                     !nameLower.includes('trich luc');
-                  const isMatchArea = area >= row.minArea && area < row.maxArea;
-                  const isMatchAreaType = !row.areaType || !currentAreaType || _nd(row.areaType) === _nd(currentAreaType);
-                  return isMatchTab && isMatchArea && isMatchAreaType;
-              });
+          // Lọc danh sách dịch vụ đo đạc phù hợp với diện tích và khu vực
+          const matchedPriceItems = priceList.filter(row => {
+              const nameLower = _nd(row.serviceName);
+              const isMatchTab = !nameLower.includes('tach thua') && 
+                                 !nameLower.includes('cam moc') && 
+                                 !nameLower.includes('trich luc');
+              const isMatchArea = area >= row.minArea && area < row.maxArea;
+              const isMatchAreaType = !row.areaType || !currentAreaType || _nd(row.areaType) === _nd(currentAreaType);
+              return isMatchTab && isMatchArea && isMatchAreaType;
+          });
 
-              if (matchedPriceItems.length > 0) {
-                  // Ưu tiên chọn dịch vụ có chứa chữ "chỉnh lý"
-                  const preferredService = matchedPriceItems.find(row => {
-                      const nameNorm = _nd(row.serviceName);
-                      return nameNorm.includes('chinh ly') || nameNorm.includes('chinh ly ban do');
-                  }) || matchedPriceItems[0];
-                  
-                  setFormData(prev => {
-                      if (prev.serviceType === preferredService.serviceName) return prev;
-                      return { ...prev, serviceType: preferredService.serviceName };
-                  });
-              }
+          if (matchedPriceItems.length > 0) {
+              const preferredService = matchedPriceItems.find(row => {
+                  const nameNorm = _nd(row.serviceName);
+                  return nameNorm.includes('chinh ly') || nameNorm.includes('chinh ly ban do');
+              }) || matchedPriceItems[0];
+              
+              return preferredService.serviceName;
           }
       }
-  }, [formData.area, formData.areaType, activeTab, priceList]);
+      return '';
+  }, [formData.serviceType, formData.area, activeTab, priceList, derivedAreaType]);
 
-
-
-  // Price Calculation Logic
-  useEffect(() => {
-      // 1. Tự động xác định Khu vực
-      let currentAreaType = formData.areaType;
-      if (!currentAreaType && formData.ward) {
-          const wardName = (formData.ward || '').toLowerCase();
-          if (wardName.includes('phường') || wardName.includes('tt.') || wardName.includes('thị trấn') || wardName.includes('minh hưng') || wardName.includes('chơn thành')) {
-              currentAreaType = 'Đất đô thị';
-          } else {
-              currentAreaType = 'Đất nông thôn';
-          }
-      }
-
+  // Derived Pricing details computed purely from state without inducing state-change cascades
+  const derivedPricing = useMemo(() => {
       let calculatedTotal = 0;
       let calculatedUnitPrice = 0;
       let calculatedVatAmount = 0;
       const vatRate = 8; // Mặc định
 
-      // Helper function to safely check if object values have actually changed (preventing NaN-induced loops)
-      const applySafeUpdates = (updates: any) => {
-          setFormData(prev => {
-              const hasChanged = Object.keys(updates).some(key => {
-                  const valA = prev[key as keyof typeof prev];
-                  const valB = updates[key];
-                  if (Number.isNaN(valA) && Number.isNaN(valB)) return false;
-                  return valA !== valB;
-              });
-              if (hasChanged) {
-                  return { ...prev, ...updates };
-              }
-              return prev;
-          });
-      };
-
-      // 2. Logic Trích Lục
+      // 1. Logic Trích Lục
       if (activeTab === 'tl') {
           calculatedUnitPrice = 49225;
           const qty = Number(formData.quantity) || 1;
@@ -282,27 +242,9 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
           if (Number.isNaN(calculatedVatAmount)) calculatedVatAmount = 0;
           calculatedTotal = baseAmount + calculatedVatAmount;
           if (Number.isNaN(calculatedTotal)) calculatedTotal = 0;
-          
-          const updates: any = {
-              serviceType: 'Trích lục bản đồ địa chính',
-              unitPrice: calculatedUnitPrice,
-              vatRate: vatRate,
-              vatAmount: calculatedVatAmount,
-              areaType: currentAreaType,
-          };
-
-          if (mode === 'liquidation') {
-              updates.liquidationAmount = calculatedTotal;
-          } else {
-              updates.totalAmount = calculatedTotal;
-          }
-          
-          applySafeUpdates(updates);
-          return;
       }
-
-      // 3. Logic Tách thửa
-      if (activeTab === 'tt') {
+      // 2. Logic Tách thửa
+      else if (activeTab === 'tt') {
           let totalBase = 0;
           tachThuaItems.forEach(item => {
               const price = getDynamicPrice(item.serviceName) || 0;
@@ -314,26 +256,9 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
           if (Number.isNaN(calculatedVatAmount)) calculatedVatAmount = 0;
           calculatedTotal = totalBase + calculatedVatAmount;
           if (Number.isNaN(calculatedTotal)) calculatedTotal = 0;
-
-          const updates: any = {
-              unitPrice: 0, 
-              vatRate, 
-              vatAmount: calculatedVatAmount, 
-              areaType: currentAreaType,
-          };
-
-          if (mode === 'liquidation') {
-              updates.liquidationAmount = calculatedTotal;
-          } else {
-              updates.totalAmount = calculatedTotal;
-          }
-
-          applySafeUpdates(updates);
-          return;
       }
-
-      // 4. Logic Đo đạc & Cắm mốc
-      if (activeTab === 'dd' && doDacItems.length > 0) {
+      // 3. Logic Đo đạc nhiều thửa
+      else if (activeTab === 'dd' && doDacItems.length > 0) {
           let totalBase = 0;
           doDacItems.forEach(item => {
               const price = getDynamicPrice(item.serviceName) || 0;
@@ -345,59 +270,38 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
           if (Number.isNaN(calculatedVatAmount)) calculatedVatAmount = 0;
           calculatedTotal = totalBase + calculatedVatAmount;
           if (Number.isNaN(calculatedTotal)) calculatedTotal = 0;
+      }
+      // 4. Logic Đo đạc một thửa hoặc Cắm mốc
+      else {
+          const serviceToUse = formData.serviceType || derivedServiceType;
+          if (serviceToUse) {
+              calculatedUnitPrice = getDynamicPrice(serviceToUse) || 0;
+              
+              const matchedItem = priceList.find(p => _nd(p.serviceName) === _nd(serviceToUse));
+              const vatIsPercent = matchedItem ? matchedItem.vatIsPercent : true;
 
-          const updates: any = {
-              unitPrice: 0, 
-              vatRate: vatRate, 
-              vatAmount: calculatedVatAmount, 
-              areaType: currentAreaType,
-          };
-
-          if (mode === 'liquidation') {
-              updates.liquidationAmount = calculatedTotal;
-          } else {
-              updates.totalAmount = calculatedTotal;
+              const qty = activeTab === 'cm' ? (Number(formData.markerCount) || 1) : (Number(formData.plotCount) || 1);
+              const baseAmount = calculatedUnitPrice * qty;
+              
+              if (vatIsPercent) {
+                  calculatedVatAmount = Math.round(baseAmount * (vatRate / 100));
+              } else {
+                  calculatedVatAmount = vatRate * qty;
+              }
+              if (Number.isNaN(calculatedVatAmount)) calculatedVatAmount = 0;
+              
+              calculatedTotal = baseAmount + calculatedVatAmount;
+              if (Number.isNaN(calculatedTotal)) calculatedTotal = 0;
           }
-
-          applySafeUpdates(updates);
-          return;
       }
 
-      if (!formData.serviceType) return;
-      calculatedUnitPrice = getDynamicPrice(formData.serviceType) || 0;
-      
-      const matchedItem = priceList.find(p => _nd(p.serviceName) === _nd(formData.serviceType));
-      const vatIsPercent = matchedItem ? matchedItem.vatIsPercent : true;
-
-      const qty = activeTab === 'cm' ? (Number(formData.markerCount) || 1) : (Number(formData.plotCount) || 1);
-      const baseAmount = calculatedUnitPrice * qty;
-      
-      if (vatIsPercent) {
-          calculatedVatAmount = Math.round(baseAmount * (vatRate / 100));
-      } else {
-          calculatedVatAmount = vatRate * qty;
-      }
-      if (Number.isNaN(calculatedVatAmount)) calculatedVatAmount = 0;
-      
-      calculatedTotal = baseAmount + calculatedVatAmount;
-      if (Number.isNaN(calculatedTotal)) calculatedTotal = 0;
-
-      const updates: any = {
-          unitPrice: calculatedUnitPrice, 
-          vatRate: vatRate, 
-          vatAmount: calculatedVatAmount, 
-          areaType: currentAreaType,
+      return {
+          unitPrice: calculatedUnitPrice,
+          vatRate,
+          vatAmount: calculatedVatAmount,
+          totalAmount: calculatedTotal
       };
-
-      if (mode === 'liquidation') {
-          updates.liquidationAmount = calculatedTotal;
-      } else {
-          updates.totalAmount = calculatedTotal;
-      }
-
-      applySafeUpdates(updates);
-      
-  }, [formData.area, formData.serviceType, formData.ward, formData.areaType, formData.plotCount, formData.markerCount, formData.quantity, tachThuaItems, doDacItems, activeTab, priceList, mode]);
+  }, [activeTab, formData.quantity, formData.markerCount, formData.plotCount, formData.serviceType, derivedServiceType, tachThuaItems, doDacItems, getDynamicPrice, priceList]);
 
   const handleSearchRecord = () => {
       const cleanSearch = searchCode.trim().toLowerCase();
@@ -550,7 +454,7 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
               const confirmSave = await confirmAction(
                   `CẢNH BÁO: Hồ sơ ${formData.customerAddress} đã có hợp đồng trước đó với Số Hợp Đồng: ${duplicateContract.code}! Bạn có chắc chắn muốn lập thêm hợp đồng mới cho hồ sơ này không?`,
                   `Cảnh báo trùng Hợp đồng`
-              );
+               );
               if (!confirmSave) {
                   return;
               }
@@ -565,19 +469,22 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
               ? doDacItems.map(item => ({ ...item, price: getDynamicPrice(item.serviceName) }))
               : [];
 
-      // Logic quan trọng:
-      // Nếu mode = liquidation, ta lưu liquidationAmount (giá trị đã tính toán trên form)
-      // Nếu mode = contract, ta lưu totalAmount (giá trị đã tính toán trên form)
-      // Các trường khác giữ nguyên
+      const calculatedServiceType = activeTab === 'tt' 
+          ? 'Đo đạc tách thửa' 
+          : activeTab === 'dd' && doDacItems.length > 0
+              ? 'Đo đạc nhiều thửa'
+              : (formData.serviceType || derivedServiceType);
       
       const contractData = { 
           ...formData, 
+          areaType: derivedAreaType,
           splitItems: finalSplitItems, 
-          serviceType: activeTab === 'tt' 
-              ? 'Đo đạc tách thửa' 
-              : activeTab === 'dd' && doDacItems.length > 0
-                  ? 'Đo đạc nhiều thửa'
-                  : formData.serviceType,
+          serviceType: calculatedServiceType,
+          unitPrice: derivedPricing.unitPrice,
+          vatRate: derivedPricing.vatRate,
+          vatAmount: derivedPricing.vatAmount,
+          totalAmount: derivedPricing.totalAmount,
+          liquidationAmount: mode === 'liquidation' ? derivedPricing.totalAmount : (formData.liquidationAmount || derivedPricing.totalAmount)
       } as Contract;
       
       // Đảm bảo không bị null
@@ -591,18 +498,30 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
           setNotification({ type: 'success', message: `${msg} Mã hợp đồng: ${savedCode}` });
           
           // Cập nhật lại code mới chốt chính thức vào form
-          setFormData(prev => ({ ...prev, code: savedCode }));
+          setFormData(prev => ({ 
+              ...prev, 
+              code: savedCode,
+              areaType: derivedAreaType,
+              serviceType: calculatedServiceType,
+              unitPrice: derivedPricing.unitPrice,
+              vatRate: derivedPricing.vatRate,
+              vatAmount: derivedPricing.vatAmount,
+              totalAmount: derivedPricing.totalAmount,
+              liquidationAmount: mode === 'liquidation' ? derivedPricing.totalAmount : (formData.liquidationAmount || derivedPricing.totalAmount)
+          }));
 
           // Tự động in sau khi lưu thành công với mã hợp đồng chính thức vừa chốt
           const finalDataToPrint = { 
               ...formData, 
               code: savedCode,
+              areaType: derivedAreaType,
               splitItems: finalSplitItems, 
-              serviceType: activeTab === 'tt' 
-                  ? 'Đo đạc tách thửa' 
-                  : activeTab === 'dd' && doDacItems.length > 0
-                      ? 'Đo đạc nhiều thửa'
-                      : formData.serviceType 
+              serviceType: calculatedServiceType,
+              unitPrice: derivedPricing.unitPrice,
+              vatRate: derivedPricing.vatRate,
+              vatAmount: derivedPricing.vatAmount,
+              totalAmount: derivedPricing.totalAmount,
+              liquidationAmount: mode === 'liquidation' ? derivedPricing.totalAmount : (formData.liquidationAmount || derivedPricing.totalAmount)
           };
           onPrint(finalDataToPrint, mode);
 
@@ -642,18 +561,21 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
 
       const currentData = { 
           ...formData, 
+          areaType: derivedAreaType,
           splitItems: finalSplitItems, 
           serviceType: activeTab === 'tt' 
               ? 'Đo đạc tách thửa' 
               : activeTab === 'dd' && doDacItems.length > 0
                   ? 'Đo đạc nhiều thửa'
-                  : formData.serviceType 
+                  : (formData.serviceType || derivedServiceType),
+          unitPrice: derivedPricing.unitPrice,
+          vatRate: derivedPricing.vatRate,
+          vatAmount: derivedPricing.vatAmount,
+          totalAmount: derivedPricing.totalAmount,
+          liquidationAmount: type === 'liquidation' ? derivedPricing.totalAmount : (formData.liquidationAmount || derivedPricing.totalAmount)
       };
-      // Khi in thanh lý, truyền đúng giá trị thanh lý để in ra form
-      if (type === 'liquidation') {
-          // Lưu ý: liquidationAmount đã được tính toán trong useEffect
-      }
-      onPrint(currentData, type);
+      
+      onPrint(currentData as any, type);
   };
 
   const handleChange = (k: keyof Contract, v: any) => setFormData(p => ({ ...p, [k]: v }));
@@ -676,7 +598,9 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
   const isLiquidationMode = mode === 'liquidation';
 
   // Biến hiển thị tổng tiền (Tùy theo mode mà hiển thị totalAmount hay liquidationAmount)
-  const displayTotalAmount = isLiquidationMode ? (formData.liquidationAmount || 0) : (formData.totalAmount || 0);
+  const displayTotalAmount = isLiquidationMode 
+      ? (formData.liquidationAmount || derivedPricing.totalAmount) 
+      : (formData.totalAmount || derivedPricing.totalAmount);
 
   return (
     <form onSubmit={handleSubmit} className="w-full grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fade-in relative pb-10">
@@ -904,7 +828,7 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
                                             type="number" 
                                             readOnly 
                                             className={`${inputClass} border-purple-200 bg-purple-50/50 text-right font-mono text-purple-700 font-bold`} 
-                                            value={formData.unitPrice === undefined || formData.unitPrice === null || isNaN(formData.unitPrice) ? '' : formData.unitPrice} 
+                                            value={formData.unitPrice || derivedPricing.unitPrice || ''} 
                                         />
                                     </div>
                                 </div>
@@ -1162,8 +1086,8 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
 
                         <div className="flex justify-end gap-6 items-center pt-4 border-t border-purple-100 mt-4">
                             <div className="text-center md:text-right min-w-[80px]">
-                                <span className="block text-[11px] font-bold text-purple-800/70 mb-1 uppercase font-sans">Thuế VAT ({formData.vatRate}%)</span>
-                                <span className="font-mono font-bold text-slate-700 text-sm">{(formData.vatAmount ?? 0).toLocaleString('vi-VN')}</span>
+                                <span className="block text-[11px] font-bold text-purple-800/70 mb-1 uppercase font-sans">Thuế VAT ({formData.vatRate || derivedPricing.vatRate || 8}%)</span>
+                                <span className="font-mono font-bold text-slate-700 text-sm">{(formData.vatAmount || derivedPricing.vatAmount || 0).toLocaleString('vi-VN')}</span>
                             </div>
                             <div className="text-center md:text-right">
                                 <span className="block text-[11px] font-bold text-purple-800/70 mb-1 uppercase font-sans">
