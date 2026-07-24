@@ -48,71 +48,66 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
 
   useEffect(() => {
       if (initialData) {
-          // Update Form Data with deep guard
-          setFormData(prev => {
-              const nextState = {
-                  ...initialData,
-                  liquidationArea: (mode === 'liquidation' && !initialData.liquidationArea) ? initialData.area : initialData.liquidationArea,
-                  liquidationAmount: (mode === 'liquidation' && !initialData.liquidationAmount) ? initialData.totalAmount : initialData.liquidationAmount
-              };
-              const hasChanged = Object.keys(nextState).some(key => prev[key as keyof typeof prev] !== nextState[key as keyof typeof nextState]);
-              if (hasChanged) return nextState;
-              return prev;
+          setFormData({
+              ...initialData,
+              liquidationArea: (mode === 'liquidation' && !initialData.liquidationArea) ? initialData.area : initialData.liquidationArea,
+              liquidationAmount: (mode === 'liquidation' && !initialData.liquidationAmount) ? initialData.totalAmount : initialData.liquidationAmount
           });
           
-          // Update Split Items (Chi tiết tính phí/Tách thửa/Đo đạc nhiều thửa) with strict reference safety
-          const items = initialData.splitItems;
-          if (items && items.length > 0) {
-              if (initialData.contractType === 'Đo đạc') {
-                  setDoDacItems(prev => JSON.stringify(prev) === JSON.stringify(items) ? prev : items);
-                  setTachThuaItems(prev => prev.length === 0 ? prev : []);
-              } else {
-                  setTachThuaItems(prev => JSON.stringify(prev) === JSON.stringify(items) ? prev : items);
-                  setDoDacItems(prev => prev.length === 0 ? prev : []);
-              }
+          const items = initialData.splitItems || [];
+          if (initialData.contractType === 'Đo đạc') {
+              setDoDacItems(items);
+              setTachThuaItems([]);
           } else {
-              setTachThuaItems(prev => prev.length === 0 ? prev : []);
-              setDoDacItems(prev => prev.length === 0 ? prev : []);
+              setTachThuaItems(items);
+              setDoDacItems([]);
           }
 
-          // Update Active Tab based on Contract Type
           const targetTab = initialData.contractType === 'Tách thửa' ? 'tt' : 
                             initialData.contractType === 'Cắm mốc' ? 'cm' : 
                             initialData.contractType === 'Trích lục' ? 'tl' : 'dd';
-          setActiveTab(prev => prev === targetTab ? prev : targetTab);
-          
-          // Kiểm tra xem hồ sơ này đã có hợp đồng hay chưa
-          if (mode === 'contract' && initialData.customerAddress && contracts) {
-              const duplicateContract = contracts.find(c => 
-                  c.customerAddress && 
-                  c.customerAddress.trim().toLowerCase() === initialData.customerAddress?.trim().toLowerCase() && 
-                  c.id !== initialData.id
-              );
-              if (duplicateContract) {
-                  setNotification(prev => {
-                      const msg = `CẢNH BÁO: Hồ sơ ${initialData.customerAddress} đã có hợp đồng trước đó với Số Hợp Đồng: ${duplicateContract.code}! Tránh lập trùng 1 bộ hồ sơ 2 số hợp đồng.`;
-                      if (prev?.type === 'error' && prev.message === msg) return prev;
-                      return { type: 'error', message: msg };
-                  });
-              } else {
-                  setNotification(prev => prev === null ? null : null);
-              }
-          } else {
-              setNotification(prev => prev === null ? null : null);
-          }
+          setActiveTab(targetTab);
       } else {
+          setFormData({
+              code: '', customerName: '', phoneNumber: '', address: '', ward: '', landPlot: '', mapSheet: '', area: 0,
+              contractType: 'Đo đạc', serviceType: '', areaType: '', plotCount: 1, markerCount: 1, quantity: 1, 
+              unitPrice: 0, vatRate: 8, vatAmount: 0, totalAmount: 0, deposit: 0, content: '',
+              createdDate: todayStr, status: 'PENDING',
+              liquidationArea: 0, liquidationAmount: 0
+          });
+          setTachThuaItems([]);
+          setDoDacItems([]);
+          setActiveTab('dd');
+          
           const fetchCode = async () => {
               const code = await generateCode('Đo đạc');
-              setFormData(prev => {
-                  if (prev.code === code) return prev;
-                  return { ...prev, code };
-              });
+              setFormData(prev => ({ ...prev, code }));
           };
           fetchCode();
-          setTachThuaItems(prev => prev.length === 0 ? prev : []);
-          setDoDacItems(prev => prev.length === 0 ? prev : []);
       }
-  }, [initialData, mode, contracts]); 
+  }, [initialData, mode]);
+
+  // Separate, stable effect for checking duplicate contracts
+  useEffect(() => {
+      if (mode === 'contract' && formData.customerAddress && contracts) {
+          const duplicateContract = contracts.find(c => 
+              c.customerAddress && 
+              c.customerAddress.trim().toLowerCase() === formData.customerAddress?.trim().toLowerCase() && 
+              c.id !== formData.id
+          );
+          if (duplicateContract) {
+              setNotification(prev => {
+                  const msg = `CẢNH BÁO: Hồ sơ ${formData.customerAddress} đã có hợp đồng trước đó với Số Hợp Đồng: ${duplicateContract.code}! Tránh lập trùng 1 bộ hồ sơ 2 số hợp đồng.`;
+                  if (prev?.type === 'error' && prev.message === msg) return prev;
+                  return { type: 'error', message: msg };
+              });
+          } else {
+              setNotification(prev => prev?.type === 'error' && prev.message.startsWith('CẢNH BÁO:') ? null : prev);
+          }
+      } else {
+          setNotification(prev => prev?.type === 'error' && prev.message.startsWith('CẢNH BÁO:') ? null : prev);
+      }
+  }, [formData.customerAddress, formData.id, mode, contracts]); 
 
   // Scroll to notification
   useEffect(() => {
