@@ -258,7 +258,7 @@ export const mapRecordFromDb = (item: any): any => {
     r.mapSheet = val(r.mapSheet, r.mapsheet, r.map_sheet);
     r.issueNumber = val(r.issueNumber, r.issuenumber, r.issue_number);
     r.entryNumber = val(r.entryNumber, r.entrynumber, r.entry_number);
-    r.issueDate = val(r.issueDate, r.issuedate, r.issue_date);
+    r.issueDate = keepOnlyDate(val(r.issueDate, r.issuedate, r.issue_date));
     r.residentialArea = val(r.residentialArea, r.residentialarea, r.residential_area);
     r.needsMapCorrection = val(r.needsMapCorrection, r.needsmapcorrection, r.needs_map_correction);
     r.explanationPlan = val(r.explanationPlan, r.explanationplan, r.explanation_plan);
@@ -266,34 +266,34 @@ export const mapRecordFromDb = (item: any): any => {
     r.recordType = val(r.recordType, r.recordtype, r.record_type);
     
     r.receivedBy = val(r.receivedBy, r.receivedby, r.received_by);
-    r.assignedDate = val(r.assignedDate, r.assigneddate, r.assigned_date);
+    r.assignedDate = keepOnlyDate(val(r.assignedDate, r.assigneddate, r.assigned_date));
     r.assignedTo = val(r.assignedTo, r.assignedto, r.assigned_to);
     
-    r.submissionDate = val(r.submissionDate, r.submissiondate, r.submission_date);
+    r.submissionDate = keepOnlyDate(val(r.submissionDate, r.submissiondate, r.submission_date));
     r.submittedTo = val(r.submittedTo, r.submittedto, r.submitted_to);
     
-    r.pendingCheckDate = val(r.pendingCheckDate, r.pendingcheckdate, r.pending_check_date);
+    r.pendingCheckDate = keepOnlyDate(val(r.pendingCheckDate, r.pendingcheckdate, r.pending_check_date));
     r.checkedBy = val(r.checkedBy, r.checkedby, r.checked_by);
-    r.checkedDate = val(r.checkedDate, r.checkeddate, r.checked_date);
+    r.checkedDate = keepOnlyDate(val(r.checkedDate, r.checkeddate, r.checked_date));
     
-    r.completedWorkDate = val(r.completedWorkDate, r.completedworkdate, r.completed_work_date);
-    r.approvalDate = val(r.approvalDate, r.approvaldate, r.approval_date);
-    r.completedDate = val(r.completedDate, r.completeddate, r.completed_date);
+    r.completedWorkDate = keepOnlyDate(val(r.completedWorkDate, r.completedworkdate, r.completed_work_date));
+    r.approvalDate = keepOnlyDate(val(r.approvalDate, r.approvaldate, r.approval_date));
+    r.completedDate = keepOnlyDate(val(r.completedDate, r.completeddate, r.completed_date));
     
     r.authorizedBy = val(r.authorizedBy, r.authorizedby, r.authorized_by);
     r.authDocType = val(r.authDocType, r.authdoctype, r.auth_doc_type);
     r.otherDocs = val(r.otherDocs, r.otherdocs, r.other_docs);
     
-    r.resultReturnedDate = val(r.resultReturnedDate, r.resultreturneddate, r.result_returned_date);
+    r.resultReturnedDate = keepOnlyDate(val(r.resultReturnedDate, r.resultreturneddate, r.result_returned_date));
     
     r.exportBatch = val(r.exportBatch, r.exportbatch, r.export_batch);
-    r.exportDate = val(r.exportDate, r.exportdate, r.export_date);
+    r.exportDate = keepOnlyDate(val(r.exportDate, r.exportdate, r.export_date));
     r.handoverWard = val(r.handoverWard, r.handoverward, r.handover_ward);
     
     r.measurementNumber = val(r.measurementNumber, r.measurementnumber, r.measurement_number);
     r.excerptNumber = val(r.excerptNumber, r.excerptnumber, r.excerpt_number);
     
-    r.reminderDate = val(r.reminderDate, r.reminderdate, r.reminder_date);
+    r.reminderDate = keepOnlyDate(val(r.reminderDate, r.reminderdate, r.reminder_date));
     r.lastRemindedAt = val(r.lastRemindedAt, r.lastremindedat, r.last_reminded_at);
     r.deadlineReminded = val(r.deadlineReminded, r.deadlinereminded, r.deadline_reminded);
     
