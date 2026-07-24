@@ -1220,7 +1220,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                 )}
                 {canPerformAction && (
                   <th className="p-3 w-28 text-center bg-gray-50 sticky right-0 shadow-l">
-                    Thao Tác
+                    THAO TÁC
                   </th>
                 )}
               </tr>

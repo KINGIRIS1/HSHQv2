@@ -8,7 +8,7 @@ import { confirmAction, calculateDeadlineHelper } from '../utils/appHelpers';
 import { createFullBackupData, downloadBackupAsFile, saveBackupToServer, restoreFullBackupToSupabase } from '../services/backupService';
 import { isConfigured } from '../services/supabaseClient';
 import { fetchRecords, updateRecordsBatchById } from '../services/apiRecords';
-import { auditRecordsDates, normalizeRecordsDatesApi, AuditReport, DateAuditIssue } from '../services/apiAudit';
+import { auditRecordsDates, normalizeRecordsDatesApi, AuditReport, DateAuditIssue, tryNormalizeDate } from '../services/apiAudit';
 
 const PERMISSION_DEPARTMENTS = [
   { id: 'Tổ Đăng ký cấp giấy', name: 'Tổ Cấp giấy', label: 'Tổ Đăng ký cấp giấy (Tổ Cấp giấy)', desc: 'Bộ phận tiếp nhận đăng ký, xử lý biến động và cấp giấy chứng nhận' },
@@ -106,38 +106,56 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
       }
   };
 
-  const handleBatchFixMismatchedDeadlines = async () => {
+  const handleBatchFixFormatAndTimeErrors = async () => {
       if (!auditReport || auditReport.issues.length === 0) return;
       
-      const mismatchIssues = auditReport.issues.filter(i => 
-          (i.issueType === 'mismatched_deadline' || (i.issueType === 'missing' && i.field === 'deadline')) && 
-          i.record && i.record.receivedDate
+      const fixableIssues = auditReport.issues.filter(i => 
+          (i.issueType === 'has_time' || i.issueType === 'invalid_format') && i.record
       );
       
-      if (mismatchIssues.length === 0) {
-          alert("Không tìm thấy hồ sơ nào có hạn giải quyết lệch chuẩn hoặc thiếu hạn giải quyết để tự động sửa.");
+      if (fixableIssues.length === 0) {
+          alert("Không tìm thấy hồ sơ nào có lỗi chứa giờ thừa hoặc sai định dạng để tự động sửa.");
           return;
       }
       
       const confirmRun = await confirmAction(
-          `Hệ thống phát hiện ${mismatchIssues.length} hồ sơ có hạn giải quyết chưa chuẩn xác hoặc đang bị thiếu.\n\nBạn có muốn tự động tính toán lại hạn giải quyết chuẩn và cập nhật hàng loạt cho tất cả ${mismatchIssues.length} hồ sơ này không?`
+          `Hệ thống phát hiện ${fixableIssues.length} lỗi liên quan đến giờ/phút/giây thừa hoặc sai định dạng ngày tháng.\n\nBạn có muốn tự động chuẩn hóa về dạng YYYY-MM-DD và cập nhật hàng loạt không?`
       );
       if (!confirmRun) return;
       
       try {
           setIsBatchFixing(true);
-          const updates = mismatchIssues.map(issue => {
+          const updatesMap = new Map<string, { id: string; receivedDate?: string | null; deadline?: string | null }>();
+          
+          fixableIssues.forEach(issue => {
               const rec = issue.record!;
-              const suggested = calculateDeadlineHelper(rec.recordType || '', rec.receivedDate || '', holidays);
-              return {
-                  id: rec.id,
-                  deadline: suggested
-              };
+              const existing = updatesMap.get(rec.id) || { id: rec.id };
+              
+              if (issue.field === 'receivedDate' || issue.field === 'both') {
+                  const norm = tryNormalizeDate(rec.receivedDate);
+                  if (norm) {
+                      existing.receivedDate = norm;
+                  }
+              }
+              if (issue.field === 'deadline' || issue.field === 'both') {
+                  const norm = tryNormalizeDate(rec.deadline);
+                  if (norm) {
+                      existing.deadline = norm;
+                  }
+              }
+              
+              updatesMap.set(rec.id, existing);
           });
+          
+          const updates = Array.from(updatesMap.values());
+          if (updates.length === 0) {
+              alert("Không có hồ sơ nào có thể chuẩn hóa tự động.");
+              return;
+          }
           
           const res = await updateRecordsBatchById(updates);
           if (res.success) {
-              alert(`Tự động sửa hàng loạt thành công!\nĐã cập nhật hạn giải quyết chuẩn cho ${res.count} hồ sơ.`);
+              alert(`Tự động dọn dẹp và chuẩn hóa định dạng ngày thành công cho ${res.count} hồ sơ.`);
               await loadAndAuditData();
           } else {
               alert("Có lỗi xảy ra trong quá trình cập nhật hàng loạt.");
@@ -1039,65 +1057,49 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                                                 {auditReport.deadlineInvalid} hồ sơ
                                             </span>
                                         </div>
-                                        <div className="flex justify-between items-center text-xs border-t border-dashed border-gray-100 pt-2">
-                                            <span className="text-gray-500 font-medium flex items-center gap-1">
-                                                <AlertTriangle size={12} className="text-amber-500" />
-                                                Hạn giải quyết trước ngày nhận:
-                                            </span>
-                                            <span className={`font-black ${auditReport.logicalErrors > 0 ? 'text-red-600' : 'text-slate-700'}`}>
-                                                {auditReport.logicalErrors} lỗi logic
-                                            </span>
-                                        </div>
-                                        <div className="flex justify-between items-center text-xs border-t border-dashed border-gray-100 pt-2">
-                                            <span className="text-gray-500 font-medium flex items-center gap-1">
-                                                <Calendar size={12} className="text-teal-500" />
-                                                Hạn lệch so với quy quy chuẩn (thủ tục):
-                                            </span>
-                                            <span className={`font-black ${auditReport.mismatchedDeadlines > 0 ? 'text-amber-600' : 'text-slate-700'}`}>
-                                                {auditReport.mismatchedDeadlines} hồ sơ
-                                            </span>
-                                        </div>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Chức năng Phân tích & Sửa nhanh ngày trả lệch chuẩn */}
+                            {/* Chức năng Phân tích & Sửa nhanh lỗi định dạng, giờ thừa & thiếu ngày tháng */}
                             <div className="bg-white border border-teal-100 rounded-2xl p-6 shadow-sm space-y-4">
                                 <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 border-b border-gray-100 pb-4">
                                     <div>
                                         <h4 className="font-black text-slate-800 text-base flex items-center gap-2">
                                             <SlidersHorizontal size={18} className="text-teal-600" />
-                                            Công cụ Phân tích & Sửa nhanh Ngày tháng / Hạn giải quyết
+                                            Công cụ Sửa nhanh Định dạng Ngày tháng & Giờ thừa
                                         </h4>
                                         <p className="text-xs text-gray-500 mt-1">
-                                            Phân tích hồ sơ sai lệch so với thời gian xử lý quy định của từng thủ tục và hỗ trợ sửa nhanh hoặc áp dụng tự động hàng loạt.
+                                            Tự động chuẩn hóa hàng loạt các hồ sơ có ngày tháng chứa giờ/phút/giây thừa hoặc sai định dạng, đồng thời hỗ trợ sửa nhanh các lỗi logic và ngày nhận còn thiếu.
                                         </p>
                                     </div>
                                     <button
-                                        onClick={handleBatchFixMismatchedDeadlines}
+                                        onClick={handleBatchFixFormatAndTimeErrors}
                                         disabled={isBatchFixing}
                                         className="px-4 py-2 bg-teal-600 hover:bg-teal-700 disabled:bg-teal-300 text-white font-bold rounded-xl text-xs uppercase tracking-wider flex items-center gap-2 transition-colors shrink-0"
                                     >
                                         {isBatchFixing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-                                        Tự động sửa toàn bộ ngày hẹn lệch chuẩn
+                                        Tự động sửa toàn bộ lỗi giờ thừa & định dạng
                                     </button>
                                 </div>
 
-                                {/* Danh sách hồ sơ lệch chuẩn để sửa nhanh */}
+                                {/* Danh sách hồ sơ lỗi định dạng, giờ thừa hoặc thiếu thông tin để sửa nhanh */}
                                 <div className="space-y-4 max-h-[450px] overflow-y-auto pr-2">
                                     {auditReport.issues.filter(i => 
-                                        i.issueType === 'mismatched_deadline' || 
-                                        (i.issueType === 'missing' && i.field === 'deadline') ||
+                                        i.issueType === 'has_time' || 
+                                        i.issueType === 'invalid_format' ||
+                                        (i.issueType === 'missing' && i.field === 'receivedDate') ||
                                         i.issueType === 'logical_error'
                                     ).length === 0 ? (
                                         <div className="text-center py-8 text-gray-400 italic text-xs font-semibold">
-                                            🎉 Tuyệt vời! Không phát hiện hồ sơ nào bị lệch hạn giải quyết hoặc sai logic thời gian.
+                                            🎉 Tuyệt vời! Không phát hiện hồ sơ nào bị lỗi giờ thừa, sai định dạng hoặc thiếu ngày nhận.
                                         </div>
                                     ) : (
                                         auditReport.issues
                                             .filter(i => 
-                                                i.issueType === 'mismatched_deadline' || 
-                                                (i.issueType === 'missing' && i.field === 'deadline') ||
+                                                i.issueType === 'has_time' || 
+                                                i.issueType === 'invalid_format' ||
+                                                (i.issueType === 'missing' && i.field === 'receivedDate') ||
                                                 i.issueType === 'logical_error'
                                             )
                                             .map((issue, idx) => {
@@ -1108,103 +1110,95 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                                                     receivedDate: rec.receivedDate || '',
                                                     deadline: rec.deadline || ''
                                                 };
-                                                
-                                                const suggested = calculateDeadlineHelper(rec.recordType || '', currentEdit.receivedDate, holidays);
-                                                const isMismatch = currentEdit.deadline !== suggested;
+
+                                                const normReceived = tryNormalizeDate(currentEdit.receivedDate);
+                                                const normDeadline = tryNormalizeDate(currentEdit.deadline);
+                                                const canNormalize = (issue.issueType === 'has_time' || issue.issueType === 'invalid_format') && 
+                                                    (normReceived !== currentEdit.receivedDate || normDeadline !== currentEdit.deadline);
 
                                                 return (
                                                     <div 
                                                         key={`quick-fix-${issue.recordId}-${idx}`} 
                                                         className="border border-slate-100 bg-slate-50/40 rounded-xl p-4 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 hover:border-teal-200 transition-colors"
-                                                    >
-                                                         {/* Thông tin hồ sơ */}
-                                                         <div className="space-y-1.5 flex-1 min-w-0">
-                                                             <div className="flex flex-wrap items-center gap-2">
-                                                                 <span className="font-mono font-black text-slate-800 text-[11px] bg-slate-100 px-2 py-0.5 rounded">
-                                                                     {rec.code || 'KHÔNG MÃ'}
-                                                                 </span>
-                                                                 <span className="font-bold text-slate-700 text-xs truncate">
-                                                                     {rec.customerName || 'Chưa rõ tên'}
-                                                                 </span>
-                                                                 <span className="text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded font-bold">
-                                                                     {rec.ward || 'Chưa rõ xã'}
-                                                                 </span>
-                                                             </div>
-                                                             <p className="text-[11px] text-gray-500 font-medium">
-                                                                 <span className="font-bold text-teal-700">Thủ tục:</span> {rec.recordType || 'Chưa phân loại'}
-                                                             </p>
-                                                             <p className="text-[11px] text-amber-600 font-bold flex items-center gap-1 leading-relaxed">
-                                                                 <AlertTriangle size={12} className="shrink-0" />
-                                                                 {issue.description}
-                                                             </p>
-                                                         </div>
+                                                     >
+                                                          {/* Thông tin hồ sơ */}
+                                                          <div className="space-y-1.5 flex-1 min-w-0">
+                                                              <div className="flex flex-wrap items-center gap-2">
+                                                                  <span className="font-mono font-black text-slate-800 text-[11px] bg-slate-100 px-2 py-0.5 rounded">
+                                                                      {rec.code || 'KHÔNG MÃ'}
+                                                                  </span>
+                                                                  <span className="font-bold text-slate-700 text-xs truncate">
+                                                                      {rec.customerName || 'Chưa rõ tên'}
+                                                                  </span>
+                                                                  <span className="text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded font-bold">
+                                                                      {rec.ward || 'Chưa rõ xã'}
+                                                                  </span>
+                                                              </div>
+                                                              <p className="text-[11px] text-gray-500 font-medium">
+                                                                  <span className="font-bold text-teal-700">Thủ tục:</span> {rec.recordType || 'Chưa phân loại'}
+                                                              </p>
+                                                              <div className="flex flex-wrap items-center gap-2">
+                                                                  <p className="text-[11px] text-amber-600 font-bold flex items-center gap-1 leading-relaxed">
+                                                                      <AlertTriangle size={12} className="shrink-0" />
+                                                                      {issue.description}
+                                                                  </p>
+                                                                  {canNormalize && (
+                                                                      <button 
+                                                                          onClick={() => {
+                                                                              setEditingDates(prev => ({
+                                                                                  ...prev,
+                                                                                  [issue.recordId]: {
+                                                                                      receivedDate: normReceived || prev[issue.recordId]?.receivedDate || '',
+                                                                                      deadline: normDeadline || prev[issue.recordId]?.deadline || ''
+                                                                                  }
+                                                                              }));
+                                                                          }}
+                                                                          className="px-2 py-0.5 bg-teal-50 text-teal-700 border border-teal-200 hover:bg-teal-100 rounded text-[10px] font-extrabold transition-colors"
+                                                                          title="Chuẩn hóa ngày tháng ngay lập tức"
+                                                                      >
+                                                                          Chuẩn hóa nhanh
+                                                                      </button>
+                                                                  )}
+                                                              </div>
+                                                          </div>
 
-                                                         {/* Các ô nhập ngày tháng chỉnh sửa nhanh */}
-                                                         <div className="flex flex-wrap items-center gap-3 shrink-0">
-                                                             {/* Ngày nhận */}
-                                                             <div className="flex flex-col gap-1">
-                                                                 <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Ngày nhận</label>
-                                                                 <input 
-                                                                     type="date" 
-                                                                     value={currentEdit.receivedDate}
-                                                                     onChange={(e) => setEditingDates(prev => ({
-                                                                         ...prev,
-                                                                         [issue.recordId]: {
-                                                                             receivedDate: e.target.value,
-                                                                             deadline: prev[issue.recordId]?.deadline || ''
-                                                                         }
-                                                                     }))}
-                                                                     className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-semibold focus:ring-1 focus:ring-teal-500 outline-none bg-white"
-                                                                 />
-                                                             </div>
+                                                          {/* Các ô nhập ngày tháng chỉnh sửa nhanh */}
+                                                          <div className="flex flex-wrap items-center gap-3 shrink-0">
+                                                              {/* Ngày nhận */}
+                                                              <div className="flex flex-col gap-1">
+                                                                  <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Ngày nhận</label>
+                                                                  <input 
+                                                                      type="text" 
+                                                                      value={currentEdit.receivedDate}
+                                                                      placeholder="YYYY-MM-DD"
+                                                                      onChange={(e) => setEditingDates(prev => ({
+                                                                          ...prev,
+                                                                          [issue.recordId]: {
+                                                                              receivedDate: e.target.value,
+                                                                              deadline: prev[issue.recordId]?.deadline || ''
+                                                                          }
+                                                                      }))}
+                                                                      className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-semibold focus:ring-1 focus:ring-teal-500 outline-none bg-white w-28"
+                                                                  />
+                                                              </div>
 
-                                                             {/* Hạn giải quyết */}
-                                                             <div className="flex flex-col gap-1">
-                                                                 <div className="flex justify-between items-center">
-                                                                     <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Hạn giải quyết</label>
-                                                                     {suggested && isMismatch && (
-                                                                         <button 
-                                                                             onClick={() => setEditingDates(prev => ({
-                                                                                 ...prev,
-                                                                                 [issue.recordId]: {
-                                                                                     receivedDate: prev[issue.recordId]?.receivedDate || '',
-                                                                                     deadline: suggested
-                                                                                 }
-                                                                             }))}
-                                                                             className="text-[10px] text-teal-600 hover:text-teal-800 font-extrabold flex items-center gap-0.5 ml-2 hover:underline"
-                                                                             title="Áp dụng hạn đề xuất theo quy định"
-                                                                         >
-                                                                             Áp dụng đề xuất
-                                                                         </button>
-                                                                     )}
-                                                                 </div>
-                                                                 <div className="relative">
-                                                                     <input 
-                                                                         type="date" 
-                                                                         value={currentEdit.deadline}
-                                                                         onChange={(e) => setEditingDates(prev => ({
-                                                                             ...prev,
-                                                                             [issue.recordId]: {
-                                                                                 receivedDate: prev[issue.recordId]?.receivedDate || '',
-                                                                                 deadline: e.target.value
-                                                                             }
-                                                                         }))}
-                                                                         className={`border rounded-lg px-2 py-1.5 text-xs font-semibold focus:ring-1 focus:ring-teal-500 outline-none bg-white ${
-                                                                             isMismatch ? 'border-amber-300 bg-amber-50/10 text-amber-700' : 'border-gray-200'
-                                                                        }`}
-                                                                     />
-                                                                 </div>
-                                                             </div>
-
-                                                             {/* Hạn đề xuất nhãn */}
-                                                             {suggested && (
-                                                                 <div className="flex flex-col gap-1 justify-center">
-                                                                     <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Đề xuất</span>
-                                                                     <span className="px-2 py-1.5 bg-teal-50 text-teal-700 border border-teal-100 rounded-lg text-xs font-bold font-mono">
-                                                                         {suggested}
-                                                                     </span>
-                                                                 </div>
-                                                             )}
+                                                              {/* Hạn giải quyết */}
+                                                              <div className="flex flex-col gap-1">
+                                                                  <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Hạn giải quyết</label>
+                                                                  <input 
+                                                                      type="text" 
+                                                                      value={currentEdit.deadline}
+                                                                      placeholder="YYYY-MM-DD"
+                                                                      onChange={(e) => setEditingDates(prev => ({
+                                                                          ...prev,
+                                                                          [issue.recordId]: {
+                                                                              receivedDate: prev[issue.recordId]?.receivedDate || '',
+                                                                              deadline: e.target.value
+                                                                          }
+                                                                      }))}
+                                                                      className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-semibold focus:ring-1 focus:ring-teal-500 outline-none bg-white w-28"
+                                                                  />
+                                                              </div>
 
                                                              {/* Hành động Cập nhật */}
                                                              <div className="flex items-end h-[46px]">

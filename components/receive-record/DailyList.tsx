@@ -260,7 +260,6 @@ const DailyList: React.FC<DailyListProps> = ({ records, wards, currentUser, empl
                             <th className="p-4 w-[120px]">Mã Hồ Sơ</th> 
                             <th className="p-4 w-[200px]">Chủ Sử Dụng</th> 
                             <th className="p-4 w-[150px]">Xã / Phường (Đất)</th> 
-                            <th className="p-4 w-[180px]">Địa chỉ chi tiết</th> 
                             <th className="p-4 w-[60px] text-center">Tờ</th>
                             <th className="p-4 w-[60px] text-center">Thửa</th>
                             <th className="p-4 w-[115px]">Loại Hồ Sơ</th> 
@@ -279,9 +278,6 @@ const DailyList: React.FC<DailyListProps> = ({ records, wards, currentUser, empl
                                     <td className="p-4 text-gray-700 truncate align-middle font-medium" title={getNormalizedWard(r.ward)}>
                                         {getNormalizedWard(r.ward)}
                                     </td>
-                                    <td className="p-4 text-gray-600 truncate align-middle" title={r.address || ''}>
-                                        {r.address || '-'}
-                                    </td> 
                                     <td className="p-4 text-center font-mono align-middle">{r.mapSheet || '-'}</td>
                                     <td className="p-4 text-center font-mono align-middle">{r.landPlot || '-'}</td>
                                     <td className="p-4 text-gray-600 truncate align-middle" title={r.recordType || ''}>{getShortRecordType(r.recordType)}</td> 
@@ -309,7 +305,7 @@ const DailyList: React.FC<DailyListProps> = ({ records, wards, currentUser, empl
                                     </td>
                                 </tr>
                             ))
-                        ) : ( <tr><td colSpan={11} className="p-8 text-center text-gray-400 italic"> Không có hồ sơ nào trong ngày này phù hợp với bộ lọc. </td></tr> )}
+                        ) : ( <tr><td colSpan={10} className="p-8 text-center text-gray-400 italic"> Không có hồ sơ nào trong ngày này phù hợp với bộ lọc. </td></tr> )}
                     </tbody>
                 </table>
             </div>
