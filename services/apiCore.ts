@@ -191,8 +191,10 @@ export const sanitizeData = (data: any, allowedColumns: string[]) => {
         'liquidationArea', 'liquidationAmount', 'residentialArea'
     ];
     numberFields.forEach(field => {
-        if (clean[field] === '' || clean[field] === undefined || (typeof clean[field] === 'number' && isNaN(clean[field]))) {
-            clean[field] = null;
+        if (clean[field] !== undefined) {
+            if (clean[field] === '' || (typeof clean[field] === 'number' && isNaN(clean[field]))) {
+                clean[field] = null;
+            }
         }
     });
     
@@ -211,25 +213,29 @@ export const sanitizeData = (data: any, allowedColumns: string[]) => {
     ];
 
     dateTimeFields.forEach(field => {
-        if (clean[field] === '' || clean[field] === undefined || clean[field] === null) {
-            clean[field] = null;
-        } else if (typeof clean[field] === 'string') {
-            const trimmed = clean[field].trim();
-            clean[field] = trimmed === '' ? null : trimmed;
+        if (clean[field] !== undefined) {
+            if (clean[field] === '' || clean[field] === null) {
+                clean[field] = null;
+            } else if (typeof clean[field] === 'string') {
+                const trimmed = clean[field].trim();
+                clean[field] = trimmed === '' ? null : trimmed;
+            }
         }
     });
 
     dateOnlyFields.forEach(field => {
-        if (clean[field] === '' || clean[field] === undefined || clean[field] === null) {
-            clean[field] = null;
-        } else {
-            clean[field] = keepOnlyDate(clean[field]);
+        if (clean[field] !== undefined) {
+            if (clean[field] === '' || clean[field] === null) {
+                clean[field] = null;
+            } else {
+                clean[field] = keepOnlyDate(clean[field]);
+            }
         }
     });
     
     const sanitized: any = {};
     allowedColumns.forEach(col => {
-        if (clean.hasOwnProperty(col)) {
+        if (clean.hasOwnProperty(col) && clean[col] !== undefined) {
             sanitized[col] = clean[col];
         }
     });
