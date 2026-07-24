@@ -180,6 +180,61 @@ export const getNextGlobalRecordCode = async (dateStr: string): Promise<string> 
     return `${datePrefix}-${seqStr}`;
 };
 
+// --- CACHE SYNCHRONIZATION HELPERS ---
+const syncCacheOnCreate = (newRecord: RecordFile) => {
+    try {
+        const cached: RecordFile[] = getFromCache(CACHE_KEYS.RECORDS, []);
+        if (!cached.some(r => r.id === newRecord.id)) {
+            cached.unshift(newRecord);
+            saveToCache(CACHE_KEYS.RECORDS, cached);
+        }
+    } catch (e) {
+        console.error("Error syncing cache for created record", e);
+    }
+};
+
+const syncCacheOnUpdate = (updatedRecord: RecordFile) => {
+    try {
+        const cached: RecordFile[] = getFromCache(CACHE_KEYS.RECORDS, []);
+        const index = cached.findIndex(r => r.id === updatedRecord.id);
+        if (index !== -1) {
+            cached[index] = { ...cached[index], ...updatedRecord };
+        } else {
+            cached.unshift(updatedRecord);
+        }
+        saveToCache(CACHE_KEYS.RECORDS, cached);
+    } catch (e) {
+        console.error("Error syncing cache for updated record", e);
+    }
+};
+
+const syncCacheOnDelete = (id: string) => {
+    try {
+        const cached: RecordFile[] = getFromCache(CACHE_KEYS.RECORDS, []);
+        const filtered = cached.filter(r => r.id !== id);
+        saveToCache(CACHE_KEYS.RECORDS, filtered);
+    } catch (e) {
+        console.error("Error syncing cache for deleted record", e);
+    }
+};
+
+const syncCacheOnBatchUpdate = (batchUpdates: Partial<RecordFile>[]) => {
+    try {
+        const cached: RecordFile[] = getFromCache(CACHE_KEYS.RECORDS, []);
+        if (cached && cached.length > 0) {
+            batchUpdates.forEach(up => {
+                const index = cached.findIndex(r => r.id === up.id);
+                if (index !== -1) {
+                    cached[index] = { ...cached[index], ...up } as RecordFile;
+                }
+            });
+            saveToCache(CACHE_KEYS.RECORDS, cached);
+        }
+    } catch (e) {
+        console.error("Error syncing cache for batch update", e);
+    }
+};
+
 export const createRecordApi = async (record: RecordFile): Promise<RecordFile | null> => {
     if (!isConfigured) return record;
     try {
@@ -208,11 +263,15 @@ export const createRecordApi = async (record: RecordFile): Promise<RecordFile | 
             OPTIONAL_NEW_COLUMNS.forEach(col => delete fallbackPayload[col]);
             const { data: fallbackData, error: fallbackError } = await supabase.from('land_records').insert([fallbackPayload]).select();
             if (fallbackError) throw fallbackError;
-            return mapRecordFromDb({ ...recordToSave, ...(fallbackData?.[0] || {}) }) as RecordFile;
+            const result = mapRecordFromDb({ ...recordToSave, ...(fallbackData?.[0] || {}) }) as RecordFile;
+            if (result) syncCacheOnCreate(result);
+            return result;
         }
         
         if (error) throw error;
-        return mapRecordFromDb(data?.[0]) as RecordFile;
+        const result = mapRecordFromDb(data?.[0]) as RecordFile;
+        if (result) syncCacheOnCreate(result);
+        return result;
     } catch (error) {
         logError("createRecordApi", error);
         return null;
@@ -235,11 +294,15 @@ export const updateRecordApi = async (record: RecordFile): Promise<RecordFile | 
             OPTIONAL_NEW_COLUMNS.forEach(col => delete fallbackPayload[col]);
             const { data: fallbackData, error: fallbackError } = await supabase.from('land_records').update(fallbackPayload).eq('id', record.id).select();
             if (fallbackError) throw fallbackError;
-            return mapRecordFromDb({ ...record, ...(fallbackData?.[0] || {}) }) as RecordFile;
+            const result = mapRecordFromDb({ ...record, ...(fallbackData?.[0] || {}) }) as RecordFile;
+            if (result) syncCacheOnUpdate(result);
+            return result;
         }
         
         if (error) throw error;
-        return mapRecordFromDb(data?.[0]) as RecordFile;
+        const result = mapRecordFromDb(data?.[0]) as RecordFile;
+        if (result) syncCacheOnUpdate(result);
+        return result;
     } catch (error) {
         logError("updateRecordApi", error);
         return null;
@@ -259,11 +322,15 @@ export const updateRecordFieldsApi = async (id: string, fields: Partial<RecordFi
             OPTIONAL_NEW_COLUMNS.forEach(col => delete fallbackPayload[col]);
             const { data: fallbackData, error: fallbackError } = await supabase.from('land_records').update(fallbackPayload).eq('id', id).select();
             if (fallbackError) throw fallbackError;
-            return mapRecordFromDb({ id, ...fields, ...(fallbackData?.[0] || {}) }) as RecordFile;
+            const result = mapRecordFromDb({ id, ...fields, ...(fallbackData?.[0] || {}) }) as RecordFile;
+            if (result) syncCacheOnUpdate(result);
+            return result;
         }
         
         if (error) throw error;
-        return mapRecordFromDb(data?.[0]) as RecordFile;
+        const result = mapRecordFromDb(data?.[0]) as RecordFile;
+        if (result) syncCacheOnUpdate(result);
+        return result;
     } catch (error) {
         logError("updateRecordFieldsApi", error);
         return null;
@@ -275,6 +342,7 @@ export const deleteRecordApi = async (id: string): Promise<boolean> => {
     try {
         const { error } = await supabase.from('land_records').delete().eq('id', id);
         if (error) throw error;
+        syncCacheOnDelete(id);
         return true;
     } catch (error) {
         logError("deleteRecordApi", error);
@@ -328,6 +396,20 @@ export const createRecordsBatchApi = async (records: RecordFile[], onProgress?: 
             if (onProgress) {
                 onProgress(Math.min(i + CHUNK_SIZE, payload.length), payload.length);
             }
+        }
+        
+        // Synchronize local cache with the batch of new records
+        try {
+            const cached: RecordFile[] = getFromCache(CACHE_KEYS.RECORDS, []);
+            payload.forEach(p => {
+                const mapped = mapRecordFromDb(p);
+                if (!cached.some(r => r.id === mapped.id)) {
+                    cached.unshift(mapped);
+                }
+            });
+            saveToCache(CACHE_KEYS.RECORDS, cached);
+        } catch (e) {
+            console.error("Error syncing cache for batch create", e);
         }
         
         return true;
@@ -528,6 +610,7 @@ export const updateRecordsBatchById = async (updates: Partial<RecordFile>[], onP
 
         if (error) throw error;
         
+        syncCacheOnBatchUpdate(updates);
         if (onProgress) onProgress(updates.length, updates.length);
         return { success: true, count: updates.length };
     } catch (error) {

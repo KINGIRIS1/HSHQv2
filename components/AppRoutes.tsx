@@ -1441,6 +1441,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
           onResetWards={props.onResetWards}
           onSaveRecord={props.handleAddOrUpdateRecord}
           holidays={holidays}
+          onRefreshData={props.onRefreshData}
         />
       );
     case "registration_records":

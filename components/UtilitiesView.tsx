@@ -23,6 +23,7 @@ interface UtilitiesViewProps {
     onResetWards?: () => void;
     onSaveRecord?: (record: any) => Promise<any>;
     holidays?: any[];
+    onRefreshData?: () => void | Promise<void>;
 }
 
 const UtilitiesView: React.FC<UtilitiesViewProps> = ({ 
@@ -35,7 +36,8 @@ const UtilitiesView: React.FC<UtilitiesViewProps> = ({
     onDeleteWard,
     onResetWards,
     onSaveRecord,
-    holidays
+    holidays,
+    onRefreshData
 }) => {
   const [activeTab, setActiveTab] = useState<'bienban' | 'thongtin' | 'vphc' | 'saiso' | 'chinhly' | 'tachthua' | 'chuyendoi' | 'dienngaythang' | 'sotltd'>('bienban');
   const [defaultExportPath, setDefaultExportPath] = useState('');
@@ -231,6 +233,7 @@ const UtilitiesView: React.FC<UtilitiesViewProps> = ({
                   onSaveRecord={onSaveRecord}
                   holidays={holidays}
                   notify={notify} 
+                  onRefreshData={onRefreshData}
               />
           </div>
 

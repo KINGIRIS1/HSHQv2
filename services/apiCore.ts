@@ -154,6 +154,34 @@ export function sanitizeFileName(fileName: string): string {
     return str;
 }
 
+export const keepOnlyDate = (val: any): string | null => {
+    if (!val) return null;
+    if (typeof val === 'string') {
+        const cleanStr = val.trim();
+        if (cleanStr === '') return null;
+        // Trích xuất YYYY-MM-DD từ chuỗi ISO (vd: 2026-07-24T12:34:56.000Z)
+        const match = cleanStr.match(/^(\d{4}-\d{2}-\d{2})/);
+        if (match) return match[1];
+        
+        // Xử lý định dạng DD/MM/YYYY hoặc DD-MM-YYYY
+        const parts = cleanStr.split(/[\sT]/)[0].split(/[-/]/);
+        if (parts.length === 3) {
+            if (parts[0].length === 4) { // YYYY-MM-DD
+                return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+            } else if (parts[2].length === 4) { // DD/MM/YYYY
+                return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+            }
+        }
+        return cleanStr;
+    } else if (val instanceof Date) {
+        const y = val.getFullYear();
+        const m = String(val.getMonth() + 1).padStart(2, '0');
+        const d = String(val.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+    }
+    return val;
+};
+
 export const sanitizeData = (data: any, allowedColumns: string[]) => {
     const clean: any = { ...data };
     const numberFields = [
@@ -168,19 +196,33 @@ export const sanitizeData = (data: any, allowedColumns: string[]) => {
         }
     });
     
-    // CẬP NHẬT: Thêm đầy đủ các trường ngày tháng để tránh lỗi 22007
-    const dateFields = [
-        'receivedDate', 'deadline', 'assignedDate', 
-        'submissionDate', 'approvalDate', 'completedDate', 
-        'createdDate', 'exportDate',
-        'resultReturnedDate', 'reminderDate', 'lastRemindedAt', 'issueDate',
-        'pendingCheckDate', 'checkedDate', 'completedWorkDate'
+    // DateTime fields: Giữ nguyên ngày và giờ (như ngày tiếp nhận & ngày trả kết quả)
+    const dateTimeFields = [
+        'receivedDate', 'resultReturnedDate', 'lastRemindedAt', 'createdDate'
     ];
-    
-    dateFields.forEach(field => {
-        // Chuyển chuỗi rỗng, undefined, hoặc chuỗi không hợp lệ thành NULL
+
+    // Date-only fields: Chỉ lấy phần ngày YYYY-MM-DD, loại bỏ hoàn toàn phần giờ
+    const dateOnlyFields = [
+        'deadline', 'assignedDate', 
+        'submissionDate', 'approvalDate', 'completedDate', 
+        'exportDate', 'issueDate',
+        'pendingCheckDate', 'checkedDate', 'completedWorkDate', 'reminderDate'
+    ];
+
+    dateTimeFields.forEach(field => {
         if (clean[field] === '' || clean[field] === undefined || clean[field] === null) {
             clean[field] = null;
+        } else if (typeof clean[field] === 'string') {
+            const trimmed = clean[field].trim();
+            clean[field] = trimmed === '' ? null : trimmed;
+        }
+    });
+
+    dateOnlyFields.forEach(field => {
+        if (clean[field] === '' || clean[field] === undefined || clean[field] === null) {
+            clean[field] = null;
+        } else {
+            clean[field] = keepOnlyDate(clean[field]);
         }
     });
     
@@ -198,57 +240,66 @@ export const mapRecordFromDb = (item: any): any => {
     if (!item) return item;
     const r = { ...item };
     
+    // Helper to get first non-null/non-undefined value
+    const val = (camel: any, lower: any, snake: any) => {
+        if (camel !== undefined && camel !== null) return camel;
+        if (lower !== undefined && lower !== null) return lower;
+        if (snake !== undefined && snake !== null) return snake;
+        return camel;
+    };
+
     // Normalization mapping from potential snake_case or lowercase
-    if (r.receivedDate === undefined && (r.receiveddate !== undefined || r.received_date !== undefined)) r.receivedDate = r.receiveddate || r.received_date;
-    if (r.customerName === undefined && (r.customername !== undefined || r.customer_name !== undefined)) r.customerName = r.customername || r.customer_name;
-    if (r.phoneNumber === undefined && (r.phonenumber !== undefined || r.phone_number !== undefined)) r.phoneNumber = r.phonenumber || r.phone_number;
-    if (r.customerAddress === undefined && (r.customeraddress !== undefined || r.customer_address !== undefined)) r.customerAddress = r.customeraddress || r.customer_address;
-    if (r.landPlot === undefined && (r.landplot !== undefined || r.land_plot !== undefined)) r.landPlot = r.landplot || r.land_plot;
-    if (r.mapSheet === undefined && (r.mapsheet !== undefined || r.map_sheet !== undefined)) r.mapSheet = r.mapsheet || r.map_sheet;
-    if (r.issueNumber === undefined && (r.issuenumber !== undefined || r.issue_number !== undefined)) r.issueNumber = r.issuenumber || r.issue_number;
-    if (r.entryNumber === undefined && (r.entrynumber !== undefined || r.entry_number !== undefined)) r.entryNumber = r.entrynumber || r.entry_number;
-    if (r.issueDate === undefined && (r.issuedate !== undefined || r.issue_date !== undefined)) r.issueDate = r.issuedate || r.issue_date;
-    if (r.residentialArea === undefined && (r.residentialarea !== undefined || r.residential_area !== undefined)) r.residentialArea = r.residentialarea || r.residential_area;
-    if (r.needsMapCorrection === undefined && (r.needsmapcorrection !== undefined || r.needs_map_correction !== undefined)) r.needsMapCorrection = r.needsmapcorrection || r.needs_map_correction;
-    if (r.explanationPlan === undefined && (r.explanationplan !== undefined || r.explanation_plan !== undefined)) r.explanationPlan = r.explanationplan || r.explanation_plan;
-    if (r.receiptNumber === undefined && (r.receiptnumber !== undefined || r.receipt_number !== undefined)) r.receiptNumber = r.receiptnumber || r.receipt_number;
-    if (r.recordType === undefined && (r.recordtype !== undefined || r.record_type !== undefined)) r.recordType = r.recordtype || r.record_type;
+    r.receivedDate = keepOnlyDate(val(r.receivedDate, r.receiveddate, r.received_date));
+    r.customerName = val(r.customerName, r.customername, r.customer_name);
+    r.phoneNumber = val(r.phoneNumber, r.phonenumber, r.phone_number);
+    r.customerAddress = val(r.customerAddress, r.customeraddress, r.customer_address);
+    r.landPlot = val(r.landPlot, r.landplot, r.land_plot);
+    r.mapSheet = val(r.mapSheet, r.mapsheet, r.map_sheet);
+    r.issueNumber = val(r.issueNumber, r.issuenumber, r.issue_number);
+    r.entryNumber = val(r.entryNumber, r.entrynumber, r.entry_number);
+    r.issueDate = val(r.issueDate, r.issuedate, r.issue_date);
+    r.residentialArea = val(r.residentialArea, r.residentialarea, r.residential_area);
+    r.needsMapCorrection = val(r.needsMapCorrection, r.needsmapcorrection, r.needs_map_correction);
+    r.explanationPlan = val(r.explanationPlan, r.explanationplan, r.explanation_plan);
+    r.receiptNumber = val(r.receiptNumber, r.receiptnumber, r.receipt_number);
+    r.recordType = val(r.recordType, r.recordtype, r.record_type);
     
-    if (r.receivedBy === undefined && (r.receivedby !== undefined || r.received_by !== undefined)) r.receivedBy = r.receivedby || r.received_by;
-    if (r.assignedDate === undefined && (r.assigneddate !== undefined || r.assigned_date !== undefined)) r.assignedDate = r.assigneddate || r.assigned_date;
-    if (r.assignedTo === undefined && (r.assignedto !== undefined || r.assigned_to !== undefined)) r.assignedTo = r.assignedto || r.assigned_to;
+    r.receivedBy = val(r.receivedBy, r.receivedby, r.received_by);
+    r.assignedDate = val(r.assignedDate, r.assigneddate, r.assigned_date);
+    r.assignedTo = val(r.assignedTo, r.assignedto, r.assigned_to);
     
-    if (r.submissionDate === undefined && (r.submissiondate !== undefined || r.submission_date !== undefined)) r.submissionDate = r.submissiondate || r.submission_date;
-    if (r.submittedTo === undefined && (r.submittedto !== undefined || r.submitted_to !== undefined)) r.submittedTo = r.submittedto || r.submitted_to;
+    r.submissionDate = val(r.submissionDate, r.submissiondate, r.submission_date);
+    r.submittedTo = val(r.submittedTo, r.submittedto, r.submitted_to);
     
-    if (r.pendingCheckDate === undefined && (r.pendingcheckdate !== undefined || r.pending_check_date !== undefined)) r.pendingCheckDate = r.pendingcheckdate || r.pending_check_date;
-    if (r.checkedBy === undefined && (r.checkedby !== undefined || r.checked_by !== undefined)) r.checkedBy = r.checkedby || r.checked_by;
-    if (r.checkedDate === undefined && (r.checkeddate !== undefined || r.checked_date !== undefined)) r.checkedDate = r.checkeddate || r.checked_date;
+    r.pendingCheckDate = val(r.pendingCheckDate, r.pendingcheckdate, r.pending_check_date);
+    r.checkedBy = val(r.checkedBy, r.checkedby, r.checked_by);
+    r.checkedDate = val(r.checkedDate, r.checkeddate, r.checked_date);
     
-    if (r.completedWorkDate === undefined && (r.completedworkdate !== undefined || r.completed_work_date !== undefined)) r.completedWorkDate = r.completedworkdate || r.completed_work_date;
-    if (r.approvalDate === undefined && (r.approvaldate !== undefined || r.approval_date !== undefined)) r.approvalDate = r.approvaldate || r.approval_date;
-    if (r.completedDate === undefined && (r.completeddate !== undefined || r.completed_date !== undefined)) r.completedDate = r.completeddate || r.completed_date;
+    r.completedWorkDate = val(r.completedWorkDate, r.completedworkdate, r.completed_work_date);
+    r.approvalDate = val(r.approvalDate, r.approvaldate, r.approval_date);
+    r.completedDate = val(r.completedDate, r.completeddate, r.completed_date);
     
-    if (r.authorizedBy === undefined && (r.authorizedby !== undefined || r.authorized_by !== undefined)) r.authorizedBy = r.authorizedby || r.authorized_by;
-    if (r.authDocType === undefined && (r.authdoctype !== undefined || r.auth_doc_type !== undefined)) r.authDocType = r.authdoctype || r.auth_doc_type;
-    if (r.otherDocs === undefined && (r.otherdocs !== undefined || r.other_docs !== undefined)) r.otherDocs = r.otherdocs || r.other_docs;
+    r.authorizedBy = val(r.authorizedBy, r.authorizedby, r.authorized_by);
+    r.authDocType = val(r.authDocType, r.authdoctype, r.auth_doc_type);
+    r.otherDocs = val(r.otherDocs, r.otherdocs, r.other_docs);
     
-    if (r.resultReturnedDate === undefined && (r.resultreturneddate !== undefined || r.result_returned_date !== undefined)) r.resultReturnedDate = r.resultreturneddate || r.result_returned_date;
+    r.resultReturnedDate = val(r.resultReturnedDate, r.resultreturneddate, r.result_returned_date);
     
-    if (r.exportBatch === undefined && (r.exportbatch !== undefined || r.export_batch !== undefined)) r.exportBatch = r.exportbatch || r.export_batch;
-    if (r.exportDate === undefined && (r.exportdate !== undefined || r.export_date !== undefined)) r.exportDate = r.exportdate || r.export_date;
-    if (r.handoverWard === undefined && (r.handoverward !== undefined || r.handover_ward !== undefined)) r.handoverWard = r.handoverward || r.handover_ward;
+    r.exportBatch = val(r.exportBatch, r.exportbatch, r.export_batch);
+    r.exportDate = val(r.exportDate, r.exportdate, r.export_date);
+    r.handoverWard = val(r.handoverWard, r.handoverward, r.handover_ward);
     
-    if (r.measurementNumber === undefined && (r.measurementnumber !== undefined || r.measurement_number !== undefined)) r.measurementNumber = r.measurementnumber || r.measurement_number;
-    if (r.excerptNumber === undefined && (r.excerptnumber !== undefined || r.excerpt_number !== undefined)) r.excerptNumber = r.excerptnumber || r.excerpt_number;
+    r.measurementNumber = val(r.measurementNumber, r.measurementnumber, r.measurement_number);
+    r.excerptNumber = val(r.excerptNumber, r.excerptnumber, r.excerpt_number);
     
-    if (r.reminderDate === undefined && (r.reminderdate !== undefined || r.reminder_date !== undefined)) r.reminderDate = r.reminderdate || r.reminder_date;
-    if (r.lastRemindedAt === undefined && (r.lastremindedat !== undefined || r.last_reminded_at !== undefined)) r.lastRemindedAt = r.lastremindedat || r.last_reminded_at;
-    if (r.deadlineReminded === undefined && (r.deadlinereminded !== undefined || r.deadline_reminded !== undefined)) r.deadlineReminded = r.deadlinereminded !== undefined ? r.deadlinereminded : r.deadline_reminded;
+    r.reminderDate = val(r.reminderDate, r.reminderdate, r.reminder_date);
+    r.lastRemindedAt = val(r.lastRemindedAt, r.lastremindedat, r.last_reminded_at);
+    r.deadlineReminded = val(r.deadlineReminded, r.deadlinereminded, r.deadline_reminded);
     
-    if (r.privateNotes === undefined && (r.privatenotes !== undefined || r.private_notes !== undefined)) r.privateNotes = r.privatenotes || r.private_notes;
-    if (r.personalNotes === undefined && (r.personalnotes !== undefined || r.personal_notes !== undefined)) r.personalNotes = r.personalnotes || r.personal_notes;
-    if (r.isHandedOver === undefined && (r.ishandedover !== undefined || r.is_handed_over !== undefined)) r.isHandedOver = r.ishandedover !== undefined ? r.ishandedover : r.is_handed_over;
+    r.privateNotes = val(r.privateNotes, r.privatenotes, r.private_notes);
+    r.personalNotes = val(r.personalNotes, r.personalnotes, r.personal_notes);
+    r.isHandedOver = val(r.isHandedOver, r.ishandedover, r.is_handed_over);
+    r.deadline = keepOnlyDate(val(r.deadline, r.deadline, r.dead_line));
     
     return r;
 };

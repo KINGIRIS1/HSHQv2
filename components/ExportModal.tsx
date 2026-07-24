@@ -170,6 +170,19 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
         
     const displayDate = `Ngày ${exportDateParts[2]} tháng ${exportDateParts[1]} năm ${exportDateParts[0]}`;
 
+    // Chỉ giữ lại ngày giờ lập danh sách giao 1 cửa thể hiện ngay dưới nội dung "DANH SÁCH BÀN GIAO HỒ SƠ 1 CỬA"
+    // Định dạng ví dụ: "20 giờ 44 phút NGÀY 15 THÁNG 07 NĂM 2027"
+    let displayGenerationTime = displayDate.toUpperCase();
+    if (type === 'handover') {
+        const now = new Date();
+        const currentHour = now.getHours();
+        const currentMinute = String(now.getMinutes()).padStart(2, '0');
+        const currentDay = String(now.getDate()).padStart(2, '0');
+        const currentMonth = String(now.getMonth() + 1).padStart(2, '0');
+        const currentYear = now.getFullYear();
+        displayGenerationTime = `${currentHour} giờ ${currentMinute} phút NGÀY ${currentDay} THÁNG ${currentMonth} NĂM ${currentYear}`;
+    }
+
     // --- CẤU HÌNH CỘT ĐỘNG ---
     const isHandover = type === 'handover';
     const isSpecificWard = selectedWard !== 'all';
@@ -245,7 +258,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
         ["Độc lập - Tự do - Hạnh phúc"],
         [""],
         [title],
-        [displayDate.toUpperCase()],
+        [displayGenerationTime],
         [subTitle],
         [""],
         tableHeader

@@ -160,12 +160,6 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
     const d = String(date.getDate()).padStart(2, '0');
     const m = String(date.getMonth() + 1).padStart(2, '0');
     const y = date.getFullYear();
-    
-    if (dateStr.includes('T')) {
-        const h = String(date.getHours()).padStart(2, '0');
-        const min = String(date.getMinutes()).padStart(2, '0');
-        return `${h}:${min} - ${d}/${m}/${y}`;
-    }
     return `${d}/${m}/${y}`;
   };
 

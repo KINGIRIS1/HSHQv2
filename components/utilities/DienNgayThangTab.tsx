@@ -8,6 +8,7 @@ interface Props {
     onSaveRecord?: (record: any) => Promise<any>;
     holidays?: any[];
     notify: NotifyFunction;
+    onRefreshData?: () => void | Promise<void>;
 }
 
 interface ProposalItem {
@@ -24,7 +25,7 @@ interface ProposalItem {
     selected: boolean;
 }
 
-export const DienNgayThangTab: React.FC<Props> = ({ records, onSaveRecord, holidays, notify }) => {
+export const DienNgayThangTab: React.FC<Props> = ({ records, onSaveRecord, holidays, notify, onRefreshData }) => {
     const [proposals, setProposals] = useState<ProposalItem[]>([]);
     const [isScanning, setIsScanning] = useState(false);
     const [isUpdating, setIsUpdating] = useState(false);
@@ -139,6 +140,11 @@ export const DienNgayThangTab: React.FC<Props> = ({ records, onSaveRecord, holid
         setProposals(prev => prev.map(p => ({ ...p, selected: anyUnselected })));
     };
 
+    const sanitizeDateString = (dateStr: string | null | undefined): string | null => {
+        if (!dateStr) return null;
+        return dateStr.split('T')[0].split(' ')[0];
+    };
+
     const handleExecuteUpdates = async () => {
         if (!onSaveRecord) {
             notify('Lỗi hệ thống: Không tìm thấy tính năng cập nhật hồ sơ.', 'error');
@@ -168,12 +174,16 @@ export const DienNgayThangTab: React.FC<Props> = ({ records, onSaveRecord, holid
                 // If existing has values, keep them, but here we specifically target missing ones
                 const originalRecord = records.find(r => r.id === prop.id);
                 if (originalRecord) {
+                    const cleanReceived = sanitizeDateString(originalRecord.receivedDate || prop.proposedReceivedDate);
+                    const cleanDeadline = sanitizeDateString(originalRecord.deadline || prop.proposedDeadline);
+                    const cleanAssigned = sanitizeDateString(originalRecord.assignedDate || originalRecord.receivedDate || prop.proposedReceivedDate);
+
                     const updatedData = {
                         ...originalRecord,
-                        receivedDate: originalRecord.receivedDate || prop.proposedReceivedDate,
-                        deadline: originalRecord.deadline || prop.proposedDeadline,
+                        receivedDate: cleanReceived,
+                        deadline: cleanDeadline,
                         // Synchronize assignedDate with receivedDate if it was also missing
-                        assignedDate: originalRecord.assignedDate || originalRecord.receivedDate || prop.proposedReceivedDate
+                        assignedDate: cleanAssigned
                     };
                     await onSaveRecord(updatedData);
                     successCount++;
@@ -190,6 +200,14 @@ export const DienNgayThangTab: React.FC<Props> = ({ records, onSaveRecord, holid
         setProposals([]);
         
         notify(`Đã điền thành công ngày tiếp nhận & ngày hẹn cho ${successCount}/${selectedProposals.length} hồ sơ!`, 'success');
+
+        if (onRefreshData) {
+            try {
+                await onRefreshData();
+            } catch (e) {
+                console.error("Lỗi tự động tải lại dữ liệu:", e);
+            }
+        }
     };
 
     // Pagination calculations
