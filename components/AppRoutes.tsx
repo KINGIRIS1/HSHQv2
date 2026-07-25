@@ -1445,6 +1445,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
       return (
         <UtilitiesView
           currentUser={currentUser}
+          employees={employees}
           initialRecordForCorrection={props.recordForMapCorrection}
           records={records}
           onUpdateRecord={(id, num, type) =>

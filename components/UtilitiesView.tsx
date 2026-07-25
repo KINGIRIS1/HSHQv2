@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { FolderCog, ExternalLink, Loader2, Download, CheckCircle, AlertCircle, X, Calculator, FileText, Gavel, Info, Table2, Grid, FileSpreadsheet, RefreshCw, BookOpen, Calendar } from 'lucide-react';
-import { User as UserType, RecordFile, NotifyFunction, NotifyType } from '../types';
+import { User as UserType, RecordFile, NotifyFunction, NotifyType, Employee } from '../types';
+import { isViewAllowedForUser } from '../config/roleConfig';
 import SoanBienBanTab from './utilities/SoanBienBanTab';
 import CungCapThongTinTab from './utilities/CungCapThongTinTab';
 import VPHCTab from './utilities/VPHCTab';
@@ -14,6 +15,7 @@ import ExcerptManagement from './ExcerptManagement';
 
 interface UtilitiesViewProps {
     currentUser: UserType;
+    employees?: Employee[];
     initialRecordForCorrection?: RecordFile | null; // New prop for auto-navigation
     records?: RecordFile[];
     onUpdateRecord?: (id: string, num: string, type: 'trichluc' | 'trichdo') => void;
@@ -28,6 +30,7 @@ interface UtilitiesViewProps {
 
 const UtilitiesView: React.FC<UtilitiesViewProps> = ({ 
     currentUser, 
+    employees = [],
     initialRecordForCorrection,
     records,
     onUpdateRecord,
@@ -45,12 +48,20 @@ const UtilitiesView: React.FC<UtilitiesViewProps> = ({
   // State cho thông báo Custom (Toast)
   const [notification, setNotification] = useState<{ type: NotifyType, message: string } | null>(null);
 
+  const isSotltdAllowed = isViewAllowedForUser(currentUser, employees || [], 'excerpt_management');
+
   // Auto-switch to correction tab if initial record is provided
   useEffect(() => {
       if (initialRecordForCorrection) {
           setActiveTab('chinhly');
       }
   }, [initialRecordForCorrection]);
+
+  useEffect(() => {
+    if (activeTab === 'sotltd' && !isSotltdAllowed) {
+      setActiveTab('bienban');
+    }
+  }, [activeTab, isSotltdAllowed]);
 
   // Load default path on mount and tab change
   useEffect(() => {
@@ -162,12 +173,14 @@ const UtilitiesView: React.FC<UtilitiesViewProps> = ({
               >
                   <Calendar size={16} /> Điền ngày tháng
               </button>
-              <button 
-                  onClick={() => setActiveTab('sotltd')}
-                  className={`px-4 py-2 text-sm font-bold rounded-md transition-all whitespace-nowrap flex items-center gap-2 ${activeTab === 'sotltd' ? 'bg-white text-teal-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-              >
-                  <BookOpen size={16} /> Số TL/TĐ
-              </button>
+              {isSotltdAllowed && (
+                  <button 
+                      onClick={() => setActiveTab('sotltd')}
+                      className={`px-4 py-2 text-sm font-bold rounded-md transition-all whitespace-nowrap flex items-center gap-2 ${activeTab === 'sotltd' ? 'bg-white text-teal-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                  >
+                      <BookOpen size={16} /> Số TL/TĐ
+                  </button>
+              )}
           </div>
           
           {activeTab !== 'saiso' && activeTab !== 'chinhly' && activeTab !== 'tachthua' && activeTab !== 'chuyendoi' && activeTab !== 'dienngaythang' && activeTab !== 'sotltd' && (
