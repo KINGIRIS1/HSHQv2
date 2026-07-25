@@ -867,9 +867,9 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                         <div className="p-6">
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                 {AVAILABLE_PERMISSIONS.map(perm => {
-                                    const hasPerm = permissionTab === 'role' 
+                                    const hasPerm = !!(permissionTab === 'role' 
                                         ? (rolePermissions[selectedRole]?.includes(perm.id) || rolePermissions[selectedRole]?.includes('*'))
-                                        : (departmentPermissions[selectedRole]?.includes(perm.id) || departmentPermissions[selectedRole]?.includes('*'));
+                                        : (departmentPermissions[selectedRole]?.includes(perm.id) || departmentPermissions[selectedRole]?.includes('*')));
                                     return (
                                         <label key={perm.id} className={`flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition-colors ${hasPerm ? 'bg-purple-50 border-purple-200' : 'bg-gray-50 border-gray-200 hover:bg-gray-100'}`}>
                                             <div className="mt-0.5">
@@ -1169,7 +1169,7 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                                                                   <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Ngày nhận</label>
                                                                   <input 
                                                                       type="text" 
-                                                                      value={currentEdit.receivedDate}
+                                                                      value={currentEdit.receivedDate || ''}
                                                                       placeholder="YYYY-MM-DD"
                                                                       onChange={(e) => setEditingDates(prev => ({
                                                                           ...prev,
@@ -1187,7 +1187,7 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                                                                   <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Hạn giải quyết</label>
                                                                   <input 
                                                                       type="text" 
-                                                                      value={currentEdit.deadline}
+                                                                      value={currentEdit.deadline || ''}
                                                                       placeholder="YYYY-MM-DD"
                                                                       onChange={(e) => setEditingDates(prev => ({
                                                                           ...prev,
