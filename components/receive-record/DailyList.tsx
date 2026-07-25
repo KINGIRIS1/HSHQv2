@@ -246,7 +246,7 @@ const DailyList: React.FC<DailyListProps> = ({ records, wards, currentUser, empl
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} /> 
                 <input type="text" placeholder="Tìm kiếm..." className="w-full pl-9 pr-4 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /> 
             </div>
-            <div className="ml-auto flex gap-2">
+            <div className="ml-auto hidden md:flex gap-2">
                 <button onClick={handlePreview} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 shadow-sm text-sm font-medium"> <Eye size={16} /> Xem Excel </button>
                 <button onClick={handleExport} className="flex items-center gap-2 bg-white text-green-600 border border-green-200 px-4 py-2 rounded-md hover:bg-green-50 shadow-sm text-sm font-medium"> <FileSpreadsheet size={16} /> Tải Excel </button>
             </div>
@@ -296,11 +296,9 @@ const DailyList: React.FC<DailyListProps> = ({ records, wards, currentUser, empl
                                             <button onClick={() => onPrint(r)} className="p-1.5 text-purple-600 hover:bg-purple-100 rounded transition-colors" title="In biên nhận">
                                                 <Printer size={16} />
                                             </button>
-                                            {(currentUser?.role === 'ADMIN' || currentUser?.role === 'SUBADMIN') && (
-                                                <button onClick={() => onDelete(r)} className="p-1.5 text-red-500 hover:bg-red-100 rounded transition-colors" title="Xóa">
-                                                    <Trash2 size={16} />
-                                                </button>
-                                            )}
+                                            <button onClick={() => onDelete(r)} className="p-1.5 text-red-500 hover:bg-red-100 rounded transition-colors" title="Xóa">
+                                                <Trash2 size={16} />
+                                            </button>
                                         </div>
                                     </td>
                                 </tr>

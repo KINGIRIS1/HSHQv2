@@ -106,7 +106,7 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
       };
       fetchPrice();
     }
-  }, [record]);
+  }, [record?.id, isOpen]);
 
   if (!isOpen || !record) return null;
 
@@ -911,43 +911,6 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
               />
             </div>
           </div>
-        )}
-      </div>
-
-      {/* Footer Actions */}
-      <div className="bg-white border-t border-slate-100 p-4 sticky bottom-0 z-10 flex gap-3 shadow-[0_-4px_10px_rgba(0,0,0,0.03)]">
-        {canPrintReceipt && (
-          <button 
-            onClick={handlePrintReceipt}
-            disabled={isProcessing}
-            className="flex-1 flex items-center justify-center gap-2 py-3 bg-blue-50 text-blue-600 rounded-xl font-bold text-sm active:scale-95 transition-all disabled:opacity-50"
-          >
-            {isProcessing ? <Loader2 size={18} className="animate-spin" /> : <Printer size={18} />}
-            In biên nhận
-          </button>
-        )}
-        {onCreateLiquidation && record && record.recordType && (getShortRecordType(record.recordType).startsWith('2.3') || getShortRecordType(record.recordType).startsWith('2.4')) && (
-          <button
-            onClick={() => { onClose(); onCreateLiquidation(record); }}
-            className="flex-1 flex items-center justify-center gap-2 py-3 bg-slate-50 text-slate-600 rounded-xl font-bold text-sm active:scale-95 transition-all"
-          >
-            <FileCheck size={18} /> Thanh lý
-          </button>
-        )}
-        {record && record.recordType && (getShortRecordType(record.recordType).startsWith('2.3') || getShortRecordType(record.recordType).startsWith('2.4')) && (
-          <button
-            onClick={() => {
-                const hasAnnexTemplate = hasTemplate(STORAGE_KEYS.CONTRACT_TEMPLATE_ANNEX);
-                if (!hasAnnexTemplate) {
-                    alert("Chưa có mẫu Phụ lục gia hạn hợp đồng nào được cấu hình trong hệ thống.\nVui lòng vào mục Cài đặt hệ thống để cấu hình mẫu này.");
-                    return;
-                }
-                setIsAnnexModalOpen(true);
-            }}
-            className="flex-1 flex items-center justify-center gap-2 py-3 bg-slate-50 text-rose-600 rounded-xl font-bold text-sm active:scale-95 transition-all"
-          >
-            <FileDown size={18} /> Phụ lục
-          </button>
         )}
       </div>
 

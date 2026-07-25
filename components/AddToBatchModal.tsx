@@ -49,10 +49,15 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
   // Ngày hiện tại cho đợt mới
   const todayStr = new Date().toISOString().split('T')[0];
 
+  const targetIdsKey = useMemo(() => {
+    if (!isOpen || !targetRecords) return '';
+    return targetRecords.map(r => `${r.id}_${r.needsMapCorrection ? 1 : 0}`).join(',');
+  }, [isOpen, targetRecords]);
+
   useEffect(() => {
       // Logic kiểm tra xem hồ sơ nào cần chỉnh lý NHƯNG chưa có trong danh sách đã chuyển ('sent')
       const checkWarnings = async () => {
-          if (!isOpen || targetRecords.length === 0) {
+          if (!isOpen || !targetRecords || targetRecords.length === 0) {
               setFilteredWarningList([]);
               return;
           }
@@ -86,7 +91,7 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
       };
 
       checkWarnings();
-  }, [isOpen, targetRecords]);
+  }, [isOpen, targetIdsKey]);
 
   const nextBatchInfo = useMemo(() => {
       let maxBatch = 0;
@@ -131,9 +136,11 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
   useEffect(() => {
       if (mode === 'existing' && historyBatches.length > 0 && !selectedExistingBatch) {
           const first = historyBatches[0];
-          setSelectedExistingBatch(`${first.date}_${first.batch}`);
+          if (first) {
+              setSelectedExistingBatch(`${first.date}_${first.batch}`);
+          }
       }
-  }, [mode, historyBatches]);
+  }, [mode, historyBatches, selectedExistingBatch]);
 
   if (!isOpen) return null;
 

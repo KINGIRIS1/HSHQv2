@@ -995,7 +995,11 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
           </p>
         </div>
         <div className={`grid ${isChecker || isMeasurementTeam ? "grid-cols-4" : "grid-cols-3"} sm:flex gap-1.5 md:gap-4 w-full md:w-auto justify-center`}>
-          <div className="text-center p-1.5 md:px-4 md:py-2 bg-blue-50 rounded-lg border border-blue-100 min-w-0 md:min-w-[100px] flex flex-col justify-center">
+          <div 
+            onClick={() => { setActiveTab("pending"); setCurrentPage(1); setSearchTerm(""); }}
+            className={`cursor-pointer active:scale-95 transition-all text-center p-1.5 md:px-4 md:py-2 bg-blue-50 rounded-lg border ${activeTab === "pending" ? "ring-2 ring-blue-500 border-blue-400 font-extrabold shadow-sm" : "border-blue-100 hover:border-blue-300"} min-w-0 md:min-w-[100px] flex flex-col justify-center`}
+            title="Xem danh sách đang thực hiện"
+          >
             <div className="text-base md:text-2xl font-bold text-blue-700">
               {pendingRecords.length}
             </div>
@@ -1004,7 +1008,11 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
             </div>
           </div>
           {(isChecker || isMeasurementTeam) && (
-            <div className="text-center p-1.5 md:px-4 md:py-2 bg-orange-50 rounded-lg border border-orange-100 min-w-0 md:min-w-[100px] flex flex-col justify-center">
+            <div 
+              onClick={() => { setActiveTab("pending_check"); setCurrentPage(1); setSearchTerm(""); }}
+              className={`cursor-pointer active:scale-95 transition-all text-center p-1.5 md:px-4 md:py-2 bg-orange-50 rounded-lg border ${activeTab === "pending_check" ? "ring-2 ring-orange-500 border-orange-400 font-extrabold shadow-sm" : "border-orange-100 hover:border-orange-300"} min-w-0 md:min-w-[100px] flex flex-col justify-center`}
+              title="Xem danh sách chờ kiểm tra"
+            >
               <div className="text-base md:text-2xl font-bold text-orange-700">
                 {pendingCheckRecords.length}
               </div>
@@ -1013,7 +1021,11 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
               </div>
             </div>
           )}
-          <div className="text-center p-1.5 md:px-4 md:py-2 bg-purple-50 rounded-lg border border-purple-100 min-w-0 md:min-w-[100px] flex flex-col justify-center">
+          <div 
+            onClick={() => { setActiveTab("pending_sign"); setCurrentPage(1); setSearchTerm(""); }}
+            className={`cursor-pointer active:scale-95 transition-all text-center p-1.5 md:px-4 md:py-2 bg-purple-50 rounded-lg border ${activeTab === "pending_sign" ? "ring-2 ring-purple-500 border-purple-400 font-extrabold shadow-sm" : "border-purple-100 hover:border-purple-300"} min-w-0 md:min-w-[100px] flex flex-col justify-center`}
+            title="Xem danh sách chờ ký"
+          >
             <div className="text-base md:text-2xl font-bold text-purple-700">
               {reviewRecords.length}
             </div>
@@ -1021,7 +1033,11 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
               Chờ ký
             </div>
           </div>
-          <div className="text-center p-1.5 md:px-4 md:py-2 bg-green-50 rounded-lg border border-green-100 min-w-0 md:min-w-[100px] flex flex-col justify-center">
+          <div 
+            onClick={() => { setActiveTab("finished"); setCurrentPage(1); setSearchTerm(""); }}
+            className={`cursor-pointer active:scale-95 transition-all text-center p-1.5 md:px-4 md:py-2 bg-green-50 rounded-lg border ${activeTab === "finished" ? "ring-2 ring-green-500 border-green-400 font-extrabold shadow-sm" : "border-green-100 hover:border-green-300"} min-w-0 md:min-w-[100px] flex flex-col justify-center`}
+            title="Xem danh sách hoàn thành"
+          >
             <div className="text-base md:text-2xl font-bold text-green-700">
               {finishedRecords.length}
             </div>
@@ -1034,90 +1050,10 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
 
       {/* MAIN CONTENT */}
       <div className="flex-1 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col min-h-0">
-        {/* TABS & SEARCH */}
-        <div className="p-4 border-b border-gray-100 bg-gray-50 flex flex-col md:flex-row justify-between items-center gap-4 shrink-0">
-          <div className="flex bg-white rounded-lg p-1 border border-gray-200 shadow-sm overflow-x-auto max-w-full">
-            {!isDirector && (
-              <button
-                onClick={() => {
-                  setActiveTab("pending");
-                  setCurrentPage(1);
-                  setSearchTerm("");
-                }}
-                className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-bold transition-all whitespace-nowrap ${
-                  activeTab === "pending"
-                    ? "bg-blue-600 text-white shadow-sm"
-                    : "text-gray-600 hover:bg-gray-100"
-                }`}
-              >
-                <CheckSquare size={16} /> Đang thực hiện ({pendingRecords.length})
-              </button>
-            )}
-            {(isChecker || isMeasurementTeam) && (
-              <button
-                onClick={() => {
-                  setActiveTab("pending_check");
-                  setCurrentPage(1);
-                  setSearchTerm("");
-                }}
-                className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-bold transition-all whitespace-nowrap ${
-                  activeTab === "pending_check"
-                    ? "bg-orange-600 text-white shadow-sm"
-                    : "text-gray-600 hover:bg-gray-100"
-                }`}
-              >
-                <ClipboardList size={16} /> Chờ kiểm tra (
-                {pendingCheckRecords.length})
-              </button>
-            )}
-            <button
-              onClick={() => {
-                setActiveTab("pending_sign");
-                setCurrentPage(1);
-                setSearchTerm("");
-              }}
-              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-bold transition-all whitespace-nowrap ${
-                activeTab === "pending_sign"
-                  ? "bg-purple-600 text-white shadow-sm"
-                  : "text-gray-600 hover:bg-gray-100"
-              }`}
-            >
-              <Send size={16} /> Chờ ký ({reviewRecords.length})
-            </button>
-            <button
-              onClick={() => {
-                setActiveTab("finished");
-                setCurrentPage(1);
-                setSearchTerm("");
-              }}
-              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-bold transition-all whitespace-nowrap ${
-                activeTab === "finished"
-                  ? "bg-green-600 text-white shadow-sm"
-                  : "text-gray-600 hover:bg-gray-100"
-              }`}
-            >
-              <FileCheck size={16} /> Hoàn thành ({finishedRecords.length})
-            </button>
-            {!isDirector && (
-              <button
-                onClick={() => {
-                  setActiveTab("reminder");
-                  setCurrentPage(1);
-                  setSearchTerm("");
-                }}
-                className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-bold transition-all whitespace-nowrap ${
-                  activeTab === "reminder"
-                    ? "bg-pink-600 text-white shadow-sm"
-                    : "text-gray-600 hover:bg-gray-100"
-                }`}
-              >
-                <Bell size={16} /> Nhắc việc ({reminderRecords.length})
-              </button>
-            )}
-          </div>
-
-          <div className="flex gap-2 w-full md:w-auto">
-            <div className="relative w-full md:w-64">
+        {/* SEARCH & ACTIONS */}
+        <div className="p-4 border-b border-gray-100 bg-gray-50 flex flex-col md:flex-row justify-between items-center gap-3 shrink-0">
+          <div className="flex items-center gap-2 w-full md:w-auto">
+            <div className="relative flex-1 md:w-72">
               <Search
                 className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
                 size={16}
@@ -1125,7 +1061,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
               <input
                 type="text"
                 placeholder={`Tìm trong ${getTabLabel()}...`}
-                className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white shadow-sm"
                 value={searchTerm}
                 onChange={(e) => {
                   setSearchTerm(e.target.value);
@@ -1133,9 +1069,31 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                 }}
               />
             </div>
+
+            {!isDirector && (
+              <button
+                onClick={() => {
+                  setActiveTab(activeTab === "reminder" ? "pending" : "reminder");
+                  setCurrentPage(1);
+                  setSearchTerm("");
+                }}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap shadow-sm border ${
+                  activeTab === "reminder"
+                    ? "bg-pink-600 text-white border-pink-700"
+                    : "bg-white text-pink-700 border-pink-200 hover:bg-pink-50"
+                }`}
+                title="Xem nhắc việc"
+              >
+                <Bell size={14} />
+                <span>Nhắc việc ({reminderRecords.length})</span>
+              </button>
+            )}
+          </div>
+
+          <div className="hidden md:flex items-center justify-end gap-2 w-full md:w-auto">
             <button
               onClick={handleExportExcel}
-              className="flex items-center gap-2 px-3 py-2 bg-green-600 text-white rounded-lg text-sm font-bold hover:bg-green-700 transition-colors whitespace-nowrap"
+              className="flex items-center gap-2 px-3.5 py-2 bg-green-600 text-white rounded-lg text-sm font-bold hover:bg-green-700 transition-colors whitespace-nowrap shadow-sm ml-auto md:ml-0"
             >
               <FileDown size={16} /> Xuất Excel
             </button>
@@ -1352,7 +1310,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                 </table>
               </div>
 
-              {/* Mobile View (Responsive card-based with precise symbols) */}
+              {/* Mobile View (Paginated like Tab Tìm kiếm) */}
               <div className="block md:hidden space-y-3 p-1">
                 {paginatedDisplayRecords.map((r, index) => {
                   const deadlineStatus = getDeadlineStatus(r);
@@ -1487,6 +1445,29 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                     </div>
                   );
                 })}
+
+                {/* Mobile Pagination Controls (Giống Tab Tìm kiếm) */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between pt-3 pb-2 px-2 border-t border-gray-200 mt-2 bg-gray-50 rounded-lg shadow-sm">
+                    <button
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                      className="px-3 py-1.5 bg-white border border-gray-200 text-xs font-bold text-gray-700 rounded-lg disabled:opacity-40 active:scale-95 transition-all shadow-sm"
+                    >
+                      Trang trước
+                    </button>
+                    <span className="text-xs text-gray-700 font-bold">
+                      Trang {currentPage} / {totalPages}
+                    </span>
+                    <button
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                      className="px-3 py-1.5 bg-white border border-gray-200 text-xs font-bold text-gray-700 rounded-lg disabled:opacity-40 active:scale-95 transition-all shadow-sm"
+                    >
+                      Trang sau
+                    </button>
+                  </div>
+                )}
               </div>
             </>
           ) : (
@@ -1501,9 +1482,9 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
           )}
         </div>
 
-        {/* PAGINATION FOOTER */}
+        {/* PAGINATION FOOTER (Desktop only; mobile uses smooth infinite scroll) */}
         {displayRecords.length > 0 && (
-          <div className="border-t border-gray-100 p-3 bg-gray-50 flex justify-between items-center shrink-0">
+          <div className="border-t border-gray-100 p-3 bg-gray-50 hidden md:flex justify-between items-center shrink-0">
             <span className="text-xs text-gray-500">
               Hiển thị <strong>{(currentPage - 1) * itemsPerPage + 1}</strong> -{" "}
               <strong>

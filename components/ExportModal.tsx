@@ -2,7 +2,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import * as XLSX from 'xlsx-js-style';
 import { RecordFile, RecordStatus } from '../types';
-import { X, FileDown, Calendar, Layers, MapPin, Printer, Eye } from 'lucide-react';
+import { isArchiveRecordType, getShortRecordType } from '../constants';
+import { X, FileDown, Calendar, Layers, MapPin, Printer, Eye, Filter } from 'lucide-react';
 
 interface ExportModalProps {
   isOpen: boolean;
@@ -11,17 +12,43 @@ interface ExportModalProps {
   wards: string[];
   type: 'handover' | 'check_list'; // Phân loại danh sách
   onPreview: (workbook: XLSX.WorkBook, fileName: string) => void; // Callback để mở Preview
+  currentView?: string;
 }
 
-const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, wards, type, onPreview }) => {
+const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, wards, type, onPreview, currentView }) => {
   const [selectedBatchKey, setSelectedBatchKey] = useState<string>('');
   const [selectedWard, setSelectedWard] = useState<string>('all');
+  const [recordCategory, setRecordCategory] = useState<'all' | 'measurement' | 'archive'>('all');
+
+  // Initialize category based on currentView
+  useEffect(() => {
+    if (isOpen) {
+      if (currentView?.startsWith('archive_')) {
+        setRecordCategory('archive');
+      } else if (currentView === 'handover_list' || currentView === 'all_records' || currentView === 'completed_list' || currentView === 'check_list') {
+        setRecordCategory('measurement');
+      } else {
+        setRecordCategory('all');
+      }
+    }
+  }, [isOpen, currentView]);
+
+  // Filter records by category
+  const categoryRecords = useMemo(() => {
+    if (recordCategory === 'archive') {
+      return records.filter(r => isArchiveRecordType(r.recordType));
+    }
+    if (recordCategory === 'measurement') {
+      return records.filter(r => !isArchiveRecordType(r.recordType) && !['CMD', 'Tòa án', 'Thi hành án'].includes(getShortRecordType(r.recordType)));
+    }
+    return records;
+  }, [records, recordCategory]);
 
   // 1. Tổng hợp danh sách các đợt (Batch Options)
   const batchOptions = useMemo(() => {
     const batches: Record<string, { date: string, batch: number | string, count: number }> = {};
 
-    records.forEach(r => {
+    categoryRecords.forEach(r => {
       if (type === 'handover') {
           // Logic cho Giao 1 cửa
           if (r.status === RecordStatus.HANDOVER || r.status === RecordStatus.SIGNED || r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED) {
@@ -61,7 +88,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
     return Object.entries(batches)
         .map(([key, value]) => ({ key, ...value }))
         .sort((a, b) => b.date.localeCompare(a.date));
-  }, [records, isOpen, type]);
+  }, [categoryRecords, isOpen, type]);
 
   // Synchronize filters and selected batch key stably to prevent resetting selection
   useEffect(() => {
@@ -116,7 +143,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
         const dateStr = parts[0];
         const batchStr = parts.slice(1).join('_');
         
-        recordsToExport = records.filter(r => {
+        recordsToExport = categoryRecords.filter(r => {
             const targetWard = r.handoverWard || r.ward;
             const matchWard = selectedWard === 'all' || targetWard === selectedWard;
             
@@ -129,11 +156,19 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
             }
         });
 
-        title = `DANH SÁCH BÀN GIAO HỒ SƠ 1 CỬA${wardTitle}`;
+        if (recordCategory === 'archive') {
+            title = `DANH SÁCH BÀN GIAO HỒ SƠ LƯU TRỮ 1 CỬA${wardTitle}`;
+        } else if (recordCategory === 'measurement') {
+            title = `DANH SÁCH BÀN GIAO HỒ SƠ ĐO ĐẠC 1 CỬA${wardTitle}`;
+        } else {
+            title = `DANH SÁCH BÀN GIAO HỒ SƠ 1 CỬA${wardTitle}`;
+        }
+
         const displayBatch = batchStr === 'NOT_BATCHED' ? 'CHƯA TẠO ĐỢT' : `ĐỢT ${batchStr}`;
         subTitle = `${displayBatch}  -  TỔNG SỐ HỒ SƠ: ${recordsToExport.length}`;
         const safeDate = dateStr.replace(/-/g, '');
-        fileName = `Giao_1_Cua_${batchStr === 'NOT_BATCHED' ? 'Le' : `Dot_${batchStr}`}_${safeDate}`;
+        const catPrefix = recordCategory === 'archive' ? 'Luu_Tru_' : recordCategory === 'measurement' ? 'Do_Dac_' : '';
+        fileName = `Giao_1_Cua_${catPrefix}${batchStr === 'NOT_BATCHED' ? 'Le' : `Dot_${batchStr}`}_${safeDate}`;
 
     } else {
         // Check List
@@ -461,6 +496,37 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
         </div>
 
         <div className="p-6 space-y-4">
+            {type === 'handover' && (
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-1.5">
+                        <Filter size={15} className="text-blue-600" /> Phân loại hồ sơ giao:
+                    </label>
+                    <div className="flex bg-gray-100 p-1 rounded-lg border border-gray-200">
+                        <button
+                            type="button"
+                            onClick={() => setRecordCategory('all')}
+                            className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all ${recordCategory === 'all' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
+                        >
+                            Tất cả
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setRecordCategory('measurement')}
+                            className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all ${recordCategory === 'measurement' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
+                        >
+                            Đo đạc
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setRecordCategory('archive')}
+                            className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all ${recordCategory === 'archive' ? 'bg-amber-600 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
+                        >
+                            Lưu trữ
+                        </button>
+                    </div>
+                </div>
+            )}
+
             <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">1. Chọn đợt / ngày xuất</label>
                 {batchOptions.length > 0 ? (

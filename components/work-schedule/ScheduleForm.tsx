@@ -10,6 +10,16 @@ interface ScheduleFormProps {
     onCancel: () => void;
 }
 
+const formatDateDDMMYYYY = (isoStr: string) => {
+    if (!isoStr) return '';
+    const dateOnly = isoStr.includes('T') ? isoStr.split('T')[0] : isoStr;
+    const parts = dateOnly.split('-');
+    if (parts.length === 3) {
+        return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+    return isoStr;
+};
+
 const ScheduleForm: React.FC<ScheduleFormProps> = ({ initialData, currentUser, onSave, onCancel }) => {
     const [formData, setFormData] = useState<Partial<WorkSchedule>>({
         date: new Date().toISOString(),
@@ -100,12 +110,15 @@ const ScheduleForm: React.FC<ScheduleFormProps> = ({ initialData, currentUser, o
             <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                     <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Ngày công tác <span className="text-red-500">*</span></label>
-                    <div className="relative">
-                        <Calendar size={16} className="absolute left-3 top-3 text-gray-400" />
+                    <div className="relative flex items-center border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white hover:border-blue-500 transition-colors cursor-pointer">
+                        <Calendar size={16} className="text-gray-400 mr-2 shrink-0" />
+                        <span className="font-semibold text-gray-700">
+                            {formatDateDDMMYYYY(formData.date || '') || 'Chọn ngày công tác'}
+                        </span>
                         <input 
                             type="date" 
-                            className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                            value={formData.date}
+                            className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                            value={formData.date ? (formData.date.includes('T') ? formData.date.split('T')[0] : formData.date) : ''}
                             onChange={e => setFormData({...formData, date: e.target.value})}
                         />
                     </div>

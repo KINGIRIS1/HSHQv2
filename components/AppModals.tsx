@@ -168,6 +168,7 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
                 onClose={() => props.setIsDeleteModalOpen(false)} 
                 onConfirm={props.handleDeleteRecord} 
                 message={`Bạn có chắc chắn muốn xóa hồ sơ ${props.deletingRecord?.code}?`} 
+                record={props.deletingRecord}
             />
             
             <ExportModal 
@@ -177,6 +178,7 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
                 wards={props.wards} 
                 type={props.exportModalType}
                 onPreview={props.handleExcelPreview}
+                currentView={props.currentView}
             />
             
             <AddToBatchModal

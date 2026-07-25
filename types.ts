@@ -158,6 +158,21 @@ export interface RecordFile {
   // Giá trực tiếp cho hồ sơ
   price?: number | null;
   advancePayment?: number | null;
+
+  // Lịch sử trạng thái và Bàn giao kho lưu
+  statusLogs?: RecordStatusLog[];
+  archiveHandoverDate?: string | null;
+  archiveHandoverBatch?: number | null;
+}
+
+export interface RecordStatusLog {
+  id: string;
+  recordId: string;
+  previousStatus?: string | null;
+  newStatus: string;
+  changedBy: string;
+  changedAt: string;
+  note?: string | null;
 }
 
 // Interface cho Item tách thửa

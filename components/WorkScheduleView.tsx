@@ -48,17 +48,10 @@ const WorkScheduleView: React.FC<WorkScheduleViewProps> = ({ currentUser }) => {
     };
 
     return (
-        <div className="flex h-full gap-6 animate-fade-in overflow-hidden">
-            {/* Left Column: Form (Sticky or Modal-like behaviour handled by UI layout) */}
-            <div className={`w-full max-w-sm flex-none transition-all duration-300 overflow-y-auto pr-2 ${isFormOpen ? 'block' : 'hidden md:block'}`}>
-                <div className="flex flex-col gap-4">
-                    <button 
-                        onClick={() => { setEditingSchedule(null); setIsFormOpen(true); }}
-                        className="w-full py-3 bg-blue-600 text-white rounded-xl shadow-md hover:bg-blue-700 font-bold flex items-center justify-center gap-2 md:hidden"
-                    >
-                        <Plus size={20} /> Tạo Lịch Mới
-                    </button>
-
+        <div className="flex h-full w-full gap-4 md:gap-6 animate-fade-in overflow-hidden">
+            {/* Left Column: Form (Full width on mobile when open, max-w-sm on desktop) */}
+            <div className={`w-full ${isFormOpen ? 'block fixed inset-0 z-50 bg-white p-4 overflow-y-auto' : 'hidden md:block md:w-80 md:max-w-sm flex-none overflow-y-auto pr-2'}`}>
+                <div className="flex flex-col gap-4 max-w-lg mx-auto md:max-w-none">
                     <ScheduleForm 
                         initialData={editingSchedule}
                         currentUser={currentUser}
@@ -77,9 +70,9 @@ const WorkScheduleView: React.FC<WorkScheduleViewProps> = ({ currentUser }) => {
                 </div>
             </div>
 
-            {/* Right Column: List & Summary */}
-            <div className={`flex-1 min-w-0 transition-all duration-300 flex flex-col gap-6 overflow-y-auto pr-2 ${isFormOpen ? 'hidden md:block' : 'block'}`}>
-                <div className="h-[500px] flex-shrink-0">
+            {/* Right Column: List & Summary (Expands to fill full container height) */}
+            <div className={`flex-1 min-w-0 transition-all duration-300 flex flex-col gap-4 md:gap-6 overflow-y-auto pr-1 md:pr-2 h-full ${isFormOpen ? 'hidden md:flex' : 'flex'}`}>
+                <div className="flex-1 min-h-[420px] md:min-h-[500px] flex flex-col">
                     <ScheduleList 
                         schedules={schedules}
                         onEdit={handleEdit}
@@ -91,6 +84,17 @@ const WorkScheduleView: React.FC<WorkScheduleViewProps> = ({ currentUser }) => {
                     <ScheduleSummary schedules={schedules} />
                 </div>
             </div>
+
+            {/* Floating Green Plus Button for Mobile Schedule Tab */}
+            {!isFormOpen && (
+                <button 
+                    onClick={() => { setEditingSchedule(null); setIsFormOpen(true); }}
+                    className="fixed bottom-20 right-4 w-14 h-14 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-full shadow-2xl border-2 border-white flex items-center justify-center transition-all z-40 md:hidden cursor-pointer"
+                    title="Đăng ký lịch công tác mới"
+                >
+                    <Plus size={28} className="stroke-[3]" />
+                </button>
+            )}
         </div>
     );
 };

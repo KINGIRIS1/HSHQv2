@@ -90,7 +90,7 @@ const OverdueStatsView: React.FC<OverdueStatsViewProps> = ({ records, employees 
     const formatDate = (d?: string | null) => d ? new Date(d).toLocaleDateString('vi-VN') : '-';
 
     return (
-        <div className="flex flex-col h-full bg-slate-100 p-4 gap-4 overflow-y-hidden">
+        <div className="flex flex-col h-full bg-slate-100 p-4 gap-4 overflow-y-auto">
             {/* Bảng dữ liệu */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col flex-1 overflow-hidden">
                 <div className="p-4 border-b flex flex-col xl:flex-row gap-4 justify-between items-start xl:items-center bg-gray-50/50">
@@ -150,7 +150,7 @@ const OverdueStatsView: React.FC<OverdueStatsViewProps> = ({ records, employees 
 
                         <button 
                             onClick={() => exportOverdueStatsToExcel(overdueData.filteredRecords, employees, filterType)}
-                            className="flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-bold text-sm shadow-sm h-[36px] min-w-[120px] ml-auto shrink-0"
+                            className="hidden md:flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-bold text-sm shadow-sm h-[36px] min-w-[120px] ml-auto shrink-0"
                         >
                             <Download size={16} /> Xuất Excel
                         </button>

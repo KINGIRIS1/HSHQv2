@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { RecordFile, RecordStatus, Employee, User, UserRole, Message } from './types';
+import { RecordFile, RecordStatus, Employee, User, UserRole, Message, RecordStatusLog } from './types';
 import { DEFAULT_WARDS as STATIC_WARDS, isArchiveRecordType } from './constants';
 import Login from './components/Login'; 
 import MainLayout from './components/layout/MainLayout';
@@ -339,11 +339,25 @@ function App() {
       });
   }, []);
 
+  const createStatusLog = useCallback((r: RecordFile, newStatus: RecordStatus | string, note?: string): RecordStatusLog[] => {
+      const existing = Array.isArray(r.statusLogs) ? r.statusLogs : [];
+      if (r.status === newStatus) return existing;
+      const newLog: RecordStatusLog = {
+          id: 'LOG_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+          recordId: r.id,
+          previousStatus: r.status || null,
+          newStatus: newStatus,
+          changedBy: currentUser?.name || currentUser?.username || 'Hệ thống',
+          changedAt: new Date().toISOString(),
+          note: note || null
+      };
+      return [newLog, ...existing];
+  }, [currentUser]);
+
   const confirmAssign = async (employeeId: string) => {
       const nowStr = new Date().toISOString();
-      const updatedIds = assignTargetRecords.map(r => r.id);
-      
-      const updates = {
+      const updatedTargets = assignTargetRecords.map(r => ({
+          ...r,
           assignedTo: employeeId,
           status: RecordStatus.ASSIGNED,
           assignedDate: nowStr,
@@ -352,11 +366,15 @@ function App() {
           completedDate: null,
           resultReturnedDate: null,
           exportBatch: null,
-          exportDate: null
-      };
+          exportDate: null,
+          statusLogs: createStatusLog(r, RecordStatus.ASSIGNED, 'Giao nhân viên xử lý')
+      }));
 
-      setRecords(prev => prev.map(r => updatedIds.includes(r.id) ? { ...r, ...updates } : r));
-      await Promise.all(assignTargetRecords.map(r => updateRecordApi({ ...r, ...updates } as any)));
+      setRecords(prev => prev.map(r => {
+          const updated = updatedTargets.find(u => u.id === r.id);
+          return updated ? updated : r;
+      }));
+      await Promise.all(updatedTargets.map(r => updateRecordApi(r)));
       setIsAssignModalOpen(false); 
       setSelectedRecordIds(new Set()); 
       setToast({ type: 'success', message: `Đã giao ${assignTargetRecords.length} hồ sơ thành công!` });
@@ -469,6 +487,7 @@ function App() {
           .map(r => {
               let recordUpdates = { ...baseUpdates };
               if (field === 'status') {
+                  recordUpdates.statusLogs = createStatusLog(r, value, 'Cập nhật trạng thái hàng loạt');
                   if (value === RecordStatus.PENDING_SIGN) {
                       recordUpdates.completedWorkDate = r.completedWorkDate || targetDateStr;
                       recordUpdates.checkedDate = r.checkedDate || targetDateStr;
@@ -511,6 +530,7 @@ function App() {
       
       if (field === 'status') {
           updates = getUpdatesForStatusChange(value as RecordStatus);
+          updates.statusLogs = createStatusLog(record, value, 'Cập nhật trạng thái nhanh');
           
           if (value === RecordStatus.PENDING_SIGN) {
               updates.completedWorkDate = record.completedWorkDate || nowStr;
@@ -540,7 +560,7 @@ function App() {
       } catch (e) { 
           console.error("Quick update failed", e); 
       }
-  }, [records]);
+  }, [records, createStatusLog]);
 
   const handleOpenReturnModal = useCallback((record: RecordFile) => {
       setReturnRecord(record);
@@ -550,18 +570,20 @@ function App() {
   const handleConfirmReturnResult = useCallback(async (receiptNumber: string, receiverName: string, returnedPrice: number) => {
       if (!returnRecord) return;
       const nowStr = new Date().toISOString();
+      const statusLogs = createStatusLog(returnRecord, RecordStatus.RETURNED, `Trả kết quả cho người dân: ${receiverName}`);
       const updates = { 
           resultReturnedDate: nowStr, 
           status: RecordStatus.RETURNED, 
           receiptNumber: receiptNumber, 
           receiverName: receiverName,
-          returnedPrice: returnedPrice
+          returnedPrice: returnedPrice,
+          statusLogs
       }; 
       setRecords(prev => prev.map(r => r.id === returnRecord.id ? { ...r, ...updates } : r));
       await updateRecordApi({ ...returnRecord, ...updates });
       setToast({ type: 'success', message: `Đã ghi nhận trả kết quả hồ sơ ${returnRecord.code} cho ${receiverName}.` });
       setReturnRecord(null);
-  }, [returnRecord]);
+  }, [returnRecord, createStatusLog]);
 
   const handleMapCorrectionRequest = useCallback(async (record: RecordFile) => {
       const newValue = !record.needsMapCorrection;
@@ -600,10 +622,11 @@ function App() {
       if (idx < flow.length - 1) {
           const nextStatus = flow[idx + 1];
           const updates = getUpdatesForStatusChange(nextStatus);
+          updates.statusLogs = createStatusLog(record, nextStatus, 'Chuyển trạng thái kế tiếp');
           setRecords(prev => prev.map(r => r.id === record.id ? { ...r, ...updates } : r));
           await updateRecordApi({ ...record, ...updates });
       }
-  }, []);
+  }, [createStatusLog]);
 
   const executeBatchExport = async (batchNumber: number, batchDate: string, handoverWard?: string) => {
       const nowStr = new Date().toISOString();
@@ -612,7 +635,8 @@ function App() {
       if (recordsToExport.length === 0) return;
       const updatesToApply = recordsToExport.map(r => {
           const nextStatus = r.status === RecordStatus.WITHDRAWN ? RecordStatus.WITHDRAWN : r.status === RecordStatus.REJECTED ? RecordStatus.REJECTED : RecordStatus.HANDOVER;
-          return { ...r, exportBatch: batchNumber, exportDate: batchDate, status: nextStatus, completedDate: r.completedDate || nowStr, handoverWard: handoverWard || r.handoverWard };
+          const statusLogs = createStatusLog(r, nextStatus, `Chốt xuất giao 1 cửa - Đợt ${batchNumber}`);
+          return { ...r, exportBatch: batchNumber, exportDate: batchDate, status: nextStatus, completedDate: r.completedDate || nowStr, handoverWard: handoverWard || r.handoverWard, statusLogs };
       });
       setRecords(prev => prev.map(r => {
           const updated = updatesToApply.find(u => u.id === r.id);
@@ -634,9 +658,18 @@ function App() {
       if (pendingSign.length === 0) { alert("Các hồ sơ được chọn không ở trạng thái chờ ký."); return; }
       if(await confirmAction(`Xác nhận chuyển ${pendingSign.length} hồ sơ đang chọn sang "Đã ký"?`)) {
           const nowStr = new Date().toISOString();
-          const updates = { status: RecordStatus.SIGNED, approvalDate: nowStr, completedDate: null };
-          setRecords(prev => prev.map(r => pendingSign.find(p => p.id === r.id) ? { ...r, ...updates } : r));
-          await Promise.all(pendingSign.map(r => updateRecordApi({ ...r, ...updates })));
+          const updatedTargets = pendingSign.map(r => ({
+              ...r,
+              status: RecordStatus.SIGNED,
+              approvalDate: nowStr,
+              completedDate: null,
+              statusLogs: createStatusLog(r, RecordStatus.SIGNED, 'Ký duyệt đợt')
+          }));
+          setRecords(prev => prev.map(r => {
+              const updated = updatedTargets.find(p => p.id === r.id);
+              return updated ? updated : r;
+          }));
+          await Promise.all(updatedTargets.map(r => updateRecordApi(r)));
           setSelectedRecordIds(new Set());
           setToast({ type: 'success', message: `Đã chuyển ${pendingSign.length} hồ sơ sang "Đã ký".` });
       }
@@ -666,6 +699,7 @@ function App() {
                  if (prevIdx >= flow.indexOf(RecordStatus.PENDING_SIGN) && !r.submissionDate) updates.submissionDate = nowStr;
                  if (prevIdx >= flow.indexOf(RecordStatus.SIGNED) && !r.approvalDate) updates.approvalDate = nowStr;
              }
+             updates.statusLogs = createStatusLog(r, RecordStatus.REJECTED, 'Đánh dấu hồ sơ trả');
              return { ...r, ...updates };
           });
           

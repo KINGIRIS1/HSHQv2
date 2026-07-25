@@ -118,7 +118,7 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
             empName,
             aiStats,
             badRecordsSimple,
-            `Từ ${new Date(fromDate).toLocaleDateString('vi-VN')} đến ${new Date(toDate).toLocaleDateString('vi-VN')}`
+            fromDate === '1970-01-01' ? `Toàn bộ thời gian đến ${new Date(toDate).toLocaleDateString('vi-VN')}` : `Từ ${new Date(fromDate).toLocaleDateString('vi-VN')} đến ${new Date(toDate).toLocaleDateString('vi-VN')}`
         );
         
         setAiEvaluation(result);
@@ -207,7 +207,7 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
                     {selectedEmpId && (
                         <button 
                             onClick={handleExportEmployeeRecords}
-                            className="bg-green-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-green-700 shadow-sm flex items-center gap-2 whitespace-nowrap"
+                            className="hidden md:flex bg-green-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-green-700 shadow-sm items-center gap-2 whitespace-nowrap"
                             title="Xuất danh sách hồ sơ của nhân viên này"
                         >
                             <FileSpreadsheet size={18} /> Xuất DS

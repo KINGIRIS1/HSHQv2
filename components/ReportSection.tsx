@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { BarChart3, FileSpreadsheet, Loader2, Sparkles, Download, CalendarDays, Printer, Layout, FileText, ListFilter, CheckCircle2, Clock, AlertTriangle, Settings, Key, X, Save, MapPin, UserCheck, ChevronLeft, ChevronRight, PieChart, CheckCircle, Ruler, FolderArchive, CalendarRange } from 'lucide-react';
+import { BarChart3, FileSpreadsheet, Loader2, Sparkles, Download, CalendarDays, Printer, Layout, FileText, ListFilter, CheckCircle2, Clock, AlertTriangle, Settings, Key, X, Save, MapPin, UserCheck, ChevronLeft, ChevronRight, PieChart, CheckCircle, Ruler, FolderArchive, CalendarRange, DollarSign } from 'lucide-react';
 import { RecordFile, RecordStatus, Employee, User } from '../types';
 import { getNormalizedWard, STATUS_LABELS, getShortRecordType, isArchiveRecordType } from '../constants';
 import { isRecordOverdue, removeVietnameseTones, isRecordApproaching, parseSafeDate } from '../utils/appHelpers';
@@ -10,6 +10,7 @@ import EmployeeStatsView from './report/EmployeeStatsView';
 import WardStatsView from './report/WardStatsView';
 import DailyStatsView from './report/DailyStatsView';
 import OverdueStatsView from './report/OverdueStatsView';
+import RevenueStatsView from './report/RevenueStatsView';
 
 interface ReportSectionProps {
     reportContent: string;
@@ -29,9 +30,18 @@ const getFormattedNotesAndDocs = (r: RecordFile): string => {
     return notesParts.join('; ') || '-';
 };
 
+const formatDateDDMMYYYY = (isoStr: string) => {
+    if (!isoStr) return '';
+    const parts = isoStr.split('-');
+    if (parts.length === 3) {
+        return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+    return isoStr;
+};
+
 const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerating, onGenerate, onExportExcel, records, wards, employees, currentUser }) => {
     const [fromDate, setFromDate] = useState(() => {
-        return '2025-01-01';
+        return '1970-01-01';
     });
     const [toDate, setToDate] = useState(() => {
         return new Date().toISOString().split('T')[0];
@@ -49,7 +59,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
     // Card filter state
     const [cardFilter, setCardFilter] = useState<'all' | 'completed' | 'processing' | 'overdue_pending' | 'overdue_completed' | null>(null);
 
-    const [activeTab, setActiveTab] = useState<'list' | 'ward_stats' | 'ai' | 'employee' | 'daily_stats' | 'overdue'>('list');
+    const [activeTab, setActiveTab] = useState<'list' | 'ward_stats' | 'revenue' | 'ai' | 'employee' | 'daily_stats' | 'overdue'>('list');
     const previewRef = useRef<HTMLDivElement>(null);
 
     const [isKeyModalOpen, setIsKeyModalOpen] = useState(false);
@@ -87,17 +97,17 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
     useEffect(() => {
         if (!isHanhChinhOrAdmin && userDept) {
             const deptLower = userDept.toLowerCase();
-            if (deptLower.includes('đo đạc') || deptLower.includes('kỹ thuật')) {
+            if ((deptLower.includes('đo đạc') || deptLower.includes('kỹ thuật')) && mainTab !== 'measurement') {
                 setMainTab('measurement');
-            } else if (deptLower.includes('lưu trữ')) {
+            } else if (deptLower.includes('lưu trữ') && mainTab !== 'archive') {
                 setMainTab('archive');
             }
         }
-    }, [isHanhChinhOrAdmin, userDept]);
+    }, [isHanhChinhOrAdmin, userDept, mainTab]);
 
     // Reset card filter when other filters change
     useEffect(() => {
-        setCardFilter(null);
+        setCardFilter(prev => prev === null ? prev : null);
     }, [fromDate, toDate, selectedWard, mainTab]);
 
     useEffect(() => {
@@ -406,7 +416,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
     const formatDate = (d?: string | null) => d ? new Date(d).toLocaleDateString('vi-VN') : '-';
 
     return (
-        <div className="flex flex-col h-full overflow-hidden relative bg-slate-50">
+        <div className="flex flex-col h-full overflow-y-auto md:overflow-hidden relative bg-slate-50">
             {/* MAIN TAB SWITCHER */}
             <div className="bg-white border-b border-gray-200 flex px-4 pt-2 gap-1 shrink-0">
                 {(isHanhChinhOrAdmin || (userDept && (userDept.toLowerCase().includes('đo đạc') || userDept.toLowerCase().includes('kỹ thuật')))) && (
@@ -457,13 +467,13 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                     <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-lg border border-slate-200">
                         <button 
                             onClick={() => {
-                                setFromDate('2025-01-01');
+                                setFromDate('1970-01-01');
                                 setToDate(new Date().toISOString().split('T')[0]);
                                 setReportType('custom');
                             }} 
-                            className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-1 ${(fromDate === '2025-01-01' && reportType === 'custom') ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-600 hover:text-blue-600'}`}
+                            className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-1 ${(fromDate === '1970-01-01' && reportType === 'custom') ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-600 hover:text-blue-600'}`}
                         >
-                            <CalendarRange size={14} /> Từ 2025 đến nay
+                            <CalendarRange size={14} /> Tất cả
                         </button>
                         <button onClick={() => handleQuickReport('week')} className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-1 ${reportType === 'week' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-600 hover:text-blue-600'}`}>
                             <CalendarDays size={14} /> Tuần này
@@ -489,13 +499,29 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                             </select>
                         </div>
 
-                        <div className="flex items-center gap-2 bg-white border border-gray-300 rounded-lg px-2 py-1 shadow-sm">
-                            <input type="date" value={fromDate} onChange={(e) => { setFromDate(e.target.value); setReportType('custom'); }} className="text-sm outline-none text-gray-700 font-medium" />
-                            <span className="text-gray-400">➜</span>
-                            <input type="date" value={toDate} onChange={(e) => { setToDate(e.target.value); setReportType('custom'); }} className="text-sm outline-none text-gray-700 font-medium" />
+                        <div className="flex items-center gap-1.5 bg-white border border-gray-300 rounded-lg px-2.5 py-1.5 shadow-sm shrink-0 whitespace-nowrap text-xs font-bold text-gray-700">
+                            <div className="relative flex items-center hover:text-blue-600 transition-colors">
+                                <span>{fromDate === '1970-01-01' ? 'Tất cả' : (formatDateDDMMYYYY(fromDate) || 'Từ ngày')}</span>
+                                <input 
+                                    type="date" 
+                                    className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" 
+                                    value={fromDate} 
+                                    onChange={(e) => { setFromDate(e.target.value); setReportType('custom'); }} 
+                                />
+                            </div>
+                            <span className="text-gray-400 font-bold text-xs">-</span>
+                            <div className="relative flex items-center hover:text-blue-600 transition-colors">
+                                <span>{formatDateDDMMYYYY(toDate) || 'Đến ngày'}</span>
+                                <input 
+                                    type="date" 
+                                    className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" 
+                                    value={toDate} 
+                                    onChange={(e) => { setToDate(e.target.value); setReportType('custom'); }} 
+                                />
+                            </div>
                         </div>
                         
-                        <button onClick={handleExportExcelClick} className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 font-bold text-sm shadow-sm transition-colors" title="Xuất Excel">
+                        <button onClick={handleExportExcelClick} className="hidden md:flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 font-bold text-sm shadow-sm transition-colors" title="Xuất Excel">
                             <FileSpreadsheet size={18} /> Xuất Excel
                         </button>
                     </div>
@@ -503,65 +529,99 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
             </div>
 
             {/* Content Tabs */}
-            <div className="flex bg-white border-b border-gray-200 px-4">
+            <div className="flex bg-white border-b border-gray-200 px-2 md:px-4 justify-between md:justify-start gap-1 overflow-x-auto no-scrollbar">
                 <button 
                     onClick={() => setActiveTab('list')}
-                    className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'list' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                    className={`px-3 md:px-6 py-2.5 md:py-3 text-xs md:text-sm font-bold border-b-2 transition-all flex items-center justify-center gap-1.5 shrink-0 ${activeTab === 'list' ? 'border-blue-600 text-blue-600 bg-blue-50/60 md:bg-transparent rounded-t-lg md:rounded-none' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                    title={`Danh sách kết quả (${filteredData.length})`}
                 >
-                    <ListFilter size={16}/> Danh sách kết quả ({filteredData.length})
+                    <ListFilter size={18}/> 
+                    <span className="hidden md:inline">Danh sách kết quả ({filteredData.length})</span>
                 </button>
                 <button 
                     onClick={() => setActiveTab('ward_stats')}
-                    className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'ward_stats' ? 'border-teal-600 text-teal-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                    className={`px-3 md:px-6 py-2.5 md:py-3 text-xs md:text-sm font-bold border-b-2 transition-all flex items-center justify-center gap-1.5 shrink-0 ${activeTab === 'ward_stats' ? 'border-teal-600 text-teal-600 bg-teal-50/60 md:bg-transparent rounded-t-lg md:rounded-none' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                    title="Thống kê theo Xã"
                 >
-                    <PieChart size={16}/> Thống kê theo Xã
+                    <PieChart size={18}/> 
+                    <span className="hidden md:inline">Thống kê theo Xã</span>
+                </button>
+                <button 
+                    onClick={() => setActiveTab('revenue')}
+                    className={`px-3 md:px-6 py-2.5 md:py-3 text-xs md:text-sm font-bold border-b-2 transition-all flex items-center justify-center gap-1.5 shrink-0 ${activeTab === 'revenue' ? 'border-emerald-600 text-emerald-600 bg-emerald-50/60 md:bg-transparent rounded-t-lg md:rounded-none' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                    title="Báo cáo Doanh thu"
+                >
+                    <DollarSign size={18}/> 
+                    <span className="hidden md:inline">Báo cáo Doanh thu</span>
                 </button>
                 <button 
                     onClick={() => setActiveTab('employee')}
-                    className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'employee' ? 'border-orange-600 text-orange-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                    className={`px-3 md:px-6 py-2.5 md:py-3 text-xs md:text-sm font-bold border-b-2 transition-all flex items-center justify-center gap-1.5 shrink-0 ${activeTab === 'employee' ? 'border-orange-600 text-orange-600 bg-orange-50/60 md:bg-transparent rounded-t-lg md:rounded-none' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                    title="Thống kê nhân viên"
                 >
-                    <UserCheck size={16}/> Thống kê nhân viên
+                    <UserCheck size={18}/> 
+                    <span className="hidden md:inline">Thống kê nhân viên</span>
                 </button>
                 <button 
                     onClick={() => setActiveTab('daily_stats')}
-                    className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'daily_stats' ? 'border-pink-600 text-pink-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                    className={`px-3 md:px-6 py-2.5 md:py-3 text-xs md:text-sm font-bold border-b-2 transition-all flex items-center justify-center gap-1.5 shrink-0 ${activeTab === 'daily_stats' ? 'border-pink-600 text-pink-600 bg-pink-50/60 md:bg-transparent rounded-t-lg md:rounded-none' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                    title="Thống kê theo ngày"
                 >
-                    <CalendarDays size={16}/> Thống kê theo ngày
+                    <CalendarDays size={18}/> 
+                    <span className="hidden md:inline">Thống kê theo ngày</span>
                 </button>
                 <button 
                     onClick={() => setActiveTab('overdue')}
-                    className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'overdue' ? 'border-red-600 text-red-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                    className={`px-3 md:px-6 py-2.5 md:py-3 text-xs md:text-sm font-bold border-b-2 transition-all flex items-center justify-center gap-1.5 shrink-0 ${activeTab === 'overdue' ? 'border-red-600 text-red-600 bg-red-50/60 md:bg-transparent rounded-t-lg md:rounded-none' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                    title="Thống kê hồ sơ trễ"
                 >
-                    <AlertTriangle size={16}/> Thống kê hồ sơ trễ
+                    <AlertTriangle size={18}/> 
+                    <span className="hidden md:inline">Thống kê hồ sơ trễ</span>
                 </button>
                 <button 
                     onClick={() => setActiveTab('ai')}
-                    className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'ai' ? 'border-purple-600 text-purple-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                    className={`px-3 md:px-6 py-2.5 md:py-3 text-xs md:text-sm font-bold border-b-2 transition-all flex items-center justify-center gap-1.5 shrink-0 ${activeTab === 'ai' ? 'border-purple-600 text-purple-600 bg-purple-50/60 md:bg-transparent rounded-t-lg md:rounded-none' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                    title="Văn bản Báo cáo (AI)"
                 >
-                    <Sparkles size={16}/> Văn bản Báo cáo (AI)
+                    <Sparkles size={18}/> 
+                    <span className="hidden md:inline">Văn bản Báo cáo (AI)</span>
                 </button>
             </div>
 
+            {/* Active Tab Subtitle Banner on Mobile */}
+            <div className="md:hidden px-3 py-1.5 bg-slate-100 border-b border-slate-200 text-xs font-bold text-slate-700 flex justify-between items-center shrink-0">
+                <span>
+                    {activeTab === 'list' && `Danh sách kết quả (${filteredData.length})`}
+                    {activeTab === 'ward_stats' && 'Thống kê theo Xã/Phường'}
+                    {activeTab === 'revenue' && 'Báo cáo Doanh thu'}
+                    {activeTab === 'employee' && 'Thống kê Nhân viên'}
+                    {activeTab === 'daily_stats' && 'Thống kê theo Ngày'}
+                    {activeTab === 'overdue' && 'Thống kê Hồ sơ Trễ'}
+                    {activeTab === 'ai' && 'Văn bản Báo cáo (AI)'}
+                </span>
+                <span className="text-[10px] text-slate-400 font-normal">Chạm icon trên để đổi</span>
+            </div>
+
             {/* STATS CARDS: HIỂN THỊ DƯỚI CONTENT TABS (Tránh chồng nội dung không cần thiết & hỗ trợ click lọc trực tiếp) */}
-            <div className="p-4 bg-slate-50 border-b border-gray-200 shrink-0">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 animate-fade-in">
+            <div className="p-2.5 md:p-4 bg-slate-50 border-b border-gray-200 shrink-0">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4 animate-fade-in">
                     {/* Thẻ: Tổng hồ sơ */}
                     <div 
                         onClick={() => {
                             setCardFilter(cardFilter === 'all' ? null : 'all');
                             setActiveTab('list');
                         }}
-                        className={`p-3 rounded-xl flex items-center gap-3 shadow-sm cursor-pointer transition-all duration-200 border ${
+                        className={`p-2 md:p-3 rounded-xl flex items-center gap-2 md:gap-3 shadow-sm cursor-pointer transition-all duration-200 border ${
                             (cardFilter === 'all' || cardFilter === null)
-                                ? 'bg-blue-100/80 border-blue-400 ring-2 ring-blue-500 scale-[1.02] shadow-md font-semibold' 
-                                : 'bg-blue-50/50 border-blue-100 hover:border-blue-300 hover:bg-blue-50 hover:scale-[1.01]'
+                                ? 'bg-blue-100/80 border-blue-400 ring-2 ring-blue-500 scale-[1.01] shadow-md font-semibold' 
+                                : 'bg-blue-50/50 border-blue-100 hover:border-blue-300 hover:bg-blue-50'
                         }`}
                         title="Click để xem tất cả hồ sơ"
                     >
-                        <div className="bg-blue-200 p-2 rounded-lg text-blue-700 shrink-0"><ListFilter size={20}/></div>
-                        <div>
-                            <div className="text-2xl font-bold text-blue-800">{generalStats.total}</div>
-                            <div className="text-xs text-blue-600 uppercase font-bold whitespace-nowrap">Tổng hồ sơ</div>
+                        <div className="bg-blue-200/70 p-1.5 rounded-lg text-blue-700 shrink-0"><ListFilter size={16}/></div>
+                        <div className="min-w-0">
+                            <div className="text-lg md:text-2xl font-bold text-blue-800 leading-none">{generalStats.total}</div>
+                            <div className="text-[10px] md:text-xs text-blue-600 uppercase font-bold whitespace-nowrap mt-1 leading-tight">Tổng hồ sơ</div>
                         </div>
                     </div>
 
@@ -571,17 +631,17 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                             setCardFilter(cardFilter === 'completed' ? null : 'completed');
                             setActiveTab('list');
                         }}
-                        className={`p-3 rounded-xl flex items-center gap-3 shadow-sm cursor-pointer transition-all duration-200 border ${
+                        className={`p-2 md:p-3 rounded-xl flex items-center gap-2 md:gap-3 shadow-sm cursor-pointer transition-all duration-200 border ${
                             cardFilter === 'completed'
-                                ? 'bg-green-100 border-green-400 ring-2 ring-green-500 scale-[1.02] shadow-md font-semibold' 
-                                : 'bg-green-50/50 border-green-100 hover:border-green-300 hover:bg-green-50 hover:scale-[1.01]'
+                                ? 'bg-green-100 border-green-400 ring-2 ring-green-500 scale-[1.01] shadow-md font-semibold' 
+                                : 'bg-green-50/50 border-green-100 hover:border-green-300 hover:bg-green-50'
                         }`}
                         title="Click để lọc hồ sơ đã hoàn thành"
                     >
-                        <div className="bg-green-200 p-2 rounded-lg text-green-700 shrink-0"><CheckCircle2 size={20}/></div>
-                        <div>
-                            <div className="text-2xl font-bold text-green-800">{generalStats.completed}</div>
-                            <div className="text-xs text-green-600 uppercase font-bold whitespace-nowrap">Đã xong</div>
+                        <div className="bg-green-200/70 p-1.5 rounded-lg text-green-700 shrink-0"><CheckCircle2 size={16}/></div>
+                        <div className="min-w-0">
+                            <div className="text-lg md:text-2xl font-bold text-green-800 leading-none">{generalStats.completed}</div>
+                            <div className="text-[10px] md:text-xs text-green-600 uppercase font-bold whitespace-nowrap mt-1 leading-tight">Đã xong</div>
                         </div>
                     </div>
 
@@ -591,17 +651,17 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                             setCardFilter(cardFilter === 'processing' ? null : 'processing');
                             setActiveTab('list');
                         }}
-                        className={`p-3 rounded-xl flex items-center gap-3 shadow-sm cursor-pointer transition-all duration-200 border ${
+                        className={`p-2 md:p-3 rounded-xl flex items-center gap-2 md:gap-3 shadow-sm cursor-pointer transition-all duration-200 border ${
                             cardFilter === 'processing'
-                                ? 'bg-orange-100 border-orange-400 ring-2 ring-orange-500 scale-[1.02] shadow-md font-semibold' 
-                                : 'bg-orange-50/50 border-orange-100 hover:border-orange-300 hover:bg-orange-50 hover:scale-[1.01]'
+                                ? 'bg-orange-100 border-orange-400 ring-2 ring-orange-500 scale-[1.01] shadow-md font-semibold' 
+                                : 'bg-orange-50/50 border-orange-100 hover:border-orange-300 hover:bg-orange-50'
                         }`}
                         title="Click để lọc hồ sơ đang xử lý"
                     >
-                        <div className="bg-orange-200 p-2 rounded-lg text-orange-700 shrink-0"><Clock size={20}/></div>
-                        <div>
-                            <div className="text-2xl font-bold text-orange-800">{generalStats.processing}</div>
-                            <div className="text-xs text-orange-600 uppercase font-bold whitespace-nowrap">Đang xử lý</div>
+                        <div className="bg-orange-200/70 p-1.5 rounded-lg text-orange-700 shrink-0"><Clock size={16}/></div>
+                        <div className="min-w-0">
+                            <div className="text-lg md:text-2xl font-bold text-orange-800 leading-none">{generalStats.processing}</div>
+                            <div className="text-[10px] md:text-xs text-orange-600 uppercase font-bold whitespace-nowrap mt-1 leading-tight">Đang xử lý</div>
                         </div>
                     </div>
 
@@ -611,14 +671,14 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                             setCardFilter(cardFilter === 'overdue_pending' ? null : 'overdue_pending');
                             setActiveTab('list');
                         }}
-                        className={`p-3 rounded-xl flex items-center gap-3 shadow-sm cursor-pointer transition-all duration-200 border ${
+                        className={`p-1.5 md:p-2.5 rounded-xl flex items-center gap-1.5 md:gap-3 shadow-sm cursor-pointer transition-all duration-200 border ${
                             (cardFilter === 'overdue_pending' || cardFilter === 'overdue_completed')
-                                ? 'bg-red-100 border-red-400 ring-2 ring-red-500 scale-[1.02] shadow-md' 
-                                : 'bg-red-50/50 border-red-100 hover:border-red-300 hover:bg-red-50 hover:scale-[1.01]'
+                                ? 'bg-red-100 border-red-400 ring-2 ring-red-500 scale-[1.01] shadow-md' 
+                                : 'bg-red-50/50 border-red-100 hover:border-red-300 hover:bg-red-50'
                         }`}
                         title="Click để lọc hồ sơ trễ hạn"
                     >
-                        <div className="bg-red-200 p-2 rounded-lg text-red-700 shrink-0"><AlertTriangle size={20}/></div>
+                        <div className="bg-red-200/70 p-1.5 rounded-lg text-red-700 shrink-0"><AlertTriangle size={16}/></div>
                         <div className="flex-1 min-w-0">
                             <div 
                                 onClick={(e) => {
@@ -626,13 +686,13 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                                     setCardFilter(cardFilter === 'overdue_pending' ? null : 'overdue_pending');
                                     setActiveTab('list');
                                 }}
-                                className={`flex justify-between items-center text-red-800 px-1 rounded transition-colors ${
+                                className={`flex justify-between items-center text-red-800 px-1 py-0.5 rounded transition-colors ${
                                     cardFilter === 'overdue_pending' ? 'bg-red-200/70 font-bold border border-red-300' : 'hover:bg-red-100/50'
                                 }`}
                                 title="Lọc hồ sơ trễ chưa xong"
                             >
-                                <span className="text-xs font-semibold">Chưa xong:</span>
-                                <span className="text-base font-bold">{generalStats.overduePending}</span>
+                                <span className="text-[9px] md:text-xs font-semibold">Chưa xong:</span>
+                                <span className="text-xs md:text-sm font-bold ml-1">{generalStats.overduePending}</span>
                             </div>
                             <div 
                                 onClick={(e) => {
@@ -640,15 +700,15 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                                     setCardFilter(cardFilter === 'overdue_completed' ? null : 'overdue_completed');
                                     setActiveTab('list');
                                 }}
-                                className={`flex justify-between items-center text-red-600/70 mt-0.5 px-1 rounded transition-colors ${
+                                className={`flex justify-between items-center text-red-600/70 mt-0.5 px-1 py-0.5 rounded transition-colors ${
                                     cardFilter === 'overdue_completed' ? 'bg-red-200/50 font-bold border border-red-300' : 'hover:bg-red-100/30'
                                 }`}
                                 title="Lọc hồ sơ trễ đã xong"
                             >
-                                <span className="text-xs font-semibold">Đã xong:</span>
-                                <span className="text-xs font-bold">{generalStats.overdueCompleted}</span>
+                                <span className="text-[9px] md:text-xs font-semibold">Đã xong:</span>
+                                <span className="text-[10px] md:text-xs font-bold ml-1">{generalStats.overdueCompleted}</span>
                             </div>
-                            <div className="text-[10px] text-red-600 uppercase font-bold text-center mt-1 pt-0.5 border-t border-red-200">
+                            <div className="text-[8px] md:text-[10px] text-red-600 uppercase font-bold text-center mt-0.5 pt-0.5 border-t border-red-200 leading-none">
                                 Tổng trễ hạn
                             </div>
                         </div>
@@ -657,10 +717,11 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
             </div>
 
             {/* TAB CONTENT */}
-            <div className="flex-1 overflow-hidden bg-slate-100 p-0">
+            <div className="flex-1 overflow-y-auto md:overflow-hidden bg-slate-100 p-0">
                 {activeTab === 'list' && (
-                    <div className="bg-white rounded-none h-full overflow-hidden flex flex-col animate-fade-in-up p-4">
-                        <div className="flex-1 overflow-auto rounded-xl border border-gray-200">
+                    <div className="bg-white rounded-none h-full overflow-hidden flex flex-col animate-fade-in-up p-2 md:p-4">
+                        {/* DESKTOP TABLE VIEW */}
+                        <div className="hidden md:block flex-1 overflow-auto rounded-xl border border-gray-200">
                             <table className="w-full text-left text-sm">
                                 <thead className="bg-gray-50 text-xs text-gray-500 uppercase font-bold sticky top-0 shadow-sm z-10">
                                     <tr>
@@ -724,6 +785,72 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                                     )}
                                 </tbody>
                             </table>
+                        </div>
+
+                        {/* MOBILE CARD LIST VIEW (Giống tab Tìm kiếm) */}
+                        <div className="md:hidden flex-1 overflow-y-auto space-y-2.5 pb-2">
+                            {paginatedData.length > 0 ? paginatedData.map((r, i) => {
+                                const emp = employees.find(e => e.id === r.assignedTo);
+                                const isOverdue = isRecordOverdue(r);
+                                const rowIndex = (currentPage - 1) * itemsPerPage + i + 1;
+                                let isCompletedLate = false;
+                                if (r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED) {
+                                    if (r.deadline && r.completedDate) {
+                                        const d = new Date(r.deadline); d.setHours(0,0,0,0);
+                                        const c = new Date(r.completedDate); c.setHours(0,0,0,0);
+                                        if (c > d) isCompletedLate = true;
+                                    }
+                                }
+
+                                return (
+                                    <div key={r.id} className="bg-white rounded-xl border border-slate-200 p-3 shadow-sm hover:shadow-md transition-all">
+                                        <div className="flex justify-between items-start mb-2 gap-2">
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className="text-[10px] bg-slate-100 text-slate-500 font-bold px-1.5 py-0.5 rounded">#{rowIndex}</span>
+                                                    <h3 className="font-bold text-slate-800 text-sm truncate">{r.customerName}</h3>
+                                                </div>
+                                                <div className="text-xs text-blue-600 font-semibold font-mono mt-0.5">{r.code}</div>
+                                            </div>
+                                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold border uppercase shrink-0 ${
+                                                r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED ? 'bg-green-100 text-green-700 border-green-200' : 
+                                                r.status === RecordStatus.WITHDRAWN ? 'bg-gray-100 text-gray-600 border-gray-200' :
+                                                r.status === RecordStatus.REJECTED ? 'bg-red-100 text-red-700 border-red-200' :
+                                                isOverdue ? 'bg-red-100 text-red-700 border-red-200 font-bold' :
+                                                'bg-blue-50 text-blue-700 border-blue-100'
+                                            }`}>
+                                                {STATUS_LABELS[r.status]}
+                                            </span>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-1.5 text-xs text-slate-600 bg-slate-50 p-2.5 rounded-lg">
+                                            <div>
+                                                <span className="text-slate-400">Địa bàn:</span> <span className="font-medium text-slate-800">{getNormalizedWard(r.ward)}</span>
+                                            </div>
+                                            <div>
+                                                <span className="text-slate-400">Tờ/Thửa:</span> <span className="font-medium text-slate-800">{r.mapSheet || '-'}/{r.landPlot || '-'}</span>
+                                            </div>
+                                            <div>
+                                                <span className="text-slate-400">Nhận:</span> <span className="font-medium text-slate-800">{formatDate(r.receivedDate)}</span>
+                                            </div>
+                                            <div>
+                                                <span className="text-slate-400">Hẹn trả:</span> <span className={`font-medium ${isOverdue ? 'text-red-600 font-bold' : 'text-slate-800'}`}>{formatDate(r.deadline)}</span>
+                                            </div>
+                                            {r.completedDate && (
+                                                <div className="col-span-2">
+                                                    <span className="text-slate-400">Hoàn thành:</span> <span className={`font-medium ${isCompletedLate ? 'text-orange-600' : 'text-green-700'}`}>{formatDate(r.completedDate)}</span>
+                                                </div>
+                                            )}
+                                            <div className="col-span-2 flex items-center justify-between pt-1 border-t border-slate-200/60 mt-0.5">
+                                                <span className="text-slate-400">NV xử lý:</span>
+                                                <span className="font-semibold text-slate-800">{emp ? emp.name : '-'}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            }) : (
+                                <div className="p-8 text-center text-slate-400 text-sm">Không có dữ liệu trong khoảng thời gian này.</div>
+                            )}
                         </div>
                         {/* Pagination Footer */}
                         {filteredData.length > 0 && (
@@ -824,6 +951,15 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                     <OverdueStatsView 
                         records={filteredData}
                         employees={activeEmployees}
+                    />
+                )}
+
+                {activeTab === 'revenue' && (
+                    <RevenueStatsView 
+                        records={filteredData}
+                        employees={activeEmployees}
+                        fromDate={fromDate}
+                        toDate={toDate}
                     />
                 )}
 

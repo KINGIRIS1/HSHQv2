@@ -308,6 +308,14 @@ export const mapRecordFromDb = (item: any): any => {
     r.isHandedOver = val(r.isHandedOver, r.ishandedover, r.is_handed_over);
     r.deadline = keepOnlyDate(val(r.deadline, r.deadline, r.dead_line));
     
+    let rawLogs = val(r.statusLogs, r.statuslogs, r.status_logs);
+    if (typeof rawLogs === 'string') {
+        try { rawLogs = JSON.parse(rawLogs); } catch (e) { rawLogs = []; }
+    }
+    r.statusLogs = Array.isArray(rawLogs) ? rawLogs : [];
+    r.archiveHandoverDate = keepOnlyDate(val(r.archiveHandoverDate, r.archivehandoverdate, r.archive_handover_date));
+    r.archiveHandoverBatch = val(r.archiveHandoverBatch, r.archivehandoverbatch, r.archive_handover_batch);
+
     return r;
 };
 

@@ -40,8 +40,8 @@ const ScheduleList: React.FC<ScheduleListProps> = ({ schedules, onEdit, onDelete
         if (type === 'week') {
             const day = now.getDay();
             const diff = now.getDate() - day + (day === 0 ? -6 : 1); // Thứ 2
-            start = new Date(now.setDate(diff));
-            end = new Date(now.setDate(diff + 6));
+            start = new Date(now.getFullYear(), now.getMonth(), diff);
+            end = new Date(now.getFullYear(), now.getMonth(), diff + 6);
         } else {
             start = new Date(now.getFullYear(), now.getMonth(), 1);
             end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
@@ -77,7 +77,17 @@ const ScheduleList: React.FC<ScheduleListProps> = ({ schedules, onEdit, onDelete
     const formatDate = (dateStr: string) => {
         if (!dateStr) return '';
         const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return dateStr;
         return `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}`;
+    };
+
+    const formatDateDDMMYYYY = (isoStr: string) => {
+        if (!isoStr) return '';
+        const parts = isoStr.split('-');
+        if (parts.length === 3) {
+            return `${parts[2]}/${parts[1]}/${parts[0]}`;
+        }
+        return isoStr;
     };
 
     const handleExport = () => {
@@ -157,7 +167,7 @@ const ScheduleList: React.FC<ScheduleListProps> = ({ schedules, onEdit, onDelete
     // Reset pagination when filter changes
     React.useEffect(() => {
         setCurrentPage(1);
-    }, [searchTerm, filterType, dateRange]);
+    }, [searchTerm, filterType, dateRange.from, dateRange.to]);
 
     // Pagination Logic
     const totalPages = Math.ceil(filteredList.length / itemsPerPage);
@@ -168,41 +178,57 @@ const ScheduleList: React.FC<ScheduleListProps> = ({ schedules, onEdit, onDelete
 
     return (
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col h-full overflow-hidden">
-            <div className="p-4 border-b border-gray-200 bg-gray-50 flex flex-col gap-3">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                    <h3 className="font-bold text-gray-700 flex items-center gap-2">
-                        <CalendarDays size={18} className="text-blue-600"/> Danh sách lịch ({filteredList.length})
+            <div className="p-3 border-b border-gray-200 bg-gray-50 flex flex-col gap-2">
+                {/* Header row with Title & Presets */}
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h3 className="font-bold text-gray-700 flex items-center gap-2 text-sm shrink-0">
+                        <CalendarDays size={18} className="text-blue-600"/> Lịch công tác ({filteredList.length})
                     </h3>
                     
-                    <div className="flex items-center gap-2 bg-white p-1 rounded-lg border border-gray-200">
-                        <button onClick={() => handleFilterPreset('week')} className={`px-3 py-1 text-xs font-bold rounded transition-colors ${filterType === 'week' ? 'bg-blue-100 text-blue-700' : 'text-gray-500 hover:bg-gray-100'}`}>Tuần này</button>
-                        <button onClick={() => handleFilterPreset('month')} className={`px-3 py-1 text-xs font-bold rounded transition-colors ${filterType === 'month' ? 'bg-blue-100 text-blue-700' : 'text-gray-500 hover:bg-gray-100'}`}>Tháng này</button>
-                        <button onClick={() => setFilterType('all')} className={`px-3 py-1 text-xs font-bold rounded transition-colors ${filterType === 'all' ? 'bg-blue-100 text-blue-700' : 'text-gray-500 hover:bg-gray-100'}`}>Tất cả</button>
+                    <div className="flex items-center gap-1 bg-white p-1 rounded-lg border border-gray-200 shadow-sm shrink-0">
+                        <button onClick={() => handleFilterPreset('week')} className={`px-2.5 py-1 text-xs font-bold rounded transition-colors ${filterType === 'week' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}>Tuần này</button>
+                        <button onClick={() => handleFilterPreset('month')} className={`px-2.5 py-1 text-xs font-bold rounded transition-colors ${filterType === 'month' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}>Tháng này</button>
+                        <button onClick={() => setFilterType('all')} className={`px-2.5 py-1 text-xs font-bold rounded transition-colors ${filterType === 'all' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}>Tất cả</button>
                     </div>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-3">
-                    <div className="relative flex-1 min-w-[200px]">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                {/* Filter controls on a single horizontal row */}
+                <div className="flex items-center gap-2 overflow-x-auto w-full py-0.5">
+                    <div className="relative flex-1 min-w-[150px]">
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
                         <input 
                             type="text" 
                             placeholder="Tìm nội dung, người thực hiện..." 
-                            className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-1 focus:ring-blue-500 outline-none"
+                            className="w-full pl-8 pr-3 py-1.5 border border-gray-300 rounded-lg text-xs font-medium focus:ring-1 focus:ring-blue-500 outline-none bg-white"
                             value={searchTerm}
                             onChange={e => setSearchTerm(e.target.value)}
                         />
                     </div>
                     
-                    {filterType !== 'all' && (
-                        <div className="flex items-center gap-2 bg-white border border-gray-300 rounded-lg px-2 py-1 shadow-sm">
-                            <input type="date" className="text-sm border-none outline-none text-gray-600 font-medium w-32" value={dateRange.from} onChange={e => { setDateRange({...dateRange, from: e.target.value}); setFilterType('range'); }} />
-                            <span className="text-gray-400">➜</span>
-                            <input type="date" className="text-sm border-none outline-none text-gray-600 font-medium w-32" value={dateRange.to} onChange={e => { setDateRange({...dateRange, to: e.target.value}); setFilterType('range'); }} />
+                    <div className="flex items-center gap-1.5 bg-white border border-gray-300 rounded-lg px-2.5 py-1.5 shadow-sm shrink-0 whitespace-nowrap text-xs font-bold text-gray-700">
+                        <div className="relative flex items-center hover:text-blue-600 transition-colors">
+                            <span>{formatDateDDMMYYYY(dateRange.from) || 'Từ ngày'}</span>
+                            <input 
+                                type="date" 
+                                className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" 
+                                value={dateRange.from} 
+                                onChange={e => { setDateRange({...dateRange, from: e.target.value}); setFilterType('range'); }} 
+                            />
                         </div>
-                    )}
+                        <span className="text-gray-400 font-bold text-xs">-</span>
+                        <div className="relative flex items-center hover:text-blue-600 transition-colors">
+                            <span>{formatDateDDMMYYYY(dateRange.to) || 'Đến ngày'}</span>
+                            <input 
+                                type="date" 
+                                className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" 
+                                value={dateRange.to} 
+                                onChange={e => { setDateRange({...dateRange, to: e.target.value}); setFilterType('range'); }} 
+                            />
+                        </div>
+                    </div>
 
-                    <button onClick={handleExport} className="flex items-center gap-2 bg-green-600 text-white px-3 py-2 rounded-lg text-sm font-bold hover:bg-green-700 shadow-sm ml-auto">
-                        <FileSpreadsheet size={16} /> Xuất Excel
+                    <button onClick={handleExport} className="hidden md:flex items-center gap-1.5 bg-green-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-green-700 shadow-sm shrink-0 ml-auto">
+                        <FileSpreadsheet size={15} /> Xuất Excel
                     </button>
                 </div>
             </div>

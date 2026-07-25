@@ -35,6 +35,20 @@ const MobileRecordList: React.FC<MobileRecordListProps> = ({
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
+  const formatDateDDMMYYYY = (dateStr?: string | null) => {
+    if (!dateStr) return 'N/A';
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return dateStr;
+      const day = d.getDate().toString().padStart(2, '0');
+      const month = (d.getMonth() + 1).toString().padStart(2, '0');
+      const year = d.getFullYear();
+      return `${day}/${month}/${year}`;
+    } catch {
+      return dateStr;
+    }
+  };
+
   // Reset page when filtering
   React.useEffect(() => {
     setCurrentPage(1);
@@ -126,9 +140,9 @@ const MobileRecordList: React.FC<MobileRecordListProps> = ({
                     <Phone size={14} className="shrink-0" />
                     <span className="text-xs">{record.phoneNumber || 'N/A'}</span>
                   </div>
-                  <div className="flex items-center gap-2 text-slate-500">
-                    <Calendar size={14} className="shrink-0" />
-                    <span className="text-xs">{record.receivedDate || 'N/A'}</span>
+                  <div className="flex items-center gap-1.5 text-slate-500">
+                    <Calendar size={13} className="shrink-0 text-blue-500" />
+                    <span className="text-[11px] font-semibold text-slate-700">{formatDateDDMMYYYY(record.receivedDate)}</span>
                   </div>
                   <div className="flex items-center gap-2 text-slate-500">
                     <User size={14} className="shrink-0" />

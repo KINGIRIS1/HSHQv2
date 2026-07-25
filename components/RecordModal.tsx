@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { RecordFile, RecordStatus, Employee, User, UserRole } from '../types';
 import { GROUPS, EXTENDED_RECORD_TYPES, STATUS_LABELS, getShortRecordType, getWardLabel, getNormalizedWard } from '../constants';
-import { X, Save, Lock, User as UserIcon, MapPin, FileText, Calendar, FileCheck, ChevronDown, ChevronUp } from 'lucide-react';
+import { X, Save, Lock, User as UserIcon, MapPin, FileText, Calendar, FileCheck, ChevronDown, ChevronUp, History } from 'lucide-react';
 import { calculateDeadlineHelper } from '../utils/appHelpers';
 
 interface AttachedDocItem {
@@ -260,6 +260,23 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
         if (!finalData.completedDate) {
             finalData.completedDate = finalData.exportDate ? finalData.exportDate : new Date().toISOString();
         }
+    }
+
+    // Tự động ghi Log lịch sử thay đổi trạng thái
+    const prevStatus = initialData ? initialData.status : null;
+    const newStatus = finalData.status || RecordStatus.RECEIVED;
+    if (prevStatus !== newStatus || !initialData) {
+        const existingLogs = Array.isArray(initialData?.statusLogs) ? initialData.statusLogs : [];
+        const newLog = {
+            id: 'LOG_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+            recordId: initialData?.id || '',
+            previousStatus: prevStatus,
+            newStatus: newStatus,
+            changedBy: currentUser.name || currentUser.username || 'Hệ thống',
+            changedAt: new Date().toISOString(),
+            note: initialData ? 'Cập nhật từ biểu mẫu hồ sơ' : 'Tạo mới hồ sơ'
+        };
+        finalData.statusLogs = [newLog, ...existingLogs];
     }
 
     // Để đảm bảo gửi null thay vì undefined cho API nếu cần xóa
@@ -677,6 +694,16 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                             </div>
                         )}
                         
+                        {/* Thông báo phân loại giao 2 bộ cho hồ sơ đo đạc */}
+                        {showMsr && (
+                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-800 flex items-start gap-2">
+                                <FileText size={16} className="text-blue-600 mt-0.5 shrink-0" />
+                                <div>
+                                    <span className="font-bold">Quy định giao nhận (Tổ Đo đạc):</span> Hồ sơ đo đạc 1 cửa bàn giao gồm <span className="font-bold text-blue-900">2 bộ</span> (1 bộ trả người dân và 1 bộ chuyển về kho lưu trữ). Danh sách bộ lưu trữ được chốt xuất giao kho khi người dân nhận kết quả.
+                                </div>
+                            </div>
+                        )}
+
                         {canEditResult && (
                             <div className="bg-emerald-50 p-4 rounded-lg border border-emerald-200">
                                 <h4 className="text-sm font-bold text-emerald-800 flex items-center gap-2 mb-3"><FileCheck size={16} /> TRẢ KẾT QUẢ CHO DÂN</h4>
@@ -691,6 +718,51 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                             <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
                                 <div className="flex items-center gap-2 mb-1"><Lock size={14} className="text-yellow-600" /><label className="text-xs font-bold text-yellow-800 uppercase">Ghi chú nội bộ</label></div>
                                 <textarea rows={2} className="w-full border border-yellow-300 rounded-md px-3 py-2 bg-white text-sm" value={val(formData.privateNotes)} onChange={(e) => handleChange('privateNotes', e.target.value)} />
+                            </div>
+                        )}
+
+                        {/* 5. LỊCH SỬ THAY ĐỔI TRẠNG THÁI (LOG) */}
+                        {formData.statusLogs && formData.statusLogs.length > 0 && (
+                            <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mt-4">
+                                <h3 className="text-xs font-bold text-gray-700 uppercase mb-3 flex items-center gap-2 border-b pb-2">
+                                    <History size={16} className="text-blue-600" /> Bảng Log lịch sử thay đổi trạng thái ({formData.statusLogs.length})
+                                </h3>
+                                <div className="overflow-x-auto max-h-60">
+                                    <table className="w-full text-xs text-left border-collapse">
+                                        <thead>
+                                            <tr className="bg-gray-50 text-gray-600 border-b">
+                                                <th className="p-2 font-semibold">Thời gian</th>
+                                                <th className="p-2 font-semibold">Người thay đổi</th>
+                                                <th className="p-2 font-semibold">Trạng thái cũ</th>
+                                                <th className="p-2 font-semibold">Trạng thái mới</th>
+                                                <th className="p-2 font-semibold">Ghi chú</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-100">
+                                            {formData.statusLogs.map((log, idx) => (
+                                                <tr key={log.id || idx} className="hover:bg-gray-50">
+                                                    <td className="p-2 whitespace-nowrap text-gray-500 font-mono">
+                                                        {log.changedAt ? new Date(log.changedAt).toLocaleString('vi-VN') : '—'}
+                                                    </td>
+                                                    <td className="p-2 font-medium text-gray-800">{log.changedBy || 'Hệ thống'}</td>
+                                                    <td className="p-2">
+                                                        {log.previousStatus ? (
+                                                            <span className="px-2 py-0.5 rounded bg-gray-100 text-gray-700 border border-gray-200">
+                                                                {STATUS_LABELS[log.previousStatus as RecordStatus] || log.previousStatus}
+                                                            </span>
+                                                        ) : <span className="text-gray-400 italic">Mới tạo</span>}
+                                                    </td>
+                                                    <td className="p-2">
+                                                        <span className="px-2 py-0.5 rounded font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                                                            {STATUS_LABELS[log.newStatus as RecordStatus] || log.newStatus}
+                                                        </span>
+                                                    </td>
+                                                    <td className="p-2 text-gray-600 italic">{log.note || '—'}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         )}
                     </div>

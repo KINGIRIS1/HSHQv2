@@ -18,6 +18,15 @@ import { getNormalizedWard, STATUS_LABELS } from '../../constants';
 import { exportDailyStatsToExcel } from '../../utils/excelExport';
 import { parseSafeDate } from '../../utils/appHelpers';
 
+const formatDateDDMMYYYY = (isoStr: string) => {
+    if (!isoStr) return '';
+    const parts = isoStr.split('-');
+    if (parts.length === 3) {
+        return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+    return isoStr;
+};
+
 interface DailyStatsViewProps {
     records: RecordFile[];
     employees: Employee[];
@@ -206,7 +215,7 @@ const DailyStatsView: React.FC<DailyStatsViewProps> = ({ records, employees, war
     const theme = getModalColorTheme();
 
     return (
-        <div className="flex flex-col h-full bg-white p-6 animate-fade-in-up">
+        <div className="flex flex-col h-full bg-white p-4 md:p-6 animate-fade-in-up overflow-y-auto">
             {/* Header section with minimal clean description */}
             <div className="mb-8">
                 <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
@@ -319,22 +328,28 @@ const DailyStatsView: React.FC<DailyStatsViewProps> = ({ records, employees, war
                                     {openModalType === 'assigned' && 'Khoảng ngày giao nhân viên'}
                                     {openModalType === 'handover' && 'Khoảng ngày bàn giao Một cửa'}
                                 </label>
-                                <div className="flex items-center gap-2">
-                                    <input 
-                                        type="date" 
-                                        value={modalFromDate} 
-                                        onChange={e => setModalFromDate(e.target.value)} 
-                                        className="border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm w-full bg-white outline-none focus:border-blue-500 h-[38px]" 
-                                        title="Từ ngày" 
-                                    />
-                                    <span className="text-gray-400 font-semibold shrink-0 px-1 text-xs">đến</span>
-                                    <input 
-                                        type="date" 
-                                        value={modalToDate} 
-                                        onChange={e => setModalToDate(e.target.value)} 
-                                        className="border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm w-full bg-white outline-none focus:border-blue-500 h-[38px]" 
-                                        title="Đến ngày" 
-                                    />
+                                <div className="flex items-center gap-1.5 bg-white border border-gray-300 rounded-lg px-2.5 py-1.5 shadow-sm text-xs font-bold text-gray-700 h-[38px] w-full">
+                                    <div className="relative flex-1 flex items-center justify-center hover:text-blue-600 transition-colors h-full">
+                                        <span>{formatDateDDMMYYYY(modalFromDate) || 'Từ ngày'}</span>
+                                        <input 
+                                            type="date" 
+                                            value={modalFromDate} 
+                                            onChange={e => setModalFromDate(e.target.value)} 
+                                            className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" 
+                                            title="Từ ngày" 
+                                        />
+                                    </div>
+                                    <span className="text-gray-400 font-bold text-xs shrink-0">-</span>
+                                    <div className="relative flex-1 flex items-center justify-center hover:text-blue-600 transition-colors h-full">
+                                        <span>{formatDateDDMMYYYY(modalToDate) || 'Đến ngày'}</span>
+                                        <input 
+                                            type="date" 
+                                            value={modalToDate} 
+                                            onChange={e => setModalToDate(e.target.value)} 
+                                            className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" 
+                                            title="Đến ngày" 
+                                        />
+                                    </div>
                                 </div>
                             </div>
 
@@ -377,7 +392,7 @@ const DailyStatsView: React.FC<DailyStatsViewProps> = ({ records, employees, war
                                 <button 
                                     onClick={handleExportFromModal}
                                     disabled={modalFilteredRecords.length === 0}
-                                    className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed w-full h-[38px]"
+                                    className="hidden md:flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed w-full h-[38px]"
                                 >
                                     <FileSpreadsheet size={16} className="shrink-0" /> Xuất Excel ({modalFilteredRecords.length})
                                 </button>

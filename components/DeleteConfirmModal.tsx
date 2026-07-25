@@ -8,6 +8,12 @@ interface DeleteConfirmModalProps {
   onConfirm: () => void;
   title?: string;
   message?: string;
+  record?: {
+    code?: string;
+    customerName?: string;
+    receivedDate?: string | null;
+    deadline?: string | null;
+  } | null;
 }
 
 const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({ 
@@ -15,9 +21,24 @@ const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
   onClose, 
   onConfirm, 
   title = "Xác nhận xóa", 
-  message = "Bạn có chắc chắn muốn xóa hồ sơ này? Hành động này không thể hoàn tác." 
+  message = "Bạn có chắc chắn muốn xóa hồ sơ này? Hành động này không thể hoàn tác.",
+  record
 }) => {
   if (!isOpen) return null;
+
+  const formatDateDDMMYYYY = (dateStr?: string | null) => {
+    if (!dateStr) return 'N/A';
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return dateStr;
+      const day = d.getDate().toString().padStart(2, '0');
+      const month = (d.getMonth() + 1).toString().padStart(2, '0');
+      const year = d.getFullYear();
+      return `${day}/${month}/${year}`;
+    } catch {
+      return dateStr;
+    }
+  };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -34,6 +55,16 @@ const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
         
         <div className="p-6">
           <p className="text-gray-600 text-sm">{message}</p>
+          {record && (
+            <div className="mt-3 p-3 bg-red-50 rounded-lg border border-red-100 text-xs text-red-800 space-y-1">
+              <div className="font-bold">Mã HS: {record.code || '---'}</div>
+              {record.customerName && <div>Chủ HS: {record.customerName}</div>}
+              <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] font-semibold text-slate-700 mt-1.5 pt-1 border-t border-red-200/50">
+                <span>Ngày nhận: {formatDateDDMMYYYY(record.receivedDate)}</span>
+                <span>Hẹn trả: {formatDateDDMMYYYY(record.deadline)}</span>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="p-4 bg-gray-50 rounded-b-lg flex justify-end gap-3">

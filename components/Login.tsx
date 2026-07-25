@@ -25,15 +25,27 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
       }
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
     
+    const form = e.currentTarget;
+    const usernameInput = form.elements.namedItem('username') as HTMLInputElement | null;
+    const passwordInput = form.elements.namedItem('password') as HTMLInputElement | null;
+    
+    const submittedUsername = (usernameInput?.value || username || '').trim();
+    const submittedPassword = (passwordInput?.value || password || '').trim();
+    
     setTimeout(() => {
-        const user = users.find(u => u.username?.toLowerCase() === username?.toLowerCase() && u.password === password);
+        const user = users.find(u => {
+            const dbUsername = (u.username || '').trim().toLowerCase();
+            const dbPassword = (u.password || '').trim();
+            return dbUsername === submittedUsername.toLowerCase() && dbPassword === submittedPassword;
+        });
+
         if (user) {
           if (rememberMe) {
-              localStorage.setItem('saved_username', username);
+              localStorage.setItem('saved_username', submittedUsername);
           } else {
               localStorage.removeItem('saved_username');
           }
@@ -134,6 +146,8 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
                             </div>
                             <input
                                 type="text"
+                                name="username"
+                                autoComplete="username"
                                 required
                                 className="w-full pl-12 pr-4 py-3.5 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all bg-slate-50 group-hover:bg-white focus:bg-white font-medium text-slate-800 placeholder-slate-400"
                                 placeholder="Nhập tên đăng nhập..."
@@ -153,6 +167,8 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
                             </div>
                             <input
                                 type="password"
+                                name="password"
+                                autoComplete="current-password"
                                 required
                                 className="w-full pl-12 pr-4 py-3.5 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all bg-slate-50 group-hover:bg-white focus:bg-white font-medium text-slate-800 placeholder-slate-400"
                                 placeholder="••••••••"
