@@ -80,6 +80,9 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
                         <option value="assignedTo">Người xử lý (Giao việc)</option>
                         <option value="deadline">Ngày hẹn trả (Gia hạn)</option>
                         <option value="receivedDate">Ngày nhận hồ sơ</option>
+                        <option value="resultReturnedDate">Ngày trả kết quả</option>
+                        <option value="receiptNumber">Số BL/HĐ</option>
+                        <option value="returnedPrice">Số tiền (VNĐ)</option>
                         <option value="ward">Xã / Phường (Địa bàn)</option>
                     </select>
                 </div>
@@ -131,9 +134,29 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
                         </select>
                     )}
 
-                    {(targetField === 'deadline' || targetField === 'receivedDate') && (
+                    {(targetField === 'deadline' || targetField === 'receivedDate' || targetField === 'resultReturnedDate') && (
                         <input 
                             type="date"
+                            className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-orange-500 outline-none"
+                            value={targetValue}
+                            onChange={(e) => setTargetValue(e.target.value)}
+                        />
+                    )}
+
+                    {targetField === 'receiptNumber' && (
+                        <input 
+                            type="text"
+                            placeholder="Nhập số BL/HĐ mới..."
+                            className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-orange-500 outline-none"
+                            value={targetValue}
+                            onChange={(e) => setTargetValue(e.target.value)}
+                        />
+                    )}
+
+                    {targetField === 'returnedPrice' && (
+                        <input 
+                            type="number"
+                            placeholder="Nhập số tiền..."
                             className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-orange-500 outline-none"
                             value={targetValue}
                             onChange={(e) => setTargetValue(e.target.value)}
