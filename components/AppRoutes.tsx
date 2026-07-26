@@ -80,6 +80,7 @@ import {
 interface AppRoutesProps {
   currentView: string;
   setCurrentView: (view: string) => void;
+  receiveRecordResetKey?: number;
   currentUser: User;
   records: RecordFile[];
   employees: Employee[];
@@ -300,8 +301,24 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
 
   const [showColumnSelector, setShowColumnSelector] = React.useState(false);
   const [isAddMenuOpen, setIsAddMenuOpen] = React.useState(false);
-  const [receiveRecordSubTab, setReceiveRecordSubTab] = React.useState<'create' | 'list' | 'bulk' | 'update'>('create');
+  const [receiveRecordSubTab, setReceiveRecordSubTab] = React.useState<'create' | 'list' | 'bulk' | 'update' | 'vphc'>('create');
   const addMenuRef = React.useRef<HTMLDivElement>(null);
+  const ignoreSubTabResetRef = React.useRef(false);
+
+  const navigateToReceiveRecordSubTab = (subTab: 'create' | 'list' | 'bulk' | 'update' | 'vphc') => {
+    ignoreSubTabResetRef.current = true;
+    setReceiveRecordSubTab(subTab);
+    props.setCurrentView('receive_record');
+  };
+
+  // Mặc định mở tab 'create' (Nhập mới) khi click trực tiếp vào tab Hồ sơ chính, trừ khi điều hướng từ lối tắt cụ thể
+  React.useEffect(() => {
+    if (ignoreSubTabResetRef.current) {
+      ignoreSubTabResetRef.current = false;
+      return;
+    }
+    setReceiveRecordSubTab('create');
+  }, [props.receiveRecordResetKey, props.currentView]);
 
   React.useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -960,8 +977,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                         <button
                           onClick={() => {
                             setIsAddMenuOpen(false);
-                            if (props.setImportModalMode) props.setImportModalMode('create');
-                            props.setIsImportModalOpen(true);
+                            navigateToReceiveRecordSubTab('bulk');
                           }}
                           className="w-full text-left px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-emerald-50 hover:text-emerald-600 flex items-center gap-2.5 transition-colors"
                         >
@@ -1451,6 +1467,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
     case "receive_record":
       return (
         <ReceiveRecord
+          key={`receive_record_${receiveRecordSubTab}_${props.receiveRecordResetKey || 0}`}
           initialTab={receiveRecordSubTab}
           onSave={props.handleAddOrUpdateRecord}
           onDelete={props.handleDeleteRecord}

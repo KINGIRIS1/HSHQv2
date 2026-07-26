@@ -50,7 +50,7 @@ const CungCapThongTinTab: React.FC<CungCapThongTinTabProps> = ({ currentUser, no
     const [formData, setFormData] = useState<PhieuInfoData>({
         Ten_Nguoi_Yeu_Cau: '', UQ: '', Dia_Chi: '', Ngay_Nop: new Date().toISOString(),
         UQ_Loai: '', UQ_So: '', UQ_Ngay: '', UQ_VPCC: '',
-        Ten_CSD: '', Dia_Chi_Thua_Dat: '', Phuong: 'thị trấn Tân Khai',
+        Ten_CSD: '', Dia_Chi_Thua_Dat: '', Phuong: 'phường Tân Khai',
         Thua_Cu: '', To_Cu: '', 
         DT_Cu: '0', DT_ODT: '0', DT_CLN: '0', 
         To_2024: '', Thua_2024: '', DT_Moi: '', To_106: '',
@@ -205,7 +205,7 @@ const CungCapThongTinTab: React.FC<CungCapThongTinTabProps> = ({ currentUser, no
         const resetData: PhieuInfoData = {
             Ten_Nguoi_Yeu_Cau: '', UQ: '', Dia_Chi: '', Ngay_Nop: new Date().toISOString(),
             UQ_Loai: '', UQ_So: '', UQ_Ngay: '', UQ_VPCC: '',
-            Ten_CSD: '', Dia_Chi_Thua_Dat: '', Phuong: 'thị trấn Tân Khai',
+            Ten_CSD: '', Dia_Chi_Thua_Dat: '', Phuong: 'phường Tân Khai',
             Thua_Cu: '', To_Cu: '', 
             DT_Cu: '0', DT_ODT: '0', DT_CLN: '0', 
             To_2024: '', Thua_2024: '', DT_Moi: '', To_106: '',

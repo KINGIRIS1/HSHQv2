@@ -47,7 +47,6 @@ const MobileLayout: React.FC<MobileLayoutProps> = ({
 }) => {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [showHelpModal, setShowHelpModal] = useState(false);
-  const [helpTab, setHelpTab] = useState<'permissions' | 'support'>('permissions');
 
   const navItems = [
     { id: 'dashboard', label: 'Tổng quan', icon: LayoutDashboard },
@@ -75,7 +74,7 @@ const MobileLayout: React.FC<MobileLayoutProps> = ({
           {/* Nút ? Chính sách phân quyền & Hỗ trợ kỹ thuật trên Top Header Mobile */}
           <button 
             type="button"
-            onClick={() => { setShowHelpModal(true); setHelpTab('permissions'); }}
+            onClick={() => { setShowHelpModal(true); }}
             title="Chính sách phân quyền & Hỗ trợ kỹ thuật"
             className="flex items-center gap-1 bg-white/20 hover:bg-white/30 text-white px-2 py-1 rounded-full text-xs font-bold transition-all border border-white/30 active:scale-95 cursor-pointer"
           >
@@ -117,7 +116,6 @@ const MobileLayout: React.FC<MobileLayoutProps> = ({
                     <button 
                       onClick={() => {
                         setShowHelpModal(true);
-                        setHelpTab('permissions');
                         setIsUserMenuOpen(false);
                       }}
                       className="w-full text-left px-2.5 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-50 rounded-lg flex items-center gap-2.5 transition-colors group"
@@ -227,173 +225,163 @@ const MobileLayout: React.FC<MobileLayoutProps> = ({
               </button>
             </div>
 
-            {/* Modal Tabs */}
-            <div className="flex border-b border-slate-200 bg-slate-50 px-2 pt-2 shrink-0 gap-1">
-              <button
-                onClick={() => setHelpTab('permissions')}
-                className={`px-3 py-2 text-xs font-bold rounded-t-lg transition-all flex items-center gap-1.5 border-b-2 cursor-pointer ${
-                  helpTab === 'permissions'
-                    ? 'bg-white border-blue-600 text-blue-700 shadow-sm'
-                    : 'border-transparent text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <Shield size={14} /> 1. Phân quyền
-              </button>
-              <button
-                onClick={() => setHelpTab('support')}
-                className={`px-3 py-2 text-xs font-bold rounded-t-lg transition-all flex items-center gap-1.5 border-b-2 cursor-pointer ${
-                  helpTab === 'support'
-                    ? 'bg-white border-emerald-600 text-emerald-700 shadow-sm'
-                    : 'border-transparent text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <Headphones size={14} /> 2. Hỗ trợ kỹ thuật
-              </button>
-            </div>
+            {/* Modal Body - Combined Permissions & Support */}
+            <div className="p-4 overflow-y-auto flex-1 space-y-5 text-xs text-slate-700">
+              {/* SECTION 1: PHÂN QUYỀN VAI TRÒ */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-1.5 pb-1.5 border-b border-slate-200">
+                  <Shield size={16} className="text-blue-600" />
+                  <h3 className="font-bold text-xs text-slate-800 uppercase tracking-wide">
+                    1. Phân quyền vai trò
+                  </h3>
+                </div>
 
-            {/* Modal Body */}
-            <div className="p-4 overflow-y-auto flex-1 space-y-3 text-xs text-slate-700">
-              {helpTab === 'permissions' ? (
-                <div className="space-y-3">
-                  {/* Current User Banner */}
-                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 flex items-center gap-2.5">
-                    <div className="p-1.5 bg-blue-600 text-white rounded-lg shrink-0">
-                      <UserCheck size={18} />
-                    </div>
-                    <div className="text-[11px]">
-                      <div className="text-blue-900 font-bold">
-                        Đăng nhập: <span className="text-blue-700 font-black">{currentUser?.name}</span>
-                      </div>
-                      <div className="text-blue-800">
-                        Vai trò: <span className="font-bold uppercase text-blue-900">{currentUser?.role === UserRole.ADMIN ? 'Administrator' : currentUser?.role === UserRole.SUBADMIN ? 'Phó quản trị' : currentUser?.role === UserRole.TEAM_LEADER ? 'Nhóm trưởng' : currentUser?.role === UserRole.ONEDOOR ? 'Một cửa' : 'Nhân viên'}</span>
-                      </div>
-                    </div>
+                {/* Current User Banner */}
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-2.5 flex items-center gap-2">
+                  <div className="p-1.5 bg-blue-600 text-white rounded-lg shrink-0">
+                    <UserCheck size={16} />
                   </div>
-
-                  {/* List of Roles */}
-                  <div className="space-y-2.5">
-                    {/* Role 1: Admin */}
-                    <div className="p-3 rounded-xl border border-slate-200 bg-white shadow-sm">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="px-2 py-0.5 rounded bg-purple-100 text-purple-800 font-bold text-[10px]">
-                          ADMINISTRATOR (Quản trị viên)
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-slate-600 leading-relaxed">
-                        Toàn quyền truy cập, quản lý người dùng, phân quyền vai trò, cấu hình bảng giá, kiểm toán dữ liệu, xem và xuất tất cả báo cáo.
-                      </p>
+                  <div className="text-[11px]">
+                    <div className="text-blue-900 font-bold">
+                      Đăng nhập: <span className="text-blue-700 font-black">{currentUser?.name}</span>
                     </div>
-
-                    {/* Role 2: SubAdmin */}
-                    <div className="p-3 rounded-xl border border-slate-200 bg-white shadow-sm">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 font-bold text-[10px]">
-                          PHÓ QUẢN TRỊ (SubAdmin)
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-slate-600 leading-relaxed">
-                        Hỗ trợ quản trị dữ liệu hồ sơ, kiểm tra chuẩn hóa ngày tháng, theo dõi tình trạng xử lý và báo cáo tổng hợp.
-                      </p>
-                    </div>
-
-                    {/* Role 3: Team Leader */}
-                    <div className="p-3 rounded-xl border border-blue-200 bg-blue-50/40 shadow-sm">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="px-2 py-0.5 rounded bg-blue-100 text-blue-800 font-bold text-[10px]">
-                          NHÓM TRƯỞNG / TỔ TRƯỞNG CHUYÊN MÔN
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-slate-600 leading-relaxed">
-                        Quản lý phân công hồ sơ cho chuyên viên trong nhóm/tổ, đôn đốc tiến độ hạn xử lý, duyệt hoàn thành công việc, tra cứu tư liệu trích lục.
-                      </p>
-                    </div>
-
-                    {/* Role 4: OneDoor */}
-                    <div className="p-3 rounded-xl border border-slate-200 bg-white shadow-sm">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-800 font-bold text-[10px]">
-                          BỘ PHẬN MỘT CỬA (OneDoor)
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-slate-600 leading-relaxed">
-                        Tiếp nhận đăng ký hồ sơ đầu vào, lập giấy hẹn, thu phí lệ phí, xuất bàn giao sang bộ phận chuyên môn và trả kết quả.
-                      </p>
-                    </div>
-
-                    {/* Role 5: Employee */}
-                    <div className="p-3 rounded-xl border border-slate-200 bg-white shadow-sm">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-[10px]">
-                          NHÂN VIÊN / CHUYÊN VIÊN
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-slate-600 leading-relaxed">
-                        Thực hiện đo đạc, thẩm định và xử lý hồ sơ được phân công, cập nhật tiến độ, tải lên bản vẽ và báo cáo hoàn tất cho Nhóm trưởng.
-                      </p>
+                    <div className="text-blue-800">
+                      Vai trò: <span className="font-bold uppercase text-blue-900">{currentUser?.role === UserRole.ADMIN ? 'Administrator' : currentUser?.role === UserRole.SUBADMIN ? 'Phó quản trị' : currentUser?.role === UserRole.TEAM_LEADER ? 'Nhóm trưởng' : currentUser?.role === UserRole.ONEDOOR ? 'Một cửa' : 'Nhân viên'}</span>
                     </div>
                   </div>
                 </div>
-              ) : (
-                <div className="space-y-3">
-                  {/* Tech Support Header Banner */}
-                  <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 space-y-1">
-                    <div className="flex items-center gap-1.5 text-emerald-900 font-bold text-xs">
-                      <Headphones className="text-emerald-600" size={16} />
-                      Đơn vị Quản trị & Hỗ trợ Kỹ thuật System
+
+                {/* List of Roles */}
+                <div className="space-y-2">
+                  {/* Role 1: Admin */}
+                  <div className="p-2.5 rounded-xl border border-slate-200 bg-white shadow-xs">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="px-2 py-0.5 rounded bg-purple-100 text-purple-800 font-bold text-[10px]">
+                        ADMINISTRATOR (Quản trị viên)
+                      </span>
                     </div>
-                    <p className="text-emerald-800 leading-relaxed text-[11px]">
-                      Sẵn sàng hỗ trợ cán bộ xử lý sự cố phần mềm, khôi phục dữ liệu, hướng dẫn thao tác và cập nhật phân quyền tài khoản.
+                    <p className="text-[11px] text-slate-600 leading-relaxed">
+                      Toàn quyền truy cập, quản lý người dùng, phân quyền vai trò, cấu hình bảng giá, kiểm toán dữ liệu, xem và xuất tất cả báo cáo.
                     </p>
                   </div>
 
-                  {/* Contact Info Cards */}
-                  <div className="space-y-2">
-                    <div className="p-3 bg-white border border-slate-200 rounded-xl flex items-start gap-2.5 shadow-sm">
-                      <div className="p-2 bg-blue-100 text-blue-700 rounded-lg shrink-0">
-                        <Phone size={16} />
-                      </div>
-                      <div className="text-[11px]">
-                        <div className="font-bold text-slate-800">Hotline / Zalo Kỹ thuật</div>
-                        <div className="font-mono text-xs font-bold text-blue-600 my-0.5">0976354944</div>
-                        <div className="text-slate-500">Hỗ trợ trực tiếp qua Zalo hoặc Cuộc gọi</div>
-                      </div>
+                  {/* Role 2: SubAdmin */}
+                  <div className="p-2.5 rounded-xl border border-slate-200 bg-white shadow-xs">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 font-bold text-[10px]">
+                        PHÓ QUẢN TRỊ (SubAdmin)
+                      </span>
                     </div>
-
-                    <div className="p-3 bg-white border border-slate-200 rounded-xl flex items-start gap-2.5 shadow-sm">
-                      <div className="p-2 bg-emerald-100 text-emerald-700 rounded-lg shrink-0">
-                        <Mail size={16} />
-                      </div>
-                      <div className="text-[11px]">
-                        <div className="font-bold text-slate-800">Email Tiếp nhận Sự cố</div>
-                        <div className="font-mono text-xs font-bold text-emerald-700 my-0.5">Ngtaitinh@gmail.com</div>
-                        <div className="text-slate-500">Phản hồi trong thời gian sớm nhất</div>
-                      </div>
-                    </div>
-
-                    <div className="p-3 bg-white border border-slate-200 rounded-xl flex items-start gap-2.5 shadow-sm">
-                      <div className="p-2 bg-amber-100 text-amber-700 rounded-lg shrink-0">
-                        <Clock size={16} />
-                      </div>
-                      <div className="text-[11px]">
-                        <div className="font-bold text-slate-800">Thời gian làm việc</div>
-                        <div className="font-semibold text-slate-700 my-0.5">07:30 - 17:00 (Thứ 2 - Thứ 6)</div>
-                        <div className="text-slate-500">Thứ 7: 08:00 - 11:30</div>
-                      </div>
-                    </div>
+                    <p className="text-[11px] text-slate-600 leading-relaxed">
+                      Hỗ trợ quản trị dữ liệu hồ sơ, kiểm tra chuẩn hóa ngày tháng, theo dõi tình trạng xử lý và báo cáo tổng hợp.
+                    </p>
                   </div>
 
-                  {/* Notes */}
-                  <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-[11px] text-slate-600 space-y-1">
-                    <div className="font-bold text-slate-800 flex items-center gap-1">
-                      <CheckCircle2 size={14} className="text-blue-600" /> Lưu ý dành cho Cán bộ:
+                  {/* Role 3: Team Leader */}
+                  <div className="p-2.5 rounded-xl border border-blue-200 bg-blue-50/40 shadow-xs">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="px-2 py-0.5 rounded bg-blue-100 text-blue-800 font-bold text-[10px]">
+                        NHÓM TRƯỞNG / TỔ TRƯỞNG CHUYÊN MÔN
+                      </span>
                     </div>
-                    <ul className="list-disc list-inside space-y-0.5 text-slate-600 pl-1">
-                      <li>Tuyệt đối bảo mật mật khẩu tài khoản cán bộ.</li>
-                      <li>Trường hợp cần hỗ trợ khẩn cấp, vui lòng gọi điện trực tiếp hotline 0976354944.</li>
-                    </ul>
+                    <p className="text-[11px] text-slate-600 leading-relaxed">
+                      Quản lý phân công hồ sơ cho chuyên viên trong nhóm/tổ, đôn đốc tiến độ hạn xử lý, duyệt hoàn thành công việc, tra cứu tư liệu trích lục.
+                    </p>
+                  </div>
+
+                  {/* Role 4: OneDoor */}
+                  <div className="p-2.5 rounded-xl border border-slate-200 bg-white shadow-xs">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-800 font-bold text-[10px]">
+                        BỘ PHẬN MỘT CỬA (OneDoor)
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-600 leading-relaxed">
+                      Tiếp nhận đăng ký hồ sơ đầu vào, lập giấy hẹn, thu phí lệ phí, xuất bàn giao sang bộ phận chuyên môn và trả kết quả.
+                    </p>
+                  </div>
+
+                  {/* Role 5: Employee */}
+                  <div className="p-2.5 rounded-xl border border-slate-200 bg-white shadow-xs">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-[10px]">
+                        NHÂN VIÊN / CHUYÊN VIÊN
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-600 leading-relaxed">
+                      Thực hiện đo đạc, thẩm định và xử lý hồ sơ được phân công, cập nhật tiến độ, tải lên bản vẽ và báo cáo hoàn tất cho Nhóm trưởng.
+                    </p>
                   </div>
                 </div>
-              )}
+              </div>
+
+              {/* SECTION 2: HỖ TRỢ KỸ THUẬT */}
+              <div className="space-y-3 pt-2">
+                <div className="flex items-center gap-1.5 pb-1.5 border-b border-slate-200">
+                  <Headphones size={16} className="text-emerald-600" />
+                  <h3 className="font-bold text-xs text-slate-800 uppercase tracking-wide">
+                    2. Hỗ trợ kỹ thuật & Liên hệ
+                  </h3>
+                </div>
+
+                {/* Tech Support Header Banner */}
+                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-2.5 space-y-1">
+                  <div className="flex items-center gap-1.5 text-emerald-900 font-bold text-xs">
+                    <Headphones className="text-emerald-600" size={15} />
+                    Đơn vị Quản trị & Hỗ trợ Kỹ thuật System
+                  </div>
+                  <p className="text-emerald-800 leading-relaxed text-[11px]">
+                    Sẵn sàng hỗ trợ cán bộ xử lý sự cố phần mềm, khôi phục dữ liệu, hướng dẫn thao tác và cập nhật phân quyền tài khoản.
+                  </p>
+                </div>
+
+                {/* Contact Info Cards */}
+                <div className="space-y-2">
+                  <div className="p-2.5 bg-white border border-slate-200 rounded-xl flex items-start gap-2.5 shadow-xs">
+                    <div className="p-1.5 bg-blue-100 text-blue-700 rounded-lg shrink-0">
+                      <Phone size={15} />
+                    </div>
+                    <div className="text-[11px]">
+                      <div className="font-bold text-slate-800">Hotline / Zalo Kỹ thuật</div>
+                      <div className="font-mono text-xs font-bold text-blue-600 my-0.5">0976354944</div>
+                      <div className="text-slate-500">Hỗ trợ trực tiếp qua Zalo hoặc Cuộc gọi</div>
+                    </div>
+                  </div>
+
+                  <div className="p-2.5 bg-white border border-slate-200 rounded-xl flex items-start gap-2.5 shadow-xs">
+                    <div className="p-1.5 bg-emerald-100 text-emerald-700 rounded-lg shrink-0">
+                      <Mail size={15} />
+                    </div>
+                    <div className="text-[11px]">
+                      <div className="font-bold text-slate-800">Email Tiếp nhận Sự cố</div>
+                      <div className="font-mono text-xs font-bold text-emerald-700 my-0.5">Ngtaitinh@gmail.com</div>
+                      <div className="text-slate-500">Phản hồi trong thời gian sớm nhất</div>
+                    </div>
+                  </div>
+
+                  <div className="p-2.5 bg-white border border-slate-200 rounded-xl flex items-start gap-2.5 shadow-xs">
+                    <div className="p-1.5 bg-amber-100 text-amber-700 rounded-lg shrink-0">
+                      <Clock size={15} />
+                    </div>
+                    <div className="text-[11px]">
+                      <div className="font-bold text-slate-800">Thời gian làm việc</div>
+                      <div className="font-semibold text-slate-700 my-0.5">07:30 - 17:00 (Thứ 2 - Thứ 6)</div>
+                      <div className="text-slate-500">Thứ 7: 08:00 - 11:30</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Notes */}
+                <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200 text-[11px] text-slate-600 space-y-1">
+                  <div className="font-bold text-slate-800 flex items-center gap-1">
+                    <CheckCircle2 size={13} className="text-blue-600" /> Lưu ý dành cho Cán bộ:
+                  </div>
+                  <ul className="list-disc list-inside space-y-0.5 text-slate-600 pl-1">
+                    <li>Tuyệt đối bảo mật mật khẩu tài khoản cán bộ.</li>
+                    <li>Trường hợp cần hỗ trợ khẩn cấp, vui lòng gọi điện trực tiếp hotline 0976354944.</li>
+                  </ul>
+                </div>
+              </div>
             </div>
 
             {/* Modal Footer */}

@@ -26,6 +26,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [progress, setProgress] = useState<{ processed: number, total: number } | null>(null);
+  const [showNoticeModal, setShowNoticeModal] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -416,25 +417,43 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
   };
 
   const handleDownloadTemplate = () => {
-      const headers = [
-          'MÃ HỒ SƠ', 'CHỦ SỬ DỤNG', 'CCCD', 'SĐT', 'ĐỊA CHỈ', 'NGƯỜI ỦY QUYỀN', 'LOẠI ỦY QUYỀN', 
-          'XÃ', 'THỬA', 'TỜ', 'DIỆN TÍCH', 'ĐẤT Ở', 'SỐ PHÁT HÀNH', 'SỐ VÀO SỔ', 'NGÀY CẤP', 
-          'LOẠI HỒ SƠ', 'NỘI DUNG', 'GIẤY TỜ KÈM THEO', 'NGÀY NHẬN', 'HẸN TRẢ', 
-          'TRẠNG THÁI', 'NGÀY THỰC HIỆN', 'NGÀY TRÌNH KIỂM TRA', 'NGÀY ĐÃ KIỂM TRA', 'NGÀY TRÌNH KÝ', 
-          'NGÀY KÝ DUYỆT', 'NGÀY HOÀN THÀNH', 'NGÀY TRẢ DÂN', 'NGÀY XUẤT', 'ĐỢT', 'NGƯỜI XỬ LÝ', 'NGÀY GIAO'
-      ];
-      
-      const sampleData = [
-          ['HS001', 'Nguyễn Văn A', '070012345678', '0901234567', 'Tổ 1, KP 2', 'Lê Văn C', 'Giấy ủy quyền', 
-           'Tân Khai', '123', '45', '100.5', '50', 'CD 123456', 'CH 01234', '2024-01-01', 
-           'Đo đạc', 'Đo đạc cắm mốc', 'Sổ đỏ|Bản chính', '2024-01-01', '2024-01-15', 
-           'Đã nhận', '', '', '', '', '', '', '', '', '', '', '']
-      ];
+      let headers: string[];
+      let sampleData: any[][];
+
+      if (mode === 'update') {
+          headers = [
+              'MÃ HỒ SƠ', 'CHỦ SỬ DỤNG', 'CCCD', 'SĐT', 'ĐỊA CHỈ', 'NGƯỜI ỦY QUYỀN', 
+              'XÃ', 'THỬA', 'TỜ', 'DIỆN TÍCH', 'ĐẤT Ở', 'SỐ PHÁT HÀNH', 'SỐ VÀO SỔ', 'NGÀY CẤP', 
+              'LOẠI HỒ SƠ', 'NỘI DUNG', 'GIẤY TỜ KÈM THEO', 'NGÀY NHẬN', 'HẸN TRẢ', 
+              'TRẠNG THÁI', 'NGƯỜI XỬ LÝ', 'NGÀY GIAO'
+          ];
+          sampleData = [
+              ['HS001', 'Nguyễn Văn A', '070012345678', '0901234567', 'Tổ 1, KP 2', 'Lê Văn C', 
+               'Tân Khải', '123', '45', '100.5', '50', 'CD 123456', 'CH 01234', '2024-01-01', 
+               '2.1 Trích Lục', 'cấp đổi', 'Sổ đỏ | Bản chính', '2024-01-01', '2024-01-15', 
+               'Đã nhận', '', '']
+          ];
+      } else {
+          headers = [
+              'MÃ HỒ SƠ', 'CHỦ SỬ DỤNG', 'CCCD', 'SĐT', 'ĐỊA CHỈ', 'NGƯỜI ỦY QUYỀN', 'LOẠI ỦY QUYỀN', 
+              'XÃ', 'THỬA', 'TỜ', 'DIỆN TÍCH', 'ĐẤT Ở', 'SỐ PHÁT HÀNH', 'SỐ VÀO SỔ', 'NGÀY CẤP', 
+              'LOẠI HỒ SƠ', 'NỘI DUNG', 'GIẤY TỜ KÈM THEO', 'NGÀY NHẬN', 'HẸN TRẢ', 
+              'TRẠNG THÁI', 'NGÀY THỰC HIỆN', 'NGÀY TRÌNH KIỂM TRA', 'NGÀY ĐÃ KIỂM TRA', 'NGÀY TRÌNH KÝ', 
+              'NGÀY KÝ DUYỆT', 'NGÀY HOÀN THÀNH', 'NGÀY TRẢ DÂN', 'NGÀY XUẤT', 'ĐỢT', 'NGƯỜI XỬ LÝ', 'NGÀY GIAO'
+          ];
+          sampleData = [
+              ['HS001', 'Nguyễn Văn A', '070012345678', '0901234567', 'Tổ 1, KP 2', 'Lê Văn C', 'Giấy ủy quyền', 
+               'Tân Khai', '123', '45', '100.5', '50', 'CD 123456', 'CH 01234', '2024-01-01', 
+               'Đo đạc', 'Đo đạc cắm mốc', 'Sổ đỏ|Bản chính', '2024-01-01', '2024-01-15', 
+               'Đã nhận', '', '', '', '', '', '', '', '', '', '', '']
+          ];
+      }
 
       const ws = XLSX.utils.aoa_to_sheet([headers, ...sampleData]);
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Mau_Nhap_Ho_So');
-      XLSX.writeFile(wb, 'Mau_Nhap_Ho_So.xlsx');
+      const fileName = mode === 'update' ? 'Mau_Cap_Nhat_Ho_So.xlsx' : 'Mau_Nhap_Ho_So.xlsx';
+      XLSX.utils.book_append_sheet(wb, ws, 'Mau_Excel');
+      XLSX.writeFile(wb, fileName);
   };
 
   if (!isOpen) return null;
@@ -445,94 +464,112 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
         {/* HEADER */}
         <div className="flex justify-between items-center p-5 border-b shrink-0">
           <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-            <FileSpreadsheet className="text-green-600" />
-            Xử Lý Dữ Liệu Excel
+            {mode === 'create' ? (
+              <>
+                <FileSpreadsheet className="text-green-600" />
+                Tiếp nhận hàng loạt từ Excel
+              </>
+            ) : (
+              <>
+                <RefreshCw className="text-amber-600" />
+                Cập nhật thông tin từ Excel
+              </>
+            )}
           </h2>
           <button onClick={onClose} className="text-gray-500 hover:text-red-600">
             <X size={24} />
           </button>
         </div>
 
-        {/* MODE SWITCHER */}
-        <div className="p-5 border-b bg-gray-50 shrink-0 space-y-4">
-            <div className="flex justify-center">
-                <div className="bg-white border border-gray-300 rounded-lg p-1 flex shadow-sm">
-                    <button 
-                        onClick={() => { setMode('create'); setPreviewData([]); setFileName(''); }}
-                        className={`flex items-center gap-2 px-6 py-2 rounded-md font-medium text-sm transition-all ${mode === 'create' ? 'bg-blue-600 text-white shadow' : 'text-gray-600 hover:bg-gray-100'}`}
-                    >
-                        <PlusCircle size={16} /> Nhập hồ sơ mới
-                    </button>
-                    <button 
-                        onClick={() => { setMode('update'); setPreviewData([]); setFileName(''); }}
-                        className={`flex items-center gap-2 px-6 py-2 rounded-md font-medium text-sm transition-all ${mode === 'update' ? 'bg-orange-500 text-white shadow' : 'text-gray-600 hover:bg-gray-100'}`}
-                    >
-                        <RefreshCw size={16} /> Cập nhật thông tin
-                    </button>
-                </div>
-            </div>
+        {/* MODE INFO & FILE CONTROLS */}
+        <div className="p-4 border-b bg-slate-50 shrink-0 space-y-3">
+            {/* Show mode switcher only when initialMode is not explicitly provided */}
+            {!initialMode && (
+              <div className="flex justify-center">
+                  <div className="bg-white border border-gray-300 rounded-lg p-1 flex shadow-sm">
+                      <button 
+                          onClick={() => { setMode('create'); setPreviewData([]); setFileName(''); }}
+                          className={`flex items-center gap-2 px-6 py-1.5 rounded-md font-medium text-sm transition-all ${mode === 'create' ? 'bg-blue-600 text-white shadow' : 'text-gray-600 hover:bg-gray-100'}`}
+                      >
+                          <PlusCircle size={16} /> Nhập hồ sơ mới
+                      </button>
+                      <button 
+                          onClick={() => { setMode('update'); setPreviewData([]); setFileName(''); }}
+                          className={`flex items-center gap-2 px-6 py-1.5 rounded-md font-medium text-sm transition-all ${mode === 'update' ? 'bg-orange-500 text-white shadow' : 'text-gray-600 hover:bg-gray-100'}`}
+                      >
+                          <RefreshCw size={16} /> Cập nhật thông tin
+                      </button>
+                  </div>
+              </div>
+            )}
 
-            <div className={`p-3 rounded border text-sm flex items-start gap-2 ${mode === 'create' ? 'bg-blue-50 border-blue-200 text-blue-800' : 'bg-orange-50 border-orange-200 text-orange-800'}`}>
-                {mode === 'create' ? (
-                    <>
-                        <AlertCircle size={18} className="shrink-0 mt-0.5" />
-                        <span>Chế độ này sẽ <strong>thêm mới</strong> toàn bộ dòng trong file Excel vào hệ thống.</span>
-                    </>
-                ) : (
-                    <>
-                        <AlertTriangle size={18} className="shrink-0 mt-0.5" />
-                        <div>
-                            <strong>Chế độ Cập Nhật Thông Minh:</strong>
-                            <ul className="list-disc pl-5 mt-1 space-y-1">
-                                <li>Hệ thống tìm hồ sơ theo <strong>Mã Hồ Sơ</strong>.</li>
-                                <li>Chỉ cập nhật các cột <strong>CÓ</strong> trong file Excel (VD: chỉ có cột Ngày Xuất thì chỉ cập nhật Ngày Xuất).</li>
-                                <li><strong>QUAN TRỌNG:</strong> Nếu có cột "Đợt" hoặc "Ngày xuất/Ngày trả", hệ thống sẽ tự động chuyển trạng thái sang "Đã giao 1 cửa" để không bị báo trễ hạn.</li>
-                            </ul>
+            {/* BAR ROW: FILTERS ON LEFT | ACTION BUTTONS ON RIGHT */}
+            <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-xl border border-slate-200 shadow-xs">
+                {/* Left Side: Filter Pills or Status */}
+                <div className="flex flex-wrap items-center gap-2">
+                    {previewData.length > 0 && !loading ? (
+                        <>
+                            <button 
+                                onClick={() => setViewFilter('all')}
+                                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${viewFilter === 'all' ? 'bg-slate-800 text-white shadow-xs' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
+                            >
+                                Tất cả ({previewData.length})
+                            </button>
+                            <button 
+                                onClick={() => setViewFilter('valid')}
+                                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${viewFilter === 'valid' ? 'bg-emerald-600 text-white shadow-xs' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'}`}
+                            >
+                                Hợp lệ ({previewData.filter(r => !r._errors?.length).length})
+                            </button>
+                            <button 
+                                onClick={() => setViewFilter('errors')}
+                                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${viewFilter === 'errors' ? 'bg-red-600 text-white shadow-xs' : 'bg-red-50 text-red-700 hover:bg-red-100 border border-red-200'}`}
+                            >
+                                Không hợp lệ ({previewData.filter(r => r._errors?.length).length})
+                            </button>
+                        </>
+                    ) : (
+                        <div className="flex items-center gap-2 text-xs font-semibold text-slate-600">
+                            <FileSpreadsheet size={16} className="text-blue-600" />
+                            {fileName ? (
+                                <span>File đã chọn: <strong className="text-blue-700">{fileName}</strong></span>
+                            ) : (
+                                <span>{mode === 'create' ? 'Tải file mẫu hoặc chọn file Excel để nhập hồ sơ mới' : 'Tải file mẫu hoặc chọn file Excel để cập nhật thông tin hồ sơ'}</span>
+                            )}
                         </div>
-                    </>
-                )}
-            </div>
+                    )}
+                </div>
 
-            <div className="flex items-center gap-4">
-                <div className="relative">
+                {/* Right Side: Action Buttons: Tải mẫu -> Chọn File -> [!] */}
+                <div className="flex items-center gap-2 ml-auto">
+                    <button 
+                        onClick={handleDownloadTemplate} 
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-1.5 rounded-lg font-bold text-xs flex items-center gap-1.5 shadow-xs transition-all cursor-pointer"
+                        title="Tải file Excel mẫu"
+                    >
+                        <FileSpreadsheet size={15} /> Tải mẫu
+                    </button>
+
                     <input type="file" ref={fileInputRef} accept=".xlsx, .xls" onChange={handleFileChange} className="hidden" />
-                    <button onClick={() => fileInputRef.current?.click()} className={`flex items-center gap-2 text-white px-4 py-2 rounded-lg hover:opacity-90 transition-colors shadow-sm font-medium ${mode === 'create' ? 'bg-green-600' : 'bg-orange-600'}`}>
-                        <Upload size={18} /> Chọn File Excel
+                    
+                    <button 
+                        onClick={() => fileInputRef.current?.click()} 
+                        className={`text-white px-3.5 py-1.5 rounded-lg font-bold text-xs flex items-center gap-1.5 shadow-xs transition-all cursor-pointer ${mode === 'create' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-orange-600 hover:bg-orange-700'}`}
+                        title="Chọn file Excel từ máy tính"
+                    >
+                        <Upload size={15} /> Chọn File
+                    </button>
+
+                    <button 
+                        onClick={() => setShowNoticeModal(true)} 
+                        className="w-6 h-6 rounded-full bg-red-500 hover:bg-red-600 text-white font-extrabold text-xs flex items-center justify-center shadow-sm border border-red-400 transition-all active:scale-90 cursor-pointer ml-0.5 shrink-0"
+                        title="Xem nhắc nhở & hướng dẫn Cập nhật thông minh"
+                    >
+                        !
                     </button>
                 </div>
-                <button onClick={handleDownloadTemplate} className="flex items-center gap-2 text-blue-600 bg-blue-50 px-4 py-2 rounded-lg hover:bg-blue-100 transition-colors shadow-sm font-medium border border-blue-200">
-                    <FileSpreadsheet size={18} /> Tải File Mẫu
-                </button>
-                {fileName && <span className="text-sm text-gray-600 font-medium">{fileName}</span>}
-                {previewData.length > 0 && <div className="ml-auto flex items-center gap-2 text-sm text-blue-700 bg-blue-100 px-3 py-1.5 rounded-full">
-                    <Check size={16} /> Đã đọc <strong>{previewData.length}</strong> dòng
-                </div>}
             </div>
         </div>
-
-        {/* CÔNG CỤ LỌC (CHỈ HIỂN THỊ KHI CÓ DATA) */}
-        {previewData.length > 0 && !loading && (
-            <div className="bg-white border-b px-5 py-3 flex gap-2 shrink-0">
-                <button 
-                    onClick={() => setViewFilter('all')}
-                    className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${viewFilter === 'all' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-                >
-                    Tất cả ({previewData.length})
-                </button>
-                <button 
-                    onClick={() => setViewFilter('valid')}
-                    className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${viewFilter === 'valid' ? 'bg-green-600 text-white' : 'bg-green-50 text-green-700 hover:bg-green-100 border border-green-200'}`}
-                >
-                    Hợp lệ ({previewData.filter(r => !r._errors?.length).length})
-                </button>
-                <button 
-                    onClick={() => setViewFilter('errors')}
-                    className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${viewFilter === 'errors' ? 'bg-red-600 text-white' : 'bg-red-50 text-red-700 hover:bg-red-100 border border-red-200'}`}
-                >
-                    Có lỗi ({previewData.filter(r => r._errors?.length).length})
-                </button>
-            </div>
-        )}
 
         {/* PREVIEW TABLE */}
         <div className="flex-1 overflow-auto p-0">
@@ -626,6 +663,49 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
             </div>
         </div>
       </div>
+
+      {/* MODAL HƯỚNG DẪN / NHẮC NHỞ CẬP NHẬT THÔNG MINH */}
+      {showNoticeModal && (
+        <div className="fixed inset-0 z-[150] bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-lg w-full p-6 animate-scale-up">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <h3 className="font-bold text-slate-800 text-base flex items-center gap-2">
+                <span className="w-7 h-7 rounded-full bg-red-500 text-white font-black flex items-center justify-center text-sm shadow-sm shrink-0">!</span>
+                HƯỚNG DẪN CHẾ ĐỘ CẬP NHẬT THÔNG MINH
+              </h3>
+              <button onClick={() => setShowNoticeModal(false)} className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg cursor-pointer">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="py-4 space-y-3 text-sm text-slate-700 leading-relaxed">
+              <p className="flex items-start gap-2">
+                <span className="font-bold text-blue-600 shrink-0">•</span>
+                <span>Hệ thống tự động dò tìm hồ sơ dựa vào <strong>Mã Hồ Sơ</strong>.</span>
+              </p>
+              <p className="flex items-start gap-2">
+                <span className="font-bold text-blue-600 shrink-0">•</span>
+                <span>Chỉ cập nhật các cột <strong>CÓ dữ liệu</strong> trong file Excel (Ví dụ: file chỉ có cột Ngày Xuất thì hệ thống chỉ cập nhật cột Ngày Xuất).</span>
+              </p>
+              <p className="flex items-start gap-2">
+                <span className="font-bold text-amber-600 shrink-0">•</span>
+                <span><strong>QUAN TRỌNG:</strong> Nếu file có cột <strong>"Đợt"</strong> hoặc <strong>"Ngày xuất/Ngày trả"</strong>, hệ thống sẽ tự động chuyển trạng thái hồ sơ sang <strong>"Đã giao 1 cửa"</strong> để tránh bị báo trễ hạn.</span>
+              </p>
+              <p className="flex items-start gap-2">
+                <span className="font-bold text-emerald-600 shrink-0">•</span>
+                <span>Bấm <strong>"Tải mẫu"</strong> để tải file Excel chuẩn, điền thông tin và bấm <strong>"Chọn File"</strong> để đối soát dữ liệu trước khi bấm Cập nhật.</span>
+              </p>
+            </div>
+            <div className="pt-3 border-t border-slate-100 flex justify-end">
+              <button 
+                onClick={() => setShowNoticeModal(false)} 
+                className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-2 rounded-xl text-sm shadow-md transition-all active:scale-95 cursor-pointer"
+              >
+                OK (Đã hiểu)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

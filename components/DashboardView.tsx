@@ -23,7 +23,6 @@ const DashboardView: React.FC<DashboardViewProps> = ({ records, currentUser, emp
 
     // Modal Trợ giúp & Phân quyền
     const [showHelpModal, setShowHelpModal] = useState(false);
-    const [helpTab, setHelpTab] = useState<'permissions' | 'support'>('permissions');
 
     // State chọn chế độ xem: Năm, Tháng, Tuần
     const [viewMode, setViewMode] = useState<'year' | 'month' | 'week'>('year');
@@ -630,190 +629,176 @@ const DashboardView: React.FC<DashboardViewProps> = ({ records, currentUser, emp
                             </button>
                         </div>
 
-                        {/* Modal Tabs */}
-                        <div className="flex border-b border-slate-200 bg-slate-50 px-4 pt-2 shrink-0 gap-2">
-                            <button
-                                onClick={() => setHelpTab('permissions')}
-                                className={`px-4 py-2.5 text-xs font-bold rounded-t-lg transition-all flex items-center gap-2 border-b-2 cursor-pointer ${
-                                    helpTab === 'permissions'
-                                        ? 'bg-white border-blue-600 text-blue-700 shadow-sm'
-                                        : 'border-transparent text-slate-600 hover:text-slate-900'
-                                }`}
-                            >
-                                <Shield size={16} /> 1. Chính sách phân quyền
-                            </button>
-                            <button
-                                onClick={() => setHelpTab('support')}
-                                className={`px-4 py-2.5 text-xs font-bold rounded-t-lg transition-all flex items-center gap-2 border-b-2 cursor-pointer ${
-                                    helpTab === 'support'
-                                        ? 'bg-white border-emerald-600 text-emerald-700 shadow-sm'
-                                        : 'border-transparent text-slate-600 hover:text-slate-900'
-                                }`}
-                            >
-                                <Headphones size={16} /> 2. Hỗ trợ kỹ thuật
-                            </button>
-                        </div>
+                        {/* Modal Body - Combined Permissions & Support */}
+                        <div className="p-5 overflow-y-auto flex-1 space-y-6 text-sm text-slate-700">
+                            {/* SECTION 1: PHÂN QUYỀN VAI TRÒ */}
+                            <div className="space-y-4">
+                                <div className="flex items-center gap-2 pb-2 border-b border-slate-200">
+                                    <Shield size={18} className="text-blue-600" />
+                                    <h3 className="font-bold text-sm text-slate-800 uppercase tracking-wide">
+                                        1. Chính sách phân quyền vai trò
+                                    </h3>
+                                </div>
 
-                        {/* Modal Body */}
-                        <div className="p-5 overflow-y-auto flex-1 space-y-4 text-sm text-slate-700">
-                            {helpTab === 'permissions' ? (
-                                <div className="space-y-4">
-                                    {/* Current User Banner */}
-                                    <div className="bg-blue-50 border border-blue-200 rounded-xl p-3.5 flex items-center gap-3">
-                                        <div className="p-2 bg-blue-600 text-white rounded-lg shrink-0">
-                                            <UserCheck size={20} />
-                                        </div>
-                                        <div className="text-xs">
-                                            <div className="text-blue-900 font-bold">
-                                                Tài khoản đang đăng nhập: <span className="text-blue-700 font-black">{currentUser?.name}</span>
-                                            </div>
-                                            <div className="text-blue-800">
-                                                Vai trò hệ thống: <span className="font-bold uppercase text-blue-900">{currentUser?.role === 'ADMIN' ? 'Administrator' : currentUser?.role === 'SUBADMIN' ? 'Phó quản trị' : currentUser?.role === 'TEAM_LEADER' ? 'Nhóm trưởng' : currentUser?.role === 'ONEDOOR' ? 'Một cửa' : 'Nhân viên'}</span>
-                                                {linkedEmployee?.department ? ` • Bộ phận: ${linkedEmployee.department}` : ''}
-                                            </div>
-                                        </div>
+                                {/* Current User Banner */}
+                                <div className="bg-blue-50 border border-blue-200 rounded-xl p-3.5 flex items-center gap-3">
+                                    <div className="p-2 bg-blue-600 text-white rounded-lg shrink-0">
+                                        <UserCheck size={20} />
                                     </div>
-
-                                    {/* List of Roles */}
-                                    <div className="space-y-3">
-                                        <h3 className="font-bold text-xs uppercase tracking-wider text-slate-500">
-                                            Quy định thẩm quyền & Phạm vi truy cập theo vai trò
-                                        </h3>
-
-                                        {/* Role 1: Admin */}
-                                        <div className="p-3.5 rounded-xl border border-slate-200 bg-white hover:border-purple-300 transition-colors shadow-sm">
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <span className="px-2 py-0.5 rounded bg-purple-100 text-purple-800 font-bold text-xs">
-                                                    ADMINISTRATOR (Quản trị viên)
-                                                </span>
-                                            </div>
-                                            <p className="text-xs text-slate-600 leading-relaxed">
-                                                Toàn quyền truy cập và cấu hình toàn bộ hệ thống. Quản lý danh mục người dùng, phân quyền vai trò, cấu hình bảng giá sản phẩm/dịch vụ, kiểm toán dữ liệu ngày tháng, xem và xuất tất cả báo cáo thống kê.
-                                            </p>
+                                    <div className="text-xs">
+                                        <div className="text-blue-900 font-bold">
+                                            Tài khoản đang đăng nhập: <span className="text-blue-700 font-black">{currentUser?.name}</span>
                                         </div>
-
-                                        {/* Role 2: SubAdmin */}
-                                        <div className="p-3.5 rounded-xl border border-slate-200 bg-white hover:border-indigo-300 transition-colors shadow-sm">
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <span className="px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 font-bold text-xs">
-                                                    PHÓ QUẢN TRỊ (SubAdmin)
-                                                </span>
-                                            </div>
-                                            <p className="text-xs text-slate-600 leading-relaxed">
-                                                Hỗ trợ quản trị dữ liệu hồ sơ, theo dõi tình trạng xử lý trên toàn địa bàn, kiểm tra và chuẩn hóa ngày tháng, truy cập báo cáo tổng hợp và thực hiện các tác vụ quản trị được phân công.
-                                            </p>
-                                        </div>
-
-                                        {/* Role 3: Team Leader */}
-                                        <div className="p-3.5 rounded-xl border border-blue-200 bg-blue-50/30 hover:border-blue-300 transition-colors shadow-sm">
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <span className="px-2 py-0.5 rounded bg-blue-100 text-blue-800 font-bold text-xs">
-                                                    NHÓM TRƯỞNG / TỔ TRƯỞNG CHUYÊN MÔN
-                                                </span>
-                                            </div>
-                                            <p className="text-xs text-slate-600 leading-relaxed">
-                                                Quản lý và phân công hồ sơ cho chuyên viên trong nhóm/tổ, đôn đốc tiến độ hạn xử lý, duyệt hoàn thành công việc, tra cứu tư liệu đất đai trích lục, và theo dõi báo cáo hiệu suất làm việc của tổ chuyên môn.
-                                            </p>
-                                        </div>
-
-                                        {/* Role 4: OneDoor */}
-                                        <div className="p-3.5 rounded-xl border border-slate-200 bg-white hover:border-amber-300 transition-colors shadow-sm">
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-800 font-bold text-xs">
-                                                    BỘ PHẬN MỘT CỬA (OneDoor)
-                                                </span>
-                                            </div>
-                                            <p className="text-xs text-slate-600 leading-relaxed">
-                                                Tiếp nhận và đăng ký hồ sơ đầu vào từ người dân/doanh nghiệp, lập giấy hẹn, thu phí/lệ phí và tiền tạm ứng, xuất danh sách bàn giao hồ sơ sang bộ phận chuyên môn, và thực hiện trả kết quả.
-                                            </p>
-                                        </div>
-
-                                        {/* Role 5: Employee */}
-                                        <div className="p-3.5 rounded-xl border border-slate-200 bg-white hover:border-emerald-300 transition-colors shadow-sm">
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-xs">
-                                                    NHÂN VIÊN / CHUYÊN VIÊN
-                                                </span>
-                                            </div>
-                                            <p className="text-xs text-slate-600 leading-relaxed">
-                                                Thực hiện đo đạc, thẩm định và xử lý nghiệp vụ các hồ sơ được phân công. Cập nhật tiến độ xử lý, đính kèm file bản vẽ/tài liệu kết quả, và báo cáo hoàn tất tác vụ cho Nhóm trưởng.
-                                            </p>
+                                        <div className="text-blue-800">
+                                            Vai trò hệ thống: <span className="font-bold uppercase text-blue-900">{currentUser?.role === 'ADMIN' ? 'Administrator' : currentUser?.role === 'SUBADMIN' ? 'Phó quản trị' : currentUser?.role === 'TEAM_LEADER' ? 'Nhóm trưởng' : currentUser?.role === 'ONEDOOR' ? 'Một cửa' : 'Nhân viên'}</span>
+                                            {linkedEmployee?.department ? ` • Bộ phận: ${linkedEmployee.department}` : ''}
                                         </div>
                                     </div>
                                 </div>
-                            ) : (
-                                <div className="space-y-4">
-                                    {/* Tech Support Header Banner */}
-                                    <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-xs space-y-2">
-                                        <div className="flex items-center gap-2 text-emerald-900 font-bold text-sm">
-                                            <Headphones className="text-emerald-600" size={18} />
-                                            Đơn vị Quản trị & Hỗ trợ Kỹ thuật Hệ thống
+
+                                {/* List of Roles */}
+                                <div className="space-y-2.5">
+                                    {/* Role 1: Admin */}
+                                    <div className="p-3.5 rounded-xl border border-slate-200 bg-white hover:border-purple-300 transition-colors shadow-xs">
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <span className="px-2 py-0.5 rounded bg-purple-100 text-purple-800 font-bold text-xs">
+                                                ADMINISTRATOR (Quản trị viên)
+                                            </span>
                                         </div>
-                                        <p className="text-emerald-800 leading-relaxed">
-                                            Bộ phận Kỹ thuật luôn sẵn sàng hỗ trợ cán bộ giải quyết các sự cố phần mềm, khôi phục dữ liệu, hướng dẫn thao tác hoặc tiếp nhận yêu cầu điều chỉnh phân quyền tài khoản.
+                                        <p className="text-xs text-slate-600 leading-relaxed">
+                                            Toàn quyền truy cập và cấu hình toàn bộ hệ thống. Quản lý danh mục người dùng, phân quyền vai trò, cấu hình bảng giá sản phẩm/dịch vụ, kiểm toán dữ liệu ngày tháng, xem và xuất tất cả báo cáo thống kê.
                                         </p>
                                     </div>
 
-                                    {/* Contact Info Cards Grid */}
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                        <div className="p-3.5 bg-white border border-slate-200 rounded-xl flex items-start gap-3 shadow-sm">
-                                            <div className="p-2.5 bg-blue-100 text-blue-700 rounded-lg shrink-0">
-                                                <Phone size={18} />
-                                            </div>
-                                            <div className="text-xs">
-                                                <div className="font-bold text-slate-800">Hotline / Zalo Kỹ thuật</div>
-                                                <div className="font-mono text-sm font-bold text-blue-600 my-0.5">0976354944</div>
-                                                <div className="text-slate-500">Hỗ trợ trực tiếp qua Zalo hoặc Cuộc gọi</div>
-                                            </div>
+                                    {/* Role 2: SubAdmin */}
+                                    <div className="p-3.5 rounded-xl border border-slate-200 bg-white hover:border-indigo-300 transition-colors shadow-xs">
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <span className="px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 font-bold text-xs">
+                                                PHÓ QUẢN TRỊ (SubAdmin)
+                                            </span>
                                         </div>
-
-                                        <div className="p-3.5 bg-white border border-slate-200 rounded-xl flex items-start gap-3 shadow-sm">
-                                            <div className="p-2.5 bg-emerald-100 text-emerald-700 rounded-lg shrink-0">
-                                                <Mail size={18} />
-                                            </div>
-                                            <div className="text-xs">
-                                                <div className="font-bold text-slate-800">Email Tiếp nhận Sự cố</div>
-                                                <div className="font-mono text-xs font-bold text-emerald-700 my-0.5">Ngtaitinh@gmail.com</div>
-                                                <div className="text-slate-500">Phản hồi trong thời gian sớm nhất</div>
-                                            </div>
-                                        </div>
-
-                                        <div className="p-3.5 bg-white border border-slate-200 rounded-xl flex items-start gap-3 shadow-sm">
-                                            <div className="p-2.5 bg-amber-100 text-amber-700 rounded-lg shrink-0">
-                                                <Clock size={18} />
-                                            </div>
-                                            <div className="text-xs">
-                                                <div className="font-bold text-slate-800">Thời gian làm việc</div>
-                                                <div className="font-semibold text-slate-700 my-0.5">07:30 - 17:00 (Thứ 2 - Thứ 6)</div>
-                                                <div className="text-slate-500">Thứ 7: 08:00 - 11:30</div>
-                                            </div>
-                                        </div>
-
-                                        <div className="p-3.5 bg-white border border-slate-200 rounded-xl flex items-start gap-3 shadow-sm">
-                                            <div className="p-2.5 bg-purple-100 text-purple-700 rounded-lg shrink-0">
-                                                <MessageSquare size={18} />
-                                            </div>
-                                            <div className="text-xs">
-                                                <div className="font-bold text-slate-800">Quy trình báo lỗi nhanh</div>
-                                                <div className="text-slate-600 my-0.5">Chụp màn hình + Gửi Mã hồ sơ bị lỗi</div>
-                                                <div className="text-slate-500">Kèm mô tả chi tiết thao tác vừa thực hiện</div>
-                                            </div>
-                                        </div>
+                                        <p className="text-xs text-slate-600 leading-relaxed">
+                                            Hỗ trợ quản trị dữ liệu hồ sơ, theo dõi tình trạng xử lý trên toàn địa bàn, kiểm tra và chuẩn hóa ngày tháng, truy cập báo cáo tổng hợp và thực hiện các tác vụ quản trị được phân công.
+                                        </p>
                                     </div>
 
-                                    {/* Additional Notes */}
-                                    <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-xs text-slate-600 space-y-1.5">
-                                        <div className="font-bold text-slate-800 flex items-center gap-1.5">
-                                            <CheckCircle2 size={15} className="text-blue-600" /> Lưu ý dành cho Cán bộ sử dụng:
+                                    {/* Role 3: Team Leader */}
+                                    <div className="p-3.5 rounded-xl border border-blue-200 bg-blue-50/30 hover:border-blue-300 transition-colors shadow-xs">
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <span className="px-2 py-0.5 rounded bg-blue-100 text-blue-800 font-bold text-xs">
+                                                NHÓM TRƯỞNG / TỔ TRƯỞNG CHUYÊN MÔN
+                                            </span>
                                         </div>
-                                        <ul className="list-disc list-inside space-y-1 text-slate-600 pl-1">
-                                            <li>Tuyệt đối không chia sẻ mật khẩu tài khoản cán bộ cho người khác.</li>
-                                            <li>Nếu phát hiện sai lệch số liệu doanh thu hoặc ngày tháng, sử dụng công cụ **Kiểm toán ngày tháng** trong Cấu hình hệ thống.</li>
-                                            <li>Mọi thao tác chỉnh sửa, xóa hồ sơ đều được lưu nhật ký (Audit Log) để đảm bảo tính minh bạch.</li>
-                                        </ul>
+                                        <p className="text-xs text-slate-600 leading-relaxed">
+                                            Quản lý và phân công hồ sơ cho chuyên viên trong nhóm/tổ, đôn đốc tiến độ hạn xử lý, duyệt hoàn thành công việc, tra cứu tư liệu đất đai trích lục, và theo dõi báo cáo hiệu suất làm việc của tổ chuyên môn.
+                                        </p>
+                                    </div>
+
+                                    {/* Role 4: OneDoor */}
+                                    <div className="p-3.5 rounded-xl border border-slate-200 bg-white hover:border-amber-300 transition-colors shadow-xs">
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-800 font-bold text-xs">
+                                                BỘ PHẬN MỘT CỬA (OneDoor)
+                                            </span>
+                                        </div>
+                                        <p className="text-xs text-slate-600 leading-relaxed">
+                                            Tiếp nhận và đăng ký hồ sơ đầu vào từ người dân/doanh nghiệp, lập giấy hẹn, thu phí/lệ phí và tiền tạm ứng, xuất danh sách bàn giao hồ sơ sang bộ phận chuyên môn, và thực hiện trả kết quả.
+                                        </p>
+                                    </div>
+
+                                    {/* Role 5: Employee */}
+                                    <div className="p-3.5 rounded-xl border border-slate-200 bg-white hover:border-emerald-300 transition-colors shadow-xs">
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-xs">
+                                                NHÂN VIÊN / CHUYÊN VIÊN
+                                            </span>
+                                        </div>
+                                        <p className="text-xs text-slate-600 leading-relaxed">
+                                            Thực hiện đo đạc, thẩm định và xử lý nghiệp vụ các hồ sơ được phân công. Cập nhật tiến độ xử lý, đính kèm file bản vẽ/tài liệu kết quả, và báo cáo hoàn tất tác vụ cho Nhóm trưởng.
+                                        </p>
                                     </div>
                                 </div>
-                            )}
+                            </div>
+
+                            {/* SECTION 2: HỖ TRỢ KỸ THUẬT */}
+                            <div className="space-y-4 pt-2">
+                                <div className="flex items-center gap-2 pb-2 border-b border-slate-200">
+                                    <Headphones size={18} className="text-emerald-600" />
+                                    <h3 className="font-bold text-sm text-slate-800 uppercase tracking-wide">
+                                        2. Hỗ trợ kỹ thuật & Liên hệ
+                                    </h3>
+                                </div>
+
+                                {/* Tech Support Header Banner */}
+                                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-xs space-y-2">
+                                    <div className="flex items-center gap-2 text-emerald-900 font-bold text-sm">
+                                        <Headphones className="text-emerald-600" size={18} />
+                                        Đơn vị Quản trị & Hỗ trợ Kỹ thuật Hệ thống
+                                    </div>
+                                    <p className="text-emerald-800 leading-relaxed">
+                                        Bộ phận Kỹ thuật luôn sẵn sàng hỗ trợ cán bộ giải quyết các sự cố phần mềm, khôi phục dữ liệu, hướng dẫn thao tác hoặc tiếp nhận yêu cầu điều chỉnh phân quyền tài khoản.
+                                    </p>
+                                </div>
+
+                                {/* Contact Info Cards Grid */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    <div className="p-3.5 bg-white border border-slate-200 rounded-xl flex items-start gap-3 shadow-xs">
+                                        <div className="p-2.5 bg-blue-100 text-blue-700 rounded-lg shrink-0">
+                                            <Phone size={18} />
+                                        </div>
+                                        <div className="text-xs">
+                                            <div className="font-bold text-slate-800">Hotline / Zalo Kỹ thuật</div>
+                                            <div className="font-mono text-sm font-bold text-blue-600 my-0.5">0976354944</div>
+                                            <div className="text-slate-500">Hỗ trợ trực tiếp qua Zalo hoặc Cuộc gọi</div>
+                                        </div>
+                                    </div>
+
+                                    <div className="p-3.5 bg-white border border-slate-200 rounded-xl flex items-start gap-3 shadow-xs">
+                                        <div className="p-2.5 bg-emerald-100 text-emerald-700 rounded-lg shrink-0">
+                                            <Mail size={18} />
+                                        </div>
+                                        <div className="text-xs">
+                                            <div className="font-bold text-slate-800">Email Tiếp nhận Sự cố</div>
+                                            <div className="font-mono text-xs font-bold text-emerald-700 my-0.5">Ngtaitinh@gmail.com</div>
+                                            <div className="text-slate-500">Phản hồi trong thời gian sớm nhất</div>
+                                        </div>
+                                    </div>
+
+                                    <div className="p-3.5 bg-white border border-slate-200 rounded-xl flex items-start gap-3 shadow-xs">
+                                        <div className="p-2.5 bg-amber-100 text-amber-700 rounded-lg shrink-0">
+                                            <Clock size={18} />
+                                        </div>
+                                        <div className="text-xs">
+                                            <div className="font-bold text-slate-800">Thời gian làm việc</div>
+                                            <div className="font-semibold text-slate-700 my-0.5">07:30 - 17:00 (Thứ 2 - Thứ 6)</div>
+                                            <div className="text-slate-500">Thứ 7: 08:00 - 11:30</div>
+                                        </div>
+                                    </div>
+
+                                    <div className="p-3.5 bg-white border border-slate-200 rounded-xl flex items-start gap-3 shadow-xs">
+                                        <div className="p-2.5 bg-purple-100 text-purple-700 rounded-lg shrink-0">
+                                            <MessageSquare size={18} />
+                                        </div>
+                                        <div className="text-xs">
+                                            <div className="font-bold text-slate-800">Quy trình báo lỗi nhanh</div>
+                                            <div className="text-slate-600 my-0.5">Chụp màn hình + Gửi Mã hồ sơ bị lỗi</div>
+                                            <div className="text-slate-500">Kèm mô tả chi tiết thao tác vừa thực hiện</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Additional Notes */}
+                                <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-xs text-slate-600 space-y-1.5">
+                                    <div className="font-bold text-slate-800 flex items-center gap-1.5">
+                                        <CheckCircle2 size={15} className="text-blue-600" /> Lưu ý dành cho Cán bộ sử dụng:
+                                    </div>
+                                    <ul className="list-disc list-inside space-y-1 text-slate-600 pl-1">
+                                        <li>Tuyệt đối không chia sẻ mật khẩu tài khoản cán bộ cho người khác.</li>
+                                        <li>Nếu phát hiện sai lệch số liệu doanh thu hoặc ngày tháng, sử dụng công cụ **Kiểm toán ngày tháng** trong Cấu hình hệ thống.</li>
+                                        <li>Mọi thao tác chỉnh sửa, xóa hồ sơ đều được lưu nhật ký (Audit Log) để đảm bảo tính minh bạch.</li>
+                                    </ul>
+                                </div>
+                            </div>
                         </div>
 
                         {/* Modal Footer */}

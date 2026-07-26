@@ -37,6 +37,14 @@ function App() {
   // Tự động kiểm tra và thực hiện sao lưu hàng tuần cho admin đã tắt theo yêu cầu
 
   const [currentView, setCurrentView] = useState('dashboard');
+  const [receiveRecordResetKey, setReceiveRecordResetKey] = useState(0);
+
+  const handleSetCurrentView = useCallback((viewId: string) => {
+    if (viewId === 'receive_record') {
+      setReceiveRecordResetKey(prev => prev + 1);
+    }
+    setCurrentView(viewId);
+  }, []);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   const [notificationEnabled, setNotificationEnabled] = useState(() => {
@@ -126,7 +134,7 @@ function App() {
   useEffect(() => {
       if (window.electronAPI && window.electronAPI.onNavigateToView) {
           window.electronAPI.onNavigateToView((viewId: string) => {
-              if (currentUser) setCurrentView(viewId);
+              if (currentUser) handleSetCurrentView(viewId);
           });
       }
       return () => {
@@ -134,7 +142,7 @@ function App() {
               window.electronAPI.removeNavigationListener();
           }
       };
-  }, [currentUser]);
+  }, [currentUser, handleSetCurrentView]);
 
   // Sync Templates
   useEffect(() => { syncTemplatesFromCloud(); }, []);
@@ -787,14 +795,14 @@ function App() {
       <MobileLayout
         currentUser={currentUser}
         currentView={currentView}
-        setCurrentView={setCurrentView}
+        setCurrentView={handleSetCurrentView}
         onLogout={() => setCurrentUser(null)}
         unreadMessages={unreadMessages}
         activeRemindersCount={activeRemindersCount}
       >
         <MobileRoutes
           currentView={currentView}
-          setCurrentView={setCurrentView}
+          setCurrentView={handleSetCurrentView}
           currentUser={currentUser}
           records={records}
           employees={employees}
@@ -939,7 +947,7 @@ function App() {
     <MainLayout
         currentUser={currentUser}
         currentView={currentView}
-        setCurrentView={setCurrentView}
+        setCurrentView={handleSetCurrentView}
         onLogout={() => setCurrentUser(null)}
         isMobileMenuOpen={isMobileMenuOpen}
         setIsMobileMenuOpen={setIsMobileMenuOpen}
@@ -964,7 +972,8 @@ function App() {
     >
         <AppRoutes 
             currentView={currentView}
-            setCurrentView={setCurrentView}
+            setCurrentView={handleSetCurrentView}
+            receiveRecordResetKey={receiveRecordResetKey}
             currentUser={currentUser}
             records={records}
             employees={employees}

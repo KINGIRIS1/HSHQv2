@@ -15,7 +15,7 @@ const VPHCForm: React.FC<VPHCFormProps> = ({ formData, handleChange }) => {
 
     const WARDS = [
         "xã Tân Quan",
-        "thị trấn Tân Khai", 
+        "phường Tân Khai", 
         "xã Minh Đức",
     "xã Tân Hưng"
     ];
@@ -181,6 +181,29 @@ const VPHCForm: React.FC<VPHCFormProps> = ({ formData, handleChange }) => {
                             <Hash size={16} className={iconClass} />
                             <input className={inputClass} value={formData.STT} onChange={e => handleChange('STT', e.target.value)} placeholder="01/BBLV" />
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* 4. THÔNG TIN NGƯỜI LẬP BIÊN BẢN (MẪU 01) */}
+            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-1 h-full bg-blue-500"></div>
+                <h3 className="text-sm font-bold text-slate-800 uppercase mb-5 flex items-center gap-2">
+                    <span className="p-1.5 bg-blue-100 text-blue-600 rounded-lg"><User size={16}/></span> 
+                    1. Người có thẩm quyền lập biên bản (Mẫu 01)
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label className={labelClass}>Họ và tên người lập BB</label>
+                        <input className={inputClass} value={formData.NGUOI_LAP_BB || ''} onChange={e => handleChange('NGUOI_LAP_BB', e.target.value)} placeholder="Cao Thị Dung" />
+                    </div>
+                    <div>
+                        <label className={labelClass}>Chức vụ</label>
+                        <input className={inputClass} value={formData.CHUCVU_NGUOI_LAP || ''} onChange={e => handleChange('CHUCVU_NGUOI_LAP', e.target.value)} placeholder="Tổ trưởng Tổ Hành chính tổng hợp" />
+                    </div>
+                    <div className="md:col-span-2">
+                        <label className={labelClass}>Cơ quan</label>
+                        <input className={inputClass} value={formData.COQUAN_NGUOI_LAP || ''} onChange={e => handleChange('COQUAN_NGUOI_LAP', e.target.value)} placeholder="Văn phòng Đăng ký đất đai thành phố Đồng Nai - Chi nhánh Hớn Quản" />
                     </div>
                 </div>
             </div>

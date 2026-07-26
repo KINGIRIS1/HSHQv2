@@ -29,7 +29,7 @@ const DIRECTIONS = ['Bắc', 'Đông', 'Nam', 'Tây'];
 const WARDS_QUICK = [
     { label: 'xã Minh Đức', value: 'xã Minh Đức' },
     { label: 'xã Tân Hưng', value: 'xã Tân Hưng' },
-    { label: 'thị trấn Tân Khai', value: 'thị trấn Tân Khai' },
+    { label: 'phường Tân Khai', value: 'phường Tân Khai' },
     { label: 'xã Tân Quan', value: 'xã Tân Quan' }
 ];
 

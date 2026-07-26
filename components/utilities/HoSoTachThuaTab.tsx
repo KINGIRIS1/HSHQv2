@@ -14,7 +14,7 @@ interface HoSoTachThuaTabProps {
 
 // Danh sách Xã/Phường giới hạn theo yêu cầu
 const HON_QUAN_WARDS = [
-    "thị trấn Tân Khai",
+    "phường Tân Khai",
     "xã Tân Quan",
     "xã Minh Đức",
     "xã Tân Hưng"

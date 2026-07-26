@@ -62,8 +62,8 @@ function _nd(s: string): string {
     return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim();
 }
 
-const ReceiveContract: React.FC<ReceiveContractProps> = ({ wards, currentUser, employees, records, recordToLiquidate, onClearRecordToLiquidate, recordToCreateContract, onClearRecordToCreateContract }) => {
-  // Thay đổi: activeModule giờ bao gồm cả 'list' và 'liquidation_list'
+const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, currentUser, employees, records, recordToLiquidate, onClearRecordToLiquidate, recordToCreateContract, onClearRecordToCreateContract }) => {
+  // activeModule bao gồm 'contract', 'liquidation', 'list', 'liquidation_list'
   const [activeModule, setActiveModule] = useState<'contract' | 'liquidation' | 'list' | 'liquidation_list'>('list'); 
   const [priceList, setPriceList] = useState<PriceItem[]>([]);
   const [contracts, setContracts] = useState<Contract[]>([]); // Move contracts state up to handle logic

@@ -114,14 +114,21 @@ const DailyList: React.FC<DailyListProps> = ({ records, wards, currentUser, empl
       const dateParts = filterDate.split('-'); 
       const dateStr = `NGÀY ${dateParts[2]} THÁNG ${dateParts[1]} NĂM ${dateParts[0]}`;
       
-      const tableHeader = ["STT", "Mã Hồ Sơ", "Chủ Sử Dụng", "Xã / Phường", "Tờ", "Thửa", "Loại Hồ Sơ", "Hẹn Trả", "Ghi Chú"];
+      const tableHeader = ["STT", "Mã Hồ Sơ", "Chủ Sử Dụng", "Xã / Phường", "Tờ", "Thửa", "Loại Hồ Sơ", "Hẹn Trả", "Ngày Trả KQ", "Số BL/HĐ", "Số Tiền", "Ghi Chú"];
       
+      const formatPrice = (p: any) => p ? new Intl.NumberFormat('vi-VN').format(Number(p)) + ' đ' : '';
+      const formatDateStr = (d: any) => d ? new Date(d).toLocaleDateString('vi-VN') : '';
+
       const dataRows = filteredDailyRecords.map((r, i) => [
           i + 1, r.code, r.customerName, 
           getNormalizedWard(r.ward), 
-          r.mapSheet, r.landPlot, 
+          r.mapSheet || '', r.landPlot || '', 
           getShortRecordType(r.recordType), 
-          r.deadline ? new Date(r.deadline).toLocaleDateString('vi-VN') : '', r.content
+          formatDateStr(r.deadline),
+          formatDateStr(r.resultReturnedDate),
+          r.receiptNumber || '',
+          formatPrice(r.returnedPrice),
+          r.content || ''
       ]);
 
       const wb = XLSX.utils.book_new();
@@ -148,38 +155,38 @@ const DailyList: React.FC<DailyListProps> = ({ records, wards, currentUser, empl
       const footerRowIndex = lastDataRowIndex + 2;
 
       XLSX.utils.sheet_add_aoa(ws, [
-          ["BÊN GIAO HỒ SƠ", "", "", "", "", "BÊN NHẬN HỒ SƠ", "", "", ""],
-          ["(Ký và ghi rõ họ tên)", "", "", "", "", "(Ký và ghi rõ họ tên)", "", "", ""]
+          ["BÊN GIAO HỒ SƠ", "", "", "", "", "", "BÊN NHẬN HỒ SƠ", "", "", "", "", ""],
+          ["(Ký và ghi rõ họ tên)", "", "", "", "", "", "(Ký và ghi rõ họ tên)", "", "", "", "", ""]
       ], { origin: { r: footerRowIndex, c: 0 } });
 
       // Merges
       if (!ws['!merges']) ws['!merges'] = [];
       ws['!merges'].push(
-          { s: { r: 0, c: 0 }, e: { r: 0, c: 8 } }, 
-          { s: { r: 1, c: 0 }, e: { r: 1, c: 8 } }, 
-          { s: { r: 3, c: 0 }, e: { r: 3, c: 8 } }, 
-          { s: { r: 4, c: 0 }, e: { r: 4, c: 8 } }, 
-          { s: { r: 5, c: 0 }, e: { r: 5, c: 8 } },
-          { s: { r: footerRowIndex, c: 0 }, e: { r: footerRowIndex, c: 3 } },
-          { s: { r: footerRowIndex + 1, c: 0 }, e: { r: footerRowIndex + 1, c: 3 } },
-          { s: { r: footerRowIndex, c: 5 }, e: { r: footerRowIndex, c: 8 } },
-          { s: { r: footerRowIndex + 1, c: 5 }, e: { r: footerRowIndex + 1, c: 8 } }
+          { s: { r: 0, c: 0 }, e: { r: 0, c: 11 } }, 
+          { s: { r: 1, c: 0 }, e: { r: 1, c: 11 } }, 
+          { s: { r: 3, c: 0 }, e: { r: 3, c: 11 } }, 
+          { s: { r: 4, c: 0 }, e: { r: 4, c: 11 } }, 
+          { s: { r: 5, c: 0 }, e: { r: 5, c: 11 } },
+          { s: { r: footerRowIndex, c: 0 }, e: { r: footerRowIndex, c: 4 } },
+          { s: { r: footerRowIndex + 1, c: 0 }, e: { r: footerRowIndex + 1, c: 4 } },
+          { s: { r: footerRowIndex, c: 6 }, e: { r: footerRowIndex, c: 11 } },
+          { s: { r: footerRowIndex + 1, c: 6 }, e: { r: footerRowIndex + 1, c: 11 } }
       );
 
       // Column Widths
-      ws['!cols'] = [{ wch: 5 }, { wch: 15 }, { wch: 22 }, { wch: 15 }, { wch: 6 }, { wch: 6 }, { wch: 20 }, { wch: 12 }, { wch: 15 }];
+      ws['!cols'] = [{ wch: 5 }, { wch: 15 }, { wch: 22 }, { wch: 15 }, { wch: 6 }, { wch: 6 }, { wch: 18 }, { wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 15 }];
 
       // Styles Loop
-      for(let c=0; c<=8; c++) { 
+      for(let c=0; c<=11; c++) { 
           const ref = XLSX.utils.encode_cell({r: 6, c: c}); 
           if(!ws[ref]) ws[ref] = { v: "", t: "s"}; 
           ws[ref].s = headerStyle; 
       }
       for(let r=7; r < lastDataRowIndex; r++) { 
-          for(let c=0; c<=8; c++) { 
+          for(let c=0; c<=11; c++) { 
               const ref = XLSX.utils.encode_cell({r: r, c: c}); 
               if(!ws[ref]) ws[ref] = { v: "", t: "s"}; 
-              if (c === 4 || c === 5) ws[ref].s = centerCellStyle;
+              if (c === 4 || c === 5 || c === 7 || c === 8) ws[ref].s = centerCellStyle;
               else ws[ref].s = cellStyle;
           } 
       }
@@ -253,57 +260,69 @@ const DailyList: React.FC<DailyListProps> = ({ records, wards, currentUser, empl
         </div>
         <div className="flex-1 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col min-h-0">
             <div className="overflow-auto flex-1">
-                <table className="w-full text-left table-fixed min-w-[1300px]">
+                <table className="w-full text-left table-fixed min-w-[1600px]">
                     <thead className="bg-gray-50 text-xs text-gray-600 uppercase font-bold sticky top-0 shadow-sm">
                         <tr> 
-                            <th className="p-4 w-12 text-center">STT</th> 
-                            <th className="p-4 w-[120px]">Mã Hồ Sơ</th> 
-                            <th className="p-4 w-[200px]">Chủ Sử Dụng</th> 
-                            <th className="p-4 w-[150px]">Xã / Phường (Đất)</th> 
-                            <th className="p-4 w-[60px] text-center">Tờ</th>
-                            <th className="p-4 w-[60px] text-center">Thửa</th>
-                            <th className="p-4 w-[115px]">Loại Hồ Sơ</th> 
-                            <th className="p-4 text-center w-[120px]">Hẹn Trả</th> 
-                            <th className="p-4 w-[150px]">Ghi Chú</th>
-                            <th className="p-4 w-[140px] text-center bg-gray-100/50 sticky right-0 shadow-l">Thao Tác</th>
+                            <th className="p-3 w-10 text-center">STT</th> 
+                            <th className="p-3 w-[110px]">Mã Hồ Sơ</th> 
+                            <th className="p-3 w-[180px]">Chủ Sử Dụng</th> 
+                            <th className="p-3 w-[130px]">Xã / Phường (Đất)</th> 
+                            <th className="p-3 w-[55px] text-center">Tờ</th>
+                            <th className="p-3 w-[55px] text-center">Thửa</th>
+                            <th className="p-3 w-[110px]">Loại Hồ Sơ</th> 
+                            <th className="p-3 text-center w-[100px]">Hẹn Trả</th> 
+                            <th className="p-3 text-center w-[105px]">Ngày Trả KQ</th>
+                            <th className="p-3 w-[110px]">Số BL/HĐ</th>
+                            <th className="p-3 text-right w-[110px]">Số Tiền</th>
+                            <th className="p-3 w-[140px]">Ghi Chú</th>
+                            <th className="p-3 w-[130px] text-center bg-gray-100/50 sticky right-0 shadow-l">Thao Tác</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100 text-sm">
+                    <tbody className="divide-y divide-gray-100 text-xs">
                         {filteredDailyRecords.length > 0 ? (
                             filteredDailyRecords.map((r, index) => (
                                 <tr key={r.id} className="hover:bg-blue-50/50 group">
-                                    <td className="p-4 text-center text-gray-400 align-middle">{index + 1}</td> 
-                                    <td className="p-4 font-medium text-blue-600 truncate align-middle" title={r.code}>{r.code}</td> 
-                                    <td className="p-4 font-medium text-gray-800 truncate align-middle" title={r.customerName}>{r.customerName}</td> 
-                                    <td className="p-4 text-gray-700 truncate align-middle font-medium" title={getNormalizedWard(r.ward)}>
+                                    <td className="p-3 text-center text-gray-400 align-middle">{index + 1}</td> 
+                                    <td className="p-3 font-medium text-blue-600 truncate align-middle" title={r.code}>{r.code}</td> 
+                                    <td className="p-3 font-medium text-gray-800 truncate align-middle" title={r.customerName}>{r.customerName}</td> 
+                                    <td className="p-3 text-gray-700 truncate align-middle font-medium" title={getNormalizedWard(r.ward)}>
                                         {getNormalizedWard(r.ward)}
                                     </td>
-                                    <td className="p-4 text-center font-mono align-middle">{r.mapSheet || '-'}</td>
-                                    <td className="p-4 text-center font-mono align-middle">{r.landPlot || '-'}</td>
-                                    <td className="p-4 text-gray-600 truncate align-middle" title={r.recordType || ''}>{getShortRecordType(r.recordType)}</td> 
-                                    <td className="p-4 text-center text-blue-700 font-medium align-middle">{r.deadline ? new Date(r.deadline).toLocaleDateString('vi-VN') : '-'}</td> 
-                                    <td className="p-4 text-gray-500 italic truncate align-middle" title={r.content || ''}>{r.content}</td>
-                                    <td className="p-3 align-middle text-center sticky right-0 bg-white group-hover:bg-blue-50/50 shadow-l">
-                                        <div className="flex items-center justify-center gap-2">
+                                    <td className="p-3 text-center font-mono align-middle">{r.mapSheet || '-'}</td>
+                                    <td className="p-3 text-center font-mono align-middle">{r.landPlot || '-'}</td>
+                                    <td className="p-3 text-gray-600 truncate align-middle" title={r.recordType || ''}>{getShortRecordType(r.recordType)}</td> 
+                                    <td className="p-3 text-center text-blue-700 font-medium align-middle">{r.deadline ? new Date(r.deadline).toLocaleDateString('vi-VN') : '-'}</td> 
+                                    <td className="p-3 text-center text-emerald-700 font-medium align-middle">
+                                        {r.resultReturnedDate ? new Date(r.resultReturnedDate).toLocaleDateString('vi-VN') : '-'}
+                                    </td>
+                                    <td className="p-3 text-gray-700 font-mono truncate align-middle" title={r.receiptNumber || ''}>
+                                        {r.receiptNumber || '-'}
+                                    </td>
+                                    <td className="p-3 text-right font-semibold text-emerald-700 align-middle">
+                                        {r.returnedPrice ? new Intl.NumberFormat('vi-VN').format(Number(r.returnedPrice)) + ' đ' : '-'}
+                                    </td>
+                                    <td className="p-3 text-gray-500 italic truncate align-middle" title={r.content || ''}>{r.content}</td>
+                                    <td className="p-2 align-middle text-center sticky right-0 bg-white group-hover:bg-blue-50/50 shadow-l">
+                                        <div className="flex items-center justify-center gap-1.5">
                                             <button onClick={() => onEdit(r)} className="p-1.5 text-blue-600 hover:bg-blue-100 rounded transition-colors" title="Sửa">
-                                                <Pencil size={16} />
+                                                <Pencil size={15} />
                                             </button>
                                             {r.recordType && (getShortRecordType(r.recordType).startsWith('2.3') || getShortRecordType(r.recordType).startsWith('2.4')) && onCreateContract && (
                                                 <button onClick={() => onCreateContract(r)} className="p-1.5 text-amber-600 hover:bg-amber-100 rounded transition-colors" title="Lập hợp đồng">
-                                                    <FileSignature size={16} />
+                                                    <FileSignature size={15} />
                                                 </button>
                                             )}
                                             <button onClick={() => onPrint(r)} className="p-1.5 text-purple-600 hover:bg-purple-100 rounded transition-colors" title="In biên nhận">
-                                                <Printer size={16} />
+                                                <Printer size={15} />
                                             </button>
                                             <button onClick={() => onDelete(r)} className="p-1.5 text-red-500 hover:bg-red-100 rounded transition-colors" title="Xóa">
-                                                <Trash2 size={16} />
+                                                <Trash2 size={15} />
                                             </button>
                                         </div>
                                     </td>
                                 </tr>
                             ))
-                        ) : ( <tr><td colSpan={10} className="p-8 text-center text-gray-400 italic"> Không có hồ sơ nào trong ngày này phù hợp với bộ lọc. </td></tr> )}
+                        ) : ( <tr><td colSpan={13} className="p-8 text-center text-gray-400 italic"> Không có hồ sơ nào trong ngày này phù hợp với bộ lọc. </td></tr> )}
                     </tbody>
                 </table>
             </div>

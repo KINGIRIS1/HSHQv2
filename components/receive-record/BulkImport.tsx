@@ -1,5 +1,5 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import * as XLSX from 'xlsx-js-style';
 import { RecordFile, RecordStatus } from '../../types';
 import { RECORD_TYPES } from '../../constants';
@@ -21,6 +21,7 @@ interface BulkRecordItem extends Partial<RecordFile> {
 
 const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calculateNextCode, onPreview, currentUser }) => {
   const [bulkRecords, setBulkRecords] = useState<BulkRecordItem[]>([]);
+  const [showNoticeModal, setShowNoticeModal] = useState<boolean>(true);
   const bulkFileInputRef = useRef<HTMLInputElement>(null);
 
   const dateVal = (v: any) => { if (!v) return ''; const str = String(v); return str.includes('T') ? str.split('T')[0] : str; };
@@ -29,23 +30,30 @@ const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calc
       const wb = XLSX.utils.book_new();
       
       const headers = [
-          "CHỦ SỬ DỤNG", "SĐT", "XÃ", "THỬA", "TỜ", "DIỆN TÍCH", "ĐỊA CHỈ", "LOẠI HỒ SƠ", "NỘI DUNG", "NGƯỜI ỦY QUYỀN", "LOẠI ỦY QUYỀN"
+          'MÃ HỒ SƠ', 'CHỦ SỬ DỤNG', 'CCCD', 'SĐT', 'ĐỊA CHỈ', 'NGƯỜI ỦY QUYỀN', 
+          'XÃ', 'THỬA', 'TỜ', 'DIỆN TÍCH', 'ĐẤT Ở', 'SỐ PHÁT HÀNH', 'SỐ VÀO SỔ', 'NGÀY CẤP', 
+          'LOẠI HỒ SƠ', 'NỘI DUNG', 'GIẤY TỜ KÈM THEO', 'NGÀY NHẬN', 'HẸN TRẢ', 
+          'TRẠNG THÁI', 'NGƯỜI XỬ LÝ', 'NGÀY GIAO'
       ];
       
       const sampleData = [
-          ["Nguyễn Văn A", "0901234567", "Tân Quan", "123", "45", "100.5", "Tổ 1, KP 2", "Trích lục", "Xin trích lục bản đồ", "", ""],
-          ["Trần Thị B", "0987654321", "Tân Khai", "456", "78", "250.0", "KP 3", "Đo đạc", "Đo đạc cắm mốc", "Lê Văn C", "Giấy ủy quyền"]
+          ['HS001', 'Nguyễn Văn A', '070012345678', '0901234567', 'Tổ 1, KP 2', 'Lê Văn C', 
+           'Tân Khải', '123', '45', '100.5', '50', 'CD 123456', 'CH 01234', '2024-01-01', 
+           '2.1 Trích Lục', 'cấp đổi', 'Sổ đỏ | Bản chính', '2024-01-01', '2024-01-15', 
+           'Đã nhận', '', '']
       ];
       
       const ws = XLSX.utils.aoa_to_sheet([headers, ...sampleData]);
       
       const wscols = [
-          {wch: 25}, {wch: 15}, {wch: 20}, {wch: 10}, {wch: 10}, 
-          {wch: 15}, {wch: 30}, {wch: 25}, {wch: 30}, {wch: 25}, {wch: 20}
+          {wch: 15}, {wch: 22}, {wch: 15}, {wch: 15}, {wch: 25}, {wch: 20},
+          {wch: 18}, {wch: 10}, {wch: 10}, {wch: 12}, {wch: 10}, {wch: 15},
+          {wch: 15}, {wch: 12}, {wch: 20}, {wch: 25}, {wch: 22}, {wch: 12},
+          {wch: 12}, {wch: 15}, {wch: 18}, {wch: 12}
       ];
       ws['!cols'] = wscols;
       
-      XLSX.utils.book_append_sheet(wb, ws, "Mau_Nhap_Lieu");
+      XLSX.utils.book_append_sheet(wb, ws, "Mau_Excel");
       XLSX.writeFile(wb, "Mau_Nhap_Lieu_Ho_So.xlsx");
   };
 
@@ -210,29 +218,31 @@ const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calc
   };
 
   return (
-    <div className="flex flex-col h-full space-y-4 animate-fade-in">
-        <div className="bg-blue-50 p-4 rounded-xl border border-blue-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
-            <div>
-                <h3 className="font-bold text-blue-800 text-lg flex items-center gap-2">
-                    <Upload size={20} /> Nhập liệu hàng loạt từ Excel
-                </h3>
-                <p className="text-sm text-blue-600 mt-1">Chọn file Excel để nhập danh sách. Mã hồ sơ sẽ được để trống và tạo sau.</p>
-            </div>
-            <div className="flex gap-2">
-                <button onClick={handleDownloadTemplate} className="bg-white text-green-700 border border-green-300 px-4 py-2 rounded-lg font-bold text-sm hover:bg-green-100 flex items-center gap-2">
-                    <Download size={16} /> Tải mẫu Excel
-                </button>
-                <button onClick={() => bulkFileInputRef.current?.click()} className="bg-white text-blue-700 border border-blue-300 px-4 py-2 rounded-lg font-bold text-sm hover:bg-blue-100 flex items-center gap-2">
-                    <FileSpreadsheet size={16} /> Chọn File Excel
-                </button>
-                <input type="file" ref={bulkFileInputRef} className="hidden" accept=".xlsx, .xls" onChange={handleBulkImport} />
-            </div>
-        </div>
-
+    <div className="flex flex-col h-full space-y-4 animate-fade-in relative">
         <div className="flex-1 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col min-h-0">
-            <div className="p-3 border-b bg-gray-50 flex justify-between items-center">
-                <span className="font-bold text-gray-700">Danh sách chờ xử lý ({bulkRecords.length})</span>
-                {bulkRecords.length > 0 && <span className="text-xs text-orange-600 italic">Lưu ý: Bấm "Tạo mã" &rarr; "Lưu" cho từng dòng.</span>}
+            <div className="p-3 border-b bg-gray-50 flex flex-wrap justify-between items-center gap-3">
+                <div className="flex items-center gap-3">
+                    <span className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                        <Upload size={18} className="text-blue-600" /> Nhập liệu hàng loạt / Danh sách chờ xử lý ({bulkRecords.length})
+                    </span>
+                    {bulkRecords.length > 0 && <span className="text-xs text-orange-600 italic hidden md:inline">Lưu ý: Bấm "Tạo mã" &rarr; "Lưu" cho từng dòng.</span>}
+                </div>
+                <div className="flex items-center gap-2">
+                    <button onClick={handleDownloadTemplate} className="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-1.5 rounded-lg font-bold text-xs flex items-center gap-1.5 shadow-xs transition-all cursor-pointer">
+                        <Download size={15} /> Tải mẫu
+                    </button>
+                    <button onClick={() => bulkFileInputRef.current?.click()} className="bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-1.5 rounded-lg font-bold text-xs flex items-center gap-1.5 shadow-xs transition-all cursor-pointer">
+                        <FileSpreadsheet size={15} /> Chọn File
+                    </button>
+                    <input type="file" ref={bulkFileInputRef} className="hidden" accept=".xlsx, .xls" onChange={handleBulkImport} />
+                    <button 
+                        onClick={() => setShowNoticeModal(true)} 
+                        className="w-6 h-6 rounded-full bg-red-500 hover:bg-red-600 text-white font-extrabold text-xs flex items-center justify-center shadow-sm border border-red-400 transition-all active:scale-90 cursor-pointer ml-0.5"
+                        title="Xem nhắc nhở & hướng dẫn"
+                    >
+                        !
+                    </button>
+                </div>
             </div>
             <div className="overflow-auto flex-1">
                 <table className="w-full text-left table-fixed min-w-[1200px]">
@@ -274,6 +284,45 @@ const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calc
                 </table>
             </div>
         </div>
+
+        {/* Modal Hướng dẫn / Nhắc nhở khi bấm icon ! hoặc vào tab */}
+        {showNoticeModal && (
+            <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+                <div className="bg-white rounded-2xl shadow-xl border border-slate-200 max-w-md w-full p-6 animate-scale-up">
+                    <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                        <h3 className="font-bold text-slate-800 text-base flex items-center gap-2">
+                            <span className="w-7 h-7 rounded-full bg-red-500 text-white font-black flex items-center justify-center text-sm shadow-sm">!</span>
+                            Nhắc nhở & Hướng dẫn Tiếp nhận
+                        </h3>
+                        <button onClick={() => setShowNoticeModal(false)} className="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
+                            <X size={18} />
+                        </button>
+                    </div>
+                    <div className="py-4 space-y-3 text-sm text-slate-600 leading-relaxed">
+                        <p className="flex items-start gap-2">
+                            <span className="font-bold text-blue-600 shrink-0">1.</span>
+                            <span>Tải <strong>file Excel mẫu</strong> để đảm bảo chuẩn cấu trúc tiêu đề các cột.</span>
+                        </p>
+                        <p className="flex items-start gap-2">
+                            <span className="font-bold text-blue-600 shrink-0">2.</span>
+                            <span>Bấm <strong>"Chọn File Excel"</strong> để nhập danh sách. Mã hồ sơ sẽ tạm để trống.</span>
+                        </p>
+                        <p className="flex items-start gap-2">
+                            <span className="font-bold text-blue-600 shrink-0">3.</span>
+                            <span>Kiểm tra Xã/Phường, bấm nút <strong className="text-blue-600">Đũa thần (Tạo mã)</strong> để tự cấp mã, sau đó bấm <strong>"Lưu"</strong> từng dòng.</span>
+                        </p>
+                    </div>
+                    <div className="pt-3 border-t border-slate-100 flex justify-end">
+                        <button 
+                            onClick={() => setShowNoticeModal(false)} 
+                            className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-2 rounded-xl text-sm shadow-md transition-all active:scale-95 cursor-pointer"
+                        >
+                            OK (Đã hiểu)
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
     </div>
   );
 };

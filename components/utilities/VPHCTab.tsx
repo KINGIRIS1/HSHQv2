@@ -33,7 +33,10 @@ const VPHCTab: React.FC<VPHCTabProps> = ({ currentUser, notify }) => {
         LOAIHS: 'chuyển nhượng',
         SOCC: '', NGAYCC: '', VPCC: '',
         TGXRVV: '', // Thời gian xảy ra vụ việc
-        STT: '' // Số thứ tự biên bản
+        STT: '', // Số thứ tự biên bản
+        NGUOI_LAP_BB: 'Cao Thị Dung',
+        CHUCVU_NGUOI_LAP: 'Tổ trưởng Tổ Hành chính tổng hợp',
+        COQUAN_NGUOI_LAP: 'Văn phòng Đăng ký đất đai thành phố Đồng Nai - Chi nhánh Hớn Quản'
     });
 
     const [templateType, setTemplateType] = useState<'mau01' | 'mau02'>('mau01');
@@ -180,7 +183,10 @@ const VPHCTab: React.FC<VPHCTabProps> = ({ currentUser, notify }) => {
             CHUSDGCN: '',
             LOAIHS: 'chuyển nhượng',
             SOCC: '', NGAYCC: '', VPCC: '',
-            TGXRVV: '', STT: ''
+            TGXRVV: '', STT: '',
+            NGUOI_LAP_BB: 'Cao Thị Dung',
+            CHUCVU_NGUOI_LAP: 'Tổ trưởng Tổ Hành chính tổng hợp',
+            COQUAN_NGUOI_LAP: 'Văn phòng Đăng ký đất đai thành phố Đồng Nai - Chi nhánh Hớn Quản'
         };
         setFormData(resetData);
         setExportedFilePath(null);
@@ -240,13 +246,13 @@ const VPHCTab: React.FC<VPHCTabProps> = ({ currentUser, notify }) => {
 
                 <p style="margin-bottom: 10px;">Hôm nay, hồi …..giờ……phút, ngày .../.../${currentYear}, tại (3) Văn phòng Đăng ký đất đai thành phố Đồng Nai - Chi nhánh Hớn Quản.</p>
                 <p style="text-align: justify; margin-bottom: 10px;">Lý do lập biên bản tại &lt;trụ sở cơ quan của người có thẩm quyền lập biên bản/địa điểm khác:&gt;(*) Hồ sơ vụ việc do Văn phòng Đăng ký đất đai thành phố Đồng Nai - Chi nhánh Hớn Quản phát hiện và chuyển đến Chủ tịch UBND ${data.XA_PHUONG} xử lý theo quy định.</p>
-                <p style="text-align: justify; margin-bottom: 10px;">Căn cứ Biên bản làm việc số: ${data.STT || '...'} /BBLV ngày .../.../${currentYear} của Văn phòng Đăng ký đất đai thành phố Đồng Nai - Chi nhánh Hớn Quản tại Trung tâm hành chính công ${data.XA_PHUONG}, tỉnh Bình Phước.</p>
+                <p style="text-align: justify; margin-bottom: 10px;">Căn cứ Biên bản làm việc số: ${data.STT || '...'} /BBLV ngày .../.../${currentYear} của Văn phòng Đăng ký đất đai thành phố Đồng Nai - Chi nhánh Hớn Quản tại Trung tâm hành chính công ${data.XA_PHUONG}, thành phố Đồng Nai.</p>
 
                 <p><b>Chúng tôi gồm:</b></p>
                 
                 <p><b>1. Người có thẩm quyền lập biên bản:</b></p>
-                <p style="margin-left: 20px;">Họ và tên: Cao Thị Dung. Chức vụ: Tổ trưởng Tổ Hành chính tổng hợp.</p>
-                <p style="margin-left: 20px; margin-bottom: 10px;">Cơ quan: Văn phòng Đăng ký đất đai thành phố Đồng Nai - Chi nhánh Hớn Quản.</p>
+                <p style="margin-left: 20px;">Họ và tên: ${data.NGUOI_LAP_BB || 'Cao Thị Dung'}. Chức vụ: ${data.CHUCVU_NGUOI_LAP || 'Tổ trưởng Tổ Hành chính tổng hợp'}.</p>
+                <p style="margin-left: 20px; margin-bottom: 10px;">Cơ quan: ${data.COQUAN_NGUOI_LAP || 'Văn phòng Đăng ký đất đai thành phố Đồng Nai - Chi nhánh Hớn Quản'}.</p>
 
                 <p><b>2. Với sự chứng kiến của: (5)</b></p>
                 <div style="margin-left: 20px; margin-bottom: 10px;">
@@ -351,7 +357,7 @@ const VPHCTab: React.FC<VPHCTabProps> = ({ currentUser, notify }) => {
                     </tr>
                     <tr style="vertical-align: top;">
                         <td><i>(Ký, ghi rõ họ và tên)</i><br/><br/><br/><br/>${data.NGUOI}</td>
-                        <td><i>(Ký, ghi rõ chức vụ, họ và tên)</i><br/><br/><br/><br/>Cao Thị Dung</td>
+                        <td><i>(Ký, ghi rõ chức vụ, họ và tên)</i><br/><br/><br/><br/>${data.NGUOI_LAP_BB || 'Cao Thị Dung'}</td>
                     </tr>
                     
                     <tr><td colspan="2" style="height: 30px;"></td></tr>

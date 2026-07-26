@@ -46,6 +46,7 @@ export const BulkUpdateTab: React.FC<BulkUpdateTabProps> = ({
   const [editingRecord, setEditingRecord] = useState<RecordFile | null>(null);
 
   // Excel update states
+  const [showNoticeModal, setShowNoticeModal] = useState<boolean>(true);
   const [excelPreview, setExcelPreview] = useState<{ record: RecordFile; updates: Record<string, any>; errors?: string[] }[]>([]);
   const [editingExcelIdx, setEditingExcelIdx] = useState<number | null>(null);
   const [editingExcelUpdates, setEditingExcelUpdates] = useState<Record<string, any>>({});
@@ -309,41 +310,20 @@ export const BulkUpdateTab: React.FC<BulkUpdateTabProps> = ({
   };
 
   const handleDownloadTemplate = () => {
+    const headers = [
+      'MÃ HỒ SƠ', 'CHỦ SỬ DỤNG', 'CCCD', 'SĐT', 'ĐỊA CHỈ', 'NGƯỜI ỦY QUYỀN', 
+      'XÃ', 'THỬA', 'TỜ', 'DIỆN TÍCH', 'ĐẤT Ở', 'SỐ PHÁT HÀNH', 'SỐ VÀO SỔ', 'NGÀY CẤP', 
+      'LOẠI HỒ SƠ', 'NỘI DUNG', 'GIẤY TỜ KÈM THEO', 'NGÀY NHẬN', 'HẸN TRẢ', 
+      'TRẠNG THÁI', 'NGƯỜI XỬ LÝ', 'NGÀY GIAO'
+    ];
     const sampleData = [
-      {
-        'MÃ HỒ SƠ': 'HS2026-0001',
-        'TÊN KHÁCH HÀNG': 'Nguyễn Văn A',
-        'XÃ PHƯỜNG': 'Tân Khải',
-        'TRẠNG THÁI': 'Đang xử lý',
-        'CÁN BỘ THỤ LÝ': employees[0]?.name || 'Nguyễn Văn B',
-        'HẠN GIẢI QUYẾT': '2026-08-15',
-        'NGÀY TRẢ KẾT QUẢ': '2026-08-14',
-        'GHI CHÚ': 'Cập nhật bổ sung giấy tờ'
-      },
-      {
-        'MÃ HỒ SƠ': 'HS2026-0002',
-        'TÊN KHÁCH HÀNG': 'Trần Thị C',
-        'XÃ PHƯỜNG': 'Minh Hưng',
-        'TRẠNG THÁI': 'Đã hoàn thành',
-        'CÁN BỘ THỤ LÝ': employees[1]?.name || 'Lê Văn D',
-        'HẠN GIẢI QUYẾT': '2026-08-20',
-        'NGÀY TRẢ KẾT QUẢ': '2026-08-18',
-        'GHI CHÚ': 'Đã giao kết quả cho công dân'
-      }
+      ['HS001', 'Nguyễn Văn A', '070012345678', '0901234567', 'Tổ 1, KP 2', 'Lê Văn C', 
+       'Tân Khải', '123', '45', '100.5', '50', 'CD 123456', 'CH 01234', '2024-01-01', 
+       '2.1 Trích Lục', 'cấp đổi', 'Sổ đỏ | Bản chính', '2024-01-01', '2024-01-15', 
+       'Đã nhận', '', '']
     ];
 
-    const worksheet = XLSX.utils.json_to_sheet(sampleData);
-    worksheet['!cols'] = [
-      { wch: 16 },
-      { wch: 22 },
-      { wch: 18 },
-      { wch: 18 },
-      { wch: 22 },
-      { wch: 16 },
-      { wch: 18 },
-      { wch: 30 },
-    ];
-
+    const worksheet = XLSX.utils.aoa_to_sheet([headers, ...sampleData]);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'CapNhatHoSoMau');
     XLSX.writeFile(workbook, 'Mau_Cap_Nhat_Ho_So_Hang_Loat.xlsx');
@@ -691,22 +671,19 @@ export const BulkUpdateTab: React.FC<BulkUpdateTabProps> = ({
       {updateMode === 'excel' && (
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-6">
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 p-4 bg-slate-50 rounded-xl border border-slate-200">
-            <div>
+            <div className="flex items-center gap-2">
               <h4 className="font-bold text-slate-800 text-base flex items-center gap-2">
                 <Upload size={18} className="text-blue-600" /> Tải File Excel Cập Nhật Hồ Sơ
               </h4>
-              <p className="text-xs text-slate-500 mt-1">
-                Hệ thống sẽ tự động tìm hồ sơ khớp theo <strong>Mã hồ sơ (MÃ / CODE / SỐ HS)</strong> và cập nhật các cột có trong Excel.
-              </p>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               <button
                 onClick={handleDownloadTemplate}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-bold text-xs flex items-center gap-2 shadow-sm transition-all"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-1.5 rounded-lg font-bold text-xs flex items-center gap-1.5 shadow-xs transition-all cursor-pointer"
                 title="Tải file mẫu Excel có cấu trúc các cột chuẩn"
               >
-                <FileSpreadsheet size={16} /> Tải File Excel Mẫu
+                <FileSpreadsheet size={15} /> Tải mẫu
               </button>
               <input
                 type="file"
@@ -717,9 +694,16 @@ export const BulkUpdateTab: React.FC<BulkUpdateTabProps> = ({
               />
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-bold text-xs flex items-center gap-2 shadow-sm transition-all"
+                className="bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-1.5 rounded-lg font-bold text-xs flex items-center gap-1.5 shadow-xs transition-all cursor-pointer"
               >
-                <Upload size={16} /> Chọn File Excel
+                <Upload size={15} /> Chọn File
+              </button>
+              <button 
+                onClick={() => setShowNoticeModal(true)} 
+                className="w-6 h-6 rounded-full bg-red-500 hover:bg-red-600 text-white font-extrabold text-xs flex items-center justify-center shadow-sm border border-red-400 transition-all active:scale-90 cursor-pointer ml-0.5"
+                title="Xem nhắc nhở & hướng dẫn"
+              >
+                !
               </button>
             </div>
           </div>
@@ -993,6 +977,49 @@ export const BulkUpdateTab: React.FC<BulkUpdateTabProps> = ({
               >
                 <Save size={16} />
                 {isProcessing ? 'Đang lưu...' : 'Lưu thông tin'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Hướng dẫn / Nhắc nhở khi bấm icon ! hoặc vào tab */}
+      {showNoticeModal && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 max-w-lg w-full p-6 animate-scale-up">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <h3 className="font-bold text-slate-800 text-base flex items-center gap-2">
+                <span className="w-7 h-7 rounded-full bg-red-500 text-white font-black flex items-center justify-center text-sm shadow-sm shrink-0">!</span>
+                HƯỚNG DẪN CHẾ ĐỘ CẬP NHẬT THÔNG MINH
+              </h3>
+              <button onClick={() => setShowNoticeModal(false)} className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg cursor-pointer">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="py-4 space-y-3 text-sm text-slate-700 leading-relaxed">
+              <p className="flex items-start gap-2">
+                <span className="font-bold text-blue-600 shrink-0">•</span>
+                <span>Hệ thống tự động dò tìm hồ sơ dựa vào <strong>Mã Hồ Sơ</strong>.</span>
+              </p>
+              <p className="flex items-start gap-2">
+                <span className="font-bold text-blue-600 shrink-0">•</span>
+                <span>Chỉ cập nhật các cột <strong>CÓ dữ liệu</strong> trong file Excel (VD: file chỉ có cột Ngày Xuất thì hệ thống chỉ cập nhật cột Ngày Xuất).</span>
+              </p>
+              <p className="flex items-start gap-2">
+                <span className="font-bold text-amber-600 shrink-0">•</span>
+                <span><strong>QUAN TRỌNG:</strong> Nếu file có cột <strong>"Đợt"</strong> hoặc <strong>"Ngày xuất/Ngày trả"</strong>, hệ thống sẽ tự động chuyển trạng thái hồ sơ sang <strong>"Đã giao 1 cửa"</strong> để tránh bị báo trễ hạn.</span>
+              </p>
+              <p className="flex items-start gap-2">
+                <span className="font-bold text-emerald-600 shrink-0">•</span>
+                <span>Bấm <strong>"Tải mẫu"</strong> để lấy file mẫu Excel chuẩn, điền thông tin và bấm <strong>"Chọn File"</strong> để kiểm tra bản xem trước trước khi cập nhật.</span>
+              </p>
+            </div>
+            <div className="pt-3 border-t border-slate-100 flex justify-end">
+              <button 
+                onClick={() => setShowNoticeModal(false)} 
+                className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-2 rounded-xl text-sm shadow-md transition-all active:scale-95 cursor-pointer"
+              >
+                OK (Đã hiểu)
               </button>
             </div>
           </div>
