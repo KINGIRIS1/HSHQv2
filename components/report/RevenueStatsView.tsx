@@ -44,10 +44,20 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({ records, employees,
 
         return records
             .map(r => {
-                const price = Number(r.price) || 0;
-                const returned = r.returnedPrice !== undefined && r.returnedPrice !== null 
-                    ? Number(r.returnedPrice) 
-                    : (r.status === RecordStatus.RETURNED || r.status === RecordStatus.HANDOVER ? price : 0);
+                const contractP = (r as any).contractPrice;
+                const price = Number(r.price) || Number(contractP) || 0;
+                let returned = 0;
+                if (r.returnedPrice !== undefined && r.returnedPrice !== null && String(r.returnedPrice).trim() !== '' && !isNaN(Number(r.returnedPrice))) {
+                    returned = Number(r.returnedPrice);
+                } else if (r.recordType === 'Cung cấp tài liệu đất đai') {
+                    returned = 310000;
+                } else if (contractP !== undefined && contractP !== null && !isNaN(Number(contractP)) && Number(contractP) > 0) {
+                    returned = Number(contractP);
+                } else if (r.price !== undefined && r.price !== null && !isNaN(Number(r.price)) && Number(r.price) > 0) {
+                    returned = Number(r.price);
+                } else if (r.status === RecordStatus.RETURNED || r.status === RecordStatus.HANDOVER) {
+                    returned = price;
+                }
                 
                 const receiptType = getRecordReceiptType(r);
 
@@ -80,15 +90,23 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({ records, employees,
                     assignedWard
                 };
             })
-            // Only include records with revenue or receipt/invoice recorded
-            .filter(r => r.calcReturned > 0 || (r.receiptNumber && r.receiptNumber.trim() !== ''))
-            // Filter strictly by resultReturnedDate (Ngày trả kết quả / Ngày thu tiền)
+            // Only include records with revenue or receipt/invoice recorded or returned status
+            .filter(r => r.calcReturned > 0 || (r.receiptNumber && r.receiptNumber.trim() !== '') || r.status === RecordStatus.RETURNED)
+            // Filter strictly by resultReturnedDate or completedDate or receivedDate
             .filter(r => {
                 if (!dateStart || !dateEnd) return true;
-                const targetDateStr = r.resultReturnedDate || r.receivedDate;
+                const targetDateStr = r.resultReturnedDate || r.completedDate || r.exportDate || r.receivedDate;
                 if (!targetDateStr) return false;
-                const d = new Date(targetDateStr);
-                if (isNaN(d.getTime())) return false;
+                let d: Date | null = null;
+                if (targetDateStr.includes('/')) {
+                    const parts = targetDateStr.split('/');
+                    if (parts.length === 3) {
+                        d = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]), 12, 0, 0);
+                    }
+                } else {
+                    d = new Date(targetDateStr);
+                }
+                if (!d || isNaN(d.getTime())) return false;
                 d.setHours(12, 0, 0, 0);
                 return d >= dateStart && d <= dateEnd;
             });
@@ -382,7 +400,13 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({ records, employees,
                                                 {getShortRecordType(r.recordType)}
                                             </td>
                                             <td className="p-3.5 text-center text-slate-500 font-medium">
-                                                {r.resultReturnedDate ? new Date(r.resultReturnedDate).toLocaleDateString('vi-VN') : '-'}
+                                                {(() => {
+                                                    const dStr = r.resultReturnedDate || r.completedDate || r.exportDate || r.receivedDate;
+                                                    if (!dStr) return '-';
+                                                    if (dStr.includes('/')) return dStr;
+                                                    const dt = new Date(dStr);
+                                                    return isNaN(dt.getTime()) ? dStr : dt.toLocaleDateString('vi-VN');
+                                                })()}
                                             </td>
                                             <td className="p-3.5 text-center">
                                                 {isHoaDon ? (

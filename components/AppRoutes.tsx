@@ -696,7 +696,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                       !props.showAdvancedDateFilter,
                     )
                   }
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors shadow-sm border ${
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium transition-colors shadow-sm border ${
                     props.showAdvancedDateFilter
                       ? "bg-blue-600 text-white border-blue-600"
                       : (props.filterFromDate || props.filterToDate || props.filterAssignedFromDate || props.filterAssignedToDate)
@@ -706,7 +706,6 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                   title="Mở / đóng bộ lọc ngày nhận và ngày giao"
                 >
                   <CalendarRange size={16} />
-                  <span className="text-xs font-bold hidden sm:inline">Lọc ngày</span>
                   {(props.filterFromDate || props.filterToDate || props.filterAssignedFromDate || props.filterAssignedToDate) && (
                     <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
                   )}
@@ -719,13 +718,13 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                   currentView !== "handover_list" &&
                   currentView !== "other_handover_list" &&
                   currentView !== "archive_handover_list" && (
-                    <div className="flex items-center gap-1.5 bg-white px-2.5 py-1.5 border border-gray-200 rounded-md shadow-sm text-xs font-bold text-gray-700">
+                    <div className="flex items-center gap-1.5 bg-white px-2.5 py-1.5 border border-gray-200 rounded-md shadow-sm text-xs font-semibold text-gray-700">
                       <Calendar size={15} className="text-gray-500 shrink-0" />
                       <span className="text-xs text-gray-500 font-bold uppercase mr-0.5">
                         Nhận:
                       </span>
                       <div className="relative flex items-center hover:text-blue-600 transition-colors">
-                        <span>{formatDateDDMMYYYY(props.filterFromDate) || "Từ ngày"}</span>
+                        <span>{formatDateDDMMYYYY(props.filterFromDate) || "dd/mm/yyyy"}</span>
                         <input
                           type="date"
                           value={props.filterFromDate}
@@ -736,7 +735,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                       </div>
                       <span className="text-gray-400 font-bold text-xs">-</span>
                       <div className="relative flex items-center hover:text-blue-600 transition-colors">
-                        <span>{formatDateDDMMYYYY(props.filterToDate) || "Đến ngày"}</span>
+                        <span>{formatDateDDMMYYYY(props.filterToDate) || "dd/mm/yyyy"}</span>
                         <input
                           type="date"
                           value={props.filterToDate}
@@ -763,14 +762,14 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                 {(currentView === "all_records" ||
                   currentView === "other_records" ||
                   currentView === "archive_records") && (
-                    <div className="flex items-center gap-1.5 bg-white px-2.5 py-1.5 border border-gray-200 rounded-md shadow-sm text-xs font-bold text-gray-700">
+                    <div className="flex items-center gap-1.5 bg-white px-2.5 py-1.5 border border-gray-200 rounded-md shadow-sm text-xs font-semibold text-gray-700">
                       <Calendar size={15} className="text-gray-500 shrink-0" />
                       <span className="text-xs text-gray-500 font-bold uppercase mr-0.5">
                         Giao NV:
                       </span>
                       <div className="relative flex items-center hover:text-blue-600 transition-colors">
                         <span>
-                          {formatDateDDMMYYYY(props.filterAssignedFromDate || "") || "Từ ngày"}
+                          {formatDateDDMMYYYY(props.filterAssignedFromDate || "") || "dd/mm/yyyy"}
                         </span>
                         <input
                           type="date"
@@ -786,7 +785,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                       <span className="text-gray-400 font-bold text-xs">-</span>
                       <div className="relative flex items-center hover:text-blue-600 transition-colors">
                         <span>
-                          {formatDateDDMMYYYY(props.filterAssignedToDate || "") || "Đến ngày"}
+                          {formatDateDDMMYYYY(props.filterAssignedToDate || "") || "dd/mm/yyyy"}
                         </span>
                         <input
                           type="date"

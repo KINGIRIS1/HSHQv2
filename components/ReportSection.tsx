@@ -495,22 +495,21 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                             </select>
                         </div>
 
-                        <div className="flex items-center gap-2 bg-white border border-gray-300 rounded-lg px-3 py-1.5 shadow-sm shrink-0 text-xs font-bold text-gray-700">
+                        <div className="flex items-center gap-2 bg-white border border-gray-300 rounded-lg px-3 py-1.5 shadow-sm shrink-0 text-xs font-semibold text-gray-700">
+                            <CalendarDays size={16} className="text-slate-500 shrink-0" />
                             <div className="flex items-center gap-1">
-                                <span className="text-gray-400">Từ:</span>
                                 <input 
                                     type="date" 
-                                    className="border-none bg-transparent p-0 outline-none text-xs font-bold text-gray-700 focus:ring-0 w-[115px] cursor-pointer" 
+                                    className="border-none bg-transparent p-0 outline-none text-xs font-semibold text-gray-700 focus:ring-0 w-[110px] cursor-pointer" 
                                     value={fromDate === '1970-01-01' ? '' : fromDate} 
                                     onChange={(e) => { setFromDate(e.target.value || '1970-01-01'); setReportType('custom'); }} 
                                 />
                             </div>
                             <span className="text-gray-400 font-bold">-</span>
                             <div className="flex items-center gap-1">
-                                <span className="text-gray-400">Đến:</span>
                                 <input 
                                     type="date" 
-                                    className="border-none bg-transparent p-0 outline-none text-xs font-bold text-gray-700 focus:ring-0 w-[115px] cursor-pointer" 
+                                    className="border-none bg-transparent p-0 outline-none text-xs font-semibold text-gray-700 focus:ring-0 w-[110px] cursor-pointer" 
                                     value={toDate} 
                                     onChange={(e) => { setToDate(e.target.value); setReportType('custom'); }} 
                                 />

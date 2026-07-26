@@ -24,11 +24,22 @@ export const useRecordFilter = (
         }));
     };
 
-    // Tự động xóa chuỗi tìm kiếm khi chuyển sang một tab hoặc view mới
+    // Tự động xóa chuỗi tìm kiếm và các bộ lọc khi chuyển sang một tab hoặc view mới
     useEffect(() => {
         if (Object.keys(searchStates).length > 0) {
             setSearchStates({});
         }
+        setFilterRecordType('all');
+        setFilterWard('all');
+        setFilterStatus('all');
+        setFilterEmployee('all');
+        setWarningFilter('none');
+        setFilterSpecificDate('');
+        setFilterAssignedDate('');
+        setFilterFromDate('');
+        setFilterToDate('');
+        setFilterAssignedFromDate('');
+        setFilterAssignedToDate('');
     }, [currentView]);
 
     const [filterDate, setFilterDate] = useState(''); 

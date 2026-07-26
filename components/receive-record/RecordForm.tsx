@@ -279,50 +279,50 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
             </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3.5 items-start">
-            {/* CỘT 1: Mã hồ sơ, Loại hồ sơ, Ngày nhận, Ngày trả */}
-            <div className="space-y-3.5">
-                <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden flex flex-col">
-                    <div className="absolute top-0 left-0 w-1 h-full bg-purple-500"></div>
-                    <h3 className="text-xs font-bold text-slate-800 uppercase mb-3 flex items-center gap-2">
-                        <span className="p-1 bg-purple-100 text-purple-600 rounded-md"><Calendar size={14} /></span> 
-                        Thời gian & Mã hồ sơ
-                    </h3>
-                    
-                    <div className="space-y-3">
-                        <div>
-                            <label className={labelClass}>Mã hồ sơ</label>
-                            <input type="text" readOnly={!initialData} className={`${inputClass} font-mono ${initialData ? 'bg-white font-bold text-blue-700' : 'bg-slate-100 text-slate-500 cursor-not-allowed'}`} value={formData.code || ''} onChange={(e) => initialData && handleChange('code', e.target.value)} />
-                        </div>
+        <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm mb-3.5">
+            <label className={`${labelClass} text-xs font-bold text-slate-800 uppercase flex items-center gap-2 mb-1.5`}>
+                <span className="p-1 bg-blue-100 text-blue-600 rounded-md"><FileCheck size={14} /></span>
+                Loại hồ sơ <span className="text-red-500">*</span>
+            </label>
+            <select className={`${inputClass} text-sm font-semibold`} value={formData.recordType || ''} onChange={(e) => handleChange('recordType', e.target.value)}>
+                <option value="">-- Chọn loại hồ sơ --</option>
+                {RECORD_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+        </div>
 
-                        <div>
-                            <label className={labelClass}>Loại hồ sơ <span className="text-red-500">*</span></label>
-                            <select className={inputClass} value={formData.recordType || ''} onChange={(e) => handleChange('recordType', e.target.value)}>
-                                <option value="">-- Chọn loại hồ sơ --</option>
-                                {RECORD_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                            </select>
-                        </div>
-
-                        <div>
-                            <label className={labelClass}>Ngày nhận</label>
-                            <input type="date" required className={inputClass} value={dateVal(formData.receivedDate)} onChange={(e) => handleChange('receivedDate', e.target.value)} />
-                        </div>
-
-                        {!isCongVan && (
-                            <div>
-                                <label className={`${labelClass} text-purple-600`}>Hẹn trả <span className="text-red-500">*</span></label>
-                                <input type="date" required className={`${inputClass} bg-purple-50 border-purple-200 text-purple-700 font-bold`} value={dateVal(formData.deadline)} onChange={(e) => handleChange('deadline', e.target.value)} />
-                            </div>
-                        )}
-                    </div>
+        {/* HÀNG 2: MÃ HỒ SƠ, NGÀY NHẬN, HẸN TRẢ (MỞ HẾT KHỔ) */}
+        <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm mb-3.5">
+            <h3 className="text-xs font-bold text-slate-800 uppercase mb-2.5 flex items-center gap-2">
+                <span className="p-1 bg-purple-100 text-purple-600 rounded-md"><Calendar size={14} /></span> 
+                Mã hồ sơ & Thời gian tiếp nhận
+            </h3>
+            
+            <div className={`grid grid-cols-1 ${isCongVan ? 'sm:grid-cols-2' : 'sm:grid-cols-3'} gap-3`}>
+                <div>
+                    <label className={labelClass}>Mã hồ sơ</label>
+                    <input type="text" readOnly={!initialData} className={`${inputClass} font-mono ${initialData ? 'bg-white font-bold text-blue-700' : 'bg-slate-100 text-slate-500 cursor-not-allowed'}`} value={formData.code || ''} onChange={(e) => initialData && handleChange('code', e.target.value)} />
                 </div>
-            </div>
 
-            {/* CỘT 2: Người nộp hồ sơ & Thông tin giấy chứng nhận */}
+                <div>
+                    <label className={labelClass}>Ngày nhận</label>
+                    <input type="date" required className={inputClass} value={dateVal(formData.receivedDate)} onChange={(e) => handleChange('receivedDate', e.target.value)} />
+                </div>
+
+                {!isCongVan && (
+                    <div>
+                        <label className={`${labelClass} text-purple-600`}>Hẹn trả <span className="text-red-500">*</span></label>
+                        <input type="date" required className={`${inputClass} bg-purple-50 border-purple-200 text-purple-700 font-bold`} value={dateVal(formData.deadline)} onChange={(e) => handleChange('deadline', e.target.value)} />
+                    </div>
+                )}
+            </div>
+        </div>
+
+        {/* PHÍA DƯỚI: CHIA LÀM 2 CỘT CÂN ĐỐI */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5 items-start">
+            {/* CỘT 1: Người nộp hồ sơ & Thông tin giấy chứng nhận */}
             <div className="space-y-3.5">
                 {/* Người nộp hồ sơ hoặc Nơi gửi / nhận */}
-                <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
-                    <div className="absolute top-0 left-0 w-1 h-full bg-blue-500"></div>
+                <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm">
                     <h3 className="text-xs font-bold text-slate-800 uppercase mb-3 flex items-center gap-2">
                         <span className="p-1 bg-blue-100 text-blue-600 rounded-md">
                             <UserIcon size={14} />
@@ -356,8 +356,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
                 </div>
 
                 {/* Thông tin giấy chứng nhận */}
-                <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden flex flex-col">
-                    <div className="absolute top-0 left-0 w-1 h-full bg-green-500"></div>
+                <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm flex flex-col">
                     <h3 className="text-xs font-bold text-slate-800 uppercase mb-3 flex items-center gap-2">
                         <span className="p-1 bg-green-100 text-green-600 rounded-md">
                             <MapPin size={14} />
@@ -403,11 +402,10 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
                 </div>
             </div>
 
-            {/* CỘT 3: Nội dung chi tiết, Giấy tờ kèm theo & Người được ủy quyền */}
+            {/* CỘT 2: Nội dung chi tiết, Giấy tờ kèm theo & Người được ủy quyền */}
             <div className="space-y-3.5">
                 {/* Nội dung chi tiết */}
-                <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden flex flex-col">
-                    <div className="absolute top-0 left-0 w-1 h-full bg-orange-500"></div>
+                <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm flex flex-col">
                     <h3 className="text-xs font-bold text-slate-800 uppercase mb-2 flex items-center gap-2">
                         <span className="p-1 bg-orange-100 text-orange-600 rounded-md"><FileCheck size={14} /></span> 
                         Nội dung chi tiết
@@ -419,8 +417,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
                 </div>
 
                 {/* Giấy tờ kèm theo khác (nếu có) */}
-                <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden flex flex-col">
-                    <div className="absolute top-0 left-0 w-1 h-full bg-teal-500"></div>
+                <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm flex flex-col">
                     <div className="flex justify-between items-center mb-2.5">
                         <h3 className="text-xs font-bold text-slate-800 uppercase flex items-center gap-2">
                             <span className="p-1 bg-teal-100 text-teal-600 rounded-md"><FileText size={14} /></span> 
@@ -506,9 +503,8 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
                 </div>
 
                 {/* Thông tin người được ủy quyền (nếu có) */}
-                <div className="bg-white rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
-                    <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500"></div>
-                    <div className="p-3 flex items-center justify-between gap-2 bg-white">
+                <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
+                    <div className="p-3 flex items-center justify-between gap-2 bg-white rounded-xl">
                         <h3 className="text-xs font-bold text-slate-800 uppercase flex items-center gap-1.5">
                             <span className="p-1 bg-indigo-100 text-indigo-600 rounded-md"><UserIcon size={14} /></span>
                             Người ủy quyền (nếu có)
