@@ -773,42 +773,78 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                             </div>
                         )}
 
-                        <div className="border-t border-gray-100 pt-4 grid grid-cols-2 gap-4">
-                            <div className="bg-blue-50 p-3 rounded-lg border border-blue-100 flex items-center gap-3">
-                                <div className="bg-blue-200 p-1.5 rounded text-blue-700"><Receipt size={16}/></div>
-                                <div>
-                                    <label className="text-[10px] text-blue-500 uppercase font-bold block">
-                                        {record.receiptType ? `Số ${record.receiptType}` : 'Số BL/HĐ'}
-                                    </label>
-                                    <p className="text-sm font-bold text-blue-800">{record.receiptNumber || '---'}</p>
+                        {/* KHU VỰC THÔNG TIN THU PHÍ & TRẢ KẾT QUẢ */}
+                        <div className="border-t border-gray-100 pt-4 mt-2">
+                            <label className="text-[11px] font-bold text-slate-700 uppercase block mb-2.5 flex items-center gap-1.5">
+                                <Receipt size={15} className="text-emerald-600" />
+                                <span>Thông tin Trả kết quả & Thu phí / Lệ phí</span>
+                            </label>
+                            
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                {/* Thẻ Số tiền */}
+                                <div className="bg-emerald-50/80 p-3.5 rounded-xl border border-emerald-200/80 flex items-center gap-3">
+                                    <div className="bg-emerald-500 text-white p-2 rounded-lg shadow-sm">
+                                        <DollarSign size={18}/>
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] text-emerald-700 uppercase font-bold block">
+                                            Số tiền thu
+                                        </label>
+                                        <p className="text-base font-black text-emerald-800">
+                                            {record.returnedPrice !== undefined && record.returnedPrice !== null
+                                                ? record.returnedPrice.toLocaleString('vi-VN') + ' đ'
+                                                : (record.recordType === 'Cung cấp tài liệu đất đai' 
+                                                    ? '310.000 đ' 
+                                                    : (contractPrice !== null && contractPrice !== undefined ? contractPrice.toLocaleString('vi-VN') + ' đ' : '---'))}
+                                        </p>
+                                    </div>
                                 </div>
-                            </div>
-                            <div className="bg-green-50 p-3 rounded-lg border border-green-100 flex items-center gap-3">
-                                <div className="bg-green-200 p-1.5 rounded text-green-700"><DollarSign size={16}/></div>
-                                <div>
-                                    <label className="text-[10px] text-green-500 uppercase font-bold block">
-                                        Số Tiền
-                                    </label>
-                                    <p className="text-sm font-bold text-green-800">
-                                        {record.returnedPrice !== undefined && record.returnedPrice !== null
-                                            ? record.returnedPrice.toLocaleString('vi-VN') + ' đ'
-                                            : (record.recordType === 'Cung cấp tài liệu đất đai' 
-                                                ? '310.000 đ' 
-                                                : (contractPrice !== null && contractPrice !== undefined ? contractPrice.toLocaleString('vi-VN') + ' đ' : '---'))}
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
 
-                        {record.receiverName && (
-                            <div className="mt-3 bg-purple-50 p-3 rounded-lg border border-purple-100 flex items-center gap-3">
-                                <div className="bg-purple-200 p-1.5 rounded text-purple-700"><UserIcon size={16}/></div>
-                                <div>
-                                    <label className="text-[10px] text-purple-600 uppercase font-bold block">Người nhận kết quả</label>
-                                    <p className="text-sm font-bold text-purple-900">{record.receiverName}</p>
+                                {/* Thẻ Số BL/HĐ */}
+                                <div className="bg-blue-50/80 p-3.5 rounded-xl border border-blue-200/80 flex items-center gap-3">
+                                    <div className="bg-blue-500 text-white p-2 rounded-lg shadow-sm">
+                                        <Receipt size={18}/>
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] text-blue-700 uppercase font-bold block">
+                                            {record.receiptType ? `Số ${record.receiptType}` : 'Số Biên lai / Hóa đơn'}
+                                        </label>
+                                        <p className="text-sm font-black text-blue-900 font-mono">
+                                            {record.receiptNumber || '---'}
+                                        </p>
+                                    </div>
                                 </div>
                             </div>
-                        )}
+
+                            {/* Thông tin ngày trả & người nhận kết quả */}
+                            {(record.resultReturnedDate || record.receiverName) && (
+                                <div className="mt-3 bg-purple-50/80 p-3 rounded-xl border border-purple-200/80 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    {record.resultReturnedDate && (
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="bg-purple-200 text-purple-700 p-1.5 rounded-lg shrink-0">
+                                                <CalendarClock size={15}/>
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] text-purple-600 uppercase font-bold block">Ngày trả kết quả</label>
+                                                <p className="text-xs font-bold text-purple-950">{formatDate(record.resultReturnedDate)}</p>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {record.receiverName && (
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="bg-purple-200 text-purple-700 p-1.5 rounded-lg shrink-0">
+                                                <UserIcon size={15}/>
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] text-purple-600 uppercase font-bold block">Người nhận kết quả</label>
+                                                <p className="text-xs font-bold text-purple-950">{record.receiverName}</p>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
                         
                         {/* LIÊN KẾT HỢP ĐỒNG */}
                         {record && record.recordType && (getShortRecordType(record.recordType).startsWith('2.3') || getShortRecordType(record.recordType).startsWith('2.4')) && (
