@@ -182,44 +182,59 @@ const SystemReceiptTemplate: React.FC<SystemReceiptTemplateProps> = ({ data, rec
     };
 
     // Parse files list
-    let parsedDocs: { name: string; type: string }[] = [];
-    try {
-        if (data.otherDocs) {
-            parsedDocs = JSON.parse(data.otherDocs);
-        }
-    } catch (e) {
-        if (data.otherDocs) {
-            const parts = data.otherDocs.split('|');
-            parsedDocs = [{ name: parts[0], type: (parts[1] === 'Bản sao' ? 'Bản sao' : 'Bản chính') }];
+    // Parse attached documents from data.otherDocs
+    let parsedDocs: { name: string; type?: string; copyType?: string; isChecked?: boolean }[] = [];
+    if (data.otherDocs) {
+        try {
+            const raw = JSON.parse(data.otherDocs);
+            if (Array.isArray(raw)) {
+                parsedDocs = raw;
+            }
+        } catch (e) {
+            if (typeof data.otherDocs === 'string' && data.otherDocs.trim()) {
+                const parts = data.otherDocs.split('|');
+                parsedDocs = parts.map((p, idx) => ({
+                    name: p.trim(),
+                    type: idx === 1 ? 'Bản sao' : 'Bản chính'
+                }));
+            }
         }
     }
 
-    // Default base documents
-    const defaultDocs = [
-        { name: 'Phiếu yêu cầu lập hợp đồng đo đạc dịch vụ; trích lục ; Cung cấp thông tin thửa đất', type: 'Bản chính' },
-        { name: 'Giấy chứng nhận đã cấp.', type: 'Bản sao' }
-    ];
+    // Filter valid docs (must have non-empty name and not explicitly un-checked)
+    const validParsedDocs = parsedDocs.filter(d => d && d.name && d.name.trim() !== '' && d.isChecked !== false);
 
-    const finalDocs = [...defaultDocs];
+    let finalDocs: { name: string; type: string }[] = [];
 
-    // Append any additional ones, filtering out duplicate lookalikes
-    parsedDocs.forEach(doc => {
-        const docName = doc.name?.trim();
-        if (!docName) return;
+    if (validParsedDocs.length > 0) {
+        const seenNames = new Set<string>();
+        let hasPhieuYeuCau = false;
 
-        const isDuplicate = defaultDocs.some(def => {
-            const cleanDef = def.name.toLowerCase().replace(/[^a-z0-9]/g, '');
-            const cleanDoc = docName.toLowerCase().replace(/[^a-z0-9]/g, '');
-            return cleanDoc.includes(cleanDef) || cleanDef.includes(cleanDoc);
+        validParsedDocs.forEach(doc => {
+            const docName = doc.name.trim();
+            const lowerName = docName.toLowerCase();
+
+            // Prevent duplicate "Phiếu yêu cầu..." items
+            if (lowerName.includes('phiếu yêu cầu') || lowerName.includes('phieu yeu cau')) {
+                if (hasPhieuYeuCau) return;
+                hasPhieuYeuCau = true;
+            }
+
+            if (!seenNames.has(lowerName)) {
+                seenNames.add(lowerName);
+                finalDocs.push({
+                    name: docName,
+                    type: doc.type || doc.copyType || 'Bản chính'
+                });
+            }
         });
-
-        if (!isDuplicate) {
-            finalDocs.push({
-                name: docName,
-                type: doc.type || 'Bản chính'
-            });
-        }
-    });
+    } else {
+        // Fallback default base documents if none attached
+        finalDocs = [
+            { name: `Phiếu yêu cầu ${data.content || 'lập hợp đồng đo đạc dịch vụ; trích lục ; Cung cấp thông tin thửa đất'}`, type: 'Bản chính' },
+            { name: 'Giấy chứng nhận đã cấp.', type: 'Bản sao' }
+        ];
+    }
 
     // We render exactly 4 empty blocks, each consisting of a 1.Giao row and a 2.Nhận row, matching the PDF's clean table structure
     const emptyBlocks = Array(4).fill(0).map((_, i) => (

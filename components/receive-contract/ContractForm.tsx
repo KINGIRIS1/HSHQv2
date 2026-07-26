@@ -160,24 +160,27 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
       }
   }, [mode]);
 
+  const isUrbanWard = useCallback((wardName: string) => {
+      if (!wardName) return false;
+      const wardNorm = _nd(wardName);
+      return wardNorm.includes('tan khai') || 
+             wardNorm.includes('minh hung') || 
+             wardNorm.includes('minh thanh') || 
+             wardNorm.includes('hung long') || 
+             wardNorm.includes('thanh tam') || 
+             wardNorm.includes('phuong') || 
+             wardNorm.includes('thi tran') || 
+             wardNorm.includes('tt.') ||
+             wardNorm.includes('chon thanh');
+  }, []);
+
   // Derived AreaType based on ward and manual choice
   const derivedAreaType = useMemo(() => {
-      let currentAreaType = formData.areaType;
-      if (!currentAreaType && formData.ward) {
-          const wardNorm = _nd(formData.ward);
-          const isUrban = wardNorm.includes('tan khai') || 
-                          wardNorm.includes('minh hung') || 
-                          wardNorm.includes('minh thanh') || 
-                          wardNorm.includes('hung long') || 
-                          wardNorm.includes('thanh tam') || 
-                          wardNorm.includes('phuong') || 
-                          wardNorm.includes('thi tran') || 
-                          wardNorm.includes('tt.') ||
-                          wardNorm.includes('chon thanh');
-          return isUrban ? 'Đất đô thị' : 'Đất nông thôn';
+      if (formData.ward) {
+          return isUrbanWard(formData.ward) ? 'Đất đô thị' : 'Đất nông thôn';
       }
-      return currentAreaType || 'Đất nông thôn';
-  }, [formData.areaType, formData.ward]);
+      return formData.areaType || 'Đất nông thôn';
+  }, [formData.areaType, formData.ward, isUrbanWard]);
 
   // Helper tìm giá động theo AreaType hiện tại (using useCallback for performance and stability)
   const getDynamicPrice = useCallback((serviceName: string) => {
@@ -698,7 +701,19 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
                     <div><label className={labelClass}>Khách hàng</label><input className={inputClass} value={formData.customerName ?? ''} onChange={e => handleChange('customerName', e.target.value)} /></div>
                     <div>
                         <label className={labelClass}>Xã phường</label>
-                        <select className={inputClass} value={formData.ward ?? ''} onChange={e => handleChange('ward', e.target.value)}>
+                        <select 
+                            className={inputClass} 
+                            value={formData.ward ?? ''} 
+                            onChange={e => {
+                                const newWard = e.target.value;
+                                const autoAreaType = newWard ? (isUrbanWard(newWard) ? 'Đất đô thị' : 'Đất nông thôn') : '';
+                                setFormData(p => ({
+                                    ...p,
+                                    ward: newWard,
+                                    areaType: autoAreaType
+                                }));
+                            }}
+                        >
                             <option value="">-- Chọn Xã/Phường --</option>
                             {wards.map(w => <option key={w} value={w}>{w}</option>)}
                         </select>
@@ -768,7 +783,7 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
                                 }}
                                 className="w-full py-2.5 bg-purple-50 text-purple-700 hover:bg-purple-100 border border-dashed border-purple-300 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-sm active:scale-95 hover:border-purple-400 font-sans"
                             >
-                                <Plus size={14} /> + Thêm thửa đất khác
+                                <Plus size={14} /> Thêm thửa đất khác
                             </button>
                         </div>
                     )}

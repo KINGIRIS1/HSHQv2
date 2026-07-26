@@ -167,12 +167,6 @@ const UtilitiesView: React.FC<UtilitiesViewProps> = ({
               >
                   <FileSpreadsheet size={16} /> Chuyển đổi tờ bản đồ
               </button>
-              <button 
-                  onClick={() => setActiveTab('dienngaythang')}
-                  className={`px-4 py-2 text-sm font-bold rounded-md transition-all whitespace-nowrap flex items-center gap-2 ${activeTab === 'dienngaythang' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-              >
-                  <Calendar size={16} /> Điền ngày tháng
-              </button>
               {isSotltdAllowed && (
                   <button 
                       onClick={() => setActiveTab('sotltd')}
@@ -183,7 +177,7 @@ const UtilitiesView: React.FC<UtilitiesViewProps> = ({
               )}
           </div>
           
-          {activeTab !== 'saiso' && activeTab !== 'chinhly' && activeTab !== 'tachthua' && activeTab !== 'chuyendoi' && activeTab !== 'dienngaythang' && activeTab !== 'sotltd' && (
+          {activeTab !== 'saiso' && activeTab !== 'chinhly' && activeTab !== 'tachthua' && activeTab !== 'chuyendoi' && activeTab !== 'sotltd' && (
             <div className="flex-1 flex justify-end items-center gap-3 pr-4">
                 <button 
                     onClick={handleConfigurePath}
@@ -239,18 +233,7 @@ const UtilitiesView: React.FC<UtilitiesViewProps> = ({
               <ChuyenDoiToBanDoTab notify={notify} />
           </div>
 
-          {/* TAB 8: TỰ ĐỘNG ĐIỀN NGÀY TIẾP NHẬN VÀ HẸN TRẢ */}
-          <div className={`w-full h-full flex flex-col bg-[#f1f5f9] ${activeTab === 'dienngaythang' ? 'block' : 'hidden'}`}>
-              <DienNgayThangTab 
-                  records={records || []} 
-                  onSaveRecord={onSaveRecord}
-                  holidays={holidays}
-                  notify={notify} 
-                  onRefreshData={onRefreshData}
-              />
-          </div>
-
-          {/* TAB 9: SỐ TL/TĐ */}
+          {/* TAB 8: SỐ TL/TĐ */}
           <div className={`w-full h-full flex flex-col bg-[#f1f5f9] ${activeTab === 'sotltd' ? 'block' : 'hidden'}`}>
               {records && onUpdateRecord && wards && onAddWard && onDeleteWard && onResetWards ? (
                   <ExcerptManagement

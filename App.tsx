@@ -82,6 +82,7 @@ function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<RecordFile | null>(null);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importModalMode, setImportModalMode] = useState<'create' | 'update'>('create');
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [assignTargetRecords, setAssignTargetRecords] = useState<RecordFile[]>([]);
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
@@ -1018,6 +1019,7 @@ function App() {
             setEditingRecord={setEditingRecord}
             handleMarkAsRejected={handleMarkAsRejected}
             setIsImportModalOpen={setIsImportModalOpen}
+            setImportModalMode={setImportModalMode}
             setIsBulkUpdateModalOpen={setIsBulkUpdateModalOpen}
             setIsAddToBatchModalOpen={setIsAddToBatchModalOpen}
             setIsReturnHandoverModalOpen={setIsReturnHandoverModalOpen}
@@ -1041,6 +1043,7 @@ function App() {
         <AppModals 
             isModalOpen={isModalOpen} setIsModalOpen={setIsModalOpen}
             isImportModalOpen={isImportModalOpen} setIsImportModalOpen={setIsImportModalOpen}
+            importModalMode={importModalMode}
             isSettingsOpen={false} setIsSettingsOpen={() => {}} 
             isAssignModalOpen={isAssignModalOpen} setIsAssignModalOpen={setIsAssignModalOpen}
             isDeleteModalOpen={isDeleteModalOpen} setIsDeleteModalOpen={setIsDeleteModalOpen}

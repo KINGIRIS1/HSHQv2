@@ -28,6 +28,7 @@ interface ReceiveRecordProps {
   onCreateContract?: (record: Partial<RecordFile>) => void;
   onHandOverRecords?: (recordIds: string[]) => Promise<void>;
   onBulkUpdate?: (field: keyof RecordFile, value: any, customDate?: string, targetRecordIds?: string[]) => Promise<void>;
+  initialTab?: 'create' | 'list' | 'bulk' | 'update';
 }
 
 // Hàm chuyển đổi Âm lịch sang Dương lịch (Cố định cho các ngày lễ chính 2024-2026)
@@ -62,8 +63,14 @@ const formatDateKey = (date: Date): string => {
     return `${year}-${month}-${day}`;
 };
 
-const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, employees, currentUser, records = [], holidays, onCreateContract, onHandOverRecords, onBulkUpdate }) => {
-  const [viewMode, setViewMode] = useState<'create' | 'list' | 'bulk' | 'update'>('create');
+const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, employees, currentUser, records = [], holidays, onCreateContract, onHandOverRecords, onBulkUpdate, initialTab = 'create' }) => {
+  const [viewMode, setViewMode] = useState<'create' | 'list' | 'bulk' | 'update'>(initialTab);
+
+  useEffect(() => {
+    if (initialTab) {
+      setViewMode(initialTab);
+    }
+  }, [initialTab]);
   // Removed local holidays state and useEffect
   
   // State chỉnh sửa
@@ -321,9 +328,6 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
             </button>
             <button onClick={() => setViewMode('bulk')} className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${viewMode === 'bulk' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}>
                 <FileSpreadsheet size={16} /> Tiếp nhận hàng loạt
-            </button>
-            <button onClick={() => setViewMode('update')} className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${viewMode === 'update' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}>
-                <RefreshCw size={16} /> Cập nhật thông tin
             </button>
             <button onClick={() => setViewMode('list')} className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${viewMode === 'list' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}>
                 <LayoutList size={16} /> Danh sách hôm nay

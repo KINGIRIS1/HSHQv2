@@ -12,15 +12,16 @@ interface ImportModalProps {
   onClose: () => void;
   onImport: (records: RecordFile[], mode: 'create' | 'update', onProgress?: (processed: number, total: number) => void) => Promise<boolean>;
   employees: Employee[];
+  initialMode?: 'create' | 'update';
 }
 
-const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, employees }) => {
+const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, employees, initialMode }) => {
   type PreviewRecord = RecordFile & { _errors?: string[] };
   const [previewData, setPreviewData] = useState<PreviewRecord[]>([]);
   const [fileName, setFileName] = useState('');
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [loading, setLoading] = useState(false);
-  const [mode, setMode] = useState<'create' | 'update'>('create');
+  const [mode, setMode] = useState<'create' | 'update'>(initialMode || 'create');
   const [viewFilter, setViewFilter] = useState<'all' | 'valid' | 'errors'>('all');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -33,9 +34,12 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
         setFileName('');
         setViewFilter('all');
         setProgress(null);
+        if (initialMode) {
+            setMode(initialMode);
+        }
         if(fileInputRef.current) fileInputRef.current.value = '';
     }
-  }, [isOpen]);
+  }, [isOpen, initialMode]);
 
   const parseExcelDate = (input: any): string | undefined => {
       if (input === undefined || input === null || input === '') return undefined;

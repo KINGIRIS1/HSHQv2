@@ -74,6 +74,7 @@ import {
   UserPlus as UserPlusIcon,
   ClipboardList,
   Send,
+  RefreshCw,
 } from "lucide-react";
 
 interface AppRoutesProps {
@@ -194,6 +195,7 @@ interface AppRoutesProps {
   setEditingRecord: (r: RecordFile | null) => void;
   handleMarkAsRejected: () => void;
   setIsImportModalOpen: (b: boolean) => void;
+  setImportModalMode?: (mode: 'create' | 'update') => void;
   setIsBulkUpdateModalOpen: (b: boolean) => void;
   setIsAddToBatchModalOpen: (b: boolean) => void;
   setIsReturnHandoverModalOpen?: (b: boolean) => void;
@@ -298,6 +300,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
 
   const [showColumnSelector, setShowColumnSelector] = React.useState(false);
   const [isAddMenuOpen, setIsAddMenuOpen] = React.useState(false);
+  const [receiveRecordSubTab, setReceiveRecordSubTab] = React.useState<'create' | 'list' | 'bulk' | 'update'>('create');
   const addMenuRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
@@ -936,7 +939,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                     </button>
 
                     {isAddMenuOpen && (
-                      <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-2xl border border-gray-100 z-50 py-1.5 animate-in fade-in zoom-in-95 duration-100">
+                      <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-2xl border border-gray-100 z-50 py-1.5 animate-in fade-in zoom-in-95 duration-100 divide-y divide-slate-100">
                         <button
                           onClick={() => {
                             setIsAddMenuOpen(false);
@@ -951,6 +954,40 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                           <div>
                             <div className="font-bold text-slate-800 text-sm">Nhập hồ sơ mới</div>
                             <div className="text-[11px] text-slate-500">Tạo thủ công một hồ sơ</div>
+                          </div>
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            setIsAddMenuOpen(false);
+                            if (props.setImportModalMode) props.setImportModalMode('create');
+                            props.setIsImportModalOpen(true);
+                          }}
+                          className="w-full text-left px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-emerald-50 hover:text-emerald-600 flex items-center gap-2.5 transition-colors"
+                        >
+                          <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                            <FileSpreadsheet size={18} />
+                          </div>
+                          <div>
+                            <div className="font-bold text-slate-800 text-sm">Tiếp nhận hàng loạt</div>
+                            <div className="text-[11px] text-slate-500">Nhập danh sách từ Excel</div>
+                          </div>
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            setIsAddMenuOpen(false);
+                            if (props.setImportModalMode) props.setImportModalMode('update');
+                            props.setIsImportModalOpen(true);
+                          }}
+                          className="w-full text-left px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-amber-50 hover:text-amber-600 flex items-center gap-2.5 transition-colors"
+                        >
+                          <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                            <RefreshCw size={18} />
+                          </div>
+                          <div>
+                            <div className="font-bold text-slate-800 text-sm">Cập nhật thông tin</div>
+                            <div className="text-[11px] text-slate-500">Đổi trạng thái, cán bộ, hạn trả...</div>
                           </div>
                         </button>
                       </div>
@@ -1414,6 +1451,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
     case "receive_record":
       return (
         <ReceiveRecord
+          initialTab={receiveRecordSubTab}
           onSave={props.handleAddOrUpdateRecord}
           onDelete={props.handleDeleteRecord}
           wards={wards}

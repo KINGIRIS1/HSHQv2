@@ -20,6 +20,7 @@ interface AppModalsProps {
     // States
     isModalOpen: boolean;
     isImportModalOpen: boolean;
+    importModalMode?: 'create' | 'update';
     isSettingsOpen: boolean; // Kept for prop compatibility but unused
     isAssignModalOpen: boolean;
     isDeleteModalOpen: boolean;
@@ -119,6 +120,7 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
                 onClose={() => props.setIsImportModalOpen(false)} 
                 onImport={props.handleImportRecords} 
                 employees={props.employees} 
+                initialMode={props.importModalMode}
             />
             
             <AssignModal 

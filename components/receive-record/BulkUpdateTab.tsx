@@ -1,8 +1,8 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import * as XLSX from 'xlsx-js-style';
 import { RecordFile, Employee, RecordStatus } from '../../types';
 import { STATUS_LABELS } from '../../constants';
-import { Search, Filter, Layers, ArrowRight, CheckCircle2, AlertTriangle, FileSpreadsheet, Upload, RefreshCw, Check, X, Edit3, Trash2, Save } from 'lucide-react';
+import { Search, Filter, Layers, ArrowRight, CheckCircle2, AlertTriangle, FileSpreadsheet, Upload, RefreshCw, Check, X, Edit3, Trash2, Save, ChevronLeft, ChevronRight, CheckSquare } from 'lucide-react';
 import { confirmAction, formatDateKey } from '../../utils/appHelpers';
 
 interface BulkUpdateTabProps {
@@ -23,13 +23,17 @@ export const BulkUpdateTab: React.FC<BulkUpdateTabProps> = ({
   currentUser,
 }) => {
   // Mode selection: Manual selection update vs Excel match update
-  const [updateMode, setUpdateMode] = useState<'manual' | 'excel'>('manual');
+  const [updateMode, setUpdateMode] = useState<'manual' | 'excel'>('excel');
 
   // Manual update states
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [wardFilter, setWardFilter] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
+
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(20);
 
   // Target update form states
   const [targetField, setTargetField] = useState<string>('status');
@@ -67,6 +71,18 @@ export const BulkUpdateTab: React.FC<BulkUpdateTabProps> = ({
     });
   }, [records, wardFilter, statusFilter, searchQuery]);
 
+  // Reset page to 1 when filter conditions change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [wardFilter, statusFilter, searchQuery]);
+
+  const totalPages = useMemo(() => Math.max(1, Math.ceil(filteredRecords.length / pageSize)), [filteredRecords.length, pageSize]);
+
+  const paginatedRecords = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredRecords.slice(start, start + pageSize);
+  }, [filteredRecords, currentPage, pageSize]);
+
   // Select all / deselect all
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.checked) {
@@ -74,6 +90,16 @@ export const BulkUpdateTab: React.FC<BulkUpdateTabProps> = ({
     } else {
       setSelectedIds(new Set());
     }
+  };
+
+  const handleSelectPage = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const next = new Set(selectedIds);
+    if (e.target.checked) {
+      paginatedRecords.forEach((r) => next.add(r.id));
+    } else {
+      paginatedRecords.forEach((r) => next.delete(r.id));
+    }
+    setSelectedIds(next);
   };
 
   const handleToggleSelect = (id: string) => {
@@ -282,38 +308,56 @@ export const BulkUpdateTab: React.FC<BulkUpdateTabProps> = ({
     setEditingExcelIdx(null);
   };
 
+  const handleDownloadTemplate = () => {
+    const sampleData = [
+      {
+        'MÃ HỒ SƠ': 'HS2026-0001',
+        'TÊN KHÁCH HÀNG': 'Nguyễn Văn A',
+        'XÃ PHƯỜNG': 'Tân Khải',
+        'TRẠNG THÁI': 'Đang xử lý',
+        'CÁN BỘ THỤ LÝ': employees[0]?.name || 'Nguyễn Văn B',
+        'HẠN GIẢI QUYẾT': '2026-08-15',
+        'NGÀY TRẢ KẾT QUẢ': '2026-08-14',
+        'GHI CHÚ': 'Cập nhật bổ sung giấy tờ'
+      },
+      {
+        'MÃ HỒ SƠ': 'HS2026-0002',
+        'TÊN KHÁCH HÀNG': 'Trần Thị C',
+        'XÃ PHƯỜNG': 'Minh Hưng',
+        'TRẠNG THÁI': 'Đã hoàn thành',
+        'CÁN BỘ THỤ LÝ': employees[1]?.name || 'Lê Văn D',
+        'HẠN GIẢI QUYẾT': '2026-08-20',
+        'NGÀY TRẢ KẾT QUẢ': '2026-08-18',
+        'GHI CHÚ': 'Đã giao kết quả cho công dân'
+      }
+    ];
+
+    const worksheet = XLSX.utils.json_to_sheet(sampleData);
+    worksheet['!cols'] = [
+      { wch: 16 },
+      { wch: 22 },
+      { wch: 18 },
+      { wch: 18 },
+      { wch: 22 },
+      { wch: 16 },
+      { wch: 18 },
+      { wch: 30 },
+    ];
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'CapNhatHoSoMau');
+    XLSX.writeFile(workbook, 'Mau_Cap_Nhat_Ho_So_Hang_Loat.xlsx');
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Top Action Toggle Bar */}
+      {/* Top Action Header */}
       <div className="flex flex-wrap items-center justify-between gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setUpdateMode('manual')}
-            className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${
-              updateMode === 'manual'
-                ? 'bg-blue-600 text-white shadow-sm'
-                : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
-            }`}
-          >
-            <Layers size={16} /> Chọn & Cập nhật thủ công
-          </button>
-          <button
-            onClick={() => setUpdateMode('excel')}
-            className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${
-              updateMode === 'excel'
-                ? 'bg-blue-600 text-white shadow-sm'
-                : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
-            }`}
-          >
+          <div className="px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 bg-blue-600 text-white shadow-sm">
             <FileSpreadsheet size={16} /> Cập nhật qua File Excel
-          </button>
-        </div>
-
-        {updateMode === 'manual' && (
-          <div className="text-sm font-semibold text-slate-600">
-            Đã chọn: <strong className="text-blue-700 text-base">{selectedIds.size}</strong> / {filteredRecords.length} hồ sơ
           </div>
-        )}
+        </div>
       </div>
 
       {/* Mode 1: Manual Selection & Bulk Update */}
@@ -494,16 +538,21 @@ export const BulkUpdateTab: React.FC<BulkUpdateTabProps> = ({
               </select>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               <span className="text-xs text-slate-500 font-medium">
                 Tìm thấy <strong className="text-slate-800">{filteredRecords.length}</strong> hồ sơ
               </span>
+              {selectedIds.size > 0 && (
+                <span className="text-xs bg-blue-100 text-blue-700 px-2.5 py-1 rounded-full font-bold">
+                  Đã chọn {selectedIds.size}
+                </span>
+              )}
             </div>
           </div>
 
           {/* Table List */}
-          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-            <div className="max-h-[450px] overflow-y-auto">
+          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm flex flex-col">
+            <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse text-xs">
                 <thead className="bg-slate-100 text-slate-700 uppercase font-bold sticky top-0 z-10 border-b border-slate-200">
                   <tr>
@@ -515,7 +564,8 @@ export const BulkUpdateTab: React.FC<BulkUpdateTabProps> = ({
                           filteredRecords.length > 0 &&
                           filteredRecords.every((r) => selectedIds.has(r.id))
                         }
-                        className="rounded text-blue-600 focus:ring-blue-500"
+                        className="rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
+                        title="Chọn tất cả kết quả tìm kiếm"
                       />
                     </th>
                     <th className="p-3">Mã Hồ Sơ</th>
@@ -529,14 +579,14 @@ export const BulkUpdateTab: React.FC<BulkUpdateTabProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-                  {filteredRecords.length === 0 ? (
+                  {paginatedRecords.length === 0 ? (
                     <tr>
                       <td colSpan={9} className="p-8 text-center text-slate-400 italic">
                         Không tìm thấy hồ sơ phù hợp với bộ lọc.
                       </td>
                     </tr>
                   ) : (
-                    filteredRecords.map((r) => {
+                    paginatedRecords.map((r) => {
                       const isSelected = selectedIds.has(r.id);
                       const assignedEmp = employees.find((e) => e.id === r.assignedTo);
                       return (
@@ -584,6 +634,55 @@ export const BulkUpdateTab: React.FC<BulkUpdateTabProps> = ({
                 </tbody>
               </table>
             </div>
+
+            {/* Pagination Controls Footer */}
+            {filteredRecords.length > 0 && (
+              <div className="bg-slate-50 border-t border-slate-200 px-4 py-3 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-600">
+                <div className="flex items-center gap-2">
+                  <span>Hiển thị</span>
+                  <select
+                    value={pageSize}
+                    onChange={(e) => {
+                      setPageSize(Number(e.target.value));
+                      setCurrentPage(1);
+                    }}
+                    className="border border-slate-300 rounded px-2 py-1 bg-white font-semibold text-slate-700"
+                  >
+                    <option value={15}>15 dòng</option>
+                    <option value={20}>20 dòng</option>
+                    <option value={50}>50 dòng</option>
+                    <option value={100}>100 dòng</option>
+                  </select>
+                  <span>
+                    từ <strong>{(currentPage - 1) * pageSize + 1}</strong> đến{' '}
+                    <strong>{Math.min(currentPage * pageSize, filteredRecords.length)}</strong> trên tổng số{' '}
+                    <strong className="text-blue-700">{filteredRecords.length}</strong> hồ sơ
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 disabled:opacity-40 font-bold flex items-center gap-1 transition-all"
+                  >
+                    <ChevronLeft size={14} /> Trước
+                  </button>
+
+                  <div className="flex items-center gap-1 px-2 font-bold text-slate-700">
+                    <span>Trang {currentPage} / {totalPages}</span>
+                  </div>
+
+                  <button
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    className="px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 disabled:opacity-40 font-bold flex items-center gap-1 transition-all"
+                  >
+                    Sau <ChevronRight size={14} />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -602,6 +701,13 @@ export const BulkUpdateTab: React.FC<BulkUpdateTabProps> = ({
             </div>
 
             <div className="flex items-center gap-3">
+              <button
+                onClick={handleDownloadTemplate}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-bold text-xs flex items-center gap-2 shadow-sm transition-all"
+                title="Tải file mẫu Excel có cấu trúc các cột chuẩn"
+              >
+                <FileSpreadsheet size={16} /> Tải File Excel Mẫu
+              </button>
               <input
                 type="file"
                 ref={fileInputRef}
@@ -613,7 +719,7 @@ export const BulkUpdateTab: React.FC<BulkUpdateTabProps> = ({
                 onClick={() => fileInputRef.current?.click()}
                 className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-bold text-xs flex items-center gap-2 shadow-sm transition-all"
               >
-                <FileSpreadsheet size={16} /> Chọn File Excel
+                <Upload size={16} /> Chọn File Excel
               </button>
             </div>
           </div>
