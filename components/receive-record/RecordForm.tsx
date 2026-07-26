@@ -515,31 +515,33 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
 
                     {isAuthOpen && (
                         <div className="p-2.5 bg-slate-50/30 space-y-2 animate-fade-in border-t border-slate-100">
-                            <div>
-                                <label className={labelClass}>Họ tên người ủy quyền</label>
-                                <input
-                                    type="text"
-                                    className={inputClass}
-                                    placeholder="Họ tên..."
-                                    value={formData.authorizedBy || ''}
-                                    onChange={(e) => handleChange('authorizedBy', e.target.value)}
-                                />
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                <div>
+                                    <label className={labelClass}>Họ và tên</label>
+                                    <input
+                                        type="text"
+                                        className={inputClass}
+                                        placeholder="Họ tên..."
+                                        value={formData.authorizedBy || ''}
+                                        onChange={(e) => handleChange('authorizedBy', e.target.value)}
+                                    />
+                                </div>
+                                <div>
+                                    <label className={labelClass}>Số CCCD</label>
+                                    <input
+                                        type="text"
+                                        className={inputClass}
+                                        placeholder="Số CCCD..."
+                                        value={authCccd}
+                                        onChange={(e) => {
+                                            setAuthCccd(e.target.value);
+                                            setFormData(prev => ({ ...prev, authDocType: `${e.target.value}|${authAddress}` }));
+                                        }}
+                                    />
+                                </div>
                             </div>
                             <div>
-                                <label className={labelClass}>CCCD người ủy quyền</label>
-                                <input
-                                    type="text"
-                                    className={inputClass}
-                                    placeholder="Số CCCD..."
-                                    value={authCccd}
-                                    onChange={(e) => {
-                                        setAuthCccd(e.target.value);
-                                        setFormData(prev => ({ ...prev, authDocType: `${e.target.value}|${authAddress}` }));
-                                    }}
-                                />
-                            </div>
-                            <div>
-                                <label className={labelClass}>Địa chỉ người ủy quyền</label>
+                                <label className={labelClass}>Địa chỉ</label>
                                 <input
                                     type="text"
                                     className={inputClass}

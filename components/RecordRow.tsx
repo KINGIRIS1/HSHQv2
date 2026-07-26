@@ -310,22 +310,29 @@ const RecordRow: React.FC<RecordRowProps> = ({
       
       {canPerformAction && (
         <td className={`${cellClass} sticky right-0 shadow-l text-center ${isOverdue ? 'bg-red-50 group-hover:bg-red-100' : isApproaching ? 'bg-orange-50 group-hover:bg-orange-100' : 'bg-white group-hover:bg-blue-50/60'}`}>
-          <div className="flex flex-wrap items-center justify-center gap-1 mt-0.5">
-            <button onClick={(e) => { e.stopPropagation(); onView(record); }} className="p-1.5 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded transition-colors" title="Xem chi tiết"><Eye size={16} /></button>
-            
-            {onReturnResult && (displayStatus === RecordStatus.HANDOVER || displayStatus === RecordStatus.SIGNED) && !record.resultReturnedDate && (
-                <button onClick={(e) => { e.stopPropagation(); onReturnResult(record); }} className="p-1.5 text-emerald-600 hover:bg-emerald-100 rounded transition-colors" title="Trả kết quả">
-                    <FileCheck size={16} />
-                </button>
-            )}
+          <div className="flex flex-col items-center justify-center gap-1 py-0.5">
+            {/* Hàng trên: Xem & Chuyển bước */}
+            <div className="flex items-center gap-1">
+              <button onClick={(e) => { e.stopPropagation(); onView(record); }} className="p-1 text-slate-600 hover:text-green-700 hover:bg-green-100/80 rounded transition-colors border border-slate-200/80 bg-white" title="Xem chi tiết"><Eye size={15} /></button>
+              
+              {onReturnResult && (displayStatus === RecordStatus.HANDOVER || displayStatus === RecordStatus.SIGNED) && !record.resultReturnedDate && (
+                  <button onClick={(e) => { e.stopPropagation(); onReturnResult(record); }} className="p-1 text-emerald-700 hover:bg-emerald-100 rounded transition-colors border border-emerald-200 bg-emerald-50" title="Trả kết quả">
+                      <FileCheck size={15} />
+                  </button>
+              )}
 
-            {displayStatus !== RecordStatus.HANDOVER && displayStatus !== RecordStatus.WITHDRAWN && displayStatus !== RecordStatus.REJECTED && !record.resultReturnedDate && currentUser?.role !== 'ONEDOOR' && (
-              <button onClick={() => onAdvanceStatus(record)} className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors" title="Chuyển bước"><ArrowRight size={16} /></button>
-            )}
-            <button onClick={() => onEdit(record)} className="p-1.5 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="Sửa"><Pencil size={16} /></button>
-            {(currentUser?.role === 'ADMIN' || currentUser?.role === 'SUBADMIN') && (
-                <button onClick={() => onDelete(record)} className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Xóa"><Trash2 size={16} /></button>
-            )}
+              {displayStatus !== RecordStatus.HANDOVER && displayStatus !== RecordStatus.WITHDRAWN && displayStatus !== RecordStatus.REJECTED && !record.resultReturnedDate && currentUser?.role !== 'ONEDOOR' && (
+                <button onClick={() => onAdvanceStatus(record)} className="p-1 text-green-700 hover:bg-green-100 rounded transition-colors border border-green-200 bg-green-50" title="Chuyển bước"><ArrowRight size={15} /></button>
+              )}
+            </div>
+
+            {/* Hàng dưới: Sửa & Xóa */}
+            <div className="flex items-center gap-1">
+              <button onClick={() => onEdit(record)} className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors border border-blue-200 bg-blue-50/50" title="Sửa"><Pencil size={15} /></button>
+              {(currentUser?.role === 'ADMIN' || currentUser?.role === 'SUBADMIN') && (
+                  <button onClick={() => onDelete(record)} className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors border border-red-200 bg-red-50/50" title="Xóa"><Trash2 size={15} /></button>
+              )}
+            </div>
           </div>
         </td>
       )}

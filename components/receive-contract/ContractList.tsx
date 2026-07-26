@@ -164,13 +164,13 @@ const ContractList: React.FC<ContractListProps> = ({ onEdit, onDelete, onPrint, 
                                         {!isLiquidationMode ? (
                                             <>
                                                 <button onClick={() => onEdit(c)} className="p-1.5 text-blue-600 hover:bg-blue-100 rounded transition-colors" title="Sửa Hợp Đồng"><Edit size={16} /></button>
-                                                <button onClick={() => onPrint(c, 'contract')} className="p-1.5 text-purple-600 hover:bg-purple-100 rounded transition-colors" title="Mở Hợp đồng"><ExternalLink size={16} /></button>
+                                                <button onClick={() => onPrint(c, 'contract')} className="p-1.5 text-purple-600 hover:bg-purple-100 rounded transition-colors" title="In Hợp Đồng"><Printer size={16} /></button>
                                                 {(c.contractType === 'Đo đạc' || c.contractType === 'Cắm mốc') && <button onClick={() => onCreateLiquidation(c)} className="p-1.5 text-green-600 hover:bg-green-100 rounded transition-colors" title="Chuyển sang Thanh Lý"><FileCheck size={16} /></button>}
                                             </>
                                         ) : (
                                             <>
                                                 <button onClick={() => onCreateLiquidation(c)} className="p-1.5 text-orange-600 hover:bg-orange-100 rounded transition-colors" title="Sửa/Lưu Thanh Lý"><Edit size={16} /></button>
-                                                <button onClick={() => onPrint(c, 'liquidation')} className="p-1.5 text-green-600 hover:bg-green-100 rounded transition-colors" title="Mở Thanh Lý"><ExternalLink size={16} /></button>
+                                                <button onClick={() => onPrint(c, 'liquidation')} className="p-1.5 text-green-600 hover:bg-green-100 rounded transition-colors" title="In Thanh Lý"><Printer size={16} /></button>
                                             </>
                                         )}
                                         

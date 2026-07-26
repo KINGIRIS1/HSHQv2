@@ -12,7 +12,7 @@ import { auditRecordsDates, normalizeRecordsDatesApi, AuditReport, DateAuditIssu
 
 const PERMISSION_DEPARTMENTS = [
   { id: 'Tổ Đăng ký cấp giấy', name: 'Tổ Cấp giấy', label: 'Tổ Đăng ký cấp giấy (Tổ Cấp giấy)', desc: 'Bộ phận tiếp nhận đăng ký, xử lý biến động và cấp giấy chứng nhận' },
-  { id: 'Tổ Thông tin lưu trữ', name: 'Tổ Lưu trữ', label: 'Tổ Thông tin lưu trữ (Tổ Lưu trữ)', desc: 'Bộ phận phụ trách lưu trữ, khai thác thông tin đất đai và hồ sơ lưu trữ' },
+  { id: 'Tổ Lưu trữ', name: 'Tổ Lưu trữ', label: 'Tổ Lưu trữ', desc: 'Bộ phận phụ trách lưu trữ, khai thác thông tin đất đai và hồ sơ lưu trữ' },
   { id: 'Tổ Đo đạc', name: 'Tổ Đo đạc', label: 'Tổ Đo đạc', desc: 'Bộ phận thực hiện đo đạc bản đồ, đo vẽ trích lục và trích đo thửa đất' },
   { id: 'Tổ Hành chính', name: 'Tổ Hành chính', label: 'Tổ Hành chính (Một cửa)', desc: 'Bộ phận hành chính tổng hợp, văn thư, tiếp nhận Một cửa' }
 ];

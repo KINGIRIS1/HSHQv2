@@ -74,7 +74,7 @@ const DailyList: React.FC<DailyListProps> = ({ records, wards, currentUser, empl
               if (selectedDept === 'Tổ Đo đạc') {
                   const isMeasurement = typeLower.includes('trích đo') || typeLower.includes('đo đạc') || typeLower.includes('cắm mốc') || typeLower.includes('tách') || typeLower.includes('hợp') || typeLower.startsWith('2.3') || typeLower.startsWith('2.4') || typeLower.startsWith('2.5') || typeLower.startsWith('2.6') || typeLower.includes('số thửa') || typeLower.includes('cập nhật') || typeLower.includes('cập nhập');
                   if (!isMeasurement) return false;
-              } else if (selectedDept === 'Tổ Thông tin lưu trữ') {
+              } else if (selectedDept === 'Tổ Lưu trữ' || selectedDept === 'Tổ Thông tin lưu trữ') {
                   const isArchive = (typeLower.includes('cung cấp') || typeLower.includes('trích lục') || typeLower.startsWith('1.1') || typeLower.startsWith('2.1') || typeLower.startsWith('2.2')) && 
                                     !typeLower.startsWith('2.6') && !typeLower.includes('số thửa') && !typeLower.includes('cập nhật') && !typeLower.includes('cập nhập');
                   if (!isArchive) return false;
@@ -107,9 +107,9 @@ const DailyList: React.FC<DailyListProps> = ({ records, wards, currentUser, empl
       if (selectedDept === 'Tổ Đo đạc') {
           mainTitle = "DANH SÁCH BÀN GIAO HỒ SƠ";
           wardTitle = "TỔ ĐO ĐẠC BẢN ĐỒ";
-      } else if (selectedDept === 'Tổ Thông tin lưu trữ') {
+      } else if (selectedDept === 'Tổ Lưu trữ' || selectedDept === 'Tổ Thông tin lưu trữ') {
           mainTitle = "DANH SÁCH BÀN GIAO HỒ SƠ";
-          wardTitle = "TỔ THÔNG TIN LƯU TRỮ";
+          wardTitle = "TỔ LƯU TRỮ";
       }
       const dateParts = filterDate.split('-'); 
       const dateStr = `NGÀY ${dateParts[2]} THÁNG ${dateParts[1]} NĂM ${dateParts[0]}`;
@@ -246,7 +246,7 @@ const DailyList: React.FC<DailyListProps> = ({ records, wards, currentUser, empl
                 >
                     <option value="Tất cả">Tất cả tổ</option>
                     <option value="Tổ Đo đạc">Tổ Đo đạc</option>
-                    <option value="Tổ Thông tin lưu trữ">Tổ Thông tin lưu trữ</option>
+                    <option value="Tổ Lưu trữ">Tổ Lưu trữ</option>
                 </select>
             </div>
             <div className="relative flex-1 max-w-sm"> 

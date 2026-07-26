@@ -18,7 +18,7 @@ const DEPARTMENTS_CONFIG: DeptConfig[] = [
         matchKeys: ['tổ cấp giấy', 'tổ đăng ký cấp giấy', 'đăng ký cấp giấy', 'tổ đăng ký', 'cấp giấy']
     },
     {
-        id: 'Tổ Thông tin lưu trữ',
+        id: 'Tổ Lưu trữ',
         label: 'Tổ Lưu trữ',
         subtitle: 'Khai thác hồ sơ & dữ liệu l...',
         matchKeys: ['tổ thông tin lưu trữ', 'tổ lưu trữ', 'thông tin lưu trữ', 'lưu trữ']
@@ -66,58 +66,58 @@ interface EmployeeItemProps {
 const EmployeeItem: React.FC<EmployeeItemProps> = ({ emp, isLastAssigned, isTargetWardMatch, isSelected, onSelect }) => (
     <div 
         onClick={() => onSelect(emp.id)}
-        className={`relative flex items-start gap-4 p-4 rounded-xl border cursor-pointer transition-all duration-200 group h-full ${
-            isSelected 
-                ? 'bg-indigo-50/80 border-indigo-500 shadow-md ring-2 ring-indigo-200' 
-                : 'bg-white border-gray-200 hover:border-indigo-400 hover:shadow-lg'
+        className={`relative flex items-start gap-3.5 p-3.5 rounded-xl border cursor-pointer transition-all duration-200 group h-full ${
+            isTargetWardMatch 
+                ? (isSelected 
+                    ? 'bg-emerald-100/90 border-emerald-600 shadow-md ring-2 ring-emerald-300' 
+                    : 'bg-emerald-50 border-emerald-300 hover:border-emerald-500 hover:bg-emerald-100/70 shadow-sm')
+                : (isSelected 
+                    ? 'bg-indigo-50/80 border-indigo-500 shadow-md ring-2 ring-indigo-200' 
+                    : 'bg-white border-gray-200 hover:border-indigo-400 hover:shadow-lg')
         }`}
     >
-        <div className={`w-11 h-11 rounded-full flex items-center justify-center text-sm font-black shrink-0 transition-colors ${
-            isSelected ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 group-hover:bg-indigo-100 group-hover:text-indigo-700'
+        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-black shrink-0 transition-colors ${
+            isSelected 
+                ? 'bg-indigo-600 text-white' 
+                : isTargetWardMatch 
+                    ? 'bg-emerald-600 text-white' 
+                    : 'bg-gray-100 text-gray-700 group-hover:bg-indigo-100 group-hover:text-indigo-700'
         }`}>
             {emp.name.charAt(0).toUpperCase()}
         </div>
         
         <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1 flex-wrap">
-                <span className={`font-black text-sm truncate ${isSelected ? 'text-indigo-800' : 'text-gray-800'}`}>
+            <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+                <span className={`font-black text-sm truncate ${isSelected ? 'text-indigo-900' : isTargetWardMatch ? 'text-emerald-950 font-extrabold' : 'text-gray-800'}`}>
                     {emp.name}
                 </span>
-                {isSelected && <Check size={16} className="text-indigo-600 shrink-0" />}
+                {/* Ẩn chữ "Giao gần nhất", chỉ để lại dấu tích chọn/badge icon ngay tại nhân viên giao gần nhất */}
+                {isLastAssigned && (
+                    <span className="inline-flex items-center justify-center bg-teal-600 text-white w-5 h-5 rounded-full shadow-xs shrink-0" title="Đã chọn giao gần nhất">
+                        <Check size={13} strokeWidth={3} />
+                    </span>
+                )}
+                {isSelected && !isLastAssigned && <Check size={16} className="text-indigo-600 shrink-0" />}
+                {isTargetWardMatch && (
+                    <span className="inline-flex items-center gap-0.5 bg-emerald-600 text-white text-[10px] font-bold px-1.5 py-0.2 rounded shadow-2xs ml-auto">
+                        <MapPin size={9} /> Đúng địa bàn
+                    </span>
+                )}
             </div>
             
-            <div className="text-xs text-gray-500 font-medium flex items-center gap-1.5 mb-1">
-                <Briefcase size={12} className="text-gray-400" />
-                {emp.position || 'Chuyên viên'}
+            {/* Chức vụ và Tổ thể hiện ví dụ: Chuyên viên - Tổ Đo đạc */}
+            <div className="text-xs font-semibold text-gray-600 flex items-center gap-1.5 mb-1">
+                <Briefcase size={12} className="text-gray-400 shrink-0" />
+                <span>{emp.position || 'Nhân viên'} - <span className="text-indigo-700 font-bold">{emp.department || 'Tổ chuyên môn'}</span></span>
             </div>
 
-            {emp.department && (
-                <div className="text-xs text-emerald-600 font-bold mb-2">
-                    {emp.department}
-                </div>
-            )}
-
-            {/* Badges */}
-            <div className="flex flex-wrap gap-1.5">
-                {isLastAssigned && (
-                    <span className="inline-flex items-center gap-1 bg-teal-50 text-teal-700 text-[10px] font-black px-2 py-0.5 rounded-md border border-teal-200">
-                        <Clock size={10} /> Giao gần nhất
-                    </span>
-                )}
-                {isTargetWardMatch && (
-                    <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 text-[10px] font-black px-2 py-0.5 rounded-md border border-blue-200">
-                        <MapPin size={10} /> Đúng địa bàn
-                    </span>
-                )}
-            </div>
-
-            {/* Hiển thị địa bàn quản lý nếu có */}
+            {/* Hiển thị địa bàn phụ trách theo 4 xã 1 hàng ngang */}
             {emp.managedWards && emp.managedWards.length > 0 && (
-                <div className="mt-3 pt-2.5 border-t border-gray-100">
-                    <span className="text-[10px] text-gray-400 font-bold block mb-1">ĐỊA BÀN PHỤ TRÁCH:</span>
-                    <div className="flex flex-wrap gap-1">
+                <div className="mt-2.5 pt-2 border-t border-gray-200/60">
+                    <span className="text-[10px] text-gray-500 font-bold block mb-1 uppercase tracking-tight">ĐỊA BÀN PHỤ TRÁCH:</span>
+                    <div className="grid grid-cols-4 gap-1">
                         {emp.managedWards.map((w, idx) => (
-                            <span key={idx} className="text-[10px] bg-slate-50 text-slate-600 px-2 py-0.5 rounded-md border border-slate-200 truncate max-w-[120px]" title={w}>
+                            <span key={idx} className="text-[10px] bg-white/80 text-slate-700 px-1 py-0.5 rounded border border-slate-200/80 truncate text-center font-medium block shadow-2xs" title={w}>
                                 {w}
                             </span>
                         ))}
@@ -156,7 +156,7 @@ const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, e
   // Xác định tổ chuyên môn mặc định cho hồ sơ
   const getRecordDefaultDepartment = (records: RecordFile[], view?: string): string => {
       if (view && view.includes('archive')) {
-          return 'Tổ Thông tin lưu trữ';
+          return 'Tổ Lưu trữ';
       }
       if (!records || records.length === 0) {
           return 'Tổ Đo đạc';
@@ -166,7 +166,7 @@ const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, e
       const type = (record.recordType || '').toLowerCase();
       
       if (type.includes('1.1') || type.includes('1.2') || type.includes('công văn') || type.includes('lưu trữ')) {
-          return 'Tổ Thông tin lưu trữ';
+          return 'Tổ Lưu trữ';
       }
       if (type.includes('2.1') || type.includes('2.2') || type.includes('trích lục')) {
           return 'Tổ Đăng ký cấp giấy';

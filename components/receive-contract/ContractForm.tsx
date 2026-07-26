@@ -400,6 +400,12 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
                   message: `Đã tìm thấy & tải dữ liệu từ hợp đồng: ${foundContract.code}${foundContract.customerAddress ? ` (Hồ sơ gốc: ${foundContract.customerAddress})` : ''}` 
               });
               return;
+          } else {
+              setNotification({ 
+                  type: 'error', 
+                  message: `Không tìm thấy Hợp Đồng nào có Số Hợp Đồng: ${searchCode}` 
+              });
+              return;
           }
       }
 
@@ -483,9 +489,7 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
       } else {
           setNotification({ 
               type: 'error', 
-              message: mode === 'liquidation' 
-                  ? 'Không tìm thấy thông tin hợp đồng hoặc hồ sơ biên nhận có mã này.' 
-                  : 'Không tìm thấy hồ sơ biên nhận gốc có mã này.' 
+              message: 'Không tìm thấy hồ sơ biên nhận gốc có mã này.' 
           });
       }
   };
@@ -648,8 +652,8 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
       return filtered;
   })();
 
-  const inputClass = "w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 transition-all font-medium bg-white hover:border-purple-300";
-  const labelClass = "block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1.5 ml-1";
+  const inputClass = "w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/10 transition-all font-medium bg-white hover:border-purple-300";
+  const labelClass = "block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1 ml-0.5";
 
   // Check if we are in liquidation mode to show extra fields
   const isLiquidationMode = mode === 'liquidation';
@@ -660,44 +664,44 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
       : (formData.totalAmount || derivedPricing.totalAmount);
 
   return (
-    <form onSubmit={handleSubmit} className="w-full grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fade-in relative pb-10">
+    <form onSubmit={handleSubmit} className="w-full grid grid-cols-1 lg:grid-cols-12 gap-3.5 animate-fade-in relative pb-6">
         <div ref={topRef} className="absolute -top-20" />
         
         {/* NOTIFICATION */}
         <div className="lg:col-span-12">
             {notification && (
-                <div className={`p-4 rounded-xl border shadow-lg flex items-start gap-3 transition-all duration-300 animate-fade-in-up mb-4 ${notification.type === 'success' ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'}`}>
-                    {notification.type === 'success' ? <CheckCircle className="shrink-0 mt-0.5" size={20} /> : <AlertCircle className="shrink-0 mt-0.5" size={20} />}
+                <div className={`p-3 rounded-xl border shadow-md flex items-start gap-2.5 transition-all duration-300 animate-fade-in-up mb-2 ${notification.type === 'success' ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'}`}>
+                    {notification.type === 'success' ? <CheckCircle className="shrink-0 mt-0.5" size={18} /> : <AlertCircle className="shrink-0 mt-0.5" size={18} />}
                     <div className="flex-1">
-                        <h4 className="font-bold text-sm uppercase">{notification.type === 'success' ? 'Thành công' : 'Thông báo'}</h4>
-                        <p className="text-sm">{notification.message}</p>
+                        <h4 className="font-bold text-xs uppercase">{notification.type === 'success' ? 'Thành công' : 'Thông báo'}</h4>
+                        <p className="text-xs">{notification.message}</p>
                     </div>
-                    <button type="button" onClick={() => setNotification(null)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+                    <button type="button" onClick={() => setNotification(null)} className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
                 </div>
             )}
         </div>
 
         {/* CỘT TRÁI: THÔNG TIN HỒ SƠ VÀ THỬA ĐẤT */}
-        <div className="lg:col-span-4 space-y-6">
-            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                <h3 className="text-sm font-bold text-slate-800 uppercase mb-5 border-b pb-3 flex items-center gap-2">
-                    <span className="p-1.5 bg-blue-100 text-blue-600 rounded-lg">
-                        {mode === 'contract' ? <FileText size={16} /> : <Search size={16} />}
+        <div className="lg:col-span-4 space-y-3.5">
+            <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm">
+                <h3 className="text-xs font-bold text-slate-800 uppercase mb-3 border-b pb-2 flex items-center gap-1.5">
+                    <span className="p-1 bg-blue-100 text-blue-600 rounded-md">
+                        {mode === 'contract' ? <FileText size={15} /> : <Search size={15} />}
                     </span> 
-                    {mode === 'contract' ? 'Thông Tin Khách Hàng & Thửa Đất' : 'Tải từ Hồ Sơ (Auto Fill)'}
+                    {mode === 'contract' ? 'Thông Tin Khách Hàng & Thửa Đất' : 'Tải từ Số Hợp Đồng'}
                 </h3>
                 
                 {mode !== 'contract' && (
-                    <div className="flex gap-2 mb-6">
+                    <div className="flex gap-1.5 mb-3">
                         <div className="relative flex-1">
-                            <input type="text" placeholder="Nhập mã hồ sơ..." className={`${inputClass} pl-9`} value={searchCode} onChange={(e) => setSearchCode(e.target.value)} />
-                            <Search size={16} className="absolute left-3 top-3 text-slate-400" />
+                            <input type="text" placeholder="Nhập số hợp đồng..." className={`${inputClass} pl-8`} value={searchCode} onChange={(e) => setSearchCode(e.target.value)} />
+                            <Search size={14} className="absolute left-2.5 top-2 text-slate-400" />
                         </div>
-                        <button type="button" onClick={handleSearchRecord} className="bg-blue-600 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-blue-700 shadow-sm transition-all active:scale-95">Tải</button>
+                        <button type="button" onClick={handleSearchRecord} className="bg-blue-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-blue-700 shadow-sm transition-all active:scale-95 whitespace-nowrap">Tải</button>
                     </div>
                 )}
 
-                <div className="space-y-4">
+                <div className="space-y-2.5">
                     <div><label className={labelClass}>Khách hàng</label><input className={inputClass} value={formData.customerName ?? ''} onChange={e => handleChange('customerName', e.target.value)} /></div>
                     <div>
                         <label className={labelClass}>Xã phường</label>
@@ -718,7 +722,7 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
                             {wards.map(w => <option key={w} value={w}>{w}</option>)}
                         </select>
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-2 gap-2">
                         <div><label className={labelClass}>Tờ bản đồ</label><input className={`${inputClass} text-center`} value={formData.mapSheet ?? ''} onChange={e => handleChange('mapSheet', e.target.value)} /></div>
                         <div><label className={labelClass}>Thửa đất</label><input className={`${inputClass} text-center`} value={formData.landPlot ?? ''} onChange={e => handleChange('landPlot', e.target.value)} /></div>
                     </div>
@@ -737,7 +741,7 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
                     
                     {/* LIQUIDATION AREA FIELD - ONLY IN LIQUIDATION MODE */}
                     {isLiquidationMode && (
-                        <div className="bg-green-50 p-3 rounded-lg border border-green-200 mt-2 animate-fade-in">
+                        <div className="bg-green-50 p-2.5 rounded-lg border border-green-200 mt-1 animate-fade-in">
                             <label className={`${labelClass} text-green-700`}>Diện tích Thanh Lý (Thực tế)</label>
                             <div className="flex gap-2 items-center">
                                 <input 
@@ -751,17 +755,16 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
                                 />
                                 <span className="text-xs font-bold text-green-600">m²</span>
                             </div>
-                            <p className="text-[10px] text-green-600 mt-1 italic">* Hệ thống sẽ tự động tính lại giá trị thanh lý dựa trên diện tích này.</p>
+                            <p className="text-[10px] text-green-600 mt-1 italic">* Tự động quyết toán lại theo diện tích thực tế.</p>
                         </div>
                     )}
 
                     {/* DYNAMIC TRANSITION BUTTON TO MULTI-PLOT MODE */}
                     {activeTab === 'dd' && doDacItems.length === 0 && (
-                        <div className="mt-4">
+                        <div className="mt-2">
                             <button
                                 type="button"
                                 onClick={() => {
-                                    // Tạo thửa thứ nhất từ dữ liệu hiện tại
                                     const firstItem: SplitItem = {
                                         serviceName: formData.serviceType || '',
                                         quantity: 1,
@@ -770,7 +773,6 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
                                         landPlot: formData.landPlot || '',
                                         mapSheet: formData.mapSheet || ''
                                     };
-                                    // Tạo thửa thứ hai trống
                                     const secondItem: SplitItem = {
                                         serviceName: '',
                                         quantity: 1,
@@ -781,9 +783,9 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
                                     };
                                     setDoDacItems([firstItem, secondItem]);
                                 }}
-                                className="w-full py-2.5 bg-purple-50 text-purple-700 hover:bg-purple-100 border border-dashed border-purple-300 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-sm active:scale-95 hover:border-purple-400 font-sans"
+                                className="w-full py-1.5 bg-purple-50 text-purple-700 hover:bg-purple-100 border border-dashed border-purple-300 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-sm active:scale-95"
                             >
-                                <Plus size={14} /> Thêm thửa đất khác
+                                <Plus size={13} /> Thêm thửa đất khác
                             </button>
                         </div>
                     )}
@@ -792,21 +794,31 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
         </div>
 
         {/* CỘT PHẢI: CHI TIẾT HỢP ĐỒNG */}
-        <div className="lg:col-span-8 space-y-6">
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                {/* TABS HEADER */}
-                <div className="flex border-b border-slate-200 bg-slate-50/50 p-1.5 gap-1.5 overflow-x-auto">
-                    {['dd', 'cm'].map(t => (
-                        <button key={t} type="button" onClick={() => setActiveTab(t as any)} className={`flex-1 py-3 px-4 text-sm font-bold text-center rounded-xl transition-all flex items-center justify-center gap-2 whitespace-nowrap ${activeTab === t ? 'bg-white text-purple-700 shadow-md ring-1 ring-purple-100' : 'text-slate-500 hover:bg-white/50 hover:text-slate-700'}`}>
-                            {t === 'dd' ? <><Ruler size={16} /> Đo đạc</> : 
-                             <><MapPin size={16} /> Cắm mốc</>}
-                        </button>
-                    ))}
+        <div className="lg:col-span-8 space-y-3.5">
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                {/* AUTOMATIC CONTRACT / LIQUIDATION TYPE HEADER (REPLACED MANUAL TAB SELECTOR) */}
+                <div className="px-3.5 py-2.5 bg-purple-50/80 border-b border-purple-100 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        <span className="p-1 bg-purple-100 text-purple-700 rounded-md">
+                            {activeTab === 'cm' ? <MapPin size={15} /> : <Ruler size={15} />}
+                        </span>
+                        <span className="text-xs font-bold uppercase text-slate-700 tracking-wide">
+                            {isLiquidationMode ? 'Loại Thanh Lý: ' : 'Loại Hợp Đồng: '}
+                            <span className="text-purple-700 font-extrabold ml-1">
+                                {activeTab === 'cm' 
+                                    ? (isLiquidationMode ? 'Thanh Lý Cắm Mốc' : 'Hợp Đồng Cắm Mốc') 
+                                    : (isLiquidationMode ? 'Thanh Lý Đo Đạc' : 'Hợp Đồng Đo Đạc')}
+                            </span>
+                        </span>
+                    </div>
+                    <span className="text-[10px] font-semibold text-slate-500 italic bg-white px-2 py-0.5 rounded-md border border-slate-200 shadow-2xs">
+                        * Tự động xác định theo {isLiquidationMode ? 'hợp đồng gốc' : 'thủ tục tiếp nhận'}
+                    </span>
                 </div>
 
-                <div className="p-6 space-y-6">
+                <div className="p-3.5 space-y-3.5">
                     {/* Basic Info */}
-                    <div className="grid grid-cols-2 gap-6 p-4 bg-slate-50 rounded-xl border border-slate-200">
+                    <div className="grid grid-cols-2 gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
                         <div>
                             <div className="flex justify-between items-center mb-1">
                                 <label className={labelClass}>Mã Hợp Đồng</label>

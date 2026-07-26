@@ -723,27 +723,21 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                       <span className="text-xs text-gray-500 font-bold uppercase mr-0.5">
                         Nhận:
                       </span>
-                      <div className="relative flex items-center hover:text-blue-600 transition-colors">
-                        <span>{formatDateDDMMYYYY(props.filterFromDate) || "dd/mm/yyyy"}</span>
-                        <input
-                          type="date"
-                          value={props.filterFromDate}
-                          onChange={(e) => props.setFilterFromDate(e.target.value)}
-                          className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
-                          title="Nhận từ ngày"
-                        />
-                      </div>
+                      <input
+                        type="date"
+                        value={props.filterFromDate}
+                        onChange={(e) => props.setFilterFromDate(e.target.value)}
+                        className="border border-gray-300 rounded px-1.5 py-0.5 text-xs outline-none focus:ring-1 focus:ring-blue-500 font-medium bg-white text-gray-800"
+                        title="Nhận từ ngày"
+                      />
                       <span className="text-gray-400 font-bold text-xs">-</span>
-                      <div className="relative flex items-center hover:text-blue-600 transition-colors">
-                        <span>{formatDateDDMMYYYY(props.filterToDate) || "dd/mm/yyyy"}</span>
-                        <input
-                          type="date"
-                          value={props.filterToDate}
-                          onChange={(e) => props.setFilterToDate(e.target.value)}
-                          className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
-                          title="Nhận đến ngày"
-                        />
-                      </div>
+                      <input
+                        type="date"
+                        value={props.filterToDate}
+                        onChange={(e) => props.setFilterToDate(e.target.value)}
+                        className="border border-gray-300 rounded px-1.5 py-0.5 text-xs outline-none focus:ring-1 focus:ring-blue-500 font-medium bg-white text-gray-800"
+                        title="Nhận đến ngày"
+                      />
                       {(props.filterFromDate || props.filterToDate) && (
                         <button
                           onClick={() => {
@@ -767,37 +761,27 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                       <span className="text-xs text-gray-500 font-bold uppercase mr-0.5">
                         Giao NV:
                       </span>
-                      <div className="relative flex items-center hover:text-blue-600 transition-colors">
-                        <span>
-                          {formatDateDDMMYYYY(props.filterAssignedFromDate || "") || "dd/mm/yyyy"}
-                        </span>
-                        <input
-                          type="date"
-                          value={props.filterAssignedFromDate || ""}
-                          onChange={(e) =>
-                            props.setFilterAssignedFromDate &&
-                            props.setFilterAssignedFromDate(e.target.value)
-                          }
-                          className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
-                          title="Giao từ ngày"
-                        />
-                      </div>
+                      <input
+                        type="date"
+                        value={props.filterAssignedFromDate || ""}
+                        onChange={(e) =>
+                          props.setFilterAssignedFromDate &&
+                          props.setFilterAssignedFromDate(e.target.value)
+                        }
+                        className="border border-gray-300 rounded px-1.5 py-0.5 text-xs outline-none focus:ring-1 focus:ring-blue-500 font-medium bg-white text-gray-800"
+                        title="Giao từ ngày"
+                      />
                       <span className="text-gray-400 font-bold text-xs">-</span>
-                      <div className="relative flex items-center hover:text-blue-600 transition-colors">
-                        <span>
-                          {formatDateDDMMYYYY(props.filterAssignedToDate || "") || "dd/mm/yyyy"}
-                        </span>
-                        <input
-                          type="date"
-                          value={props.filterAssignedToDate || ""}
-                          onChange={(e) =>
-                            props.setFilterAssignedToDate &&
-                            props.setFilterAssignedToDate(e.target.value)
-                          }
-                          className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
-                          title="Giao đến ngày"
-                        />
-                      </div>
+                      <input
+                        type="date"
+                        value={props.filterAssignedToDate || ""}
+                        onChange={(e) =>
+                          props.setFilterAssignedToDate &&
+                          props.setFilterAssignedToDate(e.target.value)
+                        }
+                        className="border border-gray-300 rounded px-1.5 py-0.5 text-xs outline-none focus:ring-1 focus:ring-blue-500 font-medium bg-white text-gray-800"
+                        title="Giao đến ngày"
+                      />
                       {(props.filterAssignedFromDate || props.filterAssignedToDate) && (
                         <button
                           onClick={() => {
