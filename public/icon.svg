@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width="500" height="500">
+  <!-- Red background circle with outer ring -->
+  <circle cx="250" cy="250" r="245" fill="none" stroke="#C80028" stroke-width="10"/>
+  <circle cx="250" cy="250" r="234" fill="none" stroke="#FFFFFF" stroke-width="6"/>
+  <circle cx="250" cy="250" r="228" fill="#C80028"/>
+
+  <!-- Left White Leaf / Sail Banner -->
+  <g id="left-banner">
+    <!-- Main white leaf container -->
+    <path d="M 50,175 C 100,160 220,165 265,260 C 265,280 265,330 262,358 C 120,358 85,340 50,175 Z" fill="#FFFFFF"/>
+    <path d="M 50,175 C 60,200 100,355 262,358 C 220,240 120,170 50,175 Z" fill="#FFFFFF"/>
+    <path d="M 58,180 C 130,162 215,188 260,265 C 260,335 150,352 102,352 C 180,350 250,300 255,260 C 205,175 100,172 58,180 Z" fill="#FFFFFF"/>
+    
+    <!-- Red Text HỚN QUẢN inside the white banner -->
+    <text x="162" y="322" 
+          font-family="'Arial Narrow', 'Arial Black', 'Trebuchet MS', sans-serif" 
+          font-weight="900" 
+          font-size="62" 
+          fill="#C80028" 
+          text-anchor="middle" 
+          letter-spacing="-1"
+          transform="scale(0.85, 1.25) translate(28, -60)">HỚN QUẢN</text>
+
+    <!-- Lower white swoops under leaf -->
+    <path d="M 103,358 C 150,420 220,455 262,438 C 200,435 140,395 103,358 Z" fill="#FFFFFF"/>
+    <path d="M 164,358 C 220,410 262,425 262,420 C 210,400 180,370 164,358 Z" fill="#FFFFFF"/>
+  </g>
+
+  <!-- Right Victory Monument (Tượng Đài Chiến Thắng) -->
+  <g id="monument" fill="#FFFFFF">
+    <!-- Monument Base / Pedestal -->
+    <polygon points="270,230 298,222 360,252 388,256 388,460 298,460 298,270 270,270"/>
+    <polygon points="320,260 388,290 388,438 325,438"/>
+    
+    <!-- Pedestal Base step details -->
+    <rect x="290" y="270" width="8" height="190"/>
+    <polygon points="325,358 454,358 410,410 325,432"/>
+    <path d="M 388,235 C 430,235 465,250 472,235 C 440,260 388,295 388,280 Z"/>
+
+    <!-- Soldier / Guerrilla Statue Figures -->
+    <!-- Main Standing Soldier holding AK Rifle up high -->
+    <!-- Head with Helmet / Pith helmet -->
+    <circle cx="335" cy="115" r="11"/>
+    <path d="M 320,113 C 320,105 335,100 350,110 C 342,118 328,118 320,113 Z"/>
+    
+    <!-- Torso and Belts -->
+    <polygon points="326,125 348,125 344,165 324,165"/>
+    <!-- Raised Right Arm holding AK-47 Rifle -->
+    <polygon points="324,130 310,85 320,80 330,126"/>
+    <!-- Rifle Barrel & AK-47 Silhouette -->
+    <polygon points="301,32 308,30 324,95 316,97"/>
+    <polygon points="301,55 295,57 300,85 305,80"/> <!-- AK Magazine curved -->
+    <line x1="301" y1="32" x2="295" y2="70" stroke="#FFFFFF" stroke-width="3"/>
+    <polygon points="302,32 305,25 308,32"/> <!-- Bayonet tip -->
+
+    <!-- Left Arm outstretched in victory gesture -->
+    <polygon points="345,130 382,98 375,90 340,124"/>
+
+    <!-- Legs & Boots standing on monument pedestal -->
+    <polygon points="325,165 333,222 342,222 335,165"/>
+    <polygon points="338,165 348,222 358,222 345,165"/>
+
+    <!-- Supporting Guerrilla Soldiers behind -->
+    <!-- Soldier 2 Head & shoulders -->
+    <circle cx="316" cy="150" r="9"/>
+    <path d="M 305,158 C 305,150 320,145 325,155 Z"/>
+    <polygon points="302,160 318,160 315,200 298,200"/>
+    <polygon points="288,170 274,210 285,215 298,175"/> <!-- Gun / Flag held by soldier 2 -->
+
+    <!-- Soldier 3 kneeling/ready figure on right -->
+    <circle cx="355" cy="165" r="8"/>
+    <polygon points="348,172 362,172 368,205 352,205"/>
+    <polygon points="360,180 375,190 368,198 355,188"/>
+
+    <!-- Base steps connecting monument to boundary curve -->
+    <polygon points="260,460 455,460 455,450 260,450"/>
+    <path d="M 298,420 C 380,420 440,360 455,358 C 420,400 350,448 298,450 Z"/>
+  </g>
+</svg>

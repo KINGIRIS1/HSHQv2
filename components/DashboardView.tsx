@@ -387,7 +387,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ records, currentUser, emp
                         <CalendarRange size={20} />
                     </div>
                     <div>
-                        <h2 className="text-base font-bold text-gray-800">Tổng quan tình hình</h2>
+                        <h2 className="text-base font-bold text-gray-800">Tổng quan</h2>
                         <p className="text-[10px] text-gray-500 font-medium">Thống kê dữ liệu: <span className="text-blue-600 font-bold">{getTitle()}</span></p>
                     </div>
                 </div>
@@ -423,11 +423,10 @@ const DashboardView: React.FC<DashboardViewProps> = ({ records, currentUser, emp
 
                     <button 
                         onClick={() => setShowConfig(!showConfig)}
-                        className={`px-2.5 py-1 h-7 rounded-lg border text-[11px] font-bold transition-all flex items-center gap-1 ${showConfig ? 'bg-blue-50 border-blue-200 text-blue-600 shadow-sm' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-800'}`}
-                        title="Tùy chỉnh các thẻ tổng quan"
+                        className={`p-1.5 h-7 w-7 rounded-lg border transition-all flex items-center justify-center ${showConfig ? 'bg-blue-50 border-blue-200 text-blue-600 shadow-sm' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-800'}`}
+                        title="Cấu hình thẻ tổng quan"
                     >
-                        <SlidersHorizontal size={12} />
-                        <span>Cấu hình thẻ</span>
+                        <SlidersHorizontal size={14} />
                     </button>
                 </div>
             </div>
@@ -579,8 +578,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ records, currentUser, emp
                                             paddingAngle={3} 
                                             dataKey="value"
                                             nameKey="name"
-                                            label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                                            labelLine={false}
+                                            label={false}
                                         >
                                             {typeData.map((entry, index) => (
                                                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />

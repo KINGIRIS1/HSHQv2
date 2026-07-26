@@ -525,16 +525,16 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                 <div className="flex justify-between items-center p-3 bg-blue-50 rounded-xl border border-blue-100">
                   <div className="flex items-center gap-2">
                     <Receipt size={16} className="text-blue-600" />
-                    <span className="text-xs font-bold text-blue-700">Số biên lai</span>
+                    <span className="text-xs font-bold text-blue-700">
+                      {record.receiptType ? `Số ${record.receiptType}` : 'Số BL/HĐ'}
+                    </span>
                   </div>
                   <span className="text-sm font-bold text-blue-800">{record.receiptNumber || '---'}</span>
                 </div>
                 <div className="flex justify-between items-center p-3 bg-green-50 rounded-xl border border-green-100">
                   <div className="flex items-center gap-2">
                     <DollarSign size={16} className="text-green-600" />
-                    <span className="text-xs font-bold text-green-700">
-                      {record.returnedPrice !== undefined && record.returnedPrice !== null ? "Thực tế thu" : (record.recordType === 'Cung cấp tài liệu đất đai' ? 'Giá trị hồ sơ' : 'Giá trị HĐ')}
-                    </span>
+                    <span className="text-xs font-bold text-green-700">Số Tiền</span>
                   </div>
                   <span className="text-sm font-bold text-green-800">
                     {record.returnedPrice !== undefined && record.returnedPrice !== null

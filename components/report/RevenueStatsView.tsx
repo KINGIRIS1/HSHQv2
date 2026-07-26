@@ -1,8 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { RecordFile, RecordStatus, Employee } from '../../types';
-import { getNormalizedWard, getShortRecordType, STATUS_LABELS } from '../../constants';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell, PieChart, Pie } from 'recharts';
-import { DollarSign, CreditCard, Wallet, TrendingUp, Table2, BarChart3, FileSpreadsheet, Search, Filter, PieChart as PieChartIcon } from 'lucide-react';
+import { getShortRecordType } from '../../constants';
+import { FileSpreadsheet, Receipt, HandCoins, Users, ChevronLeft, ChevronRight, Search } from 'lucide-react';
 import * as XLSX from 'xlsx-js-style';
 
 interface RevenueStatsViewProps {
@@ -12,166 +11,191 @@ interface RevenueStatsViewProps {
     toDate?: string;
 }
 
-const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4', '#6366f1', '#ef4444'];
-
 const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({ records, employees, fromDate, toDate }) => {
-    const [subTab, setSubTab] = useState<'overview' | 'ward' | 'type' | 'records'>('overview');
-    const [searchTerm, setSearchTerm] = useState('');
-    const [selectedWardFilter, setSelectedWardFilter] = useState('all');
-    const [paymentStatusFilter, setPaymentStatusFilter] = useState<'all' | 'paid' | 'advance' | 'unpaid'>('all');
+    // Card filter selection: 'all' | 'bien_lai' | 'hoa_don'
+    const [activeCardFilter, setActiveCardFilter] = useState<'all' | 'bien_lai' | 'hoa_don'>('all');
+    
+    // Additional filters
+    const [selectedReceiver, setSelectedReceiver] = useState<string>('all');
+    const [searchTerm, setSearchTerm] = useState<string>('');
+    const [currentPage, setCurrentPage] = useState<number>(1);
+    const pageSize = 15;
 
-    // Filter records that have financial data or belong to the set
+    // Helper to identify record receipt type
+    const getRecordReceiptType = (r: RecordFile): 'Biên Lai' | 'Hóa Đơn' => {
+        if (r.receiptType === 'Biên Lai') return 'Biên Lai';
+        if (r.receiptType === 'Hóa Đơn') return 'Hóa Đơn';
+        if (r.receiptNumber && r.receiptNumber.toLowerCase().includes('bl')) return 'Biên Lai';
+        return 'Hóa Đơn';
+    };
+
+    // Calculate revenue records filtered by resultReturnedDate (Ngày trả kết quả)
     const revenueRecords = useMemo(() => {
-        return records.map(r => {
-            const price = Number(r.price) || 0;
-            const advance = Number(r.advancePayment) || 0;
-            const returned = r.returnedPrice !== undefined && r.returnedPrice !== null ? Number(r.returnedPrice) : (r.status === RecordStatus.RETURNED || r.status === RecordStatus.HANDOVER ? price : 0);
-            
-            // Effective total value for this record
-            const effectiveTotal = returned > 0 ? returned : price;
-            const remaining = Math.max(0, effectiveTotal - advance);
+        let dateStart: Date | null = null;
+        let dateEnd: Date | null = null;
+        if (fromDate) {
+            dateStart = new Date(fromDate);
+            dateStart.setHours(0, 0, 0, 0);
+        }
+        if (toDate) {
+            dateEnd = new Date(toDate);
+            dateEnd.setHours(23, 59, 59, 999);
+        }
 
-            return {
-                ...r,
-                calcPrice: price,
-                calcAdvance: advance,
-                calcReturned: returned,
-                calcEffectiveTotal: effectiveTotal,
-                calcRemaining: remaining
-            };
-        });
-    }, [records]);
+        return records
+            .map(r => {
+                const price = Number(r.price) || 0;
+                const returned = r.returnedPrice !== undefined && r.returnedPrice !== null 
+                    ? Number(r.returnedPrice) 
+                    : (r.status === RecordStatus.RETURNED || r.status === RecordStatus.HANDOVER ? price : 0);
+                
+                const receiptType = getRecordReceiptType(r);
 
-    // Financial KPI Summary
-    const summary = useMemo(() => {
-        let totalEstimated = 0;
-        let totalCollected = 0;
-        let totalAdvance = 0;
-        let totalRemaining = 0;
-        let feeCount = 0;
+                // Determine assigned ward for resolving the record
+                let assignedWard = r.ward || r.handoverWard || '';
+                if (!assignedWard) {
+                    const assignedEmpId = r.assignedTo || r.receivedBy;
+                    if (assignedEmpId) {
+                        const emp = employees.find(e => e.id === assignedEmpId || e.name === assignedEmpId);
+                        if (emp?.managedWards && emp.managedWards.length > 0) {
+                            assignedWard = emp.managedWards[0];
+                        }
+                    }
+                }
+                if (!assignedWard && r.receiverName) {
+                    const emp = employees.find(e => e.name === r.receiverName);
+                    if (emp?.managedWards && emp.managedWards.length > 0) {
+                        assignedWard = emp.managedWards[0];
+                    }
+                }
+                if (!assignedWard) {
+                    assignedWard = 'Chưa phân công';
+                }
+
+                return {
+                    ...r,
+                    calcPrice: price,
+                    calcReturned: returned,
+                    computedReceiptType: receiptType,
+                    assignedWard
+                };
+            })
+            // Only include records with revenue or receipt/invoice recorded
+            .filter(r => r.calcReturned > 0 || (r.receiptNumber && r.receiptNumber.trim() !== ''))
+            // Filter strictly by resultReturnedDate (Ngày trả kết quả / Ngày thu tiền)
+            .filter(r => {
+                if (!dateStart || !dateEnd) return true;
+                const targetDateStr = r.resultReturnedDate || r.receivedDate;
+                if (!targetDateStr) return false;
+                const d = new Date(targetDateStr);
+                if (isNaN(d.getTime())) return false;
+                d.setHours(12, 0, 0, 0);
+                return d >= dateStart && d <= dateEnd;
+            });
+    }, [records, employees, fromDate, toDate]);
+
+    // KPI Summary for 3 Top Cards
+    const cardMetrics = useMemo(() => {
+        let totalSum = 0;
+        let totalCount = 0;
+
+        let bienLaiSum = 0;
+        let bienLaiCount = 0;
+
+        let hoaDonSum = 0;
+        let hoaDonCount = 0;
 
         revenueRecords.forEach(r => {
-            if (r.calcEffectiveTotal > 0 || r.calcAdvance > 0) {
-                feeCount++;
+            totalSum += r.calcReturned;
+            totalCount++;
+
+            if (r.computedReceiptType === 'Biên Lai') {
+                bienLaiSum += r.calcReturned;
+                bienLaiCount++;
+            } else {
+                hoaDonSum += r.calcReturned;
+                hoaDonCount++;
             }
-            totalEstimated += r.calcPrice;
-            totalCollected += r.calcReturned;
-            totalAdvance += r.calcAdvance;
-            totalRemaining += r.calcRemaining;
         });
 
         return {
-            totalEstimated,
-            totalCollected,
-            totalAdvance,
-            totalRemaining,
-            feeCount,
-            totalRecords: revenueRecords.length
+            totalSum,
+            totalCount,
+            bienLaiSum,
+            bienLaiCount,
+            hoaDonSum,
+            hoaDonCount
         };
     }, [revenueRecords]);
 
-    // Breakdown by Ward
-    const wardData = useMemo(() => {
-        const map: Record<string, { ward: string; count: number; totalEstimated: number; totalCollected: number; totalAdvance: number; totalRemaining: number }> = {};
-
+    // Get list of unique assigned wards for dropdown filter
+    const wardOptions = useMemo(() => {
+        const set = new Set<string>();
         revenueRecords.forEach(r => {
-            const ward = getNormalizedWard(r.ward) || 'Chưa xác định';
-            if (!map[ward]) {
-                map[ward] = {
-                    ward,
-                    count: 0,
-                    totalEstimated: 0,
-                    totalCollected: 0,
-                    totalAdvance: 0,
-                    totalRemaining: 0
-                };
-            }
-            map[ward].count += 1;
-            map[ward].totalEstimated += r.calcPrice;
-            map[ward].totalCollected += r.calcReturned;
-            map[ward].totalAdvance += r.calcAdvance;
-            map[ward].totalRemaining += r.calcRemaining;
+            if (r.assignedWard) set.add(r.assignedWard);
         });
-
-        return Object.values(map).sort((a, b) => b.totalCollected - a.totalCollected);
+        return Array.from(set);
     }, [revenueRecords]);
 
-    // Breakdown by Record Type
-    const typeData = useMemo(() => {
-        const map: Record<string, { type: string; count: number; totalCollected: number; totalEstimated: number }> = {};
-
-        revenueRecords.forEach(r => {
-            const type = getShortRecordType(r.recordType) || 'Khác';
-            if (!map[type]) {
-                map[type] = {
-                    type,
-                    count: 0,
-                    totalCollected: 0,
-                    totalEstimated: 0
-                };
-            }
-            map[type].count += 1;
-            map[type].totalCollected += r.calcReturned;
-            map[type].totalEstimated += r.calcPrice;
-        });
-
-        return Object.values(map).sort((a, b) => b.totalCollected - a.totalCollected);
-    }, [revenueRecords]);
-
-    // Filtered records list for detail table
-    const filteredDetailRecords = useMemo(() => {
+    // Filtered records for table
+    const filteredRecords = useMemo(() => {
         return revenueRecords.filter(r => {
-            if (selectedWardFilter !== 'all' && getNormalizedWard(r.ward) !== selectedWardFilter) {
-                return false;
+            // Card filter
+            if (activeCardFilter === 'bien_lai' && r.computedReceiptType !== 'Biên Lai') return false;
+            if (activeCardFilter === 'hoa_don' && r.computedReceiptType !== 'Hóa Đơn') return false;
+
+            // Ward filter
+            if (selectedReceiver !== 'all') {
+                if (r.assignedWard !== selectedReceiver) return false;
             }
 
-            if (paymentStatusFilter === 'paid' && r.calcReturned <= 0) return false;
-            if (paymentStatusFilter === 'advance' && r.calcAdvance <= 0) return false;
-            if (paymentStatusFilter === 'unpaid' && (r.calcReturned > 0 || r.calcAdvance > 0)) return false;
-
+            // Search term
             if (searchTerm.trim()) {
                 const term = searchTerm.toLowerCase();
                 const matchCode = r.code?.toLowerCase().includes(term);
                 const matchName = r.customerName?.toLowerCase().includes(term);
-                const matchWard = r.ward?.toLowerCase().includes(term);
-                return matchCode || matchName || matchWard;
+                const matchReceipt = r.receiptNumber?.toLowerCase().includes(term);
+                const matchWard = r.assignedWard?.toLowerCase().includes(term);
+                if (!matchCode && !matchName && !matchReceipt && !matchWard) return false;
             }
 
             return true;
         });
-    }, [revenueRecords, selectedWardFilter, paymentStatusFilter, searchTerm]);
+    }, [revenueRecords, activeCardFilter, selectedReceiver, searchTerm]);
 
-    // Export Excel Function for Revenue Report
+    // Total collected for filtered set
+    const filteredTotalAmount = useMemo(() => {
+        return filteredRecords.reduce((acc, r) => acc + r.calcReturned, 0);
+    }, [filteredRecords]);
+
+    // Pagination
+    const totalPages = Math.ceil(filteredRecords.length / pageSize) || 1;
+    const paginatedRecords = useMemo(() => {
+        const start = (currentPage - 1) * pageSize;
+        return filteredRecords.slice(start, start + pageSize);
+    }, [filteredRecords, currentPage, pageSize]);
+
+    // Reset page when filters change
+    const handleCardFilterChange = (type: 'all' | 'bien_lai' | 'hoa_don') => {
+        setActiveCardFilter(type);
+        setCurrentPage(1);
+    };
+
+    // Excel export
     const handleExportExcel = () => {
-        const rows = filteredDetailRecords.map((r, index) => ({
+        const rows = filteredRecords.map((r, index) => ({
             STT: index + 1,
             'Mã hồ sơ': r.code || '',
-            'Tên khách hàng': r.customerName || '',
-            'Xã / Phường': getNormalizedWard(r.ward) || '',
+            'Thông tin chủ sử dụng': r.customerName || '',
             'Loại hồ sơ': getShortRecordType(r.recordType) || '',
-            'Ngày nhận': r.receivedDate || '',
-            'Ngày trả KQ': r.resultReturnedDate || r.completedDate || '',
-            'Giá trị gốc (Đ)': r.calcPrice,
-            'Tạm ứng (Đ)': r.calcAdvance,
-            'Đã thu thực tế (Đ)': r.calcReturned,
-            'Còn phải thu (Đ)': r.calcRemaining,
-            'Trạng thái': STATUS_LABELS[r.status as RecordStatus] || r.status
+            'Ngày thu tiền': r.resultReturnedDate ? new Date(r.resultReturnedDate).toLocaleDateString('vi-VN') : '—',
+            'Loại chứng từ': r.computedReceiptType,
+            'Số BL/HĐ': r.receiptNumber || '—',
+            'Số tiền thu (Đ)': r.calcReturned,
+            'Xã phân công giải quyết': r.assignedWard
         }));
 
         const worksheet = XLSX.utils.json_to_sheet(rows);
-
-        // Formatting header
-        const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1:A1');
-        for (let C = range.s.c; C <= range.e.c; ++C) {
-            const address = XLSX.utils.encode_cell({ r: 0, c: C });
-            if (!worksheet[address]) continue;
-            worksheet[address].s = {
-                font: { bold: true, color: { rgb: "FFFFFF" } },
-                fill: { fgColor: { rgb: "1E40AF" } },
-                alignment: { horizontal: "center", vertical: "center" }
-            };
-        }
-
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, "BaoCaoDoanhThu");
 
@@ -180,349 +204,249 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({ records, employees,
     };
 
     return (
-        <div className="flex flex-col h-full bg-slate-100 p-4 gap-4 overflow-y-auto">
-            {/* 1. TOP CARDS OVERVIEW */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="bg-white p-4 rounded-xl border border-emerald-200 shadow-sm flex items-center gap-3">
-                    <div className="p-3 bg-emerald-100 text-emerald-700 rounded-lg">
-                        <DollarSign size={24} />
-                    </div>
-                    <div>
-                        <div className="text-xs font-bold text-emerald-600 uppercase">Đã thu thực tế</div>
-                        <div className="text-xl font-black text-emerald-800">
-                            {summary.totalCollected.toLocaleString('vi-VN')} đ
-                        </div>
-                        <div className="text-[11px] text-emerald-600">
-                            Trên {summary.feeCount} hồ sơ có thu phí
-                        </div>
-                    </div>
-                </div>
-
-                <div className="bg-white p-4 rounded-xl border border-blue-200 shadow-sm flex items-center gap-3">
-                    <div className="p-3 bg-blue-100 text-blue-700 rounded-lg">
-                        <Wallet size={24} />
-                    </div>
-                    <div>
-                        <div className="text-xs font-bold text-blue-600 uppercase">Tiền tạm ứng</div>
-                        <div className="text-xl font-black text-blue-800">
-                            {summary.totalAdvance.toLocaleString('vi-VN')} đ
-                        </div>
-                        <div className="text-[11px] text-blue-600">
-                            Số tiền dân đã ứng trước
-                        </div>
-                    </div>
-                </div>
-
-                <div className="bg-white p-4 rounded-xl border border-amber-200 shadow-sm flex items-center gap-3">
-                    <div className="p-3 bg-amber-100 text-amber-700 rounded-lg">
-                        <CreditCard size={24} />
-                    </div>
-                    <div>
-                        <div className="text-xs font-bold text-amber-600 uppercase">Giá trị gốc dự kiến</div>
-                        <div className="text-xl font-black text-amber-800">
-                            {summary.totalEstimated.toLocaleString('vi-VN')} đ
-                        </div>
-                        <div className="text-[11px] text-amber-600">
-                            Tổng theo đơn giá niêm yết
-                        </div>
-                    </div>
-                </div>
-
-                <div className="bg-white p-4 rounded-xl border border-purple-200 shadow-sm flex items-center gap-3">
-                    <div className="p-3 bg-purple-100 text-purple-700 rounded-lg">
-                        <TrendingUp size={24} />
-                    </div>
-                    <div>
-                        <div className="text-xs font-bold text-purple-600 uppercase">Còn phải thu</div>
-                        <div className="text-xl font-black text-purple-800">
-                            {summary.totalRemaining.toLocaleString('vi-VN')} đ
-                        </div>
-                        <div className="text-[11px] text-purple-600">
-                            Chênh lệch chưa hoàn tất
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* 2. SUB NAVIGATION TABS */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-2 flex flex-wrap items-center justify-between gap-2">
-                <div className="flex bg-gray-100 p-1 rounded-lg">
-                    <button
-                        onClick={() => setSubTab('overview')}
-                        className={`px-4 py-2 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 ${
-                            subTab === 'overview' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-600 hover:text-gray-900'
-                        }`}
-                    >
-                        <BarChart3 size={15} /> Biểu đồ doanh thu
-                    </button>
-                    <button
-                        onClick={() => setSubTab('ward')}
-                        className={`px-4 py-2 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 ${
-                            subTab === 'ward' ? 'bg-white text-teal-600 shadow-sm' : 'text-gray-600 hover:text-gray-900'
-                        }`}
-                    >
-                        <PieChartIcon size={15} /> Theo Xã/Phường
-                    </button>
-                    <button
-                        onClick={() => setSubTab('type')}
-                        className={`px-4 py-2 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 ${
-                            subTab === 'type' ? 'bg-white text-purple-600 shadow-sm' : 'text-gray-600 hover:text-gray-900'
-                        }`}
-                    >
-                        <Table2 size={15} /> Theo Loại hồ sơ
-                    </button>
-                    <button
-                        onClick={() => setSubTab('records')}
-                        className={`px-4 py-2 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 ${
-                            subTab === 'records' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-600 hover:text-gray-900'
-                        }`}
-                    >
-                        <FileSpreadsheet size={15} /> Chi tiết hồ sơ ({filteredDetailRecords.length})
-                    </button>
-                </div>
-
-                <button
-                    onClick={handleExportExcel}
-                    className="hidden md:flex px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-sm items-center gap-2 transition-all"
+        <div className="flex flex-col h-full bg-[#f8fafc] p-4 md:p-6 gap-6 overflow-y-auto animate-fade-in-up">
+            
+            {/* 1. TOP 3 KPI CARDS */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
+                {/* CARD 1: TỔNG NGUỒN THU */}
+                <div 
+                    onClick={() => handleCardFilterChange('all')}
+                    className={`cursor-pointer rounded-2xl p-4 flex items-center justify-between transition-all active:scale-[0.99] border-2 bg-white ${
+                        activeCardFilter === 'all' 
+                            ? 'border-emerald-500 shadow-md ring-2 ring-emerald-500/20' 
+                            : 'border-slate-200/80 hover:border-emerald-300 shadow-sm'
+                    }`}
                 >
-                    <FileSpreadsheet size={16} /> Xuất Excel Doanh Thu
-                </button>
+                    <div className="flex items-center gap-3.5">
+                        <div className="w-12 h-12 rounded-2xl bg-teal-50 text-teal-600 flex items-center justify-center shrink-0 border border-teal-100">
+                            <HandCoins size={22} />
+                        </div>
+                        <div>
+                            <div className="text-xl md:text-2xl font-black text-slate-900 tracking-tight leading-none mb-1">
+                                {cardMetrics.totalSum.toLocaleString('vi-VN')} đ
+                            </div>
+                            <div className="text-xs font-bold tracking-wider text-teal-600 uppercase">
+                                TỔNG NGUỒN THU
+                            </div>
+                        </div>
+                    </div>
+                    <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full shrink-0">
+                        {cardMetrics.totalCount} hồ sơ
+                    </span>
+                </div>
+
+                {/* CARD 2: THU QUA BIÊN LAI */}
+                <div 
+                    onClick={() => handleCardFilterChange('bien_lai')}
+                    className={`cursor-pointer rounded-2xl p-4 flex items-center justify-between transition-all active:scale-[0.99] border-2 bg-white ${
+                        activeCardFilter === 'bien_lai' 
+                            ? 'border-blue-500 shadow-md ring-2 ring-blue-500/20' 
+                            : 'border-slate-200/80 hover:border-blue-300 shadow-sm'
+                    }`}
+                >
+                    <div className="flex items-center gap-3.5">
+                        <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100">
+                            <Receipt size={22} />
+                        </div>
+                        <div>
+                            <div className="text-xl md:text-2xl font-black text-slate-900 tracking-tight leading-none mb-1">
+                                {cardMetrics.bienLaiSum.toLocaleString('vi-VN')} đ
+                            </div>
+                            <div className="text-xs font-bold tracking-wider text-blue-600 uppercase">
+                                THU QUA BIÊN LAI
+                            </div>
+                        </div>
+                    </div>
+                    <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full shrink-0">
+                        {cardMetrics.bienLaiCount} hồ sơ
+                    </span>
+                </div>
+
+                {/* CARD 3: THU QUA HÓA ĐƠN */}
+                <div 
+                    onClick={() => handleCardFilterChange('hoa_don')}
+                    className={`cursor-pointer rounded-2xl p-4 flex items-center justify-between transition-all active:scale-[0.99] border-2 bg-white ${
+                        activeCardFilter === 'hoa_don' 
+                            ? 'border-orange-500 shadow-md ring-2 ring-orange-500/20' 
+                            : 'border-slate-200/80 hover:border-orange-300 shadow-sm'
+                    }`}
+                >
+                    <div className="flex items-center gap-3.5">
+                        <div className="w-12 h-12 rounded-2xl bg-orange-50 text-orange-600 flex items-center justify-center shrink-0 border border-orange-100">
+                            <Receipt size={22} className="rotate-90" />
+                        </div>
+                        <div>
+                            <div className="text-xl md:text-2xl font-black text-slate-900 tracking-tight leading-none mb-1">
+                                {cardMetrics.hoaDonSum.toLocaleString('vi-VN')} đ
+                            </div>
+                            <div className="text-xs font-bold tracking-wider text-orange-600 uppercase">
+                                THU QUA HÓA ĐƠN
+                            </div>
+                        </div>
+                    </div>
+                    <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full shrink-0">
+                        {cardMetrics.hoaDonCount} hồ sơ
+                    </span>
+                </div>
             </div>
 
-            {/* 3. TAB CONTENT */}
-            <div className="flex-1 bg-white rounded-xl border border-gray-200 shadow-sm p-4 min-h-[400px]">
-                {/* SUBTAB 1: BIỂU ĐỒ OVERVIEW */}
-                {subTab === 'overview' && (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full min-h-[380px]">
-                        <div className="flex flex-col h-full">
-                            <h3 className="font-bold text-gray-800 text-sm mb-4 flex items-center gap-2">
-                                <BarChart3 size={18} className="text-blue-600" /> Doanh thu thực tế theo địa bàn (VNĐ)
-                            </h3>
-                            <div className="flex-1 min-h-[300px]">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={wardData.slice(0, 10)} margin={{ top: 10, right: 20, left: 20, bottom: 20 }}>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                        <XAxis dataKey="ward" fontSize={11} interval={0} angle={-15} textAnchor="end" />
-                                        <YAxis fontSize={11} tickFormatter={(val) => `${(val / 1000000).toFixed(1)}M`} />
-                                        <Tooltip
-                                            formatter={(value: any) => [`${Number(value).toLocaleString('vi-VN')} đ`, 'Đã thu']}
-                                            contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                                        />
-                                        <Bar dataKey="totalCollected" fill="#10b981" radius={[4, 4, 0, 0]} name="Đã thu" barSize={35} />
-                                    </BarChart>
-                                </ResponsiveContainer>
+            {/* 2. MAIN DETAIL REVENUE TABLE CARD */}
+            <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden flex flex-col flex-1">
+                
+                {/* Header Section */}
+                <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-wrap items-center justify-between gap-4">
+                    <div>
+                        <div className="flex items-center gap-2">
+                            <div className="p-1.5 rounded-lg bg-teal-50 text-teal-700">
+                                <HandCoins size={18} />
                             </div>
-                        </div>
-
-                        <div className="flex flex-col h-full border-t lg:border-t-0 lg:border-l lg:pl-6 border-gray-100 pt-4 lg:pt-0">
-                            <h3 className="font-bold text-gray-800 text-sm mb-4 flex items-center gap-2">
-                                <PieChartIcon size={18} className="text-purple-600" /> Tỷ lệ doanh thu theo Loại hồ sơ
+                            <h3 className="font-bold text-slate-900 text-sm md:text-base uppercase tracking-wide">
+                                DANH SÁCH CHI TIẾT NGUỒN THU ({filteredRecords.length} HỒ SƠ)
                             </h3>
-                            <div className="flex-1 min-h-[300px]">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <PieChart>
-                                        <Pie
-                                            data={typeData}
-                                            dataKey="totalCollected"
-                                            nameKey="type"
-                                            cx="50%"
-                                            cy="50%"
-                                            outerRadius={100}
-                                            label={(entry) => `${entry.type}: ${(entry.totalCollected / 1000000).toFixed(1)}M`}
-                                        >
-                                            {typeData.map((_, index) => (
-                                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                            ))}
-                                        </Pie>
-                                        <Tooltip formatter={(val: any) => `${Number(val).toLocaleString('vi-VN')} đ`} />
-                                        <Legend wrapperStyle={{ fontSize: '12px' }} />
-                                    </PieChart>
-                                </ResponsiveContainer>
-                            </div>
                         </div>
+                        <p className="text-xs text-slate-500 font-medium mt-1">
+                            Tổng thu thực tế: <span className="font-bold text-emerald-600">{filteredTotalAmount.toLocaleString('vi-VN')} đ</span>
+                        </p>
                     </div>
-                )}
 
-                {/* SUBTAB 2: DOANH THU THEO XÃ */}
-                {subTab === 'ward' && (
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm text-left border-collapse">
-                            <thead className="bg-gray-50 text-xs font-bold text-gray-600 uppercase border-b border-gray-200">
-                                <tr>
-                                    <th className="p-3 w-12 text-center">STT</th>
-                                    <th className="p-3">Xã / Phường</th>
-                                    <th className="p-3 text-center">Số hồ sơ</th>
-                                    <th className="p-3 text-right">Giá trị dự kiến</th>
-                                    <th className="p-3 text-right">Tạm ứng</th>
-                                    <th className="p-3 text-right text-emerald-700 bg-emerald-50/50">Đã thu thực tế</th>
-                                    <th className="p-3 text-right text-purple-700 bg-purple-50/50">Còn phải thu</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100">
-                                {wardData.map((row, idx) => (
-                                    <tr key={row.ward} className="hover:bg-slate-50 transition-colors">
-                                        <td className="p-3 text-center text-gray-400">{idx + 1}</td>
-                                        <td className="p-3 font-semibold text-gray-800">{row.ward}</td>
-                                        <td className="p-3 text-center font-bold text-blue-600">{row.count}</td>
-                                        <td className="p-3 text-right font-mono text-gray-700">{row.totalEstimated.toLocaleString('vi-VN')} đ</td>
-                                        <td className="p-3 text-right font-mono text-blue-700">{row.totalAdvance.toLocaleString('vi-VN')} đ</td>
-                                        <td className="p-3 text-right font-mono font-bold text-emerald-700 bg-emerald-50/30">
-                                            {row.totalCollected.toLocaleString('vi-VN')} đ
-                                        </td>
-                                        <td className="p-3 text-right font-mono font-bold text-purple-700 bg-purple-50/30">
-                                            {row.totalRemaining.toLocaleString('vi-VN')} đ
-                                        </td>
-                                    </tr>
+                    <div className="flex flex-wrap items-center gap-3">
+                        {/* Search Input */}
+                        <div className="relative">
+                            <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
+                            <input 
+                                type="text"
+                                placeholder="Tìm kiếm hồ sơ..."
+                                value={searchTerm}
+                                onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+                                className="pl-8 pr-3 py-1.5 text-xs border border-slate-200 rounded-xl outline-none focus:border-emerald-500 bg-slate-50/50 w-40 sm:w-52 font-medium"
+                            />
+                        </div>
+
+                        {/* Ward Dropdown */}
+                        <div className="relative flex items-center">
+                            <Users size={14} className="absolute left-3 text-slate-500 z-10 pointer-events-none" />
+                            <select
+                                value={selectedReceiver}
+                                onChange={(e) => { setSelectedReceiver(e.target.value); setCurrentPage(1); }}
+                                className="pl-8 pr-8 py-1.5 text-xs font-semibold text-slate-700 border border-slate-200 rounded-xl outline-none bg-slate-50 hover:bg-slate-100 cursor-pointer appearance-none"
+                            >
+                                <option value="all">Xã phân công (Tất cả)</option>
+                                {wardOptions.map(ward => (
+                                    <option key={ward} value={ward}>{ward}</option>
                                 ))}
-                            </tbody>
-                            <tfoot className="bg-slate-100 font-bold border-t-2 border-slate-300">
-                                <tr>
-                                    <td colSpan={2} className="p-3 text-right uppercase">Tổng cộng:</td>
-                                    <td className="p-3 text-center text-blue-800">{summary.totalRecords}</td>
-                                    <td className="p-3 text-right font-mono">{summary.totalEstimated.toLocaleString('vi-VN')} đ</td>
-                                    <td className="p-3 text-right font-mono text-blue-800">{summary.totalAdvance.toLocaleString('vi-VN')} đ</td>
-                                    <td className="p-3 text-right font-mono text-emerald-800 bg-emerald-100/50">{summary.totalCollected.toLocaleString('vi-VN')} đ</td>
-                                    <td className="p-3 text-right font-mono text-purple-800 bg-purple-100/50">{summary.totalRemaining.toLocaleString('vi-VN')} đ</td>
-                                </tr>
-                            </tfoot>
-                        </table>
-                    </div>
-                )}
+                            </select>
+                        </div>
 
-                {/* SUBTAB 3: DOANH THU THEO LOẠI HỒ SƠ */}
-                {subTab === 'type' && (
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm text-left border-collapse">
-                            <thead className="bg-gray-50 text-xs font-bold text-gray-600 uppercase border-b border-gray-200">
-                                <tr>
-                                    <th className="p-3 w-12 text-center">STT</th>
-                                    <th className="p-3">Loại hồ sơ</th>
-                                    <th className="p-3 text-center">Số lượng</th>
-                                    <th className="p-3 text-right">Giá trị gốc dự kiến</th>
-                                    <th className="p-3 text-right text-emerald-700 bg-emerald-50/50">Đã thu thực tế</th>
-                                    <th className="p-3 text-center">% Doanh thu</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100">
-                                {typeData.map((row, idx) => {
-                                    const percent = summary.totalCollected > 0 ? ((row.totalCollected / summary.totalCollected) * 100).toFixed(1) : '0';
+                        {/* Export Excel Button */}
+                        <button
+                            onClick={handleExportExcel}
+                            className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm flex items-center gap-1.5 transition-all active:scale-95 shrink-0"
+                        >
+                            <FileSpreadsheet size={15} /> Xuất Excel ({filteredRecords.length})
+                        </button>
+                    </div>
+                </div>
+
+                {/* Table Section with sticky header */}
+                <div className="overflow-auto flex-1 min-h-[300px] max-h-[600px] relative">
+                    <table className="w-full text-xs text-left border-collapse">
+                        <thead className="bg-slate-100/95 backdrop-blur-sm text-slate-600 font-bold uppercase tracking-wider text-[11px] border-b border-slate-200/80 sticky top-0 z-20 shadow-xs">
+                            <tr>
+                                <th className="p-3.5 w-12 text-center">STT</th>
+                                <th className="p-3.5 w-32">MÃ HỒ SƠ</th>
+                                <th className="p-3.5 min-w-[180px]">THÔNG TIN CHỦ SỬ DỤNG</th>
+                                <th className="p-3.5 w-36">LOẠI HỒ SƠ</th>
+                                <th className="p-3.5 w-32 text-center">NGÀY THU TIỀN</th>
+                                <th className="p-3.5 w-32 text-center">LOẠI CHỨNG TỪ</th>
+                                <th className="p-3.5 w-32 text-center">SỐ BIÊN LAI/HĐ</th>
+                                <th className="p-3.5 w-36 text-right">SỐ TIỀN THU</th>
+                                <th className="p-3.5 w-44">XÃ PHÂN CÔNG GIẢI QUYẾT</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                            {paginatedRecords.length > 0 ? (
+                                paginatedRecords.map((r, idx) => {
+                                    const itemNumber = (currentPage - 1) * pageSize + idx + 1;
+                                    const isHoaDon = r.computedReceiptType === 'Hóa Đơn';
+
                                     return (
-                                        <tr key={row.type} className="hover:bg-slate-50 transition-colors">
-                                            <td className="p-3 text-center text-gray-400">{idx + 1}</td>
-                                            <td className="p-3 font-semibold text-gray-800">{row.type}</td>
-                                            <td className="p-3 text-center font-bold text-blue-600">{row.count}</td>
-                                            <td className="p-3 text-right font-mono text-gray-700">{row.totalEstimated.toLocaleString('vi-VN')} đ</td>
-                                            <td className="p-3 text-right font-mono font-bold text-emerald-700 bg-emerald-50/30">
-                                                {row.totalCollected.toLocaleString('vi-VN')} đ
+                                        <tr key={r.id || idx} className="hover:bg-slate-50/80 transition-colors group">
+                                            <td className="p-3.5 text-center text-slate-400 font-medium">{itemNumber}</td>
+                                            <td className="p-3.5 font-bold text-teal-600 hover:underline cursor-pointer">
+                                                {r.code}
                                             </td>
-                                            <td className="p-3 text-center font-bold text-purple-700">{percent}%</td>
+                                            <td className="p-3.5 font-bold text-slate-800">
+                                                {r.customerName || '---'}
+                                            </td>
+                                            <td className="p-3.5 text-slate-600 font-medium">
+                                                {getShortRecordType(r.recordType)}
+                                            </td>
+                                            <td className="p-3.5 text-center text-slate-500 font-medium">
+                                                {r.resultReturnedDate ? new Date(r.resultReturnedDate).toLocaleDateString('vi-VN') : '-'}
+                                            </td>
+                                            <td className="p-3.5 text-center">
+                                                {isHoaDon ? (
+                                                    <span className="px-2.5 py-1 rounded-md text-[10px] font-bold uppercase bg-orange-50 text-orange-600 border border-orange-200/60 inline-block tracking-wider">
+                                                        HÓA ĐƠN
+                                                    </span>
+                                                ) : (
+                                                    <span className="px-2.5 py-1 rounded-md text-[10px] font-bold uppercase bg-blue-50 text-blue-600 border border-blue-200/60 inline-block tracking-wider">
+                                                        BIÊN LAI
+                                                    </span>
+                                                )}
+                                            </td>
+                                            <td className="p-3.5 text-center font-mono font-bold text-slate-700">
+                                                {r.receiptNumber || '---'}
+                                            </td>
+                                            <td className="p-3.5 text-right font-mono font-bold text-emerald-600 text-sm">
+                                                {r.calcReturned.toLocaleString('vi-VN')} đ
+                                            </td>
+                                            <td className="p-3.5 text-slate-700 font-medium">
+                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+                                                    {r.assignedWard}
+                                                </span>
+                                            </td>
                                         </tr>
                                     );
-                                })}
-                            </tbody>
-                        </table>
+                                })
+                            ) : (
+                                <tr>
+                                    <td colSpan={9} className="p-12 text-center text-slate-400 italic">
+                                        Không tìm thấy dữ liệu nguồn thu phù hợp.
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+
+                {/* Footer Section */}
+                <div className="p-3.5 px-5 border-t border-slate-100 bg-slate-50/50 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
+                    <div>
+                        Hiển thị từ <span className="font-bold text-slate-700">{filteredRecords.length > 0 ? (currentPage - 1) * pageSize + 1 : 0}</span> đến <span className="font-bold text-slate-700">{Math.min(currentPage * pageSize, filteredRecords.length)}</span> trên tổng <span className="font-bold text-slate-700">{filteredRecords.length}</span> hồ sơ đã lọc
                     </div>
-                )}
 
-                {/* SUBTAB 4: CHI TIẾT DANH SÁCH HỒ SƠ */}
-                {subTab === 'records' && (
-                    <div className="space-y-4">
-                        {/* Search & Filters */}
-                        <div className="flex flex-wrap items-center gap-3 bg-gray-50 p-3 rounded-lg border border-gray-200">
-                            <div className="relative flex-1 min-w-[200px]">
-                                <Search size={16} className="absolute left-3 top-2.5 text-gray-400" />
-                                <input
-                                    type="text"
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                    placeholder="Tìm mã HS, tên khách hàng, địa chỉ..."
-                                    className="w-full pl-9 pr-3 py-1.5 text-xs border border-gray-300 rounded-md outline-none focus:border-blue-500 bg-white"
-                                />
-                            </div>
-
-                            <div className="flex items-center gap-2">
-                                <Filter size={15} className="text-gray-500" />
-                                <select
-                                    value={selectedWardFilter}
-                                    onChange={(e) => setSelectedWardFilter(e.target.value)}
-                                    className="px-2 py-1.5 text-xs border border-gray-300 rounded-md outline-none bg-white font-medium"
-                                >
-                                    <option value="all">Tất cả Xã / Phường</option>
-                                    {wardData.map(w => (
-                                        <option key={w.ward} value={w.ward}>{w.ward}</option>
-                                    ))}
-                                </select>
-
-                                <select
-                                    value={paymentStatusFilter}
-                                    onChange={(e) => setPaymentStatusFilter(e.target.value as any)}
-                                    className="px-2 py-1.5 text-xs border border-gray-300 rounded-md outline-none bg-white font-medium"
-                                >
-                                    <option value="all">Tất cả thanh toán</option>
-                                    <option value="paid">Đã thu thực tế (&gt;0)</option>
-                                    <option value="advance">Có tạm ứng (&gt;0)</option>
-                                    <option value="unpaid">Chưa thu phí (0đ)</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        {/* Table */}
-                        <div className="overflow-x-auto max-h-[500px] border border-gray-200 rounded-lg">
-                            <table className="w-full text-xs text-left border-collapse">
-                                <thead className="bg-gray-100 text-gray-600 font-bold sticky top-0 shadow-sm z-10">
-                                    <tr>
-                                        <th className="p-2.5 w-10 text-center border-b">#</th>
-                                        <th className="p-2.5 w-28 border-b">Mã HS</th>
-                                        <th className="p-2.5 min-w-[150px] border-b">Khách hàng</th>
-                                        <th className="p-2.5 w-28 border-b">Xã/Phường</th>
-                                        <th className="p-2.5 w-28 border-b">Loại HS</th>
-                                        <th className="p-2.5 text-right w-28 border-b">Giá trị gốc</th>
-                                        <th className="p-2.5 text-right w-28 border-b">Tạm ứng</th>
-                                        <th className="p-2.5 text-right w-32 border-b bg-emerald-100/50 text-emerald-800">Đã thu thực tế</th>
-                                        <th className="p-2.5 text-right w-28 border-b bg-purple-100/50 text-purple-800">Còn lại</th>
-                                        <th className="p-2.5 text-center w-24 border-b">Trạng thái</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-100">
-                                    {filteredDetailRecords.length > 0 ? (
-                                        filteredDetailRecords.map((r, idx) => (
-                                            <tr key={r.id || idx} className="hover:bg-blue-50/40 transition-colors">
-                                                <td className="p-2.5 text-center text-gray-400">{idx + 1}</td>
-                                                <td className="p-2.5 font-bold text-blue-600">{r.code}</td>
-                                                <td className="p-2.5 font-medium text-gray-800">{r.customerName}</td>
-                                                <td className="p-2.5 text-gray-600">{getNormalizedWard(r.ward)}</td>
-                                                <td className="p-2.5 text-gray-600">{getShortRecordType(r.recordType)}</td>
-                                                <td className="p-2.5 text-right font-mono text-gray-700">
-                                                    {r.calcPrice ? `${r.calcPrice.toLocaleString('vi-VN')} đ` : '—'}
-                                                </td>
-                                                <td className="p-2.5 text-right font-mono text-blue-700">
-                                                    {r.calcAdvance ? `${r.calcAdvance.toLocaleString('vi-VN')} đ` : '—'}
-                                                </td>
-                                                <td className="p-2.5 text-right font-mono font-bold text-emerald-700 bg-emerald-50/30">
-                                                    {r.calcReturned ? `${r.calcReturned.toLocaleString('vi-VN')} đ` : '—'}
-                                                </td>
-                                                <td className="p-2.5 text-right font-mono font-bold text-purple-700 bg-purple-50/30">
-                                                    {r.calcRemaining ? `${r.calcRemaining.toLocaleString('vi-VN')} đ` : '—'}
-                                                </td>
-                                                <td className="p-2.5 text-center">
-                                                    <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-gray-100 text-gray-700 border border-gray-200">
-                                                        {STATUS_LABELS[r.status as RecordStatus] || r.status}
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                        ))
-                                    ) : (
-                                        <tr>
-                                            <td colSpan={10} className="p-8 text-center text-gray-400 italic">
-                                                Không tìm thấy hồ sơ phù hợp với điều kiện lọc.
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                            disabled={currentPage === 1}
+                            className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:hover:bg-white text-slate-600 transition-colors"
+                        >
+                            <ChevronLeft size={16} />
+                        </button>
+                        <span className="font-semibold text-slate-700 px-2">
+                            Trang {currentPage} / {totalPages}
+                        </span>
+                        <button
+                            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                            disabled={currentPage >= totalPages}
+                            className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:hover:bg-white text-slate-600 transition-colors"
+                        >
+                            <ChevronRight size={16} />
+                        </button>
                     </div>
-                )}
+                </div>
+
             </div>
         </div>
     );

@@ -620,12 +620,6 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
             >
                 <AlertTriangle size={16} /> Dữ liệu
             </button>
-            <button 
-                onClick={() => setActiveTab('audit')}
-                className={`px-4 py-3 text-xs md:text-sm font-black uppercase tracking-widest flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'audit' ? 'border-teal-600 text-teal-700 bg-white' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
-            >
-                <FileSignature size={16} /> Kiểm tra ngày tháng
-            </button>
         </div>
 
         <div className="p-4 md:p-6 overflow-y-auto flex-1 bg-slate-50/30">

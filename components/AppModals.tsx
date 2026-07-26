@@ -9,9 +9,11 @@ import { useIsMobile } from '../hooks/useIsMobile';
 import DeleteConfirmModal from './DeleteConfirmModal';
 import ExportModal from './ExportModal';
 import AddToBatchModal from './AddToBatchModal';
+import ReturnBatchHandoverModal from './ReturnBatchHandoverModal';
 import ExcelPreviewModal from './ExcelPreviewModal';
 import BulkUpdateModal from './BulkUpdateModal';
 import ReturnResultModal from './ReturnResultModal';
+import BatchErrorDiagnosticModal from './BatchErrorDiagnosticModal';
 import * as XLSX from 'xlsx-js-style';
 
 interface AppModalsProps {
@@ -23,9 +25,11 @@ interface AppModalsProps {
     isDeleteModalOpen: boolean;
     isExportModalOpen: boolean;
     isAddToBatchModalOpen: boolean;
+    isReturnHandoverModalOpen?: boolean;
     isExcelPreviewOpen: boolean;
     isBulkUpdateModalOpen: boolean;
     isReturnModalOpen: boolean;
+    isDiagnosticModalOpen?: boolean;
     
     // Data States
     editingRecord: RecordFile | null;
@@ -47,9 +51,11 @@ interface AppModalsProps {
     setIsDeleteModalOpen: (v: boolean) => void;
     setIsExportModalOpen: (v: boolean) => void;
     setIsAddToBatchModalOpen: (v: boolean) => void;
+    setIsReturnHandoverModalOpen?: (v: boolean) => void;
     setIsExcelPreviewOpen: (v: boolean) => void;
     setIsBulkUpdateModalOpen: (v: boolean) => void;
     setIsReturnModalOpen: (v: boolean) => void;
+    setIsDiagnosticModalOpen?: (v: boolean) => void;
     
     setEditingRecord: (r: RecordFile | null) => void;
     setViewingRecord: (r: RecordFile | null) => void;
@@ -68,10 +74,12 @@ interface AppModalsProps {
     confirmDelete: (r: RecordFile) => void;
     handleExcelPreview: (wb: XLSX.WorkBook, name: string) => void;
     executeBatchExport: (batch: number, date: string) => void;
+    executeReturnBatchHandover?: (batch: number, date: string, deptName: string) => void;
     onCreateLiquidation: (record: RecordFile) => void;
     onCreateContract?: (record: Partial<RecordFile>) => void;
     handleBulkUpdate: (field: keyof RecordFile, value: any) => Promise<void>;
-    confirmReturnResult: (receiptNumber: string, receiverName: string, returnedPrice: number) => void;
+    handleBatchUpdateRecords?: (updates: Partial<RecordFile>[]) => Promise<void>;
+    confirmReturnResult: (receiptNumber: string, receiverName: string, returnedPrice: number, receiptType?: 'Biên Lai' | 'Hóa Đơn') => void;
 
     // Shared Data
     employees: Employee[];
@@ -192,6 +200,16 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
                 currentUser={props.currentUser}
             />
 
+            <ReturnBatchHandoverModal
+                isOpen={!!props.isReturnHandoverModalOpen}
+                onClose={() => props.setIsReturnHandoverModalOpen && props.setIsReturnHandoverModalOpen(false)}
+                onConfirm={props.executeReturnBatchHandover || (() => {})}
+                records={props.records}
+                selectedCount={props.selectedCount}
+                targetRecords={targetRecordsForBatch}
+                currentUser={props.currentUser}
+            />
+
             <ExcelPreviewModal 
                 isOpen={props.isExcelPreviewOpen} 
                 onClose={() => props.setIsExcelPreviewOpen(false)} 
@@ -213,6 +231,17 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
                 onClose={() => { props.setIsReturnModalOpen(false); props.setReturnRecord(null); }}
                 record={props.returnRecord}
                 onConfirm={props.confirmReturnResult}
+            />
+
+            <BatchErrorDiagnosticModal
+                isOpen={!!props.isDiagnosticModalOpen}
+                onClose={() => props.setIsDiagnosticModalOpen && props.setIsDiagnosticModalOpen(false)}
+                records={props.filteredRecords}
+                employees={props.employees}
+                users={props.users}
+                currentUser={props.currentUser}
+                onBatchUpdateRecords={props.handleBatchUpdateRecords || (async () => {})}
+                onRefreshData={props.onRefreshData}
             />
         </>
     );

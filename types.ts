@@ -143,10 +143,16 @@ export interface RecordFile {
   deadlineReminded?: boolean | null; // Đã nhắc nhở hết hạn giải quyết (nhắc 1 lần)
 
   // Tính năng trả kết quả
-  receiptNumber?: string | null;     // Số biên lai
+  receiptNumber?: string | null;     // Số biên lai/hóa đơn
+  receiptType?: 'Biên Lai' | 'Hóa Đơn' | string | null; // Loại chứng từ (Biên lai hay Hóa đơn)
   receiverName?: string | null;      // Người nhận kết quả (Mới)
   resultReturnedDate?: string | null; // Ngày trả kết quả cho dân
   returnedPrice?: number | null;     // Số tiền thực tế khi trả kết quả (Mới)
+
+  // Tính năng Chốt danh sách bàn giao về phòng chuyên môn (Dành cho hồ sơ đã trả kết quả)
+  returnBatch?: number | null;
+  returnBatchDate?: string | null;
+  returnHandoverDept?: string | null;
 
   // Tính năng Chỉnh lý bản đồ (Mới)
   needsMapCorrection?: boolean; // True nếu cần lập danh sách chỉnh lý

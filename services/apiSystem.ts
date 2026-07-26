@@ -186,13 +186,13 @@ export const deleteAllDataApi = async (): Promise<boolean> => {
     }
 };
 
-export const getPreviewContractCode = async (): Promise<string> => {
+export const getPreviewContractCode = async (customYear?: number): Promise<string> => {
+    const year = customYear || new Date().getFullYear();
     if (!isConfigured) {
-        const year = new Date().getFullYear();
-        return `HĐ-${year}-0001`;
+        const nextSeq = getFromCache(`offline_seq_hd_${year}`, 1);
+        return `HĐ-${year}-${nextSeq.toString().padStart(4, '0')}`;
     }
 
-    const year = new Date().getFullYear();
     let prefix = `HĐ-${year}-`;
     let nextSeq = 1;
 
@@ -212,17 +212,30 @@ export const getPreviewContractCode = async (): Promise<string> => {
     }
 
     // 2. Lấy số nhảy hiện tại (không tăng tịnh tiến trong DB)
+    const key = `contract_next_seq_${year}`;
     try {
         const { data } = await supabase
             .from('system_settings')
             .select('value')
-            .eq('key', 'contract_next_seq')
+            .eq('key', key)
             .single();
 
         if (data && data.value) {
             const currentVal = parseInt(data.value, 10);
             if (!isNaN(currentVal)) {
                 nextSeq = currentVal;
+            }
+        } else if (year === new Date().getFullYear()) {
+            const { data: globalData } = await supabase
+                .from('system_settings')
+                .select('value')
+                .eq('key', 'contract_next_seq')
+                .single();
+            if (globalData && globalData.value) {
+                const currentVal = parseInt(globalData.value, 10);
+                if (!isNaN(currentVal)) {
+                    nextSeq = currentVal;
+                }
             }
         }
     } catch (e) {
@@ -233,14 +246,29 @@ export const getPreviewContractCode = async (): Promise<string> => {
     return `${prefix}${seqStr}`;
 };
 
-export const consumeNextContractCode = async (): Promise<string> => {
+export const consumeNextContractCode = async (userName?: string, note?: string, customYear?: number): Promise<string> => {
+    const year = customYear || new Date().getFullYear();
+    const key = `contract_next_seq_${year}`;
+    const historyKey = `contract_hd_history_${year}`;
+
     if (!isConfigured) {
-        const year = new Date().getFullYear();
-        const randomNum = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-        return `HĐ-${year}-${randomNum}`;
+        const currentVal = getFromCache(`offline_seq_hd_${year}`, 1);
+        const seqStr = currentVal.toString().padStart(4, '0');
+        const allocatedCode = `HĐ-${year}-${seqStr}`;
+        saveToCache(`offline_seq_hd_${year}`, currentVal + 1);
+        
+        const historyList = getFromCache<any[]>(`offline_hd_history_${year}`, []);
+        const newHistoryItem = {
+            code: allocatedCode,
+            by: userName || "Nhân viên",
+            date: new Date().toISOString(),
+            note: note || ""
+        };
+        historyList.unshift(newHistoryItem);
+        saveToCache(`offline_hd_history_${year}`, historyList);
+        return allocatedCode;
     }
 
-    const year = new Date().getFullYear();
     let success = false;
     let attempts = 0;
     let nextSeq = 1;
@@ -265,26 +293,41 @@ export const consumeNextContractCode = async (): Promise<string> => {
     while (!success && attempts < 5) {
         attempts++;
         try {
+            let dbKey = key;
             const { data } = await supabase
                 .from('system_settings')
                 .select('value')
-                .eq('key', 'contract_next_seq')
+                .eq('key', dbKey)
                 .single();
 
             let currentVal = 1;
+            let hasRecord = !!data;
+
             if (data && data.value) {
                 currentVal = parseInt(data.value, 10);
                 if (isNaN(currentVal)) currentVal = 1;
+            } else if (year === new Date().getFullYear()) {
+                const { data: globalData } = await supabase
+                    .from('system_settings')
+                    .select('value')
+                    .eq('key', 'contract_next_seq')
+                    .single();
+                if (globalData && globalData.value) {
+                    currentVal = parseInt(globalData.value, 10);
+                    if (isNaN(currentVal)) currentVal = 1;
+                    dbKey = 'contract_next_seq';
+                    hasRecord = true;
+                }
             }
 
             nextSeq = currentVal;
 
-            if (data) {
+            if (hasRecord) {
                 const { data: updatedData, error } = await supabase
                     .from('system_settings')
                     .update({ value: (nextSeq + 1).toString() })
-                    .eq('key', 'contract_next_seq')
-                    .eq('value', data.value)
+                    .eq('key', dbKey)
+                    .eq('value', nextSeq.toString())
                     .select();
 
                 if (!error && updatedData && updatedData.length > 0) {
@@ -293,7 +336,7 @@ export const consumeNextContractCode = async (): Promise<string> => {
             } else {
                 const { data: insertedData, error } = await supabase
                     .from('system_settings')
-                    .insert([{ key: 'contract_next_seq', value: (nextSeq + 1).toString() }])
+                    .insert([{ key: dbKey, value: (nextSeq + 1).toString() }])
                     .select();
 
                 if (!error && insertedData && insertedData.length > 0) {
@@ -309,20 +352,151 @@ export const consumeNextContractCode = async (): Promise<string> => {
         }
     }
 
+    if (!success) {
+        const currentVal = getFromCache(`offline_seq_hd_${year}`, 1);
+        nextSeq = currentVal;
+        saveToCache(`offline_seq_hd_${year}`, currentVal + 1);
+    } else {
+        saveToCache(`offline_seq_hd_${year}`, nextSeq + 1);
+        // Đồng bộ ngược lại 'contract_next_seq' nếu đang ở năm hiện tại
+        if (year === new Date().getFullYear()) {
+            try {
+                await supabase
+                    .from('system_settings')
+                    .update({ value: (nextSeq + 1).toString() })
+                    .eq('key', 'contract_next_seq');
+            } catch (e) {}
+        }
+    }
+
     const seqStr = nextSeq.toString().padStart(4, '0');
-    return `${prefix}${seqStr}`;
+    const allocatedCode = `${prefix}${seqStr}`;
+
+    // Update history for standard contract
+    try {
+        const { data: historyData } = await supabase
+            .from('system_settings')
+            .select('value')
+            .eq('key', historyKey)
+            .single();
+
+        let historyList: any[] = [];
+        if (historyData && historyData.value) {
+            try {
+                historyList = JSON.parse(historyData.value);
+            } catch (pErr) {
+                historyList = [];
+            }
+        }
+
+        const newHistoryItem = {
+            code: allocatedCode,
+            by: userName || "Nhân viên",
+            date: new Date().toISOString(),
+            note: note || ""
+        };
+
+        historyList.unshift(newHistoryItem);
+
+        if (historyData) {
+            await supabase
+                .from('system_settings')
+                .update({ value: JSON.stringify(historyList) })
+                .eq('key', historyKey);
+        } else {
+            await supabase
+                .from('system_settings')
+                .insert([{ key: historyKey, value: JSON.stringify(historyList) }]);
+        }
+        saveToCache(`offline_hd_history_${year}`, historyList);
+    } catch (hErr) {
+        console.error("Lỗi khi lưu lịch sử cấp số hợp đồng HD:", hErr);
+        const historyList = getFromCache<any[]>(`offline_hd_history_${year}`, []);
+        const newHistoryItem = {
+            code: allocatedCode,
+            by: userName || "Nhân viên",
+            date: new Date().toISOString(),
+            note: note || ""
+        };
+        historyList.unshift(newHistoryItem);
+        saveToCache(`offline_hd_history_${year}`, historyList);
+    }
+
+    return allocatedCode;
 };
 
 // Khai báo lại getNextContractCode để giữ độ tương thích nếu có import bên ngoài
 export const getNextContractCode = consumeNextContractCode;
 
-export const getPreviewHDKTCode = async (year: number): Promise<string> => {
+export const getContractHistory = async (year: number): Promise<any[]> => {
+    if (!isConfigured) return getFromCache<any[]>(`offline_hd_history_${year}`, []);
+    const historyKey = `contract_hd_history_${year}`;
+    try {
+        const { data } = await supabase
+            .from('system_settings')
+            .select('value')
+            .eq('key', historyKey)
+            .single();
+        if (data && data.value) {
+            const list = JSON.parse(data.value);
+            saveToCache(`offline_hd_history_${year}`, list);
+            return list;
+        }
+    } catch (e) {
+        return getFromCache<any[]>(`offline_hd_history_${year}`, []);
+    }
+    return getFromCache<any[]>(`offline_hd_history_${year}`, []);
+};
+
+export const updateContractSequence = async (year: number, nextSeq: number): Promise<void> => {
+    const key = `contract_next_seq_${year}`;
     if (!isConfigured) {
-        const nextSeq = getFromCache(`offline_seq_hdkt_${year}`, 1);
+        saveToCache(`offline_seq_hd_${year}`, nextSeq);
+        return;
+    }
+    try {
+        const keysToUpdate = [key];
+        if (year === new Date().getFullYear()) {
+            keysToUpdate.push('contract_next_seq');
+        }
+        
+        for (const k of keysToUpdate) {
+            const { data } = await supabase
+                .from('system_settings')
+                .select('key')
+                .eq('key', k);
+            
+            const exists = data && data.length > 0;
+            if (exists) {
+                await supabase
+                    .from('system_settings')
+                    .update({ value: nextSeq.toString() })
+                    .eq('key', k);
+            } else {
+                await supabase
+                    .from('system_settings')
+                    .insert([{ key: k, value: nextSeq.toString() }]);
+            }
+        }
+        saveToCache(`offline_seq_hd_${year}`, nextSeq);
+    } catch (e) {
+        console.error("Lỗi khi cập nhật số thứ tự HĐ:", e);
+        saveToCache(`offline_seq_hd_${year}`, nextSeq);
+    }
+};
+
+export const getPreviewHDKTCode = async (year: number): Promise<string> => {
+    let minSeq = (year === 2026) ? 610 : 1;
+    if (!isConfigured) {
+        let nextSeq = getFromCache(`offline_seq_hdkt_${year}`, minSeq);
+        if (nextSeq < minSeq) {
+            nextSeq = minSeq;
+            saveToCache(`offline_seq_hdkt_${year}`, nextSeq);
+        }
         const seqStr = nextSeq.toString().padStart(4, '0');
         return `${seqStr}/HĐKT/${year}`;
     }
-    let nextSeq = 1;
+    let nextSeq = minSeq;
     const key = `contract_seq_hdkt_${year}`;
     try {
         const { data } = await supabase
@@ -332,10 +506,13 @@ export const getPreviewHDKTCode = async (year: number): Promise<string> => {
             .single();
         if (data && data.value) {
             const val = parseInt(data.value, 10);
-            if (!isNaN(val)) nextSeq = val;
+            if (!isNaN(val)) {
+                nextSeq = Math.max(val, minSeq);
+            }
         }
     } catch (e) {
-        nextSeq = getFromCache(`offline_seq_hdkt_${year}`, 1);
+        const cached = getFromCache(`offline_seq_hdkt_${year}`, minSeq);
+        nextSeq = Math.max(cached, minSeq);
     }
     const seqStr = nextSeq.toString().padStart(4, '0');
     return `${seqStr}/HĐKT/${year}`;
@@ -344,10 +521,12 @@ export const getPreviewHDKTCode = async (year: number): Promise<string> => {
 export const consumeNextHDKTCode = async (year: number, userName: string, note: string): Promise<string> => {
     const key = `contract_seq_hdkt_${year}`;
     const historyKey = `contract_hdkt_history_${year}`;
-    let nextSeq = 1;
+    let minSeq = (year === 2026) ? 610 : 1;
+    let nextSeq = minSeq;
 
     if (!isConfigured) {
-        const currentVal = getFromCache(`offline_seq_hdkt_${year}`, 1);
+        let currentVal = getFromCache(`offline_seq_hdkt_${year}`, minSeq);
+        currentVal = Math.max(currentVal, minSeq);
         nextSeq = currentVal;
         saveToCache(`offline_seq_hdkt_${year}`, currentVal + 1);
         
@@ -376,10 +555,12 @@ export const consumeNextHDKTCode = async (year: number, userName: string, note: 
                 .eq('key', key)
                 .single();
 
-            let currentVal = 1;
+            let currentVal = minSeq;
             if (data && data.value) {
-                currentVal = parseInt(data.value, 10);
-                if (isNaN(currentVal)) currentVal = 1;
+                const parsed = parseInt(data.value, 10);
+                if (!isNaN(parsed)) {
+                    currentVal = Math.max(parsed, minSeq);
+                }
             }
             nextSeq = currentVal;
 
@@ -411,7 +592,8 @@ export const consumeNextHDKTCode = async (year: number, userName: string, note: 
     }
 
     if (!success) {
-        const currentVal = getFromCache(`offline_seq_hdkt_${year}`, 1);
+        let currentVal = getFromCache(`offline_seq_hdkt_${year}`, minSeq);
+        currentVal = Math.max(currentVal, minSeq);
         nextSeq = currentVal;
         saveToCache(`offline_seq_hdkt_${year}`, currentVal + 1);
     } else {
@@ -495,9 +677,11 @@ export const getHDKTHistory = async (year: number): Promise<any[]> => {
 };
 
 export const updateHDKTSequence = async (year: number, nextSeq: number): Promise<void> => {
+    const minSeq = (year === 2026) ? 610 : 1;
+    const finalSeq = Math.max(nextSeq, minSeq);
     const key = `contract_seq_hdkt_${year}`;
     if (!isConfigured) {
-        saveToCache(`offline_seq_hdkt_${year}`, nextSeq);
+        saveToCache(`offline_seq_hdkt_${year}`, finalSeq);
         return;
     }
     try {
@@ -510,17 +694,17 @@ export const updateHDKTSequence = async (year: number, nextSeq: number): Promise
         if (exists) {
             await supabase
                 .from('system_settings')
-                .update({ value: nextSeq.toString() })
+                .update({ value: finalSeq.toString() })
                 .eq('key', key);
         } else {
             await supabase
                 .from('system_settings')
-                .insert([{ key: key, value: nextSeq.toString() }]);
+                .insert([{ key: key, value: finalSeq.toString() }]);
         }
-        saveToCache(`offline_seq_hdkt_${year}`, nextSeq);
+        saveToCache(`offline_seq_hdkt_${year}`, finalSeq);
     } catch (e) {
         console.error("Lỗi khi cập nhật số thứ tự HĐKT:", e);
-        saveToCache(`offline_seq_hdkt_${year}`, nextSeq);
+        saveToCache(`offline_seq_hdkt_${year}`, finalSeq);
     }
 };
 

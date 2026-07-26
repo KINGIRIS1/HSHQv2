@@ -93,12 +93,14 @@ function App() {
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [exportModalType, setExportModalType] = useState<'handover' | 'check_list'>('handover');
   const [isAddToBatchModalOpen, setIsAddToBatchModalOpen] = useState(false);
+  const [isReturnHandoverModalOpen, setIsReturnHandoverModalOpen] = useState(false);
   const [isExcelPreviewOpen, setIsExcelPreviewOpen] = useState(false);
   const [previewWorkbook, setPreviewWorkbook] = useState<XLSX.WorkBook | null>(null);
   const [previewExcelName, setPreviewExcelName] = useState('');
   const [isBulkUpdateModalOpen, setIsBulkUpdateModalOpen] = useState(false);
   const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
   const [returnRecord, setReturnRecord] = useState<RecordFile | null>(null);
+  const [isDiagnosticModalOpen, setIsDiagnosticModalOpen] = useState(false);
 
   // Report States
   const [globalReportContent, setGlobalReportContent] = useState('');
@@ -452,8 +454,8 @@ function App() {
       return updates;
   };
 
-  const handleBulkUpdate = async (field: keyof RecordFile, value: any, customDateStr?: string) => {
-      const selectedIds = Array.from(selectedRecordIds);
+  const handleBulkUpdate = async (field: keyof RecordFile, value: any, customDateStr?: string, targetRecordIds?: string[]) => {
+      const selectedIds = targetRecordIds && targetRecordIds.length > 0 ? targetRecordIds : Array.from(selectedRecordIds);
       let baseUpdates: any = { [field]: value };
       const targetDateStr = customDateStr || new Date().toISOString();
 
@@ -567,14 +569,16 @@ function App() {
       setIsReturnModalOpen(true);
   }, []);
 
-  const handleConfirmReturnResult = useCallback(async (receiptNumber: string, receiverName: string, returnedPrice: number) => {
+  const handleConfirmReturnResult = useCallback(async (receiptNumber: string, receiverName: string, returnedPrice: number, receiptType?: 'Biên Lai' | 'Hóa Đơn') => {
       if (!returnRecord) return;
       const nowStr = new Date().toISOString();
-      const statusLogs = createStatusLog(returnRecord, RecordStatus.RETURNED, `Trả kết quả cho người dân: ${receiverName}`);
+      const typeLabel = receiptType || 'Biên Lai';
+      const statusLogs = createStatusLog(returnRecord, RecordStatus.RETURNED, `Trả kết quả cho người dân: ${receiverName} (${typeLabel} số: ${receiptNumber}, Số tiền: ${returnedPrice.toLocaleString('vi-VN')}đ)`);
       const updates = { 
           resultReturnedDate: nowStr, 
           status: RecordStatus.RETURNED, 
           receiptNumber: receiptNumber, 
+          receiptType: typeLabel,
           receiverName: receiverName,
           returnedPrice: returnedPrice,
           statusLogs
@@ -598,6 +602,21 @@ function App() {
           setToast({ type: 'success', message: `Đã HỦY yêu cầu chỉnh lý cho hồ sơ ${record.code}.` });
       }
   }, []);
+
+  const handleBatchUpdateRecords = useCallback(async (updates: Partial<RecordFile>[]) => {
+      try {
+          const res = await updateRecordsBatchById(updates);
+          if (res.success) {
+              await loadData();
+              setToast({ type: 'success', message: `Đã cập nhật sửa lỗi cho ${res.count} hồ sơ thành công!` });
+          } else {
+              setToast({ type: 'error', message: 'Cập nhật sửa lỗi hàng loạt thất bại.' });
+          }
+      } catch (err) {
+          console.error("Lỗi khi sửa lỗi hàng loạt:", err);
+          setToast({ type: 'error', message: 'Có lỗi xảy ra khi sửa lỗi hàng loạt.' });
+      }
+  }, [loadData]);
 
   const advanceStatus = useCallback(async (record: RecordFile) => {
       if (record.status === RecordStatus.RECEIVED) { 
@@ -649,6 +668,36 @@ function App() {
       }
       setSelectedRecordIds(new Set()); 
       setToast({ type: 'success', message: `Đã chốt danh sách ĐỢT ${batchNumber} thành công.` });
+  };
+
+  const executeReturnBatchHandover = async (batchNumber: number, batchDate: string, deptName: string) => {
+      const candidates = selectedRecordIds.size > 0 ? records.filter(r => selectedRecordIds.has(r.id)) : recordFilterProps.filteredRecords;
+      const recordsToHandover = candidates.filter(r => r.status === RecordStatus.RETURNED);
+      if (recordsToHandover.length === 0) {
+          alert("Vui lòng chọn các hồ sơ Đã trả kết quả để chốt bàn giao.");
+          return;
+      }
+      const updatesToApply = recordsToHandover.map(r => {
+          const statusLogs = createStatusLog(r, r.status, `Chốt DS bàn giao về phòng chuyên môn (${deptName}) - Đợt ${batchNumber}`);
+          return {
+              ...r,
+              returnBatch: batchNumber,
+              returnBatchDate: batchDate,
+              returnHandoverDept: deptName,
+              statusLogs
+          };
+      });
+      setRecords(prev => prev.map(r => {
+          const updated = updatesToApply.find(u => u.id === r.id);
+          return updated ? updated : r;
+      }));
+      const results = await Promise.all(updatesToApply.map(r => updateRecordApi(r)));
+      if (results.some(res => res === null)) {
+          loadData();
+          return;
+      }
+      setSelectedRecordIds(new Set());
+      setToast({ type: 'success', message: `Đã chốt danh sách bàn giao ĐỢT ${batchNumber} về ${deptName} thành công.` });
   };
 
   const handleConfirmSignBatch = async () => {
@@ -789,6 +838,7 @@ function App() {
             isDeleteModalOpen={isDeleteModalOpen} setIsDeleteModalOpen={setIsDeleteModalOpen}
             isExportModalOpen={isExportModalOpen} setIsExportModalOpen={setIsExportModalOpen}
             isAddToBatchModalOpen={isAddToBatchModalOpen} setIsAddToBatchModalOpen={setIsAddToBatchModalOpen}
+            isReturnHandoverModalOpen={isReturnHandoverModalOpen} setIsReturnHandoverModalOpen={setIsReturnHandoverModalOpen}
             isExcelPreviewOpen={isExcelPreviewOpen} setIsExcelPreviewOpen={setIsExcelPreviewOpen}
             isBulkUpdateModalOpen={isBulkUpdateModalOpen} setIsBulkUpdateModalOpen={setIsBulkUpdateModalOpen}
             isReturnModalOpen={isReturnModalOpen} setIsReturnModalOpen={setIsReturnModalOpen}
@@ -813,6 +863,7 @@ function App() {
             confirmDelete={(r) => handleDeleteRecord(r.id)}
             handleExcelPreview={(wb, name) => { setPreviewWorkbook(wb); setPreviewExcelName(name); setIsExcelPreviewOpen(true); }}
             executeBatchExport={executeBatchExport}
+            executeReturnBatchHandover={executeReturnBatchHandover}
             onCreateLiquidation={(r) => { setRecordToLiquidate(r); setCurrentView('receive_contract'); }}
             onCreateContract={(r) => { setRecordToCreateContract(r as RecordFile); setCurrentView('receive_contract'); }}
             handleBulkUpdate={handleBulkUpdate}
@@ -936,6 +987,7 @@ function App() {
             handleAddOrUpdateRecord={handleAddOrUpdateRecord}
             handleDeleteRecord={handleDeleteRecord}
             handleHandOverRecords={handleHandOverRecords}
+            onBulkUpdate={handleBulkUpdate}
             handleUpdateUser={handleUpdateUser}
             handleDeleteUser={handleDeleteUser}
             handleSaveEmployee={handleSaveEmployee}
@@ -968,6 +1020,7 @@ function App() {
             setIsImportModalOpen={setIsImportModalOpen}
             setIsBulkUpdateModalOpen={setIsBulkUpdateModalOpen}
             setIsAddToBatchModalOpen={setIsAddToBatchModalOpen}
+            setIsReturnHandoverModalOpen={setIsReturnHandoverModalOpen}
             handleExportReturnedList={handleExportReturnedList}
             handleConfirmSignBatch={handleConfirmSignBatch}
             setAssignTargetRecords={setAssignTargetRecords}
@@ -979,6 +1032,8 @@ function App() {
             setIsExportModalOpen={setIsExportModalOpen}
             setDeletingRecord={setDeletingRecord}
             setIsDeleteModalOpen={setIsDeleteModalOpen}
+            isDiagnosticModalOpen={isDiagnosticModalOpen}
+            setIsDiagnosticModalOpen={setIsDiagnosticModalOpen}
             advanceStatus={advanceStatus}
             handleOpenReturnModal={handleOpenReturnModal}
         />
@@ -991,9 +1046,11 @@ function App() {
             isDeleteModalOpen={isDeleteModalOpen} setIsDeleteModalOpen={setIsDeleteModalOpen}
             isExportModalOpen={isExportModalOpen} setIsExportModalOpen={setIsExportModalOpen}
             isAddToBatchModalOpen={isAddToBatchModalOpen} setIsAddToBatchModalOpen={setIsAddToBatchModalOpen}
+            isReturnHandoverModalOpen={isReturnHandoverModalOpen} setIsReturnHandoverModalOpen={setIsReturnHandoverModalOpen}
             isExcelPreviewOpen={isExcelPreviewOpen} setIsExcelPreviewOpen={setIsExcelPreviewOpen}
             isBulkUpdateModalOpen={isBulkUpdateModalOpen} setIsBulkUpdateModalOpen={setIsBulkUpdateModalOpen}
             isReturnModalOpen={isReturnModalOpen} setIsReturnModalOpen={setIsReturnModalOpen}
+            isDiagnosticModalOpen={isDiagnosticModalOpen} setIsDiagnosticModalOpen={setIsDiagnosticModalOpen}
             
             editingRecord={editingRecord} setEditingRecord={setEditingRecord}
             viewingRecord={viewingRecord} setViewingRecord={setViewingRecord}
@@ -1015,9 +1072,11 @@ function App() {
             confirmDelete={(r) => handleDeleteRecord(r.id)}
             handleExcelPreview={(wb, name) => { setPreviewWorkbook(wb); setPreviewExcelName(name); setIsExcelPreviewOpen(true); }}
             executeBatchExport={executeBatchExport}
+            executeReturnBatchHandover={executeReturnBatchHandover}
             onCreateLiquidation={(r) => { setRecordToLiquidate(r); setCurrentView('receive_contract'); }}
             onCreateContract={(r) => { setRecordToCreateContract(r as RecordFile); setCurrentView('receive_contract'); }}
             handleBulkUpdate={handleBulkUpdate}
+            handleBatchUpdateRecords={handleBatchUpdateRecords}
             confirmReturnResult={handleConfirmReturnResult}
 
             employees={employees}

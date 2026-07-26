@@ -154,6 +154,10 @@ interface AppRoutesProps {
   setFilterFromDate: (s: string) => void;
   filterToDate: string;
   setFilterToDate: (s: string) => void;
+  filterAssignedFromDate?: string;
+  setFilterAssignedFromDate?: (s: string) => void;
+  filterAssignedToDate?: string;
+  setFilterAssignedToDate?: (s: string) => void;
   showAdvancedDateFilter: boolean;
   setShowAdvancedDateFilter: (b: boolean) => void;
 
@@ -192,6 +196,7 @@ interface AppRoutesProps {
   setIsImportModalOpen: (b: boolean) => void;
   setIsBulkUpdateModalOpen: (b: boolean) => void;
   setIsAddToBatchModalOpen: (b: boolean) => void;
+  setIsReturnHandoverModalOpen?: (b: boolean) => void;
   handleExportReturnedList: () => void;
   handleConfirmSignBatch: () => void;
   setAssignTargetRecords: (r: RecordFile[]) => void;
@@ -203,10 +208,13 @@ interface AppRoutesProps {
   setIsExportModalOpen: (b: boolean) => void;
   setDeletingRecord: (r: RecordFile | null) => void;
   setIsDeleteModalOpen: (b: boolean) => void;
+  isDiagnosticModalOpen?: boolean;
+  setIsDiagnosticModalOpen?: (b: boolean) => void;
   advanceStatus: (r: RecordFile) => void;
   handleOpenReturnModal: (r: RecordFile) => void;
   columnOrder: string[];
   setColumnOrder: React.Dispatch<React.SetStateAction<string[]>>;
+  onBulkUpdate?: (field: keyof RecordFile, value: any, customDate?: string, targetRecordIds?: string[]) => Promise<void>;
 }
 
 const AppRoutes: React.FC<AppRoutesProps> = (props) => {
@@ -289,6 +297,18 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
     isDirector;
 
   const [showColumnSelector, setShowColumnSelector] = React.useState(false);
+  const [isAddMenuOpen, setIsAddMenuOpen] = React.useState(false);
+  const addMenuRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (addMenuRef.current && !addMenuRef.current.contains(event.target as Node)) {
+        setIsAddMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const orderedColumnDefs = React.useMemo(() => {
     return [...COLUMN_DEFS].sort((a, b) => {
@@ -341,6 +361,8 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
       "archive_handover_list",
       "archive_director_completed",
     ].includes(currentView);
+
+    const isSpecializedTab = !["all_records", "other_records", "archive_records"].includes(currentView);
 
     let title = "Danh sách Hồ sơ";
     if (
@@ -647,133 +669,6 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
 
             {currentView !== "handover_list" &&
               currentView !== "other_handover_list" &&
-              currentView !== "archive_handover_list" &&
-              !props.showAdvancedDateFilter && (
-                <div className="flex items-center gap-2 bg-white px-2 py-1.5 border border-gray-200 rounded-md shadow-sm">
-                  <Calendar size={16} className="text-gray-500" />
-                  <span className="text-xs text-gray-500 font-bold uppercase">
-                    Ngày nhận:
-                  </span>
-                  <input
-                    type="date"
-                    value={props.filterSpecificDate}
-                    onChange={(e) =>
-                      props.setFilterSpecificDate(e.target.value)
-                    }
-                    className="text-sm outline-none bg-transparent text-gray-700"
-                    title="Lọc theo ngày nhận"
-                  />
-                  {props.filterSpecificDate && (
-                    <button
-                      onClick={() => props.setFilterSpecificDate("")}
-                      className="text-gray-400 hover:text-red-500"
-                    >
-                      <X size={14} />
-                    </button>
-                  )}
-                </div>
-              )}
-
-            {(currentView === "all_records" ||
-              currentView === "other_records" ||
-              currentView === "archive_records") &&
-              !props.showAdvancedDateFilter && (
-                <div className="flex items-center gap-2 bg-white px-2 py-1.5 border border-gray-200 rounded-md shadow-sm">
-                  <Calendar size={16} className="text-gray-500" />
-                  <span className="text-xs text-gray-500 font-bold uppercase">
-                    Ngày giao NV:
-                  </span>
-                  <input
-                    type="date"
-                    value={props.filterAssignedDate}
-                    onChange={(e) =>
-                      props.setFilterAssignedDate(e.target.value)
-                    }
-                    className="text-sm outline-none bg-transparent text-gray-700"
-                    title="Lọc theo ngày giao nhân viên"
-                  />
-                  {props.filterAssignedDate && (
-                    <button
-                      onClick={() => props.setFilterAssignedDate("")}
-                      className="text-gray-400 hover:text-red-500"
-                    >
-                      <X size={14} />
-                    </button>
-                  )}
-                </div>
-              )}
-
-            {(currentView === "handover_list" ||
-              currentView === "other_handover_list" ||
-              currentView === "archive_handover_list") &&
-              props.handoverTab === "history" && (
-                <div className="flex items-center gap-2 bg-white px-2 py-1.5 border border-gray-200 rounded-md shadow-sm">
-                  <Calendar size={16} className="text-gray-500" />
-                  <span className="text-xs text-gray-500 font-bold uppercase">
-                    Ngày giao:
-                  </span>
-                  <input
-                    type="date"
-                    value={props.filterDate}
-                    onChange={(e) => props.setFilterDate(e.target.value)}
-                    className="text-sm outline-none bg-transparent text-gray-700"
-                  />
-                  {props.filterDate && (
-                    <button
-                      onClick={() => props.setFilterDate("")}
-                      className="text-gray-400 hover:text-red-500"
-                    >
-                      <X size={14} />
-                    </button>
-                  )}
-                </div>
-              )}
-
-            {(currentView === "handover_list" ||
-              currentView === "other_handover_list" ||
-              currentView === "archive_handover_list") &&
-              props.handoverTab === "returned" && (
-                <div className="flex items-center gap-1.5 bg-white px-2 py-1 border border-gray-200 rounded-md shadow-sm text-xs font-bold text-gray-700">
-                  <span className="text-xs text-gray-500 font-bold uppercase mr-1">
-                    Ngày trả:
-                  </span>
-                  <div className="relative flex items-center hover:text-blue-600 transition-colors">
-                    <span>{formatDateDDMMYYYY(props.filterFromDate) || "Từ ngày"}</span>
-                    <input
-                      type="date"
-                      value={props.filterFromDate}
-                      onChange={(e) => props.setFilterFromDate(e.target.value)}
-                      className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
-                      title="Từ ngày"
-                    />
-                  </div>
-                  <span className="text-gray-400 font-bold text-xs">-</span>
-                  <div className="relative flex items-center hover:text-blue-600 transition-colors">
-                    <span>{formatDateDDMMYYYY(props.filterToDate) || "Đến ngày"}</span>
-                    <input
-                      type="date"
-                      value={props.filterToDate}
-                      onChange={(e) => props.setFilterToDate(e.target.value)}
-                      className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
-                      title="Đến ngày"
-                    />
-                  </div>
-                  {(props.filterFromDate || props.filterToDate) && (
-                    <button
-                      onClick={() => {
-                        props.setFilterFromDate("");
-                        props.setFilterToDate("");
-                      }}
-                      className="text-gray-400 hover:text-red-500"
-                    >
-                      <X size={14} />
-                    </button>
-                  )}
-                </div>
-              )}
-
-            {currentView !== "handover_list" &&
-              currentView !== "other_handover_list" &&
               currentView !== "archive_handover_list" && (
                 <button
                   onClick={() =>
@@ -781,11 +676,146 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                       !props.showAdvancedDateFilter,
                     )
                   }
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors shadow-sm border ${props.showAdvancedDateFilter ? "bg-blue-600 text-white" : "bg-white text-gray-700"}`}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors shadow-sm border ${
+                    props.showAdvancedDateFilter
+                      ? "bg-blue-600 text-white border-blue-600"
+                      : (props.filterFromDate || props.filterToDate || props.filterAssignedFromDate || props.filterAssignedToDate)
+                      ? "bg-blue-50 text-blue-700 border-blue-300 font-bold"
+                      : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
+                  }`}
+                  title="Mở / đóng bộ lọc ngày nhận và ngày giao"
                 >
                   <CalendarRange size={16} />
+                  <span className="text-xs font-bold hidden sm:inline">Lọc ngày</span>
+                  {(props.filterFromDate || props.filterToDate || props.filterAssignedFromDate || props.filterAssignedToDate) && (
+                    <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
+                  )}
                 </button>
               )}
+
+            {props.showAdvancedDateFilter && (
+              <>
+                {!isSpecializedTab &&
+                  currentView !== "handover_list" &&
+                  currentView !== "other_handover_list" &&
+                  currentView !== "archive_handover_list" && (
+                    <div className="flex items-center gap-1.5 bg-white px-2.5 py-1.5 border border-gray-200 rounded-md shadow-sm text-xs font-bold text-gray-700">
+                      <Calendar size={15} className="text-gray-500 shrink-0" />
+                      <span className="text-xs text-gray-500 font-bold uppercase mr-0.5">
+                        Nhận:
+                      </span>
+                      <div className="relative flex items-center hover:text-blue-600 transition-colors">
+                        <span>{formatDateDDMMYYYY(props.filterFromDate) || "Từ ngày"}</span>
+                        <input
+                          type="date"
+                          value={props.filterFromDate}
+                          onChange={(e) => props.setFilterFromDate(e.target.value)}
+                          className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                          title="Nhận từ ngày"
+                        />
+                      </div>
+                      <span className="text-gray-400 font-bold text-xs">-</span>
+                      <div className="relative flex items-center hover:text-blue-600 transition-colors">
+                        <span>{formatDateDDMMYYYY(props.filterToDate) || "Đến ngày"}</span>
+                        <input
+                          type="date"
+                          value={props.filterToDate}
+                          onChange={(e) => props.setFilterToDate(e.target.value)}
+                          className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                          title="Nhận đến ngày"
+                        />
+                      </div>
+                      {(props.filterFromDate || props.filterToDate) && (
+                        <button
+                          onClick={() => {
+                            props.setFilterFromDate("");
+                            props.setFilterToDate("");
+                          }}
+                          className="text-gray-400 hover:text-red-500 ml-1"
+                          title="Xóa bộ lọc ngày nhận"
+                        >
+                          <X size={14} />
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                {(currentView === "all_records" ||
+                  currentView === "other_records" ||
+                  currentView === "archive_records") && (
+                    <div className="flex items-center gap-1.5 bg-white px-2.5 py-1.5 border border-gray-200 rounded-md shadow-sm text-xs font-bold text-gray-700">
+                      <Calendar size={15} className="text-gray-500 shrink-0" />
+                      <span className="text-xs text-gray-500 font-bold uppercase mr-0.5">
+                        Giao NV:
+                      </span>
+                      <div className="relative flex items-center hover:text-blue-600 transition-colors">
+                        <span>
+                          {formatDateDDMMYYYY(props.filterAssignedFromDate || "") || "Từ ngày"}
+                        </span>
+                        <input
+                          type="date"
+                          value={props.filterAssignedFromDate || ""}
+                          onChange={(e) =>
+                            props.setFilterAssignedFromDate &&
+                            props.setFilterAssignedFromDate(e.target.value)
+                          }
+                          className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                          title="Giao từ ngày"
+                        />
+                      </div>
+                      <span className="text-gray-400 font-bold text-xs">-</span>
+                      <div className="relative flex items-center hover:text-blue-600 transition-colors">
+                        <span>
+                          {formatDateDDMMYYYY(props.filterAssignedToDate || "") || "Đến ngày"}
+                        </span>
+                        <input
+                          type="date"
+                          value={props.filterAssignedToDate || ""}
+                          onChange={(e) =>
+                            props.setFilterAssignedToDate &&
+                            props.setFilterAssignedToDate(e.target.value)
+                          }
+                          className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                          title="Giao đến ngày"
+                        />
+                      </div>
+                      {(props.filterAssignedFromDate || props.filterAssignedToDate) && (
+                        <button
+                          onClick={() => {
+                            props.setFilterAssignedFromDate &&
+                              props.setFilterAssignedFromDate("");
+                            props.setFilterAssignedToDate &&
+                              props.setFilterAssignedToDate("");
+                          }}
+                          className="text-gray-400 hover:text-red-500 ml-1"
+                          title="Xóa bộ lọc ngày giao"
+                        >
+                          <X size={14} />
+                        </button>
+                      )}
+                    </div>
+                  )}
+              </>
+            )}
+
+            {isMeasurementView && (
+              <div className="flex items-center gap-2 bg-white px-2 py-1.5 border border-gray-200 rounded-md shadow-sm">
+                <Filter size={16} className="text-gray-500" />
+                <select
+                  value={props.filterRecordType}
+                  onChange={(e) => props.setFilterRecordType(e.target.value)}
+                  className="text-sm outline-none bg-transparent text-gray-700 font-medium cursor-pointer border-none focus:ring-0 max-w-[150px]"
+                >
+                  <option value="all">Tất cả loại HS</option>
+                  <option value="2.1 Trích lục">2.1 Trích lục</option>
+                  <option value="2.2 Trích lục QH">2.2 Trích lục QH</option>
+                  <option value="2.3 Trích đo">2.3 Trích đo</option>
+                  <option value="2.4 Cắm mốc">2.4 Cắm mốc</option>
+                  <option value="2.5 Tách-Hợp thửa">2.5 Tách-Hợp thửa</option>
+                  <option value="2.6 CN Số Thửa">2.6 CN Số Thửa</option>
+                </select>
+              </div>
+            )}
 
             {isArchiveMeasurementView && (
               <div className="flex items-center gap-2 bg-white px-2 py-1.5 border border-gray-200 rounded-md shadow-sm">
@@ -894,22 +924,39 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
 
             {canPerformAction && (
               <>
-                <div className="h-6 w-px bg-gray-300 mx-2"></div>
-                <button
-                  onClick={() => {
-                    props.setIsModalOpen(true);
-                    props.setEditingRecord(null);
-                  }}
-                  className="flex items-center gap-1 bg-blue-600 text-white px-3 py-1.5 rounded-md hover:bg-blue-700 shadow-sm text-sm font-bold"
-                >
-                  <Plus size={16} /> Nhập
-                </button>
-                <button
-                  onClick={() => props.setIsImportModalOpen(true)}
-                  className="flex items-center gap-1 bg-green-600 text-white px-3 py-1.5 rounded-md hover:bg-green-700 shadow-sm text-sm font-bold"
-                >
-                  <FileSpreadsheet size={16} /> Excel
-                </button>
+                <div className="flex items-center gap-2">
+                  <div className="h-6 w-px bg-gray-300 mx-1"></div>
+                  <div className="relative inline-block text-left" ref={addMenuRef}>
+                    <button
+                      onClick={() => setIsAddMenuOpen(!isAddMenuOpen)}
+                      className="flex items-center justify-center w-8 h-8 bg-blue-600 text-white rounded-md hover:bg-blue-700 shadow-sm font-bold active:scale-95 transition-all"
+                      title="Thêm hồ sơ hoặc nhập từ Excel"
+                    >
+                      <Plus size={20} className={`transition-transform duration-200 ${isAddMenuOpen ? "rotate-45" : ""}`} />
+                    </button>
+
+                    {isAddMenuOpen && (
+                      <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-2xl border border-gray-100 z-50 py-1.5 animate-in fade-in zoom-in-95 duration-100">
+                        <button
+                          onClick={() => {
+                            setIsAddMenuOpen(false);
+                            props.setIsModalOpen(true);
+                            props.setEditingRecord(null);
+                          }}
+                          className="w-full text-left px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-blue-50 hover:text-blue-600 flex items-center gap-2.5 transition-colors"
+                        >
+                          <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                            <Plus size={18} />
+                          </div>
+                          <div>
+                            <div className="font-bold text-slate-800 text-sm">Nhập hồ sơ mới</div>
+                            <div className="text-[11px] text-slate-500">Tạo thủ công một hồ sơ</div>
+                          </div>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
 
                 {/* Tác vụ tab con được chuyển lên cạnh Excel */}
                 {(currentView === "handover_list" ||
@@ -929,12 +976,22 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                   currentView === "other_handover_list" ||
                   currentView === "archive_handover_list") &&
                   props.handoverTab === "returned" && (
-                    <button
-                      onClick={props.handleExportReturnedList}
-                      className="hidden md:flex items-center gap-1.5 bg-emerald-600 text-white px-3 py-1.5 rounded-md hover:bg-emerald-700 text-sm font-bold shadow-sm transition-all"
-                    >
-                      <FileSpreadsheet size={16} /> Xuất Excel (Đã trả KQ)
-                    </button>
+                    <div className="flex items-center gap-2">
+                      {props.selectedRecordIds.size > 0 && (
+                        <button
+                          onClick={() => props.setIsReturnHandoverModalOpen?.(true)}
+                          className="flex items-center gap-1.5 bg-emerald-600 text-white px-3 py-1.5 rounded-md hover:bg-emerald-700 text-sm font-bold shadow-sm transition-all animate-pulse"
+                        >
+                          <Send size={16} /> Chốt DS Bàn Giao Về Phòng CM ({props.selectedRecordIds.size})
+                        </button>
+                      )}
+                      <button
+                        onClick={props.handleExportReturnedList}
+                        className="hidden md:flex items-center gap-1.5 bg-emerald-600 text-white px-3 py-1.5 rounded-md hover:bg-emerald-700 text-sm font-bold shadow-sm transition-all"
+                      >
+                        <FileSpreadsheet size={16} /> Xuất Excel (Đã trả KQ)
+                      </button>
+                    </div>
                   )}
 
                 {(currentView === "check_list" ||
@@ -948,6 +1005,8 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                       <FileSignature size={16} /> Ký Duyệt ({props.selectedRecordIds.size})
                     </button>
                   )}
+
+
 
                 {hasPermission('BTN_SUBMIT_SIGN') &&
                   (currentView === "completed_list") &&
@@ -1128,45 +1187,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
             )}
           </div>
 
-          {props.showAdvancedDateFilter && (
-            <div className="flex items-center gap-2 bg-gray-50 p-2 rounded-lg border border-gray-200 animate-fade-in text-sm font-bold text-gray-700">
-              <span className="text-gray-600 font-bold uppercase text-xs">
-                Ngày nhận từ:
-              </span>
-              <div className="relative flex items-center bg-white border border-gray-300 rounded px-2.5 py-1 hover:text-blue-600 transition-colors">
-                <span>{formatDateDDMMYYYY(props.filterFromDate) || "Từ ngày"}</span>
-                <input
-                  type="date"
-                  className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
-                  value={props.filterFromDate}
-                  onChange={(e) => props.setFilterFromDate(e.target.value)}
-                />
-              </div>
-              <span className="text-gray-600 font-bold uppercase text-xs ml-2">
-                Đến ngày:
-              </span>
-              <div className="relative flex items-center bg-white border border-gray-300 rounded px-2.5 py-1 hover:text-blue-600 transition-colors">
-                <span>{formatDateDDMMYYYY(props.filterToDate) || "Đến ngày"}</span>
-                <input
-                  type="date"
-                  className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
-                  value={props.filterToDate}
-                  onChange={(e) => props.setFilterToDate(e.target.value)}
-                />
-              </div>
-              {(props.filterFromDate || props.filterToDate) && (
-                <button
-                  onClick={() => {
-                    props.setFilterFromDate("");
-                    props.setFilterToDate("");
-                  }}
-                  className="text-red-500 hover:underline text-xs"
-                >
-                  Xóa
-                </button>
-              )}
-            </div>
-          )}
+
 
 
         </div>
@@ -1257,6 +1278,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                     columnOrder={props.columnOrder}
                     isSelected={props.selectedRecordIds.has(r.id)}
                     canPerformAction={canPerformAction}
+                    isSpecializedTab={isSpecializedTab}
                     currentUser={currentUser}
                     onToggleSelect={props.toggleSelectRecord}
                     onView={props.handleViewRecord}
@@ -1404,6 +1426,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
             props.setCurrentView("receive_contract");
           }}
           onHandOverRecords={props.handleHandOverRecords}
+          onBulkUpdate={props.onBulkUpdate}
         />
       );
     case "receive_contract":

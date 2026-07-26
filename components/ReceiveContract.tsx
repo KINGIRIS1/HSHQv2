@@ -94,9 +94,11 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ wards, currentUser, e
   useEffect(() => {
       // Quan trọng: Chỉ chạy logic khi recordToLiquidate có giá trị VÀ danh sách contracts ĐÃ ĐƯỢC TẢI
       if (recordToLiquidate && contracts.length > 0) {
-          
+          const record = recordToLiquidate; // Ghi nhận bản ghi để xử lý ổn định trong closure
+          onClearRecordToLiquidate(); // Xóa cờ đồng bộ ngay lập tức để tránh re-render lặp vô tận
+
           const normalize = (s: string) => String(s || '').trim().toLowerCase();
-          const recCode = normalize(recordToLiquidate.code);
+          const recCode = normalize(record.code);
           
           // 1. Tìm xem hồ sơ này đã có hợp đồng chưa (tìm qua customerAddress hoặc code của hợp đồng cũ)
           const existingContract = contracts.find(c => 
@@ -109,19 +111,18 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ wards, currentUser, e
               setEditingContract({
                   ...existingContract,
                   // Cập nhật lại diện tích thanh lý mới nhất từ hồ sơ (diện tích thực tế sau khi đo)
-                  // Ưu tiên: recordToLiquidate.area > liquidationArea cũ > area hợp đồng
-                  liquidationArea: recordToLiquidate.area || existingContract.liquidationArea || existingContract.area,
+                  // Ưu tiên: record.area > liquidationArea cũ > area hợp đồng
+                  liquidationArea: record.area || existingContract.liquidationArea || existingContract.area,
                   // Đảm bảo trạng thái hiển thị đúng để form hiển thị nút
                   status: 'PENDING'
               });
               setActiveModule('liquidation');
-              onClearRecordToLiquidate(); // Reset flag
           } else {
               // NẾU CHƯA CÓ HỢP ĐỒNG: Tạo Contract ảo từ Record (AUTO MAP THÔNG MINH)
               const initVirtualContract = async () => {
                   // 1. Detect Area Type (Khu vực)
                   let areaType = '';
-                  const w = (recordToLiquidate.ward || '').toLowerCase();
+                  const w = (record.ward || '').toLowerCase();
                   if (w.includes('phường') || w.includes('tt.') || w.includes('thị trấn') || w.includes('minh hưng') || w.includes('chơn thành')) {
                       areaType = 'Đất đô thị';
                   } else {
@@ -129,7 +130,7 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ wards, currentUser, e
                   }
 
                   // 2. Detect Contract & Service Type (Loại dịch vụ)
-                  const recType = (recordToLiquidate.recordType || '').toLowerCase();
+                  const recType = (record.recordType || '').toLowerCase();
                   let serviceType = '';
                   let contractType: 'Đo đạc' | 'Tách thửa' | 'Cắm mốc' | 'Trích lục' = 'Đo đạc';
 
@@ -147,7 +148,7 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ wards, currentUser, e
                       serviceType = 'Đo đạc tách thửa';
                   } else if (recType.includes('đo đạc')) {
                       // Map theo diện tích
-                      const area = recordToLiquidate.area || 0;
+                      const area = record.area || 0;
                       const match = priceList.find(p => 
                           p.serviceName.toLowerCase().includes('đo đạc') && 
                           area >= p.minArea && area < p.maxArea
@@ -161,14 +162,14 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ wards, currentUser, e
                   const newContract: Contract = {
                       id: Math.random().toString(36).substr(2, 9),
                       code: contractCode, // Lấy mã hợp đồng từ setting thay vì số biên nhận hồ sơ!
-                      customerAddress: recordToLiquidate.code, // Lưu mã số biên nhận vào customerAddress để liên kết!
-                      customerName: recordToLiquidate.customerName,
-                      phoneNumber: recordToLiquidate.phoneNumber,
-                      address: recordToLiquidate.address,
-                      ward: recordToLiquidate.ward,
-                      landPlot: recordToLiquidate.landPlot,
-                      mapSheet: recordToLiquidate.mapSheet,
-                      area: recordToLiquidate.area || 0,
+                      customerAddress: record.code, // Lưu mã số biên nhận vào customerAddress để liên kết!
+                      customerName: record.customerName,
+                      phoneNumber: record.phoneNumber,
+                      address: record.address,
+                      ward: record.ward,
+                      landPlot: record.landPlot,
+                      mapSheet: record.mapSheet,
+                      area: record.area || 0,
                       
                       // Các trường quan trọng cần điền tự động
                       contractType: contractType,
@@ -185,11 +186,10 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ wards, currentUser, e
                       deposit: 0,
                       createdDate: new Date().toISOString(),
                       status: 'PENDING',
-                      liquidationArea: recordToLiquidate.area || 0
+                      liquidationArea: record.area || 0
                   };
                   setEditingContract(newContract);
                   setActiveModule('liquidation');
-                  onClearRecordToLiquidate(); // Reset flag
               };
               initVirtualContract();
           }
@@ -199,19 +199,21 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ wards, currentUser, e
   // --- LOGIC XỬ LÝ KHI CÓ YÊU CẦU LẬP HỢP ĐỒNG TỪ BÊN NGOÀI ---
   useEffect(() => {
       if (recordToCreateContract) {
+          const record = recordToCreateContract; // Ghi nhận bản ghi để xử lý ổn định trong closure
+          if (onClearRecordToCreateContract) onClearRecordToCreateContract(); // Xóa cờ đồng bộ ngay lập tức để tránh re-render lặp vô tận
+
           const existingContract = contracts.find(c => 
-              c.customerAddress && c.customerAddress.trim().toLowerCase() === recordToCreateContract.code.trim().toLowerCase()
+              c.customerAddress && c.customerAddress.trim().toLowerCase() === record.code.trim().toLowerCase()
           );
           if (existingContract) {
               setEditingContract(existingContract);
               setActiveModule('contract');
-              if (onClearRecordToCreateContract) onClearRecordToCreateContract();
               return;
           }
 
           const initContract = async () => {
               let areaType = '';
-              const w = (recordToCreateContract.ward || '').toLowerCase();
+              const w = (record.ward || '').toLowerCase();
               const isUrban = w.includes('phường') || 
                               w.includes('tt.') || 
                               w.includes('thị trấn') || 
@@ -227,7 +229,7 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ wards, currentUser, e
                   areaType = 'Đất nông thôn';
               }
 
-              const recType = (recordToCreateContract.recordType || '').toLowerCase();
+              const recType = (record.recordType || '').toLowerCase();
               let serviceType = '';
               let contractType: 'Đo đạc' | 'Tách thửa' | 'Cắm mốc' | 'Trích lục' = 'Đo đạc';
 
@@ -244,7 +246,7 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ wards, currentUser, e
                   serviceType = 'Đo đạc tách thửa';
               } else {
                   contractType = 'Đo đạc';
-                  const area = recordToCreateContract.area || 0;
+                  const area = record.area || 0;
                   
                   // Mặc định chọn dịch vụ có chứa chữ "chỉnh lý" khớp với diện tích & khu vực
                   let match = priceList.find(p => 
@@ -267,14 +269,14 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ wards, currentUser, e
               const newContract: Contract = {
                   id: Math.random().toString(36).substr(2, 9),
                   code: contractCode, 
-                  customerAddress: recordToCreateContract.code, 
-                  customerName: recordToCreateContract.customerName,
-                  phoneNumber: recordToCreateContract.phoneNumber,
-                  address: recordToCreateContract.address,
-                  ward: recordToCreateContract.ward,
-                  landPlot: recordToCreateContract.landPlot,
-                  mapSheet: recordToCreateContract.mapSheet,
-                  area: recordToCreateContract.area || 0,
+                  customerAddress: record.code, 
+                  customerName: record.customerName,
+                  phoneNumber: record.phoneNumber,
+                  address: record.address,
+                  ward: record.ward,
+                  landPlot: record.landPlot,
+                  mapSheet: record.mapSheet,
+                  area: record.area || 0,
                   contractType: contractType,
                   serviceType: serviceType, 
                   areaType: areaType,       
@@ -288,22 +290,21 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ wards, currentUser, e
                   deposit: 0,
                   createdDate: new Date().toISOString(),
                   status: 'PENDING',
-                  liquidationArea: recordToCreateContract.area || 0
+                  liquidationArea: record.area || 0
               };
               setEditingContract(newContract);
               setActiveModule('contract');
-              if (onClearRecordToCreateContract) onClearRecordToCreateContract();
           };
           initContract();
       }
   }, [recordToCreateContract, priceList]);
 
-  const generateContractCode = async (contractType?: string): Promise<string> => {
+  const generateContractCode = async (contractType?: string, customYear?: number): Promise<string> => {
+    const year = customYear || new Date().getFullYear();
     if (contractType === 'Đo đạc' || contractType === 'Cắm mốc') {
-      const year = new Date().getFullYear();
       return await getPreviewHDKTCode(year);
     }
-    return await getPreviewContractCode();
+    return await getPreviewContractCode(year);
   };
 
   const handleEdit = (c: Contract) => { 
@@ -324,7 +325,7 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ wards, currentUser, e
       } 
   }; 
 
-  const handleSaveContract = async (contract: Contract, isUpdate: boolean): Promise<string | null> => {
+  const handleSaveContract = async (contract: Contract & { isManualCode?: boolean }, isUpdate: boolean): Promise<string | null> => {
       let success = false;
       let finalCode = contract.code;
 
@@ -333,13 +334,18 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ wards, currentUser, e
       } else {
           try {
               // Thực sự Lấy mã hợp đồng chính thức và TĂNG giá trị seq tự động trong DB khi LƯU THÀNH CÔNG
-              if (contract.contractType === 'Đo đạc' || contract.contractType === 'Cắm mốc') {
+              if (contract.isManualCode) {
+                  finalCode = contract.code;
+              } else if (contract.contractType === 'Đo đạc' || contract.contractType === 'Cắm mốc') {
                   const year = new Date().getFullYear();
                   const userName = currentUser.name || currentUser.username || "Nhân viên";
                   const note = `${contract.customerName || ''} - ${contract.contractType}`;
                   finalCode = await consumeNextHDKTCode(year, userName, note);
               } else {
-                  finalCode = await consumeNextContractCode();
+                  finalCode = await consumeNextContractCode(
+                      currentUser.name || currentUser.username || "Nhân viên",
+                      `${contract.customerName || ''} - ${contract.contractType}`
+                  );
               }
               const finalContract = { ...contract, code: finalCode };
               success = await createContractApi(finalContract);

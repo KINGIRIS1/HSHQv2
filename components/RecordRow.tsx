@@ -12,6 +12,7 @@ interface RecordRowProps {
   visibleColumns: Record<string, boolean>;
   isSelected: boolean;
   canPerformAction: boolean;
+  isSpecializedTab?: boolean;
   currentUser?: any;
   onToggleSelect: (id: string) => void;
   onView: (record: RecordFile) => void;
@@ -37,6 +38,7 @@ const RecordRow: React.FC<RecordRowProps> = ({
   visibleColumns,
   isSelected,
   canPerformAction,
+  isSpecializedTab = false,
   currentUser,
   onToggleSelect,
   onView,
@@ -159,12 +161,18 @@ const RecordRow: React.FC<RecordRowProps> = ({
       case 'assigned':
         return (
           <td key="assigned" className={`${cellClass} text-center`}>
-              {record.assignedDate ? (
-                  <div className="flex flex-col items-center gap-1">
-                      <span className="text-sm text-gray-600">{formatDate(record.assignedDate)}</span>
-                      {employee && <span className="text-xs text-indigo-600 font-bold bg-indigo-50 px-1.5 py-0.5 rounded break-words max-w-full leading-tight" title={employee.name}>{employee.name}</span>}
+              {employee ? (
+                  <div className="flex flex-col items-center gap-0.5">
+                      {record.assignedDate && (
+                          <span className="text-xs text-gray-500">{formatDate(record.assignedDate)}</span>
+                      )}
+                      <span className="text-xs text-indigo-600 font-bold bg-indigo-50 px-1.5 py-0.5 rounded break-words max-w-full leading-tight" title={employee.name}>{employee.name}</span>
                   </div>
-              ) : '--'}
+              ) : (
+                  record.assignedDate ? (
+                      <span className="text-sm text-gray-600">{formatDate(record.assignedDate)}</span>
+                  ) : '--'
+              )}
           </td>
         );
       case 'completed':

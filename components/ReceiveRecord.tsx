@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { RecordFile, Employee, User, Holiday, RecordStatus } from '../types';
 import { getNormalizedWard } from '../constants';
-import { PlusCircle, FileSpreadsheet, LayoutList, Settings, RotateCcw } from 'lucide-react';
+import { PlusCircle, FileSpreadsheet, LayoutList, Settings, RotateCcw, RefreshCw } from 'lucide-react';
 import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../services/docxService';
 import * as XLSX from 'xlsx-js-style';
 import { confirmAction, calculateDeadlineHelper } from '../utils/appHelpers';
@@ -10,6 +10,7 @@ import { confirmAction, calculateDeadlineHelper } from '../utils/appHelpers';
 // Components
 import RecordForm from './receive-record/RecordForm';
 import BulkImport from './receive-record/BulkImport';
+import BulkUpdateTab from './receive-record/BulkUpdateTab';
 import DailyList from './receive-record/DailyList';
 import TemplateConfigModal from './TemplateConfigModal';
 import DocxPreviewModal from './DocxPreviewModal';
@@ -26,6 +27,7 @@ interface ReceiveRecordProps {
   holidays: Holiday[]; // New prop
   onCreateContract?: (record: Partial<RecordFile>) => void;
   onHandOverRecords?: (recordIds: string[]) => Promise<void>;
+  onBulkUpdate?: (field: keyof RecordFile, value: any, customDate?: string, targetRecordIds?: string[]) => Promise<void>;
 }
 
 // Hàm chuyển đổi Âm lịch sang Dương lịch (Cố định cho các ngày lễ chính 2024-2026)
@@ -60,8 +62,8 @@ const formatDateKey = (date: Date): string => {
     return `${year}-${month}-${day}`;
 };
 
-const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, employees, currentUser, records = [], holidays, onCreateContract, onHandOverRecords }) => {
-  const [viewMode, setViewMode] = useState<'create' | 'list' | 'bulk'>('create');
+const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, employees, currentUser, records = [], holidays, onCreateContract, onHandOverRecords, onBulkUpdate }) => {
+  const [viewMode, setViewMode] = useState<'create' | 'list' | 'bulk' | 'update'>('create');
   // Removed local holidays state and useEffect
   
   // State chỉnh sửa
@@ -320,6 +322,9 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
             <button onClick={() => setViewMode('bulk')} className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${viewMode === 'bulk' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}>
                 <FileSpreadsheet size={16} /> Tiếp nhận hàng loạt
             </button>
+            <button onClick={() => setViewMode('update')} className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${viewMode === 'update' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}>
+                <RefreshCw size={16} /> Cập nhật thông tin
+            </button>
             <button onClick={() => setViewMode('list')} className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${viewMode === 'list' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}>
                 <LayoutList size={16} /> Danh sách hôm nay
             </button>
@@ -357,6 +362,17 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
                 calculateDeadline={calculateDeadline}
                 calculateNextCode={(w, d, exist) => calculateNextCode(w, d, exist)}
                 onPreview={handlePreviewDocx}
+                currentUser={currentUser}
+            />
+        )}
+
+        {viewMode === 'update' && (
+            <BulkUpdateTab 
+                records={combinedRecords}
+                employees={employees}
+                wards={wards}
+                onSave={onSave}
+                onBulkUpdate={onBulkUpdate}
                 currentUser={currentUser}
             />
         )}

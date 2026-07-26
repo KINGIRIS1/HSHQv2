@@ -777,7 +777,9 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                             <div className="bg-blue-50 p-3 rounded-lg border border-blue-100 flex items-center gap-3">
                                 <div className="bg-blue-200 p-1.5 rounded text-blue-700"><Receipt size={16}/></div>
                                 <div>
-                                    <label className="text-[10px] text-blue-500 uppercase font-bold block">Số biên lai</label>
+                                    <label className="text-[10px] text-blue-500 uppercase font-bold block">
+                                        {record.receiptType ? `Số ${record.receiptType}` : 'Số BL/HĐ'}
+                                    </label>
                                     <p className="text-sm font-bold text-blue-800">{record.receiptNumber || '---'}</p>
                                 </div>
                             </div>
@@ -785,7 +787,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                                 <div className="bg-green-200 p-1.5 rounded text-green-700"><DollarSign size={16}/></div>
                                 <div>
                                     <label className="text-[10px] text-green-500 uppercase font-bold block">
-                                        {record.returnedPrice !== undefined && record.returnedPrice !== null ? 'Số tiền thực tế thu' : (record.recordType === 'Cung cấp tài liệu đất đai' ? 'Giá trị hồ sơ' : 'Giá trị hợp đồng')}
+                                        Số Tiền
                                     </label>
                                     <p className="text-sm font-bold text-green-800">
                                         {record.returnedPrice !== undefined && record.returnedPrice !== null
@@ -797,6 +799,16 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                                 </div>
                             </div>
                         </div>
+
+                        {record.receiverName && (
+                            <div className="mt-3 bg-purple-50 p-3 rounded-lg border border-purple-100 flex items-center gap-3">
+                                <div className="bg-purple-200 p-1.5 rounded text-purple-700"><UserIcon size={16}/></div>
+                                <div>
+                                    <label className="text-[10px] text-purple-600 uppercase font-bold block">Người nhận kết quả</label>
+                                    <p className="text-sm font-bold text-purple-900">{record.receiverName}</p>
+                                </div>
+                            </div>
+                        )}
                         
                         {/* LIÊN KẾT HỢP ĐỒNG */}
                         {record && record.recordType && (getShortRecordType(record.recordType).startsWith('2.3') || getShortRecordType(record.recordType).startsWith('2.4')) && (

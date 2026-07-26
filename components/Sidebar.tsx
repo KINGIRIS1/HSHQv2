@@ -146,8 +146,8 @@ const Sidebar: React.FC<SidebarProps> = ({
       `}>
         {/* BRAND HEADER */}
         <div className="h-14 flex items-center justify-center border-b border-slate-800 bg-slate-900/50 shrink-0 relative group">
-             <div className="bg-blue-600 p-2 rounded-lg shadow-blue-500/20 shrink-0 cursor-pointer">
-                <ShieldCheck size={20} className="text-white" />
+             <div className="w-9 h-9 rounded-full bg-white p-0.5 flex items-center justify-center shrink-0 shadow-sm ring-1 ring-white/30 cursor-pointer">
+                <img src="/icon.png?v=4" alt="Logo Hớn Quản" className="w-full h-full object-contain rounded-full" />
              </div>
              {/* Hover Tooltip for Brand */}
              <div className="absolute left-full top-2 ml-2 bg-slate-800 text-white px-3 py-2 rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50 border border-slate-700">

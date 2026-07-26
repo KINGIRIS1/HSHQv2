@@ -6,12 +6,12 @@ import { confirmAction } from '../../utils/appHelpers';
 
 interface ContractFormProps {
   initialData?: Contract;
-  onSave: (contract: Contract, isUpdate: boolean) => Promise<string | null>;
+  onSave: (contract: Contract & { isManualCode?: boolean }, isUpdate: boolean) => Promise<string | null>;
   onPrint: (data: Partial<Contract>, type: 'contract' | 'liquidation') => void;
   priceList: PriceItem[];
   wards: string[];
   records: RecordFile[];
-  generateCode: (contractType?: string) => Promise<string>;
+  generateCode: (contractType?: string, customYear?: number) => Promise<string>;
   mode: 'contract' | 'liquidation'; // New prop
   contracts?: Contract[];
 }
@@ -46,6 +46,8 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
     liquidationArea: 0, liquidationAmount: 0 // Init
   });
 
+  const [isManual, setIsManual] = useState<boolean>(false);
+
   useEffect(() => {
       if (initialData) {
           setFormData({
@@ -78,12 +80,7 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
           setTachThuaItems([]);
           setDoDacItems([]);
           setActiveTab('dd');
-          
-          const fetchCode = async () => {
-              const code = await generateCode('Đo đạc');
-              setFormData(prev => ({ ...prev, code }));
-          };
-          fetchCode();
+          setIsManual(false);
       }
   }, [initialData, mode]);
 
@@ -120,7 +117,7 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
       }
   }, [notification]);
 
-  // Tab change logic
+  // Tab change state initialization
   useEffect(() => {
       const typeMap: Record<string, any> = { 'dd': 'Đo đạc', 'tt': 'Tách thửa', 'cm': 'Cắm mốc', 'tl': 'Trích lục' };
       const currentType = typeMap[activeTab];
@@ -129,18 +126,24 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
           return { ...prev, contractType: currentType };
       });
       if (activeTab === 'tt' && tachThuaItems.length === 0) setTachThuaItems([{ serviceName: '', quantity: 1, price: 0, area: undefined }]); // Initialize area as undefined
+  }, [activeTab]);
 
-      if (!initialData) {
-          const fetchCode = async () => {
-              const code = await generateCode(currentType);
-              setFormData(prev => {
-                  if (prev.code === code) return prev;
-                  return { ...prev, code };
-              });
-          };
-          fetchCode();
-      }
-  }, [activeTab, initialData]);
+  // Unified automatic code preview generation based on tab & date
+  useEffect(() => {
+      if (initialData || isManual) return;
+      const typeMap: Record<string, any> = { 'dd': 'Đo đạc', 'tt': 'Tách thửa', 'cm': 'Cắm mốc', 'tl': 'Trích lục' };
+      const currentType = typeMap[activeTab];
+      
+      const fetchCode = async () => {
+          const dateYear = formData.createdDate ? new Date(formData.createdDate).getFullYear() : new Date().getFullYear();
+          const code = await generateCode(currentType, dateYear);
+          setFormData(prev => {
+              if (prev.code === code) return prev;
+              return { ...prev, code };
+          });
+      };
+      fetchCode();
+  }, [activeTab, formData.createdDate, isManual, initialData]);
 
   // Init Liquidation Data if missing (Fallback logic)
   useEffect(() => {
@@ -220,6 +223,61 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
       }
       return '';
   }, [formData.serviceType, formData.area, activeTab, priceList, derivedAreaType]);
+
+  // Tự động nhảy loại dịch vụ theo khu vực và diện tích
+  useEffect(() => {
+      if (activeTab === 'dd') {
+          const area = formData.area || 0;
+          const currentAreaType = derivedAreaType;
+
+          if (area > 0) {
+              const matchedPriceItems = priceList.filter(row => {
+                  const nameLower = _nd(row.serviceName);
+                  const isMatchTab = !nameLower.includes('tach thua') && 
+                                     !nameLower.includes('cam moc') && 
+                                     !nameLower.includes('trich luc');
+                  const isMatchArea = area >= row.minArea && area < row.maxArea;
+                  const isMatchAreaType = !row.areaType || !currentAreaType || _nd(row.areaType) === _nd(currentAreaType);
+                  return isMatchTab && isMatchArea && isMatchAreaType;
+              });
+
+              if (matchedPriceItems.length > 0) {
+                  const preferredService = matchedPriceItems.find(row => {
+                      const nameNorm = _nd(row.serviceName);
+                      return nameNorm.includes('chinh ly') || nameNorm.includes('chinh ly ban do');
+                  }) || matchedPriceItems[0];
+                  
+                  setFormData(prev => {
+                      if (prev.serviceType === preferredService.serviceName) return prev;
+                      return {
+                          ...prev,
+                          serviceType: preferredService.serviceName
+                      };
+                  });
+              }
+          }
+      } else if (activeTab === 'tl') {
+          const match = priceList.find(p => p.serviceName.toLowerCase().includes('trích lục'));
+          const target = match ? match.serviceName : 'Trích lục bản đồ địa chính';
+          setFormData(prev => {
+              if (prev.serviceType === target) return prev;
+              return { ...prev, serviceType: target };
+          });
+      } else if (activeTab === 'cm') {
+          const match = priceList.find(p => p.serviceName.toLowerCase().includes('cắm mốc'));
+          const target = match ? match.serviceName : 'Cắm mốc ranh giới';
+          setFormData(prev => {
+              if (prev.serviceType === target) return prev;
+              return { ...prev, serviceType: target };
+          });
+      } else if (activeTab === 'tt') {
+          const target = 'Đo đạc tách thửa';
+          setFormData(prev => {
+              if (prev.serviceType === target) return prev;
+              return { ...prev, serviceType: target };
+          });
+      }
+  }, [formData.area, derivedAreaType, activeTab, priceList]);
 
   // Derived Pricing details computed purely from state without inducing state-change cascades
   const derivedPricing = useMemo(() => {
@@ -479,8 +537,9 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
           vatRate: derivedPricing.vatRate,
           vatAmount: derivedPricing.vatAmount,
           totalAmount: derivedPricing.totalAmount,
-          liquidationAmount: mode === 'liquidation' ? derivedPricing.totalAmount : (formData.liquidationAmount || derivedPricing.totalAmount)
-      } as Contract;
+          liquidationAmount: mode === 'liquidation' ? derivedPricing.totalAmount : (formData.liquidationAmount || derivedPricing.totalAmount),
+          isManualCode: isManual
+      } as Contract & { isManualCode?: boolean };
       
       // Đảm bảo không bị null
       if (!contractData.id) contractData.id = Math.random().toString(36).substr(2, 9);
@@ -734,10 +793,28 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
                     {/* Basic Info */}
                     <div className="grid grid-cols-2 gap-6 p-4 bg-slate-50 rounded-xl border border-slate-200">
                         <div>
-                            <label className={labelClass}>Mã Hợp Đồng</label>
+                            <div className="flex justify-between items-center mb-1">
+                                <label className={labelClass}>Mã Hợp Đồng</label>
+                                {!initialData && (
+                                    <button 
+                                        type="button" 
+                                        onClick={() => setIsManual(!isManual)} 
+                                        className={`text-xs font-bold px-2 py-0.5 rounded-md transition-all ${isManual ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' : 'bg-purple-100 text-purple-700 hover:bg-purple-200'}`}
+                                    >
+                                        {isManual ? '🔓 Tự nhập' : '🔒 Tự động'}
+                                    </button>
+                                )}
+                            </div>
                             <div className="relative">
                                 <FileText size={16} className="absolute left-3 top-3 text-slate-400" />
-                                <input type="text" readOnly className={`${inputClass} bg-white pl-9 font-mono font-bold text-purple-700`} value={formData.code ?? ''} />
+                                <input 
+                                    type="text" 
+                                    readOnly={initialData ? true : !isManual} 
+                                    className={`${inputClass} pl-9 font-mono font-bold text-purple-700 ${(!initialData && isManual) ? 'bg-amber-50/50 border-amber-300 focus:border-amber-500 focus:ring-amber-200' : 'bg-white'}`} 
+                                    value={formData.code ?? ''} 
+                                    onChange={e => isManual && handleChange('code', e.target.value)}
+                                    placeholder="Nhập mã hợp đồng..."
+                                />
                             </div>
                         </div>
                         <div>

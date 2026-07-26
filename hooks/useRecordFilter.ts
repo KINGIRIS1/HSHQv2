@@ -36,6 +36,8 @@ export const useRecordFilter = (
     const [filterAssignedDate, setFilterAssignedDate] = useState('');
     const [filterFromDate, setFilterFromDate] = useState('');
     const [filterToDate, setFilterToDate] = useState('');
+    const [filterAssignedFromDate, setFilterAssignedFromDate] = useState('');
+    const [filterAssignedToDate, setFilterAssignedToDate] = useState('');
     const [showAdvancedDateFilter, setShowAdvancedDateFilter] = useState(false);
     
     const [filterWard, setFilterWard] = useState('all');
@@ -60,7 +62,7 @@ export const useRecordFilter = (
         if (currentPage !== 1) {
             setCurrentPage(1);
         }
-    }, [currentView, sortConfig, warningFilter, filterWard, filterRecordType, filterStatus, filterEmployee, filterSpecificDate, filterAssignedDate, filterFromDate, filterToDate, handoverTab, searchTerm]);
+    }, [currentView, sortConfig, warningFilter, filterWard, filterRecordType, filterStatus, filterEmployee, filterSpecificDate, filterAssignedDate, filterFromDate, filterToDate, filterAssignedFromDate, filterAssignedToDate, handoverTab, searchTerm]);
 
     // --- WARNING CHECK LOGIC ---
     const checkWarningPermission = (r: RecordFile) => {
@@ -187,6 +189,9 @@ export const useRecordFilter = (
                     !['CMD', 'Tòa án', 'Thi hành án'].includes(shortType)
                 );
             });
+            if (filterRecordType !== 'all') {
+                result = result.filter(r => getShortRecordType(r.recordType) === filterRecordType || r.recordType === filterRecordType);
+            }
         }
 
         // Search Term (Sử dụng searchTerm đã được tách theo view)
@@ -218,22 +223,28 @@ export const useRecordFilter = (
         }
 
         // Date Filters (General for other views)
-        if (currentView !== 'handover_list') {
+        if (currentView !== 'handover_list' && currentView !== 'other_handover_list' && currentView !== 'archive_handover_list') {
             if (filterSpecificDate) {
                 result = result.filter(r => r.receivedDate && r.receivedDate.startsWith(filterSpecificDate));
-            } else if (showAdvancedDateFilter) {
-                if (filterFromDate || filterToDate) {
-                    result = result.filter(r => {
-                        if (!r.receivedDate) return false;
-                        const rDateOnly = r.receivedDate.split('T')[0];
-                        if (filterFromDate && rDateOnly < filterFromDate) return false;
-                        if (filterToDate && rDateOnly > filterToDate) return false;
-                        return true;
-                    });
-                }
+            } else if (filterFromDate || filterToDate) {
+                result = result.filter(r => {
+                    if (!r.receivedDate) return false;
+                    const rDateOnly = r.receivedDate.split('T')[0];
+                    if (filterFromDate && rDateOnly < filterFromDate) return false;
+                    if (filterToDate && rDateOnly > filterToDate) return false;
+                    return true;
+                });
             }
             
-            if (filterAssignedDate) {
+            if (filterAssignedFromDate || filterAssignedToDate) {
+                result = result.filter(r => {
+                    if (!r.assignedDate) return false;
+                    const aDateOnly = r.assignedDate.split('T')[0];
+                    if (filterAssignedFromDate && aDateOnly < filterAssignedFromDate) return false;
+                    if (filterAssignedToDate && aDateOnly > filterAssignedToDate) return false;
+                    return true;
+                });
+            } else if (filterAssignedDate) {
                 result = result.filter(r => r.assignedDate && r.assignedDate.startsWith(filterAssignedDate));
             }
         }
@@ -303,6 +314,8 @@ export const useRecordFilter = (
         filterAssignedDate, setFilterAssignedDate,
         filterFromDate, setFilterFromDate,
         filterToDate, setFilterToDate,
+        filterAssignedFromDate, setFilterAssignedFromDate,
+        filterAssignedToDate, setFilterAssignedToDate,
         showAdvancedDateFilter, setShowAdvancedDateFilter,
         filterWard, setFilterWard,
         filterRecordType, setFilterRecordType,

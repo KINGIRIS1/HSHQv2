@@ -125,9 +125,12 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
 
         const typeMapping: Record<string, string> = {
             'TL': 'Trích lục bản đồ địa chính', 'TRÍCH LỤC': 'Trích lục bản đồ địa chính',
-            'TĐ': 'Trích đo bản đồ địa chính', 'TRÍCH ĐO': 'Trích đo bản đồ địa chính',
-            'ĐĐ': 'Đo đạc', 'ĐO ĐẠC': 'Đo đạc', 'CM': 'Cắm mốc', 'CẮM MỐC': 'Cắm mốc',
-            'CL': 'Trích đo chỉnh lý bản đồ địa chính', 'CHỈNH LÝ': 'Trích đo chỉnh lý bản đồ địa chính'
+            'TĐ': 'Trích đo bản đồ địa chính', 'TD': 'Trích đo bản đồ địa chính', 'TRÍCH ĐO': 'Trích đo bản đồ địa chính',
+            'ĐĐ': 'Đo đạc', 'DD': 'Đo đạc', 'ĐO ĐẠC': 'Đo đạc',
+            'CM': 'Cắm mốc', 'CẮM MỐC': 'Cắm mốc',
+            'CL': 'Trích đo chỉnh lý bản đồ địa chính', 'CHỈNH LÝ': 'Trích đo chỉnh lý bản đồ địa chính',
+            'HIẾN ĐƯỜNG': 'Trích đo chỉnh lý bản đồ địa chính',
+            'TÁCH THỬA': 'Tách thửa', 'HỢP THỬA': 'Trích đo bản đồ địa chính', 'CẤP ĐỔI': 'Trích đo bản đồ địa chính'
         };
 
         for (let i = headerRowIndex + 1; i < data.length; i++) {
