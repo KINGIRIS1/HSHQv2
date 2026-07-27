@@ -433,60 +433,63 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
 
 
   return (
-    <div className="fixed inset-0 bg-white z-[60] flex flex-col animate-slide-in-right">
-      {/* Header */}
-      <div className="bg-white border-b border-slate-100 px-3 sm:px-6 py-3 sticky top-0 z-10">
-        <div className="max-w-5xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3 min-w-0">
-            <button onClick={onClose} className="p-1 -ml-1 text-slate-500 active:bg-slate-100 rounded-full transition-colors shrink-0">
-              <ChevronLeft size={24} />
-            </button>
-            <div className="min-w-0">
-              <h2 className="font-bold text-slate-800 text-sm sm:text-base truncate max-w-[220px] sm:max-w-md">{record.customerName}</h2>
-              <p className="text-[10px] sm:text-xs text-slate-400 font-mono">{record.code}</p>
+    <div className="fixed inset-0 bg-white z-[60] flex flex-col animate-slide-in-right pt-[env(safe-area-inset-top,0px)]">
+      {/* Sticky Header & Navigation Tabs */}
+      <div className="sticky top-0 z-10 bg-white border-b border-slate-100 shadow-xs">
+        {/* Title bar */}
+        <div className="px-3 sm:px-6 py-3">
+          <div className="max-w-5xl mx-auto flex items-center justify-between">
+            <div className="flex items-center gap-3 min-w-0">
+              <button onClick={onClose} className="p-1.5 -ml-1 text-slate-600 active:bg-slate-100 rounded-full transition-colors shrink-0 cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center">
+                <ChevronLeft size={24} />
+              </button>
+              <div className="min-w-0">
+                <h2 className="font-bold text-slate-800 text-sm sm:text-base truncate max-w-[220px] sm:max-w-md">{record.customerName}</h2>
+                <p className="text-[10px] sm:text-xs text-slate-400 font-mono">{record.code}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-1 shrink-0">
+              {canPerformAction && onEdit && (
+                <button onClick={() => { onClose(); onEdit(record); }} className="p-2 text-slate-500 hover:text-blue-600 active:bg-slate-100 rounded-xl transition-colors cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center">
+                  <Pencil size={20} />
+                </button>
+              )}
+              {canPerformAction && onDelete && (currentUser?.role === 'ADMIN' || currentUser?.role === 'SUBADMIN') && (
+                <button onClick={() => { onClose(); onDelete(record); }} className="p-2 text-slate-500 hover:text-red-600 active:bg-slate-100 rounded-xl transition-colors cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center">
+                  <Trash2 size={20} />
+                </button>
+              )}
             </div>
           </div>
-          <div className="flex items-center gap-1 shrink-0">
-            {canPerformAction && onEdit && (
-              <button onClick={() => { onClose(); onEdit(record); }} className="p-2 text-slate-400 hover:text-blue-600 active:bg-slate-100 rounded-lg transition-colors">
-                <Pencil size={20} />
-              </button>
-            )}
-            {canPerformAction && onDelete && (currentUser?.role === 'ADMIN' || currentUser?.role === 'SUBADMIN') && (
-              <button onClick={() => { onClose(); onDelete(record); }} className="p-2 text-slate-400 hover:text-red-600 active:bg-slate-100 rounded-lg transition-colors">
-                <Trash2 size={20} />
-              </button>
-            )}
-          </div>
         </div>
-      </div>
 
-      {/* Tabs */}
-      <div className="border-b border-slate-100 bg-white sticky top-[53px] z-10">
-        <div className="max-w-5xl mx-auto flex">
-          <button 
-            onClick={() => setActiveTab('info')}
-            className={`flex-1 py-3 text-xs sm:text-sm font-bold transition-all border-b-2 ${activeTab === 'info' ? 'text-blue-600 border-blue-600' : 'text-slate-400 border-transparent'}`}
-          >
-            Thông tin chi tiết
-          </button>
-          <button 
-            onClick={() => setActiveTab('timeline')}
-            className={`flex-1 py-3 text-xs sm:text-sm font-bold transition-all border-b-2 ${activeTab === 'timeline' ? 'text-blue-600 border-blue-600' : 'text-slate-400 border-transparent'}`}
-          >
-            Tiến độ & Nhật ký
-          </button>
-          <button 
-            onClick={() => setActiveTab('notes')}
-            className={`flex-1 py-3 text-xs sm:text-sm font-bold transition-all border-b-2 ${activeTab === 'notes' ? 'text-blue-600 border-blue-600' : 'text-slate-400 border-transparent'}`}
-          >
-            Ghi chú
-          </button>
+        {/* Tab navigation */}
+        <div className="border-t border-slate-100 bg-white">
+          <div className="max-w-5xl mx-auto flex">
+            <button 
+              onClick={() => setActiveTab('info')}
+              className={`flex-1 py-3 text-xs sm:text-sm font-bold transition-all border-b-2 cursor-pointer min-h-[44px] ${activeTab === 'info' ? 'text-blue-600 border-blue-600' : 'text-slate-400 border-transparent'}`}
+            >
+              Thông tin chi tiết
+            </button>
+            <button 
+              onClick={() => setActiveTab('timeline')}
+              className={`flex-1 py-3 text-xs sm:text-sm font-bold transition-all border-b-2 cursor-pointer min-h-[44px] ${activeTab === 'timeline' ? 'text-blue-600 border-blue-600' : 'text-slate-400 border-transparent'}`}
+            >
+              Tiến độ & Nhật ký
+            </button>
+            <button 
+              onClick={() => setActiveTab('notes')}
+              className={`flex-1 py-3 text-xs sm:text-sm font-bold transition-all border-b-2 cursor-pointer min-h-[44px] ${activeTab === 'notes' ? 'text-blue-600 border-blue-600' : 'text-slate-400 border-transparent'}`}
+            >
+              Ghi chú
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto bg-slate-50 pb-24">
+      <div className="flex-1 overflow-y-auto bg-slate-50 pb-[calc(2rem+env(safe-area-inset-bottom,0px))]">
         <div className="max-w-5xl mx-auto p-3 sm:p-6">
           {activeTab === 'info' && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
