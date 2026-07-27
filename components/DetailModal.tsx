@@ -794,7 +794,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                                     </div>
                                 )}
 
-                                {onCreateContract && (
+                                {onCreateContract && !matchedContract && (
                                     <button 
                                         onClick={() => {
                                             onCreateContract(record);
@@ -802,7 +802,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                                         }}
                                         className="inline-flex items-center gap-1 text-xs font-bold bg-indigo-600 text-white hover:bg-indigo-700 px-3 py-1.5 rounded-lg transition-colors shadow-sm whitespace-nowrap ml-auto"
                                     >
-                                        {matchedContract ? 'Xem chi tiết HĐ' : 'Lập Hợp đồng mới'}
+                                        Lập Hợp đồng mới
                                     </button>
                                 )}
                             </div>

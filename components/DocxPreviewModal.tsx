@@ -141,31 +141,34 @@ const DocxPreviewModal: React.FC<DocxPreviewModalProps> = ({ isOpen, onClose, do
     <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-[100] p-4 backdrop-blur-sm">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl h-[95vh] flex flex-col relative overflow-hidden">
         {/* Header */}
-        <div className="flex justify-between items-center p-4 border-b bg-gray-50 shrink-0">
+        <div className="flex justify-between items-center px-5 py-3 border-b bg-gray-50 shrink-0">
           <div>
-            <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-              Xem trước: <span className="text-blue-600 truncate max-w-[260px]">{fileName}</span>
+            <h2 className="text-base md:text-lg font-bold text-gray-800 flex items-center gap-1.5">
+              <span>Xem trước:</span>
+              <span className="text-blue-600 font-bold truncate max-w-[320px] md:max-w-[450px]" title={fileName}>
+                {fileName.endsWith('.docx') ? fileName : `${fileName}.docx`}
+              </span>
             </h2>
           </div>
 
           <div className="flex items-center gap-2">
             <button
               onClick={handleDownload}
-              className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 font-medium text-sm transition-colors"
+              className="flex items-center gap-2 px-3.5 py-1.5 bg-white border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium text-sm transition-colors shadow-sm"
             >
-              <Download size={18} /> Tải về
+              <Download size={16} /> Tải về
             </button>
             <button
               onClick={handlePrint}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold text-sm transition-colors shadow-sm"
+              className="flex items-center gap-2 px-4 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold text-sm transition-colors shadow-md"
             >
-              <Printer size={18} /> In ngay
+              <Printer size={16} /> In ngay
             </button>
             <button
               onClick={onClose}
-              className="p-2 hover:bg-red-100 rounded-full text-gray-500 hover:text-red-600 transition-colors"
+              className="p-1.5 hover:bg-red-50 rounded-lg text-gray-500 hover:text-red-600 transition-colors ml-1"
             >
-              <X size={24} />
+              <X size={20} />
             </button>
           </div>
         </div>

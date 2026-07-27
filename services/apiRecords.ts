@@ -32,8 +32,8 @@ const OPTIONAL_NEW_COLUMNS = [
 
 export const fetchRecords = async (): Promise<RecordFile[]> => {
   if (!isConfigured) {
-      console.warn("Supabase chưa được cấu hình. Đang dùng dữ liệu Cache/Mock.");
-      return getFromCache(CACHE_KEYS.RECORDS, MOCK_RECORDS);
+      console.warn("Supabase chưa được cấu hình.");
+      return [];
   }
 
   try {
@@ -82,12 +82,11 @@ export const fetchRecords = async (): Promise<RecordFile[]> => {
     const uniqueRecords = Array.from(uniqueMap.values());
     
     console.log(`[Fetch] Total fetched: ${uniqueRecords.length}`);
-    saveToCache(CACHE_KEYS.RECORDS, uniqueRecords);
     return uniqueRecords as RecordFile[];
 
   } catch (error) {
     logError("fetchRecords", error);
-    return getFromCache(CACHE_KEYS.RECORDS, MOCK_RECORDS);
+    return [];
   }
 };
 

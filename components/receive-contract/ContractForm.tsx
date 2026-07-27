@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Contract, PriceItem, SplitItem, RecordFile } from '../../types';
-import { Save, Calculator, Search, Plus, Trash2, Printer, FileCheck, CheckCircle, AlertCircle, X, RotateCcw, MapPin, Ruler, Grid, Banknote, User, FileText, Calendar, Wand2, ChevronDown, ChevronUp, Copy, ExternalLink } from 'lucide-react';
+import { Save, Calculator, Search, Plus, Trash2, Printer, FileCheck, CheckCircle, AlertCircle, X, RotateCcw, MapPin, Ruler, Grid, Banknote, User, FileText, Calendar, Wand2, ChevronDown, ChevronUp, Copy, ExternalLink, RefreshCw } from 'lucide-react';
 import { confirmAction } from '../../utils/appHelpers';
 
 interface ContractFormProps {
@@ -14,13 +14,14 @@ interface ContractFormProps {
   generateCode: (contractType?: string, customYear?: number) => Promise<string>;
   mode: 'contract' | 'liquidation'; // New prop
   contracts?: Contract[];
+  onOpenGetNumberModal?: () => void;
 }
 
 function _nd(s: string | undefined | null): string {
     return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim();
 }
 
-const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrint, priceList, wards, records, generateCode, mode, contracts }) => {
+const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrint, priceList, wards, records, generateCode, mode, contracts, onOpenGetNumberModal }) => {
   const [activeTab, setActiveTab] = useState<'dd' | 'tt' | 'cm' | 'tl'>('dd');
   const [tachThuaItems, setTachThuaItems] = useState<SplitItem[]>([]);
   const [searchCode, setSearchCode] = useState('');
@@ -130,9 +131,11 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
 
   // Unified automatic code preview generation based on tab & date
   useEffect(() => {
-      if (initialData || isManual) return;
+      if (mode === 'liquidation') return; // Không tự lấy số mới ở tab thanh lý hợp đồng
+      const isExistingContract = initialData && contracts && contracts.some(c => c.id === initialData.id);
+      if (isExistingContract || isManual) return;
       const typeMap: Record<string, any> = { 'dd': 'Đo đạc', 'tt': 'Tách thửa', 'cm': 'Cắm mốc', 'tl': 'Trích lục' };
-      const currentType = typeMap[activeTab];
+      const currentType = typeMap[activeTab] || 'Đo đạc';
       
       const fetchCode = async () => {
           const dateYear = formData.createdDate ? new Date(formData.createdDate).getFullYear() : new Date().getFullYear();
@@ -143,14 +146,14 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
           });
       };
       fetchCode();
-  }, [activeTab, formData.createdDate, isManual, initialData]);
+  }, [activeTab, formData.createdDate, isManual, initialData, contracts, generateCode, mode]);
 
   // Init Liquidation Data if missing (Fallback logic)
   useEffect(() => {
       if (mode === 'liquidation') {
           // Khi vào mode liquidation, nếu chưa có diện tích thanh lý thì lấy diện tích hợp đồng
           setFormData(prev => {
-              const targetVal = prev.liquidationArea || prev.area;
+              const targetVal = (prev.liquidationArea !== undefined && prev.liquidationArea !== null && prev.liquidationArea > 0) ? prev.liquidationArea : prev.area;
               if (prev.liquidationArea === targetVal) return prev;
               return { 
                   ...prev, 
@@ -158,7 +161,19 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
               };
           });
       }
-  }, [mode]);
+  }, [mode, formData.area]);
+
+  // Tính diện tích có hiệu lực để xác định loại dịch vụ & đơn giá
+  // Tab Hợp đồng -> lấy Diện tích Hợp đồng (area)
+  // Tab Thanh lý -> lấy Diện tích Thanh lý thực tế (liquidationArea)
+  const effectiveArea = useMemo(() => {
+      if (mode === 'liquidation') {
+          if (formData.liquidationArea !== undefined && formData.liquidationArea !== null && !isNaN(formData.liquidationArea)) {
+              return formData.liquidationArea;
+          }
+      }
+      return formData.area || 0;
+  }, [mode, formData.liquidationArea, formData.area]);
 
   const isUrbanWard = useCallback((wardName: string) => {
       if (!wardName) return false;
@@ -198,10 +213,10 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
 
   // Derived ServiceType based on area when activeTab is 'dd'
   const derivedServiceType = useMemo(() => {
-      if (formData.serviceType) return formData.serviceType;
+      if (formData.serviceType && mode !== 'liquidation') return formData.serviceType;
 
-      if (activeTab === 'dd' && formData.area && formData.area > 0) {
-          const area = formData.area;
+      if (activeTab === 'dd' && effectiveArea > 0) {
+          const area = effectiveArea;
           const currentAreaType = derivedAreaType;
 
           // Lọc danh sách dịch vụ đo đạc phù hợp với diện tích và khu vực
@@ -210,7 +225,7 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
               const isMatchTab = !nameLower.includes('tach thua') && 
                                  !nameLower.includes('cam moc') && 
                                  !nameLower.includes('trich luc');
-              const isMatchArea = area >= row.minArea && area < row.maxArea;
+              const isMatchArea = area >= row.minArea && (row.maxArea === 0 || row.maxArea === undefined || area <= row.maxArea);
               const isMatchAreaType = !row.areaType || !currentAreaType || _nd(row.areaType) === _nd(currentAreaType);
               return isMatchTab && isMatchArea && isMatchAreaType;
           });
@@ -225,12 +240,12 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
           }
       }
       return '';
-  }, [formData.serviceType, formData.area, activeTab, priceList, derivedAreaType]);
+  }, [formData.serviceType, effectiveArea, activeTab, priceList, derivedAreaType, mode]);
 
   // Tự động nhảy loại dịch vụ theo khu vực và diện tích
   useEffect(() => {
       if (activeTab === 'dd') {
-          const area = formData.area || 0;
+          const area = effectiveArea;
           const currentAreaType = derivedAreaType;
 
           if (area > 0) {
@@ -239,7 +254,7 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
                   const isMatchTab = !nameLower.includes('tach thua') && 
                                      !nameLower.includes('cam moc') && 
                                      !nameLower.includes('trich luc');
-                  const isMatchArea = area >= row.minArea && area < row.maxArea;
+                  const isMatchArea = area >= row.minArea && (row.maxArea === 0 || row.maxArea === undefined || area <= row.maxArea);
                   const isMatchAreaType = !row.areaType || !currentAreaType || _nd(row.areaType) === _nd(currentAreaType);
                   return isMatchTab && isMatchArea && isMatchAreaType;
               });
@@ -280,7 +295,7 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
               return { ...prev, serviceType: target };
           });
       }
-  }, [formData.area, derivedAreaType, activeTab, priceList]);
+  }, [effectiveArea, derivedAreaType, activeTab, priceList]);
 
   // Derived Pricing details computed purely from state without inducing state-change cascades
   const derivedPricing = useMemo(() => {
@@ -614,7 +629,9 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
       const d = new Date();
       const todayStrLocal = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       
-      const newCode = await generateCode();
+      const typeMap: Record<string, any> = { 'dd': 'Đo đạc', 'tt': 'Tách thửa', 'cm': 'Cắm mốc', 'tl': 'Trích lục' };
+      const currentType = typeMap[activeTab] || 'Đo đạc';
+      const newCode = await generateCode(currentType, d.getFullYear());
       setFormData({
         code: newCode, customerName: '', phoneNumber: '', address: '', ward: '', landPlot: '', mapSheet: '', area: 0,
         contractType: activeTab === 'tt' ? 'Tách thửa' : activeTab === 'cm' ? 'Cắm mốc' : activeTab === 'tl' ? 'Trích lục' : 'Đo đạc', 
@@ -732,18 +749,20 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
                         <div><label className={labelClass}>Tờ bản đồ</label><input className={`${inputClass} text-center`} value={formData.mapSheet ?? ''} onChange={e => handleChange('mapSheet', e.target.value)} /></div>
                         <div><label className={labelClass}>Thửa đất</label><input className={`${inputClass} text-center`} value={formData.landPlot ?? ''} onChange={e => handleChange('landPlot', e.target.value)} /></div>
                     </div>
-                    <div>
-                        <label className={labelClass}>Diện tích Hợp Đồng (m2)</label>
-                        <input 
-                            type="number" 
-                            className={`${inputClass} font-bold text-blue-600`} 
-                            value={formData.area === undefined || formData.area === null || isNaN(formData.area) ? '' : formData.area} 
-                            onChange={e => {
-                                const val = parseFloat(e.target.value);
-                                handleChange('area', isNaN(val) ? undefined : val);
-                            }} 
-                        />
-                    </div>
+                    {!isLiquidationMode && (
+                        <div>
+                            <label className={labelClass}>Diện tích Hợp Đồng (m2)</label>
+                            <input 
+                                type="number" 
+                                className={`${inputClass} font-bold text-blue-600`} 
+                                value={formData.area === undefined || formData.area === null || isNaN(formData.area) ? '' : formData.area} 
+                                onChange={e => {
+                                    const val = parseFloat(e.target.value);
+                                    handleChange('area', isNaN(val) ? undefined : val);
+                                }} 
+                            />
+                        </div>
+                    )}
                     
                     {/* LIQUIDATION AREA FIELD - ONLY IN LIQUIDATION MODE */}
                     {isLiquidationMode && (
@@ -798,10 +817,10 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
                 </div>
             </div>
 
-            {/* GHI CHÚ HỢP ĐỒNG (XEM ẢNH YÊU CẦU - ĐẶT DƯỚI THÊM THỬA ĐẤT KHÁC) */}
+            {/* GHI CHÚ HỢP ĐỒNG HOẶC THANH LÝ */}
             <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm space-y-2">
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide">
-                    GHI CHÚ HỢP ĐỒNG
+                    {mode === 'liquidation' ? 'GHI CHÚ THANH LÝ HỢP ĐỒNG' : 'GHI CHÚ HỢP ĐỒNG'}
                 </label>
                 <textarea 
                     rows={3} 
@@ -816,60 +835,46 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
         {/* CỘT PHẢI: CHI TIẾT HỢP ĐỒNG */}
         <div className="lg:col-span-8 space-y-3.5">
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                {/* AUTOMATIC CONTRACT / LIQUIDATION TYPE HEADER (REPLACED MANUAL TAB SELECTOR) */}
-                <div className="px-3.5 py-2.5 bg-purple-50/80 border-b border-purple-100 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <span className="p-1 bg-purple-100 text-purple-700 rounded-md">
-                            {activeTab === 'cm' ? <MapPin size={15} /> : <Ruler size={15} />}
-                        </span>
-                        <span className="text-xs font-bold uppercase text-slate-700 tracking-wide">
-                            {isLiquidationMode ? 'Loại Thanh Lý: ' : 'Loại Hợp Đồng: '}
-                            <span className="text-purple-700 font-extrabold ml-1">
-                                {activeTab === 'cm' 
-                                    ? (isLiquidationMode ? 'Thanh Lý Cắm Mốc' : 'Hợp Đồng Cắm Mốc') 
-                                    : activeTab === 'tl'
-                                    ? (isLiquidationMode ? 'Thanh Lý Trích Lục' : 'Hợp Đồng Trích Lục')
-                                    : activeTab === 'tt'
-                                    ? (isLiquidationMode ? 'Thanh Lý Tách Thửa' : 'Hợp Đồng Tách Thửa')
-                                    : (isLiquidationMode ? 'Thanh Lý Đo Đạc' : 'Hợp Đồng Đo Đạc')}
-                            </span>
-                        </span>
-                    </div>
-                    <span className="text-[10px] font-semibold text-slate-500 italic bg-white px-2 py-0.5 rounded-md border border-slate-200 shadow-2xs">
-                        * Tự động xác định theo mã và thủ tục hồ sơ
-                    </span>
-                </div>
-
                 <div className="p-3.5 space-y-3.5">
                     {/* Basic Info */}
-                    <div className="grid grid-cols-2 gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
-                        <div>
-                            <div className="flex justify-between items-center mb-1">
-                                <label className={labelClass}>Mã Hợp Đồng</label>
-                                {!initialData && (
-                                    <button 
-                                        type="button" 
-                                        onClick={() => setIsManual(!isManual)} 
-                                        className={`text-xs font-bold px-2 py-0.5 rounded-md transition-all ${isManual ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' : 'bg-purple-100 text-purple-700 hover:bg-purple-200'}`}
-                                    >
-                                        {isManual ? '🔓 Tự nhập' : '🔒 Tự động'}
-                                    </button>
+                    <div className={`grid ${mode === 'liquidation' ? 'grid-cols-1' : 'grid-cols-2'} gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200`}>
+                        {mode !== 'liquidation' && (
+                            <div>
+                                <div className="flex justify-between items-center mb-1">
+                                    <label className={labelClass}>Mã Hợp Đồng</label>
+                                    <div className="flex items-center gap-1.5">
+                                        {(!initialData || (contracts && !contracts.some(c => c.id === initialData.id))) && (
+                                            <button 
+                                                type="button" 
+                                                onClick={() => setIsManual(!isManual)} 
+                                                className={`text-xs font-bold px-2 py-0.5 rounded-md transition-all ${isManual ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
+                                            >
+                                                {isManual ? '🔓 Tự nhập' : '🔒 Tự động'}
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                                <div className="relative">
+                                    <FileText size={16} className="absolute left-3 top-3 text-slate-400" />
+                                    <input 
+                                        type="text" 
+                                        readOnly={(initialData && contracts && contracts.some(c => c.id === initialData.id)) ? true : !isManual} 
+                                        className={`${inputClass} pl-9 font-mono font-bold text-purple-700 ${isManual ? 'bg-amber-50/50 border-amber-300 focus:border-amber-500 focus:ring-amber-200' : 'bg-slate-50'}`} 
+                                        value={formData.code ?? ''} 
+                                        onChange={e => isManual && handleChange('code', e.target.value)}
+                                        placeholder={isManual ? "Nhập mã hợp đồng..." : "Đang lấy số tự động..."}
+                                    />
+                                </div>
+                                {!isManual && (!initialData || (contracts && !contracts.some(c => c.id === initialData.id))) && (
+                                    <p className="text-[11px] text-blue-600 mt-1 flex items-center gap-1">
+                                        <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
+                                        Số hợp đồng chính thức sẽ tự động tăng &amp; chốt vào CSDL khi bấm <b>Lưu Hợp Đồng</b>.
+                                    </p>
                                 )}
                             </div>
-                            <div className="relative">
-                                <FileText size={16} className="absolute left-3 top-3 text-slate-400" />
-                                <input 
-                                    type="text" 
-                                    readOnly={initialData ? true : !isManual} 
-                                    className={`${inputClass} pl-9 font-mono font-bold text-purple-700 ${(!initialData && isManual) ? 'bg-amber-50/50 border-amber-300 focus:border-amber-500 focus:ring-amber-200' : 'bg-white'}`} 
-                                    value={formData.code ?? ''} 
-                                    onChange={e => isManual && handleChange('code', e.target.value)}
-                                    placeholder="Nhập mã hợp đồng..."
-                                />
-                            </div>
-                        </div>
+                        )}
                         <div>
-                            <label className={labelClass}>Ngày lập</label>
+                            <label className={labelClass}>{mode === 'liquidation' ? 'Ngày lập thanh lý' : 'Ngày lập'}</label>
                             <div className="relative">
                                 <Calendar size={16} className="absolute left-3 top-3 text-slate-400" />
                                 <input type="date" className={`${inputClass} pl-9`} value={dateVal(formData.createdDate)} onChange={e => handleChange('createdDate', e.target.value)} />
@@ -1229,23 +1234,23 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
             </div>
         </div>
 
-        {/* FLOATING STICKY ACTION BAR AT BOTTOM */}
-        <div className="lg:col-span-12 sticky bottom-2 z-30 bg-white/95 backdrop-blur-md p-3 rounded-2xl border border-slate-200 shadow-xl flex items-center gap-3 transition-all">
+        {/* ACTION BAR AT BOTTOM - COMPACT STYLE MATCHING RECORD FORM */}
+        <div className="lg:col-span-12 bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-end gap-2.5 transition-all mt-1">
             <button 
                 type="submit" 
                 disabled={loading} 
-                className={`flex-1 text-white py-3 px-4 rounded-xl font-bold text-base sm:text-lg shadow-lg transition-all active:scale-95 disabled:opacity-70 flex items-center justify-center gap-2 ${isLiquidationMode ? 'bg-orange-600 hover:bg-orange-700 shadow-orange-500/30' : 'bg-purple-600 hover:bg-purple-700 shadow-purple-500/30'}`}
+                className={`px-5 py-1.5 text-white rounded-lg font-bold text-xs shadow-md transition-all active:scale-95 disabled:opacity-70 flex items-center justify-center gap-1.5 ${isLiquidationMode ? 'bg-orange-600 hover:bg-orange-700 shadow-orange-500/20' : 'bg-purple-600 hover:bg-purple-700 shadow-purple-500/20'}`}
             >
-                <Save size={20} /> {loading ? 'Đang xử lý...' : (initialData ? (isLiquidationMode ? 'CẬP NHẬT VÀ IN THANH LÝ' : 'CẬP NHẬT VÀ IN HỢP ĐỒNG') : (isLiquidationMode ? 'LƯU VÀ IN THANH LÝ' : 'LƯU VÀ IN HỢP ĐỒNG'))}
+                <Save size={15} /> {loading ? 'Đang xử lý...' : (initialData ? (isLiquidationMode ? 'CẬP NHẬT VÀ IN THANH LÝ' : 'CẬP NHẬT VÀ IN HỢP ĐỒNG') : (isLiquidationMode ? 'LƯU VÀ IN THANH LÝ' : 'LƯU VÀ IN HỢP ĐỒNG'))}
             </button>
             <button 
                 type="button" 
                 onClick={() => handleReset(false)} 
-                className="px-4 py-3 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 transition-colors shadow-sm font-bold border border-slate-200 flex items-center gap-1.5" 
+                className="px-3.5 py-1.5 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors shadow-2xs font-bold border border-slate-200 flex items-center gap-1.5 text-xs" 
                 title="Làm mới form"
             >
-                {initialData ? <X size={20} className="text-red-500" /> : <RotateCcw size={20} />}
-                <span className="hidden sm:inline text-xs font-bold">Làm mới</span>
+                {initialData ? <X size={15} className="text-red-500" /> : <RotateCcw size={15} />}
+                <span>Làm mới</span>
             </button>
         </div>
     </form>

@@ -305,3 +305,9 @@ export interface WorkSchedule {
 // Interface Notification (Chuyển từ UtilitiesView sang đây để tránh Circular Dependency)
 export type NotifyType = 'success' | 'error' | 'info';
 export type NotifyFunction = (message: string, type?: NotifyType) => void;
+
+declare global {
+  interface Window {
+    electronAPI?: any;
+  }
+}

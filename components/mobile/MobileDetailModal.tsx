@@ -30,6 +30,56 @@ interface MobileDetailModalProps {
   onRefreshData?: () => void;
 }
 
+interface ParsedDocItem {
+  name: string;
+  type: string;
+  original: number;
+  copy: number;
+  note?: string;
+}
+
+const parseOtherDocsForMobile = (raw: string | null | undefined): ParsedDocItem[] => {
+  if (!raw) return [];
+  const str = raw.trim();
+  if (!str) return [];
+
+  if (str.startsWith('[') || str.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(str);
+      const arr = Array.isArray(parsed) ? parsed : [parsed];
+      const result: ParsedDocItem[] = [];
+      
+      for (const item of arr) {
+        if (!item) continue;
+        if (typeof item === 'string') {
+          if (item.trim()) result.push({ name: item.trim(), type: 'Bản chính', original: 1, copy: 0 });
+          continue;
+        }
+        const name = (item.name || item.ten || item.title || item.docName || '').trim();
+        if (!name) continue;
+
+        const type = item.type || item.loai || item.copyType || (item.original ? 'Bản chính' : item.copy ? 'Bản sao' : 'Bản chính');
+        const original = typeof item.original === 'number' ? item.original : (item.soBanChinh ? Number(item.soBanChinh) : (type === 'Bản chính' ? 1 : 0));
+        const copy = typeof item.copy === 'number' ? item.copy : (item.soBanSao ? Number(item.soBanSao) : (type === 'Bản sao' ? 1 : 0));
+        const note = item.note || item.ghiChu || '';
+
+        result.push({ name, type, original, copy, note });
+      }
+      if (result.length > 0) return result;
+    } catch (e) {
+      // JSON parse failed, fallback below
+    }
+  }
+
+  const parts = str.split(/\n|\|/).map(s => s.trim()).filter(Boolean);
+  return parts.map(p => ({
+    name: p,
+    type: 'Bản chính',
+    original: 1,
+    copy: 0
+  }));
+};
+
 export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({ 
   isOpen, onClose, record, employees, users, currentUser, onEdit, onDelete, onCreateLiquidation, onCreateContract, onRefreshData
 }) => {
@@ -385,56 +435,61 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
   return (
     <div className="fixed inset-0 bg-white z-[60] flex flex-col animate-slide-in-right">
       {/* Header */}
-      <div className="bg-white border-b border-slate-100 px-4 py-3 flex items-center justify-between sticky top-0 z-10">
-        <div className="flex items-center gap-3">
-          <button onClick={onClose} className="p-1 -ml-1 text-slate-500 active:bg-slate-100 rounded-full transition-colors">
-            <ChevronLeft size={24} />
-          </button>
-          <div>
-            <h2 className="font-bold text-slate-800 text-sm truncate max-w-[180px]">{record.customerName}</h2>
-            <p className="text-[10px] text-slate-400 font-mono">{record.code}</p>
+      <div className="bg-white border-b border-slate-100 px-3 sm:px-6 py-3 sticky top-0 z-10">
+        <div className="max-w-5xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-3 min-w-0">
+            <button onClick={onClose} className="p-1 -ml-1 text-slate-500 active:bg-slate-100 rounded-full transition-colors shrink-0">
+              <ChevronLeft size={24} />
+            </button>
+            <div className="min-w-0">
+              <h2 className="font-bold text-slate-800 text-sm sm:text-base truncate max-w-[220px] sm:max-w-md">{record.customerName}</h2>
+              <p className="text-[10px] sm:text-xs text-slate-400 font-mono">{record.code}</p>
+            </div>
           </div>
-        </div>
-        <div className="flex items-center gap-1">
-          {canPerformAction && onEdit && (
-            <button onClick={() => { onClose(); onEdit(record); }} className="p-2 text-slate-400 active:text-blue-600">
-              <Pencil size={20} />
-            </button>
-          )}
-          {canPerformAction && onDelete && (currentUser?.role === 'ADMIN' || currentUser?.role === 'SUBADMIN') && (
-            <button onClick={() => { onClose(); onDelete(record); }} className="p-2 text-slate-400 active:text-red-600">
-              <Trash2 size={20} />
-            </button>
-          )}
+          <div className="flex items-center gap-1 shrink-0">
+            {canPerformAction && onEdit && (
+              <button onClick={() => { onClose(); onEdit(record); }} className="p-2 text-slate-400 hover:text-blue-600 active:bg-slate-100 rounded-lg transition-colors">
+                <Pencil size={20} />
+              </button>
+            )}
+            {canPerformAction && onDelete && (currentUser?.role === 'ADMIN' || currentUser?.role === 'SUBADMIN') && (
+              <button onClick={() => { onClose(); onDelete(record); }} className="p-2 text-slate-400 hover:text-red-600 active:bg-slate-100 rounded-lg transition-colors">
+                <Trash2 size={20} />
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-slate-100 bg-white sticky top-[53px] z-10">
-        <button 
-          onClick={() => setActiveTab('info')}
-          className={`flex-1 py-3 text-xs font-bold transition-all border-b-2 ${activeTab === 'info' ? 'text-blue-600 border-blue-600' : 'text-slate-400 border-transparent'}`}
-        >
-          Thông tin
-        </button>
-        <button 
-          onClick={() => setActiveTab('timeline')}
-          className={`flex-1 py-3 text-xs font-bold transition-all border-b-2 ${activeTab === 'timeline' ? 'text-blue-600 border-blue-600' : 'text-slate-400 border-transparent'}`}
-        >
-          Tiến độ
-        </button>
-        <button 
-          onClick={() => setActiveTab('notes')}
-          className={`flex-1 py-3 text-xs font-bold transition-all border-b-2 ${activeTab === 'notes' ? 'text-blue-600 border-blue-600' : 'text-slate-400 border-transparent'}`}
-        >
-          Ghi chú
-        </button>
+      <div className="border-b border-slate-100 bg-white sticky top-[53px] z-10">
+        <div className="max-w-5xl mx-auto flex">
+          <button 
+            onClick={() => setActiveTab('info')}
+            className={`flex-1 py-3 text-xs sm:text-sm font-bold transition-all border-b-2 ${activeTab === 'info' ? 'text-blue-600 border-blue-600' : 'text-slate-400 border-transparent'}`}
+          >
+            Thông tin chi tiết
+          </button>
+          <button 
+            onClick={() => setActiveTab('timeline')}
+            className={`flex-1 py-3 text-xs sm:text-sm font-bold transition-all border-b-2 ${activeTab === 'timeline' ? 'text-blue-600 border-blue-600' : 'text-slate-400 border-transparent'}`}
+          >
+            Tiến độ & Nhật ký
+          </button>
+          <button 
+            onClick={() => setActiveTab('notes')}
+            className={`flex-1 py-3 text-xs sm:text-sm font-bold transition-all border-b-2 ${activeTab === 'notes' ? 'text-blue-600 border-blue-600' : 'text-slate-400 border-transparent'}`}
+          >
+            Ghi chú
+          </button>
+        </div>
       </div>
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto bg-slate-50 pb-24">
-        {activeTab === 'info' && (
-          <div className="p-4 space-y-4">
+        <div className="max-w-5xl mx-auto p-3 sm:p-6">
+          {activeTab === 'info' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
             {/* Status & Type */}
             <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
               <div className="flex justify-between items-center mb-4">
@@ -589,18 +644,7 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                             <p className="text-[11px] text-indigo-600 mt-0.5 leading-tight">{matchedContract.serviceType || matchedContract.contractType}</p>
                           </div>
                         </div>
-                        <div className="grid grid-cols-2 gap-2">
-                          {onCreateContract && (
-                            <button 
-                              onClick={() => {
-                                onCreateContract(record);
-                                onClose();
-                              }}
-                              className="w-full text-center text-xs font-bold bg-indigo-600 text-white hover:bg-indigo-700 py-2 rounded-lg transition-colors duration-200 shadow-sm"
-                            >
-                              Xem HĐ
-                            </button>
-                          )}
+                        <div className="grid grid-cols-1 gap-2">
                           {onCreateLiquidation && (
                             <button 
                               onClick={() => {
@@ -890,16 +934,44 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
             )}
 
             {/* Giấy tờ kèm theo */}
-            {record.otherDocs && (
-              <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 space-y-3">
-                <h3 className="text-xs font-bold text-emerald-600 uppercase flex items-center gap-2">
-                  <FileDown size={16} /> Giấy tờ kèm theo
-                </h3>
-                <div className="bg-emerald-50/30 p-4 rounded-xl border border-emerald-100 text-slate-800 text-sm font-medium leading-relaxed whitespace-pre-line">
-                  {record.otherDocs}
+            {record.otherDocs && (() => {
+              const docList = parseOtherDocsForMobile(record.otherDocs);
+              if (docList.length === 0) return null;
+              return (
+                <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 space-y-3">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                    <h3 className="text-xs font-bold text-emerald-600 uppercase flex items-center gap-2">
+                      <FileDown size={16} /> Giấy tờ kèm theo ({docList.length})
+                    </h3>
+                  </div>
+                  <div className="space-y-2">
+                    {docList.map((doc, idx) => (
+                      <div key={idx} className="bg-emerald-50/40 p-3 rounded-xl border border-emerald-100/70 text-slate-800 text-xs space-y-1.5">
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="font-semibold text-slate-900 leading-snug flex-1">
+                            {idx + 1}. {doc.name}
+                          </span>
+                          <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] shrink-0 ${
+                            doc.type.toLowerCase().includes('sao') || doc.type.toLowerCase().includes('phô') 
+                              ? 'bg-amber-100 text-amber-800 border border-amber-200' 
+                              : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                          }`}>
+                            {doc.type}
+                          </span>
+                        </div>
+                        {(doc.original > 0 || doc.copy > 0 || doc.note) && (
+                          <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-600 pt-1 border-t border-emerald-100/60">
+                            {doc.original > 0 && <span>Bản chính: <strong className="text-emerald-900">{doc.original}</strong></span>}
+                            {doc.copy > 0 && <span>Bản sao: <strong className="text-amber-900">{doc.copy}</strong></span>}
+                            {doc.note && <span className="italic text-slate-500">Ghi chú: {doc.note}</span>}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* Ghi chú nội bộ (Private notes / Read only) */}
             {record.privateNotes && (
@@ -959,6 +1031,7 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
           </div>
         )}
       </div>
+    </div>
 
       <DocxPreviewModal
         isOpen={isPreviewOpen}

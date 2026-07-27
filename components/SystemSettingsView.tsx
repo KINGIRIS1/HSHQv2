@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Database, AlertTriangle, Cloud, Loader2, CheckCircle, Save, Globe, Calendar, Plus, Trash2, ShieldAlert, Key, FolderArchive, Upload, Download, RefreshCw, FolderOpen, LayoutDashboard, SlidersHorizontal, Eye, EyeOff, ArrowLeft, ArrowRight, ChevronUp, ChevronDown, Search } from 'lucide-react';
+import { Database, AlertTriangle, Cloud, Loader2, CheckCircle, Save, Globe, Calendar, Plus, Trash2, ShieldAlert, Key, FolderArchive, Upload, Download, RefreshCw, FolderOpen, LayoutDashboard, SlidersHorizontal, Eye, EyeOff, ArrowLeft, ArrowRight, ChevronUp, ChevronDown, Search, RotateCcw } from 'lucide-react';
 import { Holiday, UserRole, RolePermissions, DepartmentPermissions, DEFAULT_ROLE_PERMISSIONS, AVAILABLE_PERMISSIONS, Employee } from '../types';
 import { fetchHolidays, saveHolidays, testDatabaseConnection, saveUpdateInfo, fetchUpdateInfo, getSystemSetting, saveSystemSetting } from '../services/api';
 import { APP_VERSION } from '../constants';
@@ -374,9 +374,18 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
       const successDept = await saveSystemSetting('department_permissions', JSON.stringify(departmentPermissions));
       setIsSavingPermissions(false);
       if (successRole && successDept) {
-          alert('Đã lưu cấu hình phân quyền thành công! Cần tải lại trang để áp dụng.');
+          if (onHolidaysChanged) onHolidaysChanged();
+          alert('Đã lưu cấu hình phân quyền thành công! Hệ thống đã cập nhật quyền hạn ngay lập tức.');
       } else {
           alert('Lỗi khi lưu cấu hình phân quyền.');
+      }
+  };
+
+  const handleResetPermissions = async () => {
+      if (await confirmAction("Bạn có chắc chắn muốn khôi phục cấu hình phân quyền về mặc định ban đầu của hệ thống?")) {
+          setRolePermissions(DEFAULT_ROLE_PERMISSIONS);
+          setDepartmentPermissions({});
+          alert("Đã thiết lập lại trạng thái phân quyền mặc định. Nhấn 'Lưu cấu hình phân quyền' để hoàn tất áp dụng.");
       }
   };
 
@@ -992,6 +1001,15 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                         </div>
 
                         <div className="flex items-center gap-3 w-full sm:w-auto">
+                            <button
+                                onClick={handleResetPermissions}
+                                type="button"
+                                className="w-full sm:w-auto px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-all border border-slate-200 flex items-center justify-center gap-1.5 active:scale-95"
+                                title="Khôi phục phân quyền về trạng thái mặc định của hệ thống"
+                            >
+                                <RotateCcw size={16} />
+                                Mặc định
+                            </button>
                             <button
                                 onClick={handleSavePermissions}
                                 disabled={isSavingPermissions}

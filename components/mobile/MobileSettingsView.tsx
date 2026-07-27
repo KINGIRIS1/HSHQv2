@@ -146,7 +146,7 @@ const MobileSettingsView: React.FC<MobileSettingsViewProps> = (props) => {
         <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50 rounded-full -mr-16 -mt-16 opacity-50" />
         <div className="absolute bottom-0 left-0 w-24 h-24 bg-indigo-50 rounded-full -ml-12 -mb-12 opacity-50" />
         
-        <div className="relative z-10 flex flex-col items-center text-center">
+        <div className="relative z-10 max-w-4xl mx-auto flex flex-col items-center text-center">
           <div className="relative">
             <div className="w-24 h-24 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-3xl flex items-center justify-center text-white text-3xl font-semibold shadow-xl shadow-blue-200 border-4 border-white">
               {currentUser.name.charAt(0)}
@@ -172,7 +172,7 @@ const MobileSettingsView: React.FC<MobileSettingsViewProps> = (props) => {
         </div>
       </div>
 
-      <div className="px-5 mt-8 space-y-6">
+      <div className="max-w-4xl mx-auto w-full px-4 sm:px-6 mt-6 sm:mt-8 space-y-6">
         {/* Main Menu */}
         <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-50">

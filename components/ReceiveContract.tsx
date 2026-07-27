@@ -357,19 +357,24 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
       } 
   }; 
 
-  const handleSaveContract = async (contract: Contract & { isManualCode?: boolean }, isUpdate: boolean): Promise<string | null> => {
+  const handleSaveContract = async (contract: Contract & { isManualCode?: boolean }, isUpdateParam: boolean): Promise<string | null> => {
       let success = false;
       let finalCode = contract.code;
 
+      // Kiểm tra thực tế xem hợp đồng này đã có trong danh sách CSDL hay chưa
+      const isExistingInDb = contracts.some(c => c.id === contract.id);
+      const isUpdate = isExistingInDb;
+
       if (isUpdate) {
           success = await updateContractApi(contract);
+          finalCode = contract.code;
       } else {
           try {
               // Thực sự Lấy mã hợp đồng chính thức và TĂNG giá trị seq tự động trong DB khi LƯU THÀNH CÔNG
-              if (contract.isManualCode) {
+              if (contract.isManualCode && contract.code && contract.code.trim() !== '') {
                   finalCode = contract.code;
               } else {
-                  const year = new Date().getFullYear();
+                  const year = contract.createdDate ? new Date(contract.createdDate).getFullYear() : new Date().getFullYear();
                   const userName = currentUser.name || currentUser.username || "Nhân viên";
                   const note = `${contract.customerName || ''} - ${contract.contractType}`;
                   let checkCount = 0;
@@ -378,7 +383,7 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
                       if (contract.contractType === 'Đo đạc' || contract.contractType === 'Cắm mốc') {
                           finalCode = await consumeNextHDKTCode(year, userName, note);
                       } else {
-                          finalCode = await consumeNextContractCode(userName, note);
+                          finalCode = await consumeNextContractCode(userName, note, year);
                       }
                   } while (
                       contracts.some(c => c.code && c.code.trim().toLowerCase() === finalCode.trim().toLowerCase() && c.id !== contract.id) &&
@@ -654,9 +659,11 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
             <div><h2 className="text-xl font-bold text-gray-800 flex items-center gap-2"><FileSignature className="text-purple-600" /> Quản Lý Hợp Đồng</h2></div>
             
             <div className="flex gap-2">
-                <button onClick={() => setIsGetContractNumberOpen(true)} className="p-2 bg-white border border-gray-200 text-purple-600 hover:text-purple-700 hover:bg-purple-50 rounded-lg transition-colors shadow-sm" title="Lấy số Hợp đồng Tự động">
-                    <Hash size={20} />
-                </button>
+                {activeModule !== 'liquidation' && (
+                    <button onClick={() => setIsGetContractNumberOpen(true)} className="p-2 bg-white border border-gray-200 text-purple-600 hover:text-purple-700 hover:bg-purple-50 rounded-lg transition-colors shadow-sm" title="Lấy số Hợp đồng Tự động">
+                        <Hash size={20} />
+                    </button>
+                )}
                 <button onClick={() => setIsPriceConfigOpen(true)} className="p-2 bg-white border border-gray-200 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors shadow-sm" title="Cấu hình Bảng giá Dịch vụ">
                     <Settings2 size={20} />
                 </button>
@@ -708,6 +715,7 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
                     generateCode={generateContractCode}
                     mode='contract'
                     contracts={contracts}
+                    onOpenGetNumberModal={() => setIsGetContractNumberOpen(true)}
                 />
             )}
 
@@ -722,11 +730,13 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
                     generateCode={generateContractCode}
                     mode='liquidation'
                     contracts={contracts}
+                    onOpenGetNumberModal={() => setIsGetContractNumberOpen(true)}
                 />
             )}
 
             {activeModule === 'list' && (
                 <ContractList 
+                    contracts={contracts}
                     onEdit={handleEdit} // Chỉnh sửa hợp đồng
                     onDelete={handleDelete}
                     onPrint={handlePreviewDocx} 
@@ -739,6 +749,7 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
 
             {activeModule === 'liquidation_list' && (
                 <ContractList 
+                    contracts={contracts}
                     onEdit={handleCreateLiquidation} // Edit thanh lý thì mở form thanh lý
                     onDelete={handleDelete}
                     onPrint={handlePreviewDocx} 
@@ -773,6 +784,38 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
           isOpen={isGetContractNumberOpen}
           onClose={() => setIsGetContractNumberOpen(false)}
           currentUser={currentUser}
+          onSelectCode={(selectedCode) => {
+              if (editingContract) {
+                  setEditingContract({ ...editingContract, code: selectedCode });
+              } else {
+                  setEditingContract({
+                      id: Math.random().toString(36).substr(2, 9),
+                      code: selectedCode,
+                      customerName: '',
+                      phoneNumber: '',
+                      address: '',
+                      ward: '',
+                      landPlot: '',
+                      mapSheet: '',
+                      area: 0,
+                      contractType: selectedCode.includes('HĐKT') ? 'Đo đạc' : 'Tách thửa',
+                      serviceType: '',
+                      areaType: '',
+                      plotCount: 1,
+                      markerCount: 1,
+                      quantity: 1,
+                      unitPrice: 0,
+                      vatRate: 8,
+                      vatAmount: 0,
+                      totalAmount: 0,
+                      deposit: 0,
+                      createdDate: new Date().toISOString(),
+                      status: 'PENDING'
+                  });
+              }
+              setActiveModule('contract');
+              setIsGetContractNumberOpen(false);
+          }}
       />
     </div>
   );

@@ -2,10 +2,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Contract, User, Employee, UserRole } from '../../types';
 import { fetchContracts } from '../../services/api';
-import { Search, RotateCcw, Edit, Printer, FileCheck, Trash2, Loader2, DollarSign, ExternalLink, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, RotateCcw, Edit, Download, FileCheck, Trash2, Loader2, DollarSign, ExternalLink, ChevronLeft, ChevronRight } from 'lucide-react';
 import { confirmAction } from '../../utils/appHelpers';
 
 interface ContractListProps {
+  contracts?: Contract[];
   onEdit: (c: Contract) => void;
   onDelete: (id: string) => void;
   onPrint: (c: Contract, type: 'contract' | 'liquidation') => void;
@@ -15,8 +16,8 @@ interface ContractListProps {
   employees: Employee[];
 }
 
-const ContractList: React.FC<ContractListProps> = ({ onEdit, onDelete, onPrint, onCreateLiquidation, viewMode, currentUser, employees }) => {
-  const [contracts, setContracts] = useState<Contract[]>([]);
+const ContractList: React.FC<ContractListProps> = ({ contracts: propContracts, onEdit, onDelete, onPrint, onCreateLiquidation, viewMode, currentUser, employees }) => {
+  const [contracts, setContracts] = useState<Contract[]>(propContracts || []);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -31,7 +32,13 @@ const ContractList: React.FC<ContractListProps> = ({ onEdit, onDelete, onPrint, 
       setLoading(false);
   };
 
-  useEffect(() => { loadContracts(); }, []);
+  useEffect(() => {
+      if (propContracts) {
+          setContracts(propContracts);
+      } else {
+          loadContracts();
+      }
+  }, [propContracts]);
 
   // Reset page to 1 when search or viewMode changes
   useEffect(() => {
@@ -39,9 +46,14 @@ const ContractList: React.FC<ContractListProps> = ({ onEdit, onDelete, onPrint, 
   }, [searchTerm, viewMode]);
 
   const filtered = useMemo(() => {
-      let list = contracts;
+      let list = [...contracts];
       
-      // Bỏ lọc theo quyền ONEDOOR để nhân viên Một cửa tra cứu được tất cả hợp đồng
+      // Sắp xếp danh sách hợp đồng/thanh lý theo ngày lập từ mới nhất đến cũ nhất
+      list.sort((a, b) => {
+          const timeA = a.createdDate ? new Date(a.createdDate).getTime() : 0;
+          const timeB = b.createdDate ? new Date(b.createdDate).getTime() : 0;
+          return timeB - timeA;
+      });
 
       // Chỉ cho phép thanh lý với các hồ sơ 2.3 (Đo đạc) và 2.4 (Cắm mốc)
       if (viewMode === 'liquidation') {
@@ -164,18 +176,18 @@ const ContractList: React.FC<ContractListProps> = ({ onEdit, onDelete, onPrint, 
                                         {!isLiquidationMode ? (
                                             <>
                                                 <button onClick={() => onEdit(c)} className="p-1.5 text-blue-600 hover:bg-blue-100 rounded transition-colors" title="Sửa Hợp Đồng"><Edit size={16} /></button>
-                                                <button onClick={() => onPrint(c, 'contract')} className="p-1.5 text-purple-600 hover:bg-purple-100 rounded transition-colors" title="In Hợp Đồng"><Printer size={16} /></button>
+                                                <button onClick={() => onPrint(c, 'contract')} className="p-1.5 text-purple-600 hover:bg-purple-100 rounded transition-colors" title="In / Tải Hợp Đồng"><Download size={16} /></button>
                                                 {(c.contractType === 'Đo đạc' || c.contractType === 'Cắm mốc') && <button onClick={() => onCreateLiquidation(c)} className="p-1.5 text-green-600 hover:bg-green-100 rounded transition-colors" title="Chuyển sang Thanh Lý"><FileCheck size={16} /></button>}
                                             </>
                                         ) : (
                                             <>
                                                 <button onClick={() => onCreateLiquidation(c)} className="p-1.5 text-orange-600 hover:bg-orange-100 rounded transition-colors" title="Sửa/Lưu Thanh Lý"><Edit size={16} /></button>
-                                                <button onClick={() => onPrint(c, 'liquidation')} className="p-1.5 text-green-600 hover:bg-green-100 rounded transition-colors" title="In Thanh Lý"><Printer size={16} /></button>
+                                                <button onClick={() => onPrint(c, 'liquidation')} className="p-1.5 text-green-600 hover:bg-green-100 rounded transition-colors" title="In / Tải Thanh Lý"><Download size={16} /></button>
                                             </>
                                         )}
                                         
                                         {(currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.SUBADMIN) && (
-                                            <button onClick={async () => { if(await confirmAction('Xóa hợp đồng này?')) { onDelete(c.id); } }} className="p-1.5 text-red-500 hover:bg-red-100 rounded transition-colors" title="Xóa"><Trash2 size={16} /></button>
+                                            <button onClick={() => onDelete(c.id)} className="p-1.5 text-red-500 hover:bg-red-100 rounded transition-colors" title="Xóa"><Trash2 size={16} /></button>
                                         )}
                                     </div>
                                 </td>

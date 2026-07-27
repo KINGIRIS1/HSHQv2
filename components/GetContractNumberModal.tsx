@@ -16,9 +16,10 @@ interface GetContractNumberModalProps {
   isOpen: boolean;
   onClose: () => void;
   currentUser: UserType;
+  onSelectCode?: (code: string) => void;
 }
 
-const GetContractNumberModal: React.FC<GetContractNumberModalProps> = ({ isOpen, onClose, currentUser }) => {
+const GetContractNumberModal: React.FC<GetContractNumberModalProps> = ({ isOpen, onClose, currentUser, onSelectCode }) => {
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState<number>(currentYear);
   const [numberType, setNumberType] = useState<'HĐKT' | 'HĐ'>('HĐKT');
@@ -285,6 +286,14 @@ const GetContractNumberModal: React.FC<GetContractNumberModalProps> = ({ isOpen,
                 >
                   {copiedId === 'allocated' ? <Check size={16} className="text-emerald-600" /> : <Copy size={16} />}
                 </button>
+                {onSelectCode && (
+                  <button 
+                    onClick={() => onSelectCode(allocatedNumber)}
+                    className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-xs transition-colors shadow-xs"
+                  >
+                    Sử dụng cho Form HĐ
+                  </button>
+                )}
               </div>
               <p className="text-xs text-emerald-600">Đã lưu trữ số này vào danh sách lịch sử cấp số</p>
             </div>

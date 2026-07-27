@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { FolderCog, ExternalLink, Loader2, Download, CheckCircle, AlertCircle, X, Calculator, FileText, Gavel, Info, Table2, Grid, FileSpreadsheet, RefreshCw, BookOpen, Calendar } from 'lucide-react';
+import { FolderCog, Loader2, CheckCircle, AlertCircle, X, Calculator, FileText, Gavel, Info, Table2, Grid, FileSpreadsheet, BookOpen } from 'lucide-react';
 import { User as UserType, RecordFile, NotifyFunction, NotifyType, Employee } from '../types';
 import { isViewAllowedForUser } from '../config/roleConfig';
 import SoanBienBanTab from './utilities/SoanBienBanTab';
@@ -10,7 +10,6 @@ import SaiSoTab from './utilities/SaiSoTab';
 import ChinhLyBienDongTab from './utilities/ChinhLyBienDongTab';
 import HoSoTachThuaTab from './utilities/HoSoTachThuaTab';
 import ChuyenDoiToBanDoTab from './utilities/ChuyenDoiToBanDoTab';
-import DienNgayThangTab from './utilities/DienNgayThangTab';
 import ExcerptManagement from './ExcerptManagement';
 
 interface UtilitiesViewProps {
@@ -38,11 +37,8 @@ const UtilitiesView: React.FC<UtilitiesViewProps> = ({
     onAddWard,
     onDeleteWard,
     onResetWards,
-    onSaveRecord,
-    holidays,
-    onRefreshData
 }) => {
-  const [activeTab, setActiveTab] = useState<'bienban' | 'thongtin' | 'vphc' | 'saiso' | 'chinhly' | 'tachthua' | 'chuyendoi' | 'dienngaythang' | 'sotltd'>('bienban');
+  const [activeTab, setActiveTab] = useState<'bienban' | 'thongtin' | 'vphc' | 'saiso' | 'chinhly' | 'tachthua' | 'chuyendoi' | 'sotltd'>('bienban');
   const [defaultExportPath, setDefaultExportPath] = useState('');
   
   // State cho thông báo Custom (Toast)

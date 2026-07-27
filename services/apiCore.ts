@@ -96,19 +96,21 @@ export const logError = (context: string, error: any, silent: boolean = false) =
     }
 
     if (silent) {
-        console.warn(`⚠️ [Silent Soft Error] ${context}: ${msg} ${code ? `(Code: ${code})` : ''} ${details ? `Details: ${details}` : ''}`);
+        console.warn(`⚠️ [Error Logged] ${context}: ${msg} ${code ? `(Code: ${code})` : ''} ${details ? `Details: ${details}` : ''}`);
         return;
     }
 
     if (typeof msg === 'string' && (msg.includes('<!DOCTYPE html>') || msg.includes('500 Internal Server Error') || msg.includes('<html>'))) {
-         console.warn(`⚠️ [Server Error] ${context}: Máy chủ Cloud đang tạm dừng hoặc gặp sự cố (Lỗi 500). Hệ thống sẽ sử dụng dữ liệu Cache/Offline.`);
+         console.warn(`⚠️ [Server Error] ${context}: Máy chủ Cloud đang tạm dừng hoặc gặp sự cố (Lỗi 500).`);
          return; 
     }
 
     if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('configuration') || msg.includes('Load failed')) {
-        console.warn(`⚠️ [Offline Mode] ${context}: Không thể kết nối Cloud. Sử dụng dữ liệu Cache/Offline.`);
+        console.error(`❌ [Lỗi kết nối] ${context}: Không thể kết nối tới cơ sở dữ liệu Cloud Supabase. Vui lòng kiểm tra lại mạng.`);
+        alert(`LỖI KẾT NỐI: Không thể kết nối tới cơ sở dữ liệu Cloud Supabase. Vui lòng kiểm tra kết nối mạng của bạn.`);
     } else if (code === '42P01') {
         console.error(`❌ Lỗi tại ${context}: Bảng dữ liệu chưa tồn tại trên Supabase! (Code: 42P01)`);
+        alert(`LỖI BẢNG DỮ LIỆU: Bảng '${context.includes('Contract') ? 'contracts' : 'land_records'}' chưa tồn tại trên Supabase!\n\nVui lòng truy cập SQL Editor trên trang quản trị Supabase và tạo bảng tương ứng.`);
     } else if (code === '22P02') {
         if (context === 'saveEmployeeApi') {
             console.error(`❌ Lỗi tại ${context}: Cột 'id' trong bảng 'employees' đang là kiểu UUID.`);

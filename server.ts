@@ -24,7 +24,7 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 const router = jsonServer.router(dbFile);
-const middlewares = jsonServer.defaults();
+const middlewares = jsonServer.defaults({ logger: false });
 
 // --- TỐI ƯU HÓA TỐC ĐỘ CẬP NHẬT ---
 let releaseDir = path.join(__dirname, 'release');
@@ -87,11 +87,15 @@ if (!fs.existsSync(dbFile)) {
 server.use(middlewares);
 server.use(jsonServer.bodyParser);
 
-// Middleware hiển thị log (Chỉ log các request API, không log file tĩnh nữa do đã khai báo static ở trên)
+// Middleware hiển thị log (Chỉ log các request lỗi hoặc API quan trọng, loại bỏ log 304 không cần thiết)
 server.use((req: Request, res: Response, next: NextFunction) => {
     const start = Date.now();
     res.on('finish', () => {
-        if (res.statusCode >= 400 || req.url.includes('App.tsx')) {
+        // Lọc bỏ log 304 Not Modified và tài nguyên tĩnh
+        if (res.statusCode === 304) return;
+        if (req.url.match(/\.(tsx?|jsx?|css|png|jpg|ico|svg|woff2?)(\?.*)?$/)) return;
+
+        if (res.statusCode >= 400 || (req.method !== 'GET' && !req.url.startsWith('/@'))) {
             console.log(`[REQ] ${req.method} ${req.url} - ${res.statusCode} (${Date.now() - start}ms)`);
         }
     });

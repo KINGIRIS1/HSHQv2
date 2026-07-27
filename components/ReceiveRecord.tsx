@@ -10,7 +10,6 @@ import { confirmAction, calculateDeadlineHelper } from '../utils/appHelpers';
 // Components
 import RecordForm from './receive-record/RecordForm';
 import BulkImport from './receive-record/BulkImport';
-import BulkUpdateTab from './receive-record/BulkUpdateTab';
 import DailyList from './receive-record/DailyList';
 import VPHCTab from './utilities/VPHCTab';
 import TemplateConfigModal from './TemplateConfigModal';

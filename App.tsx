@@ -19,7 +19,6 @@ import { CheckCircle, AlertTriangle } from 'lucide-react';
 import { useAppData } from './hooks/useAppData';
 import { useRecordFilter } from './hooks/useRecordFilter';
 import { useReminderSystem } from './hooks/useReminderSystem';
-import { useGlobalChatListener } from './hooks/useGlobalChatListener';
 
 import { useIsMobile } from './hooks/useIsMobile';
 import MobileLayout from './components/layout/MobileLayout';
@@ -189,9 +188,6 @@ function App() {
   useEffect(() => {
     setSelectedRecordIds(new Set());
   }, [currentView]);
-
-  // Chat Listener
-  useGlobalChatListener(currentUser, currentView, notificationEnabled, setUnreadMessages);
 
   // Permissions
   const isAdmin = currentUser?.role === UserRole.ADMIN;

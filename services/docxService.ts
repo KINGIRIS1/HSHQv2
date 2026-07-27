@@ -163,23 +163,57 @@ const getTemplateArrayBuffer = async (templateKey: string): Promise<ArrayBuffer>
     return base64ToArrayBuffer(storedValue);
 };
 
+const formatDocxError = (error: any): string => {
+    if (error.properties && Array.isArray(error.properties.errors) && error.properties.errors.length > 0) {
+        const details = error.properties.errors.map((e: any) => {
+            const explanation = e.properties?.explanation || e.message || "Lỗi cú pháp";
+            const tag = e.properties?.xtag ? ` (Thẻ: "${e.properties.xtag}")` : "";
+            return `• ${explanation}${tag}`;
+        }).join("\n");
+        return `Mẫu file Word (.docx) bị lỗi cú pháp thẻ:\n${details}`;
+    }
+    return error.message || "Lỗi tạo văn bản không xác định";
+};
+
 const createDocAsync = async (templateKey: string, data: any) => {
     const content = await getTemplateArrayBuffer(templateKey);
-    const zip = new PizZip(content);
-    
-    const doc = new Docxtemplater(zip, {
-        paragraphLoop: true,
-        linebreaks: true,
-        delimiters: { start: '{{', end: '}}' },
-        nullGetter: (part) => {
-            if (!part.module) return "";
-            if (part.module === "rawxml") return "";
-            return "";
-        }
-    });
 
-    doc.render(data);
-    return doc;
+    const delimiterPairs = [
+        { start: '{{', end: '}}' },
+        { start: '{', end: '}' }
+    ];
+
+    let lastError: any = null;
+
+    for (const delimiters of delimiterPairs) {
+        try {
+            const zip = new PizZip(content);
+            const doc = new Docxtemplater(zip, {
+                paragraphLoop: true,
+                linebreaks: true,
+                delimiters,
+                nullGetter: (part) => {
+                    if (!part.module) return "";
+                    if (part.module === "rawxml") return "";
+                    return "";
+                }
+            });
+
+            doc.render(data);
+            return doc;
+        } catch (error: any) {
+            lastError = error;
+            // Nếu không phải lỗi syntax thẻ (MultiError), throw ngay
+            if (!error.properties || !Array.isArray(error.properties.errors)) {
+                throw error;
+            }
+        }
+    }
+
+    if (lastError) {
+        throw lastError;
+    }
+    throw new Error("Không thể tạo văn bản từ mẫu Word.");
 };
 
 export const generateDocxBlobAsync = async (templateKey: string, data: any): Promise<Blob | null> => {
@@ -192,7 +226,8 @@ export const generateDocxBlobAsync = async (templateKey: string, data: any): Pro
         return out;
     } catch (error: any) {
         console.error("Lỗi tạo file Word:", error);
-        alert("Lỗi tạo văn bản: " + error.message);
+        const errorMsg = formatDocxError(error);
+        alert(errorMsg);
         return null;
     }
 };

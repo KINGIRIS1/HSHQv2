@@ -1,5 +1,5 @@
 
-import { defineConfig } from 'vite';
+import { defineConfig, createLogger } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -8,8 +8,17 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+const customLogger = createLogger();
+const originalInfo = customLogger.info;
+customLogger.info = (msg, options) => {
+  // Lọc bỏ log 304 Not Modified của các file component/static
+  if (msg.includes('304') || msg.includes('.tsx') || msg.includes('.ts')) return;
+  originalInfo(msg, options);
+};
+
 // https://vitejs.dev/config/
 export default defineConfig({
+  customLogger,
   plugins: [react()],
   // QUAN TRỌNG: Dùng './' để hỗ trợ mọi đường dẫn con (GitHub Pages, Subfolder, Electron)
   base: './', 

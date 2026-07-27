@@ -70,14 +70,36 @@ const DailyList: React.FC<DailyListProps> = ({ records, wards, currentUser, empl
           
           // Lọc theo tổ chuyên môn
           if (selectedDept !== 'Tất cả') {
+              const codeClean = (r.code || '').trim().toLowerCase();
               const typeLower = (r.recordType || '').toLowerCase();
+              const deptLower = ((r as any).department || r.returnHandoverDept || '').toLowerCase();
+
+              // Tất cả hồ sơ có mã (hoặc loại) bắt đầu/chứa dạng 2.x là Tổ Đo đạc
+              const is2x = codeClean.startsWith('2.') || /^2[.\d]/.test(codeClean) || typeLower.startsWith('2.') || typeLower.includes('2.');
+              // Tất cả hồ sơ có mã (hoặc loại) bắt đầu/chứa dạng 1.x là Tổ Lưu trữ
+              const is1x = codeClean.startsWith('1.') || /^1[.\d]/.test(codeClean) || typeLower.startsWith('1.') || typeLower.includes('1.');
+
               if (selectedDept === 'Tổ Đo đạc') {
-                  const isMeasurement = typeLower.includes('trích đo') || typeLower.includes('đo đạc') || typeLower.includes('cắm mốc') || typeLower.includes('tách') || typeLower.includes('hợp') || typeLower.startsWith('2.3') || typeLower.startsWith('2.4') || typeLower.startsWith('2.5') || typeLower.startsWith('2.6') || typeLower.includes('số thửa') || typeLower.includes('cập nhật') || typeLower.includes('cập nhập');
-                  if (!isMeasurement) return false;
+                  const isDoDac = is2x || 
+                                  deptLower.includes('đo đạc') || 
+                                  deptLower.includes('đo dạc') || 
+                                  typeLower.includes('trích đo') || 
+                                  typeLower.includes('trích lục') || 
+                                  typeLower.includes('đo đạc') || 
+                                  typeLower.includes('cắm mốc') || 
+                                  typeLower.includes('tách') || 
+                                  typeLower.includes('hợp') || 
+                                  typeLower.includes('số thửa') || 
+                                  typeLower.includes('cập nhật') || 
+                                  typeLower.includes('cập nhập');
+                  if (!isDoDac) return false;
               } else if (selectedDept === 'Tổ Lưu trữ' || selectedDept === 'Tổ Thông tin lưu trữ') {
-                  const isArchive = (typeLower.includes('cung cấp') || typeLower.includes('trích lục') || typeLower.startsWith('1.1') || typeLower.startsWith('2.1') || typeLower.startsWith('2.2')) && 
-                                    !typeLower.startsWith('2.6') && !typeLower.includes('số thửa') && !typeLower.includes('cập nhật') && !typeLower.includes('cập nhập');
-                  if (!isArchive) return false;
+                  const isLuuTru = (is1x || 
+                                   deptLower.includes('lưu trữ') || 
+                                   typeLower.includes('cung cấp') || 
+                                   typeLower.includes('lưu trữ')) &&
+                                   !typeLower.includes('trích lục');
+                  if (!isLuuTru) return false;
               }
           }
           
@@ -260,21 +282,18 @@ const DailyList: React.FC<DailyListProps> = ({ records, wards, currentUser, empl
         </div>
         <div className="flex-1 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col min-h-0">
             <div className="overflow-auto flex-1">
-                <table className="w-full text-left table-fixed min-w-[1600px]">
+                <table className="w-full text-left table-fixed min-w-[1200px]">
                     <thead className="bg-gray-50 text-xs text-gray-600 uppercase font-bold sticky top-0 shadow-sm">
                         <tr> 
                             <th className="p-3 w-10 text-center">STT</th> 
-                            <th className="p-3 w-[110px]">Mã Hồ Sơ</th> 
-                            <th className="p-3 w-[180px]">Chủ Sử Dụng</th> 
-                            <th className="p-3 w-[130px]">Xã / Phường (Đất)</th> 
-                            <th className="p-3 w-[55px] text-center">Tờ</th>
-                            <th className="p-3 w-[55px] text-center">Thửa</th>
-                            <th className="p-3 w-[110px]">Loại Hồ Sơ</th> 
-                            <th className="p-3 text-center w-[100px]">Hẹn Trả</th> 
-                            <th className="p-3 text-center w-[105px]">Ngày Trả KQ</th>
-                            <th className="p-3 w-[110px]">Số BL/HĐ</th>
-                            <th className="p-3 text-right w-[110px]">Số Tiền</th>
-                            <th className="p-3 w-[140px]">Ghi Chú</th>
+                            <th className="p-3 w-[120px]">Mã Hồ Sơ</th> 
+                            <th className="p-3 w-[200px]">Chủ Sử Dụng</th> 
+                            <th className="p-3 w-[150px]">Xã / Phường (Đất)</th> 
+                            <th className="p-3 w-[65px] text-center">Tờ</th>
+                            <th className="p-3 w-[65px] text-center">Thửa</th>
+                            <th className="p-3 w-[130px]">Loại Hồ Sơ</th> 
+                            <th className="p-3 text-center w-[110px]">Hẹn Trả</th> 
+                            <th className="p-3 w-[180px]">Ghi Chú</th>
                             <th className="p-3 w-[130px] text-center bg-gray-100/50 sticky right-0 shadow-l">Thao Tác</th>
                         </tr>
                     </thead>
@@ -292,15 +311,6 @@ const DailyList: React.FC<DailyListProps> = ({ records, wards, currentUser, empl
                                     <td className="p-3 text-center font-mono align-middle">{r.landPlot || '-'}</td>
                                     <td className="p-3 text-gray-600 truncate align-middle" title={r.recordType || ''}>{getShortRecordType(r.recordType)}</td> 
                                     <td className="p-3 text-center text-blue-700 font-medium align-middle">{r.deadline ? new Date(r.deadline).toLocaleDateString('vi-VN') : '-'}</td> 
-                                    <td className="p-3 text-center text-emerald-700 font-medium align-middle">
-                                        {r.resultReturnedDate ? new Date(r.resultReturnedDate).toLocaleDateString('vi-VN') : '-'}
-                                    </td>
-                                    <td className="p-3 text-gray-700 font-mono truncate align-middle" title={r.receiptNumber || ''}>
-                                        {r.receiptNumber || '-'}
-                                    </td>
-                                    <td className="p-3 text-right font-semibold text-emerald-700 align-middle">
-                                        {r.returnedPrice ? new Intl.NumberFormat('vi-VN').format(Number(r.returnedPrice)) + ' đ' : '-'}
-                                    </td>
                                     <td className="p-3 text-gray-500 italic truncate align-middle" title={r.content || ''}>{r.content}</td>
                                     <td className="p-2 align-middle text-center sticky right-0 bg-white group-hover:bg-blue-50/50 shadow-l">
                                         <div className="flex items-center justify-center gap-1.5">
@@ -322,7 +332,7 @@ const DailyList: React.FC<DailyListProps> = ({ records, wards, currentUser, empl
                                     </td>
                                 </tr>
                             ))
-                        ) : ( <tr><td colSpan={13} className="p-8 text-center text-gray-400 italic"> Không có hồ sơ nào trong ngày này phù hợp với bộ lọc. </td></tr> )}
+                        ) : ( <tr><td colSpan={10} className="p-8 text-center text-gray-400 italic"> Không có hồ sơ nào trong ngày này phù hợp với bộ lọc. </td></tr> )}
                     </tbody>
                 </table>
             </div>

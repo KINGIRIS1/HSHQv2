@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { LayoutDashboard, FileText, ClipboardList, Send, BarChart3, Settings, LogOut, UserCircle, Users, Briefcase, BookOpen, UserPlus, ShieldAlert, X, FolderInput, FileSignature, MessageSquare, Loader2, UserCog, ShieldCheck, PenTool, CalendarDays, Archive, FolderArchive, ChevronDown, Bell, FilePlus, Ruler, ChevronRight, User, Shield, Settings2, Layers } from 'lucide-react';
-import { User as UserType, UserRole, RolePermissions, DepartmentPermissions, Employee } from '../types';
+import { User as UserType, UserRole, RolePermissions, DepartmentPermissions, Employee, DEFAULT_ROLE_PERMISSIONS } from '../types';
 import { matchDepartmentKey } from '../utils/appHelpers';
 import { isViewAllowedForUser } from '../config/roleConfig';
 
@@ -47,26 +47,30 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
   const hasPermission = (permissionId: string) => {
     if (isAdmin) return true;
     
-    const rolePerms = rolePermissions[currentUser.role] || [];
-    if (rolePerms.includes('*') || rolePerms.includes(permissionId)) return true;
-
     if (currentUser.employeeId && employees) {
         const emp = employees.find(e => e.id === currentUser.employeeId);
         if (emp && emp.department) {
-            const matchingKey = Object.keys(departmentPermissions).find(k => matchDepartmentKey(k, emp.department));
-            if (matchingKey) {
+            const compositeKey = `${emp.department}_${currentUser.role}`;
+            if (departmentPermissions && departmentPermissions[compositeKey]) {
+                const deptRolePerms = departmentPermissions[compositeKey] || [];
+                return deptRolePerms.includes('*') || deptRolePerms.includes(permissionId);
+            }
+
+            const matchingKey = Object.keys(departmentPermissions || {}).find(k => matchDepartmentKey(k, emp.department));
+            if (matchingKey && departmentPermissions[matchingKey]) {
                 const deptPerms = departmentPermissions[matchingKey] || [];
-                if (deptPerms.includes('*') || deptPerms.includes(permissionId)) return true;
+                return deptPerms.includes('*') || deptPerms.includes(permissionId);
             }
         }
     }
 
-    return false;
+    const rolePerms = (rolePermissions && rolePermissions[currentUser.role]) || DEFAULT_ROLE_PERMISSIONS[currentUser.role] || [];
+    return rolePerms.includes('*') || rolePerms.includes(permissionId);
   };
 
   // Cập nhật danh sách các view được phép
-  const oneDoorAllowedViews = ['dashboard', 'internal_chat', 'receive_record', 'receive_contract', 'all_records', 'registration_records', 'other_records', 'personal_profile', 'account_settings', 'utilities', 'handover_list', 'work_schedule', 'archive_records', 'congvan_records', 'receive_group', 'records_group', 'reports', 'tools_group'];
-  const teamLeaderAllowedViews = ['dashboard', 'personal_profile', 'all_records', 'registration_records', 'other_records', 'excerpt_management', 'reports', 'account_settings', 'internal_chat', 'utilities', 'work_schedule', 'archive_records', 'congvan_records', 'records_group', 'tools_group'];
+  const oneDoorAllowedViews = ['dashboard', 'receive_record', 'receive_contract', 'all_records', 'registration_records', 'other_records', 'personal_profile', 'account_settings', 'utilities', 'handover_list', 'work_schedule', 'archive_records', 'congvan_records', 'receive_group', 'records_group', 'reports', 'tools_group'];
+  const teamLeaderAllowedViews = ['dashboard', 'personal_profile', 'all_records', 'registration_records', 'other_records', 'excerpt_management', 'reports', 'account_settings', 'utilities', 'work_schedule', 'archive_records', 'congvan_records', 'records_group', 'tools_group'];
 
   // Define menu structure
   const menuItems = [
@@ -123,7 +127,7 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
       isDropdown: false,
       isTabGroup: true,
       subItems: [
-        { id: 'excerpt_management', label: 'Số TL/TĐ', icon: BookOpen, visible: false },
+        { id: 'excerpt_management', label: 'Số TL/TĐ', icon: BookOpen, visible: true },
         { id: 'utilities', label: 'Tiện ích', icon: PenTool, visible: true },
         { id: 'reports', label: 'Báo cáo', icon: BarChart3, visible: hasPermission('VIEW_REPORTS') },
       ]
@@ -168,7 +172,7 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
           {menuItems.map((item) => {
             // Kiểm tra quyền hiển thị menu (RBAC) cho item đơn lẻ
             if (!item.isDropdown && !(item as any).isTabGroup) {
-              const isAllowed = isViewAllowedForUser(currentUser, employees || [], item.id);
+              const isAllowed = isViewAllowedForUser(currentUser, employees || [], item.id, rolePermissions, departmentPermissions);
               if (!isAllowed) return null;
             }
             if (!item.visible) return null;
@@ -181,7 +185,7 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
             if ((item as any).isTabGroup) {
               // Check if group has visible & allowed items for current user
               const hasVisibleItems = item.subItems?.some(sub => {
-                 const isAllowed = isViewAllowedForUser(currentUser, employees || [], sub.id);
+                 const isAllowed = isViewAllowedForUser(currentUser, employees || [], sub.id, rolePermissions, departmentPermissions);
                  return sub.visible && isAllowed;
               });
               
@@ -194,7 +198,7 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
                   </div>
                   <div className="space-y-2">
                     {item.subItems?.map(sub => {
-                       const isAllowed = isViewAllowedForUser(currentUser, employees || [], sub.id);
+                       const isAllowed = isViewAllowedForUser(currentUser, employees || [], sub.id, rolePermissions, departmentPermissions);
                        if (!isAllowed) return null;
                        if (!sub.visible) return null;
     
@@ -230,7 +234,7 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
               
               // Check if group has visible & allowed items for current user
               const hasVisibleItems = item.subItems?.some(sub => {
-                 const isAllowed = isViewAllowedForUser(currentUser, employees || [], sub.id);
+                 const isAllowed = isViewAllowedForUser(currentUser, employees || [], sub.id, rolePermissions, departmentPermissions);
                  return sub.visible && isAllowed;
               });
               
@@ -253,7 +257,7 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
                   {isExpanded && (
                     <div className="mt-2 space-y-2 animate-in slide-in-from-top-2 duration-200 bg-black/20 rounded-xl p-1.5 shadow-inner">
                       {item.subItems?.map(sub => {
-                         const isAllowed = isViewAllowedForUser(currentUser, employees || [], sub.id);
+                         const isAllowed = isViewAllowedForUser(currentUser, employees || [], sub.id, rolePermissions, departmentPermissions);
                          if (!isAllowed) return null;
                          if (!sub.visible) return null;
    
