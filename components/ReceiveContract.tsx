@@ -14,7 +14,6 @@ import saveAs from 'file-saver'; // Import saveAs
 // Child Components
 import ContractForm from './receive-contract/ContractForm';
 import ContractList from './receive-contract/ContractList';
-import { ContractAuditView } from './receive-contract/ContractAuditView';
 
 interface ReceiveContractProps {
   onSave: (record: RecordFile) => Promise<RecordFile | null>; 
@@ -64,34 +63,10 @@ function _nd(s: string): string {
 }
 
 const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, currentUser, employees, records, recordToLiquidate, onClearRecordToLiquidate, recordToCreateContract, onClearRecordToCreateContract }) => {
-  // activeModule bao gồm 'contract', 'liquidation', 'list', 'liquidation_list', 'audit'
-  const [activeModule, setActiveModule] = useState<'contract' | 'liquidation' | 'list' | 'liquidation_list' | 'audit'>('list'); 
+  // activeModule bao gồm 'contract', 'liquidation', 'list', 'liquidation_list'
+  const [activeModule, setActiveModule] = useState<'contract' | 'liquidation' | 'list' | 'liquidation_list'>('list'); 
   const [priceList, setPriceList] = useState<PriceItem[]>([]);
   const [contracts, setContracts] = useState<Contract[]>([]); // Move contracts state up to handle logic
-
-  // Calculate audit alerts count for tab badge
-  const auditAlertsCount = React.useMemo(() => {
-    if (!contracts || contracts.length === 0) return 0;
-    const codeMap = new Map<string, number>();
-    let dupGroupCount = 0;
-    let missingDateCount = 0;
-
-    contracts.forEach(c => {
-      const codeClean = (c.code || '').trim().toLowerCase();
-      if (codeClean) {
-        codeMap.set(codeClean, (codeMap.get(codeClean) || 0) + 1);
-      }
-      if (!c.createdDate || isNaN(new Date(c.createdDate).getTime())) {
-        missingDateCount++;
-      }
-    });
-
-    codeMap.forEach((count) => {
-      if (count > 1) dupGroupCount++;
-    });
-
-    return dupGroupCount + missingDateCount;
-  }, [contracts]);
   
   // Modal States
   const [isPriceConfigOpen, setIsPriceConfigOpen] = useState(false);
@@ -717,18 +692,6 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
             >
                 <ClipboardList size={16} className="inline mr-2" /> Danh sách Thanh lý
             </button>
-            <button 
-                onClick={() => { setActiveModule('audit'); }}
-                className={`px-6 py-2.5 rounded-t-lg font-bold text-sm transition-all border-t border-l border-r whitespace-nowrap flex items-center gap-1.5 ${activeModule === 'audit' ? 'bg-white text-rose-700 border-gray-200 relative top-[1px]' : 'bg-gray-100 text-gray-500 border-transparent hover:bg-gray-200'}`}
-            >
-                <ShieldAlert size={16} className="inline" />
-                <span>Kiểm Tra & Chuẩn Hóa</span>
-                {auditAlertsCount > 0 && (
-                    <span className="ml-1 px-1.5 py-0.2 text-[10px] bg-rose-600 text-white font-black rounded-full animate-pulse">
-                        {auditAlertsCount}
-                    </span>
-                )}
-            </button>
         </div>
       </div>
 
@@ -783,15 +746,6 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
                     viewMode='liquidation'
                     currentUser={currentUser}
                     employees={employees}
-                />
-            )}
-
-            {activeModule === 'audit' && (
-                <ContractAuditView 
-                    contracts={contracts}
-                    records={records}
-                    currentUser={currentUser}
-                    onRefresh={loadContracts}
                 />
             )}
         </div>
