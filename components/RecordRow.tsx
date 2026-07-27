@@ -142,12 +142,14 @@ const RecordRow: React.FC<RecordRowProps> = ({
           </td>
         );
       case 'ward':
+        const isHandedOver = Boolean(record.exportBatch || record.exportDate || record.status === RecordStatus.HANDOVER || record.status === RecordStatus.RETURNED);
+        const isPhiDiaGioi = Boolean(record.handoverWard && record.handoverWard !== record.ward);
         return (
           <td key="ward" className={`${cellClass} text-center text-gray-700`}>
               <div className="break-words leading-normal text-sm" title={getWardLabel(record.ward)}> 
                   {getWardLabel(record.ward) || '--'}
-                  {record.handoverWard && (
-                      <div className="text-xs text-purple-600 mt-1 font-semibold" title="Nơi giao trả kết quả">
+                  {isHandedOver && isPhiDiaGioi && (
+                      <div className="text-xs text-purple-600 mt-1 font-semibold" title="Nơi giao trả kết quả một cửa (Phi địa giới)">
                           (Giao: {getWardLabel(record.handoverWard)})
                       </div>
                   )}

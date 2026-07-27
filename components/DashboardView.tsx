@@ -3,7 +3,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { RecordFile, RecordStatus } from '../types';
 import { getNormalizedWard, getShortRecordType } from '../constants';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { FileText, RotateCcw, CheckCircle, ArchiveX, MapPin, Layers, CalendarRange, Filter, CalendarDays, Calendar, SlidersHorizontal, ArrowLeft, ArrowRight, Eye, EyeOff, RefreshCw, HelpCircle, Shield, Headphones, X, CheckCircle2, Phone, Mail, Clock, MessageSquare, UserCheck } from 'lucide-react';
+import { FileText, RotateCcw, CheckCircle, ArchiveX, MapPin, Layers, CalendarRange, Filter, CalendarDays, Calendar, SlidersHorizontal, ArrowLeft, ArrowRight, Eye, EyeOff, RefreshCw, HelpCircle, Shield, Headphones, X, CheckCircle2, Phone, Mail, Clock, MessageSquare, UserCheck, FolderInput, BarChart3, User } from 'lucide-react';
 
 interface DashboardViewProps {
     records: RecordFile[];
@@ -184,14 +184,14 @@ const DashboardView: React.FC<DashboardViewProps> = ({ records, currentUser, emp
             .sort((a, b) => b.value - a.value);
     }, [filteredRecords]);
 
-    // Render Role-based dashboard for Employees and Team Leaders
-    if (currentUser && (currentUser.role === 'EMPLOYEE' || currentUser.role === 'TEAM_LEADER')) {
+    // Render Role-based dashboard for Employees, Team Leaders and OneDoor
+    if (currentUser && (currentUser.role === 'EMPLOYEE' || currentUser.role === 'TEAM_LEADER' || currentUser.role === 'ONEDOOR')) {
         const modules = [
             {
                 id: 'personal_profile',
                 label: 'Hồ sơ cá nhân',
                 description: 'Xem thông tin cá nhân, chức vụ, địa bàn quản lý, lịch sử hồ sơ và thống kê hiệu suất công việc.',
-                icon: FileText,
+                icon: UserCheck,
                 color: 'text-blue-600 bg-blue-50/50 border-blue-100 hover:border-blue-300 hover:bg-blue-50',
             },
             {
@@ -205,10 +205,28 @@ const DashboardView: React.FC<DashboardViewProps> = ({ records, currentUser, emp
                 id: 'reports',
                 label: 'Báo cáo & Thống kê',
                 description: 'Báo cáo tổng hợp số liệu thụ lý hồ sơ, tỷ lệ hoàn thành công việc và biểu đồ trực quan cá nhân.',
-                icon: FileText,
+                icon: BarChart3,
                 color: 'text-indigo-600 bg-indigo-50/50 border-indigo-100 hover:border-indigo-300 hover:bg-indigo-50',
             }
         ];
+
+        // Thêm quyền Chuyên môn cho Một cửa
+        if (currentUser.role === 'ONEDOOR') {
+            modules.unshift({
+                id: 'receive_record',
+                label: 'Tiếp nhận hồ sơ',
+                description: 'Tiếp nhận hồ sơ đầu vào từ người dân, kiểm tra tính hợp lệ và luân chuyển về các tổ chuyên môn.',
+                icon: FolderInput,
+                color: 'text-amber-600 bg-amber-50/50 border-amber-100 hover:border-amber-300 hover:bg-amber-50',
+            });
+            modules.push({
+                id: 'all_records',
+                label: 'Quản lý Hồ sơ 1 cửa',
+                description: 'Theo dõi tiến độ, trao trả kết quả, quản lý biên lai hóa đơn và bàn giao hồ sơ.',
+                icon: FileText,
+                color: 'text-rose-600 bg-rose-50/50 border-rose-100 hover:border-rose-300 hover:bg-rose-50',
+            });
+        }
 
         // Thêm quyền Chuyên môn cho Team Leader dựa theo phòng ban
         if (currentUser.role === 'TEAM_LEADER') {
@@ -243,51 +261,40 @@ const DashboardView: React.FC<DashboardViewProps> = ({ records, currentUser, emp
         return (
             <div className="w-full flex flex-col p-4 max-w-7xl mx-auto space-y-4 lg:h-full lg:overflow-hidden">
                 {/* Banner chào mừng */}
-                <div className="relative overflow-hidden bg-gradient-to-r from-slate-900 via-slate-800 to-blue-950 rounded-xl p-4 md:p-5 text-white shadow-lg border border-slate-800 shrink-0">
-                    <div className="absolute right-0 top-0 translate-x-10 -translate-y-10 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl pointer-events-none"></div>
-                    <div className="absolute left-1/3 bottom-0 w-64 h-64 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none"></div>
+                <div className="relative overflow-hidden bg-gradient-to-r from-blue-700 via-indigo-600 to-sky-600 rounded-xl p-4 md:p-5 text-white shadow-md border border-blue-400/30 shrink-0">
+                    <div className="absolute right-0 top-0 translate-x-10 -translate-y-10 w-96 h-96 bg-white/10 rounded-full blur-3xl pointer-events-none"></div>
+                    <div className="absolute left-1/3 bottom-0 w-64 h-64 bg-sky-300/10 rounded-full blur-3xl pointer-events-none"></div>
                     
                     <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                        <div>
-                            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                                <span className="bg-blue-500/20 text-blue-300 border border-blue-500/30 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1">
-                                    🛡️ {currentUser?.role === 'ADMIN' ? 'Administrator' : currentUser?.role === 'SUBADMIN' ? 'Phó quản trị' : currentUser?.role === 'TEAM_LEADER' ? 'Nhóm trưởng' : currentUser?.role === 'ONEDOOR' ? 'Một cửa' : 'Nhân viên'}
-                                </span>
-                                {linkedEmployee?.department && (
-                                    <span className="bg-slate-800 text-slate-300 border border-slate-700 text-[10px] font-semibold px-2 py-0.5 rounded-full">
-                                        {linkedEmployee.department}
-                                    </span>
-                                )}
-                            </div>
+                        <div className="flex-1 min-w-0">
                             <h1 className="text-xl md:text-2xl font-black tracking-tight text-white mb-1">
                                 Xin chào, {currentUser.name}!
                             </h1>
-                            <p className="text-slate-400 text-xs max-w-xl leading-relaxed">
+                            <p className="text-blue-100 text-xs leading-relaxed max-w-none">
                                 Chào mừng bạn quay trở lại hệ thống quản lý. Tại đây, bạn có thể nhanh chóng truy cập các tính năng chuyên môn được phân bổ theo vai trò làm việc của mình.
                             </p>
                         </div>
                         
-                        {linkedEmployee && (
-                            <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-lg p-3 w-full md:w-auto shrink-0 md:min-w-[200px]">
-                                <h3 className="text-[10px] font-bold text-blue-300 uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                                    👤 Thông tin liên kết
-                                </h3>
-                                <div className="space-y-1 text-[11px]">
-                                    <p className="flex justify-between text-slate-300"><span className="text-slate-500">Chức danh:</span> <span className="font-semibold text-slate-100">{linkedEmployee.position || 'Chuyên viên'}</span></p>
-                                    <p className="flex justify-between text-slate-300"><span className="text-slate-500">Bộ phận:</span> <span className="font-semibold text-slate-100">{linkedEmployee.department}</span></p>
-                                    {linkedEmployee.managedWards && linkedEmployee.managedWards.length > 0 && (
-                                        <div className="pt-1 border-t border-white/5 mt-1">
-                                            <span className="text-slate-500 block mb-0.5">Địa bàn quản lý:</span>
-                                            <div className="flex flex-wrap gap-1">
-                                                {linkedEmployee.managedWards.map((w: string) => (
-                                                    <span key={w} className="bg-blue-500/10 text-blue-300 text-[9px] px-1 py-0.5 rounded border border-blue-500/20">{w}</span>
-                                                ))}
-                                            </div>
+                        <div className="bg-white/15 backdrop-blur-md border border-white/20 rounded-lg p-3 w-full md:w-auto shrink-0 md:min-w-[240px]">
+                            <h3 className="text-[10px] font-bold text-sky-200 uppercase tracking-wider mb-2 flex items-center justify-center gap-1 text-center">
+                                👤 Thông tin thêm
+                            </h3>
+                            <div className="space-y-1.5 text-[11px]">
+                                <p className="flex justify-between items-center text-blue-100 border-b border-white/10 pb-1"><span className="text-blue-200/80 font-medium shrink-0">Họ và tên:</span> <span className="font-bold text-white text-center flex-1 ml-2">{linkedEmployee?.name || currentUser.name}</span></p>
+                                <p className="flex justify-between items-center text-blue-100 border-b border-white/10 pb-1"><span className="text-blue-200/80 font-medium shrink-0">Chức danh:</span> <span className="font-bold text-white text-center flex-1 ml-2">{linkedEmployee?.position || (currentUser.role === 'ONEDOOR' ? 'Viên chức' : 'Chuyên viên')}</span></p>
+                                <p className="flex justify-between items-center text-blue-100 border-b border-white/10 pb-1"><span className="text-blue-200/80 font-medium shrink-0">Bộ phận:</span> <span className="font-bold text-white text-center flex-1 ml-2">{linkedEmployee?.department || (currentUser.role === 'ONEDOOR' ? 'Bộ phận Một cửa' : 'Văn phòng')}</span></p>
+                                {linkedEmployee?.managedWards && linkedEmployee.managedWards.length > 0 && (
+                                    <div className="pt-1">
+                                        <span className="text-blue-200/80 text-[10px] block text-center mb-1">Địa bàn quản lý:</span>
+                                        <div className="flex flex-wrap gap-1 justify-center">
+                                            {linkedEmployee.managedWards.map((w: string) => (
+                                                <span key={w} className="bg-white/20 text-white text-[9px] px-1.5 py-0.5 rounded border border-white/25">{w}</span>
+                                            ))}
                                         </div>
-                                    )}
-                                </div>
+                                    </div>
+                                )}
                             </div>
-                        )}
+                        </div>
                     </div>
                 </div>
 
@@ -296,24 +303,26 @@ const DashboardView: React.FC<DashboardViewProps> = ({ records, currentUser, emp
                     <h2 className="text-sm font-bold text-slate-800 tracking-tight flex items-center gap-1.5 shrink-0">
                         <span>Phân hệ công việc của bạn</span>
                     </h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 lg:overflow-y-auto lg:flex-1 pr-1 custom-scrollbar">
+                    <div className="grid grid-cols-1 w-full gap-2.5 lg:overflow-y-auto lg:flex-1 pr-1 custom-scrollbar">
                         {modules.map(mod => {
                             const Icon = mod.icon;
                             return (
                                 <div 
                                     key={mod.id} 
                                     onClick={() => setCurrentView?.(mod.id)}
-                                    className={`group cursor-pointer bg-white p-4 rounded-xl border border-slate-100 transition-all duration-300 flex items-start gap-4 hover:-translate-y-0.5 hover:shadow-md ${mod.color}`}
+                                    className={`group cursor-pointer bg-white p-3.5 md:p-4 rounded-xl border border-slate-100 transition-all duration-200 flex items-center justify-between gap-4 hover:-translate-y-0.5 hover:shadow-md ${mod.color}`}
                                 >
-                                    <div className="p-2.5 rounded-xl bg-white border border-slate-200 shadow-sm transition-transform duration-300 group-hover:scale-105 shrink-0">
-                                        <Icon size={22} className="text-slate-700" />
-                                    </div>
-                                    <div className="flex-1 space-y-1 min-w-0">
-                                        <div className="flex justify-between items-center">
-                                            <h3 className="font-bold text-slate-800 text-sm tracking-tight truncate">{mod.label}</h3>
-                                            <ArrowRight size={14} className="text-slate-400 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-300" />
+                                    <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                                        <div className="p-2.5 rounded-xl bg-white border border-slate-200 shadow-sm transition-transform duration-200 group-hover:scale-105 shrink-0">
+                                            <Icon size={20} className="text-slate-700" />
                                         </div>
-                                        <p className="text-[11px] text-slate-500 leading-relaxed line-clamp-2">{mod.description}</p>
+                                        <div className="space-y-0.5 min-w-0 flex-1">
+                                            <h3 className="font-bold text-slate-800 text-sm tracking-tight truncate">{mod.label}</h3>
+                                            <p className="text-[11px] text-slate-500 leading-normal line-clamp-1">{mod.description}</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2 shrink-0">
+                                        <ArrowRight size={16} className="text-slate-400 group-hover:text-slate-700 group-hover:translate-x-1 transition-all duration-200" />
                                     </div>
                                 </div>
                             );

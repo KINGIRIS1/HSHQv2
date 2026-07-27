@@ -23,7 +23,7 @@ export const ROLE_VIEWS_CONFIG: Record<UserRole, RoleConfig> = {
     allowedViews: [
       'dashboard', 'internal_chat', 'receive_record', 'receive_contract', 
       'all_records', 'registration_records', 'other_records', 'personal_profile', 
-      'account_settings', 'utilities', 'handover_list', 'work_schedule', 
+      'account_settings', 'utilities', 'handover_list', 'archive_handover_list', 'other_handover_list', 'work_schedule', 
       'archive_records', 'congvan_records', 'receive_group', 'records_group', 
       'reports', 'tools_group', 'barcode_generator'
     ]
@@ -46,7 +46,7 @@ export const ROLE_VIEWS_CONFIG: Record<UserRole, RoleConfig> = {
     departmentSpecificViews: [
       {
         keyword: 'đo đạc',
-        views: ['all_records']
+        views: ['all_records', 'assign_tasks', 'completed_list', 'pending_check_list', 'check_list', 'handover_list', 'director_completed']
       },
       {
         keyword: 'đăng ký',
@@ -54,11 +54,11 @@ export const ROLE_VIEWS_CONFIG: Record<UserRole, RoleConfig> = {
       },
       {
         keyword: 'lưu trữ',
-        views: ['archive_records', 'congvan_records', 'excerpt_management']
+        views: ['archive_records', 'archive_assign_tasks', 'archive_completed_list', 'archive_pending_check_list', 'archive_check_list', 'archive_handover_list', 'congvan_records', 'excerpt_management']
       },
       {
         keyword: 'thông tin',
-        views: ['archive_records', 'congvan_records', 'excerpt_management']
+        views: ['archive_records', 'archive_assign_tasks', 'archive_completed_list', 'archive_pending_check_list', 'archive_check_list', 'archive_handover_list', 'congvan_records', 'excerpt_management']
       }
     ]
   }
@@ -91,8 +91,11 @@ export function isViewAllowedForUser(
     return true;
   }
 
+  // Standardize viewId mapping (e.g. pending_check_list maps to check_list)
+  const targetViewId = viewId === 'pending_check_list' ? 'check_list' : (viewId === 'archive_pending_check_list' ? 'archive_check_list' : viewId);
+
   // Kiểm tra danh sách được phép mặc định của Role
-  if (config.allowedViews.includes(viewId)) {
+  if (config.allowedViews.includes(viewId) || config.allowedViews.includes(targetViewId)) {
     return true;
   }
 
@@ -105,7 +108,7 @@ export function isViewAllowedForUser(
       for (const deptView of config.departmentSpecificViews) {
         const keywordNormalized = removeDiacritics(deptView.keyword.toLowerCase());
         if (deptNormalized.includes(keywordNormalized)) {
-          if (deptView.views.includes(viewId)) {
+          if (deptView.views.includes(viewId) || deptView.views.includes(targetViewId)) {
             return true;
           }
         }

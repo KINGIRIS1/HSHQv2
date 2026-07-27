@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { RecordFile, Contract, PriceItem, SplitItem, User, Employee } from '../types';
 import { fetchPriceList, deleteContractApi, updateContractApi, createContractApi, fetchContracts, getPreviewContractCode, consumeNextContractCode, getPreviewHDKTCode, consumeNextHDKTCode } from '../services/api';
-import { FileSignature, LayoutList, Settings, Settings2, FileCheck, FileText, ClipboardList, Hash } from 'lucide-react';
+import { FileSignature, LayoutList, Settings, Settings2, FileCheck, FileText, ClipboardList, Hash, ShieldAlert } from 'lucide-react';
 import PriceConfigModal from './PriceConfigModal';
 import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../services/docxService';
 import TemplateConfigModal from './TemplateConfigModal';
@@ -14,6 +14,7 @@ import saveAs from 'file-saver'; // Import saveAs
 // Child Components
 import ContractForm from './receive-contract/ContractForm';
 import ContractList from './receive-contract/ContractList';
+import { ContractAuditView } from './receive-contract/ContractAuditView';
 
 interface ReceiveContractProps {
   onSave: (record: RecordFile) => Promise<RecordFile | null>; 
@@ -63,10 +64,34 @@ function _nd(s: string): string {
 }
 
 const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, currentUser, employees, records, recordToLiquidate, onClearRecordToLiquidate, recordToCreateContract, onClearRecordToCreateContract }) => {
-  // activeModule bao gồm 'contract', 'liquidation', 'list', 'liquidation_list'
-  const [activeModule, setActiveModule] = useState<'contract' | 'liquidation' | 'list' | 'liquidation_list'>('list'); 
+  // activeModule bao gồm 'contract', 'liquidation', 'list', 'liquidation_list', 'audit'
+  const [activeModule, setActiveModule] = useState<'contract' | 'liquidation' | 'list' | 'liquidation_list' | 'audit'>('list'); 
   const [priceList, setPriceList] = useState<PriceItem[]>([]);
   const [contracts, setContracts] = useState<Contract[]>([]); // Move contracts state up to handle logic
+
+  // Calculate audit alerts count for tab badge
+  const auditAlertsCount = React.useMemo(() => {
+    if (!contracts || contracts.length === 0) return 0;
+    const codeMap = new Map<string, number>();
+    let dupGroupCount = 0;
+    let missingDateCount = 0;
+
+    contracts.forEach(c => {
+      const codeClean = (c.code || '').trim().toLowerCase();
+      if (codeClean) {
+        codeMap.set(codeClean, (codeMap.get(codeClean) || 0) + 1);
+      }
+      if (!c.createdDate || isNaN(new Date(c.createdDate).getTime())) {
+        missingDateCount++;
+      }
+    });
+
+    codeMap.forEach((count) => {
+      if (count > 1) dupGroupCount++;
+    });
+
+    return dupGroupCount + missingDateCount;
+  }, [contracts]);
   
   // Modal States
   const [isPriceConfigOpen, setIsPriceConfigOpen] = useState(false);
@@ -108,8 +133,21 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
 
           if (existingContract) {
               // NẾU CÓ HỢP ĐỒNG: Load toàn bộ dữ liệu hợp đồng đó (bao gồm splitItems, serviceType...)
+              const recType = (record.recordType || '').toLowerCase();
+              let targetContractType = existingContract.contractType;
+              if (recType.includes('2.4') || recType.includes('cắm mốc')) {
+                  targetContractType = 'Cắm mốc';
+              } else if (recType.includes('2.3') || recType.includes('đo đạc') || recType.includes('trích đo')) {
+                  targetContractType = 'Đo đạc';
+              } else if (recType.includes('2.1') || recType.includes('2.2') || recType.includes('trích lục')) {
+                  targetContractType = 'Trích lục';
+              } else if (recType.includes('2.5') || recType.includes('tách thửa')) {
+                  targetContractType = 'Tách thửa';
+              }
+
               setEditingContract({
                   ...existingContract,
+                  contractType: targetContractType,
                   // Cập nhật lại diện tích thanh lý mới nhất từ hồ sơ (diện tích thực tế sau khi đo)
                   // Ưu tiên: record.area > liquidationArea cũ > area hợp đồng
                   liquidationArea: record.area || existingContract.liquidationArea || existingContract.area,
@@ -134,34 +172,38 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
                   let serviceType = '';
                   let contractType: 'Đo đạc' | 'Tách thửa' | 'Cắm mốc' | 'Trích lục' = 'Đo đạc';
 
-                  if (recType.includes('trích lục')) {
-                      contractType = 'Trích lục';
-                      // Cố gắng map chính xác tên dịch vụ trong bảng giá
-                      const match = priceList.find(p => p.serviceName.toLowerCase().includes('trích lục'));
-                      serviceType = match ? match.serviceName : 'Trích lục bản đồ địa chính';
-                  } else if (recType.includes('cắm mốc')) {
+                  if (recType.includes('2.4') || recType.includes('cắm mốc')) {
                       contractType = 'Cắm mốc';
+                      // Cố gắng map chính xác tên dịch vụ trong bảng giá
                       const match = priceList.find(p => p.serviceName.toLowerCase().includes('cắm mốc'));
                       serviceType = match ? match.serviceName : 'Cắm mốc ranh giới';
-                  } else if (recType.includes('tách thửa')) {
+                  } else if (recType.includes('2.1') || recType.includes('2.2') || recType.includes('trích lục')) {
+                      contractType = 'Trích lục';
+                      const match = priceList.find(p => p.serviceName.toLowerCase().includes('trích lục'));
+                      serviceType = match ? match.serviceName : 'Trích lục bản đồ địa chính';
+                  } else if (recType.includes('2.5') || recType.includes('tách thửa')) {
                       contractType = 'Tách thửa';
                       serviceType = 'Đo đạc tách thửa';
-                  } else if (recType.includes('đo đạc')) {
-                      // Map theo diện tích
+                  } else {
+                      contractType = 'Đo đạc';
                       const area = record.area || 0;
-                      const match = priceList.find(p => 
-                          p.serviceName.toLowerCase().includes('đo đạc') && 
+                      let match = priceList.find(p => 
+                          (p.serviceName.toLowerCase().includes('chỉnh lý') || p.serviceName.toLowerCase().includes('chinh ly')) &&
+                          (!p.areaType || p.areaType === areaType) &&
                           area >= p.minArea && area < p.maxArea
                       );
-                      serviceType = match ? match.serviceName : 'Đo đạc hiện trạng';
+                      if (!match) {
+                          match = priceList.find(p => p.serviceName.toLowerCase().includes('chỉnh lý') || p.serviceName.toLowerCase().includes('chinh ly'));
+                      }
+                      serviceType = match ? match.serviceName : 'Trích đo chỉnh lý bản đồ địa chính';
                   }
 
-                  // Lấy mã số hợp đồng tiếp theo từ cấu hình settings
-                  const contractCode = await getPreviewContractCode();
+                  // Lấy mã số hợp đồng tiếp theo dựa theo loại hợp đồng
+                  const contractCode = await generateContractCode(contractType);
 
                   const newContract: Contract = {
                       id: Math.random().toString(36).substr(2, 9),
-                      code: contractCode, // Lấy mã hợp đồng từ setting thay vì số biên nhận hồ sơ!
+                      code: contractCode, // Lấy mã hợp đồng từ setting
                       customerAddress: record.code, // Lưu mã số biên nhận vào customerAddress để liên kết!
                       customerName: record.customerName,
                       phoneNumber: record.phoneNumber,
@@ -301,10 +343,25 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
 
   const generateContractCode = async (contractType?: string, customYear?: number): Promise<string> => {
     const year = customYear || new Date().getFullYear();
-    if (contractType === 'Đo đạc' || contractType === 'Cắm mốc') {
-      return await getPreviewHDKTCode(year);
+    let code = (contractType === 'Đo đạc' || contractType === 'Cắm mốc')
+      ? await getPreviewHDKTCode(year)
+      : await getPreviewContractCode(year);
+    
+    // Kiểm tra tránh trùng với danh sách HĐ hiện có
+    let attempts = 0;
+    while (contracts.some(c => c.code && c.code.trim().toLowerCase() === code.trim().toLowerCase()) && attempts < 50) {
+      attempts++;
+      const match = code.match(/(\d+)/);
+      if (match) {
+        const numLen = match[0].length;
+        const nextNum = parseInt(match[0], 10) + 1;
+        const newNumStr = nextNum.toString().padStart(numLen, '0');
+        code = code.replace(match[0], newNumStr);
+      } else {
+        break;
+      }
     }
-    return await getPreviewContractCode(year);
+    return code;
   };
 
   const handleEdit = (c: Contract) => { 
@@ -336,15 +393,21 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
               // Thực sự Lấy mã hợp đồng chính thức và TĂNG giá trị seq tự động trong DB khi LƯU THÀNH CÔNG
               if (contract.isManualCode) {
                   finalCode = contract.code;
-              } else if (contract.contractType === 'Đo đạc' || contract.contractType === 'Cắm mốc') {
+              } else {
                   const year = new Date().getFullYear();
                   const userName = currentUser.name || currentUser.username || "Nhân viên";
                   const note = `${contract.customerName || ''} - ${contract.contractType}`;
-                  finalCode = await consumeNextHDKTCode(year, userName, note);
-              } else {
-                  finalCode = await consumeNextContractCode(
-                      currentUser.name || currentUser.username || "Nhân viên",
-                      `${contract.customerName || ''} - ${contract.contractType}`
+                  let checkCount = 0;
+                  do {
+                      checkCount++;
+                      if (contract.contractType === 'Đo đạc' || contract.contractType === 'Cắm mốc') {
+                          finalCode = await consumeNextHDKTCode(year, userName, note);
+                      } else {
+                          finalCode = await consumeNextContractCode(userName, note);
+                      }
+                  } while (
+                      contracts.some(c => c.code && c.code.trim().toLowerCase() === finalCode.trim().toLowerCase() && c.id !== contract.id) &&
+                      checkCount < 30
                   );
               }
               const finalContract = { ...contract, code: finalCode };
@@ -654,6 +717,18 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
             >
                 <ClipboardList size={16} className="inline mr-2" /> Danh sách Thanh lý
             </button>
+            <button 
+                onClick={() => { setActiveModule('audit'); }}
+                className={`px-6 py-2.5 rounded-t-lg font-bold text-sm transition-all border-t border-l border-r whitespace-nowrap flex items-center gap-1.5 ${activeModule === 'audit' ? 'bg-white text-rose-700 border-gray-200 relative top-[1px]' : 'bg-gray-100 text-gray-500 border-transparent hover:bg-gray-200'}`}
+            >
+                <ShieldAlert size={16} className="inline" />
+                <span>Kiểm Tra & Chuẩn Hóa</span>
+                {auditAlertsCount > 0 && (
+                    <span className="ml-1 px-1.5 py-0.2 text-[10px] bg-rose-600 text-white font-black rounded-full animate-pulse">
+                        {auditAlertsCount}
+                    </span>
+                )}
+            </button>
         </div>
       </div>
 
@@ -708,6 +783,15 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
                     viewMode='liquidation'
                     currentUser={currentUser}
                     employees={employees}
+                />
+            )}
+
+            {activeModule === 'audit' && (
+                <ContractAuditView 
+                    contracts={contracts}
+                    records={records}
+                    currentUser={currentUser}
+                    onRefresh={loadContracts}
                 />
             )}
         </div>

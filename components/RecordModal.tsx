@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { RecordFile, RecordStatus, Employee, User, UserRole } from '../types';
 import { GROUPS, EXTENDED_RECORD_TYPES, STATUS_LABELS, getShortRecordType, getWardLabel, getNormalizedWard } from '../constants';
 import { X, Save, Lock, User as UserIcon, MapPin, FileText, Calendar, FileCheck, ChevronDown, ChevronUp, History } from 'lucide-react';
@@ -90,6 +90,22 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
   const hasAdminRights = currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.SUBADMIN;
   const isOneDoor = currentUser.role === UserRole.ONEDOOR;
   const canEditResult = hasAdminRights || isOneDoor;
+
+  const filteredEmployees = useMemo(() => {
+    if (!employees || employees.length === 0) return [];
+    const userEmp = employees.find(e => (currentUser?.employeeId && e.id === currentUser.employeeId) || e.name.toLowerCase() === currentUser?.name?.toLowerCase() || e.id === currentUser?.username);
+    const userDept = userEmp?.department || '';
+    if (!userDept || currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.SUBADMIN || userDept.toLowerCase().includes('giám đốc') || userDept.toLowerCase().includes('lãnh đạo')) {
+      return employees;
+    }
+    const sameDept = employees.filter(e => e.department && e.department.trim().toLowerCase() === userDept.trim().toLowerCase());
+    if (sameDept.length === 0) return employees;
+    if (formData.assignedTo && !sameDept.some(e => e.id === formData.assignedTo)) {
+      const assignedEmp = employees.find(e => e.id === formData.assignedTo);
+      if (assignedEmp) sameDept.push(assignedEmp);
+    }
+    return sameDept;
+  }, [employees, currentUser, formData.assignedTo]);
 
   useEffect(() => {
     if (isOpen) {
@@ -310,7 +326,6 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
         const firstWard = emp?.managedWards?.[0];
         if (firstWard) {
           updated.ward = firstWard;
-          updated.handoverWard = firstWard;
         }
       }
       if (updated.ward) {
@@ -496,14 +511,13 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-xs font-bold text-gray-700 mb-1">Xã / Phường thửa đất</label>
+                            <div className="md:col-span-2">
+                                <label className="block text-xs font-bold text-gray-700 mb-1">Xã / Phường</label>
                                 <select className="w-full border border-gray-300 rounded-md px-3 py-2 bg-white" value={val(formData.ward)} onChange={(e) => handleChange('ward', e.target.value)}>
                                     <option value="">-- Chọn Xã/Phường --</option>
                                     {wards.map(w => <option key={w} value={w}>{getWardLabel(w)}</option>)}
                                 </select>
                             </div>
-                            <div><label className="block text-xs font-bold text-gray-700 mb-1">Địa chỉ chi tiết</label><input type="text" className="w-full border border-gray-300 rounded-md px-3 py-2" value={val(formData.address)} onChange={(e) => handleChange('address', e.target.value)} placeholder="Số nhà, đường, ấp..." /></div>
                             <div className="grid grid-cols-3 gap-2 md:col-span-2">
                                 <div><label className="block text-xs font-bold text-gray-700 mb-1">Tờ bản đồ</label><input type="text" className="w-full border border-gray-300 rounded-md px-3 py-2 text-center font-mono" value={val(formData.mapSheet)} onChange={(e) => handleChange('mapSheet', e.target.value)} /></div>
                                 <div><label className="block text-xs font-bold text-gray-700 mb-1">Thửa đất</label><input type="text" className="w-full border border-gray-300 rounded-md px-3 py-2 text-center font-mono" value={val(formData.landPlot)} onChange={(e) => handleChange('landPlot', e.target.value)} /></div>
@@ -627,7 +641,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                                 {isAuthOpen && (
                                     <div className="p-4 bg-white grid grid-cols-1 md:grid-cols-3 gap-4 border-t border-gray-100">
                                         <div>
-                                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Họ tên người được ủy quyền</label>
+                                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Họ và tên</label>
                                             <input
                                                 type="text"
                                                 className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm"
@@ -637,7 +651,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                                             />
                                         </div>
                                         <div>
-                                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">CCCD người được ủy quyền</label>
+                                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Số CCCD</label>
                                             <input
                                                 type="text"
                                                 className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm"
@@ -650,7 +664,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                                             />
                                         </div>
                                         <div>
-                                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Địa chỉ thường trú người được ủy quyền</label>
+                                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Địa chỉ</label>
                                             <input
                                                 type="text"
                                                 className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm"
@@ -667,39 +681,54 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                             </div>
                         </div>
 
-                        <div className={`grid gap-4 bg-gray-50 p-3 rounded border border-gray-200 ${isCongVan ? 'grid-cols-1' : 'grid-cols-2 md:grid-cols-4'}`}>
+                        <div className={`grid gap-4 bg-gray-50 p-3.5 rounded-lg border border-gray-200 ${(!isCongVan && (showMsr || showExc)) ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
                             {!isCongVan && (
                                 <>
                                     {showMsr && (
-                                        <div><label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Số Trích đo</label><input type="text" className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm" value={val(formData.measurementNumber)} onChange={(e) => handleChange('measurementNumber', e.target.value)} /></div>
+                                        <div><label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Số Trích đo</label><input type="text" className="w-full border border-gray-300 rounded-md px-2.5 py-1.5 text-sm bg-white" value={val(formData.measurementNumber)} onChange={(e) => handleChange('measurementNumber', e.target.value)} placeholder="Nhập số trích đo..." /></div>
                                     )}
                                     {showExc && (
-                                        <div><label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Số Trích lục</label><input type="text" className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm" value={val(formData.excerptNumber)} onChange={(e) => handleChange('excerptNumber', e.target.value)} /></div>
+                                        <div><label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Số Trích lục</label><input type="text" className="w-full border border-gray-300 rounded-md px-2.5 py-1.5 text-sm bg-white" value={val(formData.excerptNumber)} onChange={(e) => handleChange('excerptNumber', e.target.value)} placeholder="Nhập số trích lục..." /></div>
                                     )}
                                 </>
                             )}
-                            <div className={isCongVan ? 'w-full' : 'col-span-2'}>
+                            <div className="w-full">
                                 <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Giao nhân viên xử lý</label>
-                                <select className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm" value={val(formData.assignedTo)} onChange={(e) => handleChange('assignedTo', e.target.value)}>
+                                <select className="w-full border border-gray-300 rounded-md px-2.5 py-1.5 text-sm bg-white" value={val(formData.assignedTo)} onChange={(e) => handleChange('assignedTo', e.target.value)}>
                                     <option value="">-- Chưa giao --</option>
-                                    {employees.map(emp => <option key={emp.id} value={emp.id}>{emp.name} - {emp.department}</option>)}
+                                    {filteredEmployees.map(emp => <option key={emp.id} value={emp.id}>{emp.name} - {emp.department}</option>)}
                                 </select>
                             </div>
                         </div>
-                        {/* QUAN TRỌNG: Hiển thị thông tin xuất đợt */}
+
                         {hasAdminRights && (
-                            <div className="grid grid-cols-2 gap-4 bg-indigo-50 p-3 rounded border border-indigo-200">
-                                <div><label className="block text-[10px] font-bold text-indigo-500 uppercase mb-1">Đợt xuất (Batch)</label><input type="number" className="w-full border border-indigo-200 rounded-md px-2 py-1.5 text-sm" value={val(formData.exportBatch)} onChange={(e) => handleChange('exportBatch', parseInt(e.target.value))} /></div>
-                                <div><label className="block text-[10px] font-bold text-indigo-500 uppercase mb-1">Ngày xuất</label><input type="date" className="w-full border border-indigo-200 rounded-md px-2 py-1.5 text-sm" value={val(formData.exportDate ? formData.exportDate.split('T')[0] : '')} onChange={(e) => handleChange('exportDate', new Date(e.target.value).toISOString())} /></div>
+                            <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
+                                <div className="flex items-center gap-2 mb-1"><Lock size={14} className="text-yellow-600" /><label className="text-xs font-bold text-yellow-800 uppercase">Ghi chú nội bộ</label></div>
+                                <textarea rows={2} className="w-full border border-yellow-300 rounded-md px-3 py-2 bg-white text-sm" value={val(formData.privateNotes)} onChange={(e) => handleChange('privateNotes', e.target.value)} placeholder="Nhập ghi chú nội bộ..." />
                             </div>
                         )}
-                        
-                        {/* Thông báo phân loại giao 2 bộ cho hồ sơ đo đạc */}
-                        {showMsr && (
-                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-800 flex items-start gap-2">
-                                <FileText size={16} className="text-blue-600 mt-0.5 shrink-0" />
+
+                        {/* HIỂN THỊ ĐỢT XUẤT, NGÀY XUẤT VÀ PHI ĐỊA GIỚI */}
+                        {hasAdminRights && (
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-indigo-50/80 p-3.5 rounded-lg border border-indigo-200/80">
                                 <div>
-                                    <span className="font-bold">Quy định giao nhận (Tổ Đo đạc):</span> Hồ sơ đo đạc 1 cửa bàn giao gồm <span className="font-bold text-blue-900">2 bộ</span> (1 bộ trả người dân và 1 bộ chuyển về kho lưu trữ). Danh sách bộ lưu trữ được chốt xuất giao kho khi người dân nhận kết quả.
+                                    <label className="block text-[10px] font-bold text-indigo-800 uppercase mb-1">Đợt xuất (Batch)</label>
+                                    <input type="number" className="w-full border border-indigo-200 rounded-md px-2.5 py-1.5 text-sm bg-white font-mono" value={val(formData.exportBatch)} onChange={(e) => handleChange('exportBatch', parseInt(e.target.value))} placeholder="Nhập đợt xuất..." />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-bold text-indigo-800 uppercase mb-1">Ngày xuất</label>
+                                    <input type="date" className="w-full border border-indigo-200 rounded-md px-2.5 py-1.5 text-sm bg-white" value={val(formData.exportDate ? formData.exportDate.split('T')[0] : '')} onChange={(e) => handleChange('exportDate', new Date(e.target.value).toISOString())} />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-bold text-purple-900 uppercase mb-1">Phi địa giới</label>
+                                    <select 
+                                        className="w-full border border-indigo-200 rounded-md px-2.5 py-1.5 text-sm bg-white font-semibold text-purple-900"
+                                        value={val(formData.handoverWard)} 
+                                        onChange={(e) => handleChange('handoverWard', e.target.value || null)}
+                                    >
+                                        <option value="">-- Không (Theo địa chỉ thửa đất) --</option>
+                                        {wards.map(w => <option key={w} value={w}>{getWardLabel(w)}</option>)}
+                                    </select>
                                 </div>
                             </div>
                         )}
@@ -707,17 +736,22 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                         {canEditResult && (
                             <div className="bg-emerald-50 p-4 rounded-lg border border-emerald-200">
                                 <h4 className="text-sm font-bold text-emerald-800 flex items-center gap-2 mb-3"><FileCheck size={16} /> TRẢ KẾT QUẢ CHO DÂN</h4>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div><label className="block text-xs font-bold text-emerald-700 mb-1">Ngày trả kết quả</label><input type="date" className="w-full border border-emerald-300 rounded-md px-3 py-2 bg-white font-bold text-emerald-800" value={dateVal(formData.resultReturnedDate)} onChange={(e) => handleChange('resultReturnedDate', e.target.value)} /></div>
-                                    <div><label className="block text-xs font-bold text-emerald-700 mb-1">Số Biên Lai</label><input type="text" className="w-full border border-emerald-300 rounded-md px-3 py-2 font-mono bg-white" value={val(formData.receiptNumber)} onChange={(e) => handleChange('receiptNumber', e.target.value)} placeholder="Nhập số biên lai..." /></div>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div>
+                                        <label className="block text-xs font-bold text-emerald-700 mb-1">Ngày trả kết quả</label>
+                                        <input type="date" className="w-full border border-emerald-300 rounded-md px-3 py-2 bg-white font-bold text-emerald-800" value={dateVal(formData.resultReturnedDate)} onChange={(e) => handleChange('resultReturnedDate', e.target.value)} />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-emerald-700 mb-1">
+                                            {formData.receiptType === 'Biên Lai' ? 'Số Biên lai' : formData.receiptType === 'Hóa Đơn' ? 'Số Hóa đơn' : 'Số Biên lai / Hóa đơn'}
+                                        </label>
+                                        <input type="text" className="w-full border border-emerald-300 rounded-md px-3 py-2 font-mono bg-white" value={val(formData.receiptNumber)} onChange={(e) => handleChange('receiptNumber', e.target.value)} placeholder="Nhập số biên lai/hóa đơn..." />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-emerald-700 mb-1">Số tiền (VNĐ)</label>
+                                        <input type="number" className="w-full border border-emerald-300 rounded-md px-3 py-2 font-bold text-emerald-900 bg-white" value={formData.returnedPrice !== undefined && formData.returnedPrice !== null ? formData.returnedPrice : ''} onChange={(e) => handleChange('returnedPrice', parseFloat(e.target.value) || 0)} placeholder="Nhập số tiền..." />
+                                    </div>
                                 </div>
-                            </div>
-                        )}
-
-                        {hasAdminRights && (
-                            <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
-                                <div className="flex items-center gap-2 mb-1"><Lock size={14} className="text-yellow-600" /><label className="text-xs font-bold text-yellow-800 uppercase">Ghi chú nội bộ</label></div>
-                                <textarea rows={2} className="w-full border border-yellow-300 rounded-md px-3 py-2 bg-white text-sm" value={val(formData.privateNotes)} onChange={(e) => handleChange('privateNotes', e.target.value)} />
                             </div>
                         )}
 

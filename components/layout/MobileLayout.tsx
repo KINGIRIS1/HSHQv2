@@ -71,17 +71,6 @@ const MobileLayout: React.FC<MobileLayoutProps> = ({
           <h1 className="font-bold text-base tracking-tight truncate">QLHS Mobile</h1>
         </div>
         <div className="flex items-center gap-2">
-          {/* Nút ? Chính sách phân quyền & Hỗ trợ kỹ thuật trên Top Header Mobile */}
-          <button 
-            type="button"
-            onClick={() => { setShowHelpModal(true); }}
-            title="Chính sách phân quyền & Hỗ trợ kỹ thuật"
-            className="flex items-center gap-1 bg-white/20 hover:bg-white/30 text-white px-2 py-1 rounded-full text-xs font-bold transition-all border border-white/30 active:scale-95 cursor-pointer"
-          >
-            <span className="w-4 h-4 rounded-full bg-blue-500 text-white flex items-center justify-center text-[11px] font-black">?</span>
-            <span className="text-[11px] font-bold">Hỗ trợ</span>
-          </button>
-
           <button className="relative p-1.5 hover:bg-white/10 rounded-full transition-colors">
             <Bell size={20} />
             {activeRemindersCount > 0 && (

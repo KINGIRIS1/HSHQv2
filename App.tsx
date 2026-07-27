@@ -1,13 +1,13 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { RecordFile, RecordStatus, Employee, User, UserRole, Message, RecordStatusLog } from './types';
-import { DEFAULT_WARDS as STATIC_WARDS, isArchiveRecordType } from './constants';
+import { DEFAULT_WARDS as STATIC_WARDS, isArchiveRecordType, STATUS_LABELS } from './constants';
 import Login from './components/Login'; 
 import MainLayout from './components/layout/MainLayout';
 import AppRoutes from './components/AppRoutes';
 import AppModals from './components/AppModals';
 
-import { DEFAULT_VISIBLE_COLUMNS, confirmAction, COLUMN_DEFS } from './utils/appHelpers';
+import { DEFAULT_VISIBLE_COLUMNS, confirmAction, COLUMN_DEFS, processAssignmentTimelineCheck } from './utils/appHelpers';
 import { exportReportToExcel, exportReturnedListToExcel } from './utils/excelExport';
 import { generateReport } from './services/geminiService';
 import { syncTemplatesFromCloud } from './services/docxService'; 
@@ -110,6 +110,8 @@ function App() {
   const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
   const [returnRecord, setReturnRecord] = useState<RecordFile | null>(null);
   const [isDiagnosticModalOpen, setIsDiagnosticModalOpen] = useState(false);
+  const [isRejectReturnStepModalOpen, setIsRejectReturnStepModalOpen] = useState(false);
+  const [rejectReturnTargetRecords, setRejectReturnTargetRecords] = useState<RecordFile[]>([]);
 
   // Report States
   const [globalReportContent, setGlobalReportContent] = useState('');
@@ -369,16 +371,7 @@ function App() {
       const nowStr = new Date().toISOString();
       const updatedTargets = assignTargetRecords.map(r => ({
           ...r,
-          assignedTo: employeeId,
-          status: RecordStatus.ASSIGNED,
-          assignedDate: nowStr,
-          submissionDate: null,
-          approvalDate: null,
-          completedDate: null,
-          resultReturnedDate: null,
-          exportBatch: null,
-          exportDate: null,
-          statusLogs: createStatusLog(r, RecordStatus.ASSIGNED, 'Giao nhân viên xử lý')
+          ...processAssignmentTimelineCheck(r, employeeId, nowStr, employees, currentUser)
       }));
 
       setRecords(prev => prev.map(r => {
@@ -475,21 +468,23 @@ function App() {
       }
       
       if (field === 'assignedTo') {
-          baseUpdates.assignedDate = targetDateStr;
-          baseUpdates.status = RecordStatus.ASSIGNED;
-          baseUpdates.submissionDate = null;
-          baseUpdates.approvalDate = null;
-          baseUpdates.completedDate = null;
-          baseUpdates.resultReturnedDate = null;
-          baseUpdates.exportBatch = null;
-          baseUpdates.exportDate = null;
+          const updatedTargets = records
+              .filter(r => selectedIds.includes(r.id))
+              .map(r => ({
+                  ...r,
+                  ...processAssignmentTimelineCheck(r, value, targetDateStr, employees, currentUser)
+              }));
 
-          const targetEmp = employees.find(e => e.id === value);
-          const firstWard = targetEmp?.managedWards?.[0];
-          if (firstWard) {
-              baseUpdates.ward = firstWard;
-              baseUpdates.handoverWard = firstWard;
-          }
+          setRecords(prev => prev.map(r => {
+              const updated = updatedTargets.find(u => u.id === r.id);
+              return updated ? updated : r;
+          }));
+
+          await Promise.all(updatedTargets.map(r => updateRecordApi(r)));
+          setIsBulkUpdateModalOpen(false);
+          setSelectedRecordIds(new Set());
+          setToast({ type: 'success', message: `Đã cập nhật giao việc cho ${updatedTargets.length} hồ sơ!` });
+          return;
       }
 
       // Calculate the specific, fully-elaborated target records upfront
@@ -780,6 +775,71 @@ function App() {
       setToast({ type: 'success', message: `Đã tự động bàn giao ${recordIds.length} hồ sơ và đồng bộ dữ liệu!` });
   }, [setRecords]);
 
+  const handleOpenRejectReturnModal = useCallback((targets: RecordFile[]) => {
+      setRejectReturnTargetRecords(targets);
+      setIsRejectReturnStepModalOpen(true);
+  }, []);
+
+  const handleConfirmRejectReturnStep = useCallback(async (reason: string, returnDateStr: string) => {
+      if (rejectReturnTargetRecords.length === 0) return;
+      const targetDateISO = returnDateStr ? new Date(returnDateStr).toISOString() : new Date().toISOString();
+      
+      const formatDateVN = (dStr: string) => {
+          try {
+              const d = new Date(dStr);
+              const day = String(d.getDate()).padStart(2, '0');
+              const month = String(d.getMonth() + 1).padStart(2, '0');
+              const year = d.getFullYear();
+              const hours = String(d.getHours()).padStart(2, '0');
+              const mins = String(d.getMinutes()).padStart(2, '0');
+              return `${hours}:${mins} ngày ${day}/${month}/${year}`;
+          } catch {
+              return dStr;
+          }
+      };
+
+      const updatedTargets = rejectReturnTargetRecords.map(r => {
+          const formattedReturnDate = formatDateVN(targetDateISO);
+          const prevStatusLabel = STATUS_LABELS[r.status] || r.status;
+          const internalLogNote = `[TRẢ HỒ SƠ KHÔNG ĐẠT - ${formattedReturnDate}] Trả từ bước "${prevStatusLabel}" về Đang thực hiện. Lý do: ${reason} (Người trả: ${currentUser?.name || currentUser?.username || 'Hệ thống'})`;
+
+          const existingNotes = r.privateNotes || '';
+          const updatedPrivateNotes = existingNotes ? `${existingNotes}\n${internalLogNote}` : internalLogNote;
+
+          const newLog: RecordStatusLog = {
+              id: `${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+              recordId: r.id,
+              previousStatus: r.status,
+              newStatus: RecordStatus.IN_PROGRESS,
+              changedBy: currentUser?.name || currentUser?.username || 'Hệ thống',
+              changedAt: targetDateISO,
+              note: `Trả về bước Đang thực hiện. Lý do: ${reason}`
+          };
+
+          return {
+              ...r,
+              status: RecordStatus.IN_PROGRESS,
+              pendingCheckDate: null,
+              submissionDate: null,
+              checkedDate: null,
+              approvalDate: null,
+              privateNotes: updatedPrivateNotes,
+              statusLogs: [...(r.statusLogs || []), newLog]
+          };
+      });
+
+      setRecords(prev => prev.map(r => {
+          const found = updatedTargets.find(u => u.id === r.id);
+          return found ? found : r;
+      }));
+
+      await Promise.all(updatedTargets.map(u => updateRecordApi(u)));
+      setIsRejectReturnStepModalOpen(false);
+      setRejectReturnTargetRecords([]);
+      setSelectedRecordIds(new Set());
+      setToast({ type: 'success', message: `Đã trả ${updatedTargets.length} hồ sơ về bước Đang thực hiện thành công!` });
+  }, [rejectReturnTargetRecords, currentUser]);
+
   if (!currentUser) return (
     <Login 
       onLogin={(user) => {
@@ -1047,6 +1107,7 @@ function App() {
             setIsDiagnosticModalOpen={setIsDiagnosticModalOpen}
             advanceStatus={advanceStatus}
             handleOpenReturnModal={handleOpenReturnModal}
+            handleOpenRejectReturnModal={handleOpenRejectReturnModal}
         />
 
         <AppModals 
@@ -1063,12 +1124,14 @@ function App() {
             isBulkUpdateModalOpen={isBulkUpdateModalOpen} setIsBulkUpdateModalOpen={setIsBulkUpdateModalOpen}
             isReturnModalOpen={isReturnModalOpen} setIsReturnModalOpen={setIsReturnModalOpen}
             isDiagnosticModalOpen={isDiagnosticModalOpen} setIsDiagnosticModalOpen={setIsDiagnosticModalOpen}
+            isRejectReturnStepModalOpen={isRejectReturnStepModalOpen} setIsRejectReturnStepModalOpen={setIsRejectReturnStepModalOpen}
             
             editingRecord={editingRecord} setEditingRecord={setEditingRecord}
             viewingRecord={viewingRecord} setViewingRecord={setViewingRecord}
             deletingRecord={deletingRecord} setDeletingRecord={setDeletingRecord}
             returnRecord={returnRecord} setReturnRecord={setReturnRecord}
             assignTargetRecords={assignTargetRecords}
+            rejectReturnTargetRecords={rejectReturnTargetRecords}
             exportModalType={exportModalType}
             
             previewWorkbook={previewWorkbook} previewExcelName={previewExcelName}
@@ -1090,6 +1153,8 @@ function App() {
             handleBulkUpdate={handleBulkUpdate}
             handleBatchUpdateRecords={handleBatchUpdateRecords}
             confirmReturnResult={handleConfirmReturnResult}
+            onConfirmRejectReturnStep={handleConfirmRejectReturnStep}
+            onOpenRejectReturnModal={(r) => handleOpenRejectReturnModal([r])}
 
             employees={employees}
             users={users}

@@ -17,6 +17,87 @@ const PERMISSION_DEPARTMENTS = [
   { id: 'Tổ Hành chính', name: 'Tổ Hành chính', label: 'Tổ Hành chính (Một cửa)', desc: 'Bộ phận hành chính tổng hợp, văn thư, tiếp nhận Một cửa' }
 ];
 
+const ROLES_FOR_DEPARTMENT = [
+  { role: UserRole.TEAM_LEADER, label: 'Nhóm trưởng / Tổ trưởng', badge: 'Quản lý' },
+  { role: UserRole.EMPLOYEE, label: 'Nhân viên chuyên môn', badge: 'Xử lý' },
+  { role: UserRole.ONEDOOR, label: 'Bộ phận Một cửa', badge: 'Tiếp nhận / Trả KQ' },
+  { role: UserRole.SUBADMIN, label: 'Phó Giám đốc / Lãnh đạo', badge: 'Lãnh đạo phòng' }
+];
+
+const PERMISSION_GROUPS = [
+  {
+    id: 'records',
+    title: '📋 Quản lý & Quy trình Hồ sơ',
+    desc: 'Quyền tiếp nhận, sửa, giao việc, kiểm tra, ký duyệt và bàn giao hồ sơ',
+    items: [
+      { id: 'VIEW_RECORDS', label: 'Xem danh sách hồ sơ', desc: 'Cho phép truy cập và xem chi tiết hồ sơ' },
+      { id: 'ADD_RECORDS', label: 'Thêm mới hồ sơ', desc: 'Tạo mới và tiếp nhận hồ sơ đầu vào' },
+      { id: 'EDIT_RECORDS', label: 'Sửa thông tin hồ sơ', desc: 'Cập nhật nội dung, thửa đất, chủ sở hữu' },
+      { id: 'DELETE_RECORDS', label: 'Xóa hồ sơ', desc: 'Cho phép xóa hồ sơ khỏi hệ thống' },
+      { id: 'ASSIGN_RECORDS', label: 'Giao việc / Phân công', desc: 'Giao hồ sơ cho nhân viên phụ trách' },
+      { id: 'CHECK_RECORDS', label: 'Kiểm tra & Ký kiểm tra', desc: 'Tổ trưởng / phó ký kiểm tra chuyên môn' },
+      { id: 'SIGN_RECORDS', label: 'Ký duyệt hồ sơ (Lãnh đạo)', desc: 'Ban Giám đốc phê duyệt kết quả' },
+      { id: 'HANDOVER_RECORDS', label: 'Bàn giao hồ sơ sang Một cửa', desc: 'Tạo đợt và chuyển kết quả sang Một cửa' },
+      { id: 'RETURN_RECORDS', label: 'Trả kết quả cho công dân', desc: 'Một cửa thực hiện trả kết quả hồ sơ' },
+      { id: 'EXPORT_RECORDS', label: 'Xuất danh sách Excel / Báo cáo', desc: 'Xuất danh sách hồ sơ ra tệp Excel' },
+    ]
+  },
+  {
+    id: 'views',
+    title: '👁️ Hiển thị Tab Chuyên môn (Cấu hình ẩn/hiện Tab)',
+    desc: 'Quyền xem và làm việc trực tiếp trên từng Tab quy trình chuyên môn',
+    items: [
+      { id: 'all_records', label: 'Tab: Tất cả hồ sơ', desc: 'Cho phép xem Tab Tất cả hồ sơ' },
+      { id: 'assign_tasks', label: 'Tab: Phân công / Chưa giao', desc: 'Cho phép xem Tab Phân công công việc' },
+      { id: 'completed_list', label: 'Tab: Đang thực hiện / Hồ sơ của tôi', desc: 'Cho phép xem Tab Đang thực hiện' },
+      { id: 'check_list', label: 'Tab: Ký kiểm tra / Trình ký', desc: 'Cho phép xem Tab Ký kiểm tra & Trình duyệt kiểm tra' },
+      { id: 'handover_list', label: 'Tab: Giao 1 cửa / Trả kết quả', desc: 'Cho phép xem Tab Giao 1 cửa (nhân viên 1 cửa thấy để trả kết quả)' },
+      { id: 'director_completed', label: 'Tab: Đã hoàn thành / Ký duyệt', desc: 'Cho phép xem Tab Lãnh đạo đã ký duyệt' },
+      { id: 'archive_records', label: 'Tab: Kho lưu trữ hồ sơ', desc: 'Cho phép truy cập kho lưu trữ' },
+      { id: 'congvan_records', label: 'Tab: Sổ Công văn', desc: 'Cho phép truy cập quản lý sổ công văn' },
+    ]
+  },
+  {
+    id: 'contracts',
+    title: '📜 Hợp đồng & Trích lục Bản đồ',
+    desc: 'Quyền tạo, quản lý hợp đồng dịch vụ đo đạc và hồ sơ trích lục',
+    items: [
+      { id: 'VIEW_CONTRACTS', label: 'Xem hợp đồng', desc: 'Xem danh sách và chi tiết hợp đồng' },
+      { id: 'ADD_CONTRACTS', label: 'Thêm mới hợp đồng', desc: 'Tạo hợp đồng đo đạc / dịch vụ' },
+      { id: 'EDIT_CONTRACTS', label: 'Sửa hợp đồng', desc: 'Sửa giá trị, số lượng, thanh lý hợp đồng' },
+      { id: 'DELETE_CONTRACTS', label: 'Xóa hợp đồng', desc: 'Xóa hợp đồng khỏi hệ thống' },
+      { id: 'EXPORT_CONTRACTS', label: 'Xuất tệp hợp đồng', desc: 'Xuất hợp đồng ra file mẫu' },
+      { id: 'VIEW_EXCERPTS', label: 'Xem trích lục bản đồ', desc: 'Xem danh sách hồ sơ trích lục' },
+      { id: 'MANAGE_EXCERPTS', label: 'Quản lý trích lục', desc: 'Cấp số và quản lý trích lục bản đồ' },
+    ]
+  },
+  {
+    id: 'utilities',
+    title: '🗄️ Tiện ích & Quản trị Hệ thống',
+    desc: 'Quyền truy cập lịch công tác, chat nội bộ, nhân sự và cài đặt',
+    items: [
+      { id: 'VIEW_ARCHIVE', label: 'Xem kho lưu trữ', desc: 'Tra cứu thông tin kho lưu trữ' },
+      { id: 'MANAGE_ARCHIVE', label: 'Quản lý kho lưu trữ', desc: 'Cập nhật vị trí, mượn/trả hồ sơ' },
+      { id: 'VIEW_REPORTS', label: 'Xem báo cáo thống kê', desc: 'Truy cập biểu đồ & báo cáo tổng hợp' },
+      { id: 'VIEW_SCHEDULE', label: 'Xem lịch công tác', desc: 'Xem lịch công tác tuần' },
+      { id: 'MANAGE_SCHEDULE', label: 'Quản lý lịch công tác', desc: 'Thêm/sửa lịch công tác' },
+      { id: 'VIEW_CHAT', label: 'Nhắn tin nội bộ', desc: 'Sử dụng chat trao đổi nội bộ' },
+      { id: 'MANAGE_EMPLOYEES', label: 'Quản lý nhân sự', desc: 'Quản lý danh sách nhân viên & địa bàn' },
+      { id: 'SYSTEM_SETTINGS', label: 'Cài đặt hệ thống', desc: 'Cấu hình ngày nghỉ, sao lưu & phân quyền' },
+    ]
+  },
+  {
+    id: 'buttons',
+    title: '⚡ Nút Thao tác Phê duyệt & Chuyển bước',
+    desc: 'Bật/tắt các nút bấm quy trình trong bảng làm việc',
+    items: [
+      { id: 'BTN_SUBMIT_SIGN', label: 'Nút: Trình ký / Trình kiểm tra', desc: 'Nút gửi hồ sơ lên cấp kiểm tra hoặc Giám đốc' },
+      { id: 'BTN_REJECT_RECORD', label: 'Nút: Trả hồ sơ / Từ chối', desc: 'Nút trả lại hồ sơ yêu cầu chỉnh sửa' },
+      { id: 'BTN_CLOSE_BATCH', label: 'Nút: Tạo đợt bàn giao / Chốt đợt', desc: 'Nút chốt đợt bàn giao kết quả sang Một cửa' },
+    ]
+  }
+];
+
 interface SystemSettingsViewProps {
   onDeleteAllData: () => Promise<boolean>;
   onHolidaysChanged?: () => void;
@@ -214,8 +295,11 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
   const [rolePermissions, setRolePermissions] = useState<RolePermissions>(DEFAULT_ROLE_PERMISSIONS);
   const [departmentPermissions, setDepartmentPermissions] = useState<DepartmentPermissions>({});
   const [selectedRole, setSelectedRole] = useState<UserRole | string>(UserRole.SUBADMIN);
+  const [selectedDepartment, setSelectedDepartment] = useState<string>('Tổ Đăng ký cấp giấy');
+  const [selectedRoleSub, setSelectedRoleSub] = useState<UserRole | string>(UserRole.EMPLOYEE);
+  const [permSearchQuery, setPermSearchQuery] = useState('');
   const [isSavingPermissions, setIsSavingPermissions] = useState(false);
-  const [permissionTab, setPermissionTab] = useState<'role' | 'department'>('role');
+  const [permissionTab, setPermissionTab] = useState<'department' | 'role'>('department');
 
   // Contract Number Settings States
   const [contractPrefix, setContractPrefix] = useState('HĐ-{năm}-');
@@ -460,8 +544,70 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
       }
   };
 
+  const isPermChecked = (permissionId: string): boolean => {
+      if (permissionTab === 'role') {
+          if (selectedRole === UserRole.ADMIN) return true;
+          const perms = rolePermissions[selectedRole as string] || [];
+          return perms.includes('*') || perms.includes(permissionId);
+      } else {
+          const deptRoleKey = `${selectedDepartment}_${selectedRoleSub}`;
+          if (departmentPermissions[deptRoleKey]) {
+              return departmentPermissions[deptRoleKey].includes('*') || departmentPermissions[deptRoleKey].includes(permissionId);
+          }
+          if (departmentPermissions[selectedDepartment]) {
+              return departmentPermissions[selectedDepartment].includes('*') || departmentPermissions[selectedDepartment].includes(permissionId);
+          }
+          const rolePerms = rolePermissions[selectedRoleSub as string] || [];
+          return rolePerms.includes('*') || rolePerms.includes(permissionId);
+      }
+  };
+
+  const toggleDeptRolePerm = (permissionId: string) => {
+      if (permissionTab === 'role') {
+          if (selectedRole === UserRole.ADMIN) return;
+          setRolePermissions(prev => {
+              const current = prev[selectedRole as string] || [];
+              const updated = current.includes(permissionId)
+                  ? current.filter(p => p !== permissionId)
+                  : [...current, permissionId];
+              return { ...prev, [selectedRole as string]: updated };
+          });
+      } else {
+          const deptRoleKey = `${selectedDepartment}_${selectedRoleSub}`;
+          setDepartmentPermissions(prev => {
+              const current = prev[deptRoleKey] || prev[selectedDepartment] || rolePermissions[selectedRoleSub as string] || [];
+              const updated = current.includes(permissionId)
+                  ? current.filter(p => p !== permissionId)
+                  : [...current, permissionId];
+              return { ...prev, [deptRoleKey]: updated };
+          });
+      }
+  };
+
+  const toggleCategoryAll = (itemIds: string[], selectAll: boolean) => {
+      if (permissionTab === 'role') {
+          if (selectedRole === UserRole.ADMIN) return;
+          setRolePermissions(prev => {
+              const current = prev[selectedRole as string] || [];
+              const updated = selectAll
+                  ? Array.from(new Set([...current, ...itemIds]))
+                  : current.filter(p => !itemIds.includes(p));
+              return { ...prev, [selectedRole as string]: updated };
+          });
+      } else {
+          const deptRoleKey = `${selectedDepartment}_${selectedRoleSub}`;
+          setDepartmentPermissions(prev => {
+              const current = prev[deptRoleKey] || prev[selectedDepartment] || rolePermissions[selectedRoleSub as string] || [];
+              const updated = selectAll
+                  ? Array.from(new Set([...current, ...itemIds]))
+                  : current.filter(p => !itemIds.includes(p));
+              return { ...prev, [deptRoleKey]: updated };
+          });
+      }
+  };
+
   const togglePermission = (roleOrDept: string, permissionId: string, isRole: boolean) => {
-      if (isRole && roleOrDept === UserRole.ADMIN) return; // Cannot edit ADMIN permissions
+      if (isRole && roleOrDept === UserRole.ADMIN) return;
       
       if (isRole) {
           setRolePermissions(prev => {
@@ -778,111 +924,246 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
             )}
 
             {activeTab === 'permissions' && (
-                <div className="space-y-6 max-w-4xl mx-auto">
-                    <div className="bg-white border border-purple-100 rounded-2xl p-5 flex flex-col md:flex-row gap-4 items-center justify-between shadow-sm">
-                        <div className="text-center md:text-left">
-                            <h3 className="font-black text-purple-800 flex items-center justify-center md:justify-start gap-2 mb-1 tracking-tight"> <Key size={18} /> Phân quyền hệ thống </h3>
-                            <p className="text-xs text-purple-600 font-medium">Cấu hình quyền truy cập cho từng nhóm người dùng.</p>
+                <div className="h-[calc(100vh-170px)] min-h-[500px] flex flex-col bg-white border border-purple-100 rounded-2xl shadow-sm overflow-hidden relative">
+                    {/* Header Pinned Top */}
+                    <div className="bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-900 text-white p-4 md:p-5 flex-shrink-0">
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                            <div>
+                                <h3 className="font-black text-lg md:text-xl flex items-center gap-2.5 tracking-tight text-white">
+                                    <Key className="text-purple-300" size={22} /> Cấu hình Phân quyền Hệ thống
+                                </h3>
+                                <p className="text-xs text-purple-200 mt-1 font-medium">
+                                    Phân quyền chi tiết theo <span className="font-bold text-amber-300">Phòng ban / Tổ chuyên môn</span> và <span className="font-bold text-amber-300">Chức danh / Vai trò tài khoản</span>.
+                                </p>
+                            </div>
+
+                            {/* Search Filter Box */}
+                            <div className="relative w-full md:w-72">
+                                <Search size={16} className="absolute left-3 top-3 text-purple-300" />
+                                <input
+                                    type="text"
+                                    placeholder="Tìm quyền, chức năng, nút..."
+                                    value={permSearchQuery}
+                                    onChange={(e) => setPermSearchQuery(e.target.value)}
+                                    className="w-full bg-white/10 text-white placeholder-purple-300 text-xs rounded-xl pl-9 pr-3 py-2 border border-purple-400/30 focus:outline-none focus:ring-2 focus:ring-purple-400"
+                                />
+                                {permSearchQuery && (
+                                    <button 
+                                        onClick={() => setPermSearchQuery('')}
+                                        className="absolute right-3 top-2.5 text-purple-300 hover:text-white text-xs font-bold"
+                                    >
+                                        ✕
+                                    </button>
+                                )}
+                            </div>
                         </div>
-                        <button 
-                            onClick={handleSavePermissions}
-                            disabled={isSavingPermissions}
-                            className="w-full md:w-auto px-6 py-2.5 bg-purple-600 text-white font-black text-xs uppercase tracking-widest rounded-xl hover:bg-purple-700 transition-all shadow-md shadow-purple-100 disabled:opacity-50 flex items-center justify-center gap-2 active:scale-95"
-                        >
-                            {isSavingPermissions ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />}
-                            Lưu phân quyền
-                        </button>
+
+                        {/* Top Mode Selector Tabs */}
+                        <div className="flex items-center gap-2 mt-4 pt-3 border-t border-purple-700/50">
+                            <button
+                                onClick={() => setPermissionTab('department')}
+                                className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 transition-all ${
+                                    permissionTab === 'department'
+                                        ? 'bg-amber-400 text-slate-950 shadow-md font-bold'
+                                        : 'bg-white/10 text-purple-100 hover:bg-white/20'
+                                }`}
+                            >
+                                🏢 Phân quyền theo Phòng ban / Tổ
+                            </button>
+                            <button
+                                onClick={() => setPermissionTab('role')}
+                                className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 transition-all ${
+                                    permissionTab === 'role'
+                                        ? 'bg-amber-400 text-slate-950 shadow-md font-bold'
+                                        : 'bg-white/10 text-purple-100 hover:bg-white/20'
+                                }`}
+                            >
+                                👤 Phân quyền theo Vai trò chung
+                            </button>
+                        </div>
                     </div>
 
-                    <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
-                        <div className="flex border-b border-gray-200 bg-gray-100 px-2">
-                            <button
-                                onClick={() => { setPermissionTab('role'); setSelectedRole(UserRole.SUBADMIN); }}
-                                className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors ${permissionTab === 'role' ? 'border-purple-600 text-purple-700 bg-white' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-                            >
-                                Theo Vai trò
-                            </button>
-                            <button
-                                onClick={() => { setPermissionTab('department'); setSelectedRole(departments[0] || ''); }}
-                                className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors ${permissionTab === 'department' ? 'border-purple-600 text-purple-700 bg-white' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-                            >
-                                Theo Phòng ban
-                            </button>
-                        </div>
-                        {permissionTab === 'role' ? (
-                            <div className="flex border-b border-gray-200 bg-gray-50 px-2 overflow-x-auto no-scrollbar">
-                                {Object.values(UserRole).filter(r => r !== UserRole.ADMIN).map(role => (
-                                    <button
-                                        key={role}
-                                        onClick={() => setSelectedRole(role)}
-                                        className={`px-4 py-3 text-xs md:text-sm font-black uppercase tracking-widest flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${selectedRole === role ? 'border-purple-600 text-purple-700 bg-white' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
-                                    >
-                                        {role}
-                                    </button>
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="p-4 bg-purple-50/50 border-b border-gray-200">
-                                <div className="text-xs text-purple-800 font-bold uppercase tracking-wider mb-3 px-1">
-                                    Chọn Phòng ban / Tổ chuyên môn để phân quyền:
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                                    {PERMISSION_DEPARTMENTS.map(dept => {
-                                        const isSelected = selectedRole === dept.id;
-                                        return (
-                                            <button
-                                                key={dept.id}
-                                                type="button"
-                                                onClick={() => setSelectedRole(dept.id)}
-                                                className={`p-4 rounded-xl border text-left transition-all cursor-pointer ${
-                                                    isSelected 
-                                                        ? 'bg-white border-purple-500 shadow-md ring-2 ring-purple-100' 
-                                                        : 'bg-white/60 border-gray-200 hover:bg-white hover:border-gray-300'
-                                                }`}
-                                            >
-                                                <div className="flex items-center gap-2">
-                                                    <div className={`w-2 h-2 rounded-full ${isSelected ? 'bg-purple-600 animate-pulse' : 'bg-gray-300'}`} />
-                                                    <span className={`text-xs md:text-sm font-bold ${isSelected ? 'text-purple-700 font-black' : 'text-gray-700'}`}>
-                                                        {dept.name}
-                                                    </span>
-                                                </div>
-                                                <div className="text-[11px] text-gray-500 mt-1 font-semibold leading-tight line-clamp-1" title={dept.id}>
-                                                    {dept.id}
-                                                </div>
-                                                <div className="text-[10px] text-gray-400 mt-2 leading-relaxed font-medium line-clamp-2">
-                                                    {dept.desc}
-                                                </div>
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        )}
-                        <div className="p-6">
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {AVAILABLE_PERMISSIONS.map(perm => {
-                                    const hasPerm = !!(permissionTab === 'role' 
-                                        ? (rolePermissions[selectedRole]?.includes(perm.id) || rolePermissions[selectedRole]?.includes('*'))
-                                        : (departmentPermissions[selectedRole]?.includes(perm.id) || departmentPermissions[selectedRole]?.includes('*')));
+                    {/* Department / Role Controls Sub-Bar */}
+                    {permissionTab === 'department' ? (
+                        <div className="bg-purple-50/70 border-b border-purple-100 p-3 md:p-4 flex-shrink-0 space-y-3">
+                            {/* Department Selection */}
+                            <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+                                <span className="text-[11px] font-black uppercase tracking-wider text-purple-900 shrink-0 mr-1">
+                                    Phòng ban:
+                                </span>
+                                {PERMISSION_DEPARTMENTS.map((dept) => {
+                                    const isSelected = selectedDepartment === dept.id;
                                     return (
-                                        <label key={perm.id} className={`flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition-colors ${hasPerm ? 'bg-purple-50 border-purple-200' : 'bg-gray-50 border-gray-200 hover:bg-gray-100'}`}>
-                                            <div className="mt-0.5">
-                                                <input 
-                                                    type="checkbox" 
-                                                    className="w-4 h-4 text-purple-600 rounded border-gray-300 focus:ring-purple-500"
-                                                    checked={hasPerm}
-                                                    onChange={() => togglePermission(selectedRole, perm.id, permissionTab === 'role')}
-                                                    disabled={permissionTab === 'role' && selectedRole === UserRole.ADMIN}
-                                                />
-                                            </div>
-                                            <div>
-                                                <div className={`text-sm font-bold ${hasPerm ? 'text-purple-900' : 'text-gray-700'}`}>{perm.label}</div>
-                                                <div className="text-xs text-gray-500 mt-0.5 font-mono">{perm.id}</div>
-                                            </div>
-                                        </label>
+                                        <button
+                                            key={dept.id}
+                                            onClick={() => setSelectedDepartment(dept.id)}
+                                            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 flex items-center gap-2 border ${
+                                                isSelected
+                                                    ? 'bg-purple-700 text-white border-purple-800 shadow-sm font-black'
+                                                    : 'bg-white text-slate-700 border-purple-100 hover:border-purple-300'
+                                            }`}
+                                        >
+                                            <span className={`w-2 h-2 rounded-full ${isSelected ? 'bg-amber-300 animate-pulse' : 'bg-slate-300'}`} />
+                                            {dept.name}
+                                        </button>
                                     );
                                 })}
                             </div>
+
+                            {/* Role Sub-tabs inside selected Department */}
+                            <div className="flex items-center gap-2 overflow-x-auto pt-1 border-t border-purple-200/60 no-scrollbar">
+                                <span className="text-[11px] font-black uppercase tracking-wider text-purple-900 shrink-0 mr-1">
+                                    Tài khoản / Vai trò:
+                                </span>
+                                {ROLES_FOR_DEPARTMENT.map((r) => {
+                                    const isSelected = selectedRoleSub === r.role;
+                                    return (
+                                        <button
+                                            key={r.role}
+                                            onClick={() => setSelectedRoleSub(r.role)}
+                                            className={`px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all whitespace-nowrap shrink-0 flex items-center gap-1.5 border ${
+                                                isSelected
+                                                    ? 'bg-amber-500 text-slate-950 border-amber-600 shadow-sm font-black'
+                                                    : 'bg-white/80 text-slate-600 border-purple-100 hover:bg-white'
+                                            }`}
+                                        >
+                                            <span>{r.label}</span>
+                                            <span className={`text-[9px] px-1.5 py-0.5 rounded uppercase font-bold ${
+                                                isSelected ? 'bg-slate-900 text-amber-300' : 'bg-slate-100 text-slate-500'
+                                            }`}>
+                                                {r.badge}
+                                            </span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="bg-purple-50/70 border-b border-purple-100 p-3 md:p-4 flex-shrink-0 flex items-center gap-2 overflow-x-auto no-scrollbar">
+                            <span className="text-[11px] font-black uppercase tracking-wider text-purple-900 shrink-0 mr-1">
+                                Chọn Vai trò:
+                            </span>
+                            {Object.values(UserRole).filter(r => r !== UserRole.ADMIN).map((role) => {
+                                const isSelected = selectedRole === role;
+                                return (
+                                    <button
+                                        key={role}
+                                        onClick={() => setSelectedRole(role)}
+                                        className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all whitespace-nowrap shrink-0 border ${
+                                            isSelected
+                                                ? 'bg-purple-700 text-white border-purple-800 shadow-sm'
+                                                : 'bg-white text-slate-600 border-purple-100 hover:border-purple-300'
+                                        }`}
+                                    >
+                                        {role}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    )}
+
+                    {/* Scrollable Matrix Area */}
+                    <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 bg-slate-50/50 custom-scrollbar">
+                        {PERMISSION_GROUPS.map((group) => {
+                            const filteredItems = group.items.filter((item) => {
+                                if (!permSearchQuery.trim()) return true;
+                                const q = permSearchQuery.toLowerCase();
+                                return (
+                                    item.label.toLowerCase().includes(q) ||
+                                    item.id.toLowerCase().includes(q) ||
+                                    item.desc.toLowerCase().includes(q)
+                                );
+                            });
+
+                            if (filteredItems.length === 0) return null;
+
+                            const itemIds = filteredItems.map((i) => i.id);
+                            const allChecked = itemIds.every((id) => isPermChecked(id));
+
+                            return (
+                                <div key={group.id} className="bg-white border border-purple-100/80 rounded-2xl p-5 shadow-sm space-y-4">
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-purple-50 pb-3">
+                                        <div>
+                                            <h4 className="font-black text-slate-800 text-sm md:text-base flex items-center gap-2">
+                                                {group.title}
+                                            </h4>
+                                            <p className="text-xs text-slate-500 font-medium mt-0.5">{group.desc}</p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => toggleCategoryAll(itemIds, !allChecked)}
+                                            className="text-[11px] font-bold text-purple-700 hover:text-purple-900 bg-purple-50 hover:bg-purple-100 px-3 py-1.5 rounded-lg border border-purple-200 transition-colors self-start sm:self-auto shrink-0"
+                                        >
+                                            {allChecked ? 'Bỏ chọn tất cả nhóm này' : 'Chọn tất cả nhóm này'}
+                                        </button>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                        {filteredItems.map((perm) => {
+                                            const checked = isPermChecked(perm.id);
+                                            return (
+                                                <label
+                                                    key={perm.id}
+                                                    className={`flex items-start gap-3 p-3.5 rounded-xl border cursor-pointer transition-all ${
+                                                        checked
+                                                            ? 'bg-purple-50/80 border-purple-300 shadow-xs'
+                                                            : 'bg-white border-slate-200 hover:bg-slate-50'
+                                                    }`}
+                                                >
+                                                    <div className="mt-0.5 shrink-0">
+                                                        <input
+                                                            type="checkbox"
+                                                            className="w-4 h-4 text-purple-600 rounded border-slate-300 focus:ring-purple-500 cursor-pointer"
+                                                            checked={checked}
+                                                            onChange={() => toggleDeptRolePerm(perm.id)}
+                                                            disabled={permissionTab === 'role' && selectedRole === UserRole.ADMIN}
+                                                        />
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className={`text-xs md:text-sm font-black ${checked ? 'text-purple-950' : 'text-slate-800'}`}>
+                                                            {perm.label}
+                                                        </div>
+                                                        <div className="text-[11px] text-slate-500 font-medium mt-0.5 leading-snug">
+                                                            {perm.desc}
+                                                        </div>
+                                                        <div className="text-[10px] text-slate-400 font-mono mt-1">
+                                                            {perm.id}
+                                                        </div>
+                                                    </div>
+                                                </label>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+
+                    {/* Floating Sticky Save Bar (Pinned Bottom) */}
+                    <div className="sticky bottom-0 z-30 bg-white/95 backdrop-blur-md border-t border-purple-200 p-4 px-6 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-lg flex-shrink-0">
+                        <div className="flex items-center gap-2 text-xs text-slate-700 font-medium">
+                            <span className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse" />
+                            <span>Đang cấu hình:</span>
+                            {permissionTab === 'department' ? (
+                                <span className="font-black text-purple-900 bg-purple-100 px-2.5 py-1 rounded-lg border border-purple-200">
+                                    🏢 {selectedDepartment} → {ROLES_FOR_DEPARTMENT.find(r => r.role === selectedRoleSub)?.label || selectedRoleSub}
+                                </span>
+                            ) : (
+                                <span className="font-black text-purple-900 bg-purple-100 px-2.5 py-1 rounded-lg border border-purple-200">
+                                    👤 Vai trò: {selectedRole}
+                                </span>
+                            )}
+                        </div>
+
+                        <div className="flex items-center gap-3 w-full sm:w-auto">
+                            <button
+                                onClick={handleSavePermissions}
+                                disabled={isSavingPermissions}
+                                className="w-full sm:w-auto px-8 py-3 bg-gradient-to-r from-purple-700 to-indigo-800 hover:from-purple-800 hover:to-indigo-900 text-white font-black text-xs uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-purple-200 disabled:opacity-50 flex items-center justify-center gap-2.5 active:scale-95"
+                            >
+                                {isSavingPermissions ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+                                Lưu cấu hình phân quyền
+                            </button>
                         </div>
                     </div>
                 </div>

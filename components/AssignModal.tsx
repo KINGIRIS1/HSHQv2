@@ -66,7 +66,7 @@ interface EmployeeItemProps {
 const EmployeeItem: React.FC<EmployeeItemProps> = ({ emp, isLastAssigned, isTargetWardMatch, isSelected, onSelect }) => (
     <div 
         onClick={() => onSelect(emp.id)}
-        className={`relative flex items-start gap-3.5 p-3.5 rounded-xl border cursor-pointer transition-all duration-200 group h-full ${
+        className={`relative flex flex-col justify-between p-3 rounded-xl border cursor-pointer transition-all duration-200 group h-full ${
             isTargetWardMatch 
                 ? (isSelected 
                     ? 'bg-emerald-100/90 border-emerald-600 shadow-md ring-2 ring-emerald-300' 
@@ -76,55 +76,60 @@ const EmployeeItem: React.FC<EmployeeItemProps> = ({ emp, isLastAssigned, isTarg
                     : 'bg-white border-gray-200 hover:border-indigo-400 hover:shadow-lg')
         }`}
     >
-        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-black shrink-0 transition-colors ${
-            isSelected 
-                ? 'bg-indigo-600 text-white' 
-                : isTargetWardMatch 
-                    ? 'bg-emerald-600 text-white' 
-                    : 'bg-gray-100 text-gray-700 group-hover:bg-indigo-100 group-hover:text-indigo-700'
-        }`}>
-            {emp.name.charAt(0).toUpperCase()}
-        </div>
-        
-        <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-1.5 mb-1 flex-wrap">
-                <span className={`font-black text-sm truncate ${isSelected ? 'text-indigo-900' : isTargetWardMatch ? 'text-emerald-950 font-extrabold' : 'text-gray-800'}`}>
-                    {emp.name}
-                </span>
-                {/* Ẩn chữ "Giao gần nhất", chỉ để lại dấu tích chọn/badge icon ngay tại nhân viên giao gần nhất */}
-                {isLastAssigned && (
-                    <span className="inline-flex items-center justify-center bg-teal-600 text-white w-5 h-5 rounded-full shadow-xs shrink-0" title="Đã chọn giao gần nhất">
-                        <Check size={13} strokeWidth={3} />
-                    </span>
-                )}
-                {isSelected && !isLastAssigned && <Check size={16} className="text-indigo-600 shrink-0" />}
-                {isTargetWardMatch && (
-                    <span className="inline-flex items-center gap-0.5 bg-emerald-600 text-white text-[10px] font-bold px-1.5 py-0.2 rounded shadow-2xs ml-auto">
-                        <MapPin size={9} /> Đúng địa bàn
-                    </span>
-                )}
+        {/* Phần trên: Ảnh/Chữ viết tắt tên & Thông tin nhân viên */}
+        <div className="flex items-start gap-2.5">
+            <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-black shrink-0 transition-colors ${
+                isSelected 
+                    ? 'bg-indigo-600 text-white' 
+                    : isTargetWardMatch 
+                        ? 'bg-emerald-600 text-white' 
+                        : 'bg-gray-100 text-gray-700 group-hover:bg-indigo-100 group-hover:text-indigo-700'
+            }`}>
+                {emp.name.charAt(0).toUpperCase()}
             </div>
             
-            {/* Chức vụ và Tổ thể hiện ví dụ: Chuyên viên - Tổ Đo đạc */}
-            <div className="text-xs font-semibold text-gray-600 flex items-center gap-1.5 mb-1">
-                <Briefcase size={12} className="text-gray-400 shrink-0" />
-                <span>{emp.position || 'Nhân viên'} - <span className="text-indigo-700 font-bold">{emp.department || 'Tổ chuyên môn'}</span></span>
-            </div>
-
-            {/* Hiển thị địa bàn phụ trách theo 4 xã 1 hàng ngang */}
-            {emp.managedWards && emp.managedWards.length > 0 && (
-                <div className="mt-2.5 pt-2 border-t border-gray-200/60">
-                    <span className="text-[10px] text-gray-500 font-bold block mb-1 uppercase tracking-tight">ĐỊA BÀN PHỤ TRÁCH:</span>
-                    <div className="grid grid-cols-4 gap-1">
-                        {emp.managedWards.map((w, idx) => (
-                            <span key={idx} className="text-[10px] bg-white/80 text-slate-700 px-1 py-0.5 rounded border border-slate-200/80 truncate text-center font-medium block shadow-2xs" title={w}>
-                                {w}
-                            </span>
-                        ))}
-                    </div>
+            <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-1 mb-0.5">
+                    <span className={`font-black text-sm truncate ${isSelected ? 'text-indigo-900' : isTargetWardMatch ? 'text-emerald-950 font-extrabold' : 'text-gray-800'}`}>
+                        {emp.name}
+                    </span>
+                    {/* Dấu tích chọn nổi bật màu tím indigo khi nhân viên được chọn */}
+                    {isSelected && (
+                        <div className="bg-indigo-600 text-white p-1 rounded-full shadow-xs shrink-0 flex items-center justify-center">
+                            <Check size={14} strokeWidth={3} />
+                        </div>
+                    )}
                 </div>
-            )}
+                
+                {/* Chức vụ và Tổ thể hiện ví dụ: Chuyên viên - Tổ Đo đạc */}
+                <div className="text-xs font-semibold text-gray-600 flex items-center gap-1">
+                    <Briefcase size={12} className="text-gray-400 shrink-0" />
+                    <span className="truncate">{emp.position || 'Nhân viên'} - <span className="text-indigo-700 font-bold">{emp.department || 'Tổ chuyên môn'}</span></span>
+                </div>
+            </div>
         </div>
+
+        {/* Dòng địa bàn phụ trách: Căn chỉnh vừa hết khung thẻ (full card width, không bị cản/thụt lùi bởi avatar chữ cái tên) */}
+        {emp.managedWards && emp.managedWards.length > 0 && (
+            <div className="mt-2 pt-2 border-t border-gray-200/60 w-full">
+                <span className="text-[10px] text-gray-500 font-bold block mb-1 uppercase tracking-tight">ĐỊA BÀN PHỤ TRÁCH:</span>
+                <div className="grid grid-cols-4 gap-1 w-full">
+                    {emp.managedWards.map((w, idx) => {
+                        // Tự động bỏ các tiền tố "Xã", "Phường", "Thị trấn", "TT." khi hiển thị để 4 địa bàn luôn hiển thị vừa vặn trọn vẹn 1 dòng không bị mất chữ
+                        const displayName = w.replace(/^(Xã|Phường|Thị trấn|TT\.)\s+/i, '');
+                        return (
+                            <span 
+                                key={idx} 
+                                className="text-[10px] bg-white/90 text-slate-700 px-1 py-0.5 rounded border border-slate-200/80 text-center font-medium block shadow-2xs whitespace-nowrap overflow-hidden text-ellipsis" 
+                                title={w}
+                            >
+                                {displayName}
+                            </span>
+                        );
+                    })}
+                </div>
+            </div>
+        )}
     </div>
 );
 
@@ -153,26 +158,45 @@ const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, e
       return DEPARTMENTS_CONFIG.map(c => c.id);
   }, []);
 
-  // Xác định tổ chuyên môn mặc định cho hồ sơ
-  const getRecordDefaultDepartment = (records: RecordFile[], view?: string): string => {
-      if (view && view.includes('archive')) {
-          return 'Tổ Lưu trữ';
+  // Xác định tổ chuyên môn mặc định cho hồ sơ dựa theo Tab/View hiện tại hoặc loại hồ sơ
+  const getRecordDefaultDepartment = (records: RecordFile[], view?: string, filterDept?: string): string => {
+      // 1. Kiểm tra filterDepartment truyền vào
+      if (filterDept) {
+          const normFilter = filterDept.toLowerCase();
+          if (normFilter.includes('đo đạc') || normFilter.includes('đo dạc')) return 'Tổ Đo đạc';
+          if (normFilter.includes('cấp giấy') || normFilter.includes('đăng ký')) return 'Tổ Đăng ký cấp giấy';
+          if (normFilter.includes('lưu trữ')) return 'Tổ Lưu trữ';
+          if (normFilter.includes('hành chính') || normFilter.includes('một cửa')) return 'Tổ Hành chính';
       }
-      if (!records || records.length === 0) {
-          return 'Tổ Đo đạc';
+
+      // 2. Ưu tiên kiểm tra tab/view chuyên môn đang làm việc
+      if (view) {
+          const normView = view.toLowerCase();
+          if (normView.includes('archive') || normView.includes('saoluc') || normView.includes('congvan')) {
+              return 'Tổ Lưu trữ';
+          }
+          if (normView.includes('other')) {
+              return 'Tổ Đăng ký cấp giấy';
+          }
+          if (normView.includes('all_records') || normView.includes('assign_tasks') || normView.includes('check_list') || normView.includes('handover_list') || normView.includes('completed')) {
+              return 'Tổ Đo đạc';
+          }
       }
-      
-      const record = records[0];
-      const type = (record.recordType || '').toLowerCase();
-      
-      if (type.includes('1.1') || type.includes('1.2') || type.includes('công văn') || type.includes('lưu trữ')) {
-          return 'Tổ Lưu trữ';
-      }
-      if (type.includes('2.1') || type.includes('2.2') || type.includes('trích lục')) {
-          return 'Tổ Đăng ký cấp giấy';
-      }
-      if (type.includes('2.3') || type.includes('2.4') || type.includes('2.5') || type.includes('2.6') || type.includes('số thửa') || type.includes('trích đo') || type.includes('đo đạc')) {
-          return 'Tổ Đo đạc';
+
+      // 3. Nếu có hồ sơ chọn, kiểm tra theo loại hồ sơ
+      if (records && records.length > 0) {
+          const record = records[0];
+          const type = (record.recordType || '').toLowerCase();
+          
+          if (type.includes('1.1') || type.includes('1.2') || type.includes('công văn') || type.includes('lưu trữ')) {
+              return 'Tổ Lưu trữ';
+          }
+          if (type.includes('2.1') || type.includes('2.2') || type.includes('trích lục')) {
+              return 'Tổ Đăng ký cấp giấy';
+          }
+          if (type.includes('2.3') || type.includes('2.4') || type.includes('2.5') || type.includes('2.6') || type.includes('số thửa') || type.includes('trích đo') || type.includes('đo đạc')) {
+              return 'Tổ Đo đạc';
+          }
       }
 
       return 'Tổ Đo đạc';
@@ -186,33 +210,38 @@ const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, e
           : emp.department === deptId;
   };
 
-  // Mỗi khi mở modal, tự động đặt tổ chuyên môn mặc định dựa trên loại hồ sơ
+  // Mỗi khi mở modal, tự động đặt tổ chuyên môn mặc định khớp với Tab chuyên môn đang đứng
   useEffect(() => {
       if (isOpen) {
-          const defaultDept = getRecordDefaultDepartment(selectedRecords, currentView);
+          const defaultDept = getRecordDefaultDepartment(selectedRecords, currentView, filterDepartment);
           setSelectedDept(defaultDept);
           setSearchTerm('');
       }
-  }, [isOpen, selectedRecords, currentView]);
+  }, [isOpen, selectedRecords, currentView, filterDepartment]);
 
-  // Mỗi khi đổi tổ chuyên môn, tự động ghi nhớ và khôi phục người được giao gần nhất của tổ đó
+  // Xác định người được giao việc gần nhất của tổ đang chọn
+  const lastAssignedIdForCurrentDept = useMemo(() => {
+      if (!selectedDept) return null;
+      return localStorage.getItem(`last_assigned_${selectedDept}`);
+  }, [selectedDept, isOpen]);
+
+  // Mỗi khi đổi tổ chuyên môn, tự động khôi phục người được giao gần nhất của tổ đó làm mặc định chọn
   useEffect(() => {
       if (isOpen && selectedDept) {
-          const lastAssigned = localStorage.getItem(`last_assigned_${selectedDept}`);
-          if (lastAssigned) {
-              const isValid = employees.some(e => e.id === lastAssigned && isEmployeeInDept(e, selectedDept));
+          if (lastAssignedIdForCurrentDept) {
+              const isValid = employees.some(e => e.id === lastAssignedIdForCurrentDept && isEmployeeInDept(e, selectedDept));
               if (isValid) {
-                  setSelectedEmpId(lastAssigned);
+                  setSelectedEmpId(lastAssignedIdForCurrentDept);
                   return;
               }
           }
           setSelectedEmpId('');
       }
-  }, [isOpen, selectedDept, employees]);
+  }, [isOpen, selectedDept, employees, lastAssignedIdForCurrentDept]);
 
-  // Lọc và tìm kiếm nhân viên thuộc tổ chuyên môn hiện tại
+  // Lọc và tìm kiếm nhân viên thuộc tổ chuyên môn hiện tại (Đưa người giao gần nhất lên đầu tiên)
   const filteredEmployees = useMemo(() => {
-      return employees.filter(emp => {
+      const list = employees.filter(emp => {
           const deptMatch = isEmployeeInDept(emp, selectedDept);
           
           if (!deptMatch) return false;
@@ -227,13 +256,18 @@ const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, e
           }
           return true;
       });
-  }, [employees, selectedDept, searchTerm]);
 
-  // Xác định người được giao việc gần nhất của tổ đang chọn
-  const lastAssignedIdForCurrentDept = useMemo(() => {
-      if (!selectedDept) return null;
-      return localStorage.getItem(`last_assigned_${selectedDept}`);
-  }, [selectedDept, isOpen]);
+      // Luôn sắp xếp người được giao gần nhất lên vị trí đầu tiên
+      if (lastAssignedIdForCurrentDept) {
+          list.sort((a, b) => {
+              if (a.id === lastAssignedIdForCurrentDept) return -1;
+              if (b.id === lastAssignedIdForCurrentDept) return 1;
+              return 0;
+          });
+      }
+
+      return list;
+  }, [employees, selectedDept, searchTerm, lastAssignedIdForCurrentDept]);
 
   // Xác định nhân viên phụ trách đúng địa bàn của hồ sơ
   const isWardMatch = (emp: Employee) => {

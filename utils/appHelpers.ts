@@ -1,5 +1,5 @@
 
-import { RecordFile, RecordStatus } from '../types';
+import { RecordFile, RecordStatus, Employee } from '../types';
 
 // --- HÀM TIỆN ÍCH XỬ LÝ CHUỖI TIẾNG VIỆT ---
 export function removeVietnameseTones(str: string): string {
@@ -304,5 +304,121 @@ export function parseSafeDate(dateStr: any): Date | null {
     const d = new Date(s);
     return isNaN(d.getTime()) ? null : d;
 }
+
+export function processAssignmentTimelineCheck(
+  record: RecordFile,
+  newEmployeeId: string,
+  newAssignedDateStr: string,
+  employees: Employee[],
+  currentUser: any
+): Partial<RecordFile> {
+  const newDate = parseSafeDate(newAssignedDateStr) || new Date();
+  const formatDateVN = (dStr?: string | null) => {
+    if (!dStr) return '';
+    const d = parseSafeDate(dStr);
+    if (!d) return String(dStr);
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    return `${day}/${month}/${year}`;
+  };
+
+  const oldEmp = employees.find(e => e.id === record.assignedTo);
+  const newEmp = employees.find(e => e.id === newEmployeeId);
+
+  const oldEmpName = oldEmp ? oldEmp.name : (record.assignedTo || 'Chưa phân công');
+  const newEmpName = newEmp ? newEmp.name : newEmployeeId;
+
+  // List previous milestones
+  const historyParts: string[] = [];
+  if (record.assignedDate) {
+    historyParts.push(`Giao NV ${oldEmpName} ngày ${formatDateVN(record.assignedDate)}`);
+  }
+  if (record.completedWorkDate) {
+    historyParts.push(`Đã thực hiện ngày ${formatDateVN(record.completedWorkDate)}`);
+  }
+  if (record.pendingCheckDate) {
+    historyParts.push(`Trình KT ngày ${formatDateVN(record.pendingCheckDate)}`);
+  }
+  if (record.submissionDate) {
+    historyParts.push(`Trình ký ngày ${formatDateVN(record.submissionDate)}`);
+  }
+  if (record.checkedDate) {
+    historyParts.push(`Đã kiểm tra ngày ${formatDateVN(record.checkedDate)}`);
+  }
+  if (record.approvalDate) {
+    historyParts.push(`Ký duyệt ngày ${formatDateVN(record.approvalDate)}`);
+  }
+
+  const hasSubsequentSteps = !!(
+    record.submissionDate ||
+    record.pendingCheckDate ||
+    record.checkedDate ||
+    record.approvalDate ||
+    record.completedWorkDate ||
+    record.status === RecordStatus.PENDING_CHECK ||
+    record.status === RecordStatus.CHECKED ||
+    record.status === RecordStatus.PENDING_SIGN ||
+    record.status === RecordStatus.SIGNED ||
+    record.status === RecordStatus.COMPLETED_WORK
+  );
+
+  let isLaterDate = false;
+  if (record.assignedDate) {
+    const oldAssignedDate = parseSafeDate(record.assignedDate);
+    if (oldAssignedDate && newDate > oldAssignedDate) isLaterDate = true;
+  }
+  if (record.submissionDate) {
+    const oldSubDate = parseSafeDate(record.submissionDate);
+    if (oldSubDate && newDate > oldSubDate) isLaterDate = true;
+  }
+  if (record.pendingCheckDate) {
+    const oldCheckDate = parseSafeDate(record.pendingCheckDate);
+    if (oldCheckDate && newDate > oldCheckDate) isLaterDate = true;
+  }
+
+  const updates: Partial<RecordFile> = {
+    assignedTo: newEmployeeId,
+    assignedDate: newAssignedDateStr,
+    status: RecordStatus.IN_PROGRESS,
+    submissionDate: null,
+    pendingCheckDate: null,
+    checkedDate: null,
+    approvalDate: null,
+    completedWorkDate: null,
+    completedDate: null,
+    resultReturnedDate: null,
+    exportBatch: null,
+    exportDate: null,
+  };
+
+  const firstWard = newEmp?.managedWards?.[0];
+  if (firstWard) {
+    updates.ward = firstWard;
+    updates.handoverWard = firstWard;
+  }
+
+  if (hasSubsequentSteps || isLaterDate || historyParts.length > 0) {
+    const logNote = `Giao NV ${oldEmpName} ngày ${formatDateVN(record.assignedDate) || 'trước đó'}${record.submissionDate ? `, Trình ký ngày ${formatDateVN(record.submissionDate)}` : ''}`;
+    const fullInternalNote = `[Cập nhật quy trình] Cập nhật lại đã giao việc ngày ${formatDateVN(newAssignedDateStr)} (${newEmpName}). Đưa về bước Đang thực hiện. Ghi chú nội bộ: ${logNote} để biết và truy vết.`;
+
+    const existingPrivate = record.privateNotes || '';
+    updates.privateNotes = existingPrivate ? `${existingPrivate}\n${fullInternalNote}` : fullInternalNote;
+
+    const newLog = {
+      id: `${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      recordId: record.id,
+      previousStatus: record.status,
+      newStatus: RecordStatus.IN_PROGRESS,
+      changedBy: currentUser?.name || 'Hệ thống',
+      changedAt: new Date().toISOString(),
+      note: fullInternalNote
+    };
+    updates.statusLogs = [...(record.statusLogs || []), newLog];
+  }
+
+  return updates;
+}
+
 
 

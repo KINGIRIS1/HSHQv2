@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import TopNavigation from '../TopNavigation';
 import { Menu, WifiOff, ShieldCheck, UserCircle, LogOut, UserCog, ChevronDown, Settings, HelpCircle, Shield, Headphones, X, UserCheck, Phone, Mail, Clock, CheckCircle2 } from 'lucide-react';
 import { User, UserRole, RolePermissions, DepartmentPermissions, Employee } from '../../types';
+import { isViewAllowedForUser } from '../../config/roleConfig';
 import UpdateRequiredModal from '../UpdateRequiredModal';
 
 interface MainLayoutProps {
@@ -95,23 +96,17 @@ const MainLayout: React.FC<MainLayoutProps> = ({
                         <img src="/icon.png?v=4" alt="Logo Hớn Quản" className="w-full h-full object-contain rounded-full" />
                     </div>
                     <div className="flex flex-col leading-tight">
-                        <h1 className="font-bold text-sm uppercase tracking-wide">Hệ thống tiếp nhận và</h1>
-                        <span className="font-bold text-sm uppercase tracking-wide">quản lý hồ sơ</span>
-                        <span className="text-[10px] text-blue-200 font-normal">Chi nhánh Hớn Quản</span>
+                        <h1 className="font-bold text-sm uppercase tracking-wide text-white whitespace-nowrap">
+                            Hệ thống tiếp nhận và quản lý hồ sơ
+                        </h1>
+                        <span className="font-bold text-sm uppercase tracking-wide text-blue-200 whitespace-nowrap">
+                            Chi nhánh Hớn Quản
+                        </span>
                     </div>
                 </div>
 
-                {/* RIGHT: USER INFO & HELP BUTTON */}
+                {/* RIGHT: USER INFO */}
                 <div className="relative flex items-center gap-2">
-                    {/* Nút ? Trợ giúp ngay cạnh tên đăng nhập */}
-                    <button
-                        onClick={() => setShowHelpModal(true)}
-                        className="w-8 h-8 rounded-full bg-blue-700/80 hover:bg-blue-600 text-blue-100 hover:text-white flex items-center justify-center font-bold text-sm shadow-xs border border-blue-500/40 transition-all cursor-pointer active:scale-95 shrink-0"
-                        title="Trung tâm Trợ giúp & Hỗ trợ kỹ thuật"
-                    >
-                        ?
-                    </button>
-
                     <button 
                         onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
                         className="flex items-center gap-3 group cursor-pointer hover:bg-white/10 p-1.5 rounded-lg transition-colors outline-none focus:ring-2 focus:ring-blue-400/50"
@@ -165,7 +160,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({
                                         </div>
                                         Cài đặt tài khoản
                                     </button>
-                                    {currentUser.role !== UserRole.EMPLOYEE && currentUser.role !== UserRole.ONEDOOR && (
+                                    {(currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.SUBADMIN || isViewAllowedForUser(currentUser, employees, 'system_dashboard')) && (
                                         <button 
                                             onClick={() => {
                                                 setCurrentView('system_dashboard');

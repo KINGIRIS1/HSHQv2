@@ -503,7 +503,23 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
           return; 
       }
 
-      // Kiểm tra trùng lắp hợp đồng trước khi lưu
+      // Kiểm tra trùng SỐ HỢP ĐỒNG (mã HĐ) với hợp đồng khác đã có
+      if (mode === 'contract' && formData.code && contracts) {
+          const duplicateCodeContract = contracts.find(c => 
+              c.code && 
+              c.code.trim().toLowerCase() === formData.code?.trim().toLowerCase() && 
+              c.id !== formData.id
+          );
+          if (duplicateCodeContract) {
+              setNotification({ 
+                  type: 'error', 
+                  message: `CẢNH BÁO TRÙNG SỐ HỢP ĐỒNG: Số hợp đồng "${formData.code}" đã tồn tại trên hệ thống (Chủ HĐ: ${duplicateCodeContract.customerName || 'Khác'}). Vui lòng đổi số khác!` 
+              }); 
+              return;
+          }
+      }
+
+      // Kiểm tra trùng lắp hợp đồng cho cùng 1 hồ sơ trước khi lưu
       if (mode === 'contract' && formData.customerAddress && contracts) {
           const duplicateContract = contracts.find(c => 
               c.customerAddress && 
@@ -686,20 +702,10 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
             <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm">
                 <h3 className="text-xs font-bold text-slate-800 uppercase mb-3 border-b pb-2 flex items-center gap-1.5">
                     <span className="p-1 bg-blue-100 text-blue-600 rounded-md">
-                        {mode === 'contract' ? <FileText size={15} /> : <Search size={15} />}
+                        <FileText size={15} />
                     </span> 
-                    {mode === 'contract' ? 'Thông Tin Khách Hàng & Thửa Đất' : 'Tải từ Số Hợp Đồng'}
+                    Thông Tin Khách Hàng & Thửa Đất
                 </h3>
-                
-                {mode !== 'contract' && (
-                    <div className="flex gap-1.5 mb-3">
-                        <div className="relative flex-1">
-                            <input type="text" placeholder="Nhập số hợp đồng..." className={`${inputClass} pl-8`} value={searchCode} onChange={(e) => setSearchCode(e.target.value)} />
-                            <Search size={14} className="absolute left-2.5 top-2 text-slate-400" />
-                        </div>
-                        <button type="button" onClick={handleSearchRecord} className="bg-blue-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-blue-700 shadow-sm transition-all active:scale-95 whitespace-nowrap">Tải</button>
-                    </div>
-                )}
 
                 <div className="space-y-2.5">
                     <div><label className={labelClass}>Khách hàng</label><input className={inputClass} value={formData.customerName ?? ''} onChange={e => handleChange('customerName', e.target.value)} /></div>
@@ -791,6 +797,20 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
                     )}
                 </div>
             </div>
+
+            {/* GHI CHÚ HỢP ĐỒNG (XEM ẢNH YÊU CẦU - ĐẶT DƯỚI THÊM THỬA ĐẤT KHÁC) */}
+            <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm space-y-2">
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide">
+                    GHI CHÚ HỢP ĐỒNG
+                </label>
+                <textarea 
+                    rows={3} 
+                    className="w-full text-xs p-2.5 border border-slate-200 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200 focus:outline-none transition-all resize-none font-medium text-slate-800 placeholder:text-slate-400" 
+                    value={formData.content ?? ''} 
+                    onChange={e => handleChange('content', e.target.value)} 
+                    placeholder="Nội dung chi tiết..." 
+                />
+            </div>
         </div>
 
         {/* CỘT PHẢI: CHI TIẾT HỢP ĐỒNG */}
@@ -807,12 +827,16 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
                             <span className="text-purple-700 font-extrabold ml-1">
                                 {activeTab === 'cm' 
                                     ? (isLiquidationMode ? 'Thanh Lý Cắm Mốc' : 'Hợp Đồng Cắm Mốc') 
+                                    : activeTab === 'tl'
+                                    ? (isLiquidationMode ? 'Thanh Lý Trích Lục' : 'Hợp Đồng Trích Lục')
+                                    : activeTab === 'tt'
+                                    ? (isLiquidationMode ? 'Thanh Lý Tách Thửa' : 'Hợp Đồng Tách Thửa')
                                     : (isLiquidationMode ? 'Thanh Lý Đo Đạc' : 'Hợp Đồng Đo Đạc')}
                             </span>
                         </span>
                     </div>
                     <span className="text-[10px] font-semibold text-slate-500 italic bg-white px-2 py-0.5 rounded-md border border-slate-200 shadow-2xs">
-                        * Tự động xác định theo {isLiquidationMode ? 'hợp đồng gốc' : 'thủ tục tiếp nhận'}
+                        * Tự động xác định theo mã và thủ tục hồ sơ
                     </span>
                 </div>
 
@@ -1201,25 +1225,28 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
                             </div>
                         </div>
                     </div>
-                    
-                    <div>
-                        <label className={labelClass}>Ghi chú hợp đồng</label>
-                        <textarea rows={3} className={`${inputClass} resize-none`} value={formData.content ?? ''} onChange={e => handleChange('content', e.target.value)} placeholder="Nội dung chi tiết..." />
-                    </div>
-
-                    {/* ACTION BUTTONS */}
-                    <div className="grid grid-cols-1 gap-3 pt-2">
-                        <div className="flex gap-2">
-                            <button type="submit" disabled={loading} className={`flex-1 text-white py-3 rounded-xl font-bold text-lg shadow-lg transition-all active:scale-95 disabled:opacity-70 flex items-center justify-center gap-2 ${isLiquidationMode ? 'bg-orange-600 hover:bg-orange-700 shadow-orange-500/30' : 'bg-purple-600 hover:bg-purple-700 shadow-purple-500/30'}`}>
-                                <Save size={20} /> {loading ? 'Đang xử lý...' : (initialData ? (isLiquidationMode ? 'CẬP NHẬT VÀ IN THANH LÝ' : 'CẬP NHẬT VÀ IN HỢP ĐỒNG') : (isLiquidationMode ? 'LƯU VÀ IN THANH LÝ' : 'LƯU VÀ IN HỢP ĐỒNG'))}
-                            </button>
-                            <button type="button" onClick={() => handleReset(false)} className="px-4 py-3 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 transition-colors shadow-sm font-bold border border-slate-200" title="Làm mới form">
-                                {initialData ? <X size={20} className="text-red-500" /> : <RotateCcw size={20} />}
-                            </button>
-                        </div>
-                    </div>
                 </div>
             </div>
+        </div>
+
+        {/* FLOATING STICKY ACTION BAR AT BOTTOM */}
+        <div className="lg:col-span-12 sticky bottom-2 z-30 bg-white/95 backdrop-blur-md p-3 rounded-2xl border border-slate-200 shadow-xl flex items-center gap-3 transition-all">
+            <button 
+                type="submit" 
+                disabled={loading} 
+                className={`flex-1 text-white py-3 px-4 rounded-xl font-bold text-base sm:text-lg shadow-lg transition-all active:scale-95 disabled:opacity-70 flex items-center justify-center gap-2 ${isLiquidationMode ? 'bg-orange-600 hover:bg-orange-700 shadow-orange-500/30' : 'bg-purple-600 hover:bg-purple-700 shadow-purple-500/30'}`}
+            >
+                <Save size={20} /> {loading ? 'Đang xử lý...' : (initialData ? (isLiquidationMode ? 'CẬP NHẬT VÀ IN THANH LÝ' : 'CẬP NHẬT VÀ IN HỢP ĐỒNG') : (isLiquidationMode ? 'LƯU VÀ IN THANH LÝ' : 'LƯU VÀ IN HỢP ĐỒNG'))}
+            </button>
+            <button 
+                type="button" 
+                onClick={() => handleReset(false)} 
+                className="px-4 py-3 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 transition-colors shadow-sm font-bold border border-slate-200 flex items-center gap-1.5" 
+                title="Làm mới form"
+            >
+                {initialData ? <X size={20} className="text-red-500" /> : <RotateCcw size={20} />}
+                <span className="hidden sm:inline text-xs font-bold">Làm mới</span>
+            </button>
         </div>
     </form>
   );

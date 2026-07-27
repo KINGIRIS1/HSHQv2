@@ -74,10 +74,30 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
       const fetchPrice = async () => {
         const fetchedContracts = await fetchContracts();
         setContracts(fetchedContracts);
-        const match = fetchedContracts.find(c => 
-            (c.customerAddress && record.code && c.customerAddress.trim().toLowerCase() === record.code.trim().toLowerCase()) ||
-            (c.code && record.code && c.code.trim().toLowerCase() === record.code.trim().toLowerCase())
-        );
+        // Tìm hợp đồng có cùng mã hồ sơ (qua customerAddress hoặc trường code kế thừa) - Match chính xác
+        const match = fetchedContracts.find(c => {
+            if (!c || !record) return false;
+            const cAddr = (c.customerAddress || '').trim().toLowerCase();
+            const cCode = (c.code || '').trim().toLowerCase();
+            const rCode = (record.code || '').trim().toLowerCase();
+            const cName = (c.customerName || '').trim().toLowerCase();
+            const rName = (record.customerName || '').trim().toLowerCase();
+            const cPlot = (c.landPlot || '').trim().toLowerCase();
+            const rPlot = (record.landPlot || '').trim().toLowerCase();
+            const cMap = (c.mapSheet || '').trim().toLowerCase();
+            const rMap = (record.mapSheet || '').trim().toLowerCase();
+
+            const clean = (str: string) => str.replace(/[^a-z0-9]/gi, '').toLowerCase();
+
+            if (rCode && (cAddr === rCode || cCode === rCode)) return true;
+            if (rCode && cCode && clean(rCode).length >= 3 && clean(rCode) === clean(cCode)) return true;
+            if (rCode && cAddr && clean(rCode).length >= 3 && clean(rCode) === clean(cAddr)) return true;
+            if (rName && cName && rName === cName) {
+                if (rPlot && cPlot && rPlot === cPlot) return true;
+                if (rMap && cMap && rMap === cMap) return true;
+            }
+            return false;
+        });
         
         if (match) {
           setMatchedContract(match);
@@ -526,7 +546,7 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                   <div className="flex items-center gap-2">
                     <Receipt size={16} className="text-blue-600" />
                     <span className="text-xs font-bold text-blue-700">
-                      {record.receiptType ? `Số ${record.receiptType}` : 'Số BL/HĐ'}
+                      {record.receiptType === 'Biên Lai' ? 'SỐ BIÊN LAI' : record.receiptType === 'Hóa Đơn' ? 'SỐ HÓA ĐƠN' : 'SỐ BIÊN LAI / HÓA ĐƠN'}
                     </span>
                   </div>
                   <span className="text-sm font-bold text-blue-800">{record.receiptNumber || '---'}</span>
@@ -569,17 +589,30 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                             <p className="text-[11px] text-indigo-600 mt-0.5 leading-tight">{matchedContract.serviceType || matchedContract.contractType}</p>
                           </div>
                         </div>
-                        {onCreateContract && (
-                          <button 
-                            onClick={() => {
-                              onCreateContract(record);
-                              onClose();
-                            }}
-                            className="w-full text-center text-xs font-bold bg-indigo-600 text-white hover:bg-indigo-700 py-2 rounded-lg transition-colors duration-200 shadow-sm"
-                          >
-                            Xem chi tiết HĐ
-                          </button>
-                        )}
+                        <div className="grid grid-cols-2 gap-2">
+                          {onCreateContract && (
+                            <button 
+                              onClick={() => {
+                                onCreateContract(record);
+                                onClose();
+                              }}
+                              className="w-full text-center text-xs font-bold bg-indigo-600 text-white hover:bg-indigo-700 py-2 rounded-lg transition-colors duration-200 shadow-sm"
+                            >
+                              Xem HĐ
+                            </button>
+                          )}
+                          {onCreateLiquidation && (
+                            <button 
+                              onClick={() => {
+                                onCreateLiquidation(record);
+                                onClose();
+                              }}
+                              className="w-full text-center text-xs font-bold bg-green-600 text-white hover:bg-green-700 py-2 rounded-lg transition-colors duration-200 shadow-sm"
+                            >
+                              Thanh lý HĐ
+                            </button>
+                          )}
+                        </div>
                       </div>
                     ) : (
                       <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex flex-col gap-2.5">
@@ -589,20 +622,33 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                           </div>
                           <div className="text-left">
                             <span className="text-[10px] text-slate-500 uppercase font-bold block">Hợp đồng liên kết</span>
-                            <p className="text-[11px] text-slate-500 mt-0.5 leading-normal">Hồ sơ này chưa được lập hợp đồng đo đạc.</p>
+                            <p className="text-xs font-bold text-slate-700 mt-0.5 leading-normal">Chưa có HĐ</p>
                           </div>
                         </div>
-                        {onCreateContract && (
-                          <button 
-                            onClick={() => {
-                              onCreateContract(record);
-                              onClose();
-                            }}
-                            className="w-full text-center text-xs font-bold bg-blue-600 text-white hover:bg-blue-700 py-2 rounded-lg transition-colors duration-200 shadow-sm"
-                          >
-                            Lập Hợp đồng mới
-                          </button>
-                        )}
+                        <div className="grid grid-cols-2 gap-2">
+                          {onCreateContract && (
+                            <button 
+                              onClick={() => {
+                                onCreateContract(record);
+                                onClose();
+                              }}
+                              className="w-full text-center text-xs font-bold bg-blue-600 text-white hover:bg-blue-700 py-2 rounded-lg transition-colors duration-200 shadow-sm"
+                            >
+                              Lập HĐ mới
+                            </button>
+                          )}
+                          {onCreateLiquidation && (
+                            <button 
+                              onClick={() => {
+                                onCreateLiquidation(record);
+                                onClose();
+                              }}
+                              className="w-full text-center text-xs font-bold bg-green-600 text-white hover:bg-green-700 py-2 rounded-lg transition-colors duration-200 shadow-sm"
+                            >
+                              Thanh lý HĐ
+                            </button>
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -934,7 +980,11 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
           data={{
             ...record,
             code: (() => {
-              const matched = contracts.find(c => c.customerAddress === record.code);
+              const matched = matchedContract || contracts.find(c => {
+                  const cAddr = (c.customerAddress || '').trim().toLowerCase();
+                  const rCode = (record.code || '').trim().toLowerCase();
+                  return cAddr === rCode || (rCode && cAddr.includes(rCode));
+              });
               return matched ? matched.code : (record.code || '');
             })()
           }}

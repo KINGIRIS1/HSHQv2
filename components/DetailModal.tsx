@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { RecordFile, Employee, User, UserRole, SplitItem, RecordStatus } from '../types';
 import { getNormalizedWard, getShortRecordType } from '../constants';
 import StatusBadge from './StatusBadge';
-import { X, MapPin, FileText, User as UserIcon, Receipt, DollarSign, CheckCircle2, Circle, Send, FileSignature, CheckSquare, CalendarClock, FileCheck, Calculator, Loader2, StickyNote, Save, Bell, Printer, Pencil, Trash2, Info, FileDown } from 'lucide-react';
+import { X, MapPin, FileText, User as UserIcon, Receipt, DollarSign, CheckCircle2, Circle, Send, FileSignature, CheckSquare, CalendarClock, FileCheck, Calculator, Loader2, StickyNote, Save, Bell, Printer, Pencil, Trash2, Info, FileDown, Undo2 } from 'lucide-react';
 import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../services/docxService';
 import DocxPreviewModal from './DocxPreviewModal';
 import { updateRecordApi, fetchContracts } from '../services/api';
@@ -22,9 +22,10 @@ interface DetailModalProps {
   onCreateLiquidation?: (record: RecordFile) => void; 
   onCreateContract?: (record: Partial<RecordFile>) => void;
   onRefreshData?: () => void;
+  onOpenRejectReturnModal?: (record: RecordFile) => void;
 }
 
-export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, employees, users, currentUser, onEdit, onDelete, onCreateLiquidation, onCreateContract, onRefreshData }) => {
+export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, employees, users, currentUser, onEdit, onDelete, onCreateLiquidation, onCreateContract, onRefreshData, onOpenRejectReturnModal }) => {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [previewBlob, setPreviewBlob] = useState<Blob | null>(null);
   const [previewFileName, setPreviewFileName] = useState('');
@@ -73,11 +74,30 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
           const fetchPrice = async () => {
               const fetchedContracts = await fetchContracts();
               setContracts(fetchedContracts);
-              // Tìm hợp đồng có cùng mã hồ sơ (qua customerAddress hoặc trường code kế thừa) - Case insensitive
-              const match = fetchedContracts.find(c => 
-                  (c.customerAddress && record.code && c.customerAddress.trim().toLowerCase() === record.code.trim().toLowerCase()) ||
-                  (c.code && record.code && c.code.trim().toLowerCase() === record.code.trim().toLowerCase())
-              );
+              // Tìm hợp đồng có cùng mã hồ sơ (qua customerAddress hoặc trường code kế thừa) - Match chính xác
+              const match = fetchedContracts.find(c => {
+                  if (!c || !record) return false;
+                  const cAddr = (c.customerAddress || '').trim().toLowerCase();
+                  const cCode = (c.code || '').trim().toLowerCase();
+                  const rCode = (record.code || '').trim().toLowerCase();
+                  const cName = (c.customerName || '').trim().toLowerCase();
+                  const rName = (record.customerName || '').trim().toLowerCase();
+                  const cPlot = (c.landPlot || '').trim().toLowerCase();
+                  const rPlot = (record.landPlot || '').trim().toLowerCase();
+                  const cMap = (c.mapSheet || '').trim().toLowerCase();
+                  const rMap = (record.mapSheet || '').trim().toLowerCase();
+
+                  const clean = (str: string) => str.replace(/[^a-z0-9]/gi, '').toLowerCase();
+
+                  if (rCode && (cAddr === rCode || cCode === rCode)) return true;
+                  if (rCode && cCode && clean(rCode).length >= 3 && clean(rCode) === clean(cCode)) return true;
+                  if (rCode && cAddr && clean(rCode).length >= 3 && clean(rCode) === clean(cAddr)) return true;
+                  if (rName && cName && rName === cName) {
+                      if (rPlot && cPlot && rPlot === cPlot) return true;
+                      if (rMap && cMap && rMap === cMap) return true;
+                  }
+                  return false;
+              });
               
               if (match) {
                   setMatchedContract(match);
@@ -500,6 +520,16 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
             </div>
             
             <div className="flex items-center gap-2">
+                {onOpenRejectReturnModal && record && (record.status === RecordStatus.PENDING_CHECK || record.status === RecordStatus.CHECKED || record.status === RecordStatus.PENDING_SIGN || record.status === RecordStatus.SIGNED) && (
+                    <button
+                        onClick={() => { onClose(); onOpenRejectReturnModal(record); }}
+                        className="flex items-center gap-2 px-3 py-1.5 bg-rose-50 border border-rose-200 text-rose-700 rounded hover:bg-rose-100 transition-colors text-sm font-bold shadow-sm"
+                        title="Trả hồ sơ về bước trước (Yêu cầu sửa)"
+                    >
+                        <Undo2 size={16} /> Trả lại / Yêu cầu sửa
+                    </button>
+                )}
+
                 {onCreateLiquidation && record && record.recordType && (getShortRecordType(record.recordType).startsWith('2.3') || getShortRecordType(record.recordType).startsWith('2.4')) && (
                     <button
                         onClick={() => { onClose(); onCreateLiquidation(record); }}
@@ -739,6 +769,45 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                 <div className="space-y-6">
                     {/* NỘI DUNG */}
                     <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm h-full flex flex-col">
+                        {/* HÀNG 1: HỢP ĐỒNG LIÊN KẾT & THANH LÝ */}
+                        {record && record.recordType && (getShortRecordType(record.recordType).startsWith('2.3') || getShortRecordType(record.recordType).startsWith('2.4')) && (
+                            <div className="mb-4 bg-indigo-50/80 border border-indigo-100 rounded-xl p-3 flex flex-wrap items-center justify-between gap-3">
+                                <div className="flex items-center gap-2.5">
+                                    <div className="bg-indigo-200 text-indigo-700 p-1.5 rounded-lg shrink-0">
+                                        <FileText size={16} />
+                                    </div>
+                                    <div className="text-left">
+                                        <span className="text-[10px] text-indigo-600 uppercase font-bold block">Hợp đồng liên kết</span>
+                                        <p className="text-xs font-bold text-indigo-950">
+                                            {matchedContract ? `Số HĐ: ${matchedContract.code}` : 'Chưa có HĐ'}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {liquidationInfo && (
+                                    <div className="flex items-center gap-2 bg-orange-100/80 border border-orange-200/80 px-2.5 py-1 rounded-lg">
+                                        <Calculator size={14} className="text-orange-700" />
+                                        <div className="text-left">
+                                            <span className="text-[9px] text-orange-700 uppercase font-bold block">{liquidationInfo.content}</span>
+                                            <p className="text-xs font-bold text-orange-950">{liquidationInfo.amount.toLocaleString('vi-VN')} đ</p>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {onCreateContract && (
+                                    <button 
+                                        onClick={() => {
+                                            onCreateContract(record);
+                                            onClose();
+                                        }}
+                                        className="inline-flex items-center gap-1 text-xs font-bold bg-indigo-600 text-white hover:bg-indigo-700 px-3 py-1.5 rounded-lg transition-colors shadow-sm whitespace-nowrap ml-auto"
+                                    >
+                                        {matchedContract ? 'Xem chi tiết HĐ' : 'Lập Hợp đồng mới'}
+                                    </button>
+                                )}
+                            </div>
+                        )}
+
                         <h3 className="text-xs font-bold text-purple-600 uppercase mb-4 flex items-center gap-2 border-l-4 border-purple-600 pl-2">
                             <FileText size={16}/> Nội dung chi tiết
                         </h3>
@@ -807,7 +876,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                                     </div>
                                     <div>
                                         <label className="text-[10px] text-blue-700 uppercase font-bold block">
-                                            {record.receiptType ? `Số ${record.receiptType}` : 'Số Biên lai / Hóa đơn'}
+                                            {record.receiptType === 'Biên Lai' ? 'SỐ BIÊN LAI' : record.receiptType === 'Hóa Đơn' ? 'SỐ HÓA ĐƠN' : 'SỐ BIÊN LAI / HÓA ĐƠN'}
                                         </label>
                                         <p className="text-sm font-black text-blue-900 font-mono">
                                             {record.receiptNumber || '---'}
@@ -845,73 +914,6 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                                 </div>
                             )}
                         </div>
-                        
-                        {/* LIÊN KẾT HỢP ĐỒNG */}
-                        {record && record.recordType && (getShortRecordType(record.recordType).startsWith('2.3') || getShortRecordType(record.recordType).startsWith('2.4')) && (
-                            <div className="mt-4 pt-4 border-t border-dashed border-gray-200">
-                                {matchedContract ? (
-                                    <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3 flex flex-col md:flex-row md:items-center justify-between gap-3">
-                                        <div className="flex items-start gap-3">
-                                            <div className="bg-indigo-200 text-indigo-700 p-2 rounded-lg mt-0.5">
-                                                <FileText size={16} />
-                                            </div>
-                                            <div className="text-left">
-                                                <span className="text-[10px] text-indigo-500 uppercase font-bold block">Hợp đồng liên kết</span>
-                                                <p className="text-sm font-bold text-indigo-900 leading-tight">Số HĐ: {matchedContract.code}</p>
-                                                <p className="text-xs text-indigo-600 mt-0.5">{matchedContract.serviceType || matchedContract.contractType}</p>
-                                            </div>
-                                        </div>
-                                        {onCreateContract && (
-                                            <button 
-                                                onClick={() => {
-                                                    onCreateContract(record);
-                                                    onClose();
-                                                }}
-                                                className="inline-flex items-center gap-1 text-xs font-bold bg-indigo-600 text-white hover:bg-indigo-700 px-3 py-1.5 rounded-lg transition-colors duration-200 shadow-sm whitespace-nowrap"
-                                            >
-                                                Xem chi tiết HĐ
-                                            </button>
-                                        )}
-                                    </div>
-                                ) : (
-                                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex flex-col md:flex-row md:items-center justify-between gap-3">
-                                        <div className="flex items-start gap-3">
-                                            <div className="bg-slate-200 text-slate-500 p-2 rounded-lg mt-0.5">
-                                                <FileText size={16} />
-                                            </div>
-                                            <div className="text-left">
-                                                <span className="text-[10px] text-slate-500 uppercase font-bold block">Hợp đồng liên kết</span>
-                                                <p className="text-xs text-slate-500 mt-1">Hồ sơ này chưa được lập hợp đồng đo đạc.</p>
-                                            </div>
-                                        </div>
-                                        {onCreateContract && (
-                                            <button 
-                                                onClick={() => {
-                                                    onCreateContract(record);
-                                                    onClose();
-                                                }}
-                                                className="inline-flex items-center gap-1 text-xs font-bold bg-blue-600 text-white hover:bg-blue-700 px-3 py-1.5 rounded-lg transition-colors duration-200 shadow-sm whitespace-nowrap"
-                                            >
-                                                Lập Hợp đồng mới
-                                            </button>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                        
-                        {/* GIÁ TRỊ THANH LÝ */}
-                        {liquidationInfo && (
-                            <div className="mt-4 pt-4 border-t border-dashed border-gray-200">
-                                <div className="bg-orange-50 p-3 rounded-lg border border-orange-100 flex items-center gap-3">
-                                    <div className="bg-orange-200 p-1.5 rounded text-orange-700"><Calculator size={16}/></div>
-                                    <div>
-                                        <label className="text-[10px] text-orange-600 uppercase font-bold block">{liquidationInfo.content}</label>
-                                        <p className="text-sm font-bold text-orange-800">{liquidationInfo.amount.toLocaleString('vi-VN')} đ</p>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
 
                         {/* Chi tiết tách thửa */}
                         {contractSplitItems && contractSplitItems.length > 0 && (
@@ -1178,7 +1180,11 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                 data={{
                     ...record,
                     code: (() => {
-                        const matched = contracts.find(c => c.customerAddress === record.code);
+                        const matched = matchedContract || contracts.find(c => {
+                            const cAddr = (c.customerAddress || '').trim().toLowerCase();
+                            const rCode = (record.code || '').trim().toLowerCase();
+                            return rCode && cAddr === rCode;
+                        });
                         return matched ? matched.code : (record.code || '');
                     })()
                 }}

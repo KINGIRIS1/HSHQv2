@@ -14,6 +14,7 @@ import ExcelPreviewModal from './ExcelPreviewModal';
 import BulkUpdateModal from './BulkUpdateModal';
 import ReturnResultModal from './ReturnResultModal';
 import BatchErrorDiagnosticModal from './BatchErrorDiagnosticModal';
+import RejectReturnStepModal from './RejectReturnStepModal';
 import * as XLSX from 'xlsx-js-style';
 
 interface AppModalsProps {
@@ -31,6 +32,7 @@ interface AppModalsProps {
     isBulkUpdateModalOpen: boolean;
     isReturnModalOpen: boolean;
     isDiagnosticModalOpen?: boolean;
+    isRejectReturnStepModalOpen?: boolean;
     
     // Data States
     editingRecord: RecordFile | null;
@@ -38,6 +40,7 @@ interface AppModalsProps {
     deletingRecord: RecordFile | null;
     returnRecord: RecordFile | null;
     assignTargetRecords: RecordFile[];
+    rejectReturnTargetRecords?: RecordFile[];
     exportModalType: 'handover' | 'check_list';
     
     // Preview Data
@@ -57,6 +60,7 @@ interface AppModalsProps {
     setIsBulkUpdateModalOpen: (v: boolean) => void;
     setIsReturnModalOpen: (v: boolean) => void;
     setIsDiagnosticModalOpen?: (v: boolean) => void;
+    setIsRejectReturnStepModalOpen?: (v: boolean) => void;
     
     setEditingRecord: (r: RecordFile | null) => void;
     setViewingRecord: (r: RecordFile | null) => void;
@@ -78,9 +82,11 @@ interface AppModalsProps {
     executeReturnBatchHandover?: (batch: number, date: string, deptName: string) => void;
     onCreateLiquidation: (record: RecordFile) => void;
     onCreateContract?: (record: Partial<RecordFile>) => void;
-    handleBulkUpdate: (field: keyof RecordFile, value: any) => Promise<void>;
+    handleBulkUpdate: (field: keyof RecordFile, value: any, customDateStr?: string, targetRecordIds?: string[]) => Promise<void>;
     handleBatchUpdateRecords?: (updates: Partial<RecordFile>[]) => Promise<void>;
     confirmReturnResult: (receiptNumber: string, receiverName: string, returnedPrice: number, receiptType?: 'Biên Lai' | 'Hóa Đơn') => void;
+    onConfirmRejectReturnStep?: (reason: string, returnDateStr: string) => Promise<void>;
+    onOpenRejectReturnModal?: (record: RecordFile) => void;
 
     // Shared Data
     employees: Employee[];
@@ -170,6 +176,7 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
                     onCreateLiquidation={props.onCreateLiquidation}
                     onCreateContract={props.onCreateContract}
                     onRefreshData={props.onRefreshData}
+                    onOpenRejectReturnModal={props.onOpenRejectReturnModal}
                 />
             )}
             
@@ -244,6 +251,16 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
                 currentUser={props.currentUser}
                 onBatchUpdateRecords={props.handleBatchUpdateRecords || (async () => {})}
                 onRefreshData={props.onRefreshData}
+            />
+
+            <RejectReturnStepModal
+                isOpen={!!props.isRejectReturnStepModalOpen}
+                onClose={() => props.setIsRejectReturnStepModalOpen && props.setIsRejectReturnStepModalOpen(false)}
+                records={props.rejectReturnTargetRecords || []}
+                currentUser={props.currentUser}
+                employees={props.employees}
+                users={props.users}
+                onConfirm={props.onConfirmRejectReturnStep || (async () => {})}
             />
         </>
     );

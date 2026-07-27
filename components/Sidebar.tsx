@@ -1,14 +1,16 @@
 
 import React from 'react';
 import { LayoutDashboard, FileText, ClipboardList, Send, BarChart3, Settings, LogOut, UserCircle, Users, Briefcase, BookOpen, UserPlus, ShieldAlert, X, FolderInput, FileSignature, MessageSquare, Loader2, UserCog, ShieldCheck, PenTool, CalendarDays, Archive, FolderArchive } from 'lucide-react';
-import { User, UserRole } from '../types';
+import { User, UserRole, Employee } from '../types';
 import { APP_VERSION } from '../constants';
+import { isViewAllowedForUser } from '../config/roleConfig';
 
 interface SidebarProps {
   currentView: string;
   setCurrentView: (view: string) => void;
   onOpenSettings: () => void; // Deprecated
   currentUser: User;
+  employees?: Employee[];
   onLogout: () => void;
   mobileOpen: boolean;
   setMobileOpen: (open: boolean) => void;
@@ -24,6 +26,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   setCurrentView, 
   onOpenSettings, 
   currentUser, 
+  employees = [],
   onLogout,
   mobileOpen,
   setMobileOpen,
@@ -151,8 +154,8 @@ const Sidebar: React.FC<SidebarProps> = ({
              </div>
              {/* Hover Tooltip for Brand */}
              <div className="absolute left-full top-2 ml-2 bg-slate-800 text-white px-3 py-2 rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50 border border-slate-700">
-                 <h1 className="font-bold text-sm">Hệ thống quản lý</h1>
-                 <div className="text-[10px] text-blue-400">Chi nhánh Hớn Quản</div>
+                 <h1 className="font-bold text-sm uppercase">Hệ thống tiếp nhận và quản lý hồ sơ</h1>
+                 <div className="font-bold text-sm uppercase text-blue-400">Chi nhánh Hớn Quản</div>
              </div>
              <button onClick={() => setMobileOpen(false)} className="md:hidden absolute right-4 text-slate-400 hover:text-white"><X size={20} /></button>
         </div>
@@ -174,9 +177,8 @@ const Sidebar: React.FC<SidebarProps> = ({
         {/* MENU */}
         <nav className="flex-1 py-2 space-y-1 overflow-y-auto custom-scrollbar overflow-x-visible">
           {menuItems.filter(item => {
-             if (isOneDoor && !oneDoorAllowedViews.includes(item.id)) return false;
-             if (isTeamLeader && !teamLeaderAllowedViews.includes(item.id)) return false;
-             return item.visible;
+             if (!item.visible) return false;
+             return isViewAllowedForUser(currentUser, employees, item.id);
           }).map((item) => {
             // Logic Active
             const isActive = currentView === item.id || 
