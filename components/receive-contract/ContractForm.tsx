@@ -854,30 +854,22 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
                                         )}
                                     </div>
                                 </div>
-                                <div className="relative">
-                                    <FileText size={16} className="absolute left-3 top-3 text-slate-400" />
+                                <div>
                                     <input 
                                         type="text" 
                                         readOnly={(initialData && contracts && contracts.some(c => c.id === initialData.id)) ? true : !isManual} 
-                                        className={`${inputClass} pl-9 font-mono font-bold text-purple-700 ${isManual ? 'bg-amber-50/50 border-amber-300 focus:border-amber-500 focus:ring-amber-200' : 'bg-slate-50'}`} 
+                                        className={`${inputClass} font-mono font-bold text-purple-700 ${isManual ? 'bg-amber-50/50 border-amber-300 focus:border-amber-500 focus:ring-amber-200' : 'bg-slate-50'}`} 
                                         value={formData.code ?? ''} 
                                         onChange={e => isManual && handleChange('code', e.target.value)}
                                         placeholder={isManual ? "Nhập mã hợp đồng..." : "Đang lấy số tự động..."}
                                     />
                                 </div>
-                                {!isManual && (!initialData || (contracts && !contracts.some(c => c.id === initialData.id))) && (
-                                    <p className="text-[11px] text-blue-600 mt-1 flex items-center gap-1">
-                                        <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
-                                        Số hợp đồng chính thức sẽ tự động tăng &amp; chốt vào CSDL khi bấm <b>Lưu Hợp Đồng</b>.
-                                    </p>
-                                )}
                             </div>
                         )}
                         <div>
                             <label className={labelClass}>{mode === 'liquidation' ? 'Ngày lập thanh lý' : 'Ngày lập'}</label>
-                            <div className="relative">
-                                <Calendar size={16} className="absolute left-3 top-3 text-slate-400" />
-                                <input type="date" className={`${inputClass} pl-9`} value={dateVal(formData.createdDate)} onChange={e => handleChange('createdDate', e.target.value)} />
+                            <div>
+                                <input type="date" className={inputClass} value={dateVal(formData.createdDate)} onChange={e => handleChange('createdDate', e.target.value)} />
                             </div>
                         </div>
                     </div>

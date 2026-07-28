@@ -15,6 +15,7 @@ const OverdueStatsView: React.FC<OverdueStatsViewProps> = ({ records, employees 
     const [selectedEmployee, setSelectedEmployee] = useState<string>('all');
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(20);
+    const [mobileVisibleCount, setMobileVisibleCount] = useState(20);
 
     const overdueData = useMemo(() => {
         const completed: RecordFile[] = [];
@@ -85,9 +86,18 @@ const OverdueStatsView: React.FC<OverdueStatsViewProps> = ({ records, employees 
     // Reset page when filter changes
     React.useEffect(() => {
         setCurrentPage(1);
+        setMobileVisibleCount(20);
     }, [filterType, selectedEmployee]);
 
-    const formatDate = (d?: string | null) => d ? new Date(d).toLocaleDateString('vi-VN') : '-';
+    const formatDate = (d?: string | null) => {
+        if (!d) return '-';
+        const cleanStr = d.split('T')[0];
+        const parts = cleanStr.split('-');
+        if (parts.length === 3) {
+            return `${parts[2].padStart(2, '0')}/${parts[1].padStart(2, '0')}/${parts[0]}`;
+        }
+        return d;
+    };
 
     return (
         <div className="flex flex-col h-full bg-slate-100 p-4 gap-4 overflow-y-auto">
@@ -156,7 +166,7 @@ const OverdueStatsView: React.FC<OverdueStatsViewProps> = ({ records, employees 
                         </button>
                     </div>
                 </div>
-                <div className="flex-1 overflow-auto">
+                <div className="hidden md:block flex-1 overflow-auto">
                     <table className="w-full text-left text-sm whitespace-nowrap">
                         <thead className="bg-gray-50 text-xs text-gray-500 uppercase font-bold sticky top-0 shadow-sm z-10">
                             <tr>
@@ -206,9 +216,74 @@ const OverdueStatsView: React.FC<OverdueStatsViewProps> = ({ records, employees 
                         </tbody>
                     </table>
                 </div>
-                
+
+                {/* Mobile View for OverdueStatsView (20 items + Xem thêm) */}
+                <div className="block md:hidden flex-1 overflow-y-auto space-y-2.5 p-2">
+                    {overdueData.filteredRecords.length > 0 ? (
+                        <>
+                            {overdueData.filteredRecords.slice(0, mobileVisibleCount).map((r: any, i) => {
+                                const emp = employees.find(e => e.id === r.assignedTo);
+                                const rowIndex = i + 1;
+                                const isPendingOverdue = r._overdueType === 'pending';
+
+                                return (
+                                    <div key={r.id} className="bg-white rounded-xl border border-red-200 p-3 shadow-xs space-y-2">
+                                        <div className="flex justify-between items-start gap-2">
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className="text-[10px] bg-red-100 text-red-700 font-bold px-1.5 py-0.5 rounded">#{rowIndex}</span>
+                                                    <h3 className="font-bold text-slate-800 text-sm truncate">{r.customerName}</h3>
+                                                </div>
+                                                <div className="text-xs text-red-600 font-bold font-mono mt-0.5">{r.code}</div>
+                                            </div>
+                                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold border shrink-0 flex items-center gap-1 ${isPendingOverdue ? 'bg-orange-50 text-orange-700 border-orange-200' : 'bg-yellow-50 text-yellow-700 border-yellow-200'}`}>
+                                                {isPendingOverdue ? 'Chưa có KQ' : 'Đã có KQ'}
+                                            </span>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-1.5 text-xs text-slate-600 bg-slate-50 p-2.5 rounded-lg">
+                                            <div>
+                                                <span className="text-slate-400">Địa bàn:</span> <span className="font-medium text-slate-800">{getNormalizedWard(r.ward)}</span>
+                                            </div>
+                                            <div>
+                                                <span className="text-slate-400">Hẹn trả:</span> <span className="font-bold text-red-600">{formatDate(r.deadline)}</span>
+                                            </div>
+                                            <div>
+                                                <span className="text-slate-400">Ngày nhận:</span> <span className="font-medium text-slate-800">{formatDate(r.receivedDate)}</span>
+                                            </div>
+                                            <div>
+                                                <span className="text-slate-400">Hoàn thành:</span> <span className="font-medium text-slate-800">{formatDate(r.completedDate)}</span>
+                                            </div>
+                                            <div className="col-span-2 flex items-center justify-between pt-1 border-t border-slate-200/60 mt-0.5">
+                                                <span className="text-slate-400">NV xử lý:</span>
+                                                <span className="font-semibold text-slate-800">{emp ? emp.name : '-'}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+
+                            {overdueData.filteredRecords.length > mobileVisibleCount && (
+                                <div className="pt-3 pb-6 flex flex-col items-center gap-2">
+                                    <button 
+                                        onClick={() => setMobileVisibleCount(prev => prev + 20)}
+                                        className="w-full max-w-sm py-2.5 bg-white border border-red-200 text-red-600 hover:bg-red-50 rounded-xl font-bold text-xs shadow-xs active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                                    >
+                                        Xem thêm {overdueData.filteredRecords.length - mobileVisibleCount} hồ sơ
+                                    </button>
+                                    <p className="text-[10px] text-slate-400 font-medium">
+                                        Đang hiển thị {Math.min(mobileVisibleCount, overdueData.filteredRecords.length)} / {overdueData.filteredRecords.length} hồ sơ
+                                    </p>
+                                </div>
+                            )}
+                        </>
+                    ) : (
+                        <div className="p-8 text-center text-slate-400 text-sm">Không có dữ liệu trễ hạn.</div>
+                    )}
+                </div>
+
                 {overdueData.filteredRecords.length > 0 && (
-                    <div className="border-t border-gray-200 p-3 bg-gray-50 flex justify-between items-center shrink-0">
+                    <div className="border-t border-gray-200 p-3 bg-gray-50 hidden md:flex justify-between items-center shrink-0">
                         <span className="text-xs text-gray-500">
                             Hiển thị <strong>{(currentPage - 1) * itemsPerPage + 1}</strong> - <strong>{Math.min(currentPage * itemsPerPage, overdueData.filteredRecords.length)}</strong> trên tổng <strong>{overdueData.filteredRecords.length}</strong>
                         </span>

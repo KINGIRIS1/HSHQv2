@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { RecordFile, RecordStatus, Employee } from '../../types';
 import { STATUS_LABELS } from '../../constants';
+import StatusBadge from '../StatusBadge';
 import { 
   Search, 
   Filter, 
@@ -9,8 +10,10 @@ import {
   User, 
   Phone, 
   Calendar,
+  Clock,
   MoreVertical,
-  Plus
+  Plus,
+  Map
 } from 'lucide-react';
 
 interface MobileRecordListProps {
@@ -33,7 +36,12 @@ const MobileRecordList: React.FC<MobileRecordListProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [filterWard, setFilterWard] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const itemsPerPage = 20;
+
+  // Reset page when filtering
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterWard]);
 
   const formatDateDDMMYYYY = (dateStr?: string | null) => {
     if (!dateStr) return 'N/A';
@@ -49,11 +57,6 @@ const MobileRecordList: React.FC<MobileRecordListProps> = ({
     }
   };
 
-  // Reset page when filtering
-  React.useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, filterWard]);
-
   const filtered = records.filter(r => {
     const matchesSearch = 
       r.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -62,17 +65,6 @@ const MobileRecordList: React.FC<MobileRecordListProps> = ({
     const matchesWard = filterWard === 'all' || r.ward === filterWard;
     return matchesSearch && matchesWard;
   });
-
-  // Pagination logic
-  const totalPages = Math.ceil(filtered.length / itemsPerPage);
-  const paginatedRecords = filtered.slice(0, currentPage * itemsPerPage);
-  const hasMore = currentPage < totalPages;
-
-  const handleLoadMore = () => {
-    if (hasMore) {
-      setCurrentPage(prev => prev + 1);
-    }
-  };
 
   const getStatusColor = (status: RecordStatus) => {
     switch (status) {
@@ -89,6 +81,11 @@ const MobileRecordList: React.FC<MobileRecordListProps> = ({
       default: return 'bg-slate-100 text-slate-700 border-slate-200';
     }
   };
+
+  // Pagination logic
+  const totalPages = Math.ceil(filtered.length / itemsPerPage);
+  const paginatedRecords = filtered.slice(0, currentPage * itemsPerPage);
+  const hasMore = currentPage < totalPages;
 
   return (
     <div className="flex flex-col h-full">
@@ -129,90 +126,114 @@ const MobileRecordList: React.FC<MobileRecordListProps> = ({
           {paginatedRecords.length > 0 ? (
             <>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
-                {paginatedRecords.map((record) => (
-                  <div 
-                    key={record.id} 
-                    className="bg-white rounded-2xl shadow-sm hover:shadow-md border border-slate-100 p-3.5 sm:p-4 active:scale-[0.99] transition-all flex flex-col justify-between cursor-pointer"
-                    onClick={() => onViewRecord(record)}
-                  >
-                    <div>
-                      <div className="flex justify-between items-start gap-2 mb-2.5">
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-bold text-slate-800 text-sm sm:text-base leading-snug line-clamp-1">{record.customerName}</h3>
-                          <p className="text-[11px] text-slate-500 font-mono mt-0.5">{record.code}</p>
+                {paginatedRecords.map((record) => {
+                  const emp = record.assignedTo ? employees.find(e => e.id === record.assignedTo) : null;
+
+                  return (
+                    <div 
+                      key={record.id} 
+                      className="p-4 bg-white rounded-xl border border-slate-200 shadow-sm space-y-3 hover:border-blue-300 active:scale-[0.99] transition-all flex flex-col justify-between cursor-pointer"
+                      onClick={() => onViewRecord(record)}
+                    >
+                      {/* Top row with code and status */}
+                      <div className="flex justify-between items-center gap-2">
+                        <span className="font-bold text-blue-600 text-sm font-mono">{record.code}</span>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {record.needsMapCorrection && (
+                            <span className="p-1 bg-orange-100 text-orange-600 rounded" title="Cần chỉnh lý bản đồ">
+                              <Map size={12} className="fill-orange-100" />
+                            </span>
+                          )}
+                          <StatusBadge status={record.status} />
                         </div>
-                        <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border uppercase tracking-wider shrink-0 whitespace-nowrap ${getStatusColor(record.status)}`}>
-                          {STATUS_LABELS[record.status]}
-                        </span>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-y-1.5 gap-x-2 mb-3 text-slate-600 bg-slate-50/70 p-2.5 rounded-xl border border-slate-100">
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          <MapPin size={13} className="shrink-0 text-slate-400" />
-                          <span className="text-[11px] sm:text-xs truncate font-medium">{record.ward || 'Chưa rõ'}</span>
+                      {/* Info grid using icons matching PersonalProfile */}
+                      <div className="grid grid-cols-2 gap-2 text-xs text-slate-600">
+                        <div className="flex items-center gap-1.5 col-span-2">
+                          <span className="text-slate-400 font-bold" title="Chủ sử dụng">👤</span>
+                          <span className="font-semibold text-slate-800 truncate">{record.customerName}</span>
                         </div>
-                        <div className="flex items-center gap-1.5 min-w-0">
+
+                        {record.recordType && (
+                          <div className="flex items-center gap-1.5 col-span-2">
+                            <span className="text-slate-400 font-bold" title="Loại hồ sơ">📄</span>
+                            <span className="truncate text-slate-700">{record.recordType}</span>
+                          </div>
+                        )}
+
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-slate-400 font-bold" title="Ngày nhận">📥</span>
+                          <span>{formatDateDDMMYYYY(record.receivedDate)}</span>
+                        </div>
+
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-slate-400 font-bold" title="Hẹn trả">⏱️</span>
+                          <span className="font-semibold text-amber-700">{formatDateDDMMYYYY(record.deadline)}</span>
+                        </div>
+
+                        <div className="flex items-center gap-1.5">
+                          <MapPin size={13} className="shrink-0 text-slate-400" />
+                          <span className="truncate font-medium text-slate-700">{record.ward || 'Chưa rõ'}</span>
+                        </div>
+
+                        <div className="flex items-center gap-1.5">
                           <Phone size={13} className="shrink-0 text-slate-400" />
                           {record.phoneNumber ? (
                             <a 
                               href={`tel:${record.phoneNumber}`} 
                               onClick={(e) => e.stopPropagation()} 
-                              className="text-[11px] sm:text-xs font-semibold text-blue-600 hover:underline truncate"
+                              className="font-semibold text-blue-600 hover:underline truncate"
                             >
                               {record.phoneNumber}
                             </a>
                           ) : (
-                            <span className="text-[11px] text-slate-400">N/A</span>
+                            <span className="text-slate-400">N/A</span>
                           )}
                         </div>
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          <Calendar size={13} className="shrink-0 text-blue-500" />
-                          <span className="text-[11px] font-semibold text-slate-700">{formatDateDDMMYYYY(record.receivedDate)}</span>
-                        </div>
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          <User size={13} className="shrink-0 text-slate-400" />
-                          <span className="text-[11px] truncate font-medium">
-                            {record.assignedTo ? (employees.find(e => e.id === record.assignedTo)?.name || 'N/A') : 'Chưa giao'}
+
+                        <div className="flex items-center gap-1.5 col-span-2 text-slate-500">
+                          <span className="text-slate-400 font-bold">👤 NV xử lý:</span>
+                          <span className="font-medium text-slate-800 truncate">
+                            {emp ? emp.name : 'Chưa giao'}
                           </span>
                         </div>
                       </div>
-                    </div>
 
-                    <div className="flex justify-between items-center pt-2.5 border-t border-slate-100">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded border border-blue-100">
-                          Tờ: {record.mapSheet || '-'}
-                        </span>
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded border border-emerald-100">
-                          Thửa: {record.landPlot || '-'}
-                        </span>
+                      {/* Bottom action bar */}
+                      <div className="border-t border-slate-100 pt-3 flex justify-between items-center gap-2">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded border border-blue-100">
+                            Tờ: {record.mapSheet || '-'}
+                          </span>
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded border border-emerald-100">
+                            Thửa: {record.landPlot || '-'}
+                          </span>
+                        </div>
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); onViewRecord(record); }}
+                          className="px-3 py-1.5 border border-blue-200 text-blue-600 hover:bg-blue-50 rounded-lg text-xs font-bold transition-colors flex items-center gap-0.5"
+                        >
+                          Chi tiết <ChevronRight size={14} />
+                        </button>
                       </div>
-                      <button className="text-blue-600 hover:text-blue-800 flex items-center gap-0.5 text-xs font-bold transition-colors">
-                        Chi tiết <ChevronRight size={14} />
-                      </button>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
-              {/* Pagination Controls */}
+              {/* Load More Button for Mobile */}
               {hasMore && (
-                <div className="pt-6 pb-8 flex flex-col items-center gap-3">
+                <div className="pt-6 pb-8 flex flex-col items-center gap-2">
                   <button 
-                    onClick={(e) => { e.stopPropagation(); handleLoadMore(); }}
-                    className="w-full max-w-sm py-3 bg-white border border-blue-200 text-blue-600 hover:bg-blue-50 rounded-xl font-bold text-xs sm:text-sm shadow-sm active:scale-95 transition-all flex items-center justify-center gap-2"
+                    onClick={(e) => { e.stopPropagation(); setCurrentPage(prev => prev + 1); }}
+                    className="w-full max-w-sm py-3 bg-white border border-blue-200 text-blue-600 hover:bg-blue-50 rounded-xl font-bold text-xs sm:text-sm shadow-sm active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
                   >
-                    Xem thêm {filtered.length - paginatedRecords.length} hồ sơ còn lại
+                    Xem thêm {filtered.length - paginatedRecords.length} hồ sơ
                   </button>
-                  <p className="text-[10px] text-slate-400 font-medium uppercase tracking-widest">
-                    Trang {currentPage} / {totalPages}
+                  <p className="text-[10px] text-slate-400 font-medium">
+                    Đang hiển thị {paginatedRecords.length} / {filtered.length} hồ sơ
                   </p>
-                </div>
-              )}
-
-              {!hasMore && filtered.length > itemsPerPage && (
-                <div className="py-8 text-center">
-                  <p className="text-xs text-slate-400 font-medium italic">Đã xem toàn bộ {filtered.length} hồ sơ</p>
                 </div>
               )}
             </>

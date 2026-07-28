@@ -95,9 +95,15 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
     | "reminder"
   >(isDirector ? "pending_sign" : "pending");
   const [currentPage, setCurrentPage] = useState(1);
+  const [mobileVisibleCount, setMobileVisibleCount] = useState(20);
   const itemsPerPage = 10;
 
   const [searchTerm, setSearchTerm] = useState("");
+
+  useEffect(() => {
+    setCurrentPage(1);
+    setMobileVisibleCount(20);
+  }, [activeTab, searchTerm]);
   const [sortConfig, setSortConfig] = useState<{
     key: keyof RecordFile;
     direction: "asc" | "desc";
@@ -1310,9 +1316,9 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                 </table>
               </div>
 
-              {/* Mobile View (Paginated like Tab Tìm kiếm) */}
+              {/* Mobile View (20 items per batch + Xem thêm) */}
               <div className="block md:hidden space-y-3 p-1">
-                {paginatedDisplayRecords.map((r, index) => {
+                {displayRecords.slice(0, mobileVisibleCount).map((r, index) => {
                   const deadlineStatus = getDeadlineStatus(r);
                   const isArchiveType = isArchiveRecordType(r.recordType);
                   const checkerEmp = r.checkedBy ? employees.find((e) => e.id === r.checkedBy) : null;
@@ -1446,26 +1452,17 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                   );
                 })}
 
-                {/* Mobile Pagination Controls (Giống Tab Tìm kiếm) */}
-                {totalPages > 1 && (
-                  <div className="flex items-center justify-between pt-3 pb-2 px-2 border-t border-gray-200 mt-2 bg-gray-50 rounded-lg shadow-sm">
-                    <button
-                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                      disabled={currentPage === 1}
-                      className="px-3 py-1.5 bg-white border border-gray-200 text-xs font-bold text-gray-700 rounded-lg disabled:opacity-40 active:scale-95 transition-all shadow-sm"
+                {displayRecords.length > mobileVisibleCount && (
+                  <div className="pt-4 pb-6 flex flex-col items-center gap-2">
+                    <button 
+                      onClick={() => setMobileVisibleCount(prev => prev + 20)}
+                      className="w-full max-w-sm py-2.5 bg-white border border-blue-200 text-blue-600 hover:bg-blue-50 rounded-xl font-bold text-xs shadow-sm active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
                     >
-                      Trang trước
+                      Xem thêm {displayRecords.length - mobileVisibleCount} hồ sơ
                     </button>
-                    <span className="text-xs text-gray-700 font-bold">
-                      Trang {currentPage} / {totalPages}
-                    </span>
-                    <button
-                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                      disabled={currentPage === totalPages}
-                      className="px-3 py-1.5 bg-white border border-gray-200 text-xs font-bold text-gray-700 rounded-lg disabled:opacity-40 active:scale-95 transition-all shadow-sm"
-                    >
-                      Trang sau
-                    </button>
+                    <p className="text-[10px] text-slate-400 font-medium">
+                      Đang hiển thị {Math.min(mobileVisibleCount, displayRecords.length)} / {displayRecords.length} hồ sơ
+                    </p>
                   </div>
                 )}
               </div>

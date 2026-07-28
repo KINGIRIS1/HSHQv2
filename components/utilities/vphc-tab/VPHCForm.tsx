@@ -46,9 +46,8 @@ const VPHCForm: React.FC<VPHCFormProps> = ({ formData, handleChange }) => {
                     </div>
                     <div>
                         <label className={labelClass}>Ngày sinh</label>
-                        <div className="relative">
-                            <Calendar size={16} className={iconClass} />
-                            <input className={inputClass} placeholder="dd/mm/yyyy" value={formData.NGAYSINH} onChange={e => handleChange('NGAYSINH', e.target.value)} />
+                        <div>
+                            <input type="date" className={inputClass} value={formData.NGAYSINH} onChange={e => handleChange('NGAYSINH', e.target.value)} />
                         </div>
                     </div>
                     <div>
@@ -60,9 +59,8 @@ const VPHCForm: React.FC<VPHCFormProps> = ({ formData, handleChange }) => {
                     </div>
                     <div>
                         <label className={labelClass}>Ngày cấp</label>
-                        <div className="relative">
-                            <Calendar size={16} className={iconClass} />
-                            <input className={inputClass} placeholder="dd/mm/yyyy" value={formData.NGAYCAP} onChange={e => handleChange('NGAYCAP', e.target.value)} />
+                        <div>
+                            <input type="date" className={inputClass} value={formData.NGAYCAP} onChange={e => handleChange('NGAYCAP', e.target.value)} />
                         </div>
                     </div>
                     <div className="md:col-span-2">
@@ -128,7 +126,7 @@ const VPHCForm: React.FC<VPHCFormProps> = ({ formData, handleChange }) => {
                             </div>
                             <div>
                                 <label className={labelClass}>Ngày cấp GCN</label>
-                                <input className={inputClass} placeholder="dd/mm/yyyy" value={formData.NGAYCAPGCN} onChange={e => handleChange('NGAYCAPGCN', e.target.value)} />
+                                <input type="date" className={inputClass} value={formData.NGAYCAPGCN} onChange={e => handleChange('NGAYCAPGCN', e.target.value)} />
                             </div>
                             <div>
                                 <label className={labelClass}>Cơ quan cấp</label>

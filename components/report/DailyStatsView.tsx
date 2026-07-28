@@ -39,6 +39,7 @@ const DailyStatsView: React.FC<DailyStatsViewProps> = ({ records, employees, war
     // Pagination
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(15);
+    const [mobileVisibleCount, setMobileVisibleCount] = useState(20);
 
     // Dynamic filtering helper per category (to update card counts reactively based on general filters)
     const filteredReceivedRecords = useMemo(() => {
@@ -128,6 +129,7 @@ const DailyStatsView: React.FC<DailyStatsViewProps> = ({ records, employees, war
     // Reset pagination when any filter changes
     useEffect(() => {
         setCurrentPage(1);
+        setMobileVisibleCount(20);
     }, [modalFromDate, modalToDate, modalWard, modalEmployee, activeTabType]);
 
     // Pagination
@@ -201,8 +203,13 @@ const DailyStatsView: React.FC<DailyStatsViewProps> = ({ records, employees, war
     };
 
     const formatDate = (d?: string | null) => {
-        const parsed = parseSafeDate(d);
-        return parsed ? parsed.toLocaleDateString('vi-VN') : '-';
+        if (!d) return '-';
+        const cleanStr = d.split('T')[0];
+        const parts = cleanStr.split('-');
+        if (parts.length === 3) {
+            return `${parts[2].padStart(2, '0')}/${parts[1].padStart(2, '0')}/${parts[0]}`;
+        }
+        return d;
     };
 
     return (
@@ -390,8 +397,8 @@ const DailyStatsView: React.FC<DailyStatsViewProps> = ({ records, employees, war
                     </div>
                 </div>
 
-                {/* Record Table list */}
-                <div className="flex-1 overflow-auto">
+                {/* Desktop Record Table list */}
+                <div className="hidden md:block flex-1 overflow-auto">
                     <table className="w-full text-left text-sm border-collapse">
                         <thead className="bg-slate-100 text-xs text-slate-700 uppercase font-black tracking-wider sticky top-0 shadow-sm z-10 border-b border-slate-200">
                             <tr>
@@ -452,8 +459,80 @@ const DailyStatsView: React.FC<DailyStatsViewProps> = ({ records, employees, war
                     </table>
                 </div>
 
+                {/* Mobile Record List (20 items per batch + Xem thêm) */}
+                <div className="block md:hidden flex-1 overflow-y-auto space-y-2.5 p-1">
+                    {modalFilteredRecords.length > 0 ? (
+                        <>
+                            {modalFilteredRecords.slice(0, mobileVisibleCount).map((r, i) => {
+                                const emp = employees.find(e => e.id === r.assignedTo);
+                                const rowIndex = i + 1;
+                                return (
+                                    <div key={r.id} className="bg-white rounded-xl border border-slate-200 p-3 shadow-xs space-y-2">
+                                        <div className="flex justify-between items-start gap-2">
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className="text-[10px] bg-slate-100 text-slate-500 font-bold px-1.5 py-0.5 rounded">#{rowIndex}</span>
+                                                    <h3 className="font-bold text-slate-800 text-sm truncate">{r.customerName}</h3>
+                                                </div>
+                                                <div className="text-xs text-blue-600 font-semibold font-mono mt-0.5">{r.code}</div>
+                                            </div>
+                                            <span className="px-2 py-0.5 rounded text-[10px] uppercase font-bold tracking-wider border shrink-0 bg-blue-50 text-blue-700 border-blue-100">
+                                                {STATUS_LABELS[r.status] || r.status}
+                                            </span>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-1.5 text-xs text-slate-600 bg-slate-50 p-2.5 rounded-lg">
+                                            <div>
+                                                <span className="text-slate-400">Địa bàn:</span> <span className="font-medium text-slate-800">{getNormalizedWard(r.ward)}</span>
+                                            </div>
+                                            <div>
+                                                <span className="text-slate-400">Tờ/Thửa:</span> <span className="font-medium text-slate-800">{r.mapSheet || '-'}/{r.landPlot || '-'}</span>
+                                            </div>
+                                            <div>
+                                                <span className="text-slate-400">
+                                                    {activeTabType === 'received' && 'Ngày nhận:'}
+                                                    {activeTabType === 'assigned' && 'Ngày giao:'}
+                                                    {activeTabType === 'handover' && 'Ngày xong:'}
+                                                </span>{' '}
+                                                <span className="font-medium text-slate-800">
+                                                    {activeTabType === 'received' && formatDate(r.receivedDate)}
+                                                    {activeTabType === 'assigned' && formatDate(r.assignedDate)}
+                                                    {activeTabType === 'handover' && formatDate(r.completedDate || r.resultReturnedDate)}
+                                                </span>
+                                            </div>
+                                            <div>
+                                                <span className="text-slate-400">Hẹn trả:</span> <span className="font-semibold text-amber-700">{formatDate(r.deadline)}</span>
+                                            </div>
+                                            <div className="col-span-2 flex items-center justify-between pt-1 border-t border-slate-200/60 mt-0.5">
+                                                <span className="text-slate-400">NV xử lý:</span>
+                                                <span className="font-semibold text-slate-800">{emp ? emp.name : '-'}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+
+                            {modalFilteredRecords.length > mobileVisibleCount && (
+                                <div className="pt-3 pb-6 flex flex-col items-center gap-2">
+                                    <button 
+                                        onClick={() => setMobileVisibleCount(prev => prev + 20)}
+                                        className="w-full max-w-sm py-2.5 bg-white border border-blue-200 text-blue-600 hover:bg-blue-50 rounded-xl font-bold text-xs shadow-xs active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                                    >
+                                        Xem thêm {modalFilteredRecords.length - mobileVisibleCount} hồ sơ
+                                    </button>
+                                    <p className="text-[10px] text-slate-400 font-medium">
+                                        Đang hiển thị {Math.min(mobileVisibleCount, modalFilteredRecords.length)} / {modalFilteredRecords.length} hồ sơ
+                                    </p>
+                                </div>
+                            )}
+                        </>
+                    ) : (
+                        <div className="p-8 text-center text-slate-400 text-sm">Không có dữ liệu phù hợp với bộ lọc.</div>
+                    )}
+                </div>
+
                 {/* Pagination footer */}
-                <div className="px-6 py-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between shrink-0">
+                <div className="px-6 py-3.5 bg-slate-50 border-t border-slate-200 hidden md:flex items-center justify-between shrink-0">
                     <div className="flex items-center gap-2">
                         <span className="text-xs text-gray-500 font-medium">Hiển thị</span>
                         <select 

@@ -30,11 +30,12 @@ const getFormattedNotesAndDocs = (r: RecordFile): string => {
     return notesParts.join('; ') || '-';
 };
 
-const formatDateDDMMYYYY = (isoStr: string) => {
+const formatDateDDMMYYYY = (isoStr?: string | null) => {
     if (!isoStr) return '';
-    const parts = isoStr.split('-');
+    const cleanStr = isoStr.split('T')[0];
+    const parts = cleanStr.split('-');
     if (parts.length === 3) {
-        return `${parts[2]}/${parts[1]}/${parts[0]}`;
+        return `${parts[2].padStart(2, '0')}/${parts[1].padStart(2, '0')}/${parts[0]}`;
     }
     return isoStr;
 };
@@ -264,9 +265,12 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
     }, [filteredData, cardFilter]);
 
     // Reset pagination when filter changes
+    const [mobileVisibleCount, setMobileVisibleCount] = useState(20);
+
     useEffect(() => {
         setCurrentPage(1);
-    }, [fromDate, toDate, selectedWard, mainTab, cardFilter]);
+        setMobileVisibleCount(20);
+    }, [fromDate, toDate, selectedWard, mainTab, cardFilter, activeTab]);
 
     const paginatedData = useMemo(() => {
         const start = (currentPage - 1) * itemsPerPage;
@@ -413,7 +417,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
         }
     };
 
-    const formatDate = (d?: string | null) => d ? new Date(d).toLocaleDateString('vi-VN') : '-';
+    const formatDate = (d?: string | null) => d ? (formatDateDDMMYYYY(d) || '-') : '-';
 
     return (
         <div className="flex flex-col h-full overflow-y-auto md:overflow-hidden relative bg-slate-50">
@@ -440,26 +444,6 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
             {/* Toolbar */}
             <div className={`p-4 border-b border-gray-200 shadow-sm flex flex-col gap-4 shrink-0 z-10 ${mainTab === 'measurement' ? 'bg-blue-50' : 'bg-orange-50'}`}>
                 <div className="flex flex-wrap items-center justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                        <div className={`p-2.5 rounded-xl ${mainTab === 'measurement' ? 'bg-blue-200 text-blue-700' : 'bg-orange-200 text-orange-700'}`}>
-                            <BarChart3 size={24} />
-                        </div>
-                        <div>
-                            <h2 className={`font-bold text-lg flex items-center gap-2 ${mainTab === 'measurement' ? 'text-blue-900' : 'text-orange-900'}`}>
-                                <span>{mainTab === 'measurement' ? 'Thống kê Hồ sơ Đo đạc' : 'Thống kê Hồ sơ Lưu trữ'}</span>
-                                {!isHanhChinhOrAdmin && userDept && (
-                                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-slate-200 text-slate-800 font-sans border border-slate-300">
-                                        Bộ phận: {userDept}
-                                    </span>
-                                )}
-
-                            </h2>
-                            <p className="text-xs text-gray-500">
-                                {mainTab === 'measurement' ? 'Dữ liệu từ Tổ đo đạc & Kỹ thuật' : 'Dữ liệu từ Tổ thông tin lưu trữ'}
-                            </p>
-                        </div>
-                    </div>
-                    
                     <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-lg border border-slate-200">
                         <button 
                             onClick={() => {
@@ -495,21 +479,23 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                             </select>
                         </div>
 
-                        <div className="flex items-center gap-2 bg-white border border-gray-300 rounded-lg px-3 py-1.5 shadow-sm shrink-0 text-xs font-semibold text-gray-700">
+                        <div className="flex items-center gap-1.5 bg-white border border-gray-300 rounded-lg px-2.5 py-1.5 shadow-sm shrink-0 whitespace-nowrap text-xs font-bold text-gray-700">
                             <CalendarDays size={16} className="text-slate-500 shrink-0" />
-                            <div className="flex items-center gap-1">
+                            <div className="relative flex items-center hover:text-blue-600 transition-colors cursor-pointer">
+                                <span>{fromDate === '1970-01-01' ? 'Từ ngày' : (formatDateDDMMYYYY(fromDate) || 'Từ ngày')}</span>
                                 <input 
                                     type="date" 
-                                    className="border-none bg-transparent p-0 outline-none text-xs font-semibold text-gray-700 focus:ring-0 w-[110px] cursor-pointer" 
+                                    className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" 
                                     value={fromDate === '1970-01-01' ? '' : fromDate} 
                                     onChange={(e) => { setFromDate(e.target.value || '1970-01-01'); setReportType('custom'); }} 
                                 />
                             </div>
-                            <span className="text-gray-400 font-bold">-</span>
-                            <div className="flex items-center gap-1">
+                            <span className="text-gray-400 font-bold text-xs">-</span>
+                            <div className="relative flex items-center hover:text-blue-600 transition-colors cursor-pointer">
+                                <span>{formatDateDDMMYYYY(toDate) || 'Đến ngày'}</span>
                                 <input 
                                     type="date" 
-                                    className="border-none bg-transparent p-0 outline-none text-xs font-semibold text-gray-700 focus:ring-0 w-[110px] cursor-pointer" 
+                                    className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" 
                                     value={toDate} 
                                     onChange={(e) => { setToDate(e.target.value); setReportType('custom'); }} 
                                 />
@@ -786,72 +772,90 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
 
                         {/* MOBILE CARD LIST VIEW (Giống tab Tìm kiếm) */}
                         <div className="md:hidden flex-1 overflow-y-auto space-y-2.5 pb-2">
-                            {paginatedData.length > 0 ? paginatedData.map((r, i) => {
-                                const emp = employees.find(e => e.id === r.assignedTo);
-                                const isOverdue = isRecordOverdue(r);
-                                const rowIndex = (currentPage - 1) * itemsPerPage + i + 1;
-                                let isCompletedLate = false;
-                                if (r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED) {
-                                    if (r.deadline && r.completedDate) {
-                                        const d = new Date(r.deadline); d.setHours(0,0,0,0);
-                                        const c = new Date(r.completedDate); c.setHours(0,0,0,0);
-                                        if (c > d) isCompletedLate = true;
-                                    }
-                                }
+                            {finalFilteredData.length > 0 ? (
+                                <>
+                                    {finalFilteredData.slice(0, mobileVisibleCount).map((r, i) => {
+                                        const emp = employees.find(e => e.id === r.assignedTo);
+                                        const isOverdue = isRecordOverdue(r);
+                                        const rowIndex = i + 1;
+                                        let isCompletedLate = false;
+                                        if (r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED) {
+                                            if (r.deadline && r.completedDate) {
+                                                const d = new Date(r.deadline); d.setHours(0,0,0,0);
+                                                const c = new Date(r.completedDate); c.setHours(0,0,0,0);
+                                                if (c > d) isCompletedLate = true;
+                                            }
+                                        }
 
-                                return (
-                                    <div key={r.id} className="bg-white rounded-xl border border-slate-200 p-3 shadow-sm hover:shadow-md transition-all">
-                                        <div className="flex justify-between items-start mb-2 gap-2">
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-center gap-1.5">
-                                                    <span className="text-[10px] bg-slate-100 text-slate-500 font-bold px-1.5 py-0.5 rounded">#{rowIndex}</span>
-                                                    <h3 className="font-bold text-slate-800 text-sm truncate">{r.customerName}</h3>
+                                        return (
+                                            <div key={r.id} className="bg-white rounded-xl border border-slate-200 p-3 shadow-sm hover:shadow-md transition-all">
+                                                <div className="flex justify-between items-start mb-2 gap-2">
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span className="text-[10px] bg-slate-100 text-slate-500 font-bold px-1.5 py-0.5 rounded">#{rowIndex}</span>
+                                                            <h3 className="font-bold text-slate-800 text-sm truncate">{r.customerName}</h3>
+                                                        </div>
+                                                        <div className="text-xs text-blue-600 font-semibold font-mono mt-0.5">{r.code}</div>
+                                                    </div>
+                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold border uppercase shrink-0 ${
+                                                        r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED ? 'bg-green-100 text-green-700 border-green-200' : 
+                                                        r.status === RecordStatus.WITHDRAWN ? 'bg-gray-100 text-gray-600 border-gray-200' :
+                                                        r.status === RecordStatus.REJECTED ? 'bg-red-100 text-red-700 border-red-200' :
+                                                        isOverdue ? 'bg-red-100 text-red-700 border-red-200 font-bold' :
+                                                        'bg-blue-50 text-blue-700 border-blue-100'
+                                                    }`}>
+                                                        {STATUS_LABELS[r.status]}
+                                                    </span>
                                                 </div>
-                                                <div className="text-xs text-blue-600 font-semibold font-mono mt-0.5">{r.code}</div>
-                                            </div>
-                                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold border uppercase shrink-0 ${
-                                                r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED ? 'bg-green-100 text-green-700 border-green-200' : 
-                                                r.status === RecordStatus.WITHDRAWN ? 'bg-gray-100 text-gray-600 border-gray-200' :
-                                                r.status === RecordStatus.REJECTED ? 'bg-red-100 text-red-700 border-red-200' :
-                                                isOverdue ? 'bg-red-100 text-red-700 border-red-200 font-bold' :
-                                                'bg-blue-50 text-blue-700 border-blue-100'
-                                            }`}>
-                                                {STATUS_LABELS[r.status]}
-                                            </span>
-                                        </div>
 
-                                        <div className="grid grid-cols-2 gap-1.5 text-xs text-slate-600 bg-slate-50 p-2.5 rounded-lg">
-                                            <div>
-                                                <span className="text-slate-400">Địa bàn:</span> <span className="font-medium text-slate-800">{getNormalizedWard(r.ward)}</span>
-                                            </div>
-                                            <div>
-                                                <span className="text-slate-400">Tờ/Thửa:</span> <span className="font-medium text-slate-800">{r.mapSheet || '-'}/{r.landPlot || '-'}</span>
-                                            </div>
-                                            <div>
-                                                <span className="text-slate-400">Nhận:</span> <span className="font-medium text-slate-800">{formatDate(r.receivedDate)}</span>
-                                            </div>
-                                            <div>
-                                                <span className="text-slate-400">Hẹn trả:</span> <span className={`font-medium ${isOverdue ? 'text-red-600 font-bold' : 'text-slate-800'}`}>{formatDate(r.deadline)}</span>
-                                            </div>
-                                            {r.completedDate && (
-                                                <div className="col-span-2">
-                                                    <span className="text-slate-400">Hoàn thành:</span> <span className={`font-medium ${isCompletedLate ? 'text-orange-600' : 'text-green-700'}`}>{formatDate(r.completedDate)}</span>
+                                                <div className="grid grid-cols-2 gap-1.5 text-xs text-slate-600 bg-slate-50 p-2.5 rounded-lg">
+                                                    <div>
+                                                        <span className="text-slate-400">Địa bàn:</span> <span className="font-medium text-slate-800">{getNormalizedWard(r.ward)}</span>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-slate-400">Tờ/Thửa:</span> <span className="font-medium text-slate-800">{r.mapSheet || '-'}/{r.landPlot || '-'}</span>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-slate-400">Nhận:</span> <span className="font-medium text-slate-800">{formatDate(r.receivedDate)}</span>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-slate-400">Hẹn trả:</span> <span className={`font-medium ${isOverdue ? 'text-red-600 font-bold' : 'text-slate-800'}`}>{formatDate(r.deadline)}</span>
+                                                    </div>
+                                                    {r.completedDate && (
+                                                        <div className="col-span-2">
+                                                            <span className="text-slate-400">Hoàn thành:</span> <span className={`font-medium ${isCompletedLate ? 'text-orange-600' : 'text-green-700'}`}>{formatDate(r.completedDate)}</span>
+                                                        </div>
+                                                    )}
+                                                    <div className="col-span-2 flex items-center justify-between pt-1 border-t border-slate-200/60 mt-0.5">
+                                                        <span className="text-slate-400">NV xử lý:</span>
+                                                        <span className="font-semibold text-slate-800">{emp ? emp.name : '-'}</span>
+                                                    </div>
                                                 </div>
-                                            )}
-                                            <div className="col-span-2 flex items-center justify-between pt-1 border-t border-slate-200/60 mt-0.5">
-                                                <span className="text-slate-400">NV xử lý:</span>
-                                                <span className="font-semibold text-slate-800">{emp ? emp.name : '-'}</span>
                                             </div>
+                                        );
+                                    })}
+
+                                    {finalFilteredData.length > mobileVisibleCount && (
+                                        <div className="pt-3 pb-6 flex flex-col items-center gap-2">
+                                            <button 
+                                                onClick={() => setMobileVisibleCount(prev => prev + 20)}
+                                                className="w-full max-w-sm py-2.5 bg-white border border-blue-200 text-blue-600 hover:bg-blue-50 rounded-xl font-bold text-xs shadow-sm active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                                            >
+                                                Xem thêm {finalFilteredData.length - mobileVisibleCount} hồ sơ
+                                            </button>
+                                            <p className="text-[10px] text-slate-400 font-medium">
+                                                Đang hiển thị {Math.min(mobileVisibleCount, finalFilteredData.length)} / {finalFilteredData.length} hồ sơ
+                                            </p>
                                         </div>
-                                    </div>
-                                );
-                            }) : (
+                                    )}
+                                </>
+                            ) : (
                                 <div className="p-8 text-center text-slate-400 text-sm">Không có dữ liệu trong khoảng thời gian này.</div>
                             )}
                         </div>
-                        {/* Pagination Footer */}
+                        {/* Pagination Footer (Desktop only) */}
                         {filteredData.length > 0 && (
-                            <div className="border-t border-gray-200 p-3 bg-gray-50 flex justify-between items-center shrink-0 rounded-b-xl">
+                            <div className="hidden md:flex border-t border-gray-200 p-3 bg-gray-50 justify-between items-center shrink-0 rounded-b-xl">
                                 <span className="text-xs text-gray-500">
                                     Hiển thị <strong>{(currentPage - 1) * itemsPerPage + 1}</strong> - <strong>{Math.min(currentPage * itemsPerPage, filteredData.length)}</strong> trên tổng <strong>{filteredData.length}</strong>
                                 </span>

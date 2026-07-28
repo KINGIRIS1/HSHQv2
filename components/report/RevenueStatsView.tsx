@@ -19,6 +19,7 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({ records, employees,
     const [selectedReceiver, setSelectedReceiver] = useState<string>('all');
     const [searchTerm, setSearchTerm] = useState<string>('');
     const [currentPage, setCurrentPage] = useState<number>(1);
+    const [mobileVisibleCount, setMobileVisibleCount] = useState<number>(20);
     const pageSize = 15;
 
     // Helper to identify record receipt type
@@ -197,6 +198,7 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({ records, employees,
     const handleCardFilterChange = (type: 'all' | 'bien_lai' | 'hoa_don') => {
         setActiveCardFilter(type);
         setCurrentPage(1);
+        setMobileVisibleCount(20);
     };
 
     // Excel export
@@ -365,8 +367,8 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({ records, employees,
                     </div>
                 </div>
 
-                {/* Table Section with sticky header */}
-                <div className="overflow-auto flex-1 min-h-[300px] max-h-[600px] relative">
+                {/* Desktop Table Section with sticky header */}
+                <div className="hidden md:block overflow-auto flex-1 min-h-[300px] max-h-[600px] relative">
                     <table className="w-full text-xs text-left border-collapse">
                         <thead className="bg-slate-100/95 backdrop-blur-sm text-slate-600 font-bold uppercase tracking-wider text-[11px] border-b border-slate-200/80 sticky top-0 z-20 shadow-xs">
                             <tr>
@@ -404,8 +406,12 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({ records, employees,
                                                     const dStr = r.resultReturnedDate || r.completedDate || r.exportDate || r.receivedDate;
                                                     if (!dStr) return '-';
                                                     if (dStr.includes('/')) return dStr;
-                                                    const dt = new Date(dStr);
-                                                    return isNaN(dt.getTime()) ? dStr : dt.toLocaleDateString('vi-VN');
+                                                    const cleanStr = dStr.split('T')[0];
+                                                    const parts = cleanStr.split('-');
+                                                    if (parts.length === 3) {
+                                                        return `${parts[2].padStart(2, '0')}/${parts[1].padStart(2, '0')}/${parts[0]}`;
+                                                    }
+                                                    return dStr;
                                                 })()}
                                             </td>
                                             <td className="p-3.5 text-center">
@@ -444,8 +450,79 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({ records, employees,
                     </table>
                 </div>
 
+                {/* Mobile View for RevenueStatsView (20 items + Xem thêm) */}
+                <div className="block md:hidden flex-1 overflow-y-auto space-y-2.5 p-2">
+                    {filteredRecords.length > 0 ? (
+                        <>
+                            {filteredRecords.slice(0, mobileVisibleCount).map((r, idx) => {
+                                const itemNumber = idx + 1;
+                                const isHoaDon = r.computedReceiptType === 'Hóa Đơn';
+                                const dateStr = (() => {
+                                    const dStr = r.resultReturnedDate || r.completedDate || r.exportDate || r.receivedDate;
+                                    if (!dStr) return '-';
+                                    if (dStr.includes('/')) return dStr;
+                                    const cleanStr = dStr.split('T')[0];
+                                    const parts = cleanStr.split('-');
+                                    if (parts.length === 3) {
+                                        return `${parts[2].padStart(2, '0')}/${parts[1].padStart(2, '0')}/${parts[0]}`;
+                                    }
+                                    return dStr;
+                                })();
+
+                                return (
+                                    <div key={r.id || idx} className="bg-white rounded-xl border border-slate-200 p-3 shadow-xs space-y-2">
+                                        <div className="flex justify-between items-start gap-2">
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className="text-[10px] bg-slate-100 text-slate-500 font-bold px-1.5 py-0.5 rounded">#{itemNumber}</span>
+                                                    <h3 className="font-bold text-slate-800 text-sm truncate">{r.customerName || '---'}</h3>
+                                                </div>
+                                                <div className="text-xs text-teal-600 font-bold font-mono mt-0.5">{r.code}</div>
+                                            </div>
+                                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border shrink-0 ${isHoaDon ? 'bg-orange-50 text-orange-600 border-orange-200' : 'bg-blue-50 text-blue-600 border-blue-200'}`}>
+                                                {isHoaDon ? 'HÓA ĐƠN' : 'BIÊN LAI'}
+                                            </span>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-1.5 text-xs text-slate-600 bg-slate-50 p-2.5 rounded-lg">
+                                            <div>
+                                                <span className="text-slate-400">Số chứng từ:</span> <span className="font-mono font-bold text-slate-800">{r.receiptNumber || '---'}</span>
+                                            </div>
+                                            <div>
+                                                <span className="text-slate-400">Ngày thu:</span> <span className="font-medium text-slate-800">{dateStr}</span>
+                                            </div>
+                                            <div>
+                                                <span className="text-slate-400">Số tiền:</span> <span className="font-mono font-bold text-emerald-600">{r.calcReturned.toLocaleString('vi-VN')} đ</span>
+                                            </div>
+                                            <div>
+                                                <span className="text-slate-400">Địa bàn:</span> <span className="font-medium text-slate-800">{r.assignedWard}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+
+                            {filteredRecords.length > mobileVisibleCount && (
+                                <div className="pt-3 pb-6 flex flex-col items-center gap-2">
+                                    <button 
+                                        onClick={() => setMobileVisibleCount(prev => prev + 20)}
+                                        className="w-full max-w-sm py-2.5 bg-white border border-teal-200 text-teal-600 hover:bg-teal-50 rounded-xl font-bold text-xs shadow-xs active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                                    >
+                                        Xem thêm {filteredRecords.length - mobileVisibleCount} hồ sơ
+                                    </button>
+                                    <p className="text-[10px] text-slate-400 font-medium">
+                                        Đang hiển thị {Math.min(mobileVisibleCount, filteredRecords.length)} / {filteredRecords.length} hồ sơ
+                                    </p>
+                                </div>
+                            )}
+                        </>
+                    ) : (
+                        <div className="p-8 text-center text-slate-400 text-sm">Không tìm thấy dữ liệu nguồn thu phù hợp.</div>
+                    )}
+                </div>
+
                 {/* Footer Section */}
-                <div className="p-3.5 px-5 border-t border-slate-100 bg-slate-50/50 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
+                <div className="p-3.5 px-5 border-t border-slate-100 bg-slate-50/50 hidden md:flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
                     <div>
                         Hiển thị từ <span className="font-bold text-slate-700">{filteredRecords.length > 0 ? (currentPage - 1) * pageSize + 1 : 0}</span> đến <span className="font-bold text-slate-700">{Math.min(currentPage * pageSize, filteredRecords.length)}</span> trên tổng <span className="font-bold text-slate-700">{filteredRecords.length}</span> hồ sơ đã lọc
                     </div>

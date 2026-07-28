@@ -444,8 +444,7 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                 <ChevronLeft size={24} />
               </button>
               <div className="min-w-0">
-                <h2 className="font-bold text-slate-800 text-sm sm:text-base truncate max-w-[220px] sm:max-w-md">{record.customerName}</h2>
-                <p className="text-[10px] sm:text-xs text-slate-400 font-mono">{record.code}</p>
+                <h2 className="font-bold text-blue-700 text-sm sm:text-base font-mono truncate max-w-[260px] sm:max-w-md">{record.code}</h2>
               </div>
             </div>
             <div className="flex items-center gap-1 shrink-0">
