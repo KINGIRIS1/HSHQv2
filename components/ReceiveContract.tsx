@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { RecordFile, Contract, PriceItem, SplitItem, User, Employee } from '../types';
 import { fetchPriceList, deleteContractApi, updateContractApi, createContractApi, fetchContracts, getPreviewContractCode, consumeNextContractCode, getPreviewHDKTCode, consumeNextHDKTCode } from '../services/api';
 import { FileSignature, LayoutList, Settings, Settings2, FileCheck, FileText, ClipboardList, Hash, ShieldAlert } from 'lucide-react';

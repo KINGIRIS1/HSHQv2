@@ -110,7 +110,12 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
   useEffect(() => {
     if (isOpen) {
         if (initialData) {
-            setFormData(initialData);
+            const dataToSet = { ...initialData };
+            const rLower = String(dataToSet.recordType || '').toLowerCase();
+            if ((rLower.includes('1.2') || rLower.includes('công văn') || rLower.includes('cong van') || dataToSet.recordType === '1.1 CC DL ĐĐ' || dataToSet.recordType === '1.1 Cung cấp dữ liệu đất đai') && !dataToSet.price) {
+                dataToSet.price = 310000;
+            }
+            setFormData(dataToSet);
             setAttachedDocs(parseAttachedDocs(initialData.otherDocs));
             const parsed = parseAuthDocType(initialData.authDocType);
             setAuthCccd(parsed.cccd);
@@ -339,6 +344,12 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
         const rDate = field === 'receivedDate' ? value : prev.receivedDate;
         if (rType && rDate) {
           updated.deadline = calculateDeadlineHelper(rType, String(rDate).split('T')[0], holidays || []);
+        }
+        if (field === 'recordType') {
+          const rLower = String(value || '').toLowerCase();
+          if (rLower.includes('1.2') || rLower.includes('công văn') || rLower.includes('cong van') || value === '1.1 CC DL ĐĐ' || value === '1.1 Cung cấp dữ liệu đất đai') {
+            updated.price = 310000;
+          }
         }
       }
       return updated;

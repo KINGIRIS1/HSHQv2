@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { WorkSchedule, User } from '../../types';
 import { Calendar, User as UserIcon, FileText, Building, Save, X, Plus, Check } from 'lucide-react';
+import FlexibleDateInput from '../FlexibleDateInput';
 
 interface ScheduleFormProps {
     initialData?: WorkSchedule | null;
@@ -110,18 +111,11 @@ const ScheduleForm: React.FC<ScheduleFormProps> = ({ initialData, currentUser, o
             <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                     <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Ngày công tác <span className="text-red-500">*</span></label>
-                    <div className="relative flex items-center border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white hover:border-blue-500 transition-colors cursor-pointer">
-                        <Calendar size={16} className="text-gray-400 mr-2 shrink-0" />
-                        <span className="font-semibold text-gray-700">
-                            {formatDateDDMMYYYY(formData.date || '') || 'Chọn ngày công tác'}
-                        </span>
-                        <input 
-                            type="date" 
-                            className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
-                            value={formData.date ? (formData.date.includes('T') ? formData.date.split('T')[0] : formData.date) : ''}
-                            onChange={e => setFormData({...formData, date: e.target.value})}
-                        />
-                    </div>
+                    <FlexibleDateInput
+                        value={formData.date ? (formData.date.includes('T') ? formData.date.split('T')[0] : formData.date) : ''}
+                        onChange={(isoStr) => setFormData({ ...formData, date: isoStr })}
+                        placeholder="dd/mm/yyyy"
+                    />
                 </div>
 
                 <div>

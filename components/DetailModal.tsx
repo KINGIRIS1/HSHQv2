@@ -769,44 +769,65 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                 <div className="space-y-6">
                     {/* NỘI DUNG */}
                     <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm h-full flex flex-col">
-                        {/* HÀNG 1: HỢP ĐỒNG LIÊN KẾT & THANH LÝ */}
-                        {record && record.recordType && (getShortRecordType(record.recordType).startsWith('2.3') || getShortRecordType(record.recordType).startsWith('2.4')) && (
-                            <div className="mb-4 bg-indigo-50/80 border border-indigo-100 rounded-xl p-3 flex flex-wrap items-center justify-between gap-3">
-                                <div className="flex items-center gap-2.5">
-                                    <div className="bg-indigo-200 text-indigo-700 p-1.5 rounded-lg shrink-0">
-                                        <FileText size={16} />
-                                    </div>
-                                    <div className="text-left">
-                                        <span className="text-[10px] text-indigo-600 uppercase font-bold block">Hợp đồng liên kết</span>
-                                        <p className="text-xs font-bold text-indigo-950">
-                                            {matchedContract ? `Số HĐ: ${matchedContract.code}` : 'Chưa có HĐ'}
-                                        </p>
-                                    </div>
-                                </div>
+                        {/* HÀNG BÁO HỢP ĐỒNG (CHỈ ÁP DỤNG CHO 2.3 VÀ 2.4) & SỐ TRÍCH ĐO / TRÍCH LỤC */}
+                        {(() => {
+                            const isContractProcedure = !!(record?.recordType && (getShortRecordType(record.recordType).startsWith('2.3') || getShortRecordType(record.recordType).startsWith('2.4')));
+                            const hasExcerptOrMeasurement = !!(recordTypeLower.includes('trích đo') || recordTypeLower.includes('trích lục') || record?.measurementNumber || record?.excerptNumber);
 
-                                {liquidationInfo && (
-                                    <div className="flex items-center gap-2 bg-orange-100/80 border border-orange-200/80 px-2.5 py-1 rounded-lg">
-                                        <Calculator size={14} className="text-orange-700" />
-                                        <div className="text-left">
-                                            <span className="text-[9px] text-orange-700 uppercase font-bold block">{liquidationInfo.content}</span>
-                                            <p className="text-xs font-bold text-orange-950">{liquidationInfo.amount.toLocaleString('vi-VN')} đ</p>
+                            if (!isContractProcedure && !hasExcerptOrMeasurement) return null;
+
+                            return (
+                                <div className={`grid grid-cols-1 ${isContractProcedure && hasExcerptOrMeasurement ? 'sm:grid-cols-2' : ''} gap-3 mb-4`}>
+                                    {/* CỘT HỢP ĐỒNG LIÊN KẾT - CHỈ XUẤT HIỆN CHO THỦ TỤC 2.3 & 2.4 */}
+                                    {isContractProcedure && (
+                                        <div className="bg-indigo-50/80 border border-indigo-100 rounded-xl p-3 flex items-center justify-between gap-2">
+                                            <div className="flex items-center gap-2.5 min-w-0">
+                                                <div className="bg-indigo-200 text-indigo-700 p-2 rounded-lg shrink-0">
+                                                    <FileText size={16} />
+                                                </div>
+                                                <div className="text-left truncate">
+                                                    <span className="text-[10px] text-indigo-600 uppercase font-bold block">Hợp đồng số :</span>
+                                                    <p className="text-xs font-bold text-indigo-950 truncate">
+                                                        {matchedContract ? matchedContract.code : 'Chưa có HĐ'}
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            {onCreateContract && !matchedContract && (
+                                                <button 
+                                                    onClick={() => {
+                                                        onCreateContract(record);
+                                                        onClose();
+                                                    }}
+                                                    className="inline-flex items-center gap-1 text-[11px] font-bold bg-indigo-600 text-white hover:bg-indigo-700 px-2.5 py-1.5 rounded-lg transition-colors shadow-sm whitespace-nowrap shrink-0"
+                                                >
+                                                    Lập HĐ mới
+                                                </button>
+                                            )}
                                         </div>
-                                    </div>
-                                )}
+                                    )}
 
-                                {onCreateContract && !matchedContract && (
-                                    <button 
-                                        onClick={() => {
-                                            onCreateContract(record);
-                                            onClose();
-                                        }}
-                                        className="inline-flex items-center gap-1 text-xs font-bold bg-indigo-600 text-white hover:bg-indigo-700 px-3 py-1.5 rounded-lg transition-colors shadow-sm whitespace-nowrap ml-auto"
-                                    >
-                                        Lập Hợp đồng mới
-                                    </button>
-                                )}
-                            </div>
-                        )}
+                                    {/* CỘT SỐ TRÍCH ĐO / SỐ TRÍCH LỤC */}
+                                    {hasExcerptOrMeasurement && (
+                                        <div className="bg-purple-50/80 border border-purple-100 rounded-xl p-3 flex items-center gap-2.5">
+                                            <div className="bg-purple-200 text-purple-700 p-2 rounded-lg shrink-0">
+                                                <FileCheck size={16} />
+                                            </div>
+                                            <div className="text-left truncate">
+                                                <span className="text-[10px] text-purple-600 uppercase font-bold block">
+                                                    {recordTypeLower.includes('trích lục') ? 'Số trích lục' : 'Số trích đo'}
+                                                </span>
+                                                <p className="text-xs font-bold text-purple-950 truncate">
+                                                    {recordTypeLower.includes('trích lục') 
+                                                        ? (record.excerptNumber || '---') 
+                                                        : (record.measurementNumber || record.excerptNumber || '---')}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })()}
 
                         <h3 className="text-xs font-bold text-purple-600 uppercase mb-4 flex items-center gap-2 border-l-4 border-purple-600 pl-2">
                             <FileText size={16}/> Nội dung chi tiết
@@ -825,23 +846,6 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                             </div>
                         )}
 
-                        {(recordTypeLower.includes('trích đo') || recordTypeLower.includes('trích lục')) && (
-                            <div className="grid grid-cols-2 gap-6 mb-6">
-                                {recordTypeLower.includes('trích đo') && (
-                                    <div>
-                                        <label className="text-[10px] text-gray-400 uppercase font-bold block mb-1">Số trích đo</label>
-                                        <p className="text-sm font-bold text-gray-800">{record.measurementNumber || '---'}</p>
-                                    </div>
-                                )}
-                                {recordTypeLower.includes('trích lục') && (
-                                    <div>
-                                        <label className="text-[10px] text-gray-400 uppercase font-bold block mb-1">Số trích lục</label>
-                                        <p className="text-sm font-bold text-gray-800">{record.excerptNumber || '---'}</p>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
                         {/* KHU VỰC THÔNG TIN THU PHÍ & TRẢ KẾT QUẢ */}
                         <div className="border-t border-gray-100 pt-4 mt-2">
                             <label className="text-[11px] font-bold text-slate-700 uppercase block mb-2.5 flex items-center gap-1.5">
@@ -851,68 +855,29 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                             
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 {/* Thẻ Số tiền */}
-                                <div className="bg-emerald-50/80 p-3.5 rounded-xl border border-emerald-200/80 flex items-center gap-3">
-                                    <div className="bg-emerald-500 text-white p-2 rounded-lg shadow-sm">
-                                        <DollarSign size={18}/>
-                                    </div>
-                                    <div>
-                                        <label className="text-[10px] text-emerald-700 uppercase font-bold block">
-                                            Số tiền thu
-                                        </label>
-                                        <p className="text-base font-black text-emerald-800">
-                                            {record.returnedPrice !== undefined && record.returnedPrice !== null
-                                                ? record.returnedPrice.toLocaleString('vi-VN') + ' đ'
-                                                : (record.recordType === 'Cung cấp tài liệu đất đai' 
-                                                    ? '310.000 đ' 
-                                                    : (contractPrice !== null && contractPrice !== undefined ? contractPrice.toLocaleString('vi-VN') + ' đ' : '---'))}
-                                        </p>
-                                    </div>
+                                <div className="bg-emerald-50/80 p-3 rounded-xl border border-emerald-200/80 flex flex-col justify-center min-w-0">
+                                    <label className="text-[10px] text-emerald-700 uppercase font-bold block whitespace-nowrap truncate">
+                                        Số tiền thu
+                                    </label>
+                                    <p className="text-sm font-black text-emerald-800 whitespace-nowrap truncate mt-0.5">
+                                        {record.returnedPrice !== undefined && record.returnedPrice !== null
+                                            ? record.returnedPrice.toLocaleString('vi-VN') + ' đ'
+                                            : (record.recordType === 'Cung cấp tài liệu đất đai' 
+                                                ? '310.000 đ' 
+                                                : (contractPrice !== null && contractPrice !== undefined ? contractPrice.toLocaleString('vi-VN') + ' đ' : '---'))}
+                                    </p>
                                 </div>
 
                                 {/* Thẻ Số BL/HĐ */}
-                                <div className="bg-blue-50/80 p-3.5 rounded-xl border border-blue-200/80 flex items-center gap-3">
-                                    <div className="bg-blue-500 text-white p-2 rounded-lg shadow-sm">
-                                        <Receipt size={18}/>
-                                    </div>
-                                    <div>
-                                        <label className="text-[10px] text-blue-700 uppercase font-bold block">
-                                            {record.receiptType === 'Biên Lai' ? 'SỐ BIÊN LAI' : record.receiptType === 'Hóa Đơn' ? 'SỐ HÓA ĐƠN' : 'SỐ BIÊN LAI / HÓA ĐƠN'}
-                                        </label>
-                                        <p className="text-sm font-black text-blue-900 font-mono">
-                                            {record.receiptNumber || '---'}
-                                        </p>
-                                    </div>
+                                <div className="bg-blue-50/80 p-3 rounded-xl border border-blue-200/80 flex flex-col justify-center min-w-0">
+                                    <label className="text-[10px] text-blue-700 uppercase font-bold block whitespace-nowrap truncate">
+                                        {record.receiptType === 'Biên Lai' ? 'SỐ BIÊN LAI' : record.receiptType === 'Hóa Đơn' ? 'SỐ HÓA ĐƠN' : 'SỐ BIÊN LAI / HÓA ĐƠN'}
+                                    </label>
+                                    <p className="text-xs font-black text-blue-900 font-mono whitespace-nowrap truncate mt-0.5">
+                                        {record.receiptNumber || '---'}
+                                    </p>
                                 </div>
                             </div>
-
-                            {/* Thông tin ngày trả & người nhận kết quả */}
-                            {(record.resultReturnedDate || record.receiverName) && (
-                                <div className="mt-3 bg-purple-50/80 p-3 rounded-xl border border-purple-200/80 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                    {record.resultReturnedDate && (
-                                        <div className="flex items-center gap-2.5">
-                                            <div className="bg-purple-200 text-purple-700 p-1.5 rounded-lg shrink-0">
-                                                <CalendarClock size={15}/>
-                                            </div>
-                                            <div>
-                                                <label className="text-[10px] text-purple-600 uppercase font-bold block">Ngày trả kết quả</label>
-                                                <p className="text-xs font-bold text-purple-950">{formatDate(record.resultReturnedDate)}</p>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {record.receiverName && (
-                                        <div className="flex items-center gap-2.5">
-                                            <div className="bg-purple-200 text-purple-700 p-1.5 rounded-lg shrink-0">
-                                                <UserIcon size={15}/>
-                                            </div>
-                                            <div>
-                                                <label className="text-[10px] text-purple-600 uppercase font-bold block">Người nhận kết quả</label>
-                                                <p className="text-xs font-bold text-purple-950">{record.receiverName}</p>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
                         </div>
 
                         {/* Chi tiết tách thửa */}
@@ -1126,11 +1091,13 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                             />
                             
                             <TimelineItem 
-                                date={record.completedDate} 
+                                date={record.completedDate || record.exportDate} 
+                                forceActive={!!record.completedDate || !!record.exportDate || !!record.exportBatch}
                                 label={record.status === RecordStatus.REJECTED ? "HỒ SƠ TRẢ" : record.status === RecordStatus.WITHDRAWN ? "RÚT HỒ SƠ" : "HOÀN THÀNH"} 
                                 icon={CheckSquare}
                                 isLast={false}
                                 colorClass={{text: record.status === RecordStatus.REJECTED ? 'text-red-700' : 'text-green-700', border: record.status === RecordStatus.REJECTED ? 'border-red-600' : 'border-green-600', bg: record.status === RecordStatus.REJECTED ? 'bg-red-600' : 'bg-green-600'}}
+                                subText={record.exportBatch ? `Giao Đợt ${String(record.exportBatch).padStart(2, '0')}` : undefined}
                             />
                             
                             <TimelineItem 
@@ -1143,17 +1110,6 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                             />
                         </div>
                     </div>
-
-                    {/* EXPORT INFO */}
-                    {record.exportBatch && (
-                         <div className="bg-green-50 border border-green-200 rounded-xl p-4 flex flex-col items-center text-center">
-                            <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-600 mb-2">
-                                <Info size={16}/>
-                            </div>
-                            <p className="text-sm font-bold text-green-800">Hồ sơ đã được xuất danh sách Đợt {record.exportBatch}</p>
-                            <p className="text-xs text-green-600 mt-1">Ngày: {formatDate(record.exportDate)}</p>
-                         </div>
-                    )}
                 </div>
 
             </div>

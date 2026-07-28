@@ -167,7 +167,7 @@ const VPHCForm: React.FC<VPHCFormProps> = ({ formData, handleChange }) => {
                     </div>
                     <div>
                         <label className={labelClass}>Ngày công chứng</label>
-                        <input className={inputClass} placeholder="dd/mm/yyyy" value={formData.NGAYCC} onChange={e => handleChange('NGAYCC', e.target.value)} />
+                        <input type="date" className={inputClass} value={formData.NGAYCC} onChange={e => handleChange('NGAYCC', e.target.value)} />
                     </div>
                     <div className="col-span-2">
                         <label className={labelClass}>Văn phòng công chứng</label>

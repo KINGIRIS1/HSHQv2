@@ -106,6 +106,7 @@ const ContractList: React.FC<ContractListProps> = ({ contracts: propContracts, o
             <h3 className={`font-bold text-lg ${isLiquidationMode ? 'text-orange-800' : 'text-purple-800'}`}>
                 {isLiquidationMode ? 'Danh sách Thanh Lý' : 'Danh sách Hợp Đồng'}
             </h3>
+
             <div className="relative flex-1 max-w-sm ml-auto">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                 <input 
@@ -120,6 +121,7 @@ const ContractList: React.FC<ContractListProps> = ({ contracts: propContracts, o
                 <RotateCcw size={18} /> 
             </button>
         </div>
+
         <div className="flex-1 overflow-auto min-h-0">
             <table className="w-full text-left table-fixed min-w-[1000px]">
                 <thead className={`text-xs uppercase font-semibold sticky top-0 shadow-sm ${isLiquidationMode ? 'bg-orange-100 text-orange-700' : 'bg-gray-50 text-gray-500'}`}>

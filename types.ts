@@ -229,6 +229,7 @@ export interface Contract {
   // Thanh lý
   liquidationArea?: number | null; // Diện tích thanh lý thực tế
   liquidationAmount?: number | null; // MỚI: Giá trị thanh lý thực tế (tiền)
+  liquidationDate?: string | null; // Ngày thanh lý hợp đồng thực tế
 }
 
 // Interface cho Bảng giá (Cập nhật theo hình ảnh)

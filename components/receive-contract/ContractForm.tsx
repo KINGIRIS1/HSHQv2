@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Contract, PriceItem, SplitItem, RecordFile } from '../../types';
-import { Save, Calculator, Search, Plus, Trash2, Printer, FileCheck, CheckCircle, AlertCircle, X, RotateCcw, MapPin, Ruler, Grid, Banknote, User, FileText, Calendar, Wand2, ChevronDown, ChevronUp, Copy, ExternalLink, RefreshCw } from 'lucide-react';
+import { Save, Calculator, Search, Plus, Trash2, Printer, FileCheck, CheckCircle, AlertCircle, AlertTriangle, X, RotateCcw, MapPin, Ruler, Grid, Banknote, User, FileText, Calendar, Wand2, ChevronDown, ChevronUp, Copy, ExternalLink, RefreshCw } from 'lucide-react';
 import { confirmAction } from '../../utils/appHelpers';
+import { checkContractDateErrors, getTodayDateString } from '../../utils/contractDateUtils';
 
 interface ContractFormProps {
   initialData?: Contract;
@@ -43,18 +44,24 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
     code: '', customerName: '', phoneNumber: '', address: '', ward: '', landPlot: '', mapSheet: '', area: 0,
     contractType: 'Đo đạc', serviceType: '', areaType: '', plotCount: 1, markerCount: 1, quantity: 1, 
     unitPrice: 0, vatRate: 8, vatAmount: 0, totalAmount: 0, deposit: 0, content: '',
-    createdDate: todayStr, status: 'PENDING',
+    createdDate: todayStr, liquidationDate: todayStr, status: 'PENDING',
     liquidationArea: 0, liquidationAmount: 0 // Init
   });
 
   const [isManual, setIsManual] = useState<boolean>(false);
+
+  // Re-evaluate date validation whenever formData or mode changes
+  const dateCheck = useMemo(() => {
+    return checkContractDateErrors(formData, mode);
+  }, [formData, mode]);
 
   useEffect(() => {
       if (initialData) {
           setFormData({
               ...initialData,
               liquidationArea: (mode === 'liquidation' && !initialData.liquidationArea) ? initialData.area : initialData.liquidationArea,
-              liquidationAmount: (mode === 'liquidation' && !initialData.liquidationAmount) ? initialData.totalAmount : initialData.liquidationAmount
+              liquidationAmount: (mode === 'liquidation' && !initialData.liquidationAmount) ? initialData.totalAmount : initialData.liquidationAmount,
+              liquidationDate: initialData.liquidationDate || todayStr
           });
           
           const items = initialData.splitItems || [];
@@ -75,7 +82,7 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
               code: '', customerName: '', phoneNumber: '', address: '', ward: '', landPlot: '', mapSheet: '', area: 0,
               contractType: 'Đo đạc', serviceType: '', areaType: '', plotCount: 1, markerCount: 1, quantity: 1, 
               unitPrice: 0, vatRate: 8, vatAmount: 0, totalAmount: 0, deposit: 0, content: '',
-              createdDate: todayStr, status: 'PENDING',
+              createdDate: todayStr, liquidationDate: todayStr, status: 'PENDING',
               liquidationArea: 0, liquidationAmount: 0
           });
           setTachThuaItems([]);
@@ -83,7 +90,7 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
           setActiveTab('dd');
           setIsManual(false);
       }
-  }, [initialData, mode]);
+  }, [initialData, mode, todayStr]);
 
   // Separate, stable effect for checking duplicate contracts
   useEffect(() => {
@@ -867,11 +874,37 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
                             </div>
                         )}
                         <div>
-                            <label className={labelClass}>{mode === 'liquidation' ? 'Ngày lập thanh lý' : 'Ngày lập'}</label>
-                            <div>
+                            <label className={labelClass}>{mode === 'liquidation' ? 'Ngày lập HĐ gốc' : 'Ngày lập'}</label>
+                            <div className="flex gap-1.5 items-center">
                                 <input type="date" className={inputClass} value={dateVal(formData.createdDate)} onChange={e => handleChange('createdDate', e.target.value)} />
+                                <button type="button" onClick={() => handleChange('createdDate', todayStr)} className="px-2 py-1.5 bg-purple-100 hover:bg-purple-200 text-purple-800 rounded-lg text-xs font-bold whitespace-nowrap transition-colors" title="Đặt lại ngày hôm nay">Hôm nay</button>
                             </div>
                         </div>
+
+                        {mode === 'liquidation' && (
+                            <div>
+                                <label className={labelClass}>Ngày thanh lý HĐ</label>
+                                <div className="flex gap-1.5 items-center">
+                                    <input type="date" className={inputClass} value={dateVal(formData.liquidationDate)} onChange={e => handleChange('liquidationDate', e.target.value)} />
+                                    <button type="button" onClick={() => handleChange('liquidationDate', todayStr)} className="px-2 py-1.5 bg-orange-100 hover:bg-orange-200 text-orange-800 rounded-lg text-xs font-bold whitespace-nowrap transition-colors" title="Đặt lại ngày hôm nay">Hôm nay</button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* CẢNH BÁO KIỂM TRA NGÀY BẤT THƯỜNG / SAI SO VỚI THỜI GIAN HIỆN TẠI */}
+                        {dateCheck.messages.length > 0 && (
+                            <div className={`col-span-full p-3 rounded-xl border text-xs space-y-1 animate-fade-in ${dateCheck.hasError ? 'bg-red-50 border-red-200 text-red-800' : 'bg-amber-50 border-amber-200 text-amber-800'}`}>
+                                <div className="flex items-center gap-1.5 font-bold text-sm">
+                                    <AlertTriangle size={16} className={dateCheck.hasError ? 'text-red-600' : 'text-amber-600'} />
+                                    <span>Cảnh báo ngày bất thường (So với thời gian hiện tại: {getTodayDateString()}):</span>
+                                </div>
+                                <ul className="list-disc list-inside pl-1 space-y-1 font-medium">
+                                    {dateCheck.messages.map((m, idx) => (
+                                        <li key={idx}>{m}</li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
                     </div>
 
                     {/* Pricing Box */}

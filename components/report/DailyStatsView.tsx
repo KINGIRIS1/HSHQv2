@@ -18,6 +18,7 @@ import {
 import { getNormalizedWard, STATUS_LABELS } from '../../constants';
 import { exportDailyStatsToExcel } from '../../utils/excelExport';
 import { parseSafeDate } from '../../utils/appHelpers';
+import FlexibleDateInput from '../FlexibleDateInput';
 
 interface DailyStatsViewProps {
     records: RecordFile[];
@@ -328,24 +329,26 @@ const DailyStatsView: React.FC<DailyStatsViewProps> = ({ records, employees, war
                         </div>
 
                         {/* Standard visible editable date inputs */}
-                        <div className="flex items-center gap-2 bg-white border border-gray-300 rounded-lg px-3 py-1.5 shadow-sm h-[38px] w-full text-xs font-bold text-gray-700">
+                        <div className="flex items-center gap-2 bg-white border border-gray-300 rounded-lg px-2.5 py-1 shadow-xs h-[38px] w-full text-xs font-bold text-gray-700">
                             <div className="flex items-center gap-1 w-full">
-                                <span className="text-gray-400">Từ:</span>
-                                <input 
-                                    type="date" 
-                                    value={modalFromDate} 
-                                    onChange={e => setModalFromDate(e.target.value)} 
-                                    className="border-none bg-transparent p-0 outline-none text-xs font-bold text-gray-700 focus:ring-0 w-full cursor-pointer" 
+                                <span className="text-gray-400 shrink-0">Từ:</span>
+                                <FlexibleDateInput
+                                    value={modalFromDate}
+                                    onChange={isoStr => setModalFromDate(isoStr)}
+                                    placeholder="dd/mm/yyyy"
+                                    size="sm"
+                                    inputClassName="w-full border-none bg-transparent py-0 px-1 text-xs"
                                 />
                             </div>
                             <span className="text-gray-400 font-bold shrink-0">-</span>
                             <div className="flex items-center gap-1 w-full">
-                                <span className="text-gray-400">Đến:</span>
-                                <input 
-                                    type="date" 
-                                    value={modalToDate} 
-                                    onChange={e => setModalToDate(e.target.value)} 
-                                    className="border-none bg-transparent p-0 outline-none text-xs font-bold text-gray-700 focus:ring-0 w-full cursor-pointer" 
+                                <span className="text-gray-400 shrink-0">Đến:</span>
+                                <FlexibleDateInput
+                                    value={modalToDate}
+                                    onChange={isoStr => setModalToDate(isoStr)}
+                                    placeholder="dd/mm/yyyy"
+                                    size="sm"
+                                    inputClassName="w-full border-none bg-transparent py-0 px-1 text-xs"
                                 />
                             </div>
                         </div>

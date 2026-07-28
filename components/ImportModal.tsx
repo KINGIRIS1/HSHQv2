@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import * as XLSX from 'xlsx-js-style';
 import { RecordFile, RecordStatus, Employee, Holiday } from '../types';
-import { RECORD_TYPES } from '../constants';
+import { RECORD_TYPES, STATUS_LABELS, STATUS_COLORS } from '../constants';
 import { fetchHolidays } from '../services/api';
 import { X, Upload, FileSpreadsheet, Save, Loader2, AlertCircle, Check, RefreshCw, PlusCircle, AlertTriangle } from 'lucide-react';
 import { calculateDeadlineHelper, formatDateKey } from '../utils/appHelpers';
@@ -279,8 +279,9 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
                 record.deadline = calculateDeadline(record.recordType, record.receivedDate);
             }
 
-            if (record.recordType === 'Cung cấp tài liệu đất đai') {
-                record.price = 310000;
+            const rTypeStr = String(record.recordType || '').toLowerCase();
+            if (rTypeStr.includes('1.2') || rTypeStr.includes('công văn') || rTypeStr.includes('cong van') || rTypeStr.includes('cung cấp tài liệu') || record.recordType === '1.1 CC DL ĐĐ') {
+                if (!record.price) record.price = 310000;
             }
 
             // 4. THÔNG TIN XUẤT (QUAN TRỌNG CHO VIỆC TỰ ĐỘNG HANDOVER)
@@ -295,6 +296,21 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
                 record.exportDate = parseExcelDate(exportDateRaw);
             }
 
+            // Parse NGƯỜI XỬ LÝ & NGÀY GIAO trước để hỗ trợ suy diễn trạng thái Đã Giao Việc
+            const assigneeRaw = getVal(['NGƯỜI XỬ LÝ', 'NHÂN VIÊN', 'assignedto', 'assigned_to', 'assignedTo']);
+            if (assigneeRaw !== undefined && String(assigneeRaw).trim() !== '') {
+                const emp = employees.find(e => e.name.toLowerCase().includes(String(assigneeRaw).toLowerCase().trim()));
+                if (emp) {
+                    record.assignedTo = emp.id;
+                    if (mode === 'create') record.assignedDate = record.receivedDate;
+                }
+            }
+
+            const assignedDateRaw = getVal(['NGÀY GIAO', 'NGÀY GIAO VIỆC', 'assigneddate', 'assigned_date', 'assignedDate']);
+            if (assignedDateRaw !== undefined) {
+                record.assignedDate = parseExcelDate(assignedDateRaw);
+            }
+
             // 5. TRẠNG THÁI & NGƯỜI XỬ LÝ
             // Logic ưu tiên: Nếu có cột Trạng Thái được điền trực tiếp từ Excel -> Ưu tiên dùng cột Trạng Thái trước.
             // Nếu không có, mới dùng logic suy diễn dựa trên các cột mốc ngày đã điền.
@@ -303,17 +319,32 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
             // Kiểm tra cột trạng thái từ Excel trước
             const statusRaw = getVal(['TRẠNG THÁI', 'STATUS', 'status']);
             if (statusRaw !== undefined && String(statusRaw).trim() !== '') {
-                let sStr = String(statusRaw).toUpperCase();
-                if (sStr.includes('GIAO NHÂN VIÊN') || sStr.includes('PASSED_TO') || sStr.includes('ASSIGNED')) explicitStatus = RecordStatus.ASSIGNED;
-                else if (sStr.includes('ĐANG') || sStr.includes('PROGRESS')) explicitStatus = RecordStatus.IN_PROGRESS;
-                else if (sStr.includes('ĐÃ THỰC HIỆN') || sStr.includes('THỰC HIỆN XONG') || sStr.includes('COMPLETED_WORK')) explicitStatus = RecordStatus.COMPLETED_WORK;
-                else if (sStr.includes('CHỜ KIỂM TRA') || sStr.includes('PENDING_CHECK')) explicitStatus = RecordStatus.PENDING_CHECK;
-                else if (sStr.includes('ĐÃ KIỂM TRA') || sStr.includes('CHECKED')) explicitStatus = RecordStatus.CHECKED;
-                else if (sStr.includes('CHỜ KÝ') || sStr.includes('PENDING_SIGN') || sStr.includes('TRÌNH KÝ')) explicitStatus = RecordStatus.PENDING_SIGN;
-                else if (sStr.includes('ĐÃ KÝ') || sStr.includes('SIGNED') || sStr.includes('KÝ DUYỆT')) explicitStatus = RecordStatus.SIGNED;
-                else if (sStr.includes('XONG') || sStr.includes('HOÀN THÀNH') || sStr.includes('HANDOVER') || sStr.includes('GIAO 1 CỬA')) explicitStatus = RecordStatus.HANDOVER;
-                else if (sStr.includes('TRẢ DÂN') || sStr.includes('RETURNED') || sStr.includes('ĐÃ TRẢ')) explicitStatus = RecordStatus.RETURNED;
-                else if (sStr.includes('TIẾP NHẬN') || sStr.includes('RECEIVED') || sStr.includes('MỚI NHẬN')) explicitStatus = RecordStatus.RECEIVED;
+                let sStr = String(statusRaw).toUpperCase().trim();
+                if (sStr.includes('GIAO NHÂN VIÊN') || sStr.includes('PASSED_TO') || sStr.includes('ASSIGNED') || sStr.includes('GIAO VIỆC') || sStr.includes('ĐÃ GIAO') || sStr.includes('PHÂN CÔNG')) {
+                    explicitStatus = RecordStatus.ASSIGNED;
+                } else if (sStr.includes('ĐANG') || sStr.includes('PROGRESS')) {
+                    explicitStatus = RecordStatus.IN_PROGRESS;
+                } else if (sStr.includes('ĐÃ THỰC HIỆN') || sStr.includes('THỰC HIỆN XONG') || sStr.includes('COMPLETED_WORK') || sStr.includes('ĐO ĐẠC XONG')) {
+                    explicitStatus = RecordStatus.COMPLETED_WORK;
+                } else if (sStr.includes('CHỜ KIỂM TRA') || sStr.includes('PENDING_CHECK') || sStr.includes('TRÌNH KIỂM TRA')) {
+                    explicitStatus = RecordStatus.PENDING_CHECK;
+                } else if (sStr.includes('ĐÃ KIỂM TRA') || sStr.includes('CHECKED') || sStr.includes('ĐÃ KT')) {
+                    explicitStatus = RecordStatus.CHECKED;
+                } else if (sStr.includes('CHỜ KÝ') || sStr.includes('PENDING_SIGN') || sStr.includes('TRÌNH KÝ')) {
+                    explicitStatus = RecordStatus.PENDING_SIGN;
+                } else if (sStr.includes('ĐÃ KÝ') || sStr.includes('SIGNED') || sStr.includes('KÝ DUYỆT')) {
+                    explicitStatus = RecordStatus.SIGNED;
+                } else if (sStr.includes('XONG') || sStr.includes('HOÀN THÀNH') || sStr.includes('HANDOVER') || sStr.includes('GIAO 1 CỬA') || sStr.includes('ĐÃ XUẤT') || sStr.includes('XUẤT 1 CỬA')) {
+                    explicitStatus = RecordStatus.HANDOVER;
+                } else if (sStr.includes('TRẢ DÂN') || sStr.includes('RETURNED') || sStr.includes('ĐÃ TRẢ') || sStr.includes('TRẢ KẾT QUẢ')) {
+                    explicitStatus = RecordStatus.RETURNED;
+                } else if (sStr.includes('RÚT') || sStr.includes('WITHDRAWN')) {
+                    explicitStatus = RecordStatus.WITHDRAWN;
+                } else if (sStr.includes('TỪ CHỐI') || sStr.includes('BỊ TRẢ') || sStr.includes('REJECTED')) {
+                    explicitStatus = RecordStatus.REJECTED;
+                } else if (sStr.includes('TIẾP NHẬN') || sStr.includes('RECEIVED') || sStr.includes('MỚI NHẬN') || sStr.includes('CHƯA GIAO')) {
+                    explicitStatus = RecordStatus.RECEIVED;
+                }
             }
 
             // Gán trạng thái theo độ ưu tiên
@@ -340,7 +371,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
                     if (!record.assignedDate) record.assignedDate = nowStr;
                 }
             } else {
-                // Nếu KHÔNG có cột TRẠNG THÁI cụ thể, ta dùng LOGIC SUY DIỄN DỰA TRÊN NGÀY THÁNG
+                // Nếu KHÔNG có cột TRẠNG THÁI cụ thể, dùng LOGIC SUY DIỄN DỰA TRÊN NGÀY THÁNG VÀ PHÂN CÔNG
                 if (record.exportBatch || record.exportDate || record.completedDate) {
                     record.status = RecordStatus.HANDOVER;
                     if (!record.completedDate && record.exportDate) {
@@ -358,23 +389,11 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
                     record.status = RecordStatus.PENDING_CHECK;
                 } else if (record.completedWorkDate) {
                     record.status = RecordStatus.COMPLETED_WORK;
+                } else if (record.assignedTo || record.assignedDate) {
+                    record.status = RecordStatus.ASSIGNED;
                 } else if (mode === 'create') {
                     record.status = RecordStatus.RECEIVED;
                 }
-            }
-
-            const assigneeRaw = getVal(['NGƯỜI XỬ LÝ', 'NHÂN VIÊN', 'assignedto', 'assigned_to', 'assignedTo']);
-            if (assigneeRaw !== undefined) {
-                const emp = employees.find(e => e.name.toLowerCase().includes(String(assigneeRaw).toLowerCase()));
-                if (emp) {
-                    record.assignedTo = emp.id;
-                    if (mode === 'create') record.assignedDate = record.receivedDate;
-                }
-            }
-
-            const assignedDateRaw = getVal(['NGÀY GIAO', 'NGÀY GIAO VIỆC', 'assigneddate', 'assigned_date', 'assignedDate']);
-            if (assignedDateRaw !== undefined) {
-                record.assignedDate = parseExcelDate(assignedDateRaw);
             }
 
             // ID giả lập cho preview
@@ -605,7 +624,15 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
                                     <td className="p-3">{originalIdx}</td>
                                     <td className="p-3 font-medium text-blue-600">{record.code}</td>
                                     <td className="p-3 font-medium text-gray-500">{record.customerName || <span className="text-gray-300 italic">(Giữ nguyên)</span>}</td>
-                                    <td className="p-3">{record.status ? <span className={`text-xs px-2 py-1 rounded-full font-bold ${record.status === RecordStatus.HANDOVER ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}>{record.status}</span> : <span className="text-gray-300 italic">(Giữ nguyên)</span>}</td>
+                                    <td className="p-3">
+                                        {record.status ? (
+                                            <span className={`text-xs px-2.5 py-1 rounded-full font-bold inline-block shadow-2xs ${STATUS_COLORS[record.status as RecordStatus] || 'bg-gray-100 text-gray-700'}`}>
+                                                {STATUS_LABELS[record.status as RecordStatus] || record.status}
+                                            </span>
+                                        ) : (
+                                            <span className="text-gray-300 italic">(Giữ nguyên)</span>
+                                        )}
+                                    </td>
                                     <td className="p-3 font-mono text-green-700">{record.exportDate ? record.exportDate.split('T')[0] : '-'}</td>
                                     <td className="p-3 font-bold">{record.exportBatch || '-'}</td>
                                     <td className="p-3">

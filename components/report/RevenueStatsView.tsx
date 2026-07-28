@@ -30,7 +30,7 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({ records, employees,
         return 'Hóa Đơn';
     };
 
-    // Calculate revenue records filtered by resultReturnedDate (Ngày trả kết quả)
+    // Calculate revenue records filtered strictly by resultReturnedDate / exportDate
     const revenueRecords = useMemo(() => {
         let dateStart: Date | null = null;
         let dateEnd: Date | null = null;
@@ -44,6 +44,20 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({ records, employees,
         }
 
         return records
+            // 1. Chỉ đưa vào danh sách nguồn thu các hồ sơ đã hoàn thành giao trả/trả kết quả:
+            // - Trạng thái Đã trả kết quả (RETURNED)
+            // - HOẶC Đã chuyển giao Một cửa (HANDOVER) có ngày trả kết quả / ngày xuất / ngày hoàn thành / biên lai thu tiền hợp lệ
+            // Loại bỏ hoàn toàn các hồ sơ đang xử lý nội bộ chưa hoàn thành giao trả.
+            .filter(r => {
+                if (r.status === RecordStatus.RETURNED) return true;
+                if (r.status === RecordStatus.HANDOVER) {
+                    const hasReturnDate = !!(r.resultReturnedDate || r.exportDate || r.completedDate);
+                    const hasReceipt = !!(r.receiptNumber && r.receiptNumber.trim() !== '');
+                    const hasReturnedPrice = r.returnedPrice !== undefined && r.returnedPrice !== null && String(r.returnedPrice).trim() !== '' && Number(r.returnedPrice) > 0;
+                    return hasReturnDate || hasReceipt || hasReturnedPrice;
+                }
+                return false;
+            })
             .map(r => {
                 const contractP = (r as any).contractPrice;
                 const price = Number(r.price) || Number(contractP) || 0;
@@ -91,12 +105,12 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({ records, employees,
                     assignedWard
                 };
             })
-            // Only include records with revenue or receipt/invoice recorded or returned status
-            .filter(r => r.calcReturned > 0 || (r.receiptNumber && r.receiptNumber.trim() !== '') || r.status === RecordStatus.RETURNED)
-            // Filter strictly by resultReturnedDate or completedDate or receivedDate
+            // Only include records with revenue or receipt/invoice recorded
+            .filter(r => r.calcReturned > 0 || (r.receiptNumber && r.receiptNumber.trim() !== ''))
+            // Filter strictly by resultReturnedDate or exportDate or completedDate (Loại bỏ hoàn toàn fallback về receivedDate)
             .filter(r => {
                 if (!dateStart || !dateEnd) return true;
-                const targetDateStr = r.resultReturnedDate || r.completedDate || r.exportDate || r.receivedDate;
+                const targetDateStr = r.resultReturnedDate || r.exportDate || r.completedDate;
                 if (!targetDateStr) return false;
                 let d: Date | null = null;
                 if (targetDateStr.includes('/')) {
@@ -403,7 +417,7 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({ records, employees,
                                             </td>
                                             <td className="p-3.5 text-center text-slate-500 font-medium">
                                                 {(() => {
-                                                    const dStr = r.resultReturnedDate || r.completedDate || r.exportDate || r.receivedDate;
+                                                    const dStr = r.resultReturnedDate || r.exportDate || r.completedDate;
                                                     if (!dStr) return '-';
                                                     if (dStr.includes('/')) return dStr;
                                                     const cleanStr = dStr.split('T')[0];
@@ -458,7 +472,7 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({ records, employees,
                                 const itemNumber = idx + 1;
                                 const isHoaDon = r.computedReceiptType === 'Hóa Đơn';
                                 const dateStr = (() => {
-                                    const dStr = r.resultReturnedDate || r.completedDate || r.exportDate || r.receivedDate;
+                                    const dStr = r.resultReturnedDate || r.exportDate || r.completedDate;
                                     if (!dStr) return '-';
                                     if (dStr.includes('/')) return dStr;
                                     const cleanStr = dStr.split('T')[0];

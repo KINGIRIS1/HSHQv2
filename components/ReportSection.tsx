@@ -11,6 +11,7 @@ import WardStatsView from './report/WardStatsView';
 import DailyStatsView from './report/DailyStatsView';
 import OverdueStatsView from './report/OverdueStatsView';
 import RevenueStatsView from './report/RevenueStatsView';
+import FlexibleDateInput from './FlexibleDateInput';
 
 interface ReportSectionProps {
     reportContent: string;
@@ -479,27 +480,25 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                             </select>
                         </div>
 
-                        <div className="flex items-center gap-1.5 bg-white border border-gray-300 rounded-lg px-2.5 py-1.5 shadow-sm shrink-0 whitespace-nowrap text-xs font-bold text-gray-700">
+                        <div className="flex items-center gap-1.5 bg-white border border-gray-300 rounded-lg px-2 py-1 shadow-xs shrink-0 whitespace-nowrap text-xs font-bold text-gray-700">
                             <CalendarDays size={16} className="text-slate-500 shrink-0" />
-                            <div className="relative flex items-center hover:text-blue-600 transition-colors cursor-pointer">
-                                <span>{fromDate === '1970-01-01' ? 'Từ ngày' : (formatDateDDMMYYYY(fromDate) || 'Từ ngày')}</span>
-                                <input 
-                                    type="date" 
-                                    className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" 
-                                    value={fromDate === '1970-01-01' ? '' : fromDate} 
-                                    onChange={(e) => { setFromDate(e.target.value || '1970-01-01'); setReportType('custom'); }} 
-                                />
-                            </div>
+                            <span className="text-gray-500 text-xs shrink-0">Từ:</span>
+                            <FlexibleDateInput
+                                value={fromDate === '1970-01-01' ? '' : fromDate}
+                                onChange={(isoStr) => { setFromDate(isoStr || '1970-01-01'); setReportType('custom'); }}
+                                placeholder="dd/mm/yyyy"
+                                size="sm"
+                                inputClassName="w-28 text-xs py-0.5 px-1 border-none bg-transparent"
+                            />
                             <span className="text-gray-400 font-bold text-xs">-</span>
-                            <div className="relative flex items-center hover:text-blue-600 transition-colors cursor-pointer">
-                                <span>{formatDateDDMMYYYY(toDate) || 'Đến ngày'}</span>
-                                <input 
-                                    type="date" 
-                                    className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" 
-                                    value={toDate} 
-                                    onChange={(e) => { setToDate(e.target.value); setReportType('custom'); }} 
-                                />
-                            </div>
+                            <span className="text-gray-500 text-xs shrink-0">Đến:</span>
+                            <FlexibleDateInput
+                                value={toDate}
+                                onChange={(isoStr) => { setToDate(isoStr); setReportType('custom'); }}
+                                placeholder="dd/mm/yyyy"
+                                size="sm"
+                                inputClassName="w-28 text-xs py-0.5 px-1 border-none bg-transparent"
+                            />
                         </div>
                         
                         <button onClick={handleExportExcelClick} className="hidden md:flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 font-bold text-sm shadow-sm transition-colors" title="Xuất Excel">

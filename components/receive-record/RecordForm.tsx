@@ -148,7 +148,15 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
         }
         
         if (field === 'recordType') {
-            if (value === '1.1 CC DL ĐĐ' || value === 'Cung cấp tài liệu đất đai' || value === '1.1 Cung cấp dữ liệu đất đai') {
+            const vLower = String(value || '').toLowerCase();
+            if (
+                value === '1.1 CC DL ĐĐ' || 
+                value === 'Cung cấp tài liệu đất đai' || 
+                value === '1.1 Cung cấp dữ liệu đất đai' ||
+                vLower.includes('1.2') || 
+                vLower.includes('công văn') || 
+                vLower.includes('cong van')
+            ) {
                 newData.price = 310000;
             } else {
                 newData.price = null;

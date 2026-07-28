@@ -4,6 +4,7 @@ import { WorkSchedule } from '../../types';
 import { Search, Edit, Trash2, CalendarDays, FileSpreadsheet, Filter } from 'lucide-react';
 import * as XLSX from 'xlsx-js-style';
 import { confirmAction } from '../../utils/appHelpers';
+import FlexibleDateInput from '../FlexibleDateInput';
 
 interface ScheduleListProps {
     schedules: WorkSchedule[];
@@ -205,26 +206,24 @@ const ScheduleList: React.FC<ScheduleListProps> = ({ schedules, onEdit, onDelete
                         />
                     </div>
                     
-                    <div className="flex items-center gap-1.5 bg-white border border-gray-300 rounded-lg px-2.5 py-1.5 shadow-sm shrink-0 whitespace-nowrap text-xs font-bold text-gray-700">
-                        <div className="relative flex items-center hover:text-blue-600 transition-colors">
-                            <span>{formatDateDDMMYYYY(dateRange.from) || 'Từ ngày'}</span>
-                            <input 
-                                type="date" 
-                                className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" 
-                                value={dateRange.from} 
-                                onChange={e => { setDateRange({...dateRange, from: e.target.value}); setFilterType('range'); }} 
-                            />
-                        </div>
+                    <div className="flex items-center gap-1.5 bg-white border border-gray-300 rounded-lg px-2.5 py-1 shadow-xs shrink-0 whitespace-nowrap text-xs font-bold text-gray-700">
+                        <span className="text-gray-500 text-xs shrink-0">Từ:</span>
+                        <FlexibleDateInput
+                            value={dateRange.from}
+                            onChange={(isoStr) => { setDateRange(prev => ({ ...prev, from: isoStr })); setFilterType('range'); }}
+                            placeholder="dd/mm/yyyy"
+                            size="sm"
+                            inputClassName="w-28 border-none bg-transparent py-0.5 px-1 text-xs"
+                        />
                         <span className="text-gray-400 font-bold text-xs">-</span>
-                        <div className="relative flex items-center hover:text-blue-600 transition-colors">
-                            <span>{formatDateDDMMYYYY(dateRange.to) || 'Đến ngày'}</span>
-                            <input 
-                                type="date" 
-                                className="absolute inset-0 opacity-0 w-full h-full cursor-pointer" 
-                                value={dateRange.to} 
-                                onChange={e => { setDateRange({...dateRange, to: e.target.value}); setFilterType('range'); }} 
-                            />
-                        </div>
+                        <span className="text-gray-500 text-xs shrink-0">Đến:</span>
+                        <FlexibleDateInput
+                            value={dateRange.to}
+                            onChange={(isoStr) => { setDateRange(prev => ({ ...prev, to: isoStr })); setFilterType('range'); }}
+                            placeholder="dd/mm/yyyy"
+                            size="sm"
+                            inputClassName="w-28 border-none bg-transparent py-0.5 px-1 text-xs"
+                        />
                     </div>
 
                     <button onClick={handleExport} className="hidden md:flex items-center gap-1.5 bg-green-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-green-700 shadow-sm shrink-0 ml-auto">
