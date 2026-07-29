@@ -70,6 +70,9 @@ const RecordRow: React.FC<RecordRowProps> = ({
   // LOGIC MỚI: Tự động xác định trạng thái hiển thị
   // Nếu có thông tin xuất (Batch/Date) và chưa hoàn thành (Trả/Rút/Từ chối), coi như là Đã giao 1 cửa
   const getDisplayStatus = (r: RecordFile) => {
+      if (r.resultReturnedDate) {
+          return RecordStatus.RETURNED;
+      }
       if ((r.exportBatch || r.exportDate) && r.status !== RecordStatus.WITHDRAWN && r.status !== RecordStatus.RETURNED && r.status !== RecordStatus.REJECTED) {
           return RecordStatus.HANDOVER;
       }
@@ -261,14 +264,9 @@ const RecordRow: React.FC<RecordRowProps> = ({
       case 'status':
         return (
           <td key="status" className={`${cellClass} text-center`}>
-              {record.resultReturnedDate ? (
-                  <span className="inline-flex flex-col items-center px-2 py-1 rounded text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 w-full leading-tight">
-                      <span>Đã trả KQ</span>
-                      <span className="text-[10px] font-normal">{resultReturnedDateStr}</span>
-                  </span>
-              ) : (
-                  <div className="transform origin-top pt-1"><StatusBadge status={displayStatus} /></div> 
-              )}
+              <div className="transform origin-top pt-1 flex flex-col items-center">
+                  <StatusBadge status={displayStatus} />
+              </div>
               
               {/* NÚT CHỈNH LÝ (Thay thế checkbox) */}
               {onMapCorrection && (

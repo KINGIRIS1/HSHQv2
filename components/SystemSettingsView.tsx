@@ -21,89 +21,91 @@ const ROLES_FOR_DEPARTMENT = [
   { role: UserRole.ONEDOOR, label: 'ONEDOOR (Một cửa)', badge: 'Tiếp nhận / Trả KQ' }
 ];
 
+const ROLE_OPTIONS = [
+  { role: UserRole.SUBADMIN, label: 'SUBADMIN', name: 'SUBADMIN', badge: 'Phân quyền & Quản lý', desc: 'Quyền quản trị hệ thống và cấu hình phân quyền' },
+  { role: UserRole.TEAM_LEADER, label: 'TEAM_LEADER', name: 'TEAM_LEADER', badge: 'Quản lý tác vụ', desc: 'Kiểm tra hồ sơ, giao việc, trích lục, hợp đồng' },
+  { role: UserRole.EMPLOYEE, label: 'EMPLOYEE', name: 'EMPLOYEE', badge: 'Xử lý chuyên môn', desc: 'Xử lý hồ sơ, biên bản VPHC, hợp đồng' },
+  { role: UserRole.ONEDOOR, label: 'ONEDOOR', name: 'ONEDOOR', badge: 'Tiếp nhận & Trả KQ', desc: 'Tiếp nhận hồ sơ mới, bàn giao và trả kết quả' },
+  { role: UserRole.ADMIN, label: 'ADMIN', name: 'ADMIN', badge: 'Toàn quyền', desc: 'Toàn quyền truy cập tất cả chức năng' },
+];
+
 const PERMISSION_GROUPS = [
   {
     id: 'records',
-    title: '📋 Quản lý & Quy trình Hồ sơ',
-    desc: 'Quyền tiếp nhận, sửa, giao việc, kiểm tra, ký duyệt và bàn giao hồ sơ',
+    title: 'Quản lý & Quy trình Hồ sơ',
+    desc: 'Quyền tiếp nhận, sửa, giao việc, kiểm tra, ký duyệt, bàn giao và các nút thao tác phê duyệt',
     items: [
       { id: 'VIEW_RECORDS', label: 'Xem danh sách hồ sơ', desc: 'Cho phép truy cập và xem chi tiết hồ sơ' },
-      { id: 'ADD_RECORDS', label: 'Thêm mới hồ sơ', desc: 'Tạo mới và tiếp nhận hồ sơ đầu vào' },
-      { id: 'EDIT_RECORDS', label: 'Sửa thông tin hồ sơ', desc: 'Cập nhật nội dung, thửa đất, chủ sở hữu' },
-      { id: 'DELETE_RECORDS', label: 'Xóa hồ sơ', desc: 'Cho phép xóa hồ sơ khỏi hệ thống' },
-      { id: 'ASSIGN_RECORDS', label: 'Giao việc / Phân công', desc: 'Giao hồ sơ cho nhân viên phụ trách' },
-      { id: 'CHECK_RECORDS', label: 'Kiểm tra & Ký kiểm tra', desc: 'Tổ trưởng / phó ký kiểm tra chuyên môn' },
-      { id: 'SIGN_RECORDS', label: 'Ký duyệt hồ sơ (Lãnh đạo)', desc: 'Ban Giám đốc phê duyệt kết quả' },
-      { id: 'HANDOVER_RECORDS', label: 'Bàn giao hồ sơ sang Một cửa', desc: 'Tạo đợt và chuyển kết quả sang Một cửa' },
-      { id: 'RETURN_RECORDS', label: 'Trả kết quả cho công dân', desc: 'Một cửa thực hiện trả kết quả hồ sơ' },
-      { id: 'EXPORT_RECORDS', label: 'Xuất danh sách Excel / Báo cáo', desc: 'Xuất danh sách hồ sơ ra tệp Excel' },
+      { id: 'EDIT_RECORDS', label: 'Sửa thông tin hồ sơ', desc: 'Cập nhật nội dung, thửa đất, chủ sở hữu', parentId: 'VIEW_RECORDS' },
+      { id: 'DELETE_RECORDS', label: 'Xóa hồ sơ', desc: 'Cho phép xóa hồ sơ khỏi hệ thống', parentId: 'VIEW_RECORDS' },
+      { id: 'ASSIGN_RECORDS', label: 'Giao việc / Phân công', desc: 'Giao hồ sơ cho nhân viên phụ trách', parentId: 'VIEW_RECORDS' },
+      { id: 'CHECK_RECORDS', label: 'Kiểm tra & Ký kiểm tra', desc: 'Tổ trưởng / phó ký kiểm tra chuyên môn', parentId: 'VIEW_RECORDS' },
+      { id: 'SIGN_RECORDS', label: 'Ký duyệt hồ sơ (Lãnh đạo)', desc: 'Ban Giám đốc phê duyệt kết quả', parentId: 'VIEW_RECORDS' },
+      { id: 'HANDOVER_RECORDS', label: 'Bàn giao hồ sơ sang Một cửa', desc: 'Tạo đợt và chuyển kết quả sang Một cửa', parentId: 'VIEW_RECORDS' },
+      { id: 'RETURN_RECORDS', label: 'Trả kết quả cho công dân', desc: 'Một cửa thực hiện trả kết quả hồ sơ', parentId: 'VIEW_RECORDS' },
+      { id: 'EXPORT_RECORDS', label: 'Xuất danh sách Excel / Báo cáo', desc: 'Xuất danh sách hồ sơ ra tệp Excel', parentId: 'VIEW_RECORDS' },
+      { id: 'BTN_SUBMIT_SIGN', label: 'Nút: Trình ký / Trình kiểm tra', desc: 'Nút gửi hồ sơ lên cấp kiểm tra hoặc Giám đốc', parentId: 'VIEW_RECORDS' },
+      { id: 'BTN_REJECT_RECORD', label: 'Nút: Trả hồ sơ / Từ chối', desc: 'Nút trả lại hồ sơ yêu cầu chỉnh sửa', parentId: 'VIEW_RECORDS' },
+      { id: 'BTN_CLOSE_BATCH', label: 'Nút: Tạo đợt bàn giao / Chốt đợt', desc: 'Nút chốt đợt bàn giao kết quả sang Một cửa', parentId: 'VIEW_RECORDS' },
     ]
   },
   {
     id: 'views',
-    title: '👁️ Hiển thị các Tab lớn & Tab con (Cấu hình ẩn/hiện Tab)',
-    desc: 'Quyền xem và làm việc trên từng Tab. Nếu TẮT Tab chính, toàn bộ các Tab con của nó sẽ tự động bị ẩn.',
+    title: 'Hiển thị các Tab lớn & Tab con (Cấu hình ẩn/hiện Tab)',
+    desc: 'Quyền xem và làm việc trên từng Tab. Khi TẮT Tab chính, các Tab con của nó sẽ tự động bị tắt. Khi BẬT nút chức năng con, Tab chính tương ứng sẽ tự động được cấp quyền.',
     items: [
-      { id: 'receive_record', label: '🖥️ Tiếp nhận hồ sơ', desc: 'Ẩn/hiện toàn bộ Tab Tiếp nhận hồ sơ' },
-      { id: 'receive_sub_create', label: '➕ Nhập mới', desc: 'Cho phép nhập mới hồ sơ đơn lẻ', parentId: 'receive_record' },
-      { id: 'receive_sub_bulk', label: '📊 Tiếp nhận hàng loạt', desc: 'Cho phép tiếp nhận hàng loạt từ Excel', parentId: 'receive_record' },
-      { id: 'receive_sub_list', label: '📋 Danh sách hôm nay', desc: 'Cho phép xem danh sách hồ sơ tiếp nhận hôm nay', parentId: 'receive_record' },
-      { id: 'receive_sub_vphc', label: '⚖️ Biên bản VPHC', desc: 'Cho phép lập và xem biên bản VPHC', parentId: 'receive_record' },
+      { id: 'receive_record', label: 'Tiếp nhận hồ sơ', desc: 'Ẩn/hiện toàn bộ Tab Tiếp nhận hồ sơ' },
+      { id: 'receive_sub_create', label: 'Nhập mới', desc: 'Cho phép nhập mới hồ sơ đơn lẻ', parentId: 'receive_record' },
+      { id: 'receive_sub_bulk', label: 'Tiếp nhận hàng loạt', desc: 'Cho phép tiếp nhận hàng loạt từ Excel', parentId: 'receive_record' },
+      { id: 'receive_sub_list', label: 'Danh sách hôm nay', desc: 'Cho phép xem danh sách hồ sơ tiếp nhận hôm nay', parentId: 'receive_record' },
+      { id: 'receive_sub_vphc', label: 'Biên bản VPHC', desc: 'Cho phép lập và xem biên bản VPHC', parentId: 'receive_record' },
 
-      { id: 'all_records', label: '🖥️ Quy trình Hồ sơ đo đạc (Phân công)', desc: 'Ẩn/hiện toàn bộ quy trình xử lý hồ sơ đo đạc' },
-      { id: 'all_sub_all', label: '🗂️ Tất cả hồ sơ', desc: 'Xem danh sách tất cả hồ sơ trong hệ thống', parentId: 'all_records' },
-      { id: 'assign_tasks', label: '📥 Chưa giao / Phân công', desc: 'Giao việc cho cán bộ thực hiện', parentId: 'all_records' },
-      { id: 'completed_list', label: '⚙️ Đang thực hiện', desc: 'Danh sách hồ sơ đang thực hiện', parentId: 'all_records' },
-      { id: 'pending_check_list', label: '🔍 Kiểm tra', desc: 'Ký kiểm tra chuyên môn', parentId: 'all_records' },
-      { id: 'check_list', label: '✒️ Trình ký / Chờ ký', desc: 'Trình lãnh đạo phê duyệt', parentId: 'all_records' },
-      { id: 'handover_list', label: '📤 Giao 1 cửa / Trả KQ', desc: 'Giao trả kết quả sang 1 cửa', parentId: 'all_records' },
+      { id: 'receive_contract', label: 'Tiếp nhận Hợp đồng', desc: 'Ẩn/hiện Tab Tiếp nhận Hợp đồng dịch vụ / đo đạc' },
+      { id: 'VIEW_CONTRACTS', label: 'Xem danh sách hợp đồng', desc: 'Xem danh sách và chi tiết hợp đồng', parentId: 'receive_contract' },
+      { id: 'ADD_CONTRACTS', label: 'Thêm mới hợp đồng', desc: 'Cho phép lập và tạo hợp đồng mới', parentId: 'receive_contract' },
+      { id: 'EDIT_CONTRACTS', label: 'Sửa hợp đồng', desc: 'Cho phép cập nhật thông tin, giá trị hợp đồng', parentId: 'receive_contract' },
+      { id: 'LIQUIDATE_CONTRACTS', label: 'Thanh lý hợp đồng', desc: 'Lập, cập nhật quyết toán và thanh lý hợp đồng', parentId: 'receive_contract' },
+      { id: 'DELETE_CONTRACTS', label: 'Xóa hợp đồng', desc: 'Cho phép xóa hợp đồng khỏi hệ thống', parentId: 'receive_contract' },
+      { id: 'EXPORT_CONTRACTS', label: 'Xuất tệp hợp đồng', desc: 'Xuất danh sách, biểu mẫu hợp đồng', parentId: 'receive_contract' },
 
-      { id: 'archive_records', label: '🖥️ Kho Lưu trữ hồ sơ & Công văn 1.2', desc: 'Ẩn/hiện toàn bộ Tab Kho lưu trữ hồ sơ và công văn' },
-      { id: 'archive_sub_all', label: '🗄️ Tất cả hồ sơ lưu', desc: 'Tra cứu tất cả hồ sơ kho lưu', parentId: 'archive_records' },
-      { id: 'archive_assign_tasks', label: '📥 Chưa giao (Lưu trữ)', desc: 'Phân công xử lý hồ sơ lưu trữ', parentId: 'archive_records' },
-      { id: 'archive_completed_list', label: '⚙️ Đang thực hiện (Lưu trữ)', desc: 'Hồ sơ lưu trữ đang xử lý', parentId: 'archive_records' },
-      { id: 'archive_pending_check_list', label: '🔍 Kiểm tra (Lưu trữ)', desc: 'Kiểm tra hồ sơ lưu trữ', parentId: 'archive_records' },
-      { id: 'archive_check_list', label: '✒️ Trình ký (Lưu trữ)', desc: 'Trình ký hồ sơ lưu trữ', parentId: 'archive_records' },
-      { id: 'archive_handover_list', label: '📤 Giao 1 cửa (Lưu trữ)', desc: 'Giao trả kết quả lưu trữ về 1 cửa', parentId: 'archive_records' },
+      { id: 'all_records', label: 'Quy trình Hồ sơ đo đạc (Phân công)', desc: 'Ẩn/hiện toàn bộ quy trình xử lý hồ sơ đo đạc' },
+      { id: 'all_sub_all', label: 'Tất cả hồ sơ', desc: 'Xem danh sách tất cả hồ sơ trong hệ thống', parentId: 'all_records' },
+      { id: 'assign_tasks', label: 'Chưa giao / Phân công', desc: 'Giao việc cho cán bộ thực hiện', parentId: 'all_records' },
+      { id: 'completed_list', label: 'Đang thực hiện', desc: 'Danh sách hồ sơ đang thực hiện', parentId: 'all_records' },
+      { id: 'pending_check_list', label: 'Kiểm tra', desc: 'Ký kiểm tra chuyên môn', parentId: 'all_records' },
+      { id: 'check_list', label: 'Trình ký / Chờ ký', desc: 'Trình lãnh đạo phê duyệt', parentId: 'all_records' },
+      { id: 'handover_list', label: 'Giao 1 cửa / Trả KQ', desc: 'Giao trả kết quả sang 1 cửa', parentId: 'all_records' },
+
+      { id: 'archive_records', label: 'Kho Lưu trữ hồ sơ & Công văn 1.2', desc: 'Ẩn/hiện toàn bộ Tab Kho lưu trữ hồ sơ và công văn' },
+      { id: 'archive_sub_all', label: 'Tất cả hồ sơ lưu', desc: 'Tra cứu tất cả hồ sơ kho lưu', parentId: 'archive_records' },
+      { id: 'archive_assign_tasks', label: 'Chưa giao (Lưu trữ)', desc: 'Phân công xử lý hồ sơ lưu trữ', parentId: 'archive_records' },
+      { id: 'archive_completed_list', label: 'Đang thực hiện (Lưu trữ)', desc: 'Hồ sơ lưu trữ đang xử lý', parentId: 'archive_records' },
+      { id: 'archive_pending_check_list', label: 'Kiểm tra (Lưu trữ)', desc: 'Kiểm tra hồ sơ lưu trữ', parentId: 'archive_records' },
+      { id: 'archive_check_list', label: 'Trình ký (Lưu trữ)', desc: 'Trình ký hồ sơ lưu trữ', parentId: 'archive_records' },
+      { id: 'archive_handover_list', label: 'Giao 1 cửa (Lưu trữ)', desc: 'Giao trả kết quả lưu trữ về 1 cửa', parentId: 'archive_records' },
     ]
   },
   {
     id: 'contracts',
-    title: '📜 Hợp đồng & Trích lục Bản đồ',
-    desc: 'Quyền tạo, quản lý hợp đồng dịch vụ đo đạc và hồ sơ trích lục',
+    title: 'Hợp đồng & Trích lục Bản đồ',
+    desc: 'Quyền cấp số, quản lý trích lục bản đồ địa chính và hợp đồng dịch vụ',
     items: [
-      { id: 'VIEW_CONTRACTS', label: 'Xem hợp đồng', desc: 'Xem danh sách và chi tiết hợp đồng' },
-      { id: 'ADD_CONTRACTS', label: 'Thêm mới hợp đồng', desc: 'Tạo hợp đồng đo đạc / dịch vụ' },
-      { id: 'EDIT_CONTRACTS', label: 'Sửa hợp đồng', desc: 'Sửa giá trị, số lượng, thanh lý hợp đồng' },
-      { id: 'DELETE_CONTRACTS', label: 'Xóa hợp đồng', desc: 'Xóa hợp đồng khỏi hệ thống' },
-      { id: 'EXPORT_CONTRACTS', label: 'Xuất tệp hợp đồng', desc: 'Xuất hợp đồng ra file mẫu' },
-      { id: 'VIEW_EXCERPTS', label: 'Xem trích lục bản đồ', desc: 'Xem danh sách hồ sơ trích lục' },
-      { id: 'MANAGE_EXCERPTS', label: 'Quản lý trích lục', desc: 'Cấp số và quản lý trích lục bản đồ' },
+      { id: 'MANAGE_EXCERPTS', label: 'Quản lý trích lục bản đồ', desc: 'Cấp số và quản lý trích lục bản đồ' },
+      { id: 'VIEW_EXCERPTS', label: 'Xem danh sách trích lục', desc: 'Cho phép tra cứu và xem danh sách trích lục bản đồ' },
     ]
   },
   {
     id: 'utilities',
-    title: '🗄️ Tiện ích & Quản trị Hệ thống',
+    title: 'Tiện ích & Quản trị Hệ thống',
     desc: 'Quyền truy cập lịch công tác, chat nội bộ, nhân sự và cài đặt',
     items: [
-      { id: 'VIEW_ARCHIVE', label: 'Xem kho lưu trữ', desc: 'Tra cứu thông tin kho lưu trữ' },
       { id: 'MANAGE_ARCHIVE', label: 'Quản lý kho lưu trữ', desc: 'Cập nhật vị trí, mượn/trả hồ sơ' },
       { id: 'VIEW_REPORTS', label: 'Xem báo cáo thống kê', desc: 'Truy cập biểu đồ & báo cáo tổng hợp' },
       { id: 'VIEW_SCHEDULE', label: 'Xem lịch công tác', desc: 'Xem lịch công tác tuần' },
-      { id: 'MANAGE_SCHEDULE', label: 'Quản lý lịch công tác', desc: 'Thêm/sửa lịch công tác' },
+      { id: 'MANAGE_SCHEDULE', label: 'Quản lý lịch công tác', desc: 'Thêm/sửa lịch công tác', parentId: 'VIEW_SCHEDULE' },
       { id: 'VIEW_CHAT', label: 'Nhắn tin nội bộ', desc: 'Sử dụng chat trao đổi nội bộ' },
       { id: 'MANAGE_EMPLOYEES', label: 'Quản lý nhân sự', desc: 'Quản lý danh sách nhân viên & địa bàn' },
       { id: 'SYSTEM_SETTINGS', label: 'Cài đặt hệ thống', desc: 'Cấu hình ngày nghỉ, sao lưu & phân quyền' },
-    ]
-  },
-  {
-    id: 'buttons',
-    title: '⚡ Nút Thao tác Phê duyệt & Chuyển bước',
-    desc: 'Bật/tắt các nút bấm quy trình trong bảng làm việc',
-    items: [
-      { id: 'BTN_SUBMIT_SIGN', label: 'Nút: Trình ký / Trình kiểm tra', desc: 'Nút gửi hồ sơ lên cấp kiểm tra hoặc Giám đốc' },
-      { id: 'BTN_REJECT_RECORD', label: 'Nút: Trả hồ sơ / Từ chối', desc: 'Nút trả lại hồ sơ yêu cầu chỉnh sửa' },
-      { id: 'BTN_CLOSE_BATCH', label: 'Nút: Tạo đợt bàn giao / Chốt đợt', desc: 'Nút chốt đợt bàn giao kết quả sang Một cửa' },
     ]
   }
 ];
@@ -142,12 +144,17 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
   // Permissions States
   const [rolePermissions, setRolePermissions] = useState<RolePermissions>(DEFAULT_ROLE_PERMISSIONS);
   const [departmentPermissions, setDepartmentPermissions] = useState<DepartmentPermissions>({});
-  const [selectedRole, setSelectedRole] = useState<UserRole | string>(UserRole.SUBADMIN);
+  const [selectedRole, setSelectedRole] = useState<UserRole | string>(UserRole.TEAM_LEADER);
+  const [selectedDepartmentScope, setSelectedDepartmentScope] = useState<string>('all');
   const [selectedDepartment, setSelectedDepartment] = useState<string>('Tổ Đăng ký cấp giấy');
   const [selectedRoleSub, setSelectedRoleSub] = useState<UserRole | string>(UserRole.EMPLOYEE);
   const [permSearchQuery, setPermSearchQuery] = useState('');
   const [isSavingPermissions, setIsSavingPermissions] = useState(false);
   const [permissionTab, setPermissionTab] = useState<'department' | 'role'>('department');
+
+  const allDepartmentOptions = React.useMemo(() => {
+    return PERMISSION_DEPARTMENTS.map(d => d.id);
+  }, []);
 
   useEffect(() => {
     if (selectedDepartment !== 'Tổ Hành chính' && selectedRoleSub === UserRole.ONEDOOR) {
@@ -407,94 +414,79 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
       }
   };
 
-  const isPermCheckedRaw = (permissionId: string): boolean => {
-      if (permissionTab === 'role') {
-          if (selectedRole === UserRole.ADMIN) return true;
-          const perms = rolePermissions[selectedRole as string] || [];
-          return perms.includes('*') || perms.includes(permissionId);
-      } else {
-          const deptRoleKey = `${selectedDepartment}_${selectedRoleSub}`;
-          if (departmentPermissions[deptRoleKey]) {
-              return departmentPermissions[deptRoleKey].includes('*') || departmentPermissions[deptRoleKey].includes(permissionId);
-          }
-          if (departmentPermissions[selectedDepartment]) {
-              return departmentPermissions[selectedDepartment].includes('*') || departmentPermissions[selectedDepartment].includes(permissionId);
-          }
-          const rolePerms = rolePermissions[selectedRoleSub as string] || [];
-          return rolePerms.includes('*') || rolePerms.includes(permissionId);
-      }
-  };
-
   const isPermChecked = (permissionId: string): boolean => {
-      let itemParentId: string | undefined;
-      for (const g of PERMISSION_GROUPS) {
-          const found = g.items.find(i => i.id === permissionId);
-          if (found && (found as any).parentId) {
-              itemParentId = (found as any).parentId;
-              break;
+      if (selectedRole === UserRole.ADMIN) return true;
+
+      if (selectedDepartmentScope !== 'all') {
+          const compositeKey = `${selectedDepartmentScope}_${selectedRole}`;
+          if (departmentPermissions && departmentPermissions[compositeKey]) {
+              const deptPerms = departmentPermissions[compositeKey];
+              return deptPerms.includes('*') || deptPerms.includes(permissionId);
           }
       }
 
-      if (itemParentId && !isPermCheckedRaw(itemParentId)) {
-          return false;
-      }
-
-      return isPermCheckedRaw(permissionId);
+      const perms = rolePermissions[selectedRole as string] || DEFAULT_ROLE_PERMISSIONS[selectedRole as UserRole] || [];
+      return perms.includes('*') || perms.includes(permissionId);
   };
 
   const toggleDeptRolePerm = (permissionId: string) => {
-      const childIds: string[] = [];
-      PERMISSION_GROUPS.forEach(g => {
-          g.items.forEach(i => {
-              if ((i as any).parentId === permissionId) {
-                  childIds.push(i.id);
-              }
-          });
-      });
+      if (selectedRole === UserRole.ADMIN) return;
 
-      if (permissionTab === 'role') {
-          if (selectedRole === UserRole.ADMIN) return;
-          setRolePermissions(prev => {
-              const current = prev[selectedRole as string] || [];
-              const isRemoving = current.includes(permissionId);
-              const updated = isRemoving
-                  ? current.filter(p => p !== permissionId && !childIds.includes(p))
-                  : [...current, permissionId];
-              return { ...prev, [selectedRole as string]: updated };
-          });
-      } else {
-          const deptRoleKey = `${selectedDepartment}_${selectedRoleSub}`;
+      if (selectedDepartmentScope !== 'all') {
+          const compositeKey = `${selectedDepartmentScope}_${selectedRole}`;
           setDepartmentPermissions(prev => {
-              const current = prev[deptRoleKey] || prev[selectedDepartment] || rolePermissions[selectedRoleSub as string] || [];
+              const current = prev[compositeKey] || rolePermissions[selectedRole as string] || DEFAULT_ROLE_PERMISSIONS[selectedRole as UserRole] || [];
               const isRemoving = current.includes(permissionId);
               const updated = isRemoving
-                  ? current.filter(p => p !== permissionId && !childIds.includes(p))
+                  ? current.filter(p => p !== permissionId)
                   : [...current, permissionId];
-              return { ...prev, [deptRoleKey]: updated };
+              return { ...prev, [compositeKey]: updated };
           });
+          return;
       }
+
+      setRolePermissions(prev => {
+          const current = prev[selectedRole as string] || DEFAULT_ROLE_PERMISSIONS[selectedRole as UserRole] || [];
+          const isRemoving = current.includes(permissionId);
+          const updated = isRemoving
+              ? current.filter(p => p !== permissionId)
+              : [...current, permissionId];
+          return { ...prev, [selectedRole as string]: updated };
+      });
   };
 
   const toggleCategoryAll = (itemIds: string[], selectAll: boolean) => {
-      if (permissionTab === 'role') {
-          if (selectedRole === UserRole.ADMIN) return;
-          setRolePermissions(prev => {
-              const current = prev[selectedRole as string] || [];
-              const updated = selectAll
-                  ? Array.from(new Set([...current, ...itemIds]))
-                  : current.filter(p => !itemIds.includes(p));
-              return { ...prev, [selectedRole as string]: updated };
-          });
-      } else {
-          const deptRoleKey = `${selectedDepartment}_${selectedRoleSub}`;
+      if (selectedRole === UserRole.ADMIN) return;
+
+      if (selectedDepartmentScope !== 'all') {
+          const compositeKey = `${selectedDepartmentScope}_${selectedRole}`;
           setDepartmentPermissions(prev => {
-              const current = prev[deptRoleKey] || prev[selectedDepartment] || rolePermissions[selectedRoleSub as string] || [];
+              const current = prev[compositeKey] || rolePermissions[selectedRole as string] || DEFAULT_ROLE_PERMISSIONS[selectedRole as UserRole] || [];
               const updated = selectAll
                   ? Array.from(new Set([...current, ...itemIds]))
                   : current.filter(p => !itemIds.includes(p));
-              return { ...prev, [deptRoleKey]: updated };
+              return { ...prev, [compositeKey]: updated };
           });
+          return;
       }
+
+      setRolePermissions(prev => {
+          const current = prev[selectedRole as string] || DEFAULT_ROLE_PERMISSIONS[selectedRole as UserRole] || [];
+          const updated = selectAll
+              ? Array.from(new Set([...current, ...itemIds]))
+              : current.filter(p => !itemIds.includes(p));
+          return { ...prev, [selectedRole as string]: updated };
+      });
+  };
+
+  const handleResetDeptOverride = () => {
+      if (selectedDepartmentScope === 'all') return;
+      const compositeKey = `${selectedDepartmentScope}_${selectedRole}`;
+      setDepartmentPermissions(prev => {
+          const copy = { ...prev };
+          delete copy[compositeKey];
+          return copy;
+      });
   };
 
   const togglePermission = (roleOrDept: string, permissionId: string, isRole: boolean) => {
@@ -809,42 +801,47 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
 
             {activeTab === 'permissions' && (
                 <div className="h-[calc(100vh-170px)] min-h-[500px] flex flex-col bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden relative">
-                    {/* Header Pinned Top - Clean White */}
-                    <div className="bg-white border-b border-slate-200 p-3 md:p-4 flex-shrink-0">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                            {/* Top Mode Selector Tabs */}
-                            <div className="flex items-center gap-2">
-                                <button
-                                    onClick={() => setPermissionTab('department')}
-                                    className={`px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 transition-all cursor-pointer ${
-                                        permissionTab === 'department'
-                                            ? 'bg-purple-700 text-white shadow-sm'
-                                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200'
-                                    }`}
-                                >
-                                    🏢 Phân quyền theo Phòng ban / Tổ
-                                </button>
-                                <button
-                                    onClick={() => setPermissionTab('role')}
-                                    className={`px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 transition-all cursor-pointer ${
-                                        permissionTab === 'role'
-                                            ? 'bg-purple-700 text-white shadow-sm'
-                                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200'
-                                    }`}
-                                >
-                                    👤 Phân quyền theo Vai trò chung
-                                </button>
+                    {/* Frozen Sticky Header Container for Rows 1 & 2 */}
+                    <div className="sticky top-0 z-20 bg-white border-b border-purple-100 shadow-xs shrink-0">
+                        {/* Role Selection Bar (Row 1) */}
+                        <div className="bg-purple-50/70 border-b border-purple-100 p-3 md:p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar flex-1">
+                                <span className="text-[11px] font-black uppercase tracking-wider text-purple-900 shrink-0 mr-1">
+                                    Cấu hình Vai trò:
+                                </span>
+                                {ROLE_OPTIONS.map((opt) => {
+                                    const isSelected = selectedRole === opt.role;
+                                    return (
+                                        <button
+                                            key={opt.role}
+                                            onClick={() => setSelectedRole(opt.role)}
+                                            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 flex items-center gap-2 border ${
+                                                isSelected
+                                                    ? 'bg-purple-700 text-white border-purple-800 shadow-sm font-black'
+                                                    : 'bg-white text-slate-700 border-purple-100 hover:border-purple-300'
+                                            }`}
+                                        >
+                                            <span className={`w-2 h-2 rounded-full ${isSelected ? 'bg-amber-300 animate-pulse' : 'bg-slate-300'}`} />
+                                            <span>{opt.name}</span>
+                                            <span className={`text-[9px] px-1.5 py-0.5 rounded uppercase font-extrabold ${
+                                                isSelected ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
+                                            }`}>
+                                                {opt.badge}
+                                            </span>
+                                        </button>
+                                    );
+                                })}
                             </div>
 
-                            {/* Search Filter Box - Same row */}
-                            <div className="relative w-full sm:w-64">
+                            {/* Search Filter Box */}
+                            <div className="relative w-full lg:w-64 shrink-0">
                                 <Search size={15} className="absolute left-3 top-2.5 text-slate-400" />
                                 <input
                                     type="text"
                                     placeholder="Tìm quyền, chức năng, nút..."
                                     value={permSearchQuery}
                                     onChange={(e) => setPermSearchQuery(e.target.value)}
-                                    className="w-full bg-slate-50 text-slate-800 placeholder-slate-400 text-xs rounded-xl pl-8 pr-7 py-2 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white transition-all"
+                                    className="w-full bg-white text-slate-800 placeholder-slate-400 text-xs rounded-xl pl-8 pr-7 py-2 border border-purple-200 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all shadow-2xs"
                                 />
                                 {permSearchQuery && (
                                     <button 
@@ -856,88 +853,85 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                                 )}
                             </div>
                         </div>
+
+                        {/* Department Scope Selector Bar (Row 2) */}
+                        <div className="bg-indigo-50/70 border-b border-indigo-100 px-3 py-2.5 flex flex-wrap items-center justify-between gap-2 text-xs">
+                            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar flex-1">
+                                <span className="text-[11px] font-black uppercase tracking-wider text-indigo-900 shrink-0">
+                                    Áp dụng cho Tổ / Phòng:
+                                </span>
+                                <button
+                                    onClick={() => setSelectedDepartmentScope('all')}
+                                    className={`px-3 py-1.5 rounded-lg font-extrabold text-xs transition-all whitespace-nowrap border ${
+                                        selectedDepartmentScope === 'all'
+                                            ? 'bg-indigo-700 text-white border-indigo-800 shadow-sm'
+                                            : 'bg-white text-slate-700 border-indigo-100 hover:border-indigo-300'
+                                    }`}
+                                >
+                                    🌐 Chung tất cả các Tổ
+                                </button>
+                                {allDepartmentOptions.map((deptName) => {
+                                    const isSelected = selectedDepartmentScope === deptName;
+                                    const compositeKey = `${deptName}_${selectedRole}`;
+                                    const hasCustomOverride = !!(departmentPermissions && departmentPermissions[compositeKey]);
+                                    return (
+                                        <button
+                                            key={deptName}
+                                            onClick={() => setSelectedDepartmentScope(deptName)}
+                                            className={`px-3 py-1.5 rounded-lg font-bold text-xs transition-all whitespace-nowrap flex items-center gap-1.5 border ${
+                                                isSelected
+                                                    ? 'bg-indigo-700 text-white border-indigo-800 shadow-sm font-black'
+                                                    : 'bg-white text-slate-700 border-indigo-100 hover:border-indigo-300'
+                                            }`}
+                                        >
+                                            <span>{deptName}</span>
+                                            {hasCustomOverride && (
+                                                <span className={`w-2 h-2 rounded-full ${isSelected ? 'bg-amber-300 animate-pulse' : 'bg-indigo-500'}`} title="Đã cấu hình quyền riêng cho Tổ này" />
+                                            )}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+
+                            {selectedDepartmentScope !== 'all' && departmentPermissions[`${selectedDepartmentScope}_${selectedRole}`] && (
+                                <button
+                                    onClick={handleResetDeptOverride}
+                                    className="text-[11px] font-extrabold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1 shrink-0"
+                                    title="Xóa cấu hình riêng của Tổ này để dùng cấu hình chung của Vai trò"
+                                >
+                                    <RotateCcw size={12} /> Bỏ phân quyền riêng Tổ
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Active Selected Role Banner */}
+                        <div className="bg-purple-100/50 px-4 py-2 flex items-center justify-between text-xs text-purple-950 font-medium flex-wrap gap-2">
+                            <div className="flex items-center gap-2">
+                                <span className="font-black uppercase tracking-wider text-purple-900 bg-purple-200 px-2 py-0.5 rounded text-[10px]">
+                                    {selectedRole}
+                                </span>
+                                <span className="text-slate-600 text-[11px]">
+                                    {selectedDepartmentScope === 'all' 
+                                        ? `Cấu hình mặc định cho tất cả các Tổ (${ROLE_OPTIONS.find(r => r.role === selectedRole)?.desc})`
+                                        : `Cấu hình riêng cho [${selectedDepartmentScope}] (${selectedRole})`
+                                    }
+                                </span>
+                            </div>
+                            {selectedDepartmentScope !== 'all' && (
+                                <span className="text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 rounded-full">
+                                    {departmentPermissions[`${selectedDepartmentScope}_${selectedRole}`] 
+                                        ? `⚡ Đang sử dụng Phân quyền riêng cho ${selectedDepartmentScope}`
+                                        : `ℹ️ Chưa có quyền riêng (Tự động kế thừa từ Phân quyền chung của ${selectedRole})`
+                                    }
+                                </span>
+                            )}
+                            {selectedRole === UserRole.ADMIN && (
+                                <span className="text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-full">
+                                    🔒 ADMIN có toàn bộ quyền mặc định
+                                </span>
+                            )}
+                        </div>
                     </div>
-
-                    {/* Department / Role Controls Sub-Bar */}
-                    {permissionTab === 'department' ? (
-                        <div className="bg-purple-50/70 border-b border-purple-100 p-3 md:p-4 flex-shrink-0 space-y-3">
-                            {/* Department Selection */}
-                            <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
-                                <span className="text-[11px] font-black uppercase tracking-wider text-purple-900 shrink-0 mr-1">
-                                    Phòng ban:
-                                </span>
-                                {PERMISSION_DEPARTMENTS.map((dept) => {
-                                    const isSelected = selectedDepartment === dept.id;
-                                    return (
-                                        <button
-                                            key={dept.id}
-                                            onClick={() => setSelectedDepartment(dept.id)}
-                                            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 flex items-center gap-2 border ${
-                                                isSelected
-                                                    ? 'bg-purple-700 text-white border-purple-800 shadow-sm font-black'
-                                                    : 'bg-white text-slate-700 border-purple-100 hover:border-purple-300'
-                                            }`}
-                                        >
-                                            <span className={`w-2 h-2 rounded-full ${isSelected ? 'bg-amber-300 animate-pulse' : 'bg-slate-300'}`} />
-                                            {dept.name}
-                                        </button>
-                                    );
-                                })}
-                            </div>
-
-                            {/* Role Sub-tabs inside selected Department */}
-                            <div className="flex items-center gap-2 overflow-x-auto pt-1 border-t border-purple-200/60 no-scrollbar">
-                                <span className="text-[11px] font-black uppercase tracking-wider text-purple-900 shrink-0 mr-1">
-                                    Tài khoản / Vai trò:
-                                </span>
-                                {ROLES_FOR_DEPARTMENT
-                                    .filter(r => r.role !== UserRole.ONEDOOR || selectedDepartment === 'Tổ Hành chính')
-                                    .map((r) => {
-                                    const isSelected = selectedRoleSub === r.role;
-                                    return (
-                                        <button
-                                            key={r.role}
-                                            onClick={() => setSelectedRoleSub(r.role)}
-                                            className={`px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all whitespace-nowrap shrink-0 flex items-center gap-1.5 border ${
-                                                isSelected
-                                                    ? 'bg-amber-500 text-slate-950 border-amber-600 shadow-sm font-black'
-                                                    : 'bg-white/80 text-slate-600 border-purple-100 hover:bg-white'
-                                            }`}
-                                        >
-                                            <span>{r.label}</span>
-                                            <span className={`text-[9px] px-1.5 py-0.5 rounded uppercase font-bold ${
-                                                isSelected ? 'bg-slate-900 text-amber-300' : 'bg-slate-100 text-slate-500'
-                                            }`}>
-                                                {r.badge}
-                                            </span>
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="bg-purple-50/70 border-b border-purple-100 p-3 md:p-4 flex-shrink-0 flex items-center gap-2 overflow-x-auto no-scrollbar">
-                            <span className="text-[11px] font-black uppercase tracking-wider text-purple-900 shrink-0 mr-1">
-                                Chọn Vai trò:
-                            </span>
-                            {Object.values(UserRole).filter(r => r !== UserRole.ADMIN).map((role) => {
-                                const isSelected = selectedRole === role;
-                                return (
-                                    <button
-                                        key={role}
-                                        onClick={() => setSelectedRole(role)}
-                                        className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all whitespace-nowrap shrink-0 border ${
-                                            isSelected
-                                                ? 'bg-purple-700 text-white border-purple-800 shadow-sm'
-                                                : 'bg-white text-slate-600 border-purple-100 hover:border-purple-300'
-                                        }`}
-                                    >
-                                        {role}
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    )}
 
                     {/* Scrollable Matrix Area */}
                     <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 bg-slate-50/50 custom-scrollbar">
@@ -980,7 +974,7 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                                             {filteredItems.filter(i => !(i as any).parentId).map((mainTab) => {
                                                 const subTabs = filteredItems.filter(i => (i as any).parentId === mainTab.id);
                                                 const isMainChecked = isPermChecked(mainTab.id);
-                                                const isMainDisabled = permissionTab === 'role' && selectedRole === UserRole.ADMIN;
+                                                const isMainDisabled = selectedRole === UserRole.ADMIN;
 
                                                 return (
                                                     <div key={mainTab.id} className="bg-slate-50/80 border border-purple-200/90 rounded-2xl p-4 shadow-2xs space-y-3">
@@ -1021,14 +1015,10 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                                                         {/* Sub Tabs Grid Below */}
                                                         {subTabs.length > 0 && (
                                                             <div className="pt-1 pl-3 md:pl-5 border-l-4 border-purple-400 space-y-2">
-                                                                <div className="text-[11px] font-extrabold text-purple-900 tracking-wide uppercase mb-1.5 flex items-center gap-1.5">
-                                                                    <span>Các Tab con thuộc nhóm này:</span>
-                                                                </div>
                                                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                                                                     {subTabs.map((perm) => {
-                                                                        const parentChecked = isPermCheckedRaw(mainTab.id);
                                                                         const checked = isPermChecked(perm.id);
-                                                                        const isDisabled = isMainDisabled || !parentChecked;
+                                                                        const isDisabled = isMainDisabled;
 
                                                                         return (
                                                                             <label
@@ -1056,11 +1046,6 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                                                                                     </div>
                                                                                     <div className="text-[11px] text-slate-500 font-medium mt-0.5 leading-snug">
                                                                                         {perm.desc}
-                                                                                        {!parentChecked && (
-                                                                                            <span className="block text-red-500 font-bold mt-0.5 text-[10px]">
-                                                                                                ⚠️ Tự động ẩn vì Tab chính đang TẮT
-                                                                                            </span>
-                                                                                        )}
                                                                                     </div>
                                                                                 </div>
                                                                             </label>
@@ -1078,9 +1063,10 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                                             {filteredItems.map((perm) => {
                                                 const parentId = (perm as any).parentId;
                                                 const isChild = !!parentId;
-                                                const parentChecked = isChild ? isPermCheckedRaw(parentId) : true;
+                                                // Always show sub-permission items
+
                                                 const checked = isPermChecked(perm.id);
-                                                const isDisabled = (permissionTab === 'role' && selectedRole === UserRole.ADMIN) || (isChild && !parentChecked);
+                                                const isDisabled = selectedRole === UserRole.ADMIN;
 
                                                 return (
                                                     <label
@@ -1110,11 +1096,6 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                                                             </div>
                                                             <div className="text-[11px] text-slate-500 font-medium mt-0.5 leading-snug">
                                                                 {perm.desc}
-                                                                {isChild && !parentChecked && (
-                                                                    <span className="block text-red-500 font-semibold mt-0.5 text-[10px]">
-                                                                        ⚠️ Tự động ẩn vì Tab chính đang TẮT
-                                                                    </span>
-                                                                )}
                                                             </div>
                                                             <div className="text-[10px] text-slate-400 font-mono mt-1">
                                                                 {perm.id}
@@ -1135,15 +1116,9 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                         <div className="flex items-center gap-2 text-xs text-slate-700 font-medium">
                             <span className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse" />
                             <span>Đang cấu hình:</span>
-                            {permissionTab === 'department' ? (
-                                <span className="font-black text-purple-900 bg-purple-100 px-2.5 py-1 rounded-lg border border-purple-200">
-                                    🏢 {selectedDepartment} → {ROLES_FOR_DEPARTMENT.find(r => r.role === selectedRoleSub)?.label || selectedRoleSub}
-                                </span>
-                            ) : (
-                                <span className="font-black text-purple-900 bg-purple-100 px-2.5 py-1 rounded-lg border border-purple-200">
-                                    👤 Vai trò: {selectedRole}
-                                </span>
-                            )}
+                            <span className="font-black text-purple-900 bg-purple-100 px-2.5 py-1 rounded-lg border border-purple-200 flex items-center gap-1.5">
+                                👤 {ROLE_OPTIONS.find(r => r.role === selectedRole)?.name || selectedRole}
+                            </span>
                         </div>
 
                         <div className="flex items-center gap-3 w-full sm:w-auto">
@@ -1159,13 +1134,24 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                             <button
                                 onClick={handleSavePermissions}
                                 disabled={isSavingPermissions}
-                                className="w-full sm:w-auto px-8 py-3 bg-gradient-to-r from-purple-700 to-indigo-800 hover:from-purple-800 hover:to-indigo-900 text-white font-black text-xs uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-purple-200 disabled:opacity-50 flex items-center justify-center gap-2.5 active:scale-95"
+                                className="w-full sm:w-auto px-10 py-3 bg-gradient-to-r from-purple-700 to-indigo-800 hover:from-purple-800 hover:to-indigo-900 text-white font-black text-xs uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-purple-200 disabled:opacity-50 flex items-center justify-center gap-2.5 active:scale-95"
                             >
                                 {isSavingPermissions ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
-                                Lưu cấu hình phân quyền
+                                LƯU
                             </button>
                         </div>
                     </div>
+
+                    {/* Always-Visible Floating Quick-Save Button (Bottom Right) */}
+                    <button
+                        onClick={handleSavePermissions}
+                        disabled={isSavingPermissions}
+                        className="fixed bottom-6 right-6 z-50 px-6 py-3.5 bg-gradient-to-r from-purple-700 via-indigo-700 to-purple-900 hover:from-purple-800 hover:to-indigo-950 text-white font-black text-xs uppercase tracking-wider rounded-full shadow-2xl border-2 border-white flex items-center gap-2 hover:scale-105 active:scale-95 transition-all disabled:opacity-50"
+                        title="Lưu cấu hình phân quyền ngay"
+                    >
+                        {isSavingPermissions ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+                        <span>LƯU</span>
+                    </button>
                 </div>
             )}
 

@@ -81,12 +81,12 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
       id: 'receive_group',
       label: 'Tiếp nhận',
       icon: FolderInput,
-      visible: hasPermission('ADD_RECORDS') || hasPermission('ADD_CONTRACTS'),
+      visible: true,
       isDropdown: false,
       isTabGroup: true,
       subItems: [
-        { id: 'receive_record', label: 'Hồ sơ', icon: FilePlus, visible: hasPermission('ADD_RECORDS') },
-        { id: 'receive_contract', label: 'Hợp đồng', icon: FileSignature, visible: hasPermission('ADD_CONTRACTS') || hasPermission('VIEW_CONTRACTS') },
+        { id: 'receive_record', label: 'Hồ sơ', icon: FilePlus, visible: true },
+        { id: 'receive_contract', label: 'Hợp đồng', icon: FileSignature, visible: true },
       ]
     },
 
@@ -95,12 +95,12 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
       id: 'records_group', 
       label: 'Hồ sơ', 
       icon: FileText, 
-      visible: hasPermission('VIEW_RECORDS') || hasPermission('VIEW_ARCHIVE'),
+      visible: true,
       isDropdown: false,
       isTabGroup: true,
       subItems: [
-        { id: 'all_records', label: 'Đo đạc', icon: Ruler, visible: hasPermission('VIEW_RECORDS') },
-        { id: 'archive_records', label: 'Lưu trữ', icon: FolderArchive, visible: hasPermission('VIEW_ARCHIVE') },
+        { id: 'all_records', label: 'Đo đạc', icon: Ruler, visible: true },
+        { id: 'archive_records', label: 'Lưu trữ', icon: FolderArchive, visible: true },
       ]
     },
 
@@ -113,7 +113,7 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
       isDropdown: false,
       isTabGroup: true,
       subItems: [
-        { id: 'work_schedule', label: 'Lịch công tác', icon: CalendarDays, visible: hasPermission('VIEW_SCHEDULE') },
+        { id: 'work_schedule', label: 'Lịch công tác', icon: CalendarDays, visible: true },
         { id: 'personal_profile', label: 'Hồ sơ cá nhân', icon: UserCircle, visible: true },
       ]
     },
@@ -129,7 +129,7 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
       subItems: [
         { id: 'excerpt_management', label: 'Số TL/TĐ', icon: BookOpen, visible: true },
         { id: 'utilities', label: 'Tiện ích', icon: PenTool, visible: true },
-        { id: 'reports', label: 'Báo cáo', icon: BarChart3, visible: hasPermission('VIEW_REPORTS') },
+        { id: 'reports', label: 'Báo cáo', icon: BarChart3, visible: true },
       ]
     }
   ];

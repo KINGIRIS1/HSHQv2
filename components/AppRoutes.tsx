@@ -259,25 +259,6 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
   const hasPermission = (permissionId: string) => {
     if (currentUser.role === UserRole.ADMIN) return true;
 
-    if (currentUser.employeeId && employees) {
-      const emp = employees.find((e) => e.id === currentUser.employeeId);
-      if (emp && emp.department) {
-        const compositeKey = `${emp.department}_${currentUser.role}`;
-        if (departmentPermissions && departmentPermissions[compositeKey]) {
-          const deptRolePerms = departmentPermissions[compositeKey] || [];
-          return deptRolePerms.includes("*") || deptRolePerms.includes(permissionId);
-        }
-
-        const matchingKey = Object.keys(departmentPermissions || {}).find(
-          (k) => matchDepartmentKey(k, emp.department),
-        );
-        if (matchingKey && departmentPermissions[matchingKey]) {
-          const deptPerms = departmentPermissions[matchingKey] || [];
-          return deptPerms.includes("*") || deptPerms.includes(permissionId);
-        }
-      }
-    }
-
     const rolePerms = (rolePermissions && rolePermissions[currentUser.role]) || DEFAULT_ROLE_PERMISSIONS[currentUser.role] || [];
     return rolePerms.includes("*") || rolePerms.includes(permissionId);
   };

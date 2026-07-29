@@ -28,10 +28,45 @@ export type DepartmentPermissions = Record<string, string[]>;
 
 export const DEFAULT_ROLE_PERMISSIONS: RolePermissions = {
   [UserRole.ADMIN]: ['*'],
-  [UserRole.SUBADMIN]: ['VIEW_RECORDS', 'ADD_RECORDS', 'EDIT_RECORDS', 'DELETE_RECORDS', 'ASSIGN_RECORDS', 'CHECK_RECORDS', 'SIGN_RECORDS', 'HANDOVER_RECORDS', 'RETURN_RECORDS', 'EXPORT_RECORDS', 'VIEW_CONTRACTS', 'ADD_CONTRACTS', 'EDIT_CONTRACTS', 'DELETE_CONTRACTS', 'EXPORT_CONTRACTS', 'VIEW_EXCERPTS', 'MANAGE_EXCERPTS', 'VIEW_ARCHIVE', 'MANAGE_ARCHIVE', 'VIEW_REPORTS', 'MANAGE_EMPLOYEES', 'VIEW_CHAT', 'VIEW_SCHEDULE', 'MANAGE_SCHEDULE', 'VIEW_PERSONAL_PROFILE', 'BTN_REJECT_RECORD', 'BTN_SUBMIT_SIGN', 'BTN_CLOSE_BATCH'],
-  [UserRole.TEAM_LEADER]: ['VIEW_RECORDS', 'EDIT_RECORDS', 'ASSIGN_RECORDS', 'CHECK_RECORDS', 'EXPORT_RECORDS', 'VIEW_CONTRACTS', 'VIEW_EXCERPTS', 'MANAGE_EXCERPTS', 'VIEW_ARCHIVE', 'VIEW_REPORTS', 'VIEW_CHAT', 'VIEW_SCHEDULE', 'VIEW_PERSONAL_PROFILE', 'BTN_REJECT_RECORD', 'BTN_SUBMIT_SIGN', 'BTN_CLOSE_BATCH'],
-  [UserRole.ONEDOOR]: ['VIEW_RECORDS', 'ADD_RECORDS', 'HANDOVER_RECORDS', 'RETURN_RECORDS', 'EXPORT_RECORDS', 'VIEW_CONTRACTS', 'ADD_CONTRACTS', 'VIEW_EXCERPTS', 'VIEW_ARCHIVE', 'VIEW_CHAT', 'VIEW_SCHEDULE', 'BTN_REJECT_RECORD', 'BTN_CLOSE_BATCH'],
-  [UserRole.EMPLOYEE]: ['VIEW_RECORDS', 'EDIT_RECORDS', 'VIEW_CONTRACTS', 'VIEW_EXCERPTS', 'VIEW_ARCHIVE', 'VIEW_CHAT', 'VIEW_SCHEDULE', 'VIEW_PERSONAL_PROFILE', 'BTN_SUBMIT_SIGN']
+  [UserRole.SUBADMIN]: ['*'],
+  [UserRole.TEAM_LEADER]: [
+    'receive_record', 'receive_sub_create', 'receive_sub_bulk', 'receive_sub_list', 'receive_sub_vphc',
+    'receive_contract', 'VIEW_CONTRACTS', 'ADD_CONTRACTS', 'EDIT_CONTRACTS', 'LIQUIDATE_CONTRACTS', 'EXPORT_CONTRACTS',
+    'all_records', 'all_sub_all', 'assign_tasks', 'completed_list', 'pending_check_list', 'check_list', 'handover_list', 'director_completed',
+    'archive_records', 'archive_sub_all', 'archive_assign_tasks', 'archive_completed_list', 'archive_pending_check_list', 'archive_check_list', 'archive_handover_list', 'archive_director_completed',
+    'registration_records',
+    'other_records', 'other_sub_all', 'other_assign_tasks', 'other_check_list', 'other_handover_list', 'other_director_completed',
+    'excerpt_management', 'MANAGE_EXCERPTS', 'VIEW_EXCERPTS',
+    'reports', 'VIEW_REPORTS',
+    'work_schedule', 'VIEW_SCHEDULE',
+    'utilities',
+    'BTN_SUBMIT_SIGN', 'BTN_REJECT_RECORD', 'BTN_CLOSE_BATCH'
+  ],
+  [UserRole.ONEDOOR]: [
+    'receive_record', 'receive_sub_create', 'receive_sub_bulk', 'receive_sub_list', 'receive_sub_vphc',
+    'receive_contract', 'VIEW_CONTRACTS', 'ADD_CONTRACTS', 'EDIT_CONTRACTS', 'EXPORT_CONTRACTS',
+    'all_records', 'all_sub_all', 'handover_list',
+    'archive_records', 'archive_sub_all', 'archive_handover_list',
+    'registration_records',
+    'other_records', 'other_sub_all', 'other_handover_list',
+    'excerpt_management', 'VIEW_EXCERPTS',
+    'reports', 'VIEW_REPORTS',
+    'work_schedule', 'VIEW_SCHEDULE',
+    'utilities',
+    'BTN_REJECT_RECORD', 'BTN_CLOSE_BATCH'
+  ],
+  [UserRole.EMPLOYEE]: [
+    'receive_contract', 'VIEW_CONTRACTS',
+    'all_records', 'all_sub_all', 'completed_list',
+    'archive_records', 'archive_sub_all', 'archive_completed_list',
+    'registration_records',
+    'other_records', 'other_sub_all',
+    'excerpt_management', 'VIEW_EXCERPTS',
+    'reports', 'VIEW_REPORTS',
+    'work_schedule', 'VIEW_SCHEDULE',
+    'utilities',
+    'BTN_SUBMIT_SIGN'
+  ]
 };
 
 export const AVAILABLE_PERMISSIONS = [

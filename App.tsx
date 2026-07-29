@@ -442,6 +442,9 @@ function App() {
               break;
           case RecordStatus.HANDOVER:
               updates.completedDate = targetDateStr; 
+              updates.exportDate = targetDateStr;
+              updates.is_handover = true;
+              updates.handover_date = targetDateStr;
               updates.resultReturnedDate = null;
               break;
           case RecordStatus.RETURNED:

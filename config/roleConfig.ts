@@ -1,4 +1,5 @@
-import { UserRole } from '../types';
+import { UserRole, DEFAULT_ROLE_PERMISSIONS } from '../types';
+import { matchDepartmentKey } from '../utils/appHelpers';
 
 export interface RoleConfig {
   role: UserRole;
@@ -91,84 +92,145 @@ export function isViewAllowedForUser(
   if (user.role === UserRole.ADMIN) return true;
 
   // Views that are always accessible to any logged in user
-  if (['dashboard', 'personal_profile', 'account_settings'].includes(viewId)) {
+  if (['dashboard', 'personal_profile', 'account_settings', 'utilities', 'reports', 'work_schedule', 'tools_group', 'management_group'].includes(viewId)) {
     return true;
   }
 
-  // If dynamic permissions are passed in, evaluate them!
-  if (rolePermissions || departmentPermissions) {
-    const rolePerms = (rolePermissions && rolePermissions[user.role]) || [];
-    if (rolePerms.includes('*')) return true;
+  // Evaluate Department-Role permissions first, then Role-based permissions
+  let activePerms: string[] | null = null;
 
-    // Mapping viewId to required permission IDs
-    const permMap: Record<string, string[]> = {
-      'receive_record': ['ADD_RECORDS', 'receive_record'],
-      'receive_sub_create': ['ADD_RECORDS', 'receive_sub_create'],
-      'receive_sub_bulk': ['ADD_RECORDS', 'receive_sub_bulk'],
-      'receive_sub_list': ['ADD_RECORDS', 'receive_sub_list'],
-      'receive_sub_vphc': ['ADD_RECORDS', 'receive_sub_vphc'],
-      'receive_contract': ['ADD_CONTRACTS', 'VIEW_CONTRACTS'],
-      'all_records': ['VIEW_RECORDS', 'all_records'],
-      'all_sub_all': ['VIEW_RECORDS', 'all_records', 'all_sub_all'],
-      'assign_tasks': ['ASSIGN_RECORDS', 'assign_tasks'],
-      'completed_list': ['VIEW_RECORDS', 'completed_list'],
-      'pending_check_list': ['CHECK_RECORDS', 'check_list', 'pending_check_list'],
-      'check_list': ['CHECK_RECORDS', 'check_list'],
-      'handover_list': ['HANDOVER_RECORDS', 'RETURN_RECORDS', 'handover_list'],
-      'director_completed': ['SIGN_RECORDS', 'director_completed'],
-      'archive_records': ['VIEW_ARCHIVE', 'archive_records'],
-      'archive_sub_all': ['VIEW_ARCHIVE', 'archive_records', 'archive_sub_all'],
-      'archive_assign_tasks': ['VIEW_ARCHIVE', 'archive_assign_tasks'],
-      'archive_completed_list': ['VIEW_ARCHIVE', 'archive_completed_list'],
-      'archive_pending_check_list': ['VIEW_ARCHIVE', 'archive_pending_check_list'],
-      'archive_check_list': ['VIEW_ARCHIVE', 'archive_check_list'],
-      'archive_handover_list': ['VIEW_ARCHIVE', 'archive_handover_list'],
-      'excerpt_management': ['VIEW_EXCERPTS', 'MANAGE_EXCERPTS'],
-      'reports': ['VIEW_REPORTS'],
-      'work_schedule': ['VIEW_SCHEDULE'],
-      'system_dashboard': ['SYSTEM_SETTINGS'],
-      'utilities': ['VIEW_RECORDS', 'MANAGE_ARCHIVE', 'SYSTEM_SETTINGS', 'utilities'],
-      'receive_group': ['ADD_RECORDS', 'ADD_CONTRACTS', 'VIEW_CONTRACTS', 'receive_record'],
-      'records_group': ['VIEW_RECORDS', 'VIEW_ARCHIVE', 'all_records', 'archive_records'],
-      'tools_group': ['VIEW_REPORTS', 'VIEW_EXCERPTS', 'utilities']
-    };
-
-    const neededPerms = permMap[viewId];
-
-    // Check department permissions first if user has employeeId & department
-    if (user.employeeId && employees && departmentPermissions) {
-      const emp = employees.find(e => e.id === user.employeeId);
-      if (emp && emp.department) {
-        // 1. Check composite key `${emp.department}_${user.role}`
-        const compositeKey = `${emp.department}_${user.role}`;
-        if (departmentPermissions[compositeKey]) {
-          const deptRolePerms = departmentPermissions[compositeKey];
-          if (deptRolePerms.includes('*')) return true;
-          if (neededPerms && neededPerms.some(p => deptRolePerms.includes(p))) return true;
-          // If composite key explicitly exists for user's department & role and permission is missing:
-          if (neededPerms && !neededPerms.some(p => deptRolePerms.includes(p))) return false;
-        }
-
-        // 2. Check department key
-        const deptKey = Object.keys(departmentPermissions).find(k => k.trim().toLowerCase() === emp.department.trim().toLowerCase());
-        if (deptKey && departmentPermissions[deptKey]) {
-          const deptPerms = departmentPermissions[deptKey];
-          if (deptPerms.includes('*')) return true;
-          if (neededPerms && neededPerms.some(p => deptPerms.includes(p))) return true;
-          if (neededPerms && !neededPerms.some(p => deptPerms.includes(p))) return false;
+  if (user.employeeId && employees && departmentPermissions) {
+    const emp = employees.find(e => e.id === user.employeeId);
+    if (emp && emp.department) {
+      const compositeKey = `${emp.department}_${user.role}`;
+      if (departmentPermissions[compositeKey]) {
+        activePerms = departmentPermissions[compositeKey];
+      } else if (departmentPermissions[emp.department]) {
+        activePerms = departmentPermissions[emp.department];
+      } else {
+        const matchingKey = Object.keys(departmentPermissions).find(k => {
+          if (k.endsWith(`_${user.role}`)) {
+            const deptPart = k.replace(`_${user.role}`, '');
+            return matchDepartmentKey(deptPart, emp.department);
+          }
+          return matchDepartmentKey(k, emp.department);
+        });
+        if (matchingKey && departmentPermissions[matchingKey]) {
+          activePerms = departmentPermissions[matchingKey];
         }
       }
     }
+  }
 
-    // Check role permissions
-    if (neededPerms) {
-      const hasRolePerm = neededPerms.some(p => rolePerms.includes(p));
-      if (hasRolePerm) return true;
-      if (rolePermissions && rolePermissions[user.role]) return false;
+  if (activePerms === null) {
+    if (rolePermissions && rolePermissions[user.role]) {
+      activePerms = rolePermissions[user.role];
+    } else if (DEFAULT_ROLE_PERMISSIONS[user.role]) {
+      activePerms = DEFAULT_ROLE_PERMISSIONS[user.role];
     }
   }
 
-  // Fallback to static config if dynamic perms not present
+  if (activePerms !== null) {
+    if (activePerms.includes('*')) return true;
+
+    // Check viewId-specific permission
+    switch (viewId) {
+      // Main Tab Groups in Top Navigation
+      case 'receive_group':
+        return activePerms.includes('receive_record') ||
+               activePerms.includes('receive_sub_create') ||
+               activePerms.includes('receive_sub_bulk') ||
+               activePerms.includes('receive_sub_list') ||
+               activePerms.includes('receive_sub_vphc') ||
+               activePerms.includes('receive_contract') ||
+               activePerms.includes('VIEW_CONTRACTS') ||
+               activePerms.includes('ADD_CONTRACTS') ||
+               activePerms.includes('LIQUIDATE_CONTRACTS');
+      case 'records_group':
+        return activePerms.includes('all_records') || activePerms.includes('all_sub_all') ||
+               activePerms.includes('archive_records') || activePerms.includes('archive_sub_all') ||
+               activePerms.includes('registration_records') || activePerms.includes('other_records') || activePerms.includes('other_sub_all');
+      case 'tools_group':
+        return activePerms.includes('reports') || activePerms.includes('VIEW_REPORTS') || activePerms.includes('excerpt_management') || activePerms.includes('MANAGE_EXCERPTS') || activePerms.includes('utilities') || activePerms.includes('work_schedule');
+      case 'management_group':
+        return activePerms.includes('work_schedule') || activePerms.includes('VIEW_SCHEDULE') || activePerms.includes('personal_profile');
+
+      // Main Tabs
+      case 'receive_record':
+        return activePerms.includes('receive_record') ||
+               activePerms.includes('receive_sub_create');
+      case 'all_records':
+        return activePerms.includes('all_records') ||
+               activePerms.includes('all_sub_all');
+      case 'archive_records':
+        return activePerms.includes('archive_records') ||
+               activePerms.includes('archive_sub_all');
+      case 'registration_records':
+        return activePerms.includes('registration_records');
+      case 'other_records':
+        return activePerms.includes('other_records') ||
+               activePerms.includes('other_sub_all');
+
+      // Child Tabs - Receive Group
+      case 'receive_sub_create':
+      case 'receive_sub_bulk':
+      case 'receive_sub_list':
+      case 'receive_sub_vphc':
+        return activePerms.includes(viewId) || activePerms.includes('receive_record');
+
+      // Child Tabs - All Records Group
+      case 'all_sub_all':
+      case 'assign_tasks':
+      case 'completed_list':
+      case 'pending_check_list':
+      case 'check_list':
+      case 'handover_list':
+      case 'director_completed':
+        return activePerms.includes(viewId) || activePerms.includes('all_records');
+
+      // Child Tabs - Archive Group
+      case 'archive_sub_all':
+      case 'archive_assign_tasks':
+      case 'archive_completed_list':
+      case 'archive_pending_check_list':
+      case 'archive_check_list':
+      case 'archive_handover_list':
+      case 'archive_director_completed':
+        return activePerms.includes(viewId) || activePerms.includes('archive_records');
+
+      // Child Tabs - Other Records Group
+      case 'other_sub_all':
+      case 'other_assign_tasks':
+      case 'other_check_list':
+      case 'other_handover_list':
+      case 'other_director_completed':
+        return activePerms.includes(viewId) || activePerms.includes('other_records');
+
+      // Other Standalone Views
+      case 'receive_contract':
+        return activePerms.includes('receive_contract') || activePerms.includes('VIEW_CONTRACTS') || activePerms.includes('ADD_CONTRACTS') || activePerms.includes('LIQUIDATE_CONTRACTS');
+      case 'excerpt_management':
+        return activePerms.includes('excerpt_management') || activePerms.includes('MANAGE_EXCERPTS') || activePerms.includes('VIEW_EXCERPTS');
+      case 'reports':
+        return activePerms.includes('reports') || activePerms.includes('VIEW_REPORTS');
+      case 'work_schedule':
+        return activePerms.includes('work_schedule') || activePerms.includes('VIEW_SCHEDULE');
+      case 'system_dashboard':
+        return activePerms.includes('system_dashboard') || activePerms.includes('SYSTEM_SETTINGS');
+      case 'utilities':
+        return activePerms.includes('utilities') || activePerms.includes('SYSTEM_SETTINGS');
+
+      default:
+        return activePerms.includes(viewId);
+    }
+  }
+
+  // If dynamic permissions object was provided but no activePerms found -> deny
+  if (rolePermissions || departmentPermissions) {
+    return false;
+  }
+
+  // Fallback to static config if dynamic perms not present at all
   const config = ROLE_VIEWS_CONFIG[user.role];
   if (!config) return false;
 

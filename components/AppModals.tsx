@@ -230,6 +230,7 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
                 isOpen={props.isBulkUpdateModalOpen}
                 onClose={() => props.setIsBulkUpdateModalOpen(false)}
                 selectedRecords={props.selectedRecordsForBulk}
+                allRecords={props.records}
                 employees={props.employees}
                 wards={props.wards}
                 onConfirm={props.handleBulkUpdate}
