@@ -112,7 +112,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
         if (initialData) {
             const dataToSet = { ...initialData };
             const rLower = String(dataToSet.recordType || '').toLowerCase();
-            if ((rLower.includes('1.2') || rLower.includes('công văn') || rLower.includes('cong van') || dataToSet.recordType === '1.1 CC DL ĐĐ' || dataToSet.recordType === '1.1 Cung cấp dữ liệu đất đai') && !dataToSet.price) {
+            if ((rLower.includes('1.2') || rLower.includes('công văn') || rLower.includes('cong van') || rLower.includes('sao lục') || dataToSet.recordType === '1.1 Sao lục' || dataToSet.recordType === '1.1 CC DL ĐĐ' || dataToSet.recordType === '1.1 Sao lục hồ sơ' || dataToSet.recordType === '1.1 Cung cấp dữ liệu đất đai') && !dataToSet.price) {
                 dataToSet.price = 310000;
             }
             setFormData(dataToSet);
@@ -347,7 +347,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
         }
         if (field === 'recordType') {
           const rLower = String(value || '').toLowerCase();
-          if (rLower.includes('1.2') || rLower.includes('công văn') || rLower.includes('cong van') || value === '1.1 CC DL ĐĐ' || value === '1.1 Cung cấp dữ liệu đất đai') {
+          if (rLower.includes('1.2') || rLower.includes('công văn') || rLower.includes('cong van') || rLower.includes('sao lục') || value === '1.1 Sao lục' || value === '1.1 CC DL ĐĐ' || value === '1.1 Sao lục hồ sơ' || value === '1.1 Cung cấp dữ liệu đất đai') {
             updated.price = 310000;
           }
         }
@@ -385,7 +385,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
     allowedRecordTypes = ['CMD', 'Thi hành án', 'Tòa án'];
   } else if (isArchiveView) {
     allowedRecordTypes = [
-      '1.1 CC DL ĐĐ',
+      '1.1 Sao lục',
       '1.2 Công văn'
     ];
   } else if (isMeasurementView) {
@@ -399,7 +399,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
     ];
   } else {
     allowedRecordTypes = [
-      '1.1 CC DL ĐĐ',
+      '1.1 Sao lục',
       '1.2 Công văn',
       '2.1 Trích lục',
       '2.2 Trích lục QH',

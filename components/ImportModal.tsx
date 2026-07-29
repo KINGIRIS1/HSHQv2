@@ -280,7 +280,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
             }
 
             const rTypeStr = String(record.recordType || '').toLowerCase();
-            if (rTypeStr.includes('1.2') || rTypeStr.includes('công văn') || rTypeStr.includes('cong van') || rTypeStr.includes('cung cấp tài liệu') || record.recordType === '1.1 CC DL ĐĐ') {
+            if (rTypeStr.includes('1.2') || rTypeStr.includes('công văn') || rTypeStr.includes('cong van') || rTypeStr.includes('cung cấp tài liệu') || rTypeStr.includes('sao lục') || record.recordType === '1.1 CC DL ĐĐ' || record.recordType === '1.1 Sao lục') {
                 if (!record.price) record.price = 310000;
             }
 

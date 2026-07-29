@@ -810,7 +810,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                   className="text-sm outline-none bg-transparent text-gray-700 font-medium cursor-pointer border-none focus:ring-0 max-w-[150px]"
                 >
                   <option value="all">Tất cả loại HS</option>
-                  <option value="1.1 CC DL ĐĐ">1.1 CC DL ĐĐ</option>
+                  <option value="1.1 Sao lục">1.1 Sao lục</option>
                   <option value="1.2 Công văn">1.2 Công văn</option>
                 </select>
               </div>

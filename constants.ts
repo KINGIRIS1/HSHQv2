@@ -52,7 +52,7 @@ export const WARDS = DEFAULT_WARDS;
 
 // Danh sách loại hồ sơ CƠ BẢN (Dùng cho form Tiếp nhận hồ sơ thường xuyên)
 export const RECORD_TYPES = [
-  '1.1 Cung cấp dữ liệu đất đai',
+  '1.1 Sao lục hồ sơ',
   '1.2 Công văn',
   '2.1 Trích lục',
   '2.2 Trích lục Quy hoạch',
@@ -112,7 +112,7 @@ export const getShortRecordType = (type: string | null | undefined): string => {
   if (!type) return '---';
   const t = type.toLowerCase().trim();
   
-  if (t.startsWith('1.1') || t === 'cung cấp tài liệu đất đai' || t === 'cung cấp dữ liệu đất đai' || t === 'sao lục' || t === 'sao luc') return '1.1 CC DL ĐĐ';
+  if (t.startsWith('1.1') || t === 'cung cấp tài liệu đất đai' || t === 'cung cấp dữ liệu đất đai' || t === 'sao lục' || t === 'sao luc' || t === 'sao lục hồ sơ' || t === '1.1 cc dl đđ' || t === '1.1 sao lục') return '1.1 Sao lục';
   if (t.startsWith('1.2') || t === 'công văn') return '1.2 Công văn';
   if (t.startsWith('2.1') || t === 'trích lục') return '2.1 Trích lục';
   if (t.startsWith('2.2') || t === 'trích lục quy hoạch' || t === 'trích lục qh') return '2.2 Trích lục QH';
@@ -122,7 +122,7 @@ export const getShortRecordType = (type: string | null | undefined): string => {
   if (t.startsWith('2.6') || t === 'cung cấp số thửa đất' || t === 'cung cấp số thửa' || t === 'cc số thửa' || t === 'cập nhập số thửa' || t === 'cập nhật số thửa' || t === 'cn số thửa') return '2.6 CN Số Thửa';
 
   // Fallbacks for legacy other categories
-  if (t.includes('cung cấp tài liệu đất đai') || t.includes('cung cấp dữ liệu') || t.includes('sao lục') || t.includes('sao luc')) return '1.1 CC DL ĐĐ';
+  if (t.includes('cung cấp tài liệu đất đai') || t.includes('cung cấp dữ liệu') || t.includes('sao lục') || t.includes('sao luc') || t.includes('cc dl đđ')) return '1.1 Sao lục';
   if (t.includes('trích lục quy hoạch')) return '2.2 Trích lục QH';
   if (t.includes('cung cấp số thửa đất') || t.includes('số thửa') || t.includes('cập nhập số thửa') || t.includes('cập nhật số thửa')) return '2.6 CN Số Thửa';
   if (t.includes('trích đo') && t.includes('cắm mốc')) return '2.4 Cắm mốc';
@@ -143,7 +143,7 @@ export const getShortRecordType = (type: string | null | undefined): string => {
 
 export const isArchiveRecordType = (type: string | null | undefined): boolean => {
   const short = getShortRecordType(type);
-  return short === '1.1 CC DL ĐĐ' || short === '1.2 Công văn';
+  return short === '1.1 Sao lục' || short === '1.2 Công văn';
 };
 
 export const MOCK_EMPLOYEES: Employee[] = [

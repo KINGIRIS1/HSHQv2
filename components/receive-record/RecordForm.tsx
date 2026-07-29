@@ -150,9 +150,12 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
         if (field === 'recordType') {
             const vLower = String(value || '').toLowerCase();
             if (
+                value === '1.1 Sao lục' || 
                 value === '1.1 CC DL ĐĐ' || 
                 value === 'Cung cấp tài liệu đất đai' || 
                 value === '1.1 Cung cấp dữ liệu đất đai' ||
+                value === '1.1 Sao lục hồ sơ' ||
+                vLower.includes('sao lục') ||
                 vLower.includes('1.2') || 
                 vLower.includes('công văn') || 
                 vLower.includes('cong van')
@@ -162,8 +165,8 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
                 newData.price = null;
             }
 
-            // Auto-populate default documents for "1.1 Cung cấp dữ liệu đất đai" and "Hồ sơ đo đạc" (starts with 2.)
-            if (value === '1.1 Cung cấp dữ liệu đất đai' || value === '1.1 CC DL ĐĐ' || value.startsWith('2.')) {
+            // Auto-populate default documents for "1.1 Sao lục hồ sơ" and "Hồ sơ đo đạc" (starts with 2.)
+            if (value === '1.1 Sao lục hồ sơ' || value === '1.1 Sao lục' || value === '1.1 Cung cấp dữ liệu đất đai' || value === '1.1 CC DL ĐĐ' || value.startsWith('2.')) {
                 const defaultDocs: AttachedDocItem[] = [
                     { id: '1', name: 'Phiếu yêu cầu lập hợp đồng đo đạc dịch vụ, Cắm mốc, trích lục, Cung cấp thông tin', type: 'Bản chính' },
                     { id: '2', name: 'Giấy chứng nhận đã cấp', type: 'Bản sao' }
