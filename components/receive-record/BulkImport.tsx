@@ -82,6 +82,10 @@ const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calc
           const newBulkRecords: BulkRecordItem[] = [];
 
           const typeMapping: Record<string, string> = {
+              '1.2': '1.2 Công văn',
+              '1.2 CÔNG VĂN': '1.2 Công văn',
+              'CÔNG VĂN': '1.2 Công văn',
+              'CONG VAN': '1.2 Công văn',
               'TL': 'Trích lục bản đồ địa chính',
               'TRÍCH LỤC': 'Trích lục bản đồ địa chính',
               'TĐ': 'Trích đo bản đồ địa chính',
@@ -119,7 +123,8 @@ const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calc
 
               if (!recordType) {
                   const lower = rawType.toLowerCase();
-                  if (lower.includes('trích lục')) recordType = 'Trích lục bản đồ địa chính';
+                  if (lower.includes('1.2') || lower.includes('công văn') || lower.includes('cong van') || lower.includes('cung cấp tài liệu')) recordType = '1.2 Công văn';
+                  else if (lower.includes('trích lục')) recordType = 'Trích lục bản đồ địa chính';
                   else if (lower.includes('chỉnh lý') || lower.includes('hiến đường')) recordType = 'Trích đo chỉnh lý bản đồ địa chính';
                   else if (lower.includes('tách thửa')) recordType = 'Tách thửa';
                   else if (lower.includes('trích đo') || lower.includes('hợp thửa')) recordType = 'Trích đo bản đồ địa chính';

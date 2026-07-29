@@ -1,11 +1,12 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { RecordFile, Employee, User, Holiday, RecordStatus } from '../types';
+import { RecordFile, Employee, User, Holiday, RecordStatus, RolePermissions, DepartmentPermissions } from '../types';
 import { getNormalizedWard } from '../constants';
 import { PlusCircle, FileSpreadsheet, LayoutList, Settings, RotateCcw, RefreshCw, Gavel } from 'lucide-react';
 import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../services/docxService';
 import * as XLSX from 'xlsx-js-style';
 import { confirmAction, calculateDeadlineHelper } from '../utils/appHelpers';
+import { isViewAllowedForUser } from '../config/roleConfig';
 
 // Components
 import RecordForm from './receive-record/RecordForm';
@@ -29,6 +30,8 @@ interface ReceiveRecordProps {
   onHandOverRecords?: (recordIds: string[]) => Promise<void>;
   onBulkUpdate?: (field: keyof RecordFile, value: any, customDate?: string, targetRecordIds?: string[]) => Promise<void>;
   initialTab?: 'create' | 'list' | 'bulk' | 'update' | 'vphc';
+  rolePermissions?: RolePermissions;
+  departmentPermissions?: DepartmentPermissions;
 }
 
 // Hàm chuyển đổi Âm lịch sang Dương lịch (Cố định cho các ngày lễ chính 2024-2026)
@@ -63,14 +66,39 @@ const formatDateKey = (date: Date): string => {
     return `${year}-${month}-${day}`;
 };
 
-const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, employees, currentUser, records = [], holidays, onCreateContract, onHandOverRecords, onBulkUpdate, initialTab = 'create' }) => {
+const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, employees, currentUser, records = [], holidays, onCreateContract, onHandOverRecords, onBulkUpdate, initialTab = 'create', rolePermissions, departmentPermissions }) => {
   const [viewMode, setViewMode] = useState<'create' | 'list' | 'bulk' | 'update' | 'vphc'>(initialTab);
+
+  const canCreate = !currentUser || isViewAllowedForUser(currentUser, employees || [], 'receive_sub_create', rolePermissions, departmentPermissions);
+  const canBulk = !currentUser || isViewAllowedForUser(currentUser, employees || [], 'receive_sub_bulk', rolePermissions, departmentPermissions);
+  const canList = !currentUser || isViewAllowedForUser(currentUser, employees || [], 'receive_sub_list', rolePermissions, departmentPermissions);
+  const canVphc = !currentUser || isViewAllowedForUser(currentUser, employees || [], 'receive_sub_vphc', rolePermissions, departmentPermissions);
 
   useEffect(() => {
     if (initialTab) {
       setViewMode(initialTab);
     }
   }, [initialTab]);
+
+  useEffect(() => {
+    if (viewMode === 'create' && !canCreate) {
+      if (canBulk) setViewMode('bulk');
+      else if (canList) setViewMode('list');
+      else if (canVphc) setViewMode('vphc');
+    } else if (viewMode === 'bulk' && !canBulk) {
+      if (canCreate) setViewMode('create');
+      else if (canList) setViewMode('list');
+      else if (canVphc) setViewMode('vphc');
+    } else if (viewMode === 'list' && !canList) {
+      if (canCreate) setViewMode('create');
+      else if (canBulk) setViewMode('bulk');
+      else if (canVphc) setViewMode('vphc');
+    } else if (viewMode === 'vphc' && !canVphc) {
+      if (canCreate) setViewMode('create');
+      else if (canBulk) setViewMode('bulk');
+      else if (canList) setViewMode('list');
+    }
+  }, [canCreate, canBulk, canList, canVphc, viewMode]);
   // Removed local holidays state and useEffect
   
   // State chỉnh sửa
@@ -320,21 +348,29 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col h-full animate-fade-in-up overflow-hidden">
       <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-blue-50/50 shrink-0 z-10">
         <div className="flex bg-white p-1 rounded-lg border border-gray-200">
-            <button 
-                onClick={() => { setViewMode('create'); setEditingRecord(null); }} 
-                className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${viewMode === 'create' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
-            >
-                <PlusCircle size={16} /> Nhập mới
-            </button>
-            <button onClick={() => setViewMode('bulk')} className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${viewMode === 'bulk' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}>
-                <FileSpreadsheet size={16} /> Tiếp nhận hàng loạt
-            </button>
-            <button onClick={() => setViewMode('list')} className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${viewMode === 'list' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}>
-                <LayoutList size={16} /> Danh sách hôm nay
-            </button>
-            <button onClick={() => setViewMode('vphc')} className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${viewMode === 'vphc' ? 'bg-red-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}>
-                <Gavel size={16} /> Biên bản VPHC
-            </button>
+            {canCreate && (
+              <button 
+                  onClick={() => { setViewMode('create'); setEditingRecord(null); }} 
+                  className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${viewMode === 'create' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
+              >
+                  <PlusCircle size={16} /> Nhập mới
+              </button>
+            )}
+            {canBulk && (
+              <button onClick={() => setViewMode('bulk')} className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${viewMode === 'bulk' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}>
+                  <FileSpreadsheet size={16} /> Tiếp nhận hàng loạt
+              </button>
+            )}
+            {canList && (
+              <button onClick={() => setViewMode('list')} className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${viewMode === 'list' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}>
+                  <LayoutList size={16} /> Danh sách hôm nay
+              </button>
+            )}
+            {canVphc && (
+              <button onClick={() => setViewMode('vphc')} className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${viewMode === 'vphc' ? 'bg-red-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}>
+                  <Gavel size={16} /> Biên bản VPHC
+              </button>
+            )}
         </div>
         
         {viewMode === 'create' && (

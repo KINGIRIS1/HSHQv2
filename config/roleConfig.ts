@@ -24,7 +24,7 @@ export const ROLE_VIEWS_CONFIG: Record<UserRole, RoleConfig> = {
       'dashboard', 'receive_record', 'receive_contract', 
       'all_records', 'registration_records', 'other_records', 'personal_profile', 
       'account_settings', 'utilities', 'handover_list', 'archive_handover_list', 'other_handover_list', 'work_schedule', 
-      'archive_records', 'congvan_records', 'receive_group', 'records_group', 
+      'archive_records', 'receive_group', 'records_group', 
       'reports', 'tools_group', 'barcode_generator'
     ]
   },
@@ -54,11 +54,11 @@ export const ROLE_VIEWS_CONFIG: Record<UserRole, RoleConfig> = {
       },
       {
         keyword: 'lưu trữ',
-        views: ['archive_records', 'archive_assign_tasks', 'archive_completed_list', 'archive_pending_check_list', 'archive_check_list', 'archive_handover_list', 'congvan_records', 'excerpt_management']
+        views: ['archive_records', 'archive_assign_tasks', 'archive_completed_list', 'archive_pending_check_list', 'archive_check_list', 'archive_handover_list', 'excerpt_management']
       },
       {
         keyword: 'thông tin',
-        views: ['archive_records', 'archive_assign_tasks', 'archive_completed_list', 'archive_pending_check_list', 'archive_check_list', 'archive_handover_list', 'congvan_records', 'excerpt_management']
+        views: ['archive_records', 'archive_assign_tasks', 'archive_completed_list', 'archive_pending_check_list', 'archive_check_list', 'archive_handover_list', 'excerpt_management']
       }
     ]
   }
@@ -102,23 +102,33 @@ export function isViewAllowedForUser(
 
     // Mapping viewId to required permission IDs
     const permMap: Record<string, string[]> = {
-      'receive_record': ['ADD_RECORDS'],
+      'receive_record': ['ADD_RECORDS', 'receive_record'],
+      'receive_sub_create': ['ADD_RECORDS', 'receive_sub_create'],
+      'receive_sub_bulk': ['ADD_RECORDS', 'receive_sub_bulk'],
+      'receive_sub_list': ['ADD_RECORDS', 'receive_sub_list'],
+      'receive_sub_vphc': ['ADD_RECORDS', 'receive_sub_vphc'],
       'receive_contract': ['ADD_CONTRACTS', 'VIEW_CONTRACTS'],
       'all_records': ['VIEW_RECORDS', 'all_records'],
+      'all_sub_all': ['VIEW_RECORDS', 'all_records', 'all_sub_all'],
       'assign_tasks': ['ASSIGN_RECORDS', 'assign_tasks'],
       'completed_list': ['VIEW_RECORDS', 'completed_list'],
-      'pending_check_list': ['CHECK_RECORDS', 'check_list'],
+      'pending_check_list': ['CHECK_RECORDS', 'check_list', 'pending_check_list'],
       'check_list': ['CHECK_RECORDS', 'check_list'],
       'handover_list': ['HANDOVER_RECORDS', 'RETURN_RECORDS', 'handover_list'],
       'director_completed': ['SIGN_RECORDS', 'director_completed'],
       'archive_records': ['VIEW_ARCHIVE', 'archive_records'],
-      'congvan_records': ['VIEW_ARCHIVE', 'congvan_records'],
+      'archive_sub_all': ['VIEW_ARCHIVE', 'archive_records', 'archive_sub_all'],
+      'archive_assign_tasks': ['VIEW_ARCHIVE', 'archive_assign_tasks'],
+      'archive_completed_list': ['VIEW_ARCHIVE', 'archive_completed_list'],
+      'archive_pending_check_list': ['VIEW_ARCHIVE', 'archive_pending_check_list'],
+      'archive_check_list': ['VIEW_ARCHIVE', 'archive_check_list'],
+      'archive_handover_list': ['VIEW_ARCHIVE', 'archive_handover_list'],
       'excerpt_management': ['VIEW_EXCERPTS', 'MANAGE_EXCERPTS'],
       'reports': ['VIEW_REPORTS'],
       'work_schedule': ['VIEW_SCHEDULE'],
       'system_dashboard': ['SYSTEM_SETTINGS'],
       'utilities': ['VIEW_RECORDS', 'MANAGE_ARCHIVE', 'SYSTEM_SETTINGS', 'utilities'],
-      'receive_group': ['ADD_RECORDS', 'ADD_CONTRACTS', 'VIEW_CONTRACTS'],
+      'receive_group': ['ADD_RECORDS', 'ADD_CONTRACTS', 'VIEW_CONTRACTS', 'receive_record'],
       'records_group': ['VIEW_RECORDS', 'VIEW_ARCHIVE', 'all_records', 'archive_records'],
       'tools_group': ['VIEW_REPORTS', 'VIEW_EXCERPTS', 'utilities']
     };

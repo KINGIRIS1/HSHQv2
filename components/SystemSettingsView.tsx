@@ -16,10 +16,9 @@ const PERMISSION_DEPARTMENTS = [
 ];
 
 const ROLES_FOR_DEPARTMENT = [
-  { role: UserRole.TEAM_LEADER, label: 'Nhóm trưởng / Tổ trưởng', badge: 'Quản lý' },
-  { role: UserRole.EMPLOYEE, label: 'Nhân viên chuyên môn', badge: 'Xử lý' },
-  { role: UserRole.ONEDOOR, label: 'Bộ phận Một cửa', badge: 'Tiếp nhận / Trả KQ' },
-  { role: UserRole.SUBADMIN, label: 'Phó Giám đốc / Lãnh đạo', badge: 'Lãnh đạo phòng' }
+  { role: UserRole.TEAM_LEADER, label: 'TEAM_LEADER (Team Leader)', badge: 'Quản lý' },
+  { role: UserRole.EMPLOYEE, label: 'EMPLOYEE (Nhân viên)', badge: 'Xử lý' },
+  { role: UserRole.ONEDOOR, label: 'ONEDOOR (Một cửa)', badge: 'Tiếp nhận / Trả KQ' }
 ];
 
 const PERMISSION_GROUPS = [
@@ -42,17 +41,30 @@ const PERMISSION_GROUPS = [
   },
   {
     id: 'views',
-    title: '👁️ Hiển thị Tab Chuyên môn (Cấu hình ẩn/hiện Tab)',
-    desc: 'Quyền xem và làm việc trực tiếp trên từng Tab quy trình chuyên môn',
+    title: '👁️ Hiển thị các Tab lớn & Tab con (Cấu hình ẩn/hiện Tab)',
+    desc: 'Quyền xem và làm việc trên từng Tab. Nếu TẮT Tab chính, toàn bộ các Tab con của nó sẽ tự động bị ẩn.',
     items: [
-      { id: 'all_records', label: 'Tab: Tất cả hồ sơ', desc: 'Cho phép xem Tab Tất cả hồ sơ' },
-      { id: 'assign_tasks', label: 'Tab: Phân công / Chưa giao', desc: 'Cho phép xem Tab Phân công công việc' },
-      { id: 'completed_list', label: 'Tab: Đang thực hiện / Hồ sơ của tôi', desc: 'Cho phép xem Tab Đang thực hiện' },
-      { id: 'check_list', label: 'Tab: Ký kiểm tra / Trình ký', desc: 'Cho phép xem Tab Ký kiểm tra & Trình duyệt kiểm tra' },
-      { id: 'handover_list', label: 'Tab: Giao 1 cửa / Trả kết quả', desc: 'Cho phép xem Tab Giao 1 cửa (nhân viên 1 cửa thấy để trả kết quả)' },
-      { id: 'director_completed', label: 'Tab: Đã hoàn thành / Ký duyệt', desc: 'Cho phép xem Tab Lãnh đạo đã ký duyệt' },
-      { id: 'archive_records', label: 'Tab: Kho lưu trữ hồ sơ', desc: 'Cho phép truy cập kho lưu trữ' },
-      { id: 'congvan_records', label: 'Tab: Sổ Công văn', desc: 'Cho phép truy cập quản lý sổ công văn' },
+      { id: 'receive_record', label: '🖥️ Tiếp nhận hồ sơ', desc: 'Ẩn/hiện toàn bộ Tab Tiếp nhận hồ sơ' },
+      { id: 'receive_sub_create', label: '➕ Nhập mới', desc: 'Cho phép nhập mới hồ sơ đơn lẻ', parentId: 'receive_record' },
+      { id: 'receive_sub_bulk', label: '📊 Tiếp nhận hàng loạt', desc: 'Cho phép tiếp nhận hàng loạt từ Excel', parentId: 'receive_record' },
+      { id: 'receive_sub_list', label: '📋 Danh sách hôm nay', desc: 'Cho phép xem danh sách hồ sơ tiếp nhận hôm nay', parentId: 'receive_record' },
+      { id: 'receive_sub_vphc', label: '⚖️ Biên bản VPHC', desc: 'Cho phép lập và xem biên bản VPHC', parentId: 'receive_record' },
+
+      { id: 'all_records', label: '🖥️ Quy trình Hồ sơ đo đạc (Phân công)', desc: 'Ẩn/hiện toàn bộ quy trình xử lý hồ sơ đo đạc' },
+      { id: 'all_sub_all', label: '🗂️ Tất cả hồ sơ', desc: 'Xem danh sách tất cả hồ sơ trong hệ thống', parentId: 'all_records' },
+      { id: 'assign_tasks', label: '📥 Chưa giao / Phân công', desc: 'Giao việc cho cán bộ thực hiện', parentId: 'all_records' },
+      { id: 'completed_list', label: '⚙️ Đang thực hiện', desc: 'Danh sách hồ sơ đang thực hiện', parentId: 'all_records' },
+      { id: 'pending_check_list', label: '🔍 Kiểm tra', desc: 'Ký kiểm tra chuyên môn', parentId: 'all_records' },
+      { id: 'check_list', label: '✒️ Trình ký / Chờ ký', desc: 'Trình lãnh đạo phê duyệt', parentId: 'all_records' },
+      { id: 'handover_list', label: '📤 Giao 1 cửa / Trả KQ', desc: 'Giao trả kết quả sang 1 cửa', parentId: 'all_records' },
+
+      { id: 'archive_records', label: '🖥️ Kho Lưu trữ hồ sơ & Công văn 1.2', desc: 'Ẩn/hiện toàn bộ Tab Kho lưu trữ hồ sơ và công văn' },
+      { id: 'archive_sub_all', label: '🗄️ Tất cả hồ sơ lưu', desc: 'Tra cứu tất cả hồ sơ kho lưu', parentId: 'archive_records' },
+      { id: 'archive_assign_tasks', label: '📥 Chưa giao (Lưu trữ)', desc: 'Phân công xử lý hồ sơ lưu trữ', parentId: 'archive_records' },
+      { id: 'archive_completed_list', label: '⚙️ Đang thực hiện (Lưu trữ)', desc: 'Hồ sơ lưu trữ đang xử lý', parentId: 'archive_records' },
+      { id: 'archive_pending_check_list', label: '🔍 Kiểm tra (Lưu trữ)', desc: 'Kiểm tra hồ sơ lưu trữ', parentId: 'archive_records' },
+      { id: 'archive_check_list', label: '✒️ Trình ký (Lưu trữ)', desc: 'Trình ký hồ sơ lưu trữ', parentId: 'archive_records' },
+      { id: 'archive_handover_list', label: '📤 Giao 1 cửa (Lưu trữ)', desc: 'Giao trả kết quả lưu trữ về 1 cửa', parentId: 'archive_records' },
     ]
   },
   {
@@ -136,6 +148,12 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
   const [permSearchQuery, setPermSearchQuery] = useState('');
   const [isSavingPermissions, setIsSavingPermissions] = useState(false);
   const [permissionTab, setPermissionTab] = useState<'department' | 'role'>('department');
+
+  useEffect(() => {
+    if (selectedDepartment !== 'Tổ Hành chính' && selectedRoleSub === UserRole.ONEDOOR) {
+      setSelectedRoleSub(UserRole.EMPLOYEE);
+    }
+  }, [selectedDepartment, selectedRoleSub]);
 
   // Contract Number Settings States
   const [contractPrefix, setContractPrefix] = useState('HĐ-{năm}-');
@@ -389,7 +407,7 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
       }
   };
 
-  const isPermChecked = (permissionId: string): boolean => {
+  const isPermCheckedRaw = (permissionId: string): boolean => {
       if (permissionTab === 'role') {
           if (selectedRole === UserRole.ADMIN) return true;
           const perms = rolePermissions[selectedRole as string] || [];
@@ -407,13 +425,40 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
       }
   };
 
+  const isPermChecked = (permissionId: string): boolean => {
+      let itemParentId: string | undefined;
+      for (const g of PERMISSION_GROUPS) {
+          const found = g.items.find(i => i.id === permissionId);
+          if (found && (found as any).parentId) {
+              itemParentId = (found as any).parentId;
+              break;
+          }
+      }
+
+      if (itemParentId && !isPermCheckedRaw(itemParentId)) {
+          return false;
+      }
+
+      return isPermCheckedRaw(permissionId);
+  };
+
   const toggleDeptRolePerm = (permissionId: string) => {
+      const childIds: string[] = [];
+      PERMISSION_GROUPS.forEach(g => {
+          g.items.forEach(i => {
+              if ((i as any).parentId === permissionId) {
+                  childIds.push(i.id);
+              }
+          });
+      });
+
       if (permissionTab === 'role') {
           if (selectedRole === UserRole.ADMIN) return;
           setRolePermissions(prev => {
               const current = prev[selectedRole as string] || [];
-              const updated = current.includes(permissionId)
-                  ? current.filter(p => p !== permissionId)
+              const isRemoving = current.includes(permissionId);
+              const updated = isRemoving
+                  ? current.filter(p => p !== permissionId && !childIds.includes(p))
                   : [...current, permissionId];
               return { ...prev, [selectedRole as string]: updated };
           });
@@ -421,8 +466,9 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
           const deptRoleKey = `${selectedDepartment}_${selectedRoleSub}`;
           setDepartmentPermissions(prev => {
               const current = prev[deptRoleKey] || prev[selectedDepartment] || rolePermissions[selectedRoleSub as string] || [];
-              const updated = current.includes(permissionId)
-                  ? current.filter(p => p !== permissionId)
+              const isRemoving = current.includes(permissionId);
+              const updated = isRemoving
+                  ? current.filter(p => p !== permissionId && !childIds.includes(p))
                   : [...current, permissionId];
               return { ...prev, [deptRoleKey]: updated };
           });
@@ -578,13 +624,6 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col flex-1 h-full animate-fade-in-up">
-        <div className="p-4 border-b border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gray-50 shrink-0">
-            <h2 className="text-lg font-black text-gray-800 flex items-center gap-2 tracking-tight">
-                <ShieldAlert className="text-red-600" size={20} />
-                Cấu hình Hệ thống (Admin)
-            </h2>
-        </div>
-
         {/* Tabs */}
         <div className="flex border-b border-gray-200 bg-gray-50 px-2 overflow-x-auto no-scrollbar shrink-0">
             <button 
@@ -769,62 +808,53 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
             )}
 
             {activeTab === 'permissions' && (
-                <div className="h-[calc(100vh-170px)] min-h-[500px] flex flex-col bg-white border border-purple-100 rounded-2xl shadow-sm overflow-hidden relative">
-                    {/* Header Pinned Top */}
-                    <div className="bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-900 text-white p-4 md:p-5 flex-shrink-0">
-                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                            <div>
-                                <h3 className="font-black text-lg md:text-xl flex items-center gap-2.5 tracking-tight text-white">
-                                    <Key className="text-purple-300" size={22} /> Cấu hình Phân quyền Hệ thống
-                                </h3>
-                                <p className="text-xs text-purple-200 mt-1 font-medium">
-                                    Phân quyền chi tiết theo <span className="font-bold text-amber-300">Phòng ban / Tổ chuyên môn</span> và <span className="font-bold text-amber-300">Chức danh / Vai trò tài khoản</span>.
-                                </p>
+                <div className="h-[calc(100vh-170px)] min-h-[500px] flex flex-col bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden relative">
+                    {/* Header Pinned Top - Clean White */}
+                    <div className="bg-white border-b border-slate-200 p-3 md:p-4 flex-shrink-0">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            {/* Top Mode Selector Tabs */}
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => setPermissionTab('department')}
+                                    className={`px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 transition-all cursor-pointer ${
+                                        permissionTab === 'department'
+                                            ? 'bg-purple-700 text-white shadow-sm'
+                                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200'
+                                    }`}
+                                >
+                                    🏢 Phân quyền theo Phòng ban / Tổ
+                                </button>
+                                <button
+                                    onClick={() => setPermissionTab('role')}
+                                    className={`px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 transition-all cursor-pointer ${
+                                        permissionTab === 'role'
+                                            ? 'bg-purple-700 text-white shadow-sm'
+                                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200'
+                                    }`}
+                                >
+                                    👤 Phân quyền theo Vai trò chung
+                                </button>
                             </div>
 
-                            {/* Search Filter Box */}
-                            <div className="relative w-full md:w-72">
-                                <Search size={16} className="absolute left-3 top-3 text-purple-300" />
+                            {/* Search Filter Box - Same row */}
+                            <div className="relative w-full sm:w-64">
+                                <Search size={15} className="absolute left-3 top-2.5 text-slate-400" />
                                 <input
                                     type="text"
                                     placeholder="Tìm quyền, chức năng, nút..."
                                     value={permSearchQuery}
                                     onChange={(e) => setPermSearchQuery(e.target.value)}
-                                    className="w-full bg-white/10 text-white placeholder-purple-300 text-xs rounded-xl pl-9 pr-3 py-2 border border-purple-400/30 focus:outline-none focus:ring-2 focus:ring-purple-400"
+                                    className="w-full bg-slate-50 text-slate-800 placeholder-slate-400 text-xs rounded-xl pl-8 pr-7 py-2 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white transition-all"
                                 />
                                 {permSearchQuery && (
                                     <button 
                                         onClick={() => setPermSearchQuery('')}
-                                        className="absolute right-3 top-2.5 text-purple-300 hover:text-white text-xs font-bold"
+                                        className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600 text-xs font-bold"
                                     >
                                         ✕
                                     </button>
                                 )}
                             </div>
-                        </div>
-
-                        {/* Top Mode Selector Tabs */}
-                        <div className="flex items-center gap-2 mt-4 pt-3 border-t border-purple-700/50">
-                            <button
-                                onClick={() => setPermissionTab('department')}
-                                className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 transition-all ${
-                                    permissionTab === 'department'
-                                        ? 'bg-amber-400 text-slate-950 shadow-md font-bold'
-                                        : 'bg-white/10 text-purple-100 hover:bg-white/20'
-                                }`}
-                            >
-                                🏢 Phân quyền theo Phòng ban / Tổ
-                            </button>
-                            <button
-                                onClick={() => setPermissionTab('role')}
-                                className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 transition-all ${
-                                    permissionTab === 'role'
-                                        ? 'bg-amber-400 text-slate-950 shadow-md font-bold'
-                                        : 'bg-white/10 text-purple-100 hover:bg-white/20'
-                                }`}
-                            >
-                                👤 Phân quyền theo Vai trò chung
-                            </button>
                         </div>
                     </div>
 
@@ -860,7 +890,9 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                                 <span className="text-[11px] font-black uppercase tracking-wider text-purple-900 shrink-0 mr-1">
                                     Tài khoản / Vai trò:
                                 </span>
-                                {ROLES_FOR_DEPARTMENT.map((r) => {
+                                {ROLES_FOR_DEPARTMENT
+                                    .filter(r => r.role !== UserRole.ONEDOOR || selectedDepartment === 'Tổ Hành chính')
+                                    .map((r) => {
                                     const isSelected = selectedRoleSub === r.role;
                                     return (
                                         <button
@@ -943,42 +975,156 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                                         </button>
                                     </div>
 
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                                        {filteredItems.map((perm) => {
-                                            const checked = isPermChecked(perm.id);
-                                            return (
-                                                <label
-                                                    key={perm.id}
-                                                    className={`flex items-start gap-3 p-3.5 rounded-xl border cursor-pointer transition-all ${
-                                                        checked
-                                                            ? 'bg-purple-50/80 border-purple-300 shadow-xs'
-                                                            : 'bg-white border-slate-200 hover:bg-slate-50'
-                                                    }`}
-                                                >
-                                                    <div className="mt-0.5 shrink-0">
-                                                        <input
-                                                            type="checkbox"
-                                                            className="w-4 h-4 text-purple-600 rounded border-slate-300 focus:ring-purple-500 cursor-pointer"
-                                                            checked={checked}
-                                                            onChange={() => toggleDeptRolePerm(perm.id)}
-                                                            disabled={permissionTab === 'role' && selectedRole === UserRole.ADMIN}
-                                                        />
+                                    {group.id === 'views' ? (
+                                        <div className="space-y-5">
+                                            {filteredItems.filter(i => !(i as any).parentId).map((mainTab) => {
+                                                const subTabs = filteredItems.filter(i => (i as any).parentId === mainTab.id);
+                                                const isMainChecked = isPermChecked(mainTab.id);
+                                                const isMainDisabled = permissionTab === 'role' && selectedRole === UserRole.ADMIN;
+
+                                                return (
+                                                    <div key={mainTab.id} className="bg-slate-50/80 border border-purple-200/90 rounded-2xl p-4 shadow-2xs space-y-3">
+                                                        {/* Main Tab Header Card */}
+                                                        <label
+                                                            className={`flex items-start gap-3 p-3.5 rounded-xl border transition-all ${
+                                                                isMainDisabled
+                                                                    ? 'bg-slate-100 border-slate-200 opacity-60 cursor-not-allowed'
+                                                                    : isMainChecked
+                                                                    ? 'bg-purple-700 text-white border-purple-800 shadow-md cursor-pointer'
+                                                                    : 'bg-white text-slate-800 border-slate-300 hover:bg-slate-100 cursor-pointer'
+                                                            }`}
+                                                        >
+                                                            <div className="mt-0.5 shrink-0">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    className="w-5 h-5 text-purple-800 rounded border-slate-300 focus:ring-purple-500 cursor-pointer disabled:cursor-not-allowed"
+                                                                    checked={isMainChecked}
+                                                                    onChange={() => toggleDeptRolePerm(mainTab.id)}
+                                                                    disabled={isMainDisabled}
+                                                                />
+                                                            </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="text-sm md:text-base font-black flex items-center justify-between gap-2">
+                                                                    <span>{mainTab.label}</span>
+                                                                    <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full shrink-0 ${
+                                                                        isMainChecked ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-600'
+                                                                    }`}>
+                                                                        {isMainChecked ? 'ĐANG BẬT' : 'ĐÃ TẮT'}
+                                                                    </span>
+                                                                </div>
+                                                                <div className={`text-xs font-medium mt-0.5 ${isMainChecked ? 'text-purple-100' : 'text-slate-500'}`}>
+                                                                    {mainTab.desc}
+                                                                </div>
+                                                            </div>
+                                                        </label>
+
+                                                        {/* Sub Tabs Grid Below */}
+                                                        {subTabs.length > 0 && (
+                                                            <div className="pt-1 pl-3 md:pl-5 border-l-4 border-purple-400 space-y-2">
+                                                                <div className="text-[11px] font-extrabold text-purple-900 tracking-wide uppercase mb-1.5 flex items-center gap-1.5">
+                                                                    <span>Các Tab con thuộc nhóm này:</span>
+                                                                </div>
+                                                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                                                    {subTabs.map((perm) => {
+                                                                        const parentChecked = isPermCheckedRaw(mainTab.id);
+                                                                        const checked = isPermChecked(perm.id);
+                                                                        const isDisabled = isMainDisabled || !parentChecked;
+
+                                                                        return (
+                                                                            <label
+                                                                                key={perm.id}
+                                                                                className={`flex items-start gap-3 p-3 rounded-xl border transition-all ${
+                                                                                    isDisabled
+                                                                                        ? 'bg-slate-100 border-slate-200 opacity-50 cursor-not-allowed'
+                                                                                        : checked
+                                                                                        ? 'bg-purple-50 border-purple-300 shadow-2xs cursor-pointer'
+                                                                                        : 'bg-white border-slate-200 hover:bg-slate-50 cursor-pointer'
+                                                                                }`}
+                                                                            >
+                                                                                <div className="mt-0.5 shrink-0">
+                                                                                    <input
+                                                                                        type="checkbox"
+                                                                                        className="w-4 h-4 text-purple-600 rounded border-slate-300 focus:ring-purple-500 cursor-pointer disabled:cursor-not-allowed"
+                                                                                        checked={checked}
+                                                                                        onChange={() => toggleDeptRolePerm(perm.id)}
+                                                                                        disabled={isDisabled}
+                                                                                    />
+                                                                                </div>
+                                                                                <div className="flex-1 min-w-0">
+                                                                                    <div className={`text-xs md:text-sm font-bold ${checked ? 'text-purple-950' : 'text-slate-800'}`}>
+                                                                                        {perm.label}
+                                                                                    </div>
+                                                                                    <div className="text-[11px] text-slate-500 font-medium mt-0.5 leading-snug">
+                                                                                        {perm.desc}
+                                                                                        {!parentChecked && (
+                                                                                            <span className="block text-red-500 font-bold mt-0.5 text-[10px]">
+                                                                                                ⚠️ Tự động ẩn vì Tab chính đang TẮT
+                                                                                            </span>
+                                                                                        )}
+                                                                                    </div>
+                                                                                </div>
+                                                                            </label>
+                                                                        );
+                                                                    })}
+                                                                </div>
+                                                            </div>
+                                                        )}
                                                     </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className={`text-xs md:text-sm font-black ${checked ? 'text-purple-950' : 'text-slate-800'}`}>
-                                                            {perm.label}
+                                                );
+                                            })}
+                                        </div>
+                                    ) : (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                            {filteredItems.map((perm) => {
+                                                const parentId = (perm as any).parentId;
+                                                const isChild = !!parentId;
+                                                const parentChecked = isChild ? isPermCheckedRaw(parentId) : true;
+                                                const checked = isPermChecked(perm.id);
+                                                const isDisabled = (permissionTab === 'role' && selectedRole === UserRole.ADMIN) || (isChild && !parentChecked);
+
+                                                return (
+                                                    <label
+                                                        key={perm.id}
+                                                        className={`flex items-start gap-3 p-3.5 rounded-xl border transition-all ${
+                                                            isChild ? 'ml-3 md:ml-4 border-l-4 border-l-purple-400' : ''
+                                                        } ${
+                                                            isDisabled
+                                                                ? 'bg-slate-50 border-slate-200 opacity-60 cursor-not-allowed'
+                                                                : checked
+                                                                ? 'bg-purple-50/80 border-purple-300 shadow-xs cursor-pointer'
+                                                                : 'bg-white border-slate-200 hover:bg-slate-50 cursor-pointer'
+                                                        }`}
+                                                    >
+                                                        <div className="mt-0.5 shrink-0">
+                                                            <input
+                                                                type="checkbox"
+                                                                className="w-4 h-4 text-purple-600 rounded border-slate-300 focus:ring-purple-500 cursor-pointer disabled:cursor-not-allowed"
+                                                                checked={checked}
+                                                                onChange={() => toggleDeptRolePerm(perm.id)}
+                                                                disabled={isDisabled}
+                                                            />
                                                         </div>
-                                                        <div className="text-[11px] text-slate-500 font-medium mt-0.5 leading-snug">
-                                                            {perm.desc}
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className={`text-xs md:text-sm font-black ${checked ? 'text-purple-950' : 'text-slate-800'}`}>
+                                                                {perm.label}
+                                                            </div>
+                                                            <div className="text-[11px] text-slate-500 font-medium mt-0.5 leading-snug">
+                                                                {perm.desc}
+                                                                {isChild && !parentChecked && (
+                                                                    <span className="block text-red-500 font-semibold mt-0.5 text-[10px]">
+                                                                        ⚠️ Tự động ẩn vì Tab chính đang TẮT
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            <div className="text-[10px] text-slate-400 font-mono mt-1">
+                                                                {perm.id}
+                                                            </div>
                                                         </div>
-                                                        <div className="text-[10px] text-slate-400 font-mono mt-1">
-                                                            {perm.id}
-                                                        </div>
-                                                    </div>
-                                                </label>
-                                            );
-                                        })}
-                                    </div>
+                                                    </label>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
                                 </div>
                             );
                         })}

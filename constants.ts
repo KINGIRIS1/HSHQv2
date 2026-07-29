@@ -53,6 +53,7 @@ export const WARDS = DEFAULT_WARDS;
 // Danh sách loại hồ sơ CƠ BẢN (Dùng cho form Tiếp nhận hồ sơ thường xuyên)
 export const RECORD_TYPES = [
   '1.1 Cung cấp dữ liệu đất đai',
+  '1.2 Công văn',
   '2.1 Trích lục',
   '2.2 Trích lục Quy hoạch',
   '2.3 Trích đo',

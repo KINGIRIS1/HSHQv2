@@ -1468,6 +1468,8 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
           currentUser={currentUser}
           records={records}
           holidays={holidays}
+          rolePermissions={rolePermissions}
+          departmentPermissions={departmentPermissions}
           onCreateContract={(r) => {
             props.setRecordToCreateContract(r as RecordFile);
             props.setCurrentView("receive_contract");

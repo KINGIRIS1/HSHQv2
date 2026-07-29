@@ -398,8 +398,8 @@ const UserManagement: React.FC<UserManagementProps> = ({
                                 value={formData.role}
                                 onChange={e => setFormData({...formData, role: e.target.value as UserRole})}
                             >
-                                <option value={UserRole.EMPLOYEE}>Nhân viên (Employee)</option>
-                                <option value={UserRole.TEAM_LEADER}>Nhóm trưởng (Team Leader)</option>
+                                <option value={UserRole.EMPLOYEE}>EMPLOYEE (Nhân viên)</option>
+                                <option value={UserRole.TEAM_LEADER}>TEAM_LEADER (Nhóm trưởng / Tổ trưởng)</option>
                                 <option value={UserRole.ONEDOOR}>Một cửa (One Door)</option>
                                 <option value={UserRole.SUBADMIN}>Phó quản trị (Sub Admin)</option>
                                 <option value={UserRole.ADMIN}>Quản trị viên (Admin)</option>

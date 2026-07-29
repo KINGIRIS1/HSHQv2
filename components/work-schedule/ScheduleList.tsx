@@ -180,16 +180,38 @@ const ScheduleList: React.FC<ScheduleListProps> = ({ schedules, onEdit, onDelete
     return (
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col h-full overflow-hidden">
             <div className="p-3 border-b border-gray-200 bg-gray-50 flex flex-col gap-2">
-                {/* Header row with Title & Presets */}
+                {/* Header row with Title, Presets & Date Range */}
                 <div className="flex flex-wrap items-center justify-between gap-2">
                     <h3 className="font-bold text-gray-700 flex items-center gap-2 text-sm shrink-0">
                         <CalendarDays size={18} className="text-blue-600"/> Lịch công tác ({filteredList.length})
                     </h3>
                     
-                    <div className="flex items-center gap-1 bg-white p-1 rounded-lg border border-gray-200 shadow-sm shrink-0">
-                        <button onClick={() => handleFilterPreset('week')} className={`px-2.5 py-1 text-xs font-bold rounded transition-colors ${filterType === 'week' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}>Tuần này</button>
-                        <button onClick={() => handleFilterPreset('month')} className={`px-2.5 py-1 text-xs font-bold rounded transition-colors ${filterType === 'month' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}>Tháng này</button>
-                        <button onClick={() => setFilterType('all')} className={`px-2.5 py-1 text-xs font-bold rounded transition-colors ${filterType === 'all' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}>Tất cả</button>
+                    <div className="flex flex-wrap items-center gap-2 shrink-0">
+                        <div className="flex items-center gap-1 bg-white p-1 rounded-lg border border-gray-200 shadow-sm shrink-0">
+                            <button onClick={() => handleFilterPreset('week')} className={`px-2.5 py-1 text-xs font-bold rounded transition-colors ${filterType === 'week' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}>Tuần này</button>
+                            <button onClick={() => handleFilterPreset('month')} className={`px-2.5 py-1 text-xs font-bold rounded transition-colors ${filterType === 'month' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}>Tháng này</button>
+                            <button onClick={() => setFilterType('all')} className={`px-2.5 py-1 text-xs font-bold rounded transition-colors ${filterType === 'all' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}>Tất cả</button>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 bg-white border border-gray-300 rounded-lg px-2.5 py-1 shadow-xs shrink-0 whitespace-nowrap text-xs font-bold text-gray-700">
+                            <span className="text-gray-500 text-xs shrink-0">Từ:</span>
+                            <FlexibleDateInput
+                                value={dateRange.from}
+                                onChange={(isoStr) => { setDateRange(prev => ({ ...prev, from: isoStr })); setFilterType('range'); }}
+                                placeholder="dd/mm/yyyy"
+                                size="sm"
+                                inputClassName="w-28 border-none bg-transparent py-0.5 px-1 text-xs"
+                            />
+                            <span className="text-gray-400 font-bold text-xs">-</span>
+                            <span className="text-gray-500 text-xs shrink-0">Đến:</span>
+                            <FlexibleDateInput
+                                value={dateRange.to}
+                                onChange={(isoStr) => { setDateRange(prev => ({ ...prev, to: isoStr })); setFilterType('range'); }}
+                                placeholder="dd/mm/yyyy"
+                                size="sm"
+                                inputClassName="w-28 border-none bg-transparent py-0.5 px-1 text-xs"
+                            />
+                        </div>
                     </div>
                 </div>
 
@@ -203,26 +225,6 @@ const ScheduleList: React.FC<ScheduleListProps> = ({ schedules, onEdit, onDelete
                             className="w-full pl-8 pr-3 py-1.5 border border-gray-300 rounded-lg text-xs font-medium focus:ring-1 focus:ring-blue-500 outline-none bg-white"
                             value={searchTerm}
                             onChange={e => setSearchTerm(e.target.value)}
-                        />
-                    </div>
-                    
-                    <div className="flex items-center gap-1.5 bg-white border border-gray-300 rounded-lg px-2.5 py-1 shadow-xs shrink-0 whitespace-nowrap text-xs font-bold text-gray-700">
-                        <span className="text-gray-500 text-xs shrink-0">Từ:</span>
-                        <FlexibleDateInput
-                            value={dateRange.from}
-                            onChange={(isoStr) => { setDateRange(prev => ({ ...prev, from: isoStr })); setFilterType('range'); }}
-                            placeholder="dd/mm/yyyy"
-                            size="sm"
-                            inputClassName="w-28 border-none bg-transparent py-0.5 px-1 text-xs"
-                        />
-                        <span className="text-gray-400 font-bold text-xs">-</span>
-                        <span className="text-gray-500 text-xs shrink-0">Đến:</span>
-                        <FlexibleDateInput
-                            value={dateRange.to}
-                            onChange={(isoStr) => { setDateRange(prev => ({ ...prev, to: isoStr })); setFilterType('range'); }}
-                            placeholder="dd/mm/yyyy"
-                            size="sm"
-                            inputClassName="w-28 border-none bg-transparent py-0.5 px-1 text-xs"
                         />
                     </div>
 
