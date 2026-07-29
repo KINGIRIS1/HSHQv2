@@ -76,13 +76,9 @@ const PERMISSION_GROUPS = [
       { id: 'check_list', label: 'Trình ký / Chờ ký', desc: 'Trình lãnh đạo phê duyệt', parentId: 'all_records' },
       { id: 'handover_list', label: 'Giao 1 cửa / Trả KQ', desc: 'Giao trả kết quả sang 1 cửa', parentId: 'all_records' },
 
-      { id: 'archive_records', label: 'Kho Lưu trữ hồ sơ & Công văn 1.2', desc: 'Ẩn/hiện toàn bộ Tab Kho lưu trữ hồ sơ và công văn' },
-      { id: 'archive_sub_all', label: 'Tất cả hồ sơ lưu', desc: 'Tra cứu tất cả hồ sơ kho lưu', parentId: 'archive_records' },
-      { id: 'archive_assign_tasks', label: 'Chưa giao (Lưu trữ)', desc: 'Phân công xử lý hồ sơ lưu trữ', parentId: 'archive_records' },
-      { id: 'archive_completed_list', label: 'Đang thực hiện (Lưu trữ)', desc: 'Hồ sơ lưu trữ đang xử lý', parentId: 'archive_records' },
-      { id: 'archive_pending_check_list', label: 'Kiểm tra (Lưu trữ)', desc: 'Kiểm tra hồ sơ lưu trữ', parentId: 'archive_records' },
-      { id: 'archive_check_list', label: 'Trình ký (Lưu trữ)', desc: 'Trình ký hồ sơ lưu trữ', parentId: 'archive_records' },
-      { id: 'archive_handover_list', label: 'Giao 1 cửa (Lưu trữ)', desc: 'Giao trả kết quả lưu trữ về 1 cửa', parentId: 'archive_records' },
+      { id: 'archive_records', label: 'Hồ sơ Lưu trữ (1.1 Cung cấp dữ liệu đất đai & 1.2 Công văn lưu trữ)', desc: 'Ẩn/hiện toàn bộ Tab Hồ sơ lưu trữ' },
+      { id: 'archive_sub_all', label: '1.1 Cung cấp dữ liệu đất đai', desc: 'Quản lý cung cấp thông tin / dữ liệu đất đai', parentId: 'archive_records' },
+      { id: 'archive_sub_congvan', label: '1.2 Công văn lưu trữ', desc: 'Quản lý công văn lưu trữ', parentId: 'archive_records' },
     ]
   },
   {
@@ -429,6 +425,41 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
       return perms.includes('*') || perms.includes(permissionId);
   };
 
+  const computeToggledPermissions = (current: string[], permissionId: string): string[] => {
+      const isRemoving = current.includes(permissionId);
+      const allItems = PERMISSION_GROUPS.flatMap(g => g.items);
+      const targetItem = allItems.find(i => i.id === permissionId);
+      const childItems = allItems.filter(i => (i as any).parentId === permissionId);
+
+      if (isRemoving) {
+          let updated = current.filter(p => p !== permissionId);
+          // When turning off a parent tab, also turn off all its children
+          if (childItems.length > 0) {
+              const childIds = childItems.map(c => c.id);
+              updated = updated.filter(p => !childIds.includes(p));
+          }
+          return updated;
+      } else {
+          let updated = [...current, permissionId];
+          // When turning on a child tab, automatically turn on parent tab permission
+          if (targetItem && (targetItem as any).parentId) {
+              const parentId = (targetItem as any).parentId;
+              if (!updated.includes(parentId)) {
+                  updated.push(parentId);
+              }
+          }
+          // When turning on a parent tab, automatically enable its child tabs
+          if (childItems.length > 0) {
+              childItems.forEach(c => {
+                  if (!updated.includes(c.id)) {
+                      updated.push(c.id);
+                  }
+              });
+          }
+          return Array.from(new Set(updated));
+      }
+  };
+
   const toggleDeptRolePerm = (permissionId: string) => {
       if (selectedRole === UserRole.ADMIN) return;
 
@@ -436,10 +467,7 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
           const compositeKey = `${selectedDepartmentScope}_${selectedRole}`;
           setDepartmentPermissions(prev => {
               const current = prev[compositeKey] || rolePermissions[selectedRole as string] || DEFAULT_ROLE_PERMISSIONS[selectedRole as UserRole] || [];
-              const isRemoving = current.includes(permissionId);
-              const updated = isRemoving
-                  ? current.filter(p => p !== permissionId)
-                  : [...current, permissionId];
+              const updated = computeToggledPermissions(current, permissionId);
               return { ...prev, [compositeKey]: updated };
           });
           return;
@@ -447,10 +475,7 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
 
       setRolePermissions(prev => {
           const current = prev[selectedRole as string] || DEFAULT_ROLE_PERMISSIONS[selectedRole as UserRole] || [];
-          const isRemoving = current.includes(permissionId);
-          const updated = isRemoving
-              ? current.filter(p => p !== permissionId)
-              : [...current, permissionId];
+          const updated = computeToggledPermissions(current, permissionId);
           return { ...prev, [selectedRole as string]: updated };
       });
   };
@@ -458,13 +483,27 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
   const toggleCategoryAll = (itemIds: string[], selectAll: boolean) => {
       if (selectedRole === UserRole.ADMIN) return;
 
+      const allItems = PERMISSION_GROUPS.flatMap(g => g.items);
+      // Include parents for any selected child items
+      const extraParentIds: string[] = [];
+      if (selectAll) {
+          itemIds.forEach(id => {
+              const item = allItems.find(i => i.id === id);
+              if (item && (item as any).parentId) {
+                  extraParentIds.push((item as any).parentId);
+              }
+          });
+      }
+
+      const idsToApply = Array.from(new Set([...itemIds, ...extraParentIds]));
+
       if (selectedDepartmentScope !== 'all') {
           const compositeKey = `${selectedDepartmentScope}_${selectedRole}`;
           setDepartmentPermissions(prev => {
               const current = prev[compositeKey] || rolePermissions[selectedRole as string] || DEFAULT_ROLE_PERMISSIONS[selectedRole as UserRole] || [];
               const updated = selectAll
-                  ? Array.from(new Set([...current, ...itemIds]))
-                  : current.filter(p => !itemIds.includes(p));
+                  ? Array.from(new Set([...current, ...idsToApply]))
+                  : current.filter(p => !idsToApply.includes(p));
               return { ...prev, [compositeKey]: updated };
           });
           return;
@@ -473,8 +512,8 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
       setRolePermissions(prev => {
           const current = prev[selectedRole as string] || DEFAULT_ROLE_PERMISSIONS[selectedRole as UserRole] || [];
           const updated = selectAll
-              ? Array.from(new Set([...current, ...itemIds]))
-              : current.filter(p => !itemIds.includes(p));
+              ? Array.from(new Set([...current, ...idsToApply]))
+              : current.filter(p => !idsToApply.includes(p));
           return { ...prev, [selectedRole as string]: updated };
       });
   };
