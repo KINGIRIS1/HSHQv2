@@ -372,7 +372,7 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Tân Qua
     };
 
     const handleDelete = async (id: string) => {
-        if (await confirmAction('Xóa hồ sơ cung cấp dữ liệu đất đai này?')) {
+        if (await confirmAction('Xóa hồ sơ sao lục này?')) {
             await deleteArchiveRecord(id);
             loadData();
         }
@@ -649,7 +649,7 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Tân Qua
             <div className="p-4 border-b border-gray-100 flex flex-col gap-4">
                 <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
                     <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-                        {subTab === 'all' && 'Tất cả hồ sơ Cung cấp dữ liệu đất đai'}
+                        {subTab === 'all' && 'Tất cả hồ sơ sao lục'}
                         {subTab === 'draft' && 'Hồ sơ chưa giao'}
                         {subTab === 'assigned' && 'Hồ sơ đang thực hiện'}
                         {subTab === 'executed' && 'Hồ sơ đã thực hiện'}
@@ -784,7 +784,7 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Tân Qua
                 {isFormOpen && (
                     <div className="w-[350px] shrink-0 bg-white border border-gray-200 p-5 rounded-xl h-full flex flex-col shadow-sm animate-fade-in-up">
                         <div className="flex justify-between items-center mb-4 border-b pb-2">
-                            <h3 className="font-bold text-gray-800 text-lg">{editingId ? 'Cập nhật Cung cấp dữ liệu đất đai' : 'Thêm mới Cung cấp dữ liệu đất đai'}</h3>
+                            <h3 className="font-bold text-gray-800 text-lg">{editingId ? 'Cập nhật Sao Lục' : 'Thêm mới Sao Lục'}</h3>
                             <button onClick={() => setIsFormOpen(false)} className="text-gray-400 hover:text-red-500"><X size={20}/></button>
                         </div>
                         

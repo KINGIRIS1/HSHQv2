@@ -158,31 +158,13 @@ export function isViewAllowedForUser(
       // Main Tabs
       case 'receive_record':
         return activePerms.includes('receive_record') ||
-               activePerms.includes('receive_sub_create') ||
-               activePerms.includes('receive_sub_bulk') ||
-               activePerms.includes('receive_sub_list') ||
-               activePerms.includes('receive_sub_vphc');
+               activePerms.includes('receive_sub_create');
       case 'all_records':
         return activePerms.includes('all_records') ||
-               activePerms.includes('all_sub_all') ||
-               activePerms.includes('assign_tasks') ||
-               activePerms.includes('completed_list') ||
-               activePerms.includes('pending_check_list') ||
-               activePerms.includes('check_list') ||
-               activePerms.includes('handover_list') ||
-               activePerms.includes('director_completed');
+               activePerms.includes('all_sub_all');
       case 'archive_records':
         return activePerms.includes('archive_records') ||
-               activePerms.includes('archive_sub_all') ||
-               activePerms.includes('archive_sub_saoluc') ||
-               activePerms.includes('archive_sub_congvan') ||
-               activePerms.includes('congvan_records') ||
-               activePerms.includes('archive_assign_tasks') ||
-               activePerms.includes('archive_completed_list') ||
-               activePerms.includes('archive_pending_check_list') ||
-               activePerms.includes('archive_check_list') ||
-               activePerms.includes('archive_handover_list') ||
-               activePerms.includes('archive_director_completed');
+               activePerms.includes('archive_sub_all');
       case 'registration_records':
         return activePerms.includes('registration_records');
       case 'other_records':
@@ -208,9 +190,6 @@ export function isViewAllowedForUser(
 
       // Child Tabs - Archive Group
       case 'archive_sub_all':
-      case 'archive_sub_saoluc':
-      case 'archive_sub_congvan':
-      case 'congvan_records':
       case 'archive_assign_tasks':
       case 'archive_completed_list':
       case 'archive_pending_check_list':
