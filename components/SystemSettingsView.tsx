@@ -9,10 +9,7 @@ import { createFullBackupData, downloadBackupAsFile, saveBackupToServer, restore
 import { isConfigured } from '../services/supabaseClient';
 
 const PERMISSION_DEPARTMENTS = [
-  { id: 'Tổ Đăng ký cấp giấy', name: 'Tổ Cấp giấy', label: 'Tổ Đăng ký cấp giấy (Tổ Cấp giấy)', desc: 'Bộ phận tiếp nhận đăng ký, xử lý biến động và cấp giấy chứng nhận' },
-  { id: 'Tổ Lưu trữ', name: 'Tổ Lưu trữ', label: 'Tổ Lưu trữ', desc: 'Bộ phận phụ trách lưu trữ, khai thác thông tin đất đai và hồ sơ lưu trữ' },
-  { id: 'Tổ Đo đạc', name: 'Tổ Đo đạc', label: 'Tổ Đo đạc', desc: 'Bộ phận thực hiện đo đạc bản đồ, đo vẽ trích lục và trích đo thửa đất' },
-  { id: 'Tổ Hành chính', name: 'Tổ Hành chính', label: 'Tổ Hành chính (Một cửa)', desc: 'Bộ phận hành chính tổng hợp, văn thư, tiếp nhận Một cửa' }
+  { id: 'Tổ Lưu trữ', name: 'Tổ Lưu trữ', label: 'Tổ Lưu trữ', desc: 'Bộ phận phụ trách lưu trữ, khai thác thông tin đất đai và hồ sơ lưu trữ' }
 ];
 
 const ROLES_FOR_DEPARTMENT = [
@@ -31,85 +28,83 @@ const ROLE_OPTIONS = [
 
 const PERMISSION_GROUPS = [
   {
-    id: 'records',
-    title: 'Quản lý & Quy trình Hồ sơ',
-    desc: 'Quyền tiếp nhận, sửa, giao việc, kiểm tra, ký duyệt và bàn giao hồ sơ',
+    id: 'hoso',
+    title: '1. Hồ sơ (Chức năng tại Tab Hồ sơ)',
+    desc: 'Các quyền & chức năng để thực hiện tại Tab Hồ sơ và Tiếp nhận hồ sơ',
     items: [
-      { id: 'VIEW_RECORDS', label: 'Xem danh sách hồ sơ', desc: 'Cho phép truy cập và xem chi tiết hồ sơ' },
-      { id: 'EDIT_RECORDS', label: 'Sửa thông tin hồ sơ', desc: 'Cập nhật nội dung, thửa đất, chủ sở hữu', parentId: 'VIEW_RECORDS' },
-      { id: 'DELETE_RECORDS', label: 'Xóa hồ sơ', desc: 'Cho phép xóa hồ sơ khỏi hệ thống', parentId: 'VIEW_RECORDS' },
-      { id: 'ASSIGN_RECORDS', label: 'Giao việc / Phân công', desc: 'Giao hồ sơ cho nhân viên phụ trách', parentId: 'VIEW_RECORDS' },
-      { id: 'CHECK_RECORDS', label: 'Kiểm tra & Ký kiểm tra', desc: 'Tổ trưởng / phó ký kiểm tra chuyên môn', parentId: 'VIEW_RECORDS' },
-      { id: 'SIGN_RECORDS', label: 'Ký duyệt hồ sơ (Lãnh đạo)', desc: 'Ban Giám đốc phê duyệt kết quả', parentId: 'VIEW_RECORDS' },
-      { id: 'HANDOVER_RECORDS', label: 'Bàn giao hồ sơ sang Một cửa', desc: 'Tạo đợt và chuyển kết quả sang Một cửa', parentId: 'VIEW_RECORDS' },
-      { id: 'RETURN_RECORDS', label: 'Trả kết quả cho công dân', desc: 'Một cửa thực hiện trả kết quả hồ sơ', parentId: 'VIEW_RECORDS' },
-      { id: 'EXPORT_RECORDS', label: 'Xuất danh sách Excel / Báo cáo', desc: 'Xuất danh sách hồ sơ ra tệp Excel', parentId: 'VIEW_RECORDS' },
+      { id: 'receive_record', label: 'Tiếp nhận hồ sơ mới (Tab Tiếp nhận)' },
+      { id: 'all_records', label: 'Quy trình xử lý hồ sơ (Tab Hồ sơ)' },
+      { id: 'VIEW_RECORDS', label: 'Xem danh sách hồ sơ' },
+      { id: 'ADD_RECORDS', label: 'Thêm / Nhập mới hồ sơ' },
+      { id: 'EXPORT_RECORDS', label: 'Xuất danh sách hồ sơ (Excel)' },
     ]
   },
   {
-    id: 'views',
-    title: 'Hiển thị các Tab lớn & Tab con (Cấu hình ẩn/hiện Tab)',
-    desc: 'Quyền xem và làm việc trên từng Tab. Khi TẮT Tab chính, các Tab con của nó sẽ tự động bị tắt. Khi BẬT nút chức năng con, Tab chính tương ứng sẽ tự động được cấp quyền.',
+    id: 'hopdong',
+    title: '2. Hợp đồng (Chức năng tại Tab Hợp đồng)',
+    desc: 'Các quyền & chức năng để thực hiện tại Tab Hợp đồng dịch vụ',
     items: [
-      { id: 'receive_record', label: 'Tiếp nhận hồ sơ', desc: 'Ẩn/hiện toàn bộ Tab Tiếp nhận hồ sơ' },
-      { id: 'receive_sub_create', label: 'Nhập mới', desc: 'Cho phép nhập mới hồ sơ đơn lẻ', parentId: 'receive_record' },
-      { id: 'receive_sub_bulk', label: 'Tiếp nhận hàng loạt', desc: 'Cho phép tiếp nhận hàng loạt từ Excel', parentId: 'receive_record' },
-      { id: 'receive_sub_list', label: 'Danh sách hôm nay', desc: 'Cho phép xem danh sách hồ sơ tiếp nhận hôm nay', parentId: 'receive_record' },
-      { id: 'receive_sub_vphc', label: 'Biên bản VPHC', desc: 'Cho phép lập và xem biên bản VPHC', parentId: 'receive_record' },
-
-      { id: 'all_records', label: 'Quy trình Hồ sơ đo đạc (Phân công)', desc: 'Ẩn/hiện toàn bộ quy trình xử lý hồ sơ đo đạc' },
-      { id: 'all_sub_all', label: 'Tất cả hồ sơ', desc: 'Xem danh sách tất cả hồ sơ trong hệ thống', parentId: 'all_records' },
-      { id: 'assign_tasks', label: 'Chưa giao / Phân công', desc: 'Giao việc cho cán bộ thực hiện', parentId: 'all_records' },
-      { id: 'completed_list', label: 'Đang thực hiện', desc: 'Danh sách hồ sơ đang thực hiện', parentId: 'all_records' },
-      { id: 'pending_check_list', label: 'Kiểm tra', desc: 'Ký kiểm tra chuyên môn', parentId: 'all_records' },
-      { id: 'check_list', label: 'Trình ký / Chờ ký', desc: 'Trình lãnh đạo phê duyệt', parentId: 'all_records' },
-      { id: 'handover_list', label: 'Giao 1 cửa / Trả KQ', desc: 'Giao trả kết quả sang 1 cửa', parentId: 'all_records' },
-
-      { id: 'archive_records', label: 'Kho Lưu trữ hồ sơ & Công văn 1.2', desc: 'Ẩn/hiện toàn bộ Tab Kho lưu trữ hồ sơ và công văn' },
-      { id: 'archive_sub_all', label: 'Tất cả hồ sơ lưu', desc: 'Tra cứu tất cả hồ sơ kho lưu', parentId: 'archive_records' },
-      { id: 'archive_assign_tasks', label: 'Chưa giao (Lưu trữ)', desc: 'Phân công xử lý hồ sơ lưu trữ', parentId: 'archive_records' },
-      { id: 'archive_completed_list', label: 'Đang thực hiện (Lưu trữ)', desc: 'Hồ sơ lưu trữ đang xử lý', parentId: 'archive_records' },
-      { id: 'archive_pending_check_list', label: 'Kiểm tra (Lưu trữ)', desc: 'Kiểm tra hồ sơ lưu trữ', parentId: 'archive_records' },
-      { id: 'archive_check_list', label: 'Trình ký (Lưu trữ)', desc: 'Trình ký hồ sơ lưu trữ', parentId: 'archive_records' },
-      { id: 'archive_handover_list', label: 'Giao 1 cửa (Lưu trữ)', desc: 'Giao trả kết quả lưu trữ về 1 cửa', parentId: 'archive_records' },
+      { id: 'receive_contract', label: 'Tiếp nhận & Quản lý hợp đồng (Tab Hợp đồng)' },
+      { id: 'VIEW_CONTRACTS', label: 'Xem danh sách hợp đồng' },
+      { id: 'ADD_CONTRACTS', label: 'Thêm mới hợp đồng' },
+      { id: 'EXPORT_CONTRACTS', label: 'Xuất tệp / Danh sách hợp đồng' },
     ]
   },
   {
-    id: 'contracts',
-    title: 'Hợp đồng & Trích lục Bản đồ',
-    desc: 'Quyền tạo, quản lý hợp đồng dịch vụ đo đạc và hồ sơ trích lục',
+    id: 'dodac',
+    title: '3. Đo đạc (Chức năng tại Tab Đo đạc)',
+    desc: 'Các quyền & chức năng để thực hiện tại Tab Đo đạc và Trích lục bản đồ',
     items: [
-      { id: 'VIEW_CONTRACTS', label: 'Xem hợp đồng', desc: 'Xem danh sách và chi tiết hợp đồng' },
-      { id: 'ADD_CONTRACTS', label: 'Thêm mới hợp đồng', desc: 'Tạo hợp đồng đo đạc / dịch vụ', parentId: 'VIEW_CONTRACTS' },
-      { id: 'EDIT_CONTRACTS', label: 'Sửa hợp đồng', desc: 'Sửa giá trị, số lượng hợp đồng', parentId: 'VIEW_CONTRACTS' },
-      { id: 'LIQUIDATE_CONTRACTS', label: 'Thanh lý hợp đồng', desc: 'Lập, cập nhật quyết toán và thanh lý hợp đồng', parentId: 'VIEW_CONTRACTS' },
-      { id: 'DELETE_CONTRACTS', label: 'Xóa hợp đồng', desc: 'Xóa hợp đồng khỏi hệ thống', parentId: 'VIEW_CONTRACTS' },
-      { id: 'EXPORT_CONTRACTS', label: 'Xuất tệp hợp đồng', desc: 'Xuất hợp đồng ra file mẫu', parentId: 'VIEW_CONTRACTS' },
-      { id: 'MANAGE_EXCERPTS', label: 'Quản lý trích lục bản đồ', desc: 'Cấp số và quản lý trích lục bản đồ', parentId: 'VIEW_CONTRACTS' },
+      { id: 'survey_list', label: 'Danh sách kỹ thuật đo đạc (Tab Đo đạc)' },
+      { id: 'VIEW_EXCERPTS', label: 'Xem trích lục bản đồ' },
+      { id: 'MANAGE_EXCERPTS', label: 'Quản lý & Cấp số trích lục bản đồ' },
     ]
   },
   {
-    id: 'utilities',
-    title: 'Tiện ích & Quản trị Hệ thống',
-    desc: 'Quyền truy cập lịch công tác, chat nội bộ, nhân sự và cài đặt',
+    id: 'luutru',
+    title: '4. Lưu trữ (Chức năng tại Tab Lưu trữ)',
+    desc: 'Các quyền & chức năng để thực hiện tại Tab Kho lưu trữ hồ sơ & Công văn',
     items: [
-      { id: 'MANAGE_ARCHIVE', label: 'Quản lý kho lưu trữ', desc: 'Cập nhật vị trí, mượn/trả hồ sơ' },
-      { id: 'VIEW_REPORTS', label: 'Xem báo cáo thống kê', desc: 'Truy cập biểu đồ & báo cáo tổng hợp' },
-      { id: 'VIEW_SCHEDULE', label: 'Xem lịch công tác', desc: 'Xem lịch công tác tuần' },
-      { id: 'MANAGE_SCHEDULE', label: 'Quản lý lịch công tác', desc: 'Thêm/sửa lịch công tác', parentId: 'VIEW_SCHEDULE' },
-      { id: 'VIEW_CHAT', label: 'Nhắn tin nội bộ', desc: 'Sử dụng chat trao đổi nội bộ' },
-      { id: 'MANAGE_EMPLOYEES', label: 'Quản lý nhân sự', desc: 'Quản lý danh sách nhân viên & địa bàn' },
-      { id: 'SYSTEM_SETTINGS', label: 'Cài đặt hệ thống', desc: 'Cấu hình ngày nghỉ, sao lưu & phân quyền' },
+      { id: 'archive_records', label: 'Kho lưu trữ hồ sơ & Công văn (Tab Lưu trữ)' },
+      { id: 'VIEW_ARCHIVE', label: 'Xem & Tra cứu hồ sơ lưu trữ' },
+      { id: 'MANAGE_ARCHIVE', label: 'Quản lý kho lưu trữ (Mượn/trả, vị trí)' },
     ]
   },
   {
-    id: 'buttons',
-    title: 'Nút Thao tác Phê duyệt & Chuyển bước',
-    desc: 'Bật/tắt các nút bấm quy trình trong bảng làm việc',
+    id: 'tienich',
+    title: '5. Tiện ích & Báo cáo (Lịch, Tiện ích, Báo cáo)',
+    desc: 'Các chức năng Lịch công tác, Báo cáo thống kê, Chat nội bộ, Quản lý nhân sự & Hệ thống',
     items: [
-      { id: 'BTN_SUBMIT_SIGN', label: 'Nút: Trình ký / Trình kiểm tra', desc: 'Nút gửi hồ sơ lên cấp kiểm tra hoặc Giám đốc', parentId: 'all_records' },
-      { id: 'BTN_REJECT_RECORD', label: 'Nút: Trả hồ sơ / Từ chối', desc: 'Nút trả lại hồ sơ yêu cầu chỉnh sửa', parentId: 'all_records' },
-      { id: 'BTN_CLOSE_BATCH', label: 'Nút: Tạo đợt bàn giao / Chốt đợt', desc: 'Nút chốt đợt bàn giao kết quả sang Một cửa', parentId: 'all_records' },
+      { id: 'VIEW_SCHEDULE', label: 'Xem lịch công tác tuần' },
+      { id: 'MANAGE_SCHEDULE', label: 'Quản lý lịch công tác tuần' },
+      { id: 'VIEW_REPORTS', label: 'Xem báo cáo & Thống kê' },
+      { id: 'VIEW_CHAT', label: 'Sử dụng chat nội bộ' },
+      { id: 'VIEW_PERSONAL_PROFILE', label: 'Xem hồ sơ cá nhân' },
+      { id: 'MANAGE_EMPLOYEES', label: 'Quản lý danh sách nhân sự' },
+      { id: 'MANAGE_USERS', label: 'Quản lý tài khoản người dùng' },
+      { id: 'SYSTEM_SETTINGS', label: 'Cài đặt & Phân quyền hệ thống' },
+    ]
+  },
+  {
+    id: 'buttons_actions',
+    title: '6. Nhóm Thao tác & Nút chức năng',
+    desc: 'Gom nhóm các nút bấm thao tác quy trình (Sửa, Xóa, Chuyển bước, Xem chi tiết, Giao việc, Ký duyệt, Trả hồ sơ, Trả KQ, Chốt đợt)',
+    items: [
+      { id: 'VIEW_DETAILS', label: 'Thao tác: Xem chi tiết hồ sơ' },
+      { id: 'EDIT_RECORDS', label: 'Thao tác: Sửa thông tin hồ sơ' },
+      { id: 'DELETE_RECORDS', label: 'Thao tác: Xóa hồ sơ' },
+      { id: 'EDIT_CONTRACTS', label: 'Thao tác: Sửa hợp đồng' },
+      { id: 'DELETE_CONTRACTS', label: 'Thao tác: Xóa hợp đồng' },
+      { id: 'ASSIGN_RECORDS', label: 'Thao tác: Giao việc / Phân công cán bộ' },
+      { id: 'CHECK_RECORDS', label: 'Thao tác: Kiểm tra & Ký kiểm tra' },
+      { id: 'SIGN_RECORDS', label: 'Thao tác: Chuyển bước / Ký duyệt' },
+      { id: 'HANDOVER_RECORDS', label: 'Thao tác: Bàn giao hồ sơ sang 1 cửa' },
+      { id: 'RETURN_RECORDS', label: 'Thao tác: Trả kết quả hồ sơ' },
+      { id: 'BTN_ASSIGN_STAFF', label: 'Nút: Giao việc / Phân công cán bộ' },
+      { id: 'BTN_SUBMIT_SIGN', label: 'Nút: Trình ký / Phê duyệt / Ký duyệt' },
+      { id: 'BTN_REJECT_RECORD', label: 'Nút: Trả hồ sơ / Từ chối (Yêu cầu sửa)' },
+      { id: 'BTN_RETURN_RESULT', label: 'Nút: Trả kết quả hồ sơ' },
+      { id: 'BTN_CLOSE_BATCH', label: 'Nút: Tạo đợt bàn giao / Chốt đợt' },
     ]
   }
 ];
@@ -150,22 +145,33 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
   const [departmentPermissions, setDepartmentPermissions] = useState<DepartmentPermissions>({});
   const [selectedRole, setSelectedRole] = useState<UserRole | string>(UserRole.TEAM_LEADER);
   const [selectedDepartmentScope, setSelectedDepartmentScope] = useState<string>('all');
-  const [selectedDepartment, setSelectedDepartment] = useState<string>('Tổ Đăng ký cấp giấy');
+  const [selectedDepartment, setSelectedDepartment] = useState<string>('Tổ Lưu trữ');
   const [selectedRoleSub, setSelectedRoleSub] = useState<UserRole | string>(UserRole.EMPLOYEE);
   const [permSearchQuery, setPermSearchQuery] = useState('');
   const [isSavingPermissions, setIsSavingPermissions] = useState(false);
   const [permissionTab, setPermissionTab] = useState<'department' | 'role'>('department');
 
   const allDepartmentOptions = React.useMemo(() => {
-    const list = PERMISSION_DEPARTMENTS.map(d => d.id);
+    const excludedNormalized = [
+      'tổ đăng ký cấp giấy',
+      'quản trị hệ thống',
+      'tổ hành chính',
+      'tổ đo đạc',
+      'ban giám đốc'
+    ];
+
+    const list = PERMISSION_DEPARTMENTS.map(d => d.id).filter(id => !excludedNormalized.includes(id.toLowerCase().trim()));
     if (employees && employees.length > 0) {
       employees.forEach(emp => {
-        if (emp.department && emp.department.trim() && !list.includes(emp.department.trim())) {
-          list.push(emp.department.trim());
+        if (emp.department && emp.department.trim()) {
+          const deptName = emp.department.trim();
+          if (!excludedNormalized.includes(deptName.toLowerCase()) && !list.includes(deptName)) {
+            list.push(deptName);
+          }
         }
       });
     }
-    return list;
+    return list.length > 0 ? list : ['Tổ Lưu trữ'];
   }, [employees]);
 
   useEffect(() => {
@@ -390,7 +396,12 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
       const savedPerms = await getSystemSetting('role_permissions');
       if (savedPerms) {
           try {
-              setRolePermissions(JSON.parse(savedPerms));
+              const parsed = JSON.parse(savedPerms);
+              // Tự động hợp nhất đầy đủ tất cả quyền mặc định của ONEDOOR
+              const defaultOneDoor = DEFAULT_ROLE_PERMISSIONS[UserRole.ONEDOOR] || [];
+              const existingOneDoor = parsed[UserRole.ONEDOOR] || [];
+              parsed[UserRole.ONEDOOR] = Array.from(new Set([...existingOneDoor, ...defaultOneDoor]));
+              setRolePermissions(parsed);
           } catch (e) {
               console.error("Failed to parse role_permissions", e);
           }
@@ -812,49 +823,55 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
             )}
 
             {activeTab === 'permissions' && (
-                <div className="h-[calc(100vh-170px)] min-h-[500px] flex flex-col bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden relative">
-                    {/* Role Selection Bar (Single clean bar without top department tabs) */}
-                    <div className="bg-purple-50/70 border-b border-purple-100 p-3 md:p-4 flex-shrink-0 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-                        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar flex-1">
-                            <span className="text-[11px] font-black uppercase tracking-wider text-purple-900 shrink-0 mr-1">
-                                Cấu hình Vai trò:
-                            </span>
-                            {ROLE_OPTIONS.map((opt) => {
-                                const isSelected = selectedRole === opt.role;
-                                return (
-                                    <button
-                                        key={opt.role}
-                                        onClick={() => setSelectedRole(opt.role)}
-                                        className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 flex items-center gap-2 border ${
-                                            isSelected
-                                                ? 'bg-purple-700 text-white border-purple-800 shadow-sm font-black'
-                                                : 'bg-white text-slate-700 border-purple-100 hover:border-purple-300'
-                                        }`}
-                                    >
-                                        <span className={`w-2 h-2 rounded-full ${isSelected ? 'bg-amber-300 animate-pulse' : 'bg-slate-300'}`} />
-                                        <span>{opt.name}</span>
-                                        <span className={`text-[9px] px-1.5 py-0.5 rounded uppercase font-extrabold ${
-                                            isSelected ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
-                                        }`}>
-                                            {opt.badge}
-                                        </span>
-                                    </button>
-                                );
-                            })}
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex flex-col h-[calc(100vh-170px)] min-h-[550px] relative">
+                    {/* Header tabs: Theo Vai trò | Theo Phòng ban */}
+                    <div className="bg-slate-100/90 border-b border-slate-200 px-4 pt-3 flex items-center justify-between flex-wrap gap-2">
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setPermissionTab('role');
+                                    setSelectedDepartmentScope('all');
+                                }}
+                                className={`px-5 py-2.5 text-xs font-black transition-all border-b-2 ${
+                                    permissionTab === 'role'
+                                        ? 'border-purple-600 text-purple-800 bg-white rounded-t-xl shadow-2xs'
+                                        : 'border-transparent text-slate-500 hover:text-slate-800'
+                                }`}
+                            >
+                                Theo Vai trò
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setPermissionTab('department');
+                                    if (selectedDepartmentScope === 'all' || !allDepartmentOptions.includes(selectedDepartmentScope)) {
+                                        setSelectedDepartmentScope(allDepartmentOptions[0] || 'Tổ Lưu trữ');
+                                    }
+                                }}
+                                className={`px-5 py-2.5 text-xs font-black transition-all border-b-2 ${
+                                    permissionTab === 'department'
+                                        ? 'border-purple-600 text-purple-800 bg-white rounded-t-xl shadow-2xs'
+                                        : 'border-transparent text-slate-500 hover:text-slate-800'
+                                }`}
+                            >
+                                Theo Phòng ban
+                            </button>
                         </div>
 
                         {/* Search Filter Box */}
-                        <div className="relative w-full lg:w-64 shrink-0">
-                            <Search size={15} className="absolute left-3 top-2.5 text-slate-400" />
+                        <div className="relative w-full sm:w-64 pb-2 sm:pb-0">
+                            <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
                             <input
                                 type="text"
-                                placeholder="Tìm quyền, chức năng, nút..."
+                                placeholder="Tìm kiếm quyền..."
                                 value={permSearchQuery}
                                 onChange={(e) => setPermSearchQuery(e.target.value)}
-                                className="w-full bg-white text-slate-800 placeholder-slate-400 text-xs rounded-xl pl-8 pr-7 py-2 border border-purple-200 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all shadow-2xs"
+                                className="w-full bg-white text-slate-800 placeholder-slate-400 text-xs rounded-xl pl-8 pr-7 py-1.5 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all shadow-2xs"
                             />
                             {permSearchQuery && (
                                 <button 
+                                    type="button"
                                     onClick={() => setPermSearchQuery('')}
                                     className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600 text-xs font-bold"
                                 >
@@ -864,288 +881,238 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                         </div>
                     </div>
 
-                    {/* Department Scope Selector Bar */}
-                    <div className="bg-indigo-50/70 border-b border-indigo-100 px-3 py-2.5 flex flex-wrap items-center justify-between gap-2 text-xs">
-                        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar flex-1">
-                            <span className="text-[11px] font-black uppercase tracking-wider text-indigo-900 shrink-0">
-                                Áp dụng cho Tổ / Phòng:
-                            </span>
-                            <button
-                                onClick={() => setSelectedDepartmentScope('all')}
-                                className={`px-3 py-1.5 rounded-lg font-extrabold text-xs transition-all whitespace-nowrap border ${
-                                    selectedDepartmentScope === 'all'
-                                        ? 'bg-indigo-700 text-white border-indigo-800 shadow-sm'
-                                        : 'bg-white text-slate-700 border-indigo-100 hover:border-indigo-300'
-                                }`}
-                            >
-                                🌐 Chung tất cả các Tổ
-                            </button>
-                            {allDepartmentOptions.map((deptName) => {
-                                const isSelected = selectedDepartmentScope === deptName;
-                                const compositeKey = `${deptName}_${selectedRole}`;
-                                const hasCustomOverride = !!(departmentPermissions && departmentPermissions[compositeKey]);
+                    {/* Sub-navigation bar */}
+                    {permissionTab === 'role' ? (
+                        <div className="bg-white border-b border-slate-200 px-6 py-3 flex items-center gap-6 overflow-x-auto no-scrollbar shrink-0">
+                            {[
+                                { role: UserRole.SUBADMIN, label: 'SUBADMIN' },
+                                { role: UserRole.TEAM_LEADER, label: 'TEAM_LEADER' },
+                                { role: UserRole.EMPLOYEE, label: 'EMPLOYEE' },
+                                { role: UserRole.ONEDOOR, label: 'ONEDOOR' },
+                                { role: UserRole.ADMIN, label: 'ADMIN' },
+                            ].map((item) => {
+                                const isSelected = selectedRole === item.role;
                                 return (
                                     <button
-                                        key={deptName}
-                                        onClick={() => setSelectedDepartmentScope(deptName)}
-                                        className={`px-3 py-1.5 rounded-lg font-bold text-xs transition-all whitespace-nowrap flex items-center gap-1.5 border ${
+                                        key={item.role}
+                                        type="button"
+                                        onClick={() => setSelectedRole(item.role)}
+                                        className={`text-xs font-black tracking-wider uppercase transition-all pb-1 border-b-2 ${
                                             isSelected
-                                                ? 'bg-indigo-700 text-white border-indigo-800 shadow-sm font-black'
-                                                : 'bg-white text-slate-700 border-indigo-100 hover:border-indigo-300'
+                                                ? 'border-purple-600 text-purple-800 font-extrabold'
+                                                : 'border-transparent text-slate-400 hover:text-slate-600 font-bold'
                                         }`}
                                     >
-                                        <span>{deptName}</span>
-                                        {hasCustomOverride && (
-                                            <span className={`w-2 h-2 rounded-full ${isSelected ? 'bg-amber-300 animate-pulse' : 'bg-indigo-500'}`} title="Đã cấu hình quyền riêng cho Tổ này" />
-                                        )}
+                                        {item.label}
                                     </button>
                                 );
                             })}
                         </div>
+                    ) : (
+                        <div className="bg-white border-b border-slate-200 px-6 py-2.5 flex flex-col gap-2 shrink-0">
+                            {/* Department selector */}
+                            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+                                <span className="text-[11px] font-black uppercase tracking-wider text-slate-500 shrink-0 mr-1">
+                                    Phòng / Tổ:
+                                </span>
+                                {allDepartmentOptions.map((deptName) => {
+                                    const isSelected = selectedDepartmentScope === deptName;
+                                    const compositeKey = `${deptName}_${selectedRole}`;
+                                    const hasCustomOverride = !!(departmentPermissions && departmentPermissions[compositeKey]);
+                                    return (
+                                        <button
+                                            key={deptName}
+                                            type="button"
+                                            onClick={() => setSelectedDepartmentScope(deptName)}
+                                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border flex items-center gap-1.5 ${
+                                                isSelected
+                                                    ? 'bg-purple-700 text-white border-purple-800 shadow-sm font-black'
+                                                    : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                                            }`}
+                                        >
+                                            <span>{deptName}</span>
+                                            {hasCustomOverride && (
+                                                <span className={`w-2 h-2 rounded-full ${isSelected ? 'bg-amber-300 animate-pulse' : 'bg-purple-500'}`} title="Đã có cấu hình riêng" />
+                                            )}
+                                        </button>
+                                    );
+                                })}
+                            </div>
 
-                        {selectedDepartmentScope !== 'all' && departmentPermissions[`${selectedDepartmentScope}_${selectedRole}`] && (
-                            <button
-                                onClick={handleResetDeptOverride}
-                                className="text-[11px] font-extrabold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1 shrink-0"
-                                title="Xóa cấu hình riêng của Tổ này để dùng cấu hình chung của Vai trò"
-                            >
-                                <RotateCcw size={12} /> Bỏ phân quyền riêng Tổ
-                            </button>
-                        )}
-                    </div>
+                            {/* Role selector within Department */}
+                            <div className="flex items-center gap-4 pt-1.5 border-t border-slate-100">
+                                <span className="text-[11px] font-black uppercase tracking-wider text-slate-500 shrink-0">
+                                    Vai trò trong tổ:
+                                </span>
+                                {[
+                                    { role: UserRole.TEAM_LEADER, label: 'TEAM_LEADER' },
+                                    { role: UserRole.EMPLOYEE, label: 'EMPLOYEE' },
+                                    { role: UserRole.ONEDOOR, label: 'ONEDOOR' }
+                                ].map((item) => {
+                                    const isSelected = selectedRole === item.role;
+                                    return (
+                                        <button
+                                            key={item.role}
+                                            type="button"
+                                            onClick={() => setSelectedRole(item.role)}
+                                            className={`text-xs font-black tracking-wider uppercase transition-all pb-0.5 border-b-2 ${
+                                                isSelected
+                                                    ? 'border-purple-600 text-purple-800'
+                                                    : 'border-transparent text-slate-400 hover:text-slate-600 font-bold'
+                                            }`}
+                                        >
+                                            {item.label}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
 
-                    {/* Active Selected Role Banner */}
-                    <div className="bg-purple-100/50 border-b border-purple-100 px-4 py-2.5 flex items-center justify-between text-xs text-purple-950 font-medium flex-wrap gap-2">
+                    {/* Banner info */}
+                    <div className="bg-purple-50/50 border-b border-purple-100/60 px-6 py-2 flex items-center justify-between text-xs text-purple-950 shrink-0">
                         <div className="flex items-center gap-2">
-                            <span className="font-black uppercase tracking-wider text-purple-900 bg-purple-200 px-2 py-0.5 rounded text-[10px]">
+                            <span className="font-extrabold uppercase text-[10px] bg-purple-200/80 px-2 py-0.5 rounded text-purple-900">
                                 {selectedRole}
                             </span>
                             <span className="text-slate-600 text-[11px]">
-                                {selectedDepartmentScope === 'all' 
-                                    ? `Cấu hình mặc định cho tất cả các Tổ (${ROLE_OPTIONS.find(r => r.role === selectedRole)?.desc})`
-                                    : `Cấu hình riêng cho [${selectedDepartmentScope}] (${selectedRole})`
+                                {permissionTab === 'role'
+                                    ? `Đang thiết lập quyền mặc định cho Vai trò [${selectedRole}]`
+                                    : `Đang thiết lập quyền riêng cho [${selectedDepartmentScope}] - [${selectedRole}]`
                                 }
                             </span>
                         </div>
-                        {selectedDepartmentScope !== 'all' && (
-                            <span className="text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 rounded-full">
-                                {departmentPermissions[`${selectedDepartmentScope}_${selectedRole}`] 
-                                    ? `⚡ Đang sử dụng Phân quyền riêng cho ${selectedDepartmentScope}`
-                                    : `ℹ️ Chưa có quyền riêng (Tự động kế thừa từ Phân quyền chung của ${selectedRole})`
-                                }
-                            </span>
-                        )}
                         {selectedRole === UserRole.ADMIN && (
-                            <span className="text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-full">
+                            <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-full">
                                 🔒 ADMIN có toàn bộ quyền mặc định
                             </span>
                         )}
                     </div>
 
-                    {/* Scrollable Matrix Area */}
-                    <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 bg-slate-50/50 custom-scrollbar">
+                    {/* Categorized Permissions Grid */}
+                    <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-slate-50/60 custom-scrollbar space-y-6">
                         {PERMISSION_GROUPS.map((group) => {
-                            const filteredItems = group.items.filter((item) => {
+                            const filteredItems = group.items.filter(item => {
                                 if (!permSearchQuery.trim()) return true;
                                 const q = permSearchQuery.toLowerCase();
                                 return (
                                     item.label.toLowerCase().includes(q) ||
-                                    item.id.toLowerCase().includes(q) ||
-                                    item.desc.toLowerCase().includes(q)
+                                    item.id.toLowerCase().includes(q)
                                 );
                             });
 
                             if (filteredItems.length === 0) return null;
 
-                            const itemIds = filteredItems.map((i) => i.id);
-                            const allChecked = itemIds.every((id) => isPermChecked(id));
+                            const activeCount = group.items.filter(item => isPermChecked(item.id)).length;
+                            const totalCount = group.items.length;
+                            const isDisabled = selectedRole === UserRole.ADMIN;
 
                             return (
-                                <div key={group.id} className="bg-white border border-purple-100/80 rounded-2xl p-5 shadow-sm space-y-4">
-                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-purple-50 pb-3">
+                                <div key={group.id} className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden transition-all">
+                                    {/* Category Header */}
+                                    <div className="bg-slate-100/70 border-b border-slate-200/80 px-5 py-3.5 flex items-center justify-between flex-wrap gap-2">
                                         <div>
-                                            <h4 className="font-black text-slate-800 text-sm md:text-base flex items-center gap-2">
-                                                {group.title}
+                                            <h4 className="text-sm font-black text-slate-800 flex items-center gap-2">
+                                                <span>{group.title}</span>
+                                                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 border border-purple-200">
+                                                    {activeCount}/{totalCount} Bật
+                                                </span>
                                             </h4>
-                                            <p className="text-xs text-slate-500 font-medium mt-0.5">{group.desc}</p>
+                                            <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                                                {group.desc}
+                                            </p>
                                         </div>
-                                        <button
-                                            type="button"
-                                            onClick={() => toggleCategoryAll(itemIds, !allChecked)}
-                                            className="text-[11px] font-bold text-purple-700 hover:text-purple-900 bg-purple-50 hover:bg-purple-100 px-3 py-1.5 rounded-lg border border-purple-200 transition-colors self-start sm:self-auto shrink-0"
-                                        >
-                                            {allChecked ? 'Bỏ chọn tất cả nhóm này' : 'Chọn tất cả nhóm này'}
-                                        </button>
+
+                                        {!isDisabled && (
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        group.items.forEach(item => {
+                                                            if (!isPermChecked(item.id)) toggleDeptRolePerm(item.id);
+                                                        });
+                                                    }}
+                                                    className="text-[11px] font-bold text-purple-700 hover:text-purple-900 bg-purple-50 hover:bg-purple-100 px-2.5 py-1 rounded-lg border border-purple-200 transition-all"
+                                                >
+                                                    Chọn tất cả
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        group.items.forEach(item => {
+                                                            if (isPermChecked(item.id)) toggleDeptRolePerm(item.id);
+                                                        });
+                                                    }}
+                                                    className="text-[11px] font-bold text-slate-600 hover:text-slate-800 bg-white hover:bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200 transition-all"
+                                                >
+                                                    Bỏ chọn
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
 
-                                    {group.id === 'views' ? (
-                                        <div className="space-y-5">
-                                            {filteredItems.filter(i => !(i as any).parentId).map((mainTab) => {
-                                                const subTabs = filteredItems.filter(i => (i as any).parentId === mainTab.id);
-                                                const isMainChecked = isPermChecked(mainTab.id);
-                                                const isMainDisabled = selectedRole === UserRole.ADMIN;
+                                    {/* Category Items Grid */}
+                                    <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                        {filteredItems.map((perm) => {
+                                            const checked = isPermChecked(perm.id);
 
-                                                return (
-                                                    <div key={mainTab.id} className="bg-slate-50/80 border border-purple-200/90 rounded-2xl p-4 shadow-2xs space-y-3">
-                                                        {/* Main Tab Header Card */}
-                                                        <label
-                                                            className={`flex items-start gap-3 p-3.5 rounded-xl border transition-all ${
-                                                                isMainDisabled
-                                                                    ? 'bg-slate-100 border-slate-200 opacity-60 cursor-not-allowed'
-                                                                    : isMainChecked
-                                                                    ? 'bg-purple-700 text-white border-purple-800 shadow-md cursor-pointer'
-                                                                    : 'bg-white text-slate-800 border-slate-300 hover:bg-slate-100 cursor-pointer'
-                                                            }`}
-                                                        >
-                                                            <div className="mt-0.5 shrink-0">
-                                                                <input
-                                                                    type="checkbox"
-                                                                    className="w-5 h-5 text-purple-800 rounded border-slate-300 focus:ring-purple-500 cursor-pointer disabled:cursor-not-allowed"
-                                                                    checked={isMainChecked}
-                                                                    onChange={() => toggleDeptRolePerm(mainTab.id)}
-                                                                    disabled={isMainDisabled}
-                                                                />
-                                                            </div>
-                                                            <div className="flex-1 min-w-0">
-                                                                <div className="text-sm md:text-base font-black flex items-center justify-between gap-2">
-                                                                    <span>{mainTab.label}</span>
-                                                                    <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full shrink-0 ${
-                                                                        isMainChecked ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-600'
-                                                                    }`}>
-                                                                        {isMainChecked ? 'ĐANG BẬT' : 'ĐÃ TẮT'}
-                                                                    </span>
-                                                                </div>
-                                                                <div className={`text-xs font-medium mt-0.5 ${isMainChecked ? 'text-purple-100' : 'text-slate-500'}`}>
-                                                                    {mainTab.desc}
-                                                                </div>
-                                                            </div>
-                                                        </label>
-
-                                                        {/* Sub Tabs Grid Below */}
-                                                        {subTabs.length > 0 && (
-                                                            <div className="pt-1 pl-3 md:pl-5 border-l-4 border-purple-400 space-y-2">
-                                                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                                                                    {subTabs.map((perm) => {
-                                                                        const checked = isPermChecked(perm.id);
-                                                                        const isDisabled = isMainDisabled;
-
-                                                                        return (
-                                                                            <label
-                                                                                key={perm.id}
-                                                                                className={`flex items-start gap-3 p-3 rounded-xl border transition-all ${
-                                                                                    isDisabled
-                                                                                        ? 'bg-slate-100 border-slate-200 opacity-50 cursor-not-allowed'
-                                                                                        : checked
-                                                                                        ? 'bg-purple-50 border-purple-300 shadow-2xs cursor-pointer'
-                                                                                        : 'bg-white border-slate-200 hover:bg-slate-50 cursor-pointer'
-                                                                                }`}
-                                                                            >
-                                                                                <div className="mt-0.5 shrink-0">
-                                                                                    <input
-                                                                                        type="checkbox"
-                                                                                        className="w-4 h-4 text-purple-600 rounded border-slate-300 focus:ring-purple-500 cursor-pointer disabled:cursor-not-allowed"
-                                                                                        checked={checked}
-                                                                                        onChange={() => toggleDeptRolePerm(perm.id)}
-                                                                                        disabled={isDisabled}
-                                                                                    />
-                                                                                </div>
-                                                                                <div className="flex-1 min-w-0">
-                                                                                    <div className={`text-xs md:text-sm font-bold ${checked ? 'text-purple-950' : 'text-slate-800'}`}>
-                                                                                        {perm.label}
-                                                                                    </div>
-                                                                                    <div className="text-[11px] text-slate-500 font-medium mt-0.5 leading-snug">
-                                                                                        {perm.desc}
-                                                                                    </div>
-                                                                                </div>
-                                                                            </label>
-                                                                        );
-                                                                    })}
-                                                                </div>
-                                                            </div>
-                                                        )}
+                                            return (
+                                                <label
+                                                    key={perm.id}
+                                                    className={`flex items-center gap-3.5 p-3.5 rounded-xl border transition-all cursor-pointer select-none ${
+                                                        isDisabled
+                                                            ? 'opacity-60 cursor-not-allowed bg-slate-100 border-slate-200'
+                                                            : checked
+                                                            ? 'bg-purple-50/80 border-purple-200 shadow-2xs hover:bg-purple-100/50'
+                                                            : 'bg-white border-slate-200/90 hover:bg-slate-100/70 shadow-2xs'
+                                                    }`}
+                                                >
+                                                    <div className="shrink-0 flex items-center justify-center">
+                                                        <input
+                                                            type="checkbox"
+                                                            className="w-4 h-4 text-purple-600 rounded border-slate-300 focus:ring-purple-500 cursor-pointer disabled:cursor-not-allowed"
+                                                            checked={checked}
+                                                            onChange={() => toggleDeptRolePerm(perm.id)}
+                                                            disabled={isDisabled}
+                                                        />
                                                     </div>
-                                                );
-                                            })}
-                                        </div>
-                                    ) : (
-                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                                            {filteredItems.map((perm) => {
-                                                const parentId = (perm as any).parentId;
-                                                const isChild = !!parentId;
-                                                // Always show sub-permission items
-
-                                                const checked = isPermChecked(perm.id);
-                                                const isDisabled = selectedRole === UserRole.ADMIN;
-
-                                                return (
-                                                    <label
-                                                        key={perm.id}
-                                                        className={`flex items-start gap-3 p-3.5 rounded-xl border transition-all ${
-                                                            isChild ? 'ml-3 md:ml-4 border-l-4 border-l-purple-400' : ''
-                                                        } ${
-                                                            isDisabled
-                                                                ? 'bg-slate-50 border-slate-200 opacity-60 cursor-not-allowed'
-                                                                : checked
-                                                                ? 'bg-purple-50/80 border-purple-300 shadow-xs cursor-pointer'
-                                                                : 'bg-white border-slate-200 hover:bg-slate-50 cursor-pointer'
-                                                        }`}
-                                                    >
-                                                        <div className="mt-0.5 shrink-0">
-                                                            <input
-                                                                type="checkbox"
-                                                                className="w-4 h-4 text-purple-600 rounded border-slate-300 focus:ring-purple-500 cursor-pointer disabled:cursor-not-allowed"
-                                                                checked={checked}
-                                                                onChange={() => toggleDeptRolePerm(perm.id)}
-                                                                disabled={isDisabled}
-                                                            />
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className={`text-xs md:text-sm font-bold tracking-tight ${checked ? 'text-purple-900' : 'text-slate-800'}`}>
+                                                            {perm.label}
                                                         </div>
-                                                        <div className="flex-1 min-w-0">
-                                                            <div className={`text-xs md:text-sm font-black ${checked ? 'text-purple-950' : 'text-slate-800'}`}>
-                                                                {perm.label}
-                                                            </div>
-                                                            <div className="text-[11px] text-slate-500 font-medium mt-0.5 leading-snug">
-                                                                {perm.desc}
-                                                            </div>
-                                                            <div className="text-[10px] text-slate-400 font-mono mt-1">
-                                                                {perm.id}
-                                                            </div>
+                                                        <div className={`text-[10px] font-mono tracking-wider uppercase mt-0.5 ${checked ? 'text-purple-600/80 font-semibold' : 'text-slate-400 font-medium'}`}>
+                                                            {perm.id}
                                                         </div>
-                                                    </label>
-                                                );
-                                            })}
-                                        </div>
-                                    )}
+                                                    </div>
+                                                </label>
+                                            );
+                                        })}
+                                    </div>
                                 </div>
                             );
                         })}
                     </div>
 
-                    {/* Floating Sticky Save Bar (Pinned Bottom) */}
-                    <div className="sticky bottom-0 z-30 bg-white/95 backdrop-blur-md border-t border-purple-200 p-4 px-6 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-lg flex-shrink-0">
-                        <div className="flex items-center gap-2 text-xs text-slate-700 font-medium">
-                            <span className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse" />
-                            <span>Đang cấu hình:</span>
-                            <span className="font-black text-purple-900 bg-purple-100 px-2.5 py-1 rounded-lg border border-purple-200 flex items-center gap-1.5">
-                                👤 {ROLE_OPTIONS.find(r => r.role === selectedRole)?.name || selectedRole}
-                            </span>
+                    {/* Bottom Sticky Action Bar */}
+                    <div className="bg-white border-t border-slate-200 p-4 px-6 flex items-center justify-between gap-3 shadow-md shrink-0">
+                        <div className="text-xs text-slate-600 font-medium flex items-center gap-2">
+                            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                            <span>Đang cấu hình: <strong className="text-purple-900">{selectedRole}</strong></span>
                         </div>
-
-                        <div className="flex items-center gap-3 w-full sm:w-auto">
+                        <div className="flex items-center gap-3">
                             <button
                                 onClick={handleResetPermissions}
                                 type="button"
-                                className="w-full sm:w-auto px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-all border border-slate-200 flex items-center justify-center gap-1.5 active:scale-95"
-                                title="Khôi phục phân quyền về trạng thái mặc định của hệ thống"
+                                className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-all border border-slate-200 flex items-center gap-1.5 active:scale-95"
                             >
-                                <RotateCcw size={16} />
-                                Mặc định
+                                <RotateCcw size={15} /> Mặc định
                             </button>
                             <button
                                 onClick={handleSavePermissions}
                                 disabled={isSavingPermissions}
-                                className="w-full sm:w-auto px-8 py-3 bg-gradient-to-r from-purple-700 to-indigo-800 hover:from-purple-800 hover:to-indigo-900 text-white font-black text-xs uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-purple-200 disabled:opacity-50 flex items-center justify-center gap-2.5 active:scale-95"
+                                className="px-6 py-2.5 bg-gradient-to-r from-purple-700 to-indigo-800 hover:from-purple-800 hover:to-indigo-900 text-white font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-md disabled:opacity-50 flex items-center gap-2 active:scale-95"
                             >
-                                {isSavingPermissions ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+                                {isSavingPermissions ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />}
                                 Lưu cấu hình phân quyền
                             </button>
                         </div>

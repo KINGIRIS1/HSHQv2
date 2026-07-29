@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { RecordFile, RecordStatus, Employee } from '../types';
+import { RecordFile, RecordStatus, Employee, UserRole } from '../types';
 import { getNormalizedWard, getShortRecordType, getWardLabel } from '../constants';
 import { isRecordOverdue, isRecordApproaching, toTitleCase } from '../utils/appHelpers';
 import StatusBadge from './StatusBadge';
@@ -328,7 +328,9 @@ const RecordRow: React.FC<RecordRowProps> = ({
 
             {/* Hàng dưới: Sửa & Xóa */}
             <div className="flex items-center gap-1">
-              <button onClick={() => onEdit(record)} className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors border border-blue-200 bg-blue-50/50" title="Sửa"><Pencil size={15} /></button>
+              {currentUser?.role !== 'ONEDOOR' && currentUser?.role !== UserRole.ONEDOOR && (
+                <button onClick={() => onEdit(record)} className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors border border-blue-200 bg-blue-50/50" title="Sửa"><Pencil size={15} /></button>
+              )}
               {(currentUser?.role === 'ADMIN' || currentUser?.role === 'SUBADMIN') && (
                   <button onClick={() => onDelete(record)} className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors border border-red-200 bg-red-50/50" title="Xóa"><Trash2 size={15} /></button>
               )}

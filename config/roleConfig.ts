@@ -25,7 +25,7 @@ export const ROLE_VIEWS_CONFIG: Record<UserRole, RoleConfig> = {
       'dashboard', 'receive_record', 'receive_contract', 
       'all_records', 'registration_records', 'other_records', 'personal_profile', 
       'account_settings', 'utilities', 'handover_list', 'archive_handover_list', 'other_handover_list', 'work_schedule', 
-      'archive_records', 'receive_group', 'records_group', 
+      'archive_records', 'receive_group', 'records_group', 'management_group',
       'reports', 'tools_group', 'barcode_generator'
     ]
   },
@@ -127,6 +127,16 @@ export function isViewAllowedForUser(
       activePerms = rolePermissions[user.role];
     } else if (DEFAULT_ROLE_PERMISSIONS[user.role]) {
       activePerms = DEFAULT_ROLE_PERMISSIONS[user.role];
+    }
+  }
+
+  // Luôn đảm bảo vai trò ONEDOOR kế thừa toàn bộ danh sách quyền mặc định của Một cửa
+  if (user.role === UserRole.ONEDOOR) {
+    const defaultOneDoor = DEFAULT_ROLE_PERMISSIONS[UserRole.ONEDOOR] || [];
+    if (activePerms) {
+      activePerms = Array.from(new Set([...activePerms, ...defaultOneDoor]));
+    } else {
+      activePerms = defaultOneDoor;
     }
   }
 

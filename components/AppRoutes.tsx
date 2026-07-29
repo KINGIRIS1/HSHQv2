@@ -1016,6 +1016,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                   currentView === "check_list" ||
                   currentView === "other_check_list" ||
                   currentView === "archive_check_list") &&
+                  (hasPermission('BTN_REJECT_RECORD') || hasPermission('REJECT_RECORDS')) &&
                   props.selectedRecordIds.size > 0 && props.handleOpenRejectReturnModal && (
                     <button
                       onClick={() => {
@@ -1034,6 +1035,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                 {(currentView === "check_list" ||
                   currentView === "other_check_list" ||
                   currentView === "archive_check_list") &&
+                  (hasPermission('BTN_SUBMIT_SIGN') || hasPermission('SIGN_RECORDS')) &&
                   props.selectedRecordIds.size > 0 && (
                     <button
                       onClick={props.handleConfirmSignBatch}
@@ -1114,18 +1116,20 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                           <ClipboardList size={16} /> Hồ sơ trả ({props.selectedRecordIds.size})
                         </button>
                       )}
-                      <button
-                        onClick={() => {
-                          const targets = records.filter((r) =>
-                            props.selectedRecordIds.has(r.id),
-                          );
-                          props.setAssignTargetRecords(targets);
-                          props.setIsAssignModalOpen(true);
-                        }}
-                        className="flex items-center gap-1.5 bg-blue-600 text-white px-3 py-1.5 rounded-md hover:bg-blue-700 text-sm font-bold shadow-sm transition-all animate-pulse"
-                      >
-                        <UserPlus size={16} /> Giao Nhân Viên ({props.selectedRecordIds.size})
-                      </button>
+                      {(hasPermission('BTN_ASSIGN_STAFF') || hasPermission('ASSIGN_RECORDS')) && (
+                        <button
+                          onClick={() => {
+                            const targets = records.filter((r) =>
+                              props.selectedRecordIds.has(r.id),
+                            );
+                            props.setAssignTargetRecords(targets);
+                            props.setIsAssignModalOpen(true);
+                          }}
+                          className="flex items-center gap-1.5 bg-blue-600 text-white px-3 py-1.5 rounded-md hover:bg-blue-700 text-sm font-bold shadow-sm transition-all animate-pulse"
+                        >
+                          <UserPlus size={16} /> Giao Nhân Viên ({props.selectedRecordIds.size})
+                        </button>
+                      )}
                     </>
                   )}
               </>

@@ -43,17 +43,17 @@ export const DEFAULT_ROLE_PERMISSIONS: RolePermissions = {
     'BTN_SUBMIT_SIGN', 'BTN_REJECT_RECORD', 'BTN_CLOSE_BATCH'
   ],
   [UserRole.ONEDOOR]: [
-    'receive_record', 'receive_sub_create', 'receive_sub_bulk', 'receive_sub_list', 'receive_sub_vphc',
+    'receive_record', 'receive_sub_create', 'receive_sub_bulk', 'receive_sub_list', 'receive_sub_vphc', 'ADD_RECORDS',
     'receive_contract', 'VIEW_CONTRACTS', 'ADD_CONTRACTS', 'EDIT_CONTRACTS', 'EXPORT_CONTRACTS',
-    'all_records', 'all_sub_all', 'handover_list',
-    'archive_records', 'archive_sub_all', 'archive_handover_list',
+    'all_records', 'all_sub_all', 'handover_list', 'VIEW_RECORDS', 'HANDOVER_RECORDS', 'RETURN_RECORDS', 'EXPORT_RECORDS',
+    'archive_records', 'archive_sub_all', 'VIEW_ARCHIVE',
     'registration_records',
     'other_records', 'other_sub_all', 'other_handover_list',
     'excerpt_management', 'VIEW_EXCERPTS',
     'reports', 'VIEW_REPORTS',
     'work_schedule', 'VIEW_SCHEDULE',
-    'utilities',
-    'BTN_REJECT_RECORD', 'BTN_CLOSE_BATCH'
+    'utilities', 'VIEW_CHAT', 'VIEW_PERSONAL_PROFILE',
+    'BTN_CLOSE_BATCH'
   ],
   [UserRole.EMPLOYEE]: [
     'receive_contract', 'VIEW_CONTRACTS',
@@ -70,6 +70,7 @@ export const DEFAULT_ROLE_PERMISSIONS: RolePermissions = {
 
 export const AVAILABLE_PERMISSIONS = [
   { id: 'VIEW_RECORDS', label: 'Xem hồ sơ' },
+  { id: 'VIEW_DETAILS', label: 'Xem chi tiết hồ sơ' },
   { id: 'ADD_RECORDS', label: 'Thêm hồ sơ' },
   { id: 'EDIT_RECORDS', label: 'Sửa hồ sơ' },
   { id: 'DELETE_RECORDS', label: 'Xóa hồ sơ' },
@@ -96,8 +97,10 @@ export const AVAILABLE_PERMISSIONS = [
   { id: 'VIEW_SCHEDULE', label: 'Xem lịch công tác' },
   { id: 'MANAGE_SCHEDULE', label: 'Quản lý lịch công tác' },
   { id: 'VIEW_PERSONAL_PROFILE', label: 'Xem hồ sơ cá nhân' },
-  { id: 'BTN_REJECT_RECORD', label: 'Nút: Trả hồ sơ' },
-  { id: 'BTN_SUBMIT_SIGN', label: 'Nút: Trình ký / Trình KT' },
+  { id: 'BTN_ASSIGN_STAFF', label: 'Nút: Giao nhân viên' },
+  { id: 'BTN_RETURN_RESULT', label: 'Nút: Trả kết quả hồ sơ' },
+  { id: 'BTN_REJECT_RECORD', label: 'Nút: Trả hồ sơ / Từ chối' },
+  { id: 'BTN_SUBMIT_SIGN', label: 'Nút: Trình ký / Ký duyệt' },
   { id: 'BTN_CLOSE_BATCH', label: 'Nút: Tạo đợt / Chốt đợt' }
 ];
 

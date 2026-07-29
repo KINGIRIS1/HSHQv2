@@ -1,6 +1,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
-import { RecordFile, Employee, User, RecordStatus, Holiday, RolePermissions, DepartmentPermissions, DEFAULT_ROLE_PERMISSIONS } from '../types';
+import { RecordFile, Employee, User, UserRole, RecordStatus, Holiday, RolePermissions, DepartmentPermissions, DEFAULT_ROLE_PERMISSIONS } from '../types';
 import { fetchRecords, fetchEmployees, fetchUsers, fetchUpdateInfo, fetchHolidays,
     createRecordApi, updateRecordApi, deleteRecordApi, createRecordsBatchApi,
     saveEmployeeApi, deleteEmployeeApi, saveUserApi, deleteUserApi, deleteAllDataApi, getSystemSetting
@@ -56,14 +56,25 @@ export const useAppData = (currentUser: User | null) => {
             setHolidays(holidayData); // Cập nhật state holidays
             if (permsData) {
                 try {
-                    setRolePermissions(JSON.parse(permsData));
+                    const parsed = JSON.parse(permsData);
+                    const defaultOneDoor = DEFAULT_ROLE_PERMISSIONS[UserRole.ONEDOOR] || [];
+                    const existingOneDoor = parsed[UserRole.ONEDOOR] || [];
+                    parsed[UserRole.ONEDOOR] = Array.from(new Set([...existingOneDoor, ...defaultOneDoor]));
+                    setRolePermissions(parsed);
                 } catch (e) {
                     console.error("Failed to parse role_permissions", e);
                 }
             }
             if (deptPermsData) {
                 try {
-                    setDepartmentPermissions(JSON.parse(deptPermsData));
+                    const parsedDept = JSON.parse(deptPermsData);
+                    Object.keys(parsedDept).forEach(key => {
+                        if (key.endsWith(`_${UserRole.ONEDOOR}`)) {
+                            const defaultOneDoor = DEFAULT_ROLE_PERMISSIONS[UserRole.ONEDOOR] || [];
+                            parsedDept[key] = Array.from(new Set([...(parsedDept[key] || []), ...defaultOneDoor]));
+                        }
+                    });
+                    setDepartmentPermissions(parsedDept);
                 } catch (e) {
                     console.error("Failed to parse department_permissions", e);
                 }
