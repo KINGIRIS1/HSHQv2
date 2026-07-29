@@ -9,7 +9,8 @@ import { createFullBackupData, downloadBackupAsFile, saveBackupToServer, restore
 import { isConfigured } from '../services/supabaseClient';
 
 const PERMISSION_DEPARTMENTS = [
-  { id: 'Tổ Lưu trữ', name: 'Tổ Lưu trữ', label: 'Tổ Lưu trữ', desc: 'Bộ phận phụ trách lưu trữ, khai thác thông tin đất đai và hồ sơ lưu trữ' }
+  { id: 'Tổ Lưu trữ', name: 'Tổ Lưu trữ', label: 'Tổ Lưu trữ', desc: 'Bộ phận phụ trách lưu trữ, khai thác thông tin đất đai và hồ sơ lưu trữ' },
+  { id: 'Tổ Hành chính', name: 'Tổ Hành chính', label: 'Tổ Hành chính (Một cửa)', desc: 'Bộ phận hành chính tổng hợp, văn thư, tiếp nhận Một cửa' }
 ];
 
 const ROLES_FOR_DEPARTMENT = [
@@ -155,7 +156,6 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
     const excludedNormalized = [
       'tổ đăng ký cấp giấy',
       'quản trị hệ thống',
-      'tổ hành chính',
       'tổ đo đạc',
       'ban giám đốc'
     ];
