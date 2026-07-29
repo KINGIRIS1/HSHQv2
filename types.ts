@@ -56,7 +56,7 @@ export const DEFAULT_ROLE_PERMISSIONS: RolePermissions = {
     'BTN_CLOSE_BATCH'
   ],
   [UserRole.EMPLOYEE]: [
-    'receive_contract', 'VIEW_CONTRACTS',
+    'receive_contract', 'VIEW_CONTRACTS', 'LIQUIDATE_CONTRACTS',
     'all_records', 'all_sub_all', 'completed_list',
     'archive_records', 'archive_sub_all', 'archive_completed_list',
     'registration_records',
@@ -83,6 +83,7 @@ export const AVAILABLE_PERMISSIONS = [
   { id: 'VIEW_CONTRACTS', label: 'Xem hợp đồng' },
   { id: 'ADD_CONTRACTS', label: 'Thêm hợp đồng' },
   { id: 'EDIT_CONTRACTS', label: 'Sửa hợp đồng' },
+  { id: 'LIQUIDATE_CONTRACTS', label: 'Thanh lý hợp đồng' },
   { id: 'DELETE_CONTRACTS', label: 'Xóa hợp đồng' },
   { id: 'EXPORT_CONTRACTS', label: 'Xuất danh sách hợp đồng' },
   { id: 'VIEW_EXCERPTS', label: 'Xem trích lục' },

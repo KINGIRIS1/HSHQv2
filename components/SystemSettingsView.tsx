@@ -4,7 +4,7 @@ import { Database, AlertTriangle, Cloud, Loader2, CheckCircle, Save, Globe, Cale
 import { Holiday, UserRole, RolePermissions, DepartmentPermissions, DEFAULT_ROLE_PERMISSIONS, AVAILABLE_PERMISSIONS, Employee } from '../types';
 import { fetchHolidays, saveHolidays, testDatabaseConnection, saveUpdateInfo, fetchUpdateInfo, getSystemSetting, saveSystemSetting } from '../services/api';
 import { APP_VERSION } from '../constants';
-import { confirmAction, calculateDeadlineHelper } from '../utils/appHelpers';
+import { confirmAction, calculateDeadlineHelper, matchDepartmentKey } from '../utils/appHelpers';
 import { createFullBackupData, downloadBackupAsFile, saveBackupToServer, restoreFullBackupToSupabase } from '../services/backupService';
 import { isConfigured } from '../services/supabaseClient';
 
@@ -48,6 +48,9 @@ const PERMISSION_GROUPS = [
       { id: 'receive_contract', label: 'Tiếp nhận & Quản lý hợp đồng (Tab Hợp đồng)' },
       { id: 'VIEW_CONTRACTS', label: 'Xem danh sách hợp đồng' },
       { id: 'ADD_CONTRACTS', label: 'Thêm mới hợp đồng' },
+      { id: 'EDIT_CONTRACTS', label: 'Sửa thông tin hợp đồng' },
+      { id: 'LIQUIDATE_CONTRACTS', label: 'Thanh lý / Lập quyết toán hợp đồng' },
+      { id: 'DELETE_CONTRACTS', label: 'Xóa hợp đồng' },
       { id: 'EXPORT_CONTRACTS', label: 'Xuất tệp / Danh sách hợp đồng' },
     ]
   },
@@ -89,18 +92,13 @@ const PERMISSION_GROUPS = [
   {
     id: 'buttons_actions',
     title: '6. Nhóm Thao tác & Nút chức năng',
-    desc: 'Gom nhóm các nút bấm thao tác quy trình (Sửa, Xóa, Chuyển bước, Xem chi tiết, Giao việc, Ký duyệt, Trả hồ sơ, Trả KQ, Chốt đợt)',
+    desc: 'Gom nhóm các nút bấm thao tác quy trình (Xem chi tiết, Sửa, Xóa, Giao việc, Ký duyệt, Trả hồ sơ, Trả KQ, Chốt đợt)',
     items: [
       { id: 'VIEW_DETAILS', label: 'Thao tác: Xem chi tiết hồ sơ' },
       { id: 'EDIT_RECORDS', label: 'Thao tác: Sửa thông tin hồ sơ' },
       { id: 'DELETE_RECORDS', label: 'Thao tác: Xóa hồ sơ' },
-      { id: 'EDIT_CONTRACTS', label: 'Thao tác: Sửa hợp đồng' },
-      { id: 'DELETE_CONTRACTS', label: 'Thao tác: Xóa hợp đồng' },
-      { id: 'ASSIGN_RECORDS', label: 'Thao tác: Giao việc / Phân công cán bộ' },
       { id: 'CHECK_RECORDS', label: 'Thao tác: Kiểm tra & Ký kiểm tra' },
-      { id: 'SIGN_RECORDS', label: 'Thao tác: Chuyển bước / Ký duyệt' },
       { id: 'HANDOVER_RECORDS', label: 'Thao tác: Bàn giao hồ sơ sang 1 cửa' },
-      { id: 'RETURN_RECORDS', label: 'Thao tác: Trả kết quả hồ sơ' },
       { id: 'BTN_ASSIGN_STAFF', label: 'Nút: Giao việc / Phân công cán bộ' },
       { id: 'BTN_SUBMIT_SIGN', label: 'Nút: Trình ký / Phê duyệt / Ký duyệt' },
       { id: 'BTN_REJECT_RECORD', label: 'Nút: Trả hồ sơ / Từ chối (Yêu cầu sửa)' },
@@ -437,6 +435,25 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
       }
   };
 
+  const getDefaultDeptPerms = (deptName: string, role: string): string[] => {
+      const basePerms = rolePermissions[role] || DEFAULT_ROLE_PERMISSIONS[role as UserRole] || [];
+      if (matchDepartmentKey('đo đạc', deptName)) {
+          const ARCHIVE_PERMS = [
+              'archive_records', 'archive_sub_all', 'archive_assign_tasks',
+              'archive_completed_list', 'archive_pending_check_list', 'archive_check_list',
+              'archive_handover_list', 'archive_director_completed', 'VIEW_ARCHIVE', 'MANAGE_ARCHIVE'
+          ];
+          return basePerms.filter(p => !ARCHIVE_PERMS.includes(p));
+      } else if (matchDepartmentKey('lưu trữ', deptName)) {
+          const SURVEY_PERMS = [
+              'all_records', 'all_sub_all', 'assign_tasks', 'completed_list',
+              'pending_check_list', 'check_list', 'handover_list', 'director_completed', 'survey_list'
+          ];
+          return basePerms.filter(p => !SURVEY_PERMS.includes(p));
+      }
+      return basePerms;
+  };
+
   const isPermChecked = (permissionId: string): boolean => {
       if (selectedRole === UserRole.ADMIN) return true;
 
@@ -446,6 +463,8 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
               const deptPerms = departmentPermissions[compositeKey];
               return deptPerms.includes('*') || deptPerms.includes(permissionId);
           }
+          const defaultPerms = getDefaultDeptPerms(selectedDepartmentScope, selectedRole as string);
+          return defaultPerms.includes('*') || defaultPerms.includes(permissionId);
       }
 
       const perms = rolePermissions[selectedRole as string] || DEFAULT_ROLE_PERMISSIONS[selectedRole as UserRole] || [];
@@ -458,7 +477,7 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
       if (selectedDepartmentScope !== 'all') {
           const compositeKey = `${selectedDepartmentScope}_${selectedRole}`;
           setDepartmentPermissions(prev => {
-              const current = prev[compositeKey] || rolePermissions[selectedRole as string] || DEFAULT_ROLE_PERMISSIONS[selectedRole as UserRole] || [];
+              const current = prev[compositeKey] || getDefaultDeptPerms(selectedDepartmentScope, selectedRole as string);
               const isRemoving = current.includes(permissionId);
               const updated = isRemoving
                   ? current.filter(p => p !== permissionId)

@@ -99,14 +99,18 @@ export function isViewAllowedForUser(
   // Evaluate Department-Role permissions first, then Role-based permissions
   let activePerms: string[] | null = null;
 
+  let isCustomDeptPerm = false;
+
   if (user.employeeId && employees && departmentPermissions) {
     const emp = employees.find(e => e.id === user.employeeId);
     if (emp && emp.department) {
       const compositeKey = `${emp.department}_${user.role}`;
       if (departmentPermissions[compositeKey]) {
         activePerms = departmentPermissions[compositeKey];
+        isCustomDeptPerm = true;
       } else if (departmentPermissions[emp.department]) {
         activePerms = departmentPermissions[emp.department];
+        isCustomDeptPerm = true;
       } else {
         const matchingKey = Object.keys(departmentPermissions).find(k => {
           if (k.endsWith(`_${user.role}`)) {
@@ -117,6 +121,7 @@ export function isViewAllowedForUser(
         });
         if (matchingKey && departmentPermissions[matchingKey]) {
           activePerms = departmentPermissions[matchingKey];
+          isCustomDeptPerm = true;
         }
       }
     }
@@ -127,6 +132,29 @@ export function isViewAllowedForUser(
       activePerms = rolePermissions[user.role];
     } else if (DEFAULT_ROLE_PERMISSIONS[user.role]) {
       activePerms = DEFAULT_ROLE_PERMISSIONS[user.role];
+    }
+
+    // Nếu không có phân quyền tùy chỉnh riêng cho phòng ban, áp dụng quy tắc phân tách mặc định:
+    // - Tổ đo đạc không tự động có quyền Tab Lưu trữ
+    // - Tổ Lưu trữ không tự động có quyền Tab Đo đạc
+    if (!isCustomDeptPerm && user.employeeId && employees && activePerms) {
+      const emp = employees.find(e => e.id === user.employeeId);
+      if (emp && emp.department) {
+        if (matchDepartmentKey('đo đạc', emp.department)) {
+          const ARCHIVE_PERMS = [
+            'archive_records', 'archive_sub_all', 'archive_assign_tasks',
+            'archive_completed_list', 'archive_pending_check_list', 'archive_check_list',
+            'archive_handover_list', 'archive_director_completed', 'VIEW_ARCHIVE', 'MANAGE_ARCHIVE'
+          ];
+          activePerms = activePerms.filter(p => !ARCHIVE_PERMS.includes(p));
+        } else if (matchDepartmentKey('lưu trữ', emp.department)) {
+          const SURVEY_PERMS = [
+            'all_records', 'all_sub_all', 'assign_tasks', 'completed_list',
+            'pending_check_list', 'check_list', 'handover_list', 'director_completed', 'survey_list'
+          ];
+          activePerms = activePerms.filter(p => !SURVEY_PERMS.includes(p));
+        }
+      }
     }
   }
 
