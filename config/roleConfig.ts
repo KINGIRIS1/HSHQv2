@@ -92,7 +92,7 @@ export function isViewAllowedForUser(
   if (user.role === UserRole.ADMIN) return true;
 
   // Views that are always accessible to any logged in user
-  if (['dashboard', 'personal_profile', 'account_settings', 'utilities', 'reports', 'work_schedule', 'tools_group', 'management_group'].includes(viewId)) {
+  if (['dashboard', 'personal_profile', 'account_settings'].includes(viewId)) {
     return true;
   }
 
@@ -147,9 +147,8 @@ export function isViewAllowedForUser(
                activePerms.includes('ADD_CONTRACTS') ||
                activePerms.includes('LIQUIDATE_CONTRACTS');
       case 'records_group':
-        return activePerms.includes('all_records') || activePerms.includes('all_sub_all') ||
-               activePerms.includes('archive_records') || activePerms.includes('archive_sub_all') ||
-               activePerms.includes('registration_records') || activePerms.includes('other_records') || activePerms.includes('other_sub_all');
+        return activePerms.includes('all_records') || activePerms.includes('all_sub_all') || activePerms.includes('assign_tasks') || activePerms.includes('check_list') || activePerms.includes('handover_list') || activePerms.includes('completed_list') || activePerms.includes('pending_check_list') || activePerms.includes('director_completed') ||
+               activePerms.includes('archive_records') || activePerms.includes('registration_records') || activePerms.includes('other_records');
       case 'tools_group':
         return activePerms.includes('reports') || activePerms.includes('VIEW_REPORTS') || activePerms.includes('excerpt_management') || activePerms.includes('MANAGE_EXCERPTS') || activePerms.includes('utilities') || activePerms.includes('work_schedule');
       case 'management_group':
@@ -158,18 +157,37 @@ export function isViewAllowedForUser(
       // Main Tabs
       case 'receive_record':
         return activePerms.includes('receive_record') ||
-               activePerms.includes('receive_sub_create');
+               activePerms.includes('receive_sub_create') ||
+               activePerms.includes('receive_sub_bulk') ||
+               activePerms.includes('receive_sub_list') ||
+               activePerms.includes('receive_sub_vphc');
       case 'all_records':
         return activePerms.includes('all_records') ||
-               activePerms.includes('all_sub_all');
+               activePerms.includes('all_sub_all') ||
+               activePerms.includes('assign_tasks') ||
+               activePerms.includes('completed_list') ||
+               activePerms.includes('pending_check_list') ||
+               activePerms.includes('check_list') ||
+               activePerms.includes('handover_list') ||
+               activePerms.includes('director_completed');
       case 'archive_records':
         return activePerms.includes('archive_records') ||
-               activePerms.includes('archive_sub_all');
+               activePerms.includes('archive_sub_all') ||
+               activePerms.includes('archive_assign_tasks') ||
+               activePerms.includes('archive_completed_list') ||
+               activePerms.includes('archive_pending_check_list') ||
+               activePerms.includes('archive_check_list') ||
+               activePerms.includes('archive_handover_list') ||
+               activePerms.includes('archive_director_completed');
       case 'registration_records':
         return activePerms.includes('registration_records');
       case 'other_records':
         return activePerms.includes('other_records') ||
-               activePerms.includes('other_sub_all');
+               activePerms.includes('other_sub_all') ||
+               activePerms.includes('other_assign_tasks') ||
+               activePerms.includes('other_check_list') ||
+               activePerms.includes('other_handover_list') ||
+               activePerms.includes('other_director_completed');
 
       // Child Tabs - Receive Group
       case 'receive_sub_create':

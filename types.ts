@@ -62,7 +62,6 @@ export const DEFAULT_ROLE_PERMISSIONS: RolePermissions = {
     'registration_records',
     'other_records', 'other_sub_all',
     'excerpt_management', 'VIEW_EXCERPTS',
-    'reports', 'VIEW_REPORTS',
     'work_schedule', 'VIEW_SCHEDULE',
     'utilities',
     'BTN_SUBMIT_SIGN'
