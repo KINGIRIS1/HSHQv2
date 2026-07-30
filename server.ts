@@ -253,13 +253,13 @@ const startServer = async () => {
         const distPath = path.join(process.cwd(), 'dist');
         server.use(express.static(distPath));
         
-        // SPA fallback for HTML requests
-        server.use((req: Request, res: Response, next: NextFunction) => {
-            if (req.method === 'GET' && req.headers.accept?.includes('text/html')) {
-                res.sendFile(path.join(distPath, 'index.html'));
-            } else {
-                next();
+        // SPA fallback for HTML and client routes in production
+        server.get('*', (req: Request, res: Response, next: NextFunction) => {
+            const isApi = ['/api', '/custom', '/system', '/updates', '/records', '/excerpt_history', '/excerpt_counters', '/employees', '/users'].some(p => req.path.startsWith(p));
+            if (isApi) {
+                return next();
             }
+            res.sendFile(path.join(distPath, 'index.html'));
         });
     }
 

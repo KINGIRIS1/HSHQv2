@@ -13,7 +13,7 @@ ALTER TABLE land_records ADD COLUMN IF NOT EXISTS "lastRemindedAt" timestamp;
 ALTER TABLE land_records ADD COLUMN IF NOT EXISTS "deadlineReminded" boolean;
 ALTER TABLE land_records ADD COLUMN IF NOT EXISTS "measurementNumber" text;
 ALTER TABLE land_records ADD COLUMN IF NOT EXISTS "excerptNumber" text;
-ALTER TABLE land_records ADD COLUMN IF NOT EXISTS "exportBatch" numeric;
+ALTER TABLE land_records ADD COLUMN IF NOT EXISTS "exportBatch" text;
 ALTER TABLE land_records ADD COLUMN IF NOT EXISTS "exportDate" date;
 ALTER TABLE land_records ADD COLUMN IF NOT EXISTS "handoverWard" text;
 ALTER TABLE land_records ADD COLUMN IF NOT EXISTS "authorizedBy" text;
@@ -37,4 +37,8 @@ ALTER TABLE land_records ADD COLUMN IF NOT EXISTS "advancePayment" numeric;
 ALTER TABLE land_records ADD COLUMN IF NOT EXISTS "isHandedOver" boolean;
 ALTER TABLE land_records ADD COLUMN IF NOT EXISTS "statusLogs" jsonb;
 ALTER TABLE land_records ADD COLUMN IF NOT EXISTS "archiveHandoverDate" date;
-ALTER TABLE land_records ADD COLUMN IF NOT EXISTS "archiveHandoverBatch" numeric;
+ALTER TABLE land_records ADD COLUMN IF NOT EXISTS "archiveHandoverBatch" text;
+
+-- Lệnh cập nhật lại kiểu cột nếu trước đây đã tạo nhầm kiểu numeric
+ALTER TABLE land_records ALTER COLUMN "exportBatch" TYPE text USING "exportBatch"::text;
+ALTER TABLE land_records ALTER COLUMN "archiveHandoverBatch" TYPE text USING "archiveHandoverBatch"::text;

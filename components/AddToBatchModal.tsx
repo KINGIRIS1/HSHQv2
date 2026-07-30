@@ -128,10 +128,12 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
       const numPadded = String(nextNum).padStart(2, '0');
       const todayFmt = formatDateDDMMYYYY(todayStr);
       const deptAbbr = getDeptAbbr(selectedDept);
-      const fullBatchName = `Đợt ${numPadded}-${deptAbbr}-${todayFmt}`;
+      const baseBatchName = `Đợt ${numPadded}-${deptAbbr}`;
+      const fullBatchName = `${baseBatchName}-${todayFmt}`;
 
       return {
           batchNum: nextNum,
+          baseBatchName: baseBatchName,
           batchName: fullBatchName,
           date: new Date().toISOString()
       };
@@ -294,8 +296,13 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
                         <Plus size={16} className="text-blue-600" /> Tạo đợt mới ({selectedDept})
                     </div>
                     <div className="mt-1.5 bg-white p-2.5 rounded border border-blue-200">
-                        <div className="text-xs text-gray-500 mb-1">Mã đợt giao tự động:</div>
-                        <div className="font-mono font-bold text-sm text-blue-800 break-all">{nextBatchInfo.batchName}</div>
+                        <div className="text-xs text-gray-500 mb-1">Mã đợt giao theo tab chuyên môn:</div>
+                        <div className="font-mono font-bold text-sm text-blue-800 break-all">
+                            {nextBatchInfo.batchName} 
+                            <span className="block text-[11px] font-normal text-gray-500 mt-0.5">
+                                (Tên đợt gốc: {nextBatchInfo.baseBatchName} — ngày tháng sẽ tự động thêm sau khi chốt đợt)
+                            </span>
+                        </div>
                     </div>
                 </div>
             </label>

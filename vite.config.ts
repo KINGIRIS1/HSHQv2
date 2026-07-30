@@ -20,8 +20,8 @@ customLogger.info = (msg, options) => {
 export default defineConfig({
   customLogger,
   plugins: [react()],
-  // QUAN TRỌNG: Dùng './' để hỗ trợ mọi đường dẫn con (GitHub Pages, Subfolder, Electron)
-  base: './', 
+  // Base path for web application deployment
+  base: '/', 
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './'),
