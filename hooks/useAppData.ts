@@ -147,6 +147,84 @@ export const useAppData = (currentUser: User | null) => {
         };
     }, []);
 
+    // Lắng nghe phiên bản mới từ Supabase Realtime & BroadcastChannel
+    useEffect(() => {
+        const checkUpdateStatus = async () => {
+            try {
+                const updateInfo = await fetchUpdateInfo();
+                if (updateInfo && updateInfo.version && updateInfo.version !== APP_VERSION) {
+                    setIsUpdateAvailable(true);
+                    setLatestVersion(updateInfo.version);
+                    setUpdateUrl(updateInfo.url);
+                } else {
+                    setIsUpdateAvailable(false);
+                }
+            } catch (e) {
+                console.warn("Check update status error:", e);
+            }
+        };
+
+        // Chạy ngay lập tức khi ứng dụng vừa mở
+        checkUpdateStatus();
+
+        // Lắng nghe sự kiện phát hành phiên bản ngay trên cùng window/tab
+        const handleCustomPublished = (e: any) => {
+            const ver = e.detail?.version;
+            const url = e.detail?.url;
+            if (ver && ver !== APP_VERSION) {
+                setIsUpdateAvailable(true);
+                setLatestVersion(ver);
+                if (url) setUpdateUrl(url);
+            } else {
+                checkUpdateStatus();
+            }
+        };
+        window.addEventListener('app_version_published', handleCustomPublished);
+
+        let settingsChannel: any = null;
+        if (supabase) {
+            settingsChannel = supabase.channel('system_settings_version_changes')
+                .on(
+                    'postgres_changes',
+                    { event: '*', schema: 'public', table: 'system_settings' },
+                    () => {
+                        checkUpdateStatus();
+                    }
+                )
+                .subscribe();
+        }
+
+        // BroadcastChannel cho kết nối liên tab / liên cửa sổ
+        let bc: BroadcastChannel | null = null;
+        if (typeof BroadcastChannel !== 'undefined') {
+            bc = new BroadcastChannel('app_version_channel');
+            bc.onmessage = (event) => {
+                if (event.data?.type === 'VERSION_PUBLISHED') {
+                    if (event.data.version && event.data.version !== APP_VERSION) {
+                        setIsUpdateAvailable(true);
+                        setLatestVersion(event.data.version);
+                        if (event.data.url) setUpdateUrl(event.data.url);
+                    } else {
+                        checkUpdateStatus();
+                    }
+                }
+            };
+        }
+
+        // Tự động kiểm tra định kỳ mỗi 5 giây + khi chuyển cửa sổ (focus)
+        const intervalId = setInterval(checkUpdateStatus, 5000);
+        const handleFocus = () => checkUpdateStatus();
+        window.addEventListener('focus', handleFocus);
+
+        return () => {
+            if (supabase && settingsChannel) supabase.removeChannel(settingsChannel);
+            if (bc) bc.close();
+            clearInterval(intervalId);
+            window.removeEventListener('focus', handleFocus);
+            window.removeEventListener('app_version_published', handleCustomPublished);
+        };
+    }, []);
+
     // --- Record Handlers ---
     const handleAddOrUpdateRecord = async (recordData: any): Promise<RecordFile | null> => {
         const isEdit = recordData.id && records.find(r => r.id === recordData.id);

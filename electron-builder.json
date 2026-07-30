@@ -1,0 +1,46 @@
+{
+  "appId": "com.quanlyhoso.app",
+  "productName": "Quan Ly Ho So",
+  "artifactName": "Quan-Ly-Ho-So-Setup-${version}.${ext}",
+  "asar": true,
+  "compression": "normal",
+  "directories": {
+    "output": "release"
+  },
+  "files": [
+    "dist",
+    "electron",
+    "package.json"
+  ],
+  "extraResources": [
+    {
+      "from": "server",
+      "to": "server",
+      "filter": [
+        "**/*",
+        "!db.json"
+      ]
+    }
+  ],
+  "win": {
+    "target": "nsis",
+    "icon": "public/icon.ico"
+  },
+  "nsis": {
+    "oneClick": false,
+    "perMachine": true,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "runAfterFinish": true,
+    "shortcutName": "Quan Ly Ho So",
+    "deleteAppDataOnUninstall": true,
+    "differentialPackage": true
+  },
+  "publish": [
+    {
+      "provider": "github",
+      "owner": "KINGIRIS1",
+      "repo": "QLHS2025"
+    }
+  ]
+}

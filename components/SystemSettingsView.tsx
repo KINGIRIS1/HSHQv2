@@ -602,17 +602,34 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
   };
 
   const handleSaveUpdateConfig = async () => {
-      if (!manualVersion.trim()) {
+      const ver = manualVersion.trim();
+      const url = manualUrl.trim();
+      if (!ver) {
           alert("Vui lòng nhập số phiên bản.");
           return;
       }
       setIsSavingUpdate(true);
-      const success = await saveUpdateInfo(manualVersion.trim(), manualUrl.trim());
+      const success = await saveUpdateInfo(ver, url);
       setIsSavingUpdate(false);
       if (success) {
-          alert(`Đã phát hành phiên bản ${manualVersion}!\nTất cả người dùng sẽ nhận được thông báo cập nhật sau vài giây.`);
+          // Bắn sự kiện qua BroadcastChannel cho các tab/cửa sổ khác
+          if (typeof BroadcastChannel !== 'undefined') {
+              try {
+                  const bc = new BroadcastChannel('app_version_channel');
+                  bc.postMessage({ type: 'VERSION_PUBLISHED', version: ver, url: url });
+                  bc.close();
+              } catch (e) {
+                  console.error("BroadcastChannel error:", e);
+              }
+          }
+          // Bắn sự kiện tức thì trên window ngay lập tức
+          window.dispatchEvent(new CustomEvent('app_version_published', { detail: { version: ver, url: url } }));
+
+          if (ver === APP_VERSION) {
+              alert(`Lưu cấu hình thành công!\n\nLưu ý: Số phiên bản vừa nhập (${ver}) trùng với phiên bản hiện tại (${APP_VERSION}). Để hiển thị thông báo nâng cấp cho các máy trạm, vui lòng nhập số phiên bản mới hơn (ví dụ: 2.2.0).`);
+          }
       } else {
-          alert("Lỗi khi lưu cấu hình cập nhật. Vui lòng thử lại.");
+          alert("Lỗi khi lưu cấu hình cập nhật. Vui lòng kiểm tra lại kết nối mạng hoặc thử lại.");
       }
   };
 

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { RecordFile, RecordStatus, Employee, User, UserRole, Message, RecordStatusLog } from './types';
-import { DEFAULT_WARDS as STATIC_WARDS, isArchiveRecordType, STATUS_LABELS } from './constants';
+import { DEFAULT_WARDS as STATIC_WARDS, isArchiveRecordType, STATUS_LABELS, APP_VERSION } from './constants';
 import Login from './components/Login'; 
 import MainLayout from './components/layout/MainLayout';
 import AppRoutes from './components/AppRoutes';
@@ -23,6 +23,7 @@ import { useReminderSystem } from './hooks/useReminderSystem';
 import { useIsMobile } from './hooks/useIsMobile';
 import MobileLayout from './components/layout/MobileLayout';
 import MobileRoutes from './components/mobile/MobileRoutes';
+import UpdateRequiredModal from './components/UpdateRequiredModal';
 import SubmitModal from './components/receive-record/SubmitModal';
 import GlobalConfirmModal from './components/GlobalConfirmModal';
 import GlobalAlertModal from './components/GlobalAlertModal';
@@ -166,6 +167,41 @@ function App() {
       loadData, handleAddOrUpdateRecord, handleDeleteRecord, handleImportRecords,
       handleSaveEmployee, handleDeleteEmployee, handleDeleteAllData, handleUpdateUser, handleDeleteUser
   } = useAppData(currentUser);
+
+  // Khi có phiên bản mới hoặc admin phát hành bản mới, tự động mở lại popup cập nhật ngay lập tức
+  useEffect(() => {
+      if (isUpdateAvailable) {
+          setUpdateDeferred(false);
+      }
+  }, [isUpdateAvailable, latestVersion]);
+
+  // Lắng nghe sự kiện phát hành phiên bản từ window / BroadcastChannel để lập tức hiển thị Modal
+  useEffect(() => {
+      const handleVersionPublished = (e: any) => {
+          const ver = e.detail?.version;
+          if (ver && ver !== APP_VERSION) {
+              setUpdateDeferred(false);
+          }
+      };
+      window.addEventListener('app_version_published', handleVersionPublished);
+
+      let bc: BroadcastChannel | null = null;
+      if (typeof BroadcastChannel !== 'undefined') {
+          bc = new BroadcastChannel('app_version_channel');
+          bc.onmessage = (event) => {
+              if (event.data?.type === 'VERSION_PUBLISHED') {
+                  if (event.data.version && event.data.version !== APP_VERSION) {
+                      setUpdateDeferred(false);
+                  }
+              }
+          };
+      }
+
+      return () => {
+          window.removeEventListener('app_version_published', handleVersionPublished);
+          if (bc) bc.close();
+      };
+  }, []);
 
   const records = useMemo(() => {
       return rawRecords;
@@ -908,18 +944,39 @@ function App() {
   }, [rejectReturnTargetRecords, currentUser]);
 
   if (!currentUser) return (
-    <Login 
-      onLogin={(user) => {
-        setCurrentUser(user);
-        setCurrentView('dashboard');
-      }} 
-      users={users} 
-    />
+    <>
+      <UpdateRequiredModal 
+        visible={isUpdateAvailable && !updateDeferred}
+        version={latestVersion}
+        downloadStatus={updateStatus}
+        progress={updateProgress}
+        downloadSpeed={updateSpeed}
+        onUpdateNow={handleUpdateNow}
+        onUpdateLater={handleUpdateLater}
+      />
+      <Login 
+        onLogin={(user) => {
+          setCurrentUser(user);
+          setCurrentView('dashboard');
+        }} 
+        users={users} 
+      />
+    </>
   );
 
   if (isMobile) {
     return (
-      <MobileLayout
+      <>
+        <UpdateRequiredModal 
+          visible={isUpdateAvailable && !updateDeferred}
+          version={latestVersion}
+          downloadStatus={updateStatus}
+          progress={updateProgress}
+          downloadSpeed={updateSpeed}
+          onUpdateNow={handleUpdateNow}
+          onUpdateLater={handleUpdateLater}
+        />
+        <MobileLayout
         currentUser={currentUser}
         currentView={currentView}
         setCurrentView={handleSetCurrentView}
@@ -1067,6 +1124,7 @@ function App() {
         <GlobalConfirmModal />
         <GlobalAlertModal />
       </MobileLayout>
+    </>
     );
   }
 
@@ -1079,7 +1137,7 @@ function App() {
         isMobileMenuOpen={isMobileMenuOpen}
         setIsMobileMenuOpen={setIsMobileMenuOpen}
         isGeneratingReport={isGeneratingReport}
-        isUpdateAvailable={false} 
+        isUpdateAvailable={isUpdateAvailable} 
         latestVersion={latestVersion}
         updateUrl={updateUrl}
         unreadMessages={unreadMessages}
@@ -1096,6 +1154,7 @@ function App() {
         updateSpeed={updateSpeed}
         onUpdateNow={handleUpdateNow}
         onUpdateLater={handleUpdateLater}
+        onReopenUpdateModal={() => setUpdateDeferred(false)}
     >
         <AppRoutes 
             currentView={currentView}

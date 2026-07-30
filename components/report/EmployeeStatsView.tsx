@@ -281,53 +281,6 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
     return (
         <div className="flex flex-col h-full bg-slate-100 p-6 overflow-y-auto">
             
-            {/* DEPARTMENT FILTER PILLS */}
-            <div className="bg-white p-3 rounded-xl shadow-sm border border-slate-200 mb-4 flex flex-wrap items-center gap-2 shrink-0">
-                <span className="text-xs font-bold text-slate-500 uppercase px-1 flex items-center gap-1">
-                    <ListFilter size={14} /> Lọc theo tổ:
-                </span>
-                <button
-                    onClick={() => { setDeptFilter('all'); setSelectedEmpId(''); }}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                        deptFilter === 'all'
-                            ? 'bg-indigo-600 text-white shadow-sm'
-                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                    }`}
-                >
-                    Tất cả các tổ
-                </button>
-                <button
-                    onClick={() => { setDeptFilter('archive'); setSelectedEmpId(''); }}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                        deptFilter === 'archive'
-                            ? 'bg-indigo-600 text-white shadow-sm'
-                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                    }`}
-                >
-                    Tổ Lưu trữ
-                </button>
-                <button
-                    onClick={() => { setDeptFilter('onedoor'); setSelectedEmpId(''); }}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                        deptFilter === 'onedoor'
-                            ? 'bg-indigo-600 text-white shadow-sm'
-                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                    }`}
-                >
-                    Bộ phận Một cửa
-                </button>
-                <button
-                    onClick={() => { setDeptFilter('measurement'); setSelectedEmpId(''); }}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                        deptFilter === 'measurement'
-                            ? 'bg-indigo-600 text-white shadow-sm'
-                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                    }`}
-                >
-                    Tổ Đo đạc / Kỹ thuật
-                </button>
-            </div>
-
             {/* 1. EMPLOYEE FILTER & TITLE */}
             <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-6 flex flex-col md:flex-row items-center gap-4 shrink-0">
                 <div className="flex items-center gap-3 w-full md:w-auto">

@@ -67,7 +67,7 @@ const MobileLayout: React.FC<MobileLayoutProps> = ({
         <div className="max-w-7xl mx-auto w-full flex justify-between items-center">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-full bg-white p-0.5 flex items-center justify-center shrink-0 border border-white/30 shadow-xs">
-              <img src="/icon.png?v=4" alt="Logo" className="w-full h-full object-contain rounded-full" />
+              <img src="./icon.png?v=4" alt="Logo" className="w-full h-full object-contain rounded-full" />
             </div>
             <h1 className="font-bold text-base sm:text-lg tracking-tight truncate">QLHS Mobile</h1>
           </div>

@@ -40,11 +40,19 @@ function startServer() {
   });
 }
 
+function getAppIconPath() {
+  const distIcon = path.join(__dirname, '../dist/icon.ico');
+  const publicIcon = path.join(__dirname, '../public/icon.ico');
+  if (fs.existsSync(distIcon)) return distIcon;
+  if (fs.existsSync(publicIcon)) return publicIcon;
+  return distIcon;
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
-    icon: path.join(__dirname, '../public/icon.ico'), 
+    icon: getAppIconPath(), 
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
@@ -235,7 +243,7 @@ ipcMain.handle('show-notification', async (event, { title, body }) => {
     const notification = new Notification({
       title: title,
       body: body,
-      icon: path.join(__dirname, '../public/icon.ico'),
+      icon: getAppIconPath(),
       silent: false 
     });
     notification.show();
@@ -260,7 +268,7 @@ ipcMain.handle('show-confirm-dialog', async (event, { message, title }) => {
     cancelId: 0,
     title: title || 'Xác nhận',
     message: message,
-    icon: path.join(__dirname, '../public/icon.ico')
+    icon: getAppIconPath()
   });
   return result.response === 1; 
 });

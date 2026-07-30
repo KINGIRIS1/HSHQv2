@@ -38,6 +38,7 @@ interface MainLayoutProps {
     updateSpeed?: number; // Prop mới
     onUpdateNow?: () => void;
     onUpdateLater?: () => void;
+    onReopenUpdateModal?: () => void;
 }
 
 const MainLayout: React.FC<MainLayoutProps> = ({
@@ -66,7 +67,8 @@ const MainLayout: React.FC<MainLayoutProps> = ({
     updateProgress = 0,
     updateSpeed = 0, // Default
     onUpdateNow = () => {},
-    onUpdateLater = () => {}
+    onUpdateLater = () => {},
+    onReopenUpdateModal
 }) => {
     const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
     const [showHelpModal, setShowHelpModal] = useState(false);
@@ -93,7 +95,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({
                 {/* LEFT: BRAND */}
                 <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-full bg-white p-0.5 flex items-center justify-center shrink-0 shadow-sm ring-1 ring-white/30">
-                        <img src="/icon.png?v=4" alt="Logo Hớn Quản" className="w-full h-full object-contain rounded-full" />
+                        <img src="./icon.png?v=4" alt="Logo Hớn Quản" className="w-full h-full object-contain rounded-full" />
                     </div>
                     <div className="flex flex-col leading-tight">
                         <h1 className="font-bold text-sm uppercase tracking-wide text-white whitespace-nowrap">
@@ -106,7 +108,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({
                 </div>
 
                 {/* RIGHT: USER INFO */}
-                <div className="relative flex items-center gap-2">
+                <div className="relative flex items-center gap-3">
                     <button 
                         onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
                         className="flex items-center gap-3 group cursor-pointer hover:bg-white/10 p-1.5 rounded-lg transition-colors outline-none focus:ring-2 focus:ring-blue-400/50"
