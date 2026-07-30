@@ -1,9 +1,9 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { RecordFile, RecordStatus, User, UserRole } from '../types';
-import { X, Calendar, Plus, History, CheckCircle2, AlertTriangle, Map, Building2 } from 'lucide-react';
+import { RecordFile, RecordStatus, User } from '../types';
+import { X, Plus, History, CheckCircle2, AlertTriangle, Map } from 'lucide-react';
 import { fetchChinhLyRecords } from '../services/apiUtilities';
 import { getWardLabel } from '../constants';
-import { getDepartmentForRecord, formatDateDDMMYYYY, formatDateDDMMYY, formatBatchName, getDeptAbbr } from '../utils/appHelpers';
+import { formatDateDDMMYYYY, formatBatchName } from '../utils/appHelpers';
 
 interface AddToBatchModalProps {
   isOpen: boolean;
@@ -17,8 +17,6 @@ interface AddToBatchModalProps {
   defaultDepartment?: string;
 }
 
-const DEPARTMENTS = ['Tổ Cấp giấy', 'Tổ Đo đạc', 'Tổ Lưu trữ'];
-
 const AddToBatchModal: React.FC<AddToBatchModalProps> = ({ 
   isOpen, 
   onClose, 
@@ -27,11 +25,8 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
   selectedCount,
   targetRecords = [],
   wards = [],
-  currentUser,
-  defaultDepartment
 }) => {
   const [mode, setMode] = useState<'new' | 'existing'>('new');
-  const [selectedDept, setSelectedDept] = useState<string>('Tổ Cấp giấy');
   const [selectedExistingBatch, setSelectedExistingBatch] = useState<string>('');
   
   // State xác nhận danh sách chỉnh lý
@@ -42,33 +37,13 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
   // Ngày hiện tại cho đợt mới (YYYY-MM-DD)
   const todayStr = new Date().toISOString().split('T')[0];
 
-  // Auto detect dominant department when opened
   useEffect(() => {
       if (isOpen) {
           setSelectedHandoverWard('');
           setNeedsCorrectionConfirm(false);
           setMode('new');
-
-          if (targetRecords && targetRecords.length > 0) {
-              const counts: Record<string, number> = { 'Tổ Cấp giấy': 0, 'Tổ Đo đạc': 0, 'Tổ Lưu trữ': 0 };
-              targetRecords.forEach(r => {
-                  const dept = getDepartmentForRecord(r);
-                  counts[dept] = (counts[dept] || 0) + 1;
-              });
-              let bestDept = 'Tổ Cấp giấy';
-              let maxCount = -1;
-              Object.entries(counts).forEach(([dept, cnt]) => {
-                  if (cnt > maxCount) {
-                      maxCount = cnt;
-                      bestDept = dept;
-                  }
-              });
-              setSelectedDept(bestDept);
-          } else if (defaultDepartment) {
-              setSelectedDept(defaultDepartment);
-          }
       }
-  }, [isOpen, targetRecords, defaultDepartment]);
+  }, [isOpen]);
 
   // State danh sách cảnh báo thực tế
   const [filteredWarningList, setFilteredWarningList] = useState<RecordFile[]>([]);
@@ -106,13 +81,11 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
       checkWarnings();
   }, [isOpen, targetIdsKey]);
 
-  // Tính số đợt tiếp theo cho Tổ được chọn trong ngày hôm nay
+  // Tính số đợt tiếp theo trong ngày hôm nay (không phân biệt Tổ)
   const nextBatchInfo = useMemo(() => {
       let maxBatch = 0;
       records.forEach(r => {
           if (!r.exportDate || !r.exportDate.startsWith(todayStr)) return;
-          const recDept = getDepartmentForRecord(r);
-          if (recDept !== selectedDept) return;
 
           if (r.exportBatch) {
               const batchStr = String(r.exportBatch);
@@ -127,38 +100,23 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
       const nextNum = maxBatch + 1;
       const numPadded = String(nextNum).padStart(2, '0');
       const todayFmt = formatDateDDMMYYYY(todayStr);
-      const deptAbbr = getDeptAbbr(selectedDept);
-      const baseBatchName = `Đợt ${numPadded}-${deptAbbr}`;
-      const fullBatchName = `${baseBatchName}-${todayFmt}`;
+      const fullBatchName = `Đợt ${numPadded}-${todayFmt}`;
 
       return {
           batchNum: nextNum,
-          baseBatchName: baseBatchName,
           batchName: fullBatchName,
           date: new Date().toISOString()
       };
-  }, [records, todayStr, selectedDept]);
+  }, [records, todayStr]);
 
-  // Danh sách đợt đã có (Chỉ lọc các đợt thuộc về Tổ được chọn)
+  // Danh sách đợt đã có (Toàn bộ các đợt trong hệ thống)
   const historyBatches = useMemo(() => {
       const batches: Record<string, { label: string, date: string, count: number, fullDate: string }> = {};
-      const targetAbbr = getDeptAbbr(selectedDept).toLowerCase();
       
       records.forEach(r => {
           if ((r.status === RecordStatus.HANDOVER || r.status === RecordStatus.SIGNED || r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED || r.exportBatch) && r.exportBatch && r.exportDate) {
-              const recDept = getDepartmentForRecord(r);
-              const batchStr = String(r.exportBatch).trim().toLowerCase();
-              
-              // Lọc nghiêm ngặt: chỉ giữ lại đợt của tổ chuyên môn đang được chọn
-              const matchesDept = recDept === selectedDept || 
-                                  batchStr.includes(`-${targetAbbr}-`) || 
-                                  batchStr.includes(`-${targetAbbr}`) ||
-                                  batchStr.startsWith(targetAbbr) || 
-                                  batchStr.startsWith(selectedDept.toLowerCase());
-              if (!matchesDept) return;
-
               const datePart = r.exportDate.split('T')[0];
-              const label = formatBatchName(r.exportBatch, recDept, datePart);
+              const label = formatBatchName(r.exportBatch, '', datePart);
               
               if (!batches[label]) {
                   batches[label] = { 
@@ -173,7 +131,7 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
       });
 
       return Object.values(batches).sort((a, b) => b.label.localeCompare(a.label));
-  }, [records, selectedDept]);
+  }, [records]);
 
   useEffect(() => {
       if (mode === 'existing') {
@@ -186,7 +144,7 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
               setSelectedExistingBatch('');
           }
       }
-  }, [mode, historyBatches, selectedExistingBatch, selectedDept]);
+  }, [mode, historyBatches, selectedExistingBatch]);
 
   if (!isOpen) return null;
 
@@ -235,25 +193,6 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
                 Bạn đang thực hiện chốt <strong>{selectedCount > 0 ? selectedCount : 'toàn bộ'}</strong> hồ sơ sang trạng thái "Đã giao 1 cửa".
             </p>
 
-            {/* CHỌN TỔ CHUYÊN MÔN GIAO HỒ SƠ */}
-            <div className="bg-slate-50 border border-slate-200 p-3 rounded-lg">
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5 flex items-center gap-1.5">
-                    <Building2 size={14} className="text-blue-600" /> Tổ chuyên môn bàn giao:
-                </label>
-                <div className="grid grid-cols-3 gap-2">
-                    {DEPARTMENTS.map(dept => (
-                        <button
-                            key={dept}
-                            type="button"
-                            onClick={() => setSelectedDept(dept)}
-                            className={`py-1.5 px-2 rounded-md text-xs font-bold transition-all border text-center ${selectedDept === dept ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100'}`}
-                        >
-                            {dept}
-                        </button>
-                    ))}
-                </div>
-            </div>
-
             {/* CẢNH BÁO CHỈNH LÝ BẢN ĐỒ */}
             {filteredWarningList.length > 0 && (
                 <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 animate-pulse">
@@ -293,15 +232,12 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
                 />
                 <div className="flex-1">
                     <div className="flex items-center gap-2 font-bold text-gray-800">
-                        <Plus size={16} className="text-blue-600" /> Tạo đợt mới ({selectedDept})
+                        <Plus size={16} className="text-blue-600" /> Tạo đợt mới trong ngày
                     </div>
                     <div className="mt-1.5 bg-white p-2.5 rounded border border-blue-200">
-                        <div className="text-xs text-gray-500 mb-1">Mã đợt giao theo tab chuyên môn:</div>
+                        <div className="text-xs text-gray-500 mb-1">Tên đợt giao tự động:</div>
                         <div className="font-mono font-bold text-sm text-blue-800 break-all">
-                            {nextBatchInfo.batchName} 
-                            <span className="block text-[11px] font-normal text-gray-500 mt-0.5">
-                                (Tên đợt gốc: {nextBatchInfo.baseBatchName} — ngày tháng sẽ tự động thêm sau khi chốt đợt)
-                            </span>
+                            {nextBatchInfo.batchName}
                         </div>
                     </div>
                 </div>
@@ -335,7 +271,7 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
                                     </option>
                                 ))
                             ) : (
-                                <option value="">Chưa có đợt nào của {selectedDept}</option>
+                                <option value="">Chưa có đợt nào trong hệ thống</option>
                             )}
                         </select>
                     </div>

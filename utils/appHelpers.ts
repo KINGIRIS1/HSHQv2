@@ -490,37 +490,54 @@ export function formatDateDDMMYY(d?: string | null): string {
     return d;
 }
 
-export function formatBatchName(batch: number | string | null | undefined, deptName: string, dateStr?: string | null): string {
+export function formatBatchName(batch: number | string | null | undefined, deptName?: string, dateStr?: string | null): string {
     if (!batch) return '';
-    const bStr = String(batch).trim();
-    if (bStr.includes('Đợt') || bStr.includes('CG') || bStr.includes('LT') || bStr.includes('DD') || bStr.includes('Tổ ')) {
+    let bStr = String(batch).trim();
+    if (!bStr) return '';
+
+    // Loại bỏ mã tổ chuyên môn cũ nếu có (-CG-, -LT-, -DD-, -Tổ Cấp giấy-)
+    bStr = bStr.replace(/-(CG|LT|DD|Tổ\s*[^-\s]+)-/gi, '-');
+
+    if (bStr.includes('Đợt') && bStr.includes('/')) {
         return bStr;
     }
-    const deptAbbr = getDeptAbbr(deptName);
+
     const dateFormatted = formatDateDDMMYYYY(dateStr);
+
+    const match = bStr.match(/Đợt\s*(\d+)/i) || bStr.match(/^(\d+)$/);
+    if (match && match[1]) {
+        const numPadded = String(parseInt(match[1], 10)).padStart(2, '0');
+        return `Đợt ${numPadded}-${dateFormatted}`;
+    }
+
+    if (bStr.startsWith('Đợt')) {
+        if (!bStr.includes('-') && dateFormatted) {
+            return `${bStr}-${dateFormatted}`;
+        }
+        return bStr;
+    }
+
     const numPadded = isNaN(Number(bStr)) ? bStr : String(bStr).padStart(2, '0');
-    return `Đợt ${numPadded}-${deptAbbr}-${dateFormatted}`;
+    return `Đợt ${numPadded}-${dateFormatted}`;
 }
 
 /**
  * Tự động gom các hồ sơ trước đây chưa chốt đợt (exportBatch rỗng/null)
- * thành đợt cuối cùng trong ngày theo từng tổ chuyên môn.
+ * thành đợt cuối cùng trong ngày.
  */
 export function migrateUnbatchedRecords(records: RecordFile[]): { migratedRecords: RecordFile[], hasChanges: boolean } {
     let hasChanges = false;
 
-    // Pass 1: Build map of existing batches by date (YYYY-MM-DD) and department
-    const existingBatchesByDateDept: Record<string, string> = {};
+    // Pass 1: Build map of existing batches by date (YYYY-MM-DD)
+    const existingBatchesByDate: Record<string, string> = {};
     records.forEach(r => {
         if (r.exportBatch && String(r.exportBatch).trim() !== '' && r.exportBatch !== 'NOT_BATCHED') {
             const rawDate = r.exportDate || r.completedDate;
             if (rawDate) {
                 const dateKey = String(rawDate).split('T')[0];
-                const dept = getDepartmentForRecord(r);
-                const key = `${dateKey}_${dept}`;
                 const currentBatchStr = String(r.exportBatch);
-                if (!existingBatchesByDateDept[key] || currentBatchStr.localeCompare(existingBatchesByDateDept[key], undefined, { numeric: true }) > 0) {
-                    existingBatchesByDateDept[key] = currentBatchStr;
+                if (!existingBatchesByDate[dateKey] || currentBatchStr.localeCompare(existingBatchesByDate[dateKey], undefined, { numeric: true }) > 0) {
+                    existingBatchesByDate[dateKey] = currentBatchStr;
                 }
             }
         }
@@ -529,9 +546,15 @@ export function migrateUnbatchedRecords(records: RecordFile[]): { migratedRecord
     const migratedRecords = records.map(r => {
         let currentBatch = r.exportBatch;
 
-        // Tự động làm sạch các tên đợt cũ bị lặp chữ "Đợt" (vd: Đợt Đợt Cuối -> Đợt Cuối)
+        // Tự động làm sạch các tên đợt cũ bị lặp chữ "Đợt"
         if (typeof currentBatch === 'string' && /^Đợt\s+Đợt/i.test(currentBatch)) {
             currentBatch = currentBatch.replace(/^Đợt\s+/i, '');
+            hasChanges = true;
+        }
+
+        // Tự động làm sạch các mã tổ chuyên môn thừa trong tên đợt (vd: Đợt 01-CG-30/07/2026 -> Đợt 01-30/07/2026)
+        if (typeof currentBatch === 'string' && /-(CG|LT|DD|Tổ\s*[^-\s]+)-/i.test(currentBatch)) {
+            currentBatch = currentBatch.replace(/-(CG|LT|DD|Tổ\s*[^-\s]+)-/gi, '-');
             hasChanges = true;
         }
 
@@ -540,15 +563,12 @@ export function migrateUnbatchedRecords(records: RecordFile[]): { migratedRecord
 
         if (isHandedOver && missingBatch) {
             hasChanges = true;
-            const dept = getDepartmentForRecord(r);
-            const deptAbbr = getDeptAbbr(dept);
             const rawDate = r.exportDate || r.completedDate || r.receivedDate || new Date().toISOString();
             const dateKey = String(rawDate).split('T')[0];
             const dateFmt = formatDateDDMMYYYY(rawDate);
-            const key = `${dateKey}_${dept}`;
 
-            // Priority: assign to existing batch of that day & dept if available, else create 'Đợt Cuối'
-            const defaultBatchName = existingBatchesByDateDept[key] || `Đợt Cuối-${deptAbbr}-${dateFmt}`;
+            // Priority: assign to existing batch of that day if available, else create 'Đợt Cuối'
+            const defaultBatchName = existingBatchesByDate[dateKey] || `Đợt Cuối-${dateFmt}`;
 
             return {
                 ...r,
@@ -562,14 +582,12 @@ export function migrateUnbatchedRecords(records: RecordFile[]): { migratedRecord
         // Tự động chuẩn hóa đợt số cũ (ví dụ: exportBatch = 1) thành chuỗi tên đợt chuẩn
         if (currentBatch && typeof currentBatch === 'number') {
             hasChanges = true;
-            const dept = getDepartmentForRecord(r);
-            const deptAbbr = getDeptAbbr(dept);
             const rawDate = r.exportDate || r.completedDate || r.receivedDate || new Date().toISOString();
             const dateFmt = formatDateDDMMYYYY(rawDate);
             const numStr = String(currentBatch).padStart(2, '0');
             return {
                 ...r,
-                exportBatch: `Đợt ${numStr}-${deptAbbr}-${dateFmt}`
+                exportBatch: `Đợt ${numStr}-${dateFmt}`
             };
         }
 
