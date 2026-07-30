@@ -1,22 +1,33 @@
 import React, { useState, useMemo } from 'react';
 import { RecordFile, RecordStatus, Employee } from '../../types';
 import { getShortRecordType } from '../../constants';
-import { FileSpreadsheet, Receipt, HandCoins, Users, ChevronLeft, ChevronRight, Search } from 'lucide-react';
+import { removeVietnameseTones } from '../../utils/appHelpers';
+import { FileSpreadsheet, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import * as XLSX from 'xlsx-js-style';
 
 interface RevenueStatsViewProps {
     records: RecordFile[];
     employees: Employee[];
+    wards?: string[];
+    selectedWard?: string;
     fromDate?: string;
     toDate?: string;
+    onFilteredRecordsChange?: (records: RecordFile[]) => void;
 }
 
-const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({ records, employees, fromDate, toDate }) => {
+const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({ 
+    records, 
+    employees, 
+    wards,
+    selectedWard = 'all',
+    fromDate, 
+    toDate,
+    onFilteredRecordsChange
+}) => {
     // Card filter selection: 'all' | 'bien_lai' | 'hoa_don'
     const [activeCardFilter, setActiveCardFilter] = useState<'all' | 'bien_lai' | 'hoa_don'>('all');
     
     // Additional filters
-    const [selectedReceiver, setSelectedReceiver] = useState<string>('all');
     const [searchTerm, setSearchTerm] = useState<string>('');
     const [currentPage, setCurrentPage] = useState<number>(1);
     const [mobileVisibleCount, setMobileVisibleCount] = useState<number>(20);
@@ -44,10 +55,6 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({ records, employees,
         }
 
         return records
-            // 1. Chỉ đưa vào danh sách nguồn thu các hồ sơ đã hoàn thành giao trả/trả kết quả:
-            // - Trạng thái Đã trả kết quả (RETURNED)
-            // - HOẶC Đã chuyển giao Một cửa (HANDOVER) có ngày trả kết quả / ngày xuất / ngày hoàn thành / biên lai thu tiền hợp lệ
-            // Loại bỏ hoàn toàn các hồ sơ đang xử lý nội bộ chưa hoàn thành giao trả.
             .filter(r => {
                 if (r.status === RecordStatus.RETURNED) return true;
                 if (r.status === RecordStatus.HANDOVER) {
@@ -107,7 +114,7 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({ records, employees,
             })
             // Only include records with revenue or receipt/invoice recorded
             .filter(r => r.calcReturned > 0 || (r.receiptNumber && r.receiptNumber.trim() !== ''))
-            // Filter strictly by resultReturnedDate or exportDate or completedDate (Loại bỏ hoàn toàn fallback về receivedDate)
+            // Filter strictly by resultReturnedDate or exportDate or completedDate
             .filter(r => {
                 if (!dateStart || !dateEnd) return true;
                 const targetDateStr = r.resultReturnedDate || r.exportDate || r.completedDate;
@@ -127,18 +134,28 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({ records, employees,
             });
     }, [records, employees, fromDate, toDate]);
 
-    // KPI Summary for 3 Top Cards
+    // Ward-filtered revenue records using top filter bar selection
+    const wardFilteredRevenueRecords = useMemo(() => {
+        if (!selectedWard || selectedWard === 'all') return revenueRecords;
+        const sWard = removeVietnameseTones(selectedWard);
+        return revenueRecords.filter(r => {
+            const w1 = removeVietnameseTones(r.assignedWard || '');
+            const w2 = removeVietnameseTones(r.ward || '');
+            const w3 = removeVietnameseTones(r.handoverWard || '');
+            return w1.includes(sWard) || w2.includes(sWard) || w3.includes(sWard);
+        });
+    }, [revenueRecords, selectedWard]);
+
+    // KPI Summary for 3 Top Controls
     const cardMetrics = useMemo(() => {
         let totalSum = 0;
         let totalCount = 0;
-
         let bienLaiSum = 0;
         let bienLaiCount = 0;
-
         let hoaDonSum = 0;
         let hoaDonCount = 0;
 
-        revenueRecords.forEach(r => {
+        wardFilteredRevenueRecords.forEach(r => {
             totalSum += r.calcReturned;
             totalCount++;
 
@@ -159,42 +176,28 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({ records, employees,
             hoaDonSum,
             hoaDonCount
         };
-    }, [revenueRecords]);
+    }, [wardFilteredRevenueRecords]);
 
-    // Get list of unique assigned wards for dropdown filter
-    const wardOptions = useMemo(() => {
-        const set = new Set<string>();
-        revenueRecords.forEach(r => {
-            if (r.assignedWard) set.add(r.assignedWard);
-        });
-        return Array.from(set);
-    }, [revenueRecords]);
-
-    // Filtered records for table
+    // Filtered records for table & search
     const filteredRecords = useMemo(() => {
-        return revenueRecords.filter(r => {
+        return wardFilteredRevenueRecords.filter(r => {
             // Card filter
             if (activeCardFilter === 'bien_lai' && r.computedReceiptType !== 'Biên Lai') return false;
             if (activeCardFilter === 'hoa_don' && r.computedReceiptType !== 'Hóa Đơn') return false;
 
-            // Ward filter
-            if (selectedReceiver !== 'all') {
-                if (r.assignedWard !== selectedReceiver) return false;
-            }
-
             // Search term
             if (searchTerm.trim()) {
-                const term = searchTerm.toLowerCase();
-                const matchCode = r.code?.toLowerCase().includes(term);
-                const matchName = r.customerName?.toLowerCase().includes(term);
-                const matchReceipt = r.receiptNumber?.toLowerCase().includes(term);
-                const matchWard = r.assignedWard?.toLowerCase().includes(term);
+                const term = removeVietnameseTones(searchTerm.toLowerCase());
+                const matchCode = removeVietnameseTones(r.code || '').toLowerCase().includes(term);
+                const matchName = removeVietnameseTones(r.customerName || '').toLowerCase().includes(term);
+                const matchReceipt = removeVietnameseTones(r.receiptNumber || '').toLowerCase().includes(term);
+                const matchWard = removeVietnameseTones(r.assignedWard || '').toLowerCase().includes(term);
                 if (!matchCode && !matchName && !matchReceipt && !matchWard) return false;
             }
 
             return true;
         });
-    }, [revenueRecords, activeCardFilter, selectedReceiver, searchTerm]);
+    }, [wardFilteredRevenueRecords, activeCardFilter, searchTerm]);
 
     // Total & sub-totals collected for filtered set
     const filteredStats = useMemo(() => {
@@ -263,111 +266,77 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({ records, employees,
     };
 
     return (
-        <div className="flex flex-col h-full bg-[#f8fafc] p-4 md:p-6 gap-6 overflow-y-auto animate-fade-in-up">
+        <div className="flex flex-col h-full bg-white p-4 md:p-6 animate-fade-in-up overflow-y-auto">
             
-            {/* 1. TOP 3 KPI CONTROLS (Pill Segmented Controls) */}
-            <div className="w-full">
-                <div className="inline-flex items-center bg-slate-200/80 p-1 rounded-xl gap-1 text-xs font-semibold overflow-x-auto max-w-full">
-                    <button
-                        type="button"
-                        onClick={() => handleCardFilterChange('all')}
-                        className={`px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
-                            activeCardFilter === 'all'
-                                ? 'bg-white text-teal-700 shadow-xs font-bold'
-                                : 'text-slate-600 hover:text-slate-900'
-                        }`}
-                    >
-                        <span>Tổng thu:</span>
-                        <span className="font-bold text-teal-600">{cardMetrics.totalSum.toLocaleString('vi-VN')} đ</span>
-                        <span className="text-[11px] text-slate-500 font-medium">({cardMetrics.totalCount} hs)</span>
-                    </button>
-
-                    <button
-                        type="button"
-                        onClick={() => handleCardFilterChange('bien_lai')}
-                        className={`px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
-                            activeCardFilter === 'bien_lai'
-                                ? 'bg-white text-blue-700 shadow-xs font-bold'
-                                : 'text-slate-600 hover:text-slate-900'
-                        }`}
-                    >
-                        <span>Thu biên lai:</span>
-                        <span className="font-bold text-blue-600">{cardMetrics.bienLaiSum.toLocaleString('vi-VN')} đ</span>
-                        <span className="text-[11px] text-slate-500 font-medium">({cardMetrics.bienLaiCount} hs)</span>
-                    </button>
-
-                    <button
-                        type="button"
-                        onClick={() => handleCardFilterChange('hoa_don')}
-                        className={`px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
-                            activeCardFilter === 'hoa_don'
-                                ? 'bg-white text-orange-700 shadow-xs font-bold'
-                                : 'text-slate-600 hover:text-slate-900'
-                        }`}
-                    >
-                        <span>Thu hóa đơn:</span>
-                        <span className="font-bold text-orange-600">{cardMetrics.hoaDonSum.toLocaleString('vi-VN')} đ</span>
-                        <span className="text-[11px] text-slate-500 font-medium">({cardMetrics.hoaDonCount} hs)</span>
-                    </button>
-                </div>
-            </div>
-
-            {/* 2. MAIN DETAIL REVENUE TABLE CARD */}
-            <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden flex flex-col flex-1">
+            {/* MAIN DETAIL REVENUE TABLE CARD */}
+            <div className="border border-slate-200 rounded-2xl overflow-hidden bg-white shadow-sm flex flex-col flex-1 min-h-[450px]">
                 
-                {/* Header Section */}
-                <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-wrap items-center justify-between gap-4">
-                    {/* Summary Bar replacing the title */}
-                    <div className="flex flex-wrap items-center gap-4 sm:gap-6 p-1.5 sm:p-2 bg-slate-100/90 rounded-2xl text-xs sm:text-sm">
-                        <div className="bg-white rounded-xl px-4 py-2 shadow-xs border border-slate-200/80 flex items-center gap-1.5">
-                            <span className="font-bold text-teal-700">Tổng thu:</span>
-                            <span className="font-bold text-teal-700 font-mono">{filteredStats.totalAmount.toLocaleString('vi-VN')} đ</span>
-                            <span className="text-slate-500 font-normal ml-0.5">({filteredStats.totalCount} hs)</span>
-                        </div>
-                        <div className="px-2 py-1 flex items-center gap-1.5 text-slate-700">
-                            <span className="font-medium">Thu biên lai:</span>
-                            <span className="font-bold font-mono text-blue-600">{filteredStats.bienLaiAmount.toLocaleString('vi-VN')} đ</span>
-                            <span className="text-slate-500 font-normal">({filteredStats.bienLaiCount} hs)</span>
-                        </div>
-                        <div className="px-2 py-1 flex items-center gap-1.5 text-slate-700">
-                            <span className="font-medium">Thu hóa đơn:</span>
-                            <span className="font-bold font-mono text-orange-600">{filteredStats.hoaDonAmount.toLocaleString('vi-VN')} đ</span>
-                            <span className="text-slate-500 font-normal">({filteredStats.hoaDonCount} hs)</span>
+                {/* Embedded filters toolbar matching DailyStatsView */}
+                <div className="px-6 py-3.5 bg-slate-50 border-b border-gray-200 flex flex-wrap items-center justify-between gap-4 shrink-0">
+                    
+                    {/* Segmented Pills for Revenue Category */}
+                    <div className="flex-1 min-w-[320px]">
+                        <div className="inline-flex items-center bg-slate-200/80 p-1 rounded-xl gap-1 text-xs font-semibold w-full sm:w-auto h-[38px]">
+                            <button
+                                type="button"
+                                onClick={() => handleCardFilterChange('all')}
+                                className={`px-3 py-1 rounded-lg transition-all flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer h-full ${
+                                    activeCardFilter === 'all'
+                                        ? 'bg-white text-teal-700 shadow-xs font-bold'
+                                        : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                            >
+                                <span>Tất cả:</span>
+                                <span className="font-bold text-teal-600 font-mono">{cardMetrics.totalSum.toLocaleString('vi-VN')} đ</span>
+                                <span className="text-[10px] text-slate-500 font-normal">({cardMetrics.totalCount})</span>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => handleCardFilterChange('bien_lai')}
+                                className={`px-3 py-1 rounded-lg transition-all flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer h-full ${
+                                    activeCardFilter === 'bien_lai'
+                                        ? 'bg-white text-blue-700 shadow-xs font-bold'
+                                        : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                            >
+                                <span>Biên lai:</span>
+                                <span className="font-bold text-blue-600 font-mono">{cardMetrics.bienLaiSum.toLocaleString('vi-VN')} đ</span>
+                                <span className="text-[10px] text-slate-500 font-normal">({cardMetrics.bienLaiCount})</span>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => handleCardFilterChange('hoa_don')}
+                                className={`px-3 py-1 rounded-lg transition-all flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer h-full ${
+                                    activeCardFilter === 'hoa_don'
+                                        ? 'bg-white text-orange-700 shadow-xs font-bold'
+                                        : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                            >
+                                <span>Hóa đơn:</span>
+                                <span className="font-bold text-orange-600 font-mono">{cardMetrics.hoaDonSum.toLocaleString('vi-VN')} đ</span>
+                                <span className="text-[10px] text-slate-500 font-normal">({cardMetrics.hoaDonCount})</span>
+                            </button>
                         </div>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-3">
-                        {/* Search Input */}
-                        <div className="relative">
-                            <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
+                    {/* Search Input & Export Button */}
+                    <div className="flex items-center gap-3 w-full sm:w-auto">
+                        <div className="relative flex-1 sm:w-56">
+                            <Search size={14} className="absolute left-3 top-3 text-slate-400" />
                             <input 
                                 type="text"
-                                placeholder="Tìm kiếm hồ sơ..."
+                                placeholder="Tìm hồ sơ, BL..."
                                 value={searchTerm}
                                 onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-                                className="pl-8 pr-3 py-1.5 text-xs border border-slate-200 rounded-xl outline-none focus:border-emerald-500 bg-slate-50/50 w-40 sm:w-52 font-medium"
+                                className="w-full pl-8 pr-3 py-1.5 text-xs border border-slate-300 rounded-xl outline-none focus:border-emerald-500 bg-white h-[38px] font-medium"
                             />
                         </div>
 
-                        {/* Ward Dropdown */}
-                        <div className="relative flex items-center">
-                            <Users size={14} className="absolute left-3 text-slate-500 z-10 pointer-events-none" />
-                            <select
-                                value={selectedReceiver}
-                                onChange={(e) => { setSelectedReceiver(e.target.value); setCurrentPage(1); }}
-                                className="pl-8 pr-8 py-1.5 text-xs font-semibold text-slate-700 border border-slate-200 rounded-xl outline-none bg-slate-50 hover:bg-slate-100 cursor-pointer appearance-none"
-                            >
-                                <option value="all">Xã phân công (Tất cả)</option>
-                                {wardOptions.map(ward => (
-                                    <option key={ward} value={ward}>{ward}</option>
-                                ))}
-                            </select>
-                        </div>
-
-                        {/* Export Excel Button */}
                         <button
                             onClick={handleExportExcel}
-                            className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm flex items-center gap-1.5 transition-all active:scale-95 shrink-0"
+                            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer h-[38px] shrink-0"
                         >
                             <FileSpreadsheet size={15} /> Xuất Excel ({filteredRecords.length})
                         </button>

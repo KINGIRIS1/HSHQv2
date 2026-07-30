@@ -13,13 +13,39 @@ interface EmployeeStatsViewProps {
     toDate: string;
     selectedEmpId: string;
     setSelectedEmpId: (id: string) => void;
+    defaultDeptFilter?: 'all' | 'archive' | 'onedoor' | 'measurement';
 }
 
 const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({ 
-    records, employees, fromDate, toDate, selectedEmpId, setSelectedEmpId 
+    records, employees, fromDate, toDate, selectedEmpId, setSelectedEmpId, defaultDeptFilter = 'all' 
 }) => {
     const [aiEvaluation, setAiEvaluation] = useState<string>('');
     const [isGenerating, setIsGenerating] = useState(false);
+    const [deptFilter, setDeptFilter] = useState<'all' | 'archive' | 'onedoor' | 'measurement'>(defaultDeptFilter);
+
+    // Synchronize deptFilter if defaultDeptFilter changes
+    React.useEffect(() => {
+        if (defaultDeptFilter) {
+            setDeptFilter(defaultDeptFilter);
+        }
+    }, [defaultDeptFilter]);
+
+    // Filter employees by department (separating One-Door from Archive)
+    const filteredEmployeesByDept = useMemo(() => {
+        return employees.filter(emp => {
+            const d = (emp.department || '').toLowerCase();
+            if (deptFilter === 'archive') {
+                return d.includes('lưu trữ') && !d.includes('một cửa') && !d.includes('hành chính');
+            }
+            if (deptFilter === 'onedoor') {
+                return d.includes('một cửa') || d.includes('hành chính');
+            }
+            if (deptFilter === 'measurement') {
+                return d.includes('đo đạc') || d.includes('kỹ thuật');
+            }
+            return true;
+        });
+    }, [employees, deptFilter]);
 
     // Filter records by date range first
     const recordsInTimeRange = useMemo(() => {
@@ -93,6 +119,83 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
             totalOverdue: overduePendingCount + overdueCompletedCount
         };
     }, [recordsInTimeRange, selectedEmpId]);
+
+    // Summary table for all employees when no specific employee is selected
+    const employeeSummaryList = useMemo(() => {
+        const today = new Date(); today.setHours(0,0,0,0);
+
+        return filteredEmployeesByDept.map(emp => {
+            const empRecords = recordsInTimeRange.filter(r => r.assignedTo === emp.id);
+            const totalAssigned = empRecords.length;
+
+            let completed = 0;
+            let processing = 0;
+            let overdueCompleted = 0;
+            let overduePending = 0;
+
+            empRecords.forEach(r => {
+                const isFinished = [
+                    RecordStatus.HANDOVER, 
+                    RecordStatus.RETURNED, 
+                    RecordStatus.WITHDRAWN, 
+                    RecordStatus.SIGNED
+                ].includes(r.status) || !!r.exportBatch || !!r.exportDate;
+
+                if (isFinished) {
+                    completed++;
+                    if (r.deadline && r.completedDate) {
+                        const d = new Date(r.deadline); d.setHours(0,0,0,0);
+                        const c = new Date(r.completedDate); c.setHours(0,0,0,0);
+                        if (c > d) overdueCompleted++;
+                    }
+                } else {
+                    processing++;
+                    if (r.deadline) {
+                        const d = new Date(r.deadline); d.setHours(0,0,0,0);
+                        if (today > d) overduePending++;
+                    }
+                }
+            });
+
+            return {
+                employee: emp,
+                totalAssigned,
+                completed,
+                processing,
+                overdueCompleted,
+                overduePending
+            };
+        }).sort((a, b) => b.totalAssigned - a.totalAssigned);
+    }, [filteredEmployeesByDept, recordsInTimeRange]);
+
+    const handleExportSummaryExcel = () => {
+        const dataToExport = employeeSummaryList.map((item, idx) => ({
+            'STT': idx + 1,
+            'Tên cán bộ': item.employee.name,
+            'Phòng / Tổ': item.employee.department || 'Tổ chuyên môn',
+            'Hồ sơ giao': item.totalAssigned,
+            'Đã xong': item.completed,
+            'Đang xử lý': item.processing,
+            'Trễ đã xong': item.overdueCompleted,
+            'Trễ chưa xong': item.overduePending
+        }));
+
+        const ws = XLSX.utils.json_to_sheet(dataToExport);
+        ws['!cols'] = [
+            { wch: 5 },
+            { wch: 25 },
+            { wch: 20 },
+            { wch: 12 },
+            { wch: 12 },
+            { wch: 12 },
+            { wch: 12 },
+            { wch: 12 }
+        ];
+
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "ThongKeNhanVien");
+        XLSX.writeFile(wb, `Bao_Cao_Thong_Ke_Nhan_Vien_${fromDate}_${toDate}.xlsx`);
+    };
 
     const handleGenerateReview = async () => {
         if (!stats || !selectedEmpId) return;
@@ -178,6 +281,53 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
     return (
         <div className="flex flex-col h-full bg-slate-100 p-6 overflow-y-auto">
             
+            {/* DEPARTMENT FILTER PILLS */}
+            <div className="bg-white p-3 rounded-xl shadow-sm border border-slate-200 mb-4 flex flex-wrap items-center gap-2 shrink-0">
+                <span className="text-xs font-bold text-slate-500 uppercase px-1 flex items-center gap-1">
+                    <ListFilter size={14} /> Lọc theo tổ:
+                </span>
+                <button
+                    onClick={() => { setDeptFilter('all'); setSelectedEmpId(''); }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        deptFilter === 'all'
+                            ? 'bg-indigo-600 text-white shadow-sm'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                >
+                    Tất cả các tổ
+                </button>
+                <button
+                    onClick={() => { setDeptFilter('archive'); setSelectedEmpId(''); }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        deptFilter === 'archive'
+                            ? 'bg-indigo-600 text-white shadow-sm'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                >
+                    Tổ Lưu trữ
+                </button>
+                <button
+                    onClick={() => { setDeptFilter('onedoor'); setSelectedEmpId(''); }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        deptFilter === 'onedoor'
+                            ? 'bg-indigo-600 text-white shadow-sm'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                >
+                    Bộ phận Một cửa
+                </button>
+                <button
+                    onClick={() => { setDeptFilter('measurement'); setSelectedEmpId(''); }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        deptFilter === 'measurement'
+                            ? 'bg-indigo-600 text-white shadow-sm'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                >
+                    Tổ Đo đạc / Kỹ thuật
+                </button>
+            </div>
+
             {/* 1. EMPLOYEE FILTER & TITLE */}
             <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-6 flex flex-col md:flex-row items-center gap-4 shrink-0">
                 <div className="flex items-center gap-3 w-full md:w-auto">
@@ -199,18 +349,26 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
                             onChange={(e) => { setSelectedEmpId(e.target.value); setAiEvaluation(''); }}
                         >
                             <option value="">-- Tổng hợp tất cả nhân viên --</option>
-                            {employees.map(emp => (
+                            {filteredEmployeesByDept.map(emp => (
                                 <option key={emp.id} value={emp.id}>{emp.name} - {emp.department}</option>
                             ))}
                         </select>
                     </div>
-                    {selectedEmpId && (
+                    {selectedEmpId ? (
                         <button 
                             onClick={handleExportEmployeeRecords}
-                            className="hidden md:flex bg-green-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-green-700 shadow-sm items-center gap-2 whitespace-nowrap"
+                            className="hidden md:flex bg-green-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-green-700 shadow-sm items-center gap-2 whitespace-nowrap cursor-pointer"
                             title="Xuất danh sách hồ sơ của nhân viên này"
                         >
                             <FileSpreadsheet size={18} /> Xuất DS
+                        </button>
+                    ) : (
+                        <button 
+                            onClick={handleExportSummaryExcel}
+                            className="hidden md:flex bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-emerald-700 shadow-sm items-center gap-2 whitespace-nowrap cursor-pointer"
+                            title="Xuất báo cáo tổng hợp nhân viên"
+                        >
+                            <FileSpreadsheet size={18} /> Xuất Báo Cáo
                         </button>
                     )}
                 </div>
@@ -323,9 +481,111 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
                     </div>
                 </div>
             ) : (
-                <div className="flex flex-col items-center justify-center h-64 bg-white rounded-xl border border-dashed border-slate-300 text-gray-400 m-4 shadow-sm">
-                    <UserIcon size={48} className="mb-3 opacity-20"/>
-                    <p className="text-sm font-medium">Vui lòng chọn một nhân viên cụ thể ở trên để xem chi tiết.</p>
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col flex-1 animate-fade-in min-h-[400px]">
+                    {/* Header bar */}
+                    <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                        <div className="flex items-center gap-2">
+                            <UserIcon size={18} className="text-slate-600" />
+                            <h3 className="font-bold text-slate-800 text-sm sm:text-base uppercase tracking-wide">
+                                BẢNG THỐNG KÊ NHÂN VIÊN
+                            </h3>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <span className="bg-indigo-50 text-indigo-700 font-bold px-3 py-1 rounded-full text-xs border border-indigo-100">
+                                Cán bộ: {filteredEmployeesByDept.length}
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* Table */}
+                    <div className="flex-1 overflow-x-auto overflow-y-auto custom-scrollbar">
+                        <table className="w-full text-left text-xs sm:text-sm border-collapse">
+                            <thead className="bg-slate-50/90 text-slate-500 font-bold text-[11px] sm:text-xs uppercase sticky top-0 border-b border-slate-200 z-10">
+                                <tr>
+                                    <th className="py-3.5 px-4 text-center w-12">STT</th>
+                                    <th className="py-3.5 px-4 text-left">TÊN CÁN BỘ</th>
+                                    <th className="py-3.5 px-4 text-center">HỒ SƠ GIAO</th>
+                                    <th className="py-3.5 px-4 text-center">ĐÃ XONG</th>
+                                    <th className="py-3.5 px-4 text-center">ĐANG XỬ LÝ</th>
+                                    <th className="py-3.5 px-4 text-center">TRỄ ĐÃ XONG</th>
+                                    <th className="py-3.5 px-4 text-center">TRỄ CHƯA XONG</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {employeeSummaryList.map((item, idx) => (
+                                    <tr 
+                                        key={item.employee.id} 
+                                        onClick={() => setSelectedEmpId(item.employee.id)}
+                                        className="hover:bg-indigo-50/30 transition-colors cursor-pointer group"
+                                    >
+                                        <td className="py-3.5 px-4 text-center font-semibold text-slate-400 group-hover:text-slate-600">
+                                            {idx + 1}
+                                        </td>
+                                        <td className="py-3.5 px-4">
+                                            <div className="font-bold text-slate-800 text-sm group-hover:text-indigo-600 transition-colors">
+                                                {item.employee.name}
+                                            </div>
+                                            <div className="text-xs text-slate-400 font-normal mt-0.5">
+                                                {item.employee.department || 'Tổ chuyên môn'}
+                                            </div>
+                                        </td>
+                                        <td className="py-3.5 px-4 text-center">
+                                            <span className={`inline-flex items-center justify-center px-3 py-1 rounded-full text-xs font-bold min-w-[48px] ${
+                                                item.totalAssigned > 0 
+                                                    ? 'bg-blue-50 text-blue-600 border border-blue-100/50' 
+                                                    : 'bg-slate-100 text-slate-400'
+                                            }`}>
+                                                {item.totalAssigned}
+                                            </span>
+                                        </td>
+                                        <td className="py-3.5 px-4 text-center">
+                                            <span className={`inline-flex items-center justify-center px-3 py-1 rounded-full text-xs font-bold min-w-[48px] ${
+                                                item.completed > 0 
+                                                    ? 'bg-emerald-50 text-emerald-600 border border-emerald-100/50' 
+                                                    : 'bg-slate-100 text-slate-400'
+                                            }`}>
+                                                {item.completed}
+                                            </span>
+                                        </td>
+                                        <td className="py-3.5 px-4 text-center">
+                                            <span className={`inline-flex items-center justify-center px-3 py-1 rounded-full text-xs font-bold min-w-[48px] ${
+                                                item.processing > 0 
+                                                    ? 'bg-amber-50 text-amber-600 border border-amber-100/50' 
+                                                    : 'bg-slate-100 text-slate-400'
+                                            }`}>
+                                                {item.processing}
+                                            </span>
+                                        </td>
+                                        <td className="py-3.5 px-4 text-center">
+                                            <span className={`inline-flex items-center justify-center px-3 py-1 rounded-full text-xs font-bold min-w-[48px] ${
+                                                item.overdueCompleted > 0 
+                                                    ? 'bg-rose-50 text-rose-600 border border-rose-100/50' 
+                                                    : 'bg-slate-100 text-slate-400'
+                                            }`}>
+                                                {item.overdueCompleted}
+                                            </span>
+                                        </td>
+                                        <td className="py-3.5 px-4 text-center">
+                                            <span className={`inline-flex items-center justify-center px-3 py-1 rounded-full text-xs font-bold min-w-[48px] ${
+                                                item.overduePending > 0 
+                                                    ? 'bg-red-100 text-red-700 border border-red-200/60' 
+                                                    : 'bg-slate-100 text-slate-400'
+                                            }`}>
+                                                {item.overduePending}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                ))}
+                                {employeeSummaryList.length === 0 && (
+                                    <tr>
+                                        <td colSpan={7} className="py-8 text-center text-slate-400 italic">
+                                            Chưa có dữ liệu cán bộ.
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             )}
         </div>

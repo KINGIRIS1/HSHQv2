@@ -197,7 +197,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
         } else {
             return employees.filter(e => {
                 const dept = e.department?.toLowerCase() || '';
-                return dept.includes('lưu trữ') || dept.includes('một cửa');
+                return dept.includes('lưu trữ') && !dept.includes('một cửa') && !dept.includes('hành chính');
             });
         }
     }, [employees, mainTab]);
@@ -861,11 +861,12 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                 {activeTab === 'employee' && (
                     <EmployeeStatsView 
                         records={activeRecords}
-                        employees={activeEmployees}
+                        employees={employees}
                         fromDate={fromDate}
                         toDate={toDate}
                         selectedEmpId={selectedEmpId}
                         setSelectedEmpId={setSelectedEmpId}
+                        defaultDeptFilter={mainTab === 'archive' ? 'archive' : mainTab === 'measurement' ? 'measurement' : 'all'}
                     />
                 )}
 
@@ -916,6 +917,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                         records={activeRecords} 
                         employees={activeEmployees} 
                         wards={wards} 
+                        selectedWard={selectedWard}
                         fromDate={fromDate}
                         toDate={toDate}
                         onFilteredRecordsChange={setDailyStatsRecords}
@@ -938,6 +940,8 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                     <RevenueStatsView 
                         records={activeRecords}
                         employees={activeEmployees}
+                        wards={wards}
+                        selectedWard={selectedWard}
                         fromDate={fromDate}
                         toDate={toDate}
                     />

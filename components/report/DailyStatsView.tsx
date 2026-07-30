@@ -15,12 +15,13 @@ import {
 } from 'lucide-react';
 import { getNormalizedWard, STATUS_LABELS } from '../../constants';
 import { exportDailyStatsToExcel } from '../../utils/excelExport';
-import { parseSafeDate } from '../../utils/appHelpers';
+import { parseSafeDate, removeVietnameseTones } from '../../utils/appHelpers';
 
 interface DailyStatsViewProps {
     records: RecordFile[];
     employees: Employee[];
     wards: string[];
+    selectedWard?: string;
     fromDate?: string;
     toDate?: string;
     onFilteredRecordsChange?: (records: RecordFile[]) => void;
@@ -31,6 +32,7 @@ const DailyStatsView: React.FC<DailyStatsViewProps> = ({
     records, 
     employees, 
     wards, 
+    selectedWard = 'all',
     fromDate,
     toDate,
     onFilteredRecordsChange,
@@ -47,12 +49,20 @@ const DailyStatsView: React.FC<DailyStatsViewProps> = ({
     };
 
     // Filter states for Daily Stats
-    const [modalWard, setModalWard] = useState('all');
     const [modalEmployee, setModalEmployee] = useState('all');
     
     // Effective dates from props
     const effectiveFrom = useMemo(() => fromDate && fromDate !== '1970-01-01' ? fromDate : '', [fromDate]);
     const effectiveTo = useMemo(() => toDate || '', [toDate]);
+
+    // Helper for matching selected ward against record ward
+    const isWardMatch = (recordWard?: string) => {
+        if (!selectedWard || selectedWard === 'all') return true;
+        if (!recordWard) return false;
+        const normRWard = removeVietnameseTones(getNormalizedWard(recordWard)).toLowerCase();
+        const normTargetWard = removeVietnameseTones(getNormalizedWard(selectedWard)).toLowerCase();
+        return normRWard.includes(normTargetWard) || normTargetWard.includes(normRWard);
+    };
 
     // Pagination
     const [currentPage, setCurrentPage] = useState(1);
@@ -77,11 +87,11 @@ const DailyStatsView: React.FC<DailyStatsViewProps> = ({
                     if (rDate > to) matchDate = false;
                 }
             }
-            const matchWard = modalWard === 'all' || getNormalizedWard(r.ward) === modalWard;
+            const matchWard = isWardMatch(r.ward || undefined);
             const matchEmployee = modalEmployee === 'all' || (modalEmployee === 'unassigned' ? !r.assignedTo : r.assignedTo === modalEmployee);
             return matchDate && matchWard && matchEmployee;
         });
-    }, [records, effectiveFrom, effectiveTo, modalWard, modalEmployee]);
+    }, [records, effectiveFrom, effectiveTo, selectedWard, modalEmployee]);
 
     const filteredAssignedRecords = useMemo(() => {
         return records.filter(r => {
@@ -100,11 +110,11 @@ const DailyStatsView: React.FC<DailyStatsViewProps> = ({
                     if (rDate > to) matchDate = false;
                 }
             }
-            const matchWard = modalWard === 'all' || getNormalizedWard(r.ward) === modalWard;
+            const matchWard = isWardMatch(r.ward || undefined);
             const matchEmployee = modalEmployee === 'all' || (modalEmployee === 'unassigned' ? !r.assignedTo : r.assignedTo === modalEmployee);
             return matchDate && matchWard && matchEmployee;
         });
-    }, [records, effectiveFrom, effectiveTo, modalWard, modalEmployee]);
+    }, [records, effectiveFrom, effectiveTo, selectedWard, modalEmployee]);
 
     const filteredHandoverRecords = useMemo(() => {
         return records.filter(r => {
@@ -123,11 +133,11 @@ const DailyStatsView: React.FC<DailyStatsViewProps> = ({
                     if (rDate > to) matchDate = false;
                 }
             }
-            const matchWard = modalWard === 'all' || getNormalizedWard(r.ward) === modalWard;
+            const matchWard = isWardMatch(r.ward || undefined);
             const matchEmployee = modalEmployee === 'all' || (modalEmployee === 'unassigned' ? !r.assignedTo : r.assignedTo === modalEmployee);
             return matchDate && matchWard && matchEmployee;
         });
-    }, [records, effectiveFrom, effectiveTo, modalWard, modalEmployee]);
+    }, [records, effectiveFrom, effectiveTo, selectedWard, modalEmployee]);
 
     // Main records for the selected card/type
     const modalFilteredRecords = useMemo(() => {
@@ -148,7 +158,7 @@ const DailyStatsView: React.FC<DailyStatsViewProps> = ({
     useEffect(() => {
         setCurrentPage(1);
         setMobileVisibleCount(20);
-    }, [effectiveFrom, effectiveTo, modalWard, modalEmployee, activeTabType]);
+    }, [effectiveFrom, effectiveTo, selectedWard, modalEmployee, activeTabType]);
 
     // Pagination
     const totalPages = Math.ceil(modalFilteredRecords.length / itemsPerPage);
@@ -210,16 +220,15 @@ const DailyStatsView: React.FC<DailyStatsViewProps> = ({
             <div className="border border-slate-200 rounded-2xl overflow-hidden bg-white shadow-sm flex flex-col flex-1 min-h-[450px]">
                 
                 {/* Embedded filters toolbar */}
-                <div className="px-6 py-4 bg-slate-50 border-b border-gray-200 grid grid-cols-1 xl:grid-cols-12 gap-4 items-end shrink-0">
+                <div className="px-6 py-3.5 bg-slate-50 border-b border-gray-200 flex flex-wrap items-center justify-between gap-4 shrink-0">
                     
                     {/* Status segmented pills replacing date selector */}
-                    <div className="xl:col-span-5">
-                        <label className="block text-xs font-bold text-gray-700 mb-1.5">Phân loại thống kê</label>
-                        <div className="inline-flex items-center bg-slate-200/80 p-1 rounded-xl gap-1 text-xs font-semibold overflow-x-auto w-full h-[38px]">
+                    <div className="flex-1 min-w-[320px]">
+                        <div className="inline-flex items-center bg-slate-200/80 p-1 rounded-xl gap-1 text-xs font-semibold w-full sm:w-auto h-[38px]">
                             <button
                                 type="button"
                                 onClick={() => handleTabChange('received')}
-                                className={`flex-1 px-3 py-1.5 rounded-lg transition-all flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer h-full ${
+                                className={`px-3 py-1.5 rounded-lg transition-all flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer h-full ${
                                     activeTabType === 'received'
                                         ? 'bg-white text-blue-700 shadow-xs font-bold'
                                         : 'text-slate-600 hover:text-slate-900'
@@ -232,7 +241,7 @@ const DailyStatsView: React.FC<DailyStatsViewProps> = ({
                             <button
                                 type="button"
                                 onClick={() => handleTabChange('assigned')}
-                                className={`flex-1 px-3 py-1.5 rounded-lg transition-all flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer h-full ${
+                                className={`px-3 py-1.5 rounded-lg transition-all flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer h-full ${
                                     activeTabType === 'assigned'
                                         ? 'bg-white text-emerald-700 shadow-xs font-bold'
                                         : 'text-slate-600 hover:text-slate-900'
@@ -245,7 +254,7 @@ const DailyStatsView: React.FC<DailyStatsViewProps> = ({
                             <button
                                 type="button"
                                 onClick={() => handleTabChange('handover')}
-                                className={`flex-1 px-3 py-1.5 rounded-lg transition-all flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer h-full ${
+                                className={`px-3 py-1.5 rounded-lg transition-all flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer h-full ${
                                     activeTabType === 'handover'
                                         ? 'bg-white text-amber-700 shadow-xs font-bold'
                                         : 'text-slate-600 hover:text-slate-900'
@@ -257,31 +266,13 @@ const DailyStatsView: React.FC<DailyStatsViewProps> = ({
                         </div>
                     </div>
 
-                    <div className="xl:col-span-2">
-                        <label className="block text-xs font-bold text-gray-700 mb-1.5">Địa bàn Xã / Phường</label>
-                        <div className="flex items-center gap-2 bg-white px-3 py-1.5 border border-gray-300 rounded-lg h-[38px] focus-within:border-blue-500">
-                            <MapPin size={16} className="text-gray-400 shrink-0" />
-                            <select 
-                                value={modalWard} 
-                                onChange={(e) => setModalWard(e.target.value)} 
-                                className="text-sm outline-none bg-transparent text-gray-700 font-medium cursor-pointer border-none focus:ring-0 w-full p-0"
-                            >
-                                <option value="all">Toàn bộ địa bàn</option>
-                                {wards.map(w => (
-                                    <option key={w} value={w}>{w}</option>
-                                ))}
-                            </select>
-                        </div>
-                    </div>
-
-                    <div className="xl:col-span-3">
-                        <label className="block text-xs font-bold text-gray-700 mb-1.5">Nhân viên xử lý</label>
-                        <div className="flex items-center gap-2 bg-white px-3 py-1.5 border border-gray-300 rounded-lg h-[38px] focus-within:border-blue-500">
+                    <div className="flex items-center gap-3 w-full sm:w-auto">
+                        <div className="flex items-center gap-2 bg-white px-3 py-1.5 border border-gray-300 rounded-lg h-[38px] focus-within:border-blue-500 w-full sm:w-56">
                             <Search size={16} className="text-gray-400 shrink-0" />
                             <select 
                                 value={modalEmployee} 
                                 onChange={(e) => setModalEmployee(e.target.value)} 
-                                className="text-sm outline-none bg-transparent text-gray-700 font-medium cursor-pointer border-none focus:ring-0 w-full p-0"
+                                className="text-xs outline-none bg-transparent text-gray-700 font-medium cursor-pointer border-none focus:ring-0 w-full p-0"
                             >
                                 <option value="all">Tất cả nhân viên</option>
                                 <option value="unassigned">Chưa giao</option>
@@ -290,13 +281,11 @@ const DailyStatsView: React.FC<DailyStatsViewProps> = ({
                                 ))}
                             </select>
                         </div>
-                    </div>
 
-                    <div className="xl:col-span-2">
                         <button 
                             onClick={handleExportFromModal}
                             disabled={modalFilteredRecords.length === 0}
-                            className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed w-full h-[38px]"
+                            className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-bold text-xs shadow-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed h-[38px] shrink-0"
                         >
                             <FileSpreadsheet size={16} className="shrink-0" /> Xuất Excel ({modalFilteredRecords.length})
                         </button>
