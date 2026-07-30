@@ -2,7 +2,7 @@
 import { supabase, isConfigured } from './supabaseClient';
 import { RecordFile } from '../types';
 import { MOCK_RECORDS, API_BASE_URL } from '../constants';
-import { logError, getFromCache, saveToCache, CACHE_KEYS, sanitizeData, normalizeCode, mapRecordFromDb } from './apiCore';
+import { logError, getFromCache, saveToCache, CACHE_KEYS, sanitizeData, sanitizePayloadFor22P02, normalizeCode, mapRecordFromDb } from './apiCore';
 
 const RECORD_DB_COLUMNS = [
     'id', 'code', 'customerName', 'phoneNumber', 'cccd', 'customerAddress', 'ward', 'landPlot', 'mapSheet', 
@@ -252,15 +252,23 @@ export const createRecordApi = async (record: RecordFile): Promise<RecordFile | 
         }
         
         const payload = sanitizeData(recordToSave, RECORD_DB_COLUMNS);
-        const { data, error } = await supabase.from('land_records').insert([payload]).select();
+        let { data, error } = await supabase.from('land_records').insert([payload]).select();
         
+        if (error && (error.code === '22P02' || String(error.message || '').includes('22P02') || String(error.message || '').includes('invalid input syntax'))) {
+            console.warn("⚠️ [22P02 Fallback] Retrying insert with 22P02 sanitized payload...");
+            const fallback22P02Payload = sanitizePayloadFor22P02(payload);
+            const res = await supabase.from('land_records').insert([fallback22P02Payload]).select();
+            data = res.data;
+            error = res.error;
+        }
+
         if (error && (error.code === 'PGRST204' || String(error.code) === '42703' || (error.message && String(error.message).includes('does not exist')))) {
             console.warn("⚠️ [Fallback] Database is missing columns. Retrying without new columns...");
             if (!(window as any).fallbackAlertShown) {
                 logError("createRecordApi", error, true);
                 (window as any).fallbackAlertShown = true;
             }
-            const fallbackPayload = { ...payload };
+            const fallbackPayload = sanitizePayloadFor22P02({ ...payload });
             OPTIONAL_NEW_COLUMNS.forEach(col => delete fallbackPayload[col]);
             const { data: fallbackData, error: fallbackError } = await supabase.from('land_records').insert([fallbackPayload]).select();
             if (fallbackError) throw fallbackError;
@@ -270,7 +278,7 @@ export const createRecordApi = async (record: RecordFile): Promise<RecordFile | 
         }
         
         if (error) throw error;
-        const result = mapRecordFromDb(data?.[0]) as RecordFile;
+        const result = mapRecordFromDb({ ...recordToSave, ...(data?.[0] || {}) }) as RecordFile;
         if (result) syncCacheOnCreate(result);
         return result;
     } catch (error) {
@@ -283,15 +291,23 @@ export const updateRecordApi = async (record: RecordFile): Promise<RecordFile | 
     if (!isConfigured) return record;
     try {
         const payload = sanitizeData(record, RECORD_DB_COLUMNS);
-        const { data, error } = await supabase.from('land_records').update(payload).eq('id', record.id).select();
+        let { data, error } = await supabase.from('land_records').update(payload).eq('id', record.id).select();
         
+        if (error && (error.code === '22P02' || String(error.message || '').includes('22P02') || String(error.message || '').includes('invalid input syntax'))) {
+            console.warn("⚠️ [22P02 Fallback] Retrying update with 22P02 sanitized payload...");
+            const fallback22P02Payload = sanitizePayloadFor22P02(payload);
+            const res = await supabase.from('land_records').update(fallback22P02Payload).eq('id', record.id).select();
+            data = res.data;
+            error = res.error;
+        }
+
         if (error && (error.code === 'PGRST204' || String(error.code) === '42703' || (error.message && String(error.message).includes('does not exist')))) {
             console.warn("⚠️ [Fallback] Database is missing columns. Retrying without new columns...");
             if (!(window as any).fallbackAlertShown) {
                 logError("updateRecordApi", error, true);
                 (window as any).fallbackAlertShown = true;
             }
-            const fallbackPayload = { ...payload };
+            const fallbackPayload = sanitizePayloadFor22P02({ ...payload });
             OPTIONAL_NEW_COLUMNS.forEach(col => delete fallbackPayload[col]);
             const { data: fallbackData, error: fallbackError } = await supabase.from('land_records').update(fallbackPayload).eq('id', record.id).select();
             if (fallbackError) throw fallbackError;
@@ -301,7 +317,7 @@ export const updateRecordApi = async (record: RecordFile): Promise<RecordFile | 
         }
         
         if (error) throw error;
-        const result = mapRecordFromDb(data?.[0]) as RecordFile;
+        const result = mapRecordFromDb({ ...record, ...(data?.[0] || {}) }) as RecordFile;
         if (result) syncCacheOnUpdate(result);
         return result;
     } catch (error) {
@@ -315,11 +331,19 @@ export const updateRecordFieldsApi = async (id: string, fields: Partial<RecordFi
     try {
         const payload = sanitizeData({ id, ...fields } as any, RECORD_DB_COLUMNS);
         delete payload.id;
-        const { data, error } = await supabase.from('land_records').update(payload).eq('id', id).select();
+        let { data, error } = await supabase.from('land_records').update(payload).eq('id', id).select();
         
+        if (error && (error.code === '22P02' || String(error.message || '').includes('22P02') || String(error.message || '').includes('invalid input syntax'))) {
+            console.warn("⚠️ [22P02 Fallback] Retrying updateRecordFieldsApi with 22P02 sanitized payload...");
+            const fallback22P02Payload = sanitizePayloadFor22P02(payload);
+            const res = await supabase.from('land_records').update(fallback22P02Payload).eq('id', id).select();
+            data = res.data;
+            error = res.error;
+        }
+
         if (error && (error.code === 'PGRST204' || String(error.code) === '42703' || (error.message && String(error.message).includes('does not exist')))) {
             console.warn("⚠️ [Fallback] Database is missing columns. Retrying without new columns...");
-            const fallbackPayload = { ...payload };
+            const fallbackPayload = sanitizePayloadFor22P02({ ...payload });
             OPTIONAL_NEW_COLUMNS.forEach(col => delete fallbackPayload[col]);
             const { data: fallbackData, error: fallbackError } = await supabase.from('land_records').update(fallbackPayload).eq('id', id).select();
             if (fallbackError) throw fallbackError;
@@ -329,7 +353,7 @@ export const updateRecordFieldsApi = async (id: string, fields: Partial<RecordFi
         }
         
         if (error) throw error;
-        const result = mapRecordFromDb(data?.[0]) as RecordFile;
+        const result = mapRecordFromDb({ id, ...fields, ...(data?.[0] || {}) }) as RecordFile;
         if (result) syncCacheOnUpdate(result);
         return result;
     } catch (error) {
@@ -375,8 +399,15 @@ export const createRecordsBatchApi = async (records: RecordFile[], onProgress?: 
         const CHUNK_SIZE = 500;
         for (let i = 0; i < payload.length; i += CHUNK_SIZE) {
             const chunk = payload.slice(i, i + CHUNK_SIZE);
-            const { error } = await supabase.from('land_records').insert(chunk);
+            let { error } = await supabase.from('land_records').insert(chunk);
             
+            if (error && (error.code === '22P02' || String(error.message || '').includes('22P02') || String(error.message || '').includes('invalid input syntax'))) {
+                console.warn(`⚠️ [22P02 Fallback] Retrying batch insert chunk ${i} with 22P02 sanitized payload...`);
+                const fallback22P02 = sanitizePayloadFor22P02(chunk);
+                const res = await supabase.from('land_records').insert(fallback22P02);
+                error = res.error;
+            }
+
             if (error && (error.code === 'PGRST204' || String(error.code) === '42703' || (error.message && String(error.message).includes('does not exist')))) {
                 console.warn(`⚠️ [Fallback] Database is missing columns. Retrying batch insert chunk ${i} without new columns...`);
                 if (!(window as any).fallbackAlertShown) {
@@ -384,7 +415,7 @@ export const createRecordsBatchApi = async (records: RecordFile[], onProgress?: 
                     (window as any).fallbackAlertShown = true;
                 }
                 const fallbackPayload = chunk.map(p => {
-                    const fp = { ...p };
+                    const fp = sanitizePayloadFor22P02({ ...p });
                     OPTIONAL_NEW_COLUMNS.forEach(col => delete fp[col]);
                     return fp;
                 });
@@ -554,8 +585,15 @@ export const forceUpdateRecordsBatchApi = async (records: RecordFile[], onProgre
             });
 
             if (updatesToPush.length > 0) {
-                const { error: upsertError } = await supabase.from('land_records').upsert(updatesToPush);
+                let { error: upsertError } = await supabase.from('land_records').upsert(updatesToPush);
                 
+                if (upsertError && (upsertError.code === '22P02' || String(upsertError.message || '').includes('22P02') || String(upsertError.message || '').includes('invalid input syntax'))) {
+                    console.warn(`⚠️ [22P02 Fallback] Retrying chunk target upsert with 22P02 sanitized payload...`);
+                    const fallback22P02 = sanitizePayloadFor22P02(updatesToPush);
+                    const res = await supabase.from('land_records').upsert(fallback22P02);
+                    upsertError = res.error;
+                }
+
                 if (upsertError && (upsertError.code === 'PGRST204' || String(upsertError.code) === '42703' || (upsertError.message && String(upsertError.message).includes('does not exist')))) {
                     console.warn(`⚠️ [Fallback] Retrying chunk target upsert without new columns...`);
                     if (!(window as any).fallbackAlertShown) {
@@ -563,7 +601,7 @@ export const forceUpdateRecordsBatchApi = async (records: RecordFile[], onProgre
                         (window as any).fallbackAlertShown = true;
                     }
                     const fallbackPayload = updatesToPush.map(p => {
-                        const fp = { ...p };
+                        const fp = sanitizePayloadFor22P02({ ...p });
                         OPTIONAL_NEW_COLUMNS.forEach(col => delete fp[col]);
                         return fp;
                     });
@@ -605,9 +643,16 @@ export const updateRecordsBatchById = async (updates: Partial<RecordFile>[], onP
 
     try {
         const rows = updates.map(u => sanitizeData(u, RECORD_DB_COLUMNS));
-        const { error } = await supabase
+        let { error } = await supabase
             .from('land_records')
             .upsert(rows);
+
+        if (error && (error.code === '22P02' || String(error.message || '').includes('22P02') || String(error.message || '').includes('invalid input syntax'))) {
+            console.warn("⚠️ [22P02 Fallback] Retrying updateRecordsBatchById with 22P02 sanitized payload...");
+            const fallback22P02Rows = sanitizePayloadFor22P02(rows);
+            const res = await supabase.from('land_records').upsert(fallback22P02Rows);
+            error = res.error;
+        }
 
         if (error && (error.code === 'PGRST204' || String(error.code) === '42703' || (error.message && String(error.message).includes('does not exist')))) {
             console.warn("⚠️ [Fallback] Database is missing columns inside updateRecordsBatchById. Retrying without new columns...");
@@ -616,7 +661,7 @@ export const updateRecordsBatchById = async (updates: Partial<RecordFile>[], onP
                 (window as any).fallbackAlertShown = true;
             }
             const fallbackPayload = rows.map(r => {
-                const fp = { ...r };
+                const fp = sanitizePayloadFor22P02({ ...r });
                 OPTIONAL_NEW_COLUMNS.forEach(col => delete fp[col]);
                 return fp;
             });

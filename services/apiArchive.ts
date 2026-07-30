@@ -1,6 +1,6 @@
 
 import { supabase, isConfigured } from './supabaseClient';
-import { logError, getFromCache, saveToCache } from './apiCore';
+import { logError, getFromCache, saveToCache, sanitizePayloadFor22P02 } from './apiCore';
 
 // --- TYPES ---
 export interface ArchiveRecord {
@@ -183,7 +183,7 @@ export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise
         if (payload.ngay_thang === '') payload.ngay_thang = null;
 
         if (record.id) {
-            const { data, error } = await supabase.from('archive_records').update({ 
+            let { data, error } = await supabase.from('archive_records').update({ 
                 status: payload.status,
                 so_hieu: payload.so_hieu,
                 trich_yeu: payload.trich_yeu,
@@ -192,6 +192,21 @@ export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise
                 data: payload.data
             }).eq('id', record.id).select();
             
+            if (error && (error.code === '22P02' || String(error.message || '').includes('22P02'))) {
+                console.warn("⚠️ [22P02 Fallback] Retrying archive update with sanitized payload...");
+                const cleanData = sanitizePayloadFor22P02(payload.data);
+                const res = await supabase.from('archive_records').update({
+                    status: payload.status,
+                    so_hieu: payload.so_hieu,
+                    trich_yeu: payload.trich_yeu,
+                    ngay_thang: payload.ngay_thang,
+                    noi_nhan_gui: payload.noi_nhan_gui,
+                    data: cleanData
+                }).eq('id', record.id).select();
+                data = res.data;
+                error = res.error;
+            }
+
             if (error) throw error;
             return data && data.length > 0 ? (data[0] as ArchiveRecord) : null;
         } else {
@@ -199,7 +214,16 @@ export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise
                 payload.id = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substr(2, 9);
             }
             
-            const { data, error } = await supabase.from('archive_records').insert([payload]).select();
+            let { data, error } = await supabase.from('archive_records').insert([payload]).select();
+            
+            if (error && (error.code === '22P02' || String(error.message || '').includes('22P02'))) {
+                console.warn("⚠️ [22P02 Fallback] Retrying archive insert with sanitized payload...");
+                const cleanPayload = sanitizePayloadFor22P02(payload);
+                const res = await supabase.from('archive_records').insert([cleanPayload]).select();
+                data = res.data;
+                error = res.error;
+            }
+
             if (error) throw error;
             return data && data.length > 0 ? (data[0] as ArchiveRecord) : null;
         }

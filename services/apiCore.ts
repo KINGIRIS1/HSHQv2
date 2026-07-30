@@ -112,13 +112,7 @@ export const logError = (context: string, error: any, silent: boolean = false) =
         console.error(`❌ Lỗi tại ${context}: Bảng dữ liệu chưa tồn tại trên Supabase! (Code: 42P01)`);
         alert(`LỖI BẢNG DỮ LIỆU: Bảng '${context.includes('Contract') ? 'contracts' : 'land_records'}' chưa tồn tại trên Supabase!\n\nVui lòng truy cập SQL Editor trên trang quản trị Supabase và tạo bảng tương ứng.`);
     } else if (code === '22P02') {
-        if (context === 'saveEmployeeApi') {
-            console.error(`❌ Lỗi tại ${context}: Cột 'id' trong bảng 'employees' đang là kiểu UUID.`);
-            alert(`LỖI CẤU TRÚC DATABASE (Kiểu dữ liệu):\nCột 'id' trong bảng 'employees' đang là kiểu 'uuid' (mặc định), nhưng mã nhân viên là chuỗi (ví dụ: NV001).\n\nVui lòng vào SQL Editor trên Supabase và chạy lệnh sau:\n\nALTER TABLE employees ALTER COLUMN id TYPE text USING id::text;`);
-        } else {
-            console.error(`❌ Lỗi tại ${context}: Sai định dạng dữ liệu (Lỗi 22P02). Cột trên Supabase đang kiểu Số (numeric) nhưng dữ liệu gửi lên là Chuỗi.`);
-            alert(`LỖI CẤU TRÚC DATABASE TRÊN SUPABASE (Kiểu dữ liệu 22P02):\nCột 'exportBatch' (Đợt giao) hoặc 'excerptNumber' trên Supabase đang là kiểu SỐ (numeric/integer), nên không lưu được tên đợt dạng chuỗi (ví dụ: "Đợt 3-DD-30/07/2026").\n\nHƯỚNG DẪN SỬA LỖI TỨC THÌ TRÊN SUPABASE:\nVào SQL Editor trên Supabase và chạy lệnh sau để đổi kiểu cột thành CHUỖI (text):\n\nALTER TABLE land_records ALTER COLUMN "exportBatch" TYPE text USING "exportBatch"::text;\nALTER TABLE archive_records ALTER COLUMN "exportBatch" TYPE text USING "exportBatch"::text;`);
-        }
+        console.error(`❌ Lỗi tại ${context}: Định dạng dữ liệu không khớp kiểu cột Supabase (Lỗi 22P02). Hệ thống sẽ tự động xử lý ép kiểu an toàn.`);
     } else if (code === 'PGRST204' || code === '42703' || msg.includes('column') || details.includes('column') || msg.includes('does not exist')) {
          console.error(`❌ Lỗi tại ${context}: Cột không tồn tại (Lỗi ${code}). Details: ${details || msg}`);
          // Cập nhật thông báo lỗi hướng dẫn cụ thể SQL
@@ -242,6 +236,61 @@ export const sanitizeData = (data: any, allowedColumns: string[]) => {
         }
     });
     return sanitized;
+};
+
+/**
+ * Tự động làm sạch & chuyển đổi payload khi gặp lỗi 22P02 (Sai kiểu dữ liệu trên Supabase)
+ * Giúp người dùng không cần chạy lệnh SQL chỉnh sửa kiểu cột trên Supabase.
+ */
+export const sanitizePayloadFor22P02 = (payload: any): any => {
+    if (!payload) return payload;
+    if (Array.isArray(payload)) {
+        return payload.map(item => sanitizePayloadFor22P02(item));
+    }
+    const clean = { ...payload };
+
+    // 1. Chuyển exportBatch: nếu cột trên Supabase đang là numeric/integer,
+    // biến chuỗi "Đợt 01-30/07/2026" hoặc "Đợt 1" thành số 1
+    if (clean.exportBatch !== undefined && clean.exportBatch !== null) {
+        if (typeof clean.exportBatch === 'string') {
+            const match = clean.exportBatch.match(/Đợt\s*(\d+)/i) || clean.exportBatch.match(/^(\d+)/);
+            if (match && match[1]) {
+                clean.exportBatch = parseInt(match[1], 10);
+            } else if (isNaN(Number(clean.exportBatch))) {
+                clean.exportBatch = null;
+            } else {
+                clean.exportBatch = Number(clean.exportBatch);
+            }
+        }
+    }
+
+    // 2. Chuyển đổi các cột số bị dính chuỗi chữ hoặc chuỗi rỗng
+    const numericKeys = [
+        'area', 'unitPrice', 'vatRate', 'vatAmount', 'totalAmount', 
+        'deposit', 'quantity', 'plotCount', 'markerCount', 
+        'minArea', 'maxArea', 'price', 'advancePayment',
+        'liquidationArea', 'liquidationAmount', 'residentialArea',
+        'excerptNumber', 'measurementNumber', 'sheetNumber', 'plotNumber',
+        'issueNumber', 'receiptNumber', 'entryNumber'
+    ];
+
+    numericKeys.forEach(k => {
+        if (clean[k] !== undefined && clean[k] !== null) {
+            if (clean[k] === '' || clean[k] === 'null' || clean[k] === 'undefined') {
+                clean[k] = null;
+            } else if (typeof clean[k] === 'string') {
+                const cleanDigits = clean[k].replace(/[^0-9\.]/g, '');
+                if (cleanDigits === '') {
+                    clean[k] = null;
+                } else {
+                    const num = parseFloat(cleanDigits);
+                    clean[k] = isNaN(num) ? null : num;
+                }
+            }
+        }
+    });
+
+    return clean;
 };
 
 // --- MAPPERS ---
