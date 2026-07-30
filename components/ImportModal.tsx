@@ -5,7 +5,7 @@ import { RecordFile, RecordStatus, Employee, Holiday } from '../types';
 import { RECORD_TYPES, STATUS_LABELS, STATUS_COLORS } from '../constants';
 import { fetchHolidays } from '../services/api';
 import { X, Upload, FileSpreadsheet, Save, Loader2, AlertCircle, Check, RefreshCw, PlusCircle, AlertTriangle } from 'lucide-react';
-import { calculateDeadlineHelper, formatDateKey } from '../utils/appHelpers';
+import { calculateDeadlineHelper, formatDateKey, migrateUnbatchedRecords } from '../utils/appHelpers';
 
 interface ImportModalProps {
   isOpen: boolean;
@@ -412,7 +412,8 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
             mappedRecords.push(record);
         }
 
-        setPreviewData(mappedRecords as PreviewRecord[]);
+        const { migratedRecords } = migrateUnbatchedRecords(mappedRecords as RecordFile[]);
+        setPreviewData(migratedRecords as PreviewRecord[]);
         setLoading(false);
 
       } catch (error) {

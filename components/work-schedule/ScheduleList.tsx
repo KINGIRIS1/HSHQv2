@@ -186,32 +186,37 @@ const ScheduleList: React.FC<ScheduleListProps> = ({ schedules, onEdit, onDelete
                         <CalendarDays size={18} className="text-blue-600"/> Lịch công tác ({filteredList.length})
                     </h3>
                     
-                    <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    <div className="flex flex-wrap items-center gap-2 shrink-0 sm:ml-auto">
                         <div className="flex items-center gap-1 bg-white p-1 rounded-lg border border-gray-200 shadow-sm shrink-0">
                             <button onClick={() => handleFilterPreset('week')} className={`px-2.5 py-1 text-xs font-bold rounded transition-colors ${filterType === 'week' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}>Tuần này</button>
                             <button onClick={() => handleFilterPreset('month')} className={`px-2.5 py-1 text-xs font-bold rounded transition-colors ${filterType === 'month' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}>Tháng này</button>
                             <button onClick={() => setFilterType('all')} className={`px-2.5 py-1 text-xs font-bold rounded transition-colors ${filterType === 'all' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}>Tất cả</button>
                         </div>
 
-                        <div className="flex items-center gap-1.5 bg-white border border-gray-300 rounded-lg px-2.5 py-1 shadow-xs shrink-0 whitespace-nowrap text-xs font-bold text-gray-700">
-                            <span className="text-gray-500 text-xs shrink-0">Từ:</span>
+                        <div className="flex items-center gap-1 bg-white border border-gray-300 rounded-lg px-2 py-1 shadow-xs shrink-0 whitespace-nowrap text-xs font-bold text-gray-700">
+                            <span className="text-gray-500 text-xs shrink-0 font-bold">Từ:</span>
                             <FlexibleDateInput
                                 value={dateRange.from}
                                 onChange={(isoStr) => { setDateRange(prev => ({ ...prev, from: isoStr })); setFilterType('range'); }}
                                 placeholder="dd/mm/yyyy"
                                 size="sm"
-                                inputClassName="w-28 border-none bg-transparent py-0.5 px-1 text-xs"
+                                className="w-[85px] shrink-0"
+                                inputClassName="w-full border-none bg-transparent py-0 px-0 text-xs font-semibold tracking-tight pr-3.5"
                             />
                             <span className="text-gray-400 font-bold text-xs">-</span>
-                            <span className="text-gray-500 text-xs shrink-0">Đến:</span>
                             <FlexibleDateInput
                                 value={dateRange.to}
                                 onChange={(isoStr) => { setDateRange(prev => ({ ...prev, to: isoStr })); setFilterType('range'); }}
                                 placeholder="dd/mm/yyyy"
                                 size="sm"
-                                inputClassName="w-28 border-none bg-transparent py-0.5 px-1 text-xs"
+                                className="w-[85px] shrink-0"
+                                inputClassName="w-full border-none bg-transparent py-0 px-0 text-xs font-semibold tracking-tight pr-3.5"
                             />
                         </div>
+
+                        <button onClick={handleExport} className="flex items-center gap-1.5 bg-green-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-green-700 shadow-sm shrink-0">
+                            <FileSpreadsheet size={15} /> Xuất Excel
+                        </button>
                     </div>
                 </div>
 
@@ -227,10 +232,6 @@ const ScheduleList: React.FC<ScheduleListProps> = ({ schedules, onEdit, onDelete
                             onChange={e => setSearchTerm(e.target.value)}
                         />
                     </div>
-
-                    <button onClick={handleExport} className="hidden md:flex items-center gap-1.5 bg-green-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-green-700 shadow-sm shrink-0 ml-auto">
-                        <FileSpreadsheet size={15} /> Xuất Excel
-                    </button>
                 </div>
             </div>
 

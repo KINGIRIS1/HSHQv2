@@ -571,11 +571,9 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
   };
 
   const handleOpenReturnModal = (record: RecordFile) => {
-    // Khởi tạo ngày giờ hiện tại theo giờ địa phương (ISO format cho datetime-local)
-    const localNow = new Date(Date.now() - new Date().getTimezoneOffset() * 60000)
-      .toISOString()
-      .slice(0, 16);
-    setReturnDateTime(localNow);
+    // Khởi tạo ngày hiện tại (YYYY-MM-DD)
+    const today = new Date().toISOString().split('T')[0];
+    setReturnDateTime(today);
     setReturnReason("");
     setReturnModalConfig({
       isOpen: true,
@@ -592,17 +590,15 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
       return;
     }
 
-    // Format ngày giờ hiển thị trong ghi chú
+    // Format ngày hiển thị trong ghi chú
     let displayTime = "---";
     if (returnDateTime) {
       const d = new Date(returnDateTime);
       if (!isNaN(d.getTime())) {
-        const hh = String(d.getHours()).padStart(2, "0");
-        const mm = String(d.getMinutes()).padStart(2, "0");
         const day = String(d.getDate()).padStart(2, "0");
         const month = String(d.getMonth() + 1).padStart(2, "0");
         const year = d.getFullYear();
-        displayTime = `${hh}:${mm} ${day}/${month}/${year}`;
+        displayTime = `${day}/${month}/${year}`;
       }
     }
 
@@ -1626,10 +1622,10 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
             <div className="p-5 space-y-4">
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-                  Thời gian thực hiện
+                  Ngày thực hiện
                 </label>
                 <input
-                  type="datetime-local"
+                  type="date"
                   className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-100 transition-all font-medium"
                   value={returnDateTime}
                   onChange={(e) => setReturnDateTime(e.target.value)}

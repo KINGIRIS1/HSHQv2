@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { RecordFile, Employee, RecordStatus } from '../../types';
 import { 
-    CalendarDays, 
     Download, 
     Search, 
     FileSpreadsheet, 
@@ -12,31 +11,49 @@ import {
     CheckCircle2, 
     Clock, 
     ArrowRight,
-    CalendarRange,
     FileText
 } from 'lucide-react';
 import { getNormalizedWard, STATUS_LABELS } from '../../constants';
 import { exportDailyStatsToExcel } from '../../utils/excelExport';
 import { parseSafeDate } from '../../utils/appHelpers';
-import FlexibleDateInput from '../FlexibleDateInput';
 
 interface DailyStatsViewProps {
     records: RecordFile[];
     employees: Employee[];
     wards: string[];
+    fromDate?: string;
+    toDate?: string;
     onFilteredRecordsChange?: (records: RecordFile[]) => void;
+    onResetDates?: () => void;
 }
 
-const DailyStatsView: React.FC<DailyStatsViewProps> = ({ records, employees, wards, onFilteredRecordsChange }) => {
+const DailyStatsView: React.FC<DailyStatsViewProps> = ({ 
+    records, 
+    employees, 
+    wards, 
+    fromDate,
+    toDate,
+    onFilteredRecordsChange,
+    onResetDates
+}) => {
     // Active selected tab/card type ('received' | 'assigned' | 'handover')
     const [activeTabType, setActiveTabType] = useState<'received' | 'assigned' | 'handover'>('received');
 
+    const handleTabChange = (type: 'received' | 'assigned' | 'handover') => {
+        setActiveTabType(type);
+        if (onResetDates) {
+            onResetDates();
+        }
+    };
+
     // Filter states for Daily Stats
-    const [modalFromDate, setModalFromDate] = useState('');
-    const [modalToDate, setModalToDate] = useState('');
     const [modalWard, setModalWard] = useState('all');
     const [modalEmployee, setModalEmployee] = useState('all');
     
+    // Effective dates from props
+    const effectiveFrom = useMemo(() => fromDate && fromDate !== '1970-01-01' ? fromDate : '', [fromDate]);
+    const effectiveTo = useMemo(() => toDate || '', [toDate]);
+
     // Pagination
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(15);
@@ -51,12 +68,12 @@ const DailyStatsView: React.FC<DailyStatsViewProps> = ({ records, employees, war
                 matchDate = false;
             } else {
                 rDate.setHours(0,0,0,0);
-                if (modalFromDate) {
-                    const from = parseSafeDate(modalFromDate) || new Date(modalFromDate); from.setHours(0,0,0,0);
+                if (effectiveFrom) {
+                    const from = parseSafeDate(effectiveFrom) || new Date(effectiveFrom); from.setHours(0,0,0,0);
                     if (rDate < from) matchDate = false;
                 }
-                if (modalToDate) {
-                    const to = parseSafeDate(modalToDate) || new Date(modalToDate); to.setHours(23,59,59,999);
+                if (effectiveTo) {
+                    const to = parseSafeDate(effectiveTo) || new Date(effectiveTo); to.setHours(23,59,59,999);
                     if (rDate > to) matchDate = false;
                 }
             }
@@ -64,7 +81,7 @@ const DailyStatsView: React.FC<DailyStatsViewProps> = ({ records, employees, war
             const matchEmployee = modalEmployee === 'all' || (modalEmployee === 'unassigned' ? !r.assignedTo : r.assignedTo === modalEmployee);
             return matchDate && matchWard && matchEmployee;
         });
-    }, [records, modalFromDate, modalToDate, modalWard, modalEmployee]);
+    }, [records, effectiveFrom, effectiveTo, modalWard, modalEmployee]);
 
     const filteredAssignedRecords = useMemo(() => {
         return records.filter(r => {
@@ -74,12 +91,12 @@ const DailyStatsView: React.FC<DailyStatsViewProps> = ({ records, employees, war
                 matchDate = false;
             } else {
                 rDate.setHours(0,0,0,0);
-                if (modalFromDate) {
-                    const from = parseSafeDate(modalFromDate) || new Date(modalFromDate); from.setHours(0,0,0,0);
+                if (effectiveFrom) {
+                    const from = parseSafeDate(effectiveFrom) || new Date(effectiveFrom); from.setHours(0,0,0,0);
                     if (rDate < from) matchDate = false;
                 }
-                if (modalToDate) {
-                    const to = parseSafeDate(modalToDate) || new Date(modalToDate); to.setHours(23,59,59,999);
+                if (effectiveTo) {
+                    const to = parseSafeDate(effectiveTo) || new Date(effectiveTo); to.setHours(23,59,59,999);
                     if (rDate > to) matchDate = false;
                 }
             }
@@ -87,7 +104,7 @@ const DailyStatsView: React.FC<DailyStatsViewProps> = ({ records, employees, war
             const matchEmployee = modalEmployee === 'all' || (modalEmployee === 'unassigned' ? !r.assignedTo : r.assignedTo === modalEmployee);
             return matchDate && matchWard && matchEmployee;
         });
-    }, [records, modalFromDate, modalToDate, modalWard, modalEmployee]);
+    }, [records, effectiveFrom, effectiveTo, modalWard, modalEmployee]);
 
     const filteredHandoverRecords = useMemo(() => {
         return records.filter(r => {
@@ -97,12 +114,12 @@ const DailyStatsView: React.FC<DailyStatsViewProps> = ({ records, employees, war
                 matchDate = false;
             } else {
                 rDate.setHours(0,0,0,0);
-                if (modalFromDate) {
-                    const from = parseSafeDate(modalFromDate) || new Date(modalFromDate); from.setHours(0,0,0,0);
+                if (effectiveFrom) {
+                    const from = parseSafeDate(effectiveFrom) || new Date(effectiveFrom); from.setHours(0,0,0,0);
                     if (rDate < from) matchDate = false;
                 }
-                if (modalToDate) {
-                    const to = parseSafeDate(modalToDate) || new Date(modalToDate); to.setHours(23,59,59,999);
+                if (effectiveTo) {
+                    const to = parseSafeDate(effectiveTo) || new Date(effectiveTo); to.setHours(23,59,59,999);
                     if (rDate > to) matchDate = false;
                 }
             }
@@ -110,7 +127,7 @@ const DailyStatsView: React.FC<DailyStatsViewProps> = ({ records, employees, war
             const matchEmployee = modalEmployee === 'all' || (modalEmployee === 'unassigned' ? !r.assignedTo : r.assignedTo === modalEmployee);
             return matchDate && matchWard && matchEmployee;
         });
-    }, [records, modalFromDate, modalToDate, modalWard, modalEmployee]);
+    }, [records, effectiveFrom, effectiveTo, modalWard, modalEmployee]);
 
     // Main records for the selected card/type
     const modalFilteredRecords = useMemo(() => {
@@ -131,7 +148,7 @@ const DailyStatsView: React.FC<DailyStatsViewProps> = ({ records, employees, war
     useEffect(() => {
         setCurrentPage(1);
         setMobileVisibleCount(20);
-    }, [modalFromDate, modalToDate, modalWard, modalEmployee, activeTabType]);
+    }, [effectiveFrom, effectiveTo, modalWard, modalEmployee, activeTabType]);
 
     // Pagination
     const totalPages = Math.ceil(modalFilteredRecords.length / itemsPerPage);
@@ -139,32 +156,6 @@ const DailyStatsView: React.FC<DailyStatsViewProps> = ({ records, employees, war
         const start = (currentPage - 1) * itemsPerPage;
         return modalFilteredRecords.slice(start, start + itemsPerPage);
     }, [modalFilteredRecords, currentPage, itemsPerPage]);
-
-    // Quick range selector logic
-    const handleQuickRange = (range: 'all' | 'today' | 'week' | 'month') => {
-        const now = new Date();
-        if (range === 'all') {
-            setModalFromDate('');
-            setModalToDate('');
-        } else if (range === 'today') {
-            const todayStr = now.toISOString().split('T')[0];
-            setModalFromDate(todayStr);
-            setModalToDate(todayStr);
-        } else if (range === 'week') {
-            const day = now.getDay();
-            const diff = now.getDate() - day + (day === 0 ? -6 : 1); // Thứ hai
-            const start = new Date(now.setDate(diff));
-            const end = new Date(start);
-            end.setDate(start.getDate() + 6);
-            setModalFromDate(start.toISOString().split('T')[0]);
-            setModalToDate(end.toISOString().split('T')[0]);
-        } else if (range === 'month') {
-            const start = new Date(now.getFullYear(), now.getMonth(), 1);
-            const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-            setModalFromDate(start.toISOString().split('T')[0]);
-            setModalToDate(end.toISOString().split('T')[0]);
-        }
-    };
 
     // Export to Excel for Modal Records
     const handleExportFromModal = () => {
@@ -177,8 +168,8 @@ const DailyStatsView: React.FC<DailyStatsViewProps> = ({ records, employees, war
             exportDailyStatsToExcel(
                 modalFilteredRecords, 
                 employees, 
-                modalFromDate, 
-                modalToDate, 
+                effectiveFrom, 
+                effectiveTo, 
                 '', ''
             );
         } else if (activeTabType === 'assigned') {
@@ -187,8 +178,8 @@ const DailyStatsView: React.FC<DailyStatsViewProps> = ({ records, employees, war
                 employees, 
                 '', '', 
                 '', '', 
-                modalFromDate, 
-                modalToDate
+                effectiveFrom, 
+                effectiveTo
             );
         } else if (activeTabType === 'handover') {
             exportDailyStatsToExcel(
@@ -197,8 +188,8 @@ const DailyStatsView: React.FC<DailyStatsViewProps> = ({ records, employees, war
                 '', '', 
                 '', '', 
                 '', '', 
-                modalFromDate, 
-                modalToDate
+                effectiveFrom, 
+                effectiveTo
             );
         }
     };
@@ -215,142 +206,54 @@ const DailyStatsView: React.FC<DailyStatsViewProps> = ({ records, employees, war
 
     return (
         <div className="flex flex-col h-full bg-white p-4 md:p-6 animate-fade-in-up overflow-y-auto">
-            {/* Main Cards Section - Structured like the uploaded image */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 w-full">
-                {/* CARD 1: Tiếp nhận */}
-                <div 
-                    onClick={() => setActiveTabType('received')}
-                    className={`cursor-pointer rounded-2xl p-3.5 flex items-center gap-3 transition-all hover:shadow-md active:scale-95 border-2 ${
-                        activeTabType === 'received' 
-                            ? 'border-blue-600 bg-blue-50/90 shadow-sm' 
-                            : 'border-slate-150 bg-blue-50/20 hover:border-blue-200 hover:bg-blue-50/40'
-                    }`}
-                >
-                    <div className="bg-blue-100 text-blue-600 p-2.5 rounded-xl flex items-center justify-center shrink-0">
-                        <FileText size={18} />
-                    </div>
-                    <div>
-                        <div className="text-xl font-bold text-blue-900 tracking-tight leading-none mb-1">
-                            {filteredReceivedRecords.length}
-                        </div>
-                        <div className="text-[10px] font-bold tracking-wider text-blue-600 uppercase">
-                            TIẾP NHẬN
-                        </div>
-                    </div>
-                </div>
-
-                {/* CARD 2: Đã bàn giao */}
-                <div 
-                    onClick={() => setActiveTabType('assigned')}
-                    className={`cursor-pointer rounded-2xl p-3.5 flex items-center gap-3 transition-all hover:shadow-md active:scale-95 border-2 ${
-                        activeTabType === 'assigned' 
-                            ? 'border-emerald-600 bg-emerald-50/90 shadow-sm' 
-                            : 'border-slate-150 bg-emerald-50/20 hover:border-emerald-200 hover:bg-emerald-50/40'
-                    }`}
-                >
-                    <div className="bg-emerald-100 text-emerald-600 p-2.5 rounded-xl flex items-center justify-center shrink-0">
-                        <Users size={18} />
-                    </div>
-                    <div>
-                        <div className="text-xl font-bold text-emerald-900 tracking-tight leading-none mb-1">
-                            {filteredAssignedRecords.length}
-                        </div>
-                        <div className="text-[10px] font-bold tracking-wider text-emerald-600 uppercase">
-                            ĐÃ BÀN GIAO
-                        </div>
-                    </div>
-                </div>
-
-                {/* CARD 3: Hoàn thành */}
-                <div 
-                    onClick={() => setActiveTabType('handover')}
-                    className={`cursor-pointer rounded-2xl p-3.5 flex items-center gap-3 transition-all hover:shadow-md active:scale-95 border-2 ${
-                        activeTabType === 'handover' 
-                            ? 'border-amber-600 bg-amber-50/90 shadow-sm' 
-                            : 'border-slate-150 bg-amber-50/20 hover:border-amber-200 hover:bg-amber-50/40'
-                    }`}
-                >
-                    <div className="bg-amber-100 text-amber-600 p-2.5 rounded-xl flex items-center justify-center shrink-0">
-                        <CheckCircle2 size={18} />
-                    </div>
-                    <div>
-                        <div className="text-xl font-bold text-amber-900 tracking-tight leading-none mb-1">
-                            {filteredHandoverRecords.length}
-                        </div>
-                        <div className="text-[10px] font-bold tracking-wider text-amber-600 uppercase">
-                            HOÀN THÀNH
-                        </div>
-                    </div>
-                </div>
-            </div>
-
             {/* Shared list layout below the cards */}
             <div className="border border-slate-200 rounded-2xl overflow-hidden bg-white shadow-sm flex flex-col flex-1 min-h-[450px]">
                 
                 {/* Embedded filters toolbar */}
                 <div className="px-6 py-4 bg-slate-50 border-b border-gray-200 grid grid-cols-1 xl:grid-cols-12 gap-4 items-end shrink-0">
                     
-                    {/* Dates input customized */}
+                    {/* Status segmented pills replacing date selector */}
                     <div className="xl:col-span-5">
-                        <div className="flex items-center justify-between mb-1.5">
-                            <label className="block text-xs font-bold text-gray-700">
-                                {activeTabType === 'received' && 'Khoảng ngày nhận hồ sơ'}
-                                {activeTabType === 'assigned' && 'Khoảng ngày giao nhân viên'}
-                                {activeTabType === 'handover' && 'Khoảng ngày bàn giao Một cửa'}
-                            </label>
-                            
-                            {/* Quick selector filters */}
-                            <div className="flex gap-1">
-                                <button 
-                                    onClick={() => handleQuickRange('all')}
-                                    className="text-[10px] font-bold text-slate-500 hover:text-blue-600 hover:underline bg-slate-200/50 px-1.5 py-0.5 rounded"
-                                >
-                                    Tất cả
-                                </button>
-                                <button 
-                                    onClick={() => handleQuickRange('today')}
-                                    className="text-[10px] font-bold text-slate-500 hover:text-blue-600 hover:underline bg-slate-200/50 px-1.5 py-0.5 rounded"
-                                >
-                                    Hôm nay
-                                </button>
-                                <button 
-                                    onClick={() => handleQuickRange('week')}
-                                    className="text-[10px] font-bold text-slate-500 hover:text-blue-600 hover:underline bg-slate-200/50 px-1.5 py-0.5 rounded"
-                                >
-                                    Tuần này
-                                </button>
-                                <button 
-                                    onClick={() => handleQuickRange('month')}
-                                    className="text-[10px] font-bold text-slate-500 hover:text-blue-600 hover:underline bg-slate-200/50 px-1.5 py-0.5 rounded"
-                                >
-                                    Tháng này
-                                </button>
-                            </div>
-                        </div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1.5">Phân loại thống kê</label>
+                        <div className="inline-flex items-center bg-slate-200/80 p-1 rounded-xl gap-1 text-xs font-semibold overflow-x-auto w-full h-[38px]">
+                            <button
+                                type="button"
+                                onClick={() => handleTabChange('received')}
+                                className={`flex-1 px-3 py-1.5 rounded-lg transition-all flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer h-full ${
+                                    activeTabType === 'received'
+                                        ? 'bg-white text-blue-700 shadow-xs font-bold'
+                                        : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                            >
+                                <span>Tiếp nhận</span>
+                                <span className="font-bold text-blue-600">({filteredReceivedRecords.length})</span>
+                            </button>
 
-                        {/* Standard visible editable date inputs */}
-                        <div className="flex items-center gap-2 bg-white border border-gray-300 rounded-lg px-2.5 py-1 shadow-xs h-[38px] w-full text-xs font-bold text-gray-700">
-                            <div className="flex items-center gap-1 w-full">
-                                <span className="text-gray-400 shrink-0">Từ:</span>
-                                <FlexibleDateInput
-                                    value={modalFromDate}
-                                    onChange={isoStr => setModalFromDate(isoStr)}
-                                    placeholder="dd/mm/yyyy"
-                                    size="sm"
-                                    inputClassName="w-full border-none bg-transparent py-0 px-1 text-xs"
-                                />
-                            </div>
-                            <span className="text-gray-400 font-bold shrink-0">-</span>
-                            <div className="flex items-center gap-1 w-full">
-                                <span className="text-gray-400 shrink-0">Đến:</span>
-                                <FlexibleDateInput
-                                    value={modalToDate}
-                                    onChange={isoStr => setModalToDate(isoStr)}
-                                    placeholder="dd/mm/yyyy"
-                                    size="sm"
-                                    inputClassName="w-full border-none bg-transparent py-0 px-1 text-xs"
-                                />
-                            </div>
+                            <button
+                                type="button"
+                                onClick={() => handleTabChange('assigned')}
+                                className={`flex-1 px-3 py-1.5 rounded-lg transition-all flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer h-full ${
+                                    activeTabType === 'assigned'
+                                        ? 'bg-white text-emerald-700 shadow-xs font-bold'
+                                        : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                            >
+                                <span>Giao việc</span>
+                                <span className="font-bold text-emerald-600">({filteredAssignedRecords.length})</span>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => handleTabChange('handover')}
+                                className={`flex-1 px-3 py-1.5 rounded-lg transition-all flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer h-full ${
+                                    activeTabType === 'handover'
+                                        ? 'bg-white text-amber-700 shadow-xs font-bold'
+                                        : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                            >
+                                <span>Hoàn thành</span>
+                                <span className="font-bold text-amber-600">({filteredHandoverRecords.length})</span>
+                            </button>
                         </div>
                     </div>
 

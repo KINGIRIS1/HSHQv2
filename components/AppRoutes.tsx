@@ -999,7 +999,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                           onClick={() => props.setIsReturnHandoverModalOpen?.(true)}
                           className="flex items-center gap-1.5 bg-emerald-600 text-white px-3 py-1.5 rounded-md hover:bg-emerald-700 text-sm font-bold shadow-sm transition-all animate-pulse"
                         >
-                          <Send size={16} /> Chốt DS Bàn Giao Về Phòng CM ({props.selectedRecordIds.size})
+                          <Send size={16} /> Chốt DS Lưu ({props.selectedRecordIds.size})
                         </button>
                       )}
                       <button
@@ -1127,7 +1127,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                           }}
                           className="flex items-center gap-1.5 bg-blue-600 text-white px-3 py-1.5 rounded-md hover:bg-blue-700 text-sm font-bold shadow-sm transition-all animate-pulse"
                         >
-                          <UserPlus size={16} /> Giao Nhân Viên ({props.selectedRecordIds.size})
+                          <UserPlus size={16} /> Giao việc ({props.selectedRecordIds.size})
                         </button>
                       )}
                     </>

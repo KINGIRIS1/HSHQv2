@@ -23,14 +23,22 @@ const isoToDisplay = (isoStr?: string): string => {
     return isoStr;
 };
 
-// Convert DD/MM/YYYY to YYYY-MM-DD
+// Convert DD/MM/YYYY or 8-digit DDMMYYYY to YYYY-MM-DD
 const displayToIso = (displayStr: string): string | null => {
     const clean = displayStr.replace(/[^0-9/]/g, '');
-    const parts = clean.split('/');
+    let parts = clean.split('/');
+    if (parts.length === 1 && clean.length === 8) {
+        parts = [clean.slice(0, 2), clean.slice(2, 4), clean.slice(4, 8)];
+    } else if (parts.length === 1 && clean.length === 6) {
+        parts = [clean.slice(0, 2), clean.slice(2, 4), clean.slice(4, 6)];
+    }
     if (parts.length === 3) {
         const day = parseInt(parts[0], 10);
         const month = parseInt(parts[1], 10);
-        const year = parseInt(parts[2], 10);
+        let year = parseInt(parts[2], 10);
+        if (parts[2].length === 2) {
+            year = year < 50 ? 2000 + year : 1900 + year;
+        }
 
         if (day >= 1 && day <= 31 && month >= 1 && month <= 12 && year >= 1900 && year <= 2100) {
             const yStr = String(year).padStart(4, '0');
@@ -42,14 +50,12 @@ const displayToIso = (displayStr: string): string | null => {
     return null;
 };
 
-// Auto format raw digits as typing, e.g., 01052025 -> 01/05/2025
+// Auto format raw digits as typing, e.g., 30072026 -> 30/07/2026
 const autoFormatDateText = (rawStr: string): string => {
-    // Only allow numbers and slashes
     let val = rawStr.replace(/[^0-9/]/g, '');
-    
-    // If user typed digits without slashes, e.g. 01052025
     const digitsOnly = val.replace(/\//g, '');
-    if (digitsOnly.length === 8 && !val.includes('/')) {
+    
+    if (digitsOnly.length >= 8) {
         const d = digitsOnly.slice(0, 2);
         const m = digitsOnly.slice(2, 4);
         const y = digitsOnly.slice(4, 8);
@@ -133,41 +139,36 @@ export const FlexibleDateInput: React.FC<FlexibleDateInputProps> = ({
 
     const isoValue = value ? (value.includes('T') ? value.split('T')[0] : value) : '';
 
-    const pyClass = size === 'sm' ? 'py-1 text-xs' : 'py-1.5 text-sm';
+    const pyClass = size === 'sm' ? 'py-0.5 text-xs' : 'py-1.5 text-sm';
+    const paddingClass = size === 'sm' ? (inputClassName?.includes('px-') ? '' : 'px-1 pr-4') : 'px-2.5 pr-8';
 
     return (
         <div className={`flex flex-col gap-1 ${className}`}>
             {label && <label className="text-xs font-bold text-gray-700">{label}</label>}
-            <div className="relative flex items-center">
+            <div className="relative flex items-center w-full">
                 <input
                     type="text"
                     value={textValue}
                     onChange={handleTextChange}
                     onBlur={handleBlur}
                     placeholder={placeholder}
-                    className={`w-full bg-white border border-gray-300 rounded-lg px-2.5 ${pyClass} pr-8 font-medium text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${inputClassName}`}
+                    className={`w-full bg-white border border-gray-300 rounded-lg ${paddingClass} ${pyClass} font-medium text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${inputClassName}`}
                 />
                 
                 {showCalendarIcon && (
-                    <button
-                        type="button"
-                        onClick={triggerDatePicker}
-                        className="absolute right-2 text-gray-400 hover:text-blue-600 transition-colors p-0.5 rounded cursor-pointer"
-                        title="Chọn từ lịch"
-                    >
-                        <Calendar size={size === 'sm' ? 14 : 16} />
-                    </button>
+                    <div className="absolute right-0.5 flex items-center justify-center p-0.5 text-gray-400 hover:text-blue-600 transition-colors rounded cursor-pointer">
+                        <Calendar size={size === 'sm' ? 13 : 16} />
+                        <input
+                            type="date"
+                            ref={datePickerRef}
+                            value={isoValue}
+                            onChange={handleNativeDateChange}
+                            className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                            title="Chọn từ lịch"
+                            tabIndex={-1}
+                        />
+                    </div>
                 )}
-
-                {/* Hidden native date picker */}
-                <input
-                    type="date"
-                    ref={datePickerRef}
-                    value={isoValue}
-                    onChange={handleNativeDateChange}
-                    className="sr-only pointer-events-none absolute opacity-0 w-0 h-0"
-                    tabIndex={-1}
-                />
             </div>
         </div>
     );

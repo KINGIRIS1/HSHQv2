@@ -157,7 +157,7 @@ export const MOCK_EMPLOYEES: Employee[] = [
   { 
     id: 'emp2', 
     name: 'Trần Thị B', 
-    department: 'Tổ Đăng ký cấp giấy', 
+    department: 'Tổ Cấp giấy', 
     position: 'Chuyên viên',
     managedWards: ['Minh Đức', 'Tân Khai'] 
   },

@@ -22,7 +22,7 @@ export const RejectReturnStepModal: React.FC<RejectReturnStepModalProps> = ({
   onConfirm
 }) => {
   const [reason, setReason] = useState('');
-  const [returnDate, setReturnDate] = useState(() => new Date().toISOString().slice(0, 16));
+  const [returnDate, setReturnDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -117,14 +117,14 @@ export const RejectReturnStepModal: React.FC<RejectReturnStepModalProps> = ({
             />
           </div>
 
-          {/* Input 2: Ngày giờ trả hồ sơ */}
+          {/* Input 2: Ngày trả hồ sơ */}
           <div>
             <label className="block text-sm font-bold text-slate-800 mb-1.5 flex items-center gap-2">
               <Calendar size={16} className="text-indigo-600" />
-              <span>Ngày giờ trả hồ sơ</span>
+              <span>Ngày trả hồ sơ</span>
             </label>
             <input
-              type="datetime-local"
+              type="date"
               className="w-full border border-gray-300 rounded-xl px-3.5 py-2 text-sm focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none font-semibold text-slate-700 bg-gray-50"
               value={returnDate}
               onChange={(e) => setReturnDate(e.target.value)}

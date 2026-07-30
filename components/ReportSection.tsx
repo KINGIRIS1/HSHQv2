@@ -56,7 +56,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
     const [selectedEmpId, setSelectedEmpId] = useState<string>('');
 
     // Report Type State
-    const [reportType, setReportType] = useState<'week' | 'month' | 'custom'>('custom');
+    const [reportType, setReportType] = useState<'today' | 'week' | 'month' | 'custom'>('custom');
 
     // Card filter state
     const [cardFilter, setCardFilter] = useState<'all' | 'completed' | 'processing' | 'overdue_pending' | 'overdue_completed' | null>(null);
@@ -107,10 +107,16 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
         }
     }, [isHanhChinhOrAdmin, userDept, mainTab]);
 
-    // Reset card filter when other filters change
+    // Reset date filters and search states to "Tất cả" when switching report tabs or main tabs
     useEffect(() => {
-        setCardFilter(prev => prev === null ? prev : null);
-    }, [fromDate, toDate, selectedWard, mainTab]);
+        setFromDate('1970-01-01');
+        setToDate(new Date().toISOString().split('T')[0]);
+        setReportType('custom');
+        setSelectedWard('all');
+        setSelectedEmpId('');
+        setCardFilter(null);
+        setCurrentPage(1);
+    }, [activeTab, mainTab]);
 
     useEffect(() => {
         if (mainTab === 'archive') {
@@ -329,10 +335,12 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
         return { total, completed, withdrawn, overduePending, overdueCompleted, processing };
     }, [filteredData, activeTab, selectedEmpId, dailyStatsRecords]);
 
-    const handleQuickReport = (type: 'week' | 'month') => {
+    const handleQuickReport = (type: 'today' | 'week' | 'month') => {
         const now = new Date();
         let start = new Date();
-        if (type === 'week') {
+        if (type === 'today') {
+            start = new Date();
+        } else if (type === 'week') {
             const day = now.getDay();
             const diff = now.getDate() - day + (day === 0 ? -6 : 1); // Thứ 2
             start = new Date(now.setDate(diff));
@@ -364,6 +372,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
         setActiveTab('ai');
         
         let title = mainTab === 'measurement' ? "BÁO CÁO KẾT QUẢ CÔNG TÁC ĐO ĐẠC" : "BÁO CÁO KẾT QUẢ CÔNG TÁC LƯU TRỮ";
+        if (reportType === 'today') title = mainTab === 'measurement' ? "BÁO CÁO KẾT QUẢ CÔNG TÁC ĐO ĐẠC HÔM NAY" : "BÁO CÁO KẾT QUẢ CÔNG TÁC LƯU TRỮ HÔM NAY";
         if (reportType === 'week') title = mainTab === 'measurement' ? "BÁO CÁO KẾT QUẢ CÔNG TÁC ĐO ĐẠC TUẦN" : "BÁO CÁO KẾT QUẢ CÔNG TÁC LƯU TRỮ TUẦN";
         if (reportType === 'month') title = mainTab === 'measurement' ? "BÁO CÁO KẾT QUẢ CÔNG TÁC ĐO ĐẠC THÁNG" : "BÁO CÁO KẾT QUẢ CÔNG TÁC LƯU TRỮ THÁNG";
 
@@ -374,6 +383,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
     const handleExportExcelClick = () => {
         if (!fromDate || !toDate) { alert("Vui lòng chọn đầy đủ thời gian."); return; }
         let title = mainTab === 'measurement' ? "BÁO CÁO KẾT QUẢ CÔNG TÁC ĐO ĐẠC" : "BÁO CÁO KẾT QUẢ CÔNG TÁC LƯU TRỮ";
+        if (reportType === 'today') title = mainTab === 'measurement' ? "BÁO CÁO KẾT QUẢ CÔNG TÁC ĐO ĐẠC HÔM NAY" : "BÁO CÁO KẾT QUẢ CÔNG TÁC LƯU TRỮ HÔM NAY";
         if (reportType === 'week') title = mainTab === 'measurement' ? "BÁO CÁO KẾT QUẢ CÔNG TÁC ĐO ĐẠC TUẦN" : "BÁO CÁO KẾT QUẢ CÔNG TÁC LƯU TRỮ TUẦN";
         if (reportType === 'month') title = mainTab === 'measurement' ? "BÁO CÁO KẾT QUẢ CÔNG TÁC ĐO ĐẠC THÁNG" : "BÁO CÁO KẾT QUẢ CÔNG TÁC LƯU TRỮ THÁNG";
         
@@ -462,6 +472,9 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                         <button onClick={() => handleQuickReport('month')} className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-1 ${reportType === 'month' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-600 hover:text-blue-600'}`}>
                             <Layout size={14} /> Tháng này
                         </button>
+                        <button onClick={() => handleQuickReport('today')} className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-1 ${reportType === 'today' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-600 hover:text-blue-600'}`}>
+                            <Clock size={14} /> Hôm nay
+                        </button>
                     </div>
 
                     <div className="flex items-center gap-2 ml-auto">
@@ -480,24 +493,25 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                             </select>
                         </div>
 
-                        <div className="flex items-center gap-1.5 bg-white border border-gray-300 rounded-lg px-2 py-1 shadow-xs shrink-0 whitespace-nowrap text-xs font-bold text-gray-700">
+                        <div className="flex items-center gap-1 bg-white border border-gray-300 rounded-lg px-2 py-1 shadow-xs shrink-0 whitespace-nowrap text-xs font-bold text-gray-700">
                             <CalendarDays size={16} className="text-slate-500 shrink-0" />
-                            <span className="text-gray-500 text-xs shrink-0">Từ:</span>
+                            <span className="text-gray-500 text-xs shrink-0 font-bold">Từ:</span>
                             <FlexibleDateInput
                                 value={fromDate === '1970-01-01' ? '' : fromDate}
                                 onChange={(isoStr) => { setFromDate(isoStr || '1970-01-01'); setReportType('custom'); }}
                                 placeholder="dd/mm/yyyy"
                                 size="sm"
-                                inputClassName="w-28 text-xs py-0.5 px-1 border-none bg-transparent"
+                                className="w-[85px] shrink-0"
+                                inputClassName="w-full text-xs font-semibold tracking-tight py-0 px-0 border-none bg-transparent pr-3.5"
                             />
                             <span className="text-gray-400 font-bold text-xs">-</span>
-                            <span className="text-gray-500 text-xs shrink-0">Đến:</span>
                             <FlexibleDateInput
                                 value={toDate}
                                 onChange={(isoStr) => { setToDate(isoStr); setReportType('custom'); }}
                                 placeholder="dd/mm/yyyy"
                                 size="sm"
-                                inputClassName="w-28 text-xs py-0.5 px-1 border-none bg-transparent"
+                                className="w-[85px] shrink-0"
+                                inputClassName="w-full text-xs font-semibold tracking-tight py-0 px-0 border-none bg-transparent pr-3.5"
                             />
                         </div>
                         
@@ -582,118 +596,77 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                 <span className="text-[10px] text-slate-400 font-normal">Chạm icon trên để đổi</span>
             </div>
 
-            {/* STATS CARDS: HIỂN THỊ DƯỚI CONTENT TABS (Tránh chồng nội dung không cần thiết & hỗ trợ click lọc trực tiếp) */}
+            {/* THỐNG KÊ DẠNG NÚT DẸP (PILL SEGMENTED CONTROLS) GỌN GÀNG DÙNG ĐỂ LỌC NHANH */}
             {activeTab === 'list' && (
-                <div className="p-2.5 md:p-4 bg-slate-50 border-b border-gray-200 shrink-0">
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4 animate-fade-in">
-                        {/* Thẻ: Tổng hồ sơ */}
-                        <div 
+                <div className="px-3 py-2 bg-slate-50 border-b border-gray-200 shrink-0">
+                    <div className="inline-flex items-center bg-slate-200/80 p-1 rounded-xl gap-1 text-xs font-semibold overflow-x-auto max-w-full">
+                        {/* Tất cả / Tổng hồ sơ */}
+                        <button
+                            type="button"
                             onClick={() => {
                                 setCardFilter(cardFilter === 'all' ? null : 'all');
                                 setActiveTab('list');
                             }}
-                            className={`p-2 md:p-3 rounded-xl flex items-center gap-2 md:gap-3 shadow-sm cursor-pointer transition-all duration-200 border ${
+                            className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1 whitespace-nowrap cursor-pointer ${
                                 (cardFilter === 'all' || cardFilter === null)
-                                    ? 'bg-blue-100/80 border-blue-400 ring-2 ring-blue-500 scale-[1.01] shadow-md font-semibold' 
-                                    : 'bg-blue-50/50 border-blue-100 hover:border-blue-300 hover:bg-blue-50'
+                                    ? 'bg-white text-blue-700 shadow-xs font-bold'
+                                    : 'text-slate-600 hover:text-slate-900'
                             }`}
-                            title="Click để xem tất cả hồ sơ"
                         >
-                            <div className="bg-blue-200/70 p-1.5 rounded-lg text-blue-700 shrink-0"><ListFilter size={16}/></div>
-                            <div className="min-w-0">
-                                <div className="text-lg md:text-2xl font-bold text-blue-800 leading-none">{generalStats.total}</div>
-                                <div className="text-[10px] md:text-xs text-blue-600 uppercase font-bold whitespace-nowrap mt-1 leading-tight">Tổng hồ sơ</div>
-                            </div>
-                        </div>
+                            <span>Tổng hồ sơ</span>
+                            <span className="font-bold text-blue-600">({generalStats.total})</span>
+                        </button>
 
-                        {/* Thẻ: Đã xong */}
-                        <div 
+                        {/* Đã xong */}
+                        <button
+                            type="button"
                             onClick={() => {
                                 setCardFilter(cardFilter === 'completed' ? null : 'completed');
                                 setActiveTab('list');
                             }}
-                            className={`p-2 md:p-3 rounded-xl flex items-center gap-2 md:gap-3 shadow-sm cursor-pointer transition-all duration-200 border ${
+                            className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1 whitespace-nowrap cursor-pointer ${
                                 cardFilter === 'completed'
-                                    ? 'bg-green-100 border-green-400 ring-2 ring-green-500 scale-[1.01] shadow-md font-semibold' 
-                                    : 'bg-green-50/50 border-green-100 hover:border-green-300 hover:bg-green-50'
+                                    ? 'bg-white text-emerald-700 shadow-xs font-bold'
+                                    : 'text-slate-600 hover:text-slate-900'
                             }`}
-                            title="Click để lọc hồ sơ đã hoàn thành"
                         >
-                            <div className="bg-green-200/70 p-1.5 rounded-lg text-green-700 shrink-0"><CheckCircle2 size={16}/></div>
-                            <div className="min-w-0">
-                                <div className="text-lg md:text-2xl font-bold text-green-800 leading-none">{generalStats.completed}</div>
-                                <div className="text-[10px] md:text-xs text-green-600 uppercase font-bold whitespace-nowrap mt-1 leading-tight">Đã xong</div>
-                            </div>
-                        </div>
+                            <span>Đã xong</span>
+                            <span className="font-bold text-emerald-600">({generalStats.completed})</span>
+                        </button>
 
-                        {/* Thẻ: Đang xử lý */}
-                        <div 
+                        {/* Đang xử lý */}
+                        <button
+                            type="button"
                             onClick={() => {
                                 setCardFilter(cardFilter === 'processing' ? null : 'processing');
                                 setActiveTab('list');
                             }}
-                            className={`p-2 md:p-3 rounded-xl flex items-center gap-2 md:gap-3 shadow-sm cursor-pointer transition-all duration-200 border ${
+                            className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1 whitespace-nowrap cursor-pointer ${
                                 cardFilter === 'processing'
-                                    ? 'bg-orange-100 border-orange-400 ring-2 ring-orange-500 scale-[1.01] shadow-md font-semibold' 
-                                    : 'bg-orange-50/50 border-orange-100 hover:border-orange-300 hover:bg-orange-50'
+                                    ? 'bg-white text-amber-700 shadow-xs font-bold'
+                                    : 'text-slate-600 hover:text-slate-900'
                             }`}
-                            title="Click để lọc hồ sơ đang xử lý"
                         >
-                            <div className="bg-orange-200/70 p-1.5 rounded-lg text-orange-700 shrink-0"><Clock size={16}/></div>
-                            <div className="min-w-0">
-                                <div className="text-lg md:text-2xl font-bold text-orange-800 leading-none">{generalStats.processing}</div>
-                                <div className="text-[10px] md:text-xs text-orange-600 uppercase font-bold whitespace-nowrap mt-1 leading-tight">Đang xử lý</div>
-                            </div>
-                        </div>
+                            <span>Đang xử lý</span>
+                            <span className="font-bold text-amber-600">({generalStats.processing})</span>
+                        </button>
 
-                        {/* Thẻ: Tổng trễ hạn */}
-                        <div 
+                        {/* Trễ hạn chưa xong */}
+                        <button
+                            type="button"
                             onClick={() => {
                                 setCardFilter(cardFilter === 'overdue_pending' ? null : 'overdue_pending');
                                 setActiveTab('list');
                             }}
-                            className={`p-1.5 md:p-2.5 rounded-xl flex items-center gap-1.5 md:gap-3 shadow-sm cursor-pointer transition-all duration-200 border ${
+                            className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1 whitespace-nowrap cursor-pointer ${
                                 (cardFilter === 'overdue_pending' || cardFilter === 'overdue_completed')
-                                    ? 'bg-red-100 border-red-400 ring-2 ring-red-500 scale-[1.01] shadow-md' 
-                                    : 'bg-red-50/50 border-red-100 hover:border-red-300 hover:bg-red-50'
+                                    ? 'bg-white text-red-700 shadow-xs font-bold'
+                                    : 'text-slate-600 hover:text-slate-900'
                             }`}
-                            title="Click để lọc hồ sơ trễ hạn"
                         >
-                            <div className="bg-red-200/70 p-1.5 rounded-lg text-red-700 shrink-0"><AlertTriangle size={16}/></div>
-                            <div className="flex-1 min-w-0">
-                                <div 
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        setCardFilter(cardFilter === 'overdue_pending' ? null : 'overdue_pending');
-                                        setActiveTab('list');
-                                    }}
-                                    className={`flex justify-between items-center text-red-800 px-1 py-0.5 rounded transition-colors ${
-                                        cardFilter === 'overdue_pending' ? 'bg-red-200/70 font-bold border border-red-300' : 'hover:bg-red-100/50'
-                                    }`}
-                                    title="Lọc hồ sơ trễ chưa xong"
-                                >
-                                    <span className="text-[9px] md:text-xs font-semibold">Chưa xong:</span>
-                                    <span className="text-xs md:text-sm font-bold ml-1">{generalStats.overduePending}</span>
-                                </div>
-                                <div 
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        setCardFilter(cardFilter === 'overdue_completed' ? null : 'overdue_completed');
-                                        setActiveTab('list');
-                                    }}
-                                    className={`flex justify-between items-center text-red-600/70 mt-0.5 px-1 py-0.5 rounded transition-colors ${
-                                        cardFilter === 'overdue_completed' ? 'bg-red-200/50 font-bold border border-red-300' : 'hover:bg-red-100/30'
-                                    }`}
-                                    title="Lọc hồ sơ trễ đã xong"
-                                >
-                                    <span className="text-[9px] md:text-xs font-semibold">Đã xong:</span>
-                                    <span className="text-[10px] md:text-xs font-bold ml-1">{generalStats.overdueCompleted}</span>
-                                </div>
-                                <div className="text-[8px] md:text-[10px] text-red-600 uppercase font-bold text-center mt-0.5 pt-0.5 border-t border-red-200 leading-none">
-                                    Tổng trễ hạn
-                                </div>
-                            </div>
-                        </div>
+                            <span>Trễ hạn chưa xong</span>
+                            <span className="font-bold text-red-600">({generalStats.overduePending})</span>
+                        </button>
                     </div>
                 </div>
             )}
@@ -943,7 +916,14 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                         records={activeRecords} 
                         employees={activeEmployees} 
                         wards={wards} 
+                        fromDate={fromDate}
+                        toDate={toDate}
                         onFilteredRecordsChange={setDailyStatsRecords}
+                        onResetDates={() => {
+                            setFromDate('1970-01-01');
+                            setToDate(new Date().toISOString().split('T')[0]);
+                            setReportType('custom');
+                        }}
                     />
                 )}
 

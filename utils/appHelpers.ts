@@ -417,8 +417,175 @@ export function processAssignmentTimelineCheck(
     updates.statusLogs = [...(record.statusLogs || []), newLog];
   }
 
+  if (record.data) {
+    updates.data = {
+      ...record.data,
+      assigned_to: newEmployeeId,
+      ngay_giao: newAssignedDateStr,
+      ghi_chu_noi_bo: updates.privateNotes || record.data.ghi_chu_noi_bo
+    };
+  }
+
   return updates;
 }
+
+// --- HÀM XỬ LÝ VÀ ĐỊNH DẠNG ĐỢT GIAO 1 CỬA ---
+
+export function getDepartmentForRecord(r: RecordFile): string {
+    if (r.returnHandoverDept) {
+        const d = r.returnHandoverDept.toLowerCase();
+        if (d.includes('lưu trữ') || d.includes('thông tin')) return 'Tổ Lưu trữ';
+        if (d.includes('đo đạc') || d.includes('đo dạc')) return 'Tổ Đo đạc';
+        if (d.includes('cấp giấy') || d.includes('đăng ký')) return 'Tổ Cấp giấy';
+    }
+    const type = (r.recordType || '').toLowerCase();
+    const code = (r.code || '').toLowerCase();
+
+    if (type.includes('1.1') || type.includes('1.2') || type.includes('công văn') || type.includes('sao lục') || code.startsWith('1.')) {
+        return 'Tổ Lưu trữ';
+    }
+    if (type.includes('2.1') || type.includes('2.2') || type.includes('trích lục')) {
+        return 'Tổ Cấp giấy';
+    }
+    if (type.includes('2.3') || type.includes('2.4') || type.includes('2.5') || type.includes('2.6') || type.includes('số thửa') || type.includes('trích đo') || type.includes('đo đạc') || code.startsWith('2.')) {
+        return 'Tổ Đo đạc';
+    }
+    return 'Tổ Cấp giấy';
+}
+
+export function getDeptAbbr(deptName: string): string {
+    if (!deptName) return 'CG';
+    const d = deptName.toLowerCase();
+    if (d.includes('lưu trữ') || d.includes('thông tin') || d === 'lt') return 'LT';
+    if (d.includes('đo đạc') || d.includes('đo dạc') || d.includes('kỹ thuật') || d === 'dd') return 'DD';
+    if (d.includes('cấp giấy') || d.includes('đăng ký') || d === 'cg') return 'CG';
+    return deptName;
+}
+
+export function formatDateDDMMYYYY(d?: string | null): string {
+    if (!d) {
+        const today = new Date();
+        return `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
+    }
+    const clean = d.split('T')[0];
+    const parts = clean.split('-');
+    if (parts.length === 3) {
+        return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+    return d;
+}
+
+export function formatDateDDMMYY(d?: string | null): string {
+    if (!d) {
+        const today = new Date();
+        const yy = String(today.getFullYear()).slice(-2);
+        return `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${yy}`;
+    }
+    const clean = d.split('T')[0];
+    const parts = clean.split('-');
+    if (parts.length === 3) {
+        const yy = parts[0].length === 4 ? parts[0].slice(-2) : parts[0];
+        return `${parts[2]}/${parts[1]}/${yy}`;
+    }
+    return d;
+}
+
+export function formatBatchName(batch: number | string | null | undefined, deptName: string, dateStr?: string | null): string {
+    if (!batch) return '';
+    const bStr = String(batch).trim();
+    if (bStr.includes('Đợt') || bStr.includes('CG') || bStr.includes('LT') || bStr.includes('DD') || bStr.includes('Tổ ')) {
+        return bStr;
+    }
+    const deptAbbr = getDeptAbbr(deptName);
+    const dateFormatted = formatDateDDMMYYYY(dateStr);
+    const numPadded = isNaN(Number(bStr)) ? bStr : String(bStr).padStart(2, '0');
+    return `Đợt ${numPadded}-${deptAbbr}-${dateFormatted}`;
+}
+
+/**
+ * Tự động gom các hồ sơ trước đây chưa chốt đợt (exportBatch rỗng/null)
+ * thành đợt cuối cùng trong ngày theo từng tổ chuyên môn.
+ */
+export function migrateUnbatchedRecords(records: RecordFile[]): { migratedRecords: RecordFile[], hasChanges: boolean } {
+    let hasChanges = false;
+
+    // Pass 1: Build map of existing batches by date (YYYY-MM-DD) and department
+    const existingBatchesByDateDept: Record<string, string> = {};
+    records.forEach(r => {
+        if (r.exportBatch && String(r.exportBatch).trim() !== '' && r.exportBatch !== 'NOT_BATCHED') {
+            const rawDate = r.exportDate || r.completedDate;
+            if (rawDate) {
+                const dateKey = String(rawDate).split('T')[0];
+                const dept = getDepartmentForRecord(r);
+                const key = `${dateKey}_${dept}`;
+                const currentBatchStr = String(r.exportBatch);
+                if (!existingBatchesByDateDept[key] || currentBatchStr.localeCompare(existingBatchesByDateDept[key], undefined, { numeric: true }) > 0) {
+                    existingBatchesByDateDept[key] = currentBatchStr;
+                }
+            }
+        }
+    });
+
+    const migratedRecords = records.map(r => {
+        let currentBatch = r.exportBatch;
+
+        // Tự động làm sạch các tên đợt cũ bị lặp chữ "Đợt" (vd: Đợt Đợt Cuối -> Đợt Cuối)
+        if (typeof currentBatch === 'string' && /^Đợt\s+Đợt/i.test(currentBatch)) {
+            currentBatch = currentBatch.replace(/^Đợt\s+/i, '');
+            hasChanges = true;
+        }
+
+        const isHandedOver = r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED || Boolean((r as any).is_handover);
+        const missingBatch = !currentBatch || String(currentBatch).trim() === '' || currentBatch === 'NOT_BATCHED';
+
+        if (isHandedOver && missingBatch) {
+            hasChanges = true;
+            const dept = getDepartmentForRecord(r);
+            const deptAbbr = getDeptAbbr(dept);
+            const rawDate = r.exportDate || r.completedDate || r.receivedDate || new Date().toISOString();
+            const dateKey = String(rawDate).split('T')[0];
+            const dateFmt = formatDateDDMMYYYY(rawDate);
+            const key = `${dateKey}_${dept}`;
+
+            // Priority: assign to existing batch of that day & dept if available, else create 'Đợt Cuối'
+            const defaultBatchName = existingBatchesByDateDept[key] || `Đợt Cuối-${deptAbbr}-${dateFmt}`;
+
+            return {
+                ...r,
+                exportBatch: defaultBatchName,
+                exportDate: r.exportDate || rawDate,
+                completedDate: r.completedDate || rawDate,
+                status: r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED ? r.status : RecordStatus.HANDOVER
+            };
+        }
+
+        // Tự động chuẩn hóa đợt số cũ (ví dụ: exportBatch = 1) thành chuỗi tên đợt chuẩn
+        if (currentBatch && typeof currentBatch === 'number') {
+            hasChanges = true;
+            const dept = getDepartmentForRecord(r);
+            const deptAbbr = getDeptAbbr(dept);
+            const rawDate = r.exportDate || r.completedDate || r.receivedDate || new Date().toISOString();
+            const dateFmt = formatDateDDMMYYYY(rawDate);
+            const numStr = String(currentBatch).padStart(2, '0');
+            return {
+                ...r,
+                exportBatch: `Đợt ${numStr}-${deptAbbr}-${dateFmt}`
+            };
+        }
+
+        if (currentBatch !== r.exportBatch) {
+            return {
+                ...r,
+                exportBatch: currentBatch
+            };
+        }
+
+        return r;
+    });
+
+    return { migratedRecords, hasChanges };
+}
+
 
 
 

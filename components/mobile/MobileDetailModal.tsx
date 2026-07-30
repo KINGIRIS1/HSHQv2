@@ -1001,7 +1001,7 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                 </button>
               </div>
               <input 
-                type="datetime-local" 
+                type="date" 
                 className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-100 transition-all"
                 value={reminderDate}
                 onChange={(e) => setReminderDate(e.target.value)}

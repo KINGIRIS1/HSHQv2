@@ -7,17 +7,16 @@ import cors from 'cors';
 import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const appDirname = typeof __dirname !== 'undefined' ? __dirname : process.cwd();
 
 const server = jsonServer.create();
-let dbFile = process.env.DB_PATH || path.join(__dirname, 'server/db.json');
+let dbFile = process.env.DB_PATH || path.join(process.cwd(), 'server/db.json');
 
 // In production (Cloud Run), the filesystem is read-only except for /tmp
 if (process.env.NODE_ENV === 'production') {
     dbFile = '/tmp/db.json';
     // Copy initial db.json to /tmp if it doesn't exist
-    const initialDbFile = path.join(__dirname, 'server/db.json');
+    const initialDbFile = path.join(process.cwd(), 'server/db.json');
     if (!fs.existsSync(dbFile) && fs.existsSync(initialDbFile)) {
         fs.copyFileSync(initialDbFile, dbFile);
     }
@@ -27,10 +26,10 @@ const router = jsonServer.router(dbFile);
 const middlewares = jsonServer.defaults({ logger: false });
 
 // --- TỐI ƯU HÓA TỐC ĐỘ CẬP NHẬT ---
-let releaseDir = path.join(__dirname, 'release');
+let releaseDir = path.join(process.cwd(), 'release');
 if (!fs.existsSync(releaseDir)) {
     // Thử tìm ở thư mục gốc project (khi chạy dev)
-    releaseDir = path.join(__dirname, 'release');
+    releaseDir = path.join(process.cwd(), 'release');
 }
 console.log(`Update Server path: ${releaseDir}`);
 server.use('/updates', express.static(releaseDir));
@@ -251,7 +250,7 @@ const startServer = async () => {
         });
         server.use(vite.middlewares);
     } else {
-        const distPath = path.join(__dirname, 'dist');
+        const distPath = path.join(process.cwd(), 'dist');
         server.use(express.static(distPath));
         
         // SPA fallback for HTML requests

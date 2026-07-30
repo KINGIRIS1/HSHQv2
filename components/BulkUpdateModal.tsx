@@ -1,8 +1,8 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { RecordFile, Employee, RecordStatus } from '../types';
 import { STATUS_LABELS } from '../constants';
-import { X, CheckCircle2, AlertTriangle, Layers, ArrowRight, FileText } from 'lucide-react';
+import { X, CheckCircle2, Layers, ArrowRight } from 'lucide-react';
 
 interface BulkUpdateModalProps {
   isOpen: boolean;
@@ -15,38 +15,16 @@ interface BulkUpdateModalProps {
 }
 
 const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({ 
-  isOpen, onClose, selectedRecords, allRecords = [], employees, wards, onConfirm 
+  isOpen, onClose, selectedRecords, employees, wards, onConfirm 
 }) => {
   const [targetField, setTargetField] = useState<string>('status');
   const [targetValue, setTargetValue] = useState<string>('');
   const [useCustomDate, setUseCustomDate] = useState<boolean>(false);
   const [customDate, setCustomDate] = useState<string>('');
-  const [pastedCodesText, setPastedCodesText] = useState<string>('');
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Parse pasted codes
-  const parsedPastedCodes = useMemo(() => {
-    if (!pastedCodesText.trim()) return [];
-    return pastedCodesText
-      .split(/[\n,;\t\s]+/)
-      .map(c => c.trim())
-      .filter(c => c.length > 0);
-  }, [pastedCodesText]);
-
-  // Find matching records from allRecords if pasted codes exist
-  const matchedPastedRecords = useMemo(() => {
-    if (parsedPastedCodes.length === 0) return [];
-    const lowerCodesSet = new Set(parsedPastedCodes.map(c => c.toLowerCase()));
-    return allRecords.filter(r => r.code && lowerCodesSet.has(r.code.trim().toLowerCase()));
-  }, [parsedPastedCodes, allRecords]);
-
   // Determine active target records
-  const activeRecordsToUpdate = useMemo(() => {
-    if (parsedPastedCodes.length > 0) {
-      return matchedPastedRecords;
-    }
-    return selectedRecords;
-  }, [parsedPastedCodes, matchedPastedRecords, selectedRecords]);
+  const activeRecordsToUpdate = selectedRecords;
 
   if (!isOpen) return null;
 
@@ -56,12 +34,12 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
         return;
     }
     if (activeRecordsToUpdate.length === 0) {
-        alert("Không tìm thấy hồ sơ nào cần cập nhật. Vui lòng chọn hồ sơ hoặc nhập danh sách mã hợp lệ.");
+        alert("Không tìm thấy hồ sơ nào cần cập nhật.");
         return;
     }
 
     const count = activeRecordsToUpdate.length;
-    if (confirm(`Bạn có chắc chắn muốn cập nhật ${count} hồ sơ đang chọn / khớp danh sách không?`)) {
+    if (confirm(`Bạn có chắc chắn muốn cập nhật ${count} hồ sơ đang chọn không?`)) {
         setIsProcessing(true);
         const isoDate = useCustomDate && customDate ? new Date(customDate + "T12:00:00").toISOString() : undefined;
         const targetIds = activeRecordsToUpdate.map(r => r.id);
@@ -91,43 +69,6 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
         </div>
 
         <div className="p-6 space-y-5 max-h-[75vh] overflow-y-auto">
-            <div className="bg-blue-50 p-4 rounded-lg border border-blue-100 flex items-start gap-3">
-                <AlertTriangle className="text-blue-600 shrink-0 mt-0.5" size={18} />
-                <p className="text-sm text-blue-800">
-                    Hành động này sẽ thay đổi dữ liệu của <strong>tất cả</strong> hồ sơ được chọn. Vui lòng kiểm tra kỹ trước khi thực hiện.
-                </p>
-            </div>
-
-            {/* Input list of codes option */}
-            <div className="border border-slate-200 rounded-lg p-3.5 bg-slate-50/60 space-y-2">
-                <label className="block text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                    <FileText size={15} className="text-orange-600" />
-                    Đưa danh sách mã hồ sơ vào (Tùy chọn - Nhập/Dán nhiều mã):
-                </label>
-                <textarea
-                    rows={3}
-                    placeholder="Dán hoặc nhập các mã hồ sơ (ví dụ: 2026.001, 2026.002, mỗi mã 1 dòng hoặc cách nhau bằng dấu phẩy)..."
-                    className="w-full text-xs font-mono p-2.5 border border-slate-300 rounded bg-white focus:ring-2 focus:ring-orange-500 outline-none"
-                    value={pastedCodesText}
-                    onChange={(e) => setPastedCodesText(e.target.value)}
-                />
-                {pastedCodesText.trim() !== '' && (
-                    <div className="text-xs">
-                        {parsedPastedCodes.length > 0 ? (
-                            matchedPastedRecords.length > 0 ? (
-                                <span className="text-emerald-700 font-bold">
-                                    ✓ Đã tìm thấy {matchedPastedRecords.length} / {parsedPastedCodes.length} mã hồ sơ phù hợp trong hệ thống.
-                                </span>
-                            ) : (
-                                <span className="text-red-600 font-bold">
-                                    ✕ Đã nhập {parsedPastedCodes.length} mã nhưng không tìm thấy hồ sơ trùng khớp trong hệ thống.
-                                </span>
-                            )
-                        ) : null}
-                    </div>
-                )}
-            </div>
-
             <div className="space-y-4">
                 <div>
                     <label className="block text-sm font-bold text-gray-700 mb-2">1. Chọn thông tin cần thay đổi</label>

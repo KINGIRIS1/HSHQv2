@@ -51,7 +51,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
     categoryRecords.forEach(r => {
       if (type === 'handover') {
           // Logic cho Giao 1 cửa
-          if (r.status === RecordStatus.HANDOVER || r.status === RecordStatus.SIGNED || r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED) {
+          if (r.status === RecordStatus.HANDOVER || r.status === RecordStatus.SIGNED || r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED || r.exportBatch) {
               if (r.exportBatch && r.exportDate) {
                   const dateStr = r.exportDate.split('T')[0];
                   const key = `${dateStr}_${r.exportBatch}`;
@@ -151,8 +151,10 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
                 const rDateObj = (r.completedDate || r.receivedDate || new Date().toISOString()).split('T')[0];
                 return r.status === RecordStatus.HANDOVER && !r.exportBatch && rDateObj === dateStr && matchWard;
             } else {
-                const batchNum = parseInt(batchStr);
-                return r.exportDate?.startsWith(dateStr) && r.exportBatch === batchNum && matchWard;
+                const rDateObj = r.exportDate ? r.exportDate.split('T')[0] : '';
+                const matchDate = !dateStr || rDateObj === dateStr;
+                const matchBatch = String(r.exportBatch ?? '').trim() === String(batchStr ?? '').trim();
+                return matchDate && matchBatch && matchWard;
             }
         });
 
@@ -496,37 +498,6 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
         </div>
 
         <div className="p-6 space-y-4">
-            {type === 'handover' && (
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-1.5">
-                        <Filter size={15} className="text-blue-600" /> Phân loại hồ sơ giao:
-                    </label>
-                    <div className="flex bg-gray-100 p-1 rounded-lg border border-gray-200">
-                        <button
-                            type="button"
-                            onClick={() => setRecordCategory('all')}
-                            className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all ${recordCategory === 'all' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
-                        >
-                            Tất cả
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setRecordCategory('measurement')}
-                            className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all ${recordCategory === 'measurement' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
-                        >
-                            Đo đạc
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setRecordCategory('archive')}
-                            className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all ${recordCategory === 'archive' ? 'bg-amber-600 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
-                        >
-                            Lưu trữ
-                        </button>
-                    </div>
-                </div>
-            )}
-
             <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">1. Chọn đợt / ngày xuất</label>
                 {batchOptions.length > 0 ? (
@@ -541,7 +512,9 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
                                     {type === 'handover' 
                                       ? (opt.batch === 'Lẻ (Chưa tạo đợt)' 
                                           ? `Lẻ (Chưa tạo đợt) - Ngày ${formatDate(opt.date)} (${opt.count} HS)`
-                                          : `Đợt ${opt.batch} - Ngày ${formatDate(opt.date)} (${opt.count} HS)`)
+                                          : (String(opt.batch).startsWith('Đợt')
+                                              ? `${opt.batch} (${opt.count} HS)`
+                                              : `Đợt ${opt.batch} - Ngày ${formatDate(opt.date)} (${opt.count} HS)`))
                                       : `Ngày tiếp nhận: ${formatDate(opt.date)} (${opt.count} HS)`
                                     }
                                 </option>

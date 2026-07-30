@@ -8,6 +8,7 @@ import { fetchRecords, fetchEmployees, fetchUsers, fetchUpdateInfo, fetchHoliday
 import { supabase } from '../services/supabaseClient';
 import { mapRecordFromDb } from '../services/apiCore';
 import { DEFAULT_WARDS as STATIC_WARDS, APP_VERSION } from '../constants';
+import { migrateUnbatchedRecords } from '../utils/appHelpers';
 
 export const useAppData = (currentUser: User | null) => {
     const [records, setRecords] = useState<RecordFile[]>([]);
@@ -50,7 +51,8 @@ export const useAppData = (currentUser: User | null) => {
             // Race giữa fetch data và timeout
             const [recData, empData, userData, updateInfo, holidayData, permsData, deptPermsData] = await Promise.race([dataPromise, timeoutPromise]) as any;
 
-            setRecords(recData);
+            const { migratedRecords } = migrateUnbatchedRecords(Array.isArray(recData) ? recData : []);
+            setRecords(migratedRecords);
             setEmployees(empData);
             setUsers(userData);
             setHolidays(holidayData); // Cập nhật state holidays

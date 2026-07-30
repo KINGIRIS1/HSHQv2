@@ -12,7 +12,7 @@ interface DeptConfig {
 
 const DEPARTMENTS_CONFIG: DeptConfig[] = [
     {
-        id: 'Tổ Đăng ký cấp giấy',
+        id: 'Tổ Cấp giấy',
         label: 'Tổ Cấp giấy',
         subtitle: 'Đăng ký, biến động, cấp ...',
         matchKeys: ['tổ cấp giấy', 'tổ đăng ký cấp giấy', 'đăng ký cấp giấy', 'tổ đăng ký', 'cấp giấy']
@@ -164,7 +164,7 @@ const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, e
       if (filterDept) {
           const normFilter = filterDept.toLowerCase();
           if (normFilter.includes('đo đạc') || normFilter.includes('đo dạc')) return 'Tổ Đo đạc';
-          if (normFilter.includes('cấp giấy') || normFilter.includes('đăng ký')) return 'Tổ Đăng ký cấp giấy';
+          if (normFilter.includes('cấp giấy') || normFilter.includes('đăng ký')) return 'Tổ Cấp giấy';
           if (normFilter.includes('lưu trữ')) return 'Tổ Lưu trữ';
           if (normFilter.includes('hành chính') || normFilter.includes('một cửa')) return 'Tổ Hành chính';
       }
@@ -176,7 +176,7 @@ const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, e
               return 'Tổ Lưu trữ';
           }
           if (normView.includes('other')) {
-              return 'Tổ Đăng ký cấp giấy';
+              return 'Tổ Cấp giấy';
           }
           if (normView.includes('all_records') || normView.includes('assign_tasks') || normView.includes('check_list') || normView.includes('handover_list') || normView.includes('completed')) {
               return 'Tổ Đo đạc';
@@ -192,7 +192,7 @@ const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, e
               return 'Tổ Lưu trữ';
           }
           if (type.includes('2.1') || type.includes('2.2') || type.includes('trích lục')) {
-              return 'Tổ Đăng ký cấp giấy';
+              return 'Tổ Cấp giấy';
           }
           if (type.includes('2.3') || type.includes('2.4') || type.includes('2.5') || type.includes('2.6') || type.includes('số thửa') || type.includes('trích đo') || type.includes('đo đạc')) {
               return 'Tổ Đo đạc';

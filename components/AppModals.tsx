@@ -78,7 +78,7 @@ interface AppModalsProps {
     handleDeleteRecord: () => void;
     confirmDelete: (r: RecordFile) => void;
     handleExcelPreview: (wb: XLSX.WorkBook, name: string) => void;
-    executeBatchExport: (batch: number, date: string) => void;
+    executeBatchExport: (batch: string, date: string, handoverWard?: string) => void;
     executeReturnBatchHandover?: (batch: number, date: string, deptName: string) => void;
     onCreateLiquidation: (record: RecordFile) => void;
     onCreateContract?: (record: Partial<RecordFile>) => void;

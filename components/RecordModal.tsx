@@ -91,6 +91,61 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
   const isOneDoor = currentUser.role === UserRole.ONEDOOR;
   const canEditResult = hasAdminRights || isOneDoor;
 
+  const isOtherView = currentView?.startsWith('other_') || currentView === 'other_records';
+  
+  const isArchiveView = [
+    "archive_records",
+    "archive_assign_tasks",
+    "archive_completed_list",
+    "archive_pending_check_list",
+    "archive_check_list",
+    "archive_handover_list",
+    "archive_director_completed",
+  ].includes(currentView || "");
+
+  const isMeasurementView = [
+    "all_records",
+    "assign_tasks",
+    "completed_list",
+    "pending_check_list",
+    "check_list",
+    "handover_list",
+    "director_completed",
+  ].includes(currentView || "");
+
+  let allowedRecordTypes: string[] = [];
+  if (isOtherView) {
+    allowedRecordTypes = ['CMD', 'Thi hành án', 'Tòa án'];
+  } else if (isArchiveView) {
+    allowedRecordTypes = [
+      '1.1 Sao lục',
+      '1.2 Công văn'
+    ];
+  } else if (isMeasurementView) {
+    allowedRecordTypes = [
+      '2.1 Trích lục',
+      '2.2 Trích lục QH',
+      '2.3 Trích đo',
+      '2.4 Cắm mốc',
+      '2.5 Tách-Hợp thửa',
+      '2.6 CC số thửa'
+    ];
+  } else {
+    allowedRecordTypes = [
+      '1.1 Sao lục',
+      '1.2 Công văn',
+      '2.1 Trích lục',
+      '2.2 Trích lục QH',
+      '2.3 Trích đo',
+      '2.4 Cắm mốc',
+      '2.5 Tách-Hợp thửa',
+      '2.6 CC số thửa',
+      'CMD',
+      'Thi hành án',
+      'Tòa án'
+    ];
+  }
+
   const filteredEmployees = useMemo(() => {
     if (!employees || employees.length === 0) return [];
     const userEmp = employees.find(e => (currentUser?.employeeId && e.id === currentUser.employeeId) || e.name.toLowerCase() === currentUser?.name?.toLowerCase() || e.id === currentUser?.username);
@@ -122,14 +177,29 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
             setAuthAddress(parsed.address);
             setIsAuthOpen(!!(initialData.authorizedBy || parsed.cccd || parsed.address));
         } else {
-            setFormData({ ...defaultState, code: `HS-${new Date().getFullYear()}-${Math.floor(Math.random() * 1000)}` });
+            const defaultRecType = allowedRecordTypes[0] || EXTENDED_RECORD_TYPES[0];
+            const recDate = new Date().toISOString();
+            const initDeadline = calculateDeadlineHelper(defaultRecType, recDate.split('T')[0], holidays || []);
+            let initPrice: number | undefined = undefined;
+            if (defaultRecType.includes('1.1') || defaultRecType.includes('1.2') || defaultRecType.includes('sao lục') || defaultRecType.includes('công văn')) {
+              initPrice = 310000;
+            }
+
+            setFormData({
+              ...defaultState,
+              recordType: defaultRecType,
+              receivedDate: recDate,
+              deadline: initDeadline,
+              price: initPrice,
+              code: `HS-${new Date().getFullYear()}-${Math.floor(Math.random() * 1000)}`
+            });
             setAttachedDocs([]);
             setAuthCccd('');
             setAuthAddress('');
             setIsAuthOpen(false);
         }
     }
-  }, [initialData, isOpen]);
+  }, [initialData, isOpen, currentView]);
 
   const handleAddDoc = () => {
       const nextNum = attachedDocs.length + 1;
@@ -357,61 +427,6 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
   };
   const val = (v: any) => v === undefined || v === null ? '' : v;
   const dateVal = (v: any) => { if (!v) return ''; const str = String(v); return str.includes('T') ? str.split('T')[0] : str; };
-
-  const isOtherView = currentView?.startsWith('other_') || currentView === 'other_records';
-  
-  const isArchiveView = [
-    "archive_records",
-    "archive_assign_tasks",
-    "archive_completed_list",
-    "archive_pending_check_list",
-    "archive_check_list",
-    "archive_handover_list",
-    "archive_director_completed",
-  ].includes(currentView || "");
-
-  const isMeasurementView = [
-    "all_records",
-    "assign_tasks",
-    "completed_list",
-    "pending_check_list",
-    "check_list",
-    "handover_list",
-    "director_completed",
-  ].includes(currentView || "");
-
-  let allowedRecordTypes: string[] = [];
-  if (isOtherView) {
-    allowedRecordTypes = ['CMD', 'Thi hành án', 'Tòa án'];
-  } else if (isArchiveView) {
-    allowedRecordTypes = [
-      '1.1 Sao lục',
-      '1.2 Công văn'
-    ];
-  } else if (isMeasurementView) {
-    allowedRecordTypes = [
-      '2.1 Trích lục',
-      '2.2 Trích lục QH',
-      '2.3 Trích đo',
-      '2.4 Cắm mốc',
-      '2.5 Tách-Hợp thửa',
-      '2.6 CC số thửa'
-    ];
-  } else {
-    allowedRecordTypes = [
-      '1.1 Sao lục',
-      '1.2 Công văn',
-      '2.1 Trích lục',
-      '2.2 Trích lục QH',
-      '2.3 Trích đo',
-      '2.4 Cắm mốc',
-      '2.5 Tách-Hợp thửa',
-      '2.6 CC số thửa',
-      'CMD',
-      'Thi hành án',
-      'Tòa án'
-    ];
-  }
 
   const isCongVan = formData.recordType ? getShortRecordType(formData.recordType) === '1.2 Công văn' : false;
   const recTypeLower = (formData.recordType || '').toLowerCase();
@@ -724,7 +739,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-indigo-50/80 p-3.5 rounded-lg border border-indigo-200/80">
                                 <div>
                                     <label className="block text-[10px] font-bold text-indigo-800 uppercase mb-1">Đợt xuất (Batch)</label>
-                                    <input type="number" className="w-full border border-indigo-200 rounded-md px-2.5 py-1.5 text-sm bg-white font-mono" value={val(formData.exportBatch)} onChange={(e) => handleChange('exportBatch', parseInt(e.target.value))} placeholder="Nhập đợt xuất..." />
+                                    <input type="text" className="w-full border border-indigo-200 rounded-md px-2.5 py-1.5 text-sm bg-white font-medium" value={val(formData.exportBatch)} onChange={(e) => handleChange('exportBatch', e.target.value)} placeholder="VD: CG - Đợt 01 - 29/07/26..." />
                                 </div>
                                 <div>
                                     <label className="block text-[10px] font-bold text-indigo-800 uppercase mb-1">Ngày xuất</label>

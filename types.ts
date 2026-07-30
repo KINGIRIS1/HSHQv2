@@ -168,7 +168,7 @@ export interface RecordFile {
   authDocType?: string | null;   
   otherDocs?: string | null;     
 
-  exportBatch?: number | null;   
+  exportBatch?: number | string | null;   
   exportDate?: string | null;    
   handoverWard?: string | null; // Nơi giao trả kết quả (nếu khác địa chỉ thửa đất)
   
@@ -198,6 +198,8 @@ export interface RecordFile {
 
   // Đã xuất danh sách giao (Hồ sơ tiếp nhận trong ngày)
   isHandedOver?: boolean;
+  is_handover?: boolean;
+  data?: Record<string, any>;
 
   // Giá trực tiếp cho hồ sơ
   price?: number | null;

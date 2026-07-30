@@ -61,11 +61,9 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
   useEffect(() => {
       if (record) {
           setPersonalNote(record.personalNotes || '');
-          // Chuyển ISO string sang format datetime-local (yyyy-MM-ddTHH:mm) để hiển thị trong input
+          // Set reminder date (yyyy-MM-dd)
           if (record.reminderDate) {
-              const d = new Date(record.reminderDate);
-              const localIso = new Date(d.getTime() - (d.getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
-              setReminderDate(localIso);
+              setReminderDate(record.reminderDate.split('T')[0]);
           } else {
               setReminderDate('');
           }
@@ -732,7 +730,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                             </button>
                         </div>
                         <input 
-                            type="datetime-local" 
+                            type="date" 
                             className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all"
                             value={reminderDate}
                             onChange={(e) => setReminderDate(e.target.value)}

@@ -58,7 +58,7 @@ export const ReturnBatchHandoverModal: React.FC<ReturnBatchHandoverModalProps> =
           <div>
             <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2">
               <Send className="text-emerald-600" size={22} />
-              Chốt Danh Sách Bàn Giao Về Phòng Chuyên Môn
+              Chốt DS Lưu
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
               Bàn giao danh sách hồ sơ <strong>Đã trả kết quả</strong> về cho Phòng / Tổ chuyên môn quản lý
@@ -104,7 +104,7 @@ export const ReturnBatchHandoverModal: React.FC<ReturnBatchHandoverModalProps> =
             >
               <option value="Tổ Đo đạc & Kỹ thuật">Tổ Đo đạc & Kỹ thuật</option>
               <option value="Tổ Thông tin Lưu trữ">Tổ Thông tin Lưu trữ</option>
-              <option value="Tổ Đăng ký & Cấp giấy">Tổ Đăng ký & Cấp giấy</option>
+              <option value="Tổ Cấp giấy">Tổ Cấp giấy</option>
               <option value="Phòng Chuyên môn">Phòng Chuyên môn</option>
               <option value="Khác">Phòng / Bộ phận khác...</option>
             </select>

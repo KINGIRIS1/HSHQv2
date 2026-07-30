@@ -196,9 +196,34 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({ records, employees,
         });
     }, [revenueRecords, activeCardFilter, selectedReceiver, searchTerm]);
 
-    // Total collected for filtered set
-    const filteredTotalAmount = useMemo(() => {
-        return filteredRecords.reduce((acc, r) => acc + r.calcReturned, 0);
+    // Total & sub-totals collected for filtered set
+    const filteredStats = useMemo(() => {
+        let totalAmount = 0;
+        let totalCount = filteredRecords.length;
+        let bienLaiAmount = 0;
+        let bienLaiCount = 0;
+        let hoaDonAmount = 0;
+        let hoaDonCount = 0;
+
+        filteredRecords.forEach(r => {
+            totalAmount += r.calcReturned;
+            if (r.computedReceiptType === 'Hóa Đơn') {
+                hoaDonAmount += r.calcReturned;
+                hoaDonCount++;
+            } else {
+                bienLaiAmount += r.calcReturned;
+                bienLaiCount++;
+            }
+        });
+
+        return {
+            totalAmount,
+            totalCount,
+            bienLaiAmount,
+            bienLaiCount,
+            hoaDonAmount,
+            hoaDonCount
+        };
     }, [filteredRecords]);
 
     // Pagination
@@ -240,87 +265,50 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({ records, employees,
     return (
         <div className="flex flex-col h-full bg-[#f8fafc] p-4 md:p-6 gap-6 overflow-y-auto animate-fade-in-up">
             
-            {/* 1. TOP 3 KPI CARDS */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
-                {/* CARD 1: TỔNG NGUỒN THU */}
-                <div 
-                    onClick={() => handleCardFilterChange('all')}
-                    className={`cursor-pointer rounded-2xl p-4 flex items-center justify-between transition-all active:scale-[0.99] border-2 bg-white ${
-                        activeCardFilter === 'all' 
-                            ? 'border-emerald-500 shadow-md ring-2 ring-emerald-500/20' 
-                            : 'border-slate-200/80 hover:border-emerald-300 shadow-sm'
-                    }`}
-                >
-                    <div className="flex items-center gap-3.5">
-                        <div className="w-12 h-12 rounded-2xl bg-teal-50 text-teal-600 flex items-center justify-center shrink-0 border border-teal-100">
-                            <HandCoins size={22} />
-                        </div>
-                        <div>
-                            <div className="text-xl md:text-2xl font-black text-slate-900 tracking-tight leading-none mb-1">
-                                {cardMetrics.totalSum.toLocaleString('vi-VN')} đ
-                            </div>
-                            <div className="text-xs font-bold tracking-wider text-teal-600 uppercase">
-                                TỔNG NGUỒN THU
-                            </div>
-                        </div>
-                    </div>
-                    <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full shrink-0">
-                        {cardMetrics.totalCount} hồ sơ
-                    </span>
-                </div>
+            {/* 1. TOP 3 KPI CONTROLS (Pill Segmented Controls) */}
+            <div className="w-full">
+                <div className="inline-flex items-center bg-slate-200/80 p-1 rounded-xl gap-1 text-xs font-semibold overflow-x-auto max-w-full">
+                    <button
+                        type="button"
+                        onClick={() => handleCardFilterChange('all')}
+                        className={`px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+                            activeCardFilter === 'all'
+                                ? 'bg-white text-teal-700 shadow-xs font-bold'
+                                : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                    >
+                        <span>Tổng thu:</span>
+                        <span className="font-bold text-teal-600">{cardMetrics.totalSum.toLocaleString('vi-VN')} đ</span>
+                        <span className="text-[11px] text-slate-500 font-medium">({cardMetrics.totalCount} hs)</span>
+                    </button>
 
-                {/* CARD 2: THU QUA BIÊN LAI */}
-                <div 
-                    onClick={() => handleCardFilterChange('bien_lai')}
-                    className={`cursor-pointer rounded-2xl p-4 flex items-center justify-between transition-all active:scale-[0.99] border-2 bg-white ${
-                        activeCardFilter === 'bien_lai' 
-                            ? 'border-blue-500 shadow-md ring-2 ring-blue-500/20' 
-                            : 'border-slate-200/80 hover:border-blue-300 shadow-sm'
-                    }`}
-                >
-                    <div className="flex items-center gap-3.5">
-                        <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100">
-                            <Receipt size={22} />
-                        </div>
-                        <div>
-                            <div className="text-xl md:text-2xl font-black text-slate-900 tracking-tight leading-none mb-1">
-                                {cardMetrics.bienLaiSum.toLocaleString('vi-VN')} đ
-                            </div>
-                            <div className="text-xs font-bold tracking-wider text-blue-600 uppercase">
-                                THU QUA BIÊN LAI
-                            </div>
-                        </div>
-                    </div>
-                    <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full shrink-0">
-                        {cardMetrics.bienLaiCount} hồ sơ
-                    </span>
-                </div>
+                    <button
+                        type="button"
+                        onClick={() => handleCardFilterChange('bien_lai')}
+                        className={`px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+                            activeCardFilter === 'bien_lai'
+                                ? 'bg-white text-blue-700 shadow-xs font-bold'
+                                : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                    >
+                        <span>Thu biên lai:</span>
+                        <span className="font-bold text-blue-600">{cardMetrics.bienLaiSum.toLocaleString('vi-VN')} đ</span>
+                        <span className="text-[11px] text-slate-500 font-medium">({cardMetrics.bienLaiCount} hs)</span>
+                    </button>
 
-                {/* CARD 3: THU QUA HÓA ĐƠN */}
-                <div 
-                    onClick={() => handleCardFilterChange('hoa_don')}
-                    className={`cursor-pointer rounded-2xl p-4 flex items-center justify-between transition-all active:scale-[0.99] border-2 bg-white ${
-                        activeCardFilter === 'hoa_don' 
-                            ? 'border-orange-500 shadow-md ring-2 ring-orange-500/20' 
-                            : 'border-slate-200/80 hover:border-orange-300 shadow-sm'
-                    }`}
-                >
-                    <div className="flex items-center gap-3.5">
-                        <div className="w-12 h-12 rounded-2xl bg-orange-50 text-orange-600 flex items-center justify-center shrink-0 border border-orange-100">
-                            <Receipt size={22} className="rotate-90" />
-                        </div>
-                        <div>
-                            <div className="text-xl md:text-2xl font-black text-slate-900 tracking-tight leading-none mb-1">
-                                {cardMetrics.hoaDonSum.toLocaleString('vi-VN')} đ
-                            </div>
-                            <div className="text-xs font-bold tracking-wider text-orange-600 uppercase">
-                                THU QUA HÓA ĐƠN
-                            </div>
-                        </div>
-                    </div>
-                    <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full shrink-0">
-                        {cardMetrics.hoaDonCount} hồ sơ
-                    </span>
+                    <button
+                        type="button"
+                        onClick={() => handleCardFilterChange('hoa_don')}
+                        className={`px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+                            activeCardFilter === 'hoa_don'
+                                ? 'bg-white text-orange-700 shadow-xs font-bold'
+                                : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                    >
+                        <span>Thu hóa đơn:</span>
+                        <span className="font-bold text-orange-600">{cardMetrics.hoaDonSum.toLocaleString('vi-VN')} đ</span>
+                        <span className="text-[11px] text-slate-500 font-medium">({cardMetrics.hoaDonCount} hs)</span>
+                    </button>
                 </div>
             </div>
 
@@ -329,18 +317,23 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({ records, employees,
                 
                 {/* Header Section */}
                 <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-wrap items-center justify-between gap-4">
-                    <div>
-                        <div className="flex items-center gap-2">
-                            <div className="p-1.5 rounded-lg bg-teal-50 text-teal-700">
-                                <HandCoins size={18} />
-                            </div>
-                            <h3 className="font-bold text-slate-900 text-sm md:text-base uppercase tracking-wide">
-                                DANH SÁCH CHI TIẾT NGUỒN THU ({filteredRecords.length} HỒ SƠ)
-                            </h3>
+                    {/* Summary Bar replacing the title */}
+                    <div className="flex flex-wrap items-center gap-4 sm:gap-6 p-1.5 sm:p-2 bg-slate-100/90 rounded-2xl text-xs sm:text-sm">
+                        <div className="bg-white rounded-xl px-4 py-2 shadow-xs border border-slate-200/80 flex items-center gap-1.5">
+                            <span className="font-bold text-teal-700">Tổng thu:</span>
+                            <span className="font-bold text-teal-700 font-mono">{filteredStats.totalAmount.toLocaleString('vi-VN')} đ</span>
+                            <span className="text-slate-500 font-normal ml-0.5">({filteredStats.totalCount} hs)</span>
                         </div>
-                        <p className="text-xs text-slate-500 font-medium mt-1">
-                            Tổng thu thực tế: <span className="font-bold text-emerald-600">{filteredTotalAmount.toLocaleString('vi-VN')} đ</span>
-                        </p>
+                        <div className="px-2 py-1 flex items-center gap-1.5 text-slate-700">
+                            <span className="font-medium">Thu biên lai:</span>
+                            <span className="font-bold font-mono text-blue-600">{filteredStats.bienLaiAmount.toLocaleString('vi-VN')} đ</span>
+                            <span className="text-slate-500 font-normal">({filteredStats.bienLaiCount} hs)</span>
+                        </div>
+                        <div className="px-2 py-1 flex items-center gap-1.5 text-slate-700">
+                            <span className="font-medium">Thu hóa đơn:</span>
+                            <span className="font-bold font-mono text-orange-600">{filteredStats.hoaDonAmount.toLocaleString('vi-VN')} đ</span>
+                            <span className="text-slate-500 font-normal">({filteredStats.hoaDonCount} hs)</span>
+                        </div>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-3">
