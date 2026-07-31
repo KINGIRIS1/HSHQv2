@@ -152,16 +152,18 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
             if (!row || row.length === 0) continue;
 
             // Hàm helper: Trả về undefined nếu cột không tồn tại, trả về giá trị nếu có
-            const getVal = (possibleHeaders: string[]) => {
+            const getVal = (possibleHeaders: string[], excludeSub?: string) => {
                 // Ưu tiên khớp chính xác (exact match)
                 let idx = headers.findIndex(h => {
                     const hUpper = h.trim().toUpperCase();
+                    if (excludeSub && hUpper.includes(excludeSub.toUpperCase())) return false;
                     return possibleHeaders.some(ph => hUpper === ph.toUpperCase());
                 });
                 // Nếu không có khớp chính xác, tìm khớp chứa chuỗi (contains)
                 if (idx === -1) {
                     idx = headers.findIndex(h => {
                         const hUpper = h.trim().toUpperCase();
+                        if (excludeSub && hUpper.includes(excludeSub.toUpperCase())) return false;
                         return possibleHeaders.some(ph => hUpper.includes(ph.toUpperCase()));
                     });
                 }
@@ -210,7 +212,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
 
             const errors: string[] = [];
 
-            const rawArea = getVal(['DIỆN TÍCH', 'AREA', 'area']);
+            const rawArea = getVal(['DIỆN TÍCH', 'AREA', 'area'], 'ĐẤT Ở');
             if (rawArea !== undefined && rawArea !== null && rawArea !== '') {
                 const parsedArea = parseFloat(String(rawArea));
                 record.area = isNaN(parsedArea) ? 0 : parsedArea;
@@ -306,18 +308,35 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
             }
 
             // Parse NGƯỜI XỬ LÝ & NGÀY GIAO trước để hỗ trợ suy diễn trạng thái Đã Giao Việc
-            const assigneeRaw = getVal(['NGƯỜI XỬ LÝ', 'NHÂN VIÊN', 'assignedto', 'assigned_to', 'assignedTo']);
+            const assigneeRaw = getVal(['NGƯỜI XỬ LÝ', 'NHÂN VIÊN', 'CÁN BỘ', 'assignedto', 'assigned_to', 'assignedTo']);
             if (assigneeRaw !== undefined && String(assigneeRaw).trim() !== '') {
-                const emp = employees.find(e => e.name.toLowerCase().includes(String(assigneeRaw).toLowerCase().trim()));
+                const rawStr = String(assigneeRaw).trim();
+                const normalizeName = (str: string) => str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+                const rawNorm = normalizeName(rawStr);
+
+                const emp = employees.find(e => {
+                    const empNameNorm = normalizeName(e.name);
+                    return empNameNorm === rawNorm || 
+                           empNameNorm.includes(rawNorm) || 
+                           rawNorm.includes(empNameNorm) || 
+                           e.id === rawStr || 
+                           (e as any).employeeId === rawStr;
+                });
+
                 if (emp) {
                     record.assignedTo = emp.id;
-                    if (mode === 'create') record.assignedDate = record.receivedDate;
+                } else {
+                    record.assignedTo = rawStr;
+                }
+                if (mode === 'create' && !record.assignedDate) {
+                    record.assignedDate = record.receivedDate || new Date().toISOString();
                 }
             }
 
             const assignedDateRaw = getVal(['NGÀY GIAO', 'NGÀY GIAO VIỆC', 'assigneddate', 'assigned_date', 'assignedDate']);
             if (assignedDateRaw !== undefined) {
-                record.assignedDate = parseExcelDate(assignedDateRaw);
+                const parsedDate = parseExcelDate(assignedDateRaw);
+                if (parsedDate) record.assignedDate = parsedDate;
             }
 
             // 5. TRẠNG THÁI & NGƯỜI XỬ LÝ

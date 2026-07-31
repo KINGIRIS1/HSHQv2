@@ -452,11 +452,36 @@ export const createRecordsBatchApi = async (records: RecordFile[], onProgress?: 
 };
 
 export const forceUpdateRecordsBatchApi = async (records: RecordFile[], onProgress?: (processed: number, total: number) => void): Promise<{ success: boolean, count: number }> => {
-    if (!isConfigured) return { success: true, count: 0 };
-    
-    const isSupabase = API_BASE_URL.includes('supabase.co');
+    const isSupabase = isConfigured && API_BASE_URL.includes('supabase.co');
     if (!isSupabase) {
-        return { success: true, count: 0 };
+        let count = 0;
+        const cached: RecordFile[] = getFromCache(CACHE_KEYS.RECORDS, MOCK_RECORDS);
+        records.forEach(excelRecord => {
+            const normCode = normalizeCode(excelRecord.code);
+            const index = cached.findIndex(r => normalizeCode(r.code) === normCode);
+            if (index !== -1) {
+                const merged = { ...cached[index] };
+                let hasChange = false;
+                Object.keys(excelRecord).forEach(key => {
+                    const newVal = (excelRecord as any)[key];
+                    if (newVal !== null && newVal !== undefined && newVal !== '' && key !== 'id') {
+                        if (String((merged as any)[key]) !== String(newVal)) {
+                            (merged as any)[key] = newVal;
+                            hasChange = true;
+                        }
+                    }
+                });
+                if (hasChange) {
+                    cached[index] = merged;
+                    const mockIdx = MOCK_RECORDS.findIndex(r => normalizeCode(r.code) === normCode);
+                    if (mockIdx !== -1) MOCK_RECORDS[mockIdx] = merged;
+                    count++;
+                }
+            }
+        });
+        saveToCache(CACHE_KEYS.RECORDS, cached);
+        if (onProgress) onProgress(records.length, records.length);
+        return { success: true, count };
     }
 
     // Helper tạo danh sách biến thể mã hồ sơ phong phú để truy vấn DB chính xác nhất
@@ -609,6 +634,23 @@ export const forceUpdateRecordsBatchApi = async (records: RecordFile[], onProgre
                     if (fallbackError) throw fallbackError;
                 } else if (upsertError) {
                     throw upsertError;
+                }
+
+                try {
+                    const cached: RecordFile[] = getFromCache(CACHE_KEYS.RECORDS, MOCK_RECORDS);
+                    updatesToPush.forEach(up => {
+                        const normCode = normalizeCode(up.code);
+                        const mapped = mapRecordFromDb(up);
+                        const idx = cached.findIndex(r => normalizeCode(r.code) === normCode);
+                        if (idx !== -1) {
+                            cached[idx] = { ...cached[idx], ...mapped };
+                            const mIdx = MOCK_RECORDS.findIndex(r => normalizeCode(r.code) === normCode);
+                            if (mIdx !== -1) MOCK_RECORDS[mIdx] = cached[idx];
+                        }
+                    });
+                    saveToCache(CACHE_KEYS.RECORDS, cached);
+                } catch (e) {
+                    console.error("Error syncing cache in forceUpdateRecordsBatchApi:", e);
                 }
             }
             

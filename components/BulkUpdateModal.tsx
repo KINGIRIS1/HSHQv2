@@ -85,7 +85,6 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
                         <option value="status">Trạng thái hồ sơ (Quy trình)</option>
                         <option value="assignedTo">Người xử lý (Giao việc)</option>
                         <option value="assignedDate">Ngày giao việc</option>
-                        <option value="completedWorkDate">Ngày hoàn thành chuyên môn</option>
                         <option value="checkedDate">Ngày kiểm tra</option>
                         <option value="submissionDate">Ngày trình ký</option>
                         <option value="approvalDate">Ngày ký duyệt</option>
@@ -116,9 +115,11 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
                             onChange={(e) => setTargetValue(e.target.value)}
                         >
                             <option value="">-- Chọn trạng thái mới --</option>
-                            {Object.entries(STATUS_LABELS).map(([key, label]) => (
-                                <option key={key} value={key}>{label}</option>
-                            ))}
+                            {Object.entries(STATUS_LABELS)
+                                .filter(([key]) => key !== RecordStatus.COMPLETED_WORK)
+                                .map(([key, label]) => (
+                                    <option key={key} value={key}>{label}</option>
+                                ))}
                         </select>
                     )}
 

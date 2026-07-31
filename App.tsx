@@ -505,12 +505,38 @@ function App() {
           return;
       }
 
+      const VALID_STATUSES = [
+          RecordStatus.RECEIVED,
+          RecordStatus.ASSIGNED,
+          RecordStatus.IN_PROGRESS,
+          RecordStatus.PENDING_CHECK,
+          RecordStatus.CHECKED,
+          RecordStatus.PENDING_SIGN,
+          RecordStatus.SIGNED,
+          RecordStatus.HANDOVER,
+          RecordStatus.RETURNED,
+          RecordStatus.WITHDRAWN,
+          RecordStatus.REJECTED
+      ];
+
+      if (field === 'status' && !VALID_STATUSES.includes(value as RecordStatus)) {
+          setToast({ type: 'error', message: `Trạng thái "${value}" không hợp lệ! Vui lòng chỉ chọn trạng thái đúng quy trình.` });
+          return;
+      }
+
       const updatedTargets = selectedRecords.map(r => {
           let recordUpdates: any = {};
 
           if (field === 'status') {
               recordUpdates = { ...getUpdatesForStatusChange(value as RecordStatus, targetDateStr) };
               recordUpdates.statusLogs = createStatusLog(r, value, 'Cập nhật trạng thái hàng loạt');
+
+              if (value === RecordStatus.PENDING_CHECK || value === RecordStatus.CHECKED) {
+                  if (!r.checkedBy && currentUser?.employeeId) recordUpdates.checkedBy = currentUser.employeeId;
+              } else if (value === RecordStatus.PENDING_SIGN || value === RecordStatus.SIGNED) {
+                  if (!r.submittedTo && currentUser?.employeeId) recordUpdates.submittedTo = currentUser.employeeId;
+              }
+
               if (value === RecordStatus.COMPLETED_WORK) {
                   if (!r.assignedDate) recordUpdates.assignedDate = targetDateStr;
               } else if (value === RecordStatus.PENDING_CHECK) {
@@ -600,8 +626,32 @@ function App() {
       let updates: any = { [field]: value };
       
       if (field === 'status') {
+          const VALID_STATUSES = [
+              RecordStatus.RECEIVED,
+              RecordStatus.ASSIGNED,
+              RecordStatus.IN_PROGRESS,
+              RecordStatus.PENDING_CHECK,
+              RecordStatus.CHECKED,
+              RecordStatus.PENDING_SIGN,
+              RecordStatus.SIGNED,
+              RecordStatus.HANDOVER,
+              RecordStatus.RETURNED,
+              RecordStatus.WITHDRAWN,
+              RecordStatus.REJECTED
+          ];
+          if (!VALID_STATUSES.includes(value as RecordStatus)) {
+              setToast({ type: 'error', message: `Trạng thái "${value}" không thuộc danh sách quy trình hợp lệ!` });
+              return;
+          }
+
           updates = getUpdatesForStatusChange(value as RecordStatus);
           updates.statusLogs = createStatusLog(record, value, 'Cập nhật trạng thái nhanh');
+
+          if (value === RecordStatus.PENDING_CHECK || value === RecordStatus.CHECKED) {
+              if (!record.checkedBy && currentUser?.employeeId) updates.checkedBy = currentUser.employeeId;
+          } else if (value === RecordStatus.PENDING_SIGN || value === RecordStatus.SIGNED) {
+              if (!record.submittedTo && currentUser?.employeeId) updates.submittedTo = currentUser.employeeId;
+          }
           
           if (value === RecordStatus.PENDING_SIGN) {
               updates.completedWorkDate = record.completedWorkDate || nowStr;

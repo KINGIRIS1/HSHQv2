@@ -57,7 +57,14 @@ const RecordRow: React.FC<RecordRowProps> = ({
   React.useEffect(() => { setLocalMsr(record.measurementNumber || ""); }, [record.measurementNumber]);
   React.useEffect(() => { setLocalExc(record.excerptNumber || ""); }, [record.excerptNumber]);
   React.useEffect(() => { setLocalRec(record.receiptNumber || ""); }, [record.receiptNumber]);
-  const employee = employees.find(e => e.id === record.assignedTo);
+  const normalizeName = (str: string) => str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+  const employee = employees.find(e => 
+      e.id === record.assignedTo || 
+      (e as any).employeeId === record.assignedTo || 
+      e.name === record.assignedTo ||
+      (record.assignedTo && normalizeName(e.name) === normalizeName(record.assignedTo))
+  );
+  const assignedDisplayName = employee ? employee.name : record.assignedTo;
   const isOverdue = isRecordOverdue(record);
   const isApproaching = isRecordApproaching(record);
   
@@ -166,18 +173,16 @@ const RecordRow: React.FC<RecordRowProps> = ({
       case 'assigned':
         return (
           <td key="assigned" className={`${cellClass} text-center`}>
-              {employee ? (
+              {assignedDisplayName || record.assignedDate ? (
                   <div className="flex flex-col items-center gap-0.5">
                       {record.assignedDate && (
                           <span className="text-xs text-gray-500">{formatDate(record.assignedDate)}</span>
                       )}
-                      <span className="text-xs text-indigo-600 font-bold bg-indigo-50 px-1.5 py-0.5 rounded break-words max-w-full leading-tight" title={employee.name}>{employee.name}</span>
+                      {assignedDisplayName && (
+                          <span className="text-xs text-indigo-600 font-bold bg-indigo-50 px-1.5 py-0.5 rounded break-words max-w-full leading-tight" title={assignedDisplayName}>{assignedDisplayName}</span>
+                      )}
                   </div>
-              ) : (
-                  record.assignedDate ? (
-                      <span className="text-sm text-gray-600">{formatDate(record.assignedDate)}</span>
-                  ) : '--'
-              )}
+              ) : '--'}
           </td>
         );
       case 'completed':
