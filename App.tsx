@@ -738,6 +738,9 @@ function App() {
   }, [loadData]);
 
   const advanceStatus = useCallback(async (record: RecordFile) => {
+      if (record.status === RecordStatus.RETURNED || record.status === RecordStatus.HANDOVER || record.status === RecordStatus.WITHDRAWN || record.status === RecordStatus.REJECTED || record.resultReturnedDate) {
+          return;
+      }
       if (record.status === RecordStatus.RECEIVED) { 
           setAssignTargetRecords([record]); 
           setIsAssignModalOpen(true); 

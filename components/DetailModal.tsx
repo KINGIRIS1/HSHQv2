@@ -9,6 +9,7 @@ import DocxPreviewModal from './DocxPreviewModal';
 import { updateRecordApi, fetchContracts } from '../services/api';
 import SystemReceiptTemplate from './receive-record/SystemReceiptTemplate';
 import SystemAnnexTemplate from './receive-record/SystemAnnexTemplate';
+import { getBatchDisplayParts } from '../utils/appHelpers';
 
 interface DetailModalProps {
   isOpen: boolean;
@@ -1095,7 +1096,11 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                                 icon={CheckSquare}
                                 isLast={false}
                                 colorClass={{text: record.status === RecordStatus.REJECTED ? 'text-red-700' : 'text-green-700', border: record.status === RecordStatus.REJECTED ? 'border-red-600' : 'border-green-600', bg: record.status === RecordStatus.REJECTED ? 'bg-red-600' : 'bg-green-600'}}
-                                subText={record.exportBatch ? `Giao Đợt ${String(record.exportBatch).padStart(2, '0')}` : undefined}
+                                subText={(() => {
+                                    if (!record.exportBatch) return undefined;
+                                    const bName = getBatchDisplayParts(record.exportBatch).batchName || `Đợt ${record.exportBatch}`;
+                                    return bName.toLowerCase().startsWith('giao') ? bName : `Giao ${bName}`;
+                                })()}
                             />
                             
                             <TimelineItem 

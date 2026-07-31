@@ -329,7 +329,7 @@ const RecordRow: React.FC<RecordRowProps> = ({
                   </button>
               )}
 
-              {displayStatus !== RecordStatus.HANDOVER && displayStatus !== RecordStatus.WITHDRAWN && displayStatus !== RecordStatus.REJECTED && !record.resultReturnedDate && currentUser?.role !== 'ONEDOOR' && (
+              {displayStatus !== RecordStatus.HANDOVER && displayStatus !== RecordStatus.RETURNED && displayStatus !== RecordStatus.WITHDRAWN && displayStatus !== RecordStatus.REJECTED && record.status !== RecordStatus.RETURNED && record.status !== RecordStatus.HANDOVER && record.status !== RecordStatus.WITHDRAWN && record.status !== RecordStatus.REJECTED && !record.resultReturnedDate && currentUser?.role !== 'ONEDOOR' && (
                 <button onClick={() => onAdvanceStatus(record)} className="p-1 text-green-700 hover:bg-green-100 rounded transition-colors border border-green-200 bg-green-50" title="Chuyển bước"><ArrowRight size={15} /></button>
               )}
             </div>

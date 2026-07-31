@@ -288,9 +288,13 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
         ["Độc lập - Tự do - Hạnh phúc"],
         [""],
         [title],
-        [displayDate.toUpperCase()],
-        [subTitle],
     ];
+
+    if (!isHandover) {
+        headerRows.push([displayDate.toUpperCase()]);
+    }
+
+    headerRows.push([subTitle]);
 
     let handoverNoteRowIndex: number | null = null;
     if (type === 'handover') {
@@ -391,16 +395,9 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
     ws['!rows'] = wsrows;
 
     // Merge Config
-    const merges = [
-        { s: { r: 0, c: 0 }, e: { r: 0, c: totalCols - 1 } },
-        { s: { r: 1, c: 0 }, e: { r: 1, c: totalCols - 1 } },
-        { s: { r: 3, c: 0 }, e: { r: 3, c: totalCols - 1 } },
-        { s: { r: 4, c: 0 }, e: { r: 4, c: totalCols - 1 } },
-        { s: { r: 5, c: 0 }, e: { r: 5, c: totalCols - 1 } },
-    ];
-
-    if (handoverNoteRowIndex !== null) {
-        merges.push({ s: { r: handoverNoteRowIndex, c: 0 }, e: { r: handoverNoteRowIndex, c: totalCols - 1 } });
+    const merges = [];
+    for (let r = 0; r < tableHeaderRowIndex; r++) {
+        merges.push({ s: { r: r, c: 0 }, e: { r: r, c: totalCols - 1 } });
     }
 
     // Footer Merges
@@ -428,15 +425,13 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
         sigNote: { font: { name: "Times New Roman", sz: 11, italic: true }, alignment: { horizontal: "center", vertical: "center" } }
     };
 
-    if(ws['A1']) ws['A1'].s = styles.nationalTitle;
-    if(ws['A2']) ws['A2'].s = styles.nationalSlogan;
-    if(ws['A4']) ws['A4'].s = styles.reportTitle;
-    if(ws['A5']) ws['A5'].s = styles.reportSubTitle;
-    if(ws['A6']) ws['A6'].s = styles.reportSubTitle;
+    if (ws['A1']) ws['A1'].s = styles.nationalTitle;
+    if (ws['A2']) ws['A2'].s = styles.nationalSlogan;
+    if (ws['A4']) ws['A4'].s = styles.reportTitle;
 
-    if (handoverNoteRowIndex !== null) {
-        const handoverNoteCell = XLSX.utils.encode_cell({ r: handoverNoteRowIndex, c: 0 });
-        if (ws[handoverNoteCell]) ws[handoverNoteCell].s = styles.reportSubTitle;
+    for (let r = 4; r < tableHeaderRowIndex; r++) {
+        const cellRef = XLSX.utils.encode_cell({ r: r, c: 0 });
+        if (ws[cellRef]) ws[cellRef].s = styles.reportSubTitle;
     }
 
     for (let c = 0; c < totalCols; c++) {
