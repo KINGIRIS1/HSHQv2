@@ -873,20 +873,21 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
                                 </div>
                             </div>
                         )}
-                        <div>
-                            <label className={labelClass}>{mode === 'liquidation' ? 'Ngày lập HĐ gốc' : 'Ngày lập'}</label>
-                            <div className="flex gap-1.5 items-center">
-                                <input type="date" className={inputClass} value={dateVal(formData.createdDate)} onChange={e => handleChange('createdDate', e.target.value)} />
-                                <button type="button" onClick={() => handleChange('createdDate', todayStr)} className="px-2 py-1.5 bg-purple-100 hover:bg-purple-200 text-purple-800 rounded-lg text-xs font-bold whitespace-nowrap transition-colors" title="Đặt lại ngày hôm nay">Hôm nay</button>
+                        {mode !== 'liquidation' && (
+                            <div>
+                                <label className={labelClass}>Ngày lập</label>
+                                <div className="flex gap-1.5 items-center">
+                                    <input type="date" className={inputClass} value={dateVal(formData.createdDate)} onChange={e => handleChange('createdDate', e.target.value)} />
+                                    <button type="button" onClick={() => handleChange('createdDate', todayStr)} className="px-2 py-1.5 bg-purple-100 hover:bg-purple-200 text-purple-800 rounded-lg text-xs font-bold whitespace-nowrap transition-colors" title="Đặt lại ngày hôm nay">Hôm nay</button>
+                                </div>
                             </div>
-                        </div>
+                        )}
 
                         {mode === 'liquidation' && (
                             <div>
                                 <label className={labelClass}>Ngày thanh lý HĐ</label>
                                 <div className="flex gap-1.5 items-center">
                                     <input type="date" className={inputClass} value={dateVal(formData.liquidationDate)} onChange={e => handleChange('liquidationDate', e.target.value)} />
-                                    <button type="button" onClick={() => handleChange('liquidationDate', todayStr)} className="px-2 py-1.5 bg-orange-100 hover:bg-orange-200 text-orange-800 rounded-lg text-xs font-bold whitespace-nowrap transition-colors" title="Đặt lại ngày hôm nay">Hôm nay</button>
                                 </div>
                             </div>
                         )}
