@@ -522,6 +522,43 @@ export function formatBatchName(batch: number | string | null | undefined, deptN
     return `Đợt ${num}${dateFormatted ? ` - Ngày ${dateFormatted}` : ''}`;
 }
 
+export function getBatchDisplayParts(batch: number | string | null | undefined, dateStr?: string | null): { batchName: string; dateName: string } {
+    if (!batch) return { batchName: '', dateName: '' };
+    let bStr = String(batch).trim();
+    if (!bStr) return { batchName: '', dateName: '' };
+
+    // Loại bỏ mã tổ chuyên môn cũ nếu có
+    bStr = bStr.replace(/-(CG|LT|DD|Tổ\s*[^-\s]+)-/gi, '-');
+
+    let dateFormatted = formatDateDDMMYYYY(dateStr);
+    const dateInBatchMatch = bStr.match(/(\d{1,2}\/\d{1,2}\/\d{2,4})/);
+    if (dateInBatchMatch) {
+        let matchedDate = dateInBatchMatch[1];
+        const parts = matchedDate.split('/');
+        if (parts.length === 3) {
+            if (parts[2].length === 2) parts[2] = '20' + parts[2];
+            matchedDate = `${parts[0].padStart(2, '0')}/${parts[1].padStart(2, '0')}/${parts[2]}`;
+        }
+        dateFormatted = matchedDate;
+    }
+
+    const match = bStr.match(/Đợt\s*0*(\d+)/i) || bStr.match(/^(\d+)$/);
+    let batchName = '';
+    if (match && match[1]) {
+        batchName = `Đợt ${parseInt(match[1], 10)}`;
+    } else if (bStr.startsWith('Đợt')) {
+        batchName = bStr.split('-')[0].replace(/Ngày.*/i, '').trim();
+    } else {
+        const num = isNaN(Number(bStr)) ? bStr : parseInt(bStr, 10);
+        batchName = `Đợt ${num}`;
+    }
+
+    return {
+        batchName,
+        dateName: dateFormatted || ''
+    };
+}
+
 /**
  * Tự động gom các hồ sơ trước đây chưa chốt đợt (exportBatch rỗng/null)
  * hoặc hồ sơ có chữ "Đợt Cuối" thành đợt có số lớn nhất trong ngày.

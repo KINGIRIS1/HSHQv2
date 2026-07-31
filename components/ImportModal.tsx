@@ -48,7 +48,10 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
       // If it is already a Date object
       if (input instanceof Date) {
           if (!isNaN(input.getTime())) {
-              return formatDateKey(input);
+              const y = input.getUTCFullYear();
+              const m = String(input.getUTCMonth() + 1).padStart(2, '0');
+              const d = String(input.getUTCDate()).padStart(2, '0');
+              return `${y}-${m}-${d}`;
           }
           return undefined;
       }
@@ -56,11 +59,14 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
       // Check for Excel serial number
       const num = Number(input);
       if (!isNaN(num) && num > 20000 && typeof input !== 'string') {
-          const excelEpoch = new Date(1899, 11, 30);
-          const totalMilliseconds = Math.round(num * 86400 * 1000); 
-          const date = new Date(excelEpoch.getTime() + totalMilliseconds);
+          // Calculate UTC milliseconds directly from Excel epoch without local timezone offset shift
+          const utcMs = Math.round((num - 25569) * 86400 * 1000);
+          const date = new Date(utcMs);
           if (!isNaN(date.getTime())) {
-              return formatDateKey(date);
+              const y = date.getUTCFullYear();
+              const m = String(date.getUTCMonth() + 1).padStart(2, '0');
+              const d = String(date.getUTCDate()).padStart(2, '0');
+              return `${y}-${m}-${d}`;
           }
       }
 
@@ -88,10 +94,13 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
               return `${year}-${month}-${day}`;
           }
 
-          // Native Date fallback
+          // Native Date fallback using UTC
           const date = new Date(cleanStr);
           if (!isNaN(date.getTime())) {
-              return formatDateKey(date);
+              const y = date.getUTCFullYear();
+              const m = String(date.getUTCMonth() + 1).padStart(2, '0');
+              const d = String(date.getUTCDate()).padStart(2, '0');
+              return `${y}-${m}-${d}`;
           }
       }
       return undefined;

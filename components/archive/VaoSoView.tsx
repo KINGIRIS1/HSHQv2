@@ -475,7 +475,10 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                         // Xử lý ngày tháng Excel (serial number)
                         if (typeof val === 'number' && val > 20000 && val < 60000) {
                              const date = new Date(Math.round((val - 25569) * 86400 * 1000));
-                             return date.toISOString().split('T')[0];
+                             const y = date.getUTCFullYear();
+                             const m = String(date.getUTCMonth() + 1).padStart(2, '0');
+                             const d = String(date.getUTCDate()).padStart(2, '0');
+                             return `${y}-${m}-${d}`;
                         }
                         return String(val).trim();
                     };

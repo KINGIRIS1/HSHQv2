@@ -92,18 +92,19 @@ const PERMISSION_GROUPS = [
   {
     id: 'buttons_actions',
     title: '6. Nhóm Thao tác & Nút chức năng',
-    desc: 'Gom nhóm các nút bấm thao tác quy trình (Xem chi tiết, Sửa, Xóa, Giao việc, Ký duyệt, Trả hồ sơ, Trả KQ, Chốt đợt)',
+    desc: 'Gom nhóm các nút bấm thao tác quy trình (Xem chi tiết, Sửa, Xóa, Giao việc, Ký duyệt, Trả hồ sơ, Trả KQ, Chốt đợt, Gia hạn ngày hẹn)',
     items: [
       { id: 'VIEW_DETAILS', label: 'Thao tác: Xem chi tiết hồ sơ' },
       { id: 'EDIT_RECORDS', label: 'Thao tác: Sửa thông tin hồ sơ' },
       { id: 'DELETE_RECORDS', label: 'Thao tác: Xóa hồ sơ' },
       { id: 'CHECK_RECORDS', label: 'Thao tác: Kiểm tra & Ký kiểm tra' },
       { id: 'HANDOVER_RECORDS', label: 'Thao tác: Bàn giao hồ sơ sang 1 cửa' },
-      { id: 'BTN_ASSIGN_STAFF', label: 'Nút: Giao việc / Phân công cán bộ' },
-      { id: 'BTN_SUBMIT_SIGN', label: 'Nút: Trình ký / Phê duyệt / Ký duyệt' },
-      { id: 'BTN_REJECT_RECORD', label: 'Nút: Trả hồ sơ / Từ chối (Yêu cầu sửa)' },
-      { id: 'BTN_RETURN_RESULT', label: 'Nút: Trả kết quả hồ sơ' },
-      { id: 'BTN_CLOSE_BATCH', label: 'Nút: Tạo đợt bàn giao / Chốt đợt' },
+      { id: 'BTN_ASSIGN_STAFF', label: 'Thao tác: Giao việc / Phân công cán bộ' },
+      { id: 'BTN_SUBMIT_SIGN', label: 'Thao tác: Trình ký / Phê duyệt / Ký duyệt' },
+      { id: 'BTN_REJECT_RECORD', label: 'Thao tác: Trả hồ sơ / Từ chối (Yêu cầu sửa)' },
+      { id: 'BTN_RETURN_RESULT', label: 'Thao tác: Trả kết quả hồ sơ' },
+      { id: 'BTN_CLOSE_BATCH', label: 'Thao tác: Tạo đợt bàn giao / Chốt đợt' },
+      { id: 'BTN_EXTEND_DEADLINE', label: 'Thao tác: Gia hạn ngày hẹn' },
     ]
   }
 ];

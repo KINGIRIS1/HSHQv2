@@ -40,7 +40,7 @@ export const DEFAULT_ROLE_PERMISSIONS: RolePermissions = {
     'reports', 'VIEW_REPORTS',
     'work_schedule', 'VIEW_SCHEDULE',
     'utilities',
-    'BTN_SUBMIT_SIGN', 'BTN_REJECT_RECORD', 'BTN_CLOSE_BATCH'
+    'BTN_SUBMIT_SIGN', 'BTN_REJECT_RECORD', 'BTN_CLOSE_BATCH', 'BTN_EXTEND_DEADLINE'
   ],
   [UserRole.ONEDOOR]: [
     'receive_record', 'receive_sub_create', 'receive_sub_bulk', 'receive_sub_list', 'receive_sub_vphc', 'ADD_RECORDS',
@@ -53,7 +53,7 @@ export const DEFAULT_ROLE_PERMISSIONS: RolePermissions = {
     'reports', 'VIEW_REPORTS',
     'work_schedule', 'VIEW_SCHEDULE',
     'utilities', 'VIEW_CHAT', 'VIEW_PERSONAL_PROFILE',
-    'BTN_CLOSE_BATCH'
+    'BTN_CLOSE_BATCH', 'BTN_EXTEND_DEADLINE'
   ],
   [UserRole.EMPLOYEE]: [
     'receive_contract', 'VIEW_CONTRACTS', 'LIQUIDATE_CONTRACTS',
@@ -98,11 +98,12 @@ export const AVAILABLE_PERMISSIONS = [
   { id: 'VIEW_SCHEDULE', label: 'Xem lịch công tác' },
   { id: 'MANAGE_SCHEDULE', label: 'Quản lý lịch công tác' },
   { id: 'VIEW_PERSONAL_PROFILE', label: 'Xem hồ sơ cá nhân' },
-  { id: 'BTN_ASSIGN_STAFF', label: 'Nút: Giao nhân viên' },
-  { id: 'BTN_RETURN_RESULT', label: 'Nút: Trả kết quả hồ sơ' },
-  { id: 'BTN_REJECT_RECORD', label: 'Nút: Trả hồ sơ / Từ chối' },
-  { id: 'BTN_SUBMIT_SIGN', label: 'Nút: Trình ký / Ký duyệt' },
-  { id: 'BTN_CLOSE_BATCH', label: 'Nút: Tạo đợt / Chốt đợt' }
+  { id: 'BTN_ASSIGN_STAFF', label: 'Thao tác: Giao nhân viên' },
+  { id: 'BTN_RETURN_RESULT', label: 'Thao tác: Trả kết quả hồ sơ' },
+  { id: 'BTN_REJECT_RECORD', label: 'Thao tác: Trả hồ sơ / Từ chối' },
+  { id: 'BTN_SUBMIT_SIGN', label: 'Thao tác: Trình ký / Ký duyệt' },
+  { id: 'BTN_CLOSE_BATCH', label: 'Thao tác: Tạo đợt / Chốt đợt' },
+  { id: 'BTN_EXTEND_DEADLINE', label: 'Thao tác: Gia hạn ngày hẹn' }
 ];
 
 export interface User {

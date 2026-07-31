@@ -2,7 +2,7 @@
 import React from 'react';
 import { RecordFile, RecordStatus, Employee, UserRole } from '../types';
 import { getNormalizedWard, getShortRecordType, getWardLabel } from '../constants';
-import { isRecordOverdue, isRecordApproaching, toTitleCase, formatBatchName } from '../utils/appHelpers';
+import { isRecordOverdue, isRecordApproaching, toTitleCase, formatBatchName, getBatchDisplayParts } from '../utils/appHelpers';
 import StatusBadge from './StatusBadge';
 import { CheckSquare, Square, AlertCircle, Clock, Eye, ArrowRight, Pencil, Trash2, Bell, FileCheck, Phone, Map } from 'lucide-react';
 
@@ -181,12 +181,15 @@ const RecordRow: React.FC<RecordRowProps> = ({
           </td>
         );
       case 'completed':
-        const formattedBatch = record.exportBatch ? formatBatchName(record.exportBatch, '', record.exportDate || record.completedDate) : '';
+        const batchParts = record.exportBatch ? getBatchDisplayParts(record.exportBatch, record.exportDate || record.completedDate) : null;
         return (
           <td key="completed" className={`${cellClass} text-center text-gray-600`}>
-            {record.exportBatch ? (
-               <span className={`inline-flex flex-col items-center px-2 py-1 rounded border ${record.status === RecordStatus.WITHDRAWN ? 'bg-slate-100 text-slate-700 border-slate-300' : record.status === RecordStatus.REJECTED ? 'bg-red-50 text-red-700 border-red-200' : 'bg-green-50 text-green-700 border-green-200'}`}>
-                  <span className="text-[11px] font-bold">{formattedBatch}</span>
+            {record.exportBatch && batchParts ? (
+               <span className={`inline-flex flex-col items-center justify-center px-2 py-0.5 rounded border leading-tight ${record.status === RecordStatus.WITHDRAWN ? 'bg-slate-100 text-slate-700 border-slate-300' : record.status === RecordStatus.REJECTED ? 'bg-red-50 text-red-700 border-red-200' : 'bg-green-50 text-green-700 border-green-200'}`}>
+                  <span className="text-[11px] font-extrabold whitespace-nowrap">{batchParts.batchName}</span>
+                  {batchParts.dateName && (
+                      <span className="text-[10px] font-medium opacity-90 whitespace-nowrap">{batchParts.dateName}</span>
+                  )}
                </span>
             ) : record.status === RecordStatus.WITHDRAWN ? (
                <div className="flex flex-col items-center">

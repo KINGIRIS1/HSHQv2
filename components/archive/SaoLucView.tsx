@@ -491,38 +491,37 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Tân Qua
                 const parseExcelDate = (val: any) => {
                     if (!val) return '';
                     
-                    let date: Date | null = null;
-
                     if (typeof val === 'number') {
-                        // Excel serial date
-                        date = new Date(Math.round((val - 25569) * 86400 * 1000));
+                        const utcMs = Math.round((val - 25569) * 86400 * 1000);
+                        const date = new Date(utcMs);
+                        if (!isNaN(date.getTime())) {
+                            const y = date.getUTCFullYear();
+                            const m = String(date.getUTCMonth() + 1).padStart(2, '0');
+                            const d = String(date.getUTCDate()).padStart(2, '0');
+                            return `${y}-${m}-${d}`;
+                        }
                     } else if (typeof val === 'string') {
                         const cleanVal = val.trim();
-                        // Check for DD/MM/YYYY
-                        if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(cleanVal)) {
-                            const [d, m, y] = cleanVal.split('/');
-                            date = new Date(Number(y), Number(m) - 1, Number(d));
+                        if (/^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4}$/.test(cleanVal)) {
+                            const [d, m, y] = cleanVal.split(/[\/\-]/);
+                            return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
                         }
-                        // Check for DD-MM-YYYY
-                        else if (/^\d{1,2}-\d{1,2}-\d{4}$/.test(cleanVal)) {
-                            const [d, m, y] = cleanVal.split('-');
-                            date = new Date(Number(y), Number(m) - 1, Number(d));
+                        if (/^\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}$/.test(cleanVal)) {
+                            const [y, m, d] = cleanVal.split(/[\/\-]/);
+                            return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
                         }
-                        // Check for YYYY-MM-DD
-                        else if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(cleanVal)) {
-                            date = new Date(cleanVal);
+                        const date = new Date(cleanVal);
+                        if (!isNaN(date.getTime())) {
+                            const y = date.getUTCFullYear();
+                            const m = String(date.getUTCMonth() + 1).padStart(2, '0');
+                            const d = String(date.getUTCDate()).padStart(2, '0');
+                            return `${y}-${m}-${d}`;
                         }
-                    }
-
-                    if (date && !isNaN(date.getTime())) {
-                        const y = date.getFullYear();
-                        // Validate year range to prevent typos like 20245
-                        if (y >= 1900 && y <= 2100) {
-                            // Adjust for timezone offset to ensure correct date string
-                            const offset = date.getTimezoneOffset() * 60000;
-                            const localDate = new Date(date.getTime() - offset);
-                            return localDate.toISOString().split('T')[0];
-                        }
+                    } else if (val instanceof Date) {
+                        const y = val.getUTCFullYear();
+                        const m = String(val.getUTCMonth() + 1).padStart(2, '0');
+                        const d = String(val.getUTCDate()).padStart(2, '0');
+                        return `${y}-${m}-${d}`;
                     }
                     return '';
                 };

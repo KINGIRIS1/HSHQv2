@@ -736,7 +736,7 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                 </div>
 
                 {/* Tính năng gia hạn ngày hẹn cho Một cửa / Admin */}
-                {currentUser && (currentUser.role === UserRole.ONEDOOR || currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.SUBADMIN) && (
+                {currentUser && (currentUser.role === UserRole.ONEDOOR || currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.SUBADMIN || currentUser.role === UserRole.TEAM_LEADER) && (
                     <div className="mt-4 w-full flex flex-col items-center">
                         {!showExtendForm ? (
                             <button 

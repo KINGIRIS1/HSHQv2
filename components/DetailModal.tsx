@@ -931,7 +931,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                              </span>
 
                              {/* Tính năng gia hạn hạn trả cho Một cửa / Admin */}
-                             {currentUser && (currentUser.role === UserRole.ONEDOOR || currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.SUBADMIN) && (
+                             {currentUser && (currentUser.role === UserRole.ONEDOOR || currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.SUBADMIN || currentUser.role === UserRole.TEAM_LEADER) && (
                                  <div className="mt-4 pt-4 border-t border-gray-100 flex flex-col items-center">
                                      {!showExtendForm ? (
                                          <button 
