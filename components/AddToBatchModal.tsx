@@ -180,8 +180,8 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg animate-fade-in-up flex flex-col overflow-hidden">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-2 sm:p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg lg:max-w-xl xl:max-w-2xl 2xl:max-w-3xl animate-fade-in-up flex flex-col overflow-hidden">
         <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
             <h3 className="font-bold text-gray-800 text-lg">Chốt Danh Sách Giao 1 Cửa</h3>
             <button onClick={onClose} className="text-gray-400 hover:text-red-500"><X size={20}/></button>

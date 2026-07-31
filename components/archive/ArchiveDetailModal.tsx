@@ -42,8 +42,8 @@ const ArchiveDetailModal: React.FC<ArchiveDetailModalProps> = ({ isOpen, onClose
     };
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-            <div className="bg-gray-50 rounded-xl shadow-2xl w-full max-w-7xl max-h-[95vh] overflow-hidden flex flex-col animate-fade-in-up">
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-2 sm:p-4 backdrop-blur-sm">
+            <div className="bg-gray-50 rounded-xl shadow-2xl w-full max-w-7xl 2xl:max-w-[1700px] max-h-[95vh] overflow-hidden flex flex-col animate-fade-in-up">
                 {/* HEADER */}
                 <div className="bg-white px-6 py-4 border-b border-gray-200 flex justify-between items-center shrink-0">
                     <div className="flex items-center gap-4">

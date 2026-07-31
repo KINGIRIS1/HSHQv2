@@ -287,8 +287,8 @@ const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, e
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-[100] p-4 backdrop-blur-sm animate-fade-in">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl flex flex-col h-[85vh] animate-fade-in-up overflow-hidden border border-slate-100">
+    <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-[100] p-2 sm:p-4 backdrop-blur-sm animate-fade-in">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl xl:max-w-7xl 2xl:max-w-[1700px] flex flex-col h-[88vh] animate-fade-in-up overflow-hidden border border-slate-100">
         
         {/* Modal Header */}
         <div className="flex justify-between items-center px-6 py-4 border-b bg-slate-50 shrink-0">

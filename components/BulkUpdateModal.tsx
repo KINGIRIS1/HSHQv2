@@ -52,8 +52,8 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
   const showDatePicker = targetField === 'status' || targetField === 'assignedTo';
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[70] p-4 backdrop-blur-sm">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg flex flex-col overflow-hidden animate-fade-in-up">
+    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[70] p-2 sm:p-4 backdrop-blur-sm">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg lg:max-w-xl xl:max-w-2xl 2xl:max-w-3xl flex flex-col overflow-hidden animate-fade-in-up">
         
         {/* Header */}
         <div className="p-5 border-b bg-gradient-to-r from-orange-50 to-orange-100 flex justify-between items-center">

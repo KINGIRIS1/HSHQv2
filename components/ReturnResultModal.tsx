@@ -113,8 +113,8 @@ const ReturnResultModal: React.FC<ReturnResultModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[70] p-4 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col overflow-hidden animate-fade-in-up border border-emerald-100">
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[70] p-2 sm:p-4 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md lg:max-w-lg xl:max-w-xl flex flex-col overflow-hidden animate-fade-in-up border border-emerald-100">
         
         {/* Header */}
         <div className="px-5 py-4 bg-emerald-50/80 border-b border-emerald-100 flex justify-between items-center">

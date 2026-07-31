@@ -292,8 +292,8 @@ const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calc
 
         {/* Modal Hướng dẫn / Nhắc nhở khi bấm icon ! hoặc vào tab */}
         {showNoticeModal && (
-            <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-                <div className="bg-white rounded-2xl shadow-xl border border-slate-200 max-w-md w-full p-6 animate-scale-up">
+            <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">
+                <div className="bg-white rounded-2xl shadow-xl border border-slate-200 max-w-md lg:max-w-lg w-full p-6 animate-scale-up">
                     <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                         <h3 className="font-bold text-slate-800 text-base flex items-center gap-2">
                             <span className="w-7 h-7 rounded-full bg-red-500 text-white font-black flex items-center justify-center text-sm shadow-sm">!</span>

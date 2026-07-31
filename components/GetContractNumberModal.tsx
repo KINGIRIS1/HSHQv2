@@ -129,8 +129,8 @@ const GetContractNumberModal: React.FC<GetContractNumberModalProps> = ({ isOpen,
   };
 
   return (
-    <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-xs flex justify-center items-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[90vh] overflow-hidden border border-slate-100 animate-fade-in-up">
+    <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-xs flex justify-center items-center p-2 sm:p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl lg:max-w-3xl xl:max-w-4xl 2xl:max-w-5xl flex flex-col max-h-[90vh] overflow-hidden border border-slate-100 animate-fade-in-up">
         
         {/* HEADER */}
         <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-gradient-to-r from-purple-50/50 to-indigo-50/50">
