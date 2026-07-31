@@ -692,8 +692,8 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
       return filtered;
   })();
 
-  const inputClass = "w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/10 transition-all font-medium bg-white hover:border-purple-300";
-  const labelClass = "block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1 ml-0.5";
+  const inputClass = "w-full border border-slate-300 rounded-lg px-2.5 py-1.5 md:py-2 text-xs md:text-sm 2xl:text-base outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/10 transition-all font-medium bg-white hover:border-purple-300";
+  const labelClass = "block text-[10px] md:text-xs 2xl:text-sm font-bold text-slate-500 uppercase tracking-wide mb-1 ml-0.5";
 
   // Check if we are in liquidation mode to show extra fields
   const isLiquidationMode = mode === 'liquidation';
@@ -704,7 +704,7 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
       : (formData.totalAmount || derivedPricing.totalAmount);
 
   return (
-    <form onSubmit={handleSubmit} className="w-full grid grid-cols-1 lg:grid-cols-12 gap-3.5 animate-fade-in relative pb-6">
+    <form onSubmit={handleSubmit} className="w-full max-w-[1800px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-3.5 md:gap-4 2xl:gap-6 animate-fade-in relative pb-6">
         <div ref={topRef} className="absolute -top-20" />
         
         {/* NOTIFICATION */}
