@@ -98,9 +98,8 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
       });
 
       const nextNum = maxBatch + 1;
-      const numPadded = String(nextNum).padStart(2, '0');
       const todayFmt = formatDateDDMMYYYY(todayStr);
-      const fullBatchName = `Đợt ${numPadded}-${todayFmt}`;
+      const fullBatchName = `Đợt ${nextNum} - Ngày ${todayFmt}`;
 
       return {
           batchNum: nextNum,

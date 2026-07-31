@@ -307,23 +307,7 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
                             ))}
                         </select>
                     </div>
-                    {selectedEmpId ? (
-                        <button 
-                            onClick={handleExportEmployeeRecords}
-                            className="hidden md:flex bg-green-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-green-700 shadow-sm items-center gap-2 whitespace-nowrap cursor-pointer"
-                            title="Xuất danh sách hồ sơ của nhân viên này"
-                        >
-                            <FileSpreadsheet size={18} /> Xuất DS
-                        </button>
-                    ) : (
-                        <button 
-                            onClick={handleExportSummaryExcel}
-                            className="hidden md:flex bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-emerald-700 shadow-sm items-center gap-2 whitespace-nowrap cursor-pointer"
-                            title="Xuất báo cáo tổng hợp nhân viên"
-                        >
-                            <FileSpreadsheet size={18} /> Xuất Báo Cáo
-                        </button>
-                    )}
+                    {/* Single shared Excel button is on top toolbar */}
                 </div>
             </div>
 

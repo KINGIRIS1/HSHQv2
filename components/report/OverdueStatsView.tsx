@@ -158,12 +158,7 @@ const OverdueStatsView: React.FC<OverdueStatsViewProps> = ({ records, employees 
                             </select>
                         </div>
 
-                        <button 
-                            onClick={() => exportOverdueStatsToExcel(overdueData.filteredRecords, employees, filterType)}
-                            className="hidden md:flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-bold text-sm shadow-sm h-[36px] min-w-[120px] ml-auto shrink-0"
-                        >
-                            <Download size={16} /> Xuất Excel
-                        </button>
+                        {/* Single shared Excel button is on top toolbar */}
                     </div>
                 </div>
                 <div className="hidden md:block flex-1 overflow-auto">

@@ -1,10 +1,10 @@
 
-=== HƯỚNG DẪN SỬ DỤNG HỆ THỐNG QUẢN LÝ HỒ SƠ ===
+=== HƯỚNG DẪN SỬ DỤNG HỆ THỐNG QUẢN LÝ HỒ SƠ (PHIÊN BẢN 2.1.1) ===
 
 YÊU CẦU: Máy tính phải cài đặt Node.js trước (Tải tại nodejs.org).
 
 BƯỚC 1: CÀI ĐẶT LẦN ĐẦU (Chỉ chạy 1 lần khi mới tải về)
-- Chạy file "1_Cai_Dat.bat"
+- Chạy file "1_Cai_Dat.bat" (Có thể chuột phải chọn Run as administrator)
 - Chờ đến khi báo "DA CAI DAT XONG" thì tắt đi.
 
 BƯỚC 2: CHẠY ỨNG DỤNG HÀNG NGÀY
@@ -30,9 +30,9 @@ B. Nếu triển khai Mạng LAN (1 Máy chủ, nhiều máy con):
    - File dữ liệu `db.json` sẽ được copy ra một file riêng có kèm ngày tháng.
    - Ngoài ra, mỗi khi bạn bật Server, hệ thống cũng TỰ ĐỘNG sao lưu vào thư mục `server/backups`.
 
-2. CẬP NHẬT HỆ THỐNG (Khi có phiên bản code mới):
+2. CẬP NHẬT HỆ THỐNG (Khi có phiên bản code mới - Phiên bản 2.1.1):
    - Bước 1: Chạy "4_Sao_Luu_Du_Lieu.bat" để cho chắc chắn.
-   - Bước 2: Copy đè các file Code mới vào thư mục (trừ file `server/db.json` nếu bạn muốn giữ dữ liệu cũ, nhưng hệ thống code mới đã có cơ chế bảo vệ file này).
+   - Bước 2: Copy đè các file Code mới vào thư mục. Hệ thống 2.1.1 tự động kiểm tra và tạo file db.json nếu chưa có.
    - Bước 3: Chạy file "5_Cap_Nhat_Thu_Vien.bat". 
      (Lệnh này chạy `npm install` để cập nhật thư viện, KHÔNG XÓA DỮ LIỆU).
 
@@ -48,6 +48,8 @@ NỘI DUNG CÁC FILE CHẠY (.BAT) - TỰ TẠO NẾU MẤT
 
 --- FILE 1: 1_Cai_Dat.bat ---
 @echo off
+cd /d "%~dp0"
+chcp 65001 > nul
 title CAI DAT HE THONG
 color 0A
 echo ==========================================
@@ -61,6 +63,8 @@ pause
 
 --- FILE 2: 2_Chay_Ung_Dung.bat ---
 @echo off
+cd /d "%~dp0"
+chcp 65001 > nul
 title QUAN LY HO SO - CLIENT
 color 0B
 echo ==========================================
@@ -71,6 +75,8 @@ pause
 
 --- FILE 3: 3_Chay_Server_LAN.bat ---
 @echo off
+cd /d "%~dp0"
+chcp 65001 > nul
 title SERVER QUAN LY HO SO (LUU DU LIEU)
 color 0C
 echo ==========================================
@@ -85,6 +91,8 @@ pause
 
 --- FILE 4: 4_Sao_Luu_Du_Lieu.bat ---
 @echo off
+cd /d "%~dp0"
+chcp 65001 > nul
 title SAO LUU DU LIEU
 color 0E
 echo ==========================================
@@ -103,6 +111,8 @@ pause
 
 --- FILE 5: 5_Cap_Nhat_Thu_Vien.bat ---
 @echo off
+cd /d "%~dp0"
+chcp 65001 > nul
 title CAP NHAT THU VIEN
 color 0D
 echo ==========================================
@@ -116,6 +126,8 @@ pause
 
 --- FILE 6: 6_Tao_File_Exe.bat ---
 @echo off
+cd /d "%~dp0"
+chcp 65001 > nul
 title TAO FILE CAI DAT (BUILD EXE)
 color 0F
 echo ==========================================

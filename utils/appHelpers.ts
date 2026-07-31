@@ -498,50 +498,72 @@ export function formatBatchName(batch: number | string | null | undefined, deptN
     // Loại bỏ mã tổ chuyên môn cũ nếu có (-CG-, -LT-, -DD-, -Tổ Cấp giấy-)
     bStr = bStr.replace(/-(CG|LT|DD|Tổ\s*[^-\s]+)-/gi, '-');
 
-    if (bStr.includes('Đợt') && bStr.includes('/')) {
-        return bStr;
+    let dateFormatted = formatDateDDMMYYYY(dateStr);
+    const dateInBatchMatch = bStr.match(/(\d{1,2}\/\d{1,2}\/\d{4})/);
+    if (dateInBatchMatch) {
+        dateFormatted = dateInBatchMatch[1];
     }
-
-    const dateFormatted = formatDateDDMMYYYY(dateStr);
 
     const match = bStr.match(/Đợt\s*(\d+)/i) || bStr.match(/^(\d+)$/);
     if (match && match[1]) {
-        const numPadded = String(parseInt(match[1], 10)).padStart(2, '0');
-        return `Đợt ${numPadded}-${dateFormatted}`;
+        const num = parseInt(match[1], 10);
+        return dateFormatted ? `Đợt ${num} - Ngày ${dateFormatted}` : `Đợt ${num}`;
     }
 
     if (bStr.startsWith('Đợt')) {
-        if (!bStr.includes('-') && dateFormatted) {
-            return `${bStr}-${dateFormatted}`;
+        if (!bStr.includes('Ngày') && dateFormatted) {
+            const cleanStr = bStr.replace(/Đợt\s*0*(\d+).*/i, 'Đợt $1');
+            return `${cleanStr} - Ngày ${dateFormatted}`;
         }
         return bStr;
     }
 
-    const numPadded = isNaN(Number(bStr)) ? bStr : String(bStr).padStart(2, '0');
-    return `Đợt ${numPadded}-${dateFormatted}`;
+    const num = isNaN(Number(bStr)) ? bStr : parseInt(bStr, 10);
+    return `Đợt ${num}${dateFormatted ? ` - Ngày ${dateFormatted}` : ''}`;
 }
 
 /**
  * Tự động gom các hồ sơ trước đây chưa chốt đợt (exportBatch rỗng/null)
- * thành đợt cuối cùng trong ngày.
+ * hoặc hồ sơ có chữ "Đợt Cuối" thành đợt có số lớn nhất trong ngày.
  */
 export function migrateUnbatchedRecords(records: RecordFile[]): { migratedRecords: RecordFile[], hasChanges: boolean } {
     let hasChanges = false;
 
     // Pass 1: Build map of existing batches by date (YYYY-MM-DD)
     const existingBatchesByDate: Record<string, string> = {};
+    const existingMaxBatchNumByDate: Record<string, number> = {};
+
     records.forEach(r => {
-        if (r.exportBatch && String(r.exportBatch).trim() !== '' && r.exportBatch !== 'NOT_BATCHED') {
+        if (r.exportBatch && String(r.exportBatch).trim() !== '' && r.exportBatch !== 'NOT_BATCHED' && !/cuối/i.test(String(r.exportBatch))) {
             const rawDate = r.exportDate || r.completedDate;
             if (rawDate) {
                 const dateKey = String(rawDate).split('T')[0];
                 const currentBatchStr = String(r.exportBatch);
+                
+                const match = currentBatchStr.match(/Đợt\s*(\d+)/i) || currentBatchStr.match(/^(\d+)$/);
+                if (match && match[1]) {
+                    const num = parseInt(match[1], 10);
+                    if (!existingMaxBatchNumByDate[dateKey] || num > existingMaxBatchNumByDate[dateKey]) {
+                        existingMaxBatchNumByDate[dateKey] = num;
+                    }
+                }
+
                 if (!existingBatchesByDate[dateKey] || currentBatchStr.localeCompare(existingBatchesByDate[dateKey], undefined, { numeric: true }) > 0) {
                     existingBatchesByDate[dateKey] = currentBatchStr;
                 }
             }
         }
     });
+
+    const getFallbackBatchName = (rawDate: string) => {
+        const dateKey = String(rawDate).split('T')[0];
+        const dateFmt = formatDateDDMMYYYY(rawDate);
+        if (existingBatchesByDate[dateKey]) {
+            return formatBatchName(existingBatchesByDate[dateKey], '', dateKey);
+        }
+        const maxNum = existingMaxBatchNumByDate[dateKey] || 1;
+        return `Đợt ${maxNum} - Ngày ${dateFmt}`;
+    };
 
     const migratedRecords = records.map(r => {
         let currentBatch = r.exportBatch;
@@ -552,10 +574,27 @@ export function migrateUnbatchedRecords(records: RecordFile[]): { migratedRecord
             hasChanges = true;
         }
 
-        // Tự động làm sạch các mã tổ chuyên môn thừa trong tên đợt (vd: Đợt 01-CG-30/07/2026 -> Đợt 01-30/07/2026)
+        // Tự động làm sạch các mã tổ chuyên môn thừa trong tên đợt (vd: Đợt 01-CG-30/07/2026 -> Đợt 1 - Ngày 30/07/2026)
         if (typeof currentBatch === 'string' && /-(CG|LT|DD|Tổ\s*[^-\s]+)-/i.test(currentBatch)) {
             currentBatch = currentBatch.replace(/-(CG|LT|DD|Tổ\s*[^-\s]+)-/gi, '-');
             hasChanges = true;
+        }
+
+        // Tự động đổi tên "Đợt Cuối" / "Đợt cuối" thành đợt số lớn nhất trong ngày
+        if (typeof currentBatch === 'string' && /cuối/i.test(currentBatch)) {
+            hasChanges = true;
+            const rawDate = r.exportDate || r.completedDate || r.receivedDate || new Date().toISOString();
+            currentBatch = getFallbackBatchName(rawDate);
+        }
+
+        // Chuẩn hóa tên đợt sang dạng "Đợt X - Ngày DD/MM/YYYY"
+        if (currentBatch && currentBatch !== 'NOT_BATCHED') {
+            const rawDate = r.exportDate || r.completedDate || r.receivedDate;
+            const formatted = formatBatchName(currentBatch, '', rawDate);
+            if (formatted && formatted !== currentBatch) {
+                currentBatch = formatted;
+                hasChanges = true;
+            }
         }
 
         const isHandedOver = r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED || Boolean((r as any).is_handover);
@@ -564,11 +603,7 @@ export function migrateUnbatchedRecords(records: RecordFile[]): { migratedRecord
         if (isHandedOver && missingBatch) {
             hasChanges = true;
             const rawDate = r.exportDate || r.completedDate || r.receivedDate || new Date().toISOString();
-            const dateKey = String(rawDate).split('T')[0];
-            const dateFmt = formatDateDDMMYYYY(rawDate);
-
-            // Priority: assign to existing batch of that day if available, else create 'Đợt Cuối'
-            const defaultBatchName = existingBatchesByDate[dateKey] || `Đợt Cuối-${dateFmt}`;
+            const defaultBatchName = getFallbackBatchName(rawDate);
 
             return {
                 ...r,

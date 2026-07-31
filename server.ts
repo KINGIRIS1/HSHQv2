@@ -22,6 +22,35 @@ if (process.env.NODE_ENV === 'production') {
     }
 }
 
+// Đảm bảo thư mục cha chứa db.json tồn tại
+const dbDir = path.dirname(dbFile);
+if (!fs.existsSync(dbDir)) {
+    try {
+        fs.mkdirSync(dbDir, { recursive: true });
+    } catch (e) {
+        console.error('Không thể tạo thư mục lưu trữ DB:', e);
+    }
+}
+
+// Đảm bảo file db.json tồn tại trước khi jsonServer.router khởi tạo (tránh lỗi ENOENT)
+if (!fs.existsSync(dbFile)) {
+    const initialData = { records: [], logs: [], employees: [], holidays: [] };
+    const templateDb = path.join(process.cwd(), 'server/db.json');
+    if (fs.existsSync(templateDb) && templateDb !== dbFile) {
+        try {
+            fs.copyFileSync(templateDb, dbFile);
+        } catch (e) {
+            fs.writeFileSync(dbFile, JSON.stringify(initialData, null, 2), 'utf8');
+        }
+    } else {
+        try {
+            fs.writeFileSync(dbFile, JSON.stringify(initialData, null, 2), 'utf8');
+        } catch (e) {
+            console.error('Không thể khởi tạo file db.json:', e);
+        }
+    }
+}
+
 const router = jsonServer.router(dbFile);
 const middlewares = jsonServer.defaults({ logger: false });
 

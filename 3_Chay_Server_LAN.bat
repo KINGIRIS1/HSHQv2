@@ -1,4 +1,5 @@
 @echo off
+cd /d "%~dp0"
 chcp 65001 > nul
 title SERVER QUAN LY HO SO - LUU DU LIEU LAN
 color 0C

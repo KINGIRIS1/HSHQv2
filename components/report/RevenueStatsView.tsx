@@ -334,12 +334,7 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
                             />
                         </div>
 
-                        <button
-                            onClick={handleExportExcel}
-                            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer h-[38px] shrink-0"
-                        >
-                            <FileSpreadsheet size={15} /> Xuất Excel ({filteredRecords.length})
-                        </button>
+                        {/* Single shared Excel button is on top toolbar */}
                     </div>
                 </div>
 

@@ -50,7 +50,7 @@ export const fetchUpdateInfo = async (): Promise<{ version: string | null, url: 
         return { version, url };
     } catch (e: any) {
         if (e?.code === '42P01') return { version: null, url: null };
-        logError("fetchUpdateInfo", e);
+        logError("fetchUpdateInfo", e, true);
         return { version: null, url: null };
     }
 };

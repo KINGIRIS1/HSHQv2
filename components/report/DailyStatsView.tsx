@@ -282,13 +282,7 @@ const DailyStatsView: React.FC<DailyStatsViewProps> = ({
                             </select>
                         </div>
 
-                        <button 
-                            onClick={handleExportFromModal}
-                            disabled={modalFilteredRecords.length === 0}
-                            className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-bold text-xs shadow-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed h-[38px] shrink-0"
-                        >
-                            <FileSpreadsheet size={16} className="shrink-0" /> Xuất Excel ({modalFilteredRecords.length})
-                        </button>
+                        {/* Single shared Excel button is on the top ReportSection toolbar */}
                     </div>
                 </div>
 

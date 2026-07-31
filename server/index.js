@@ -13,7 +13,36 @@ try {
 
 // Lấy đường dẫn DB từ biến môi trường (do Electron truyền vào) hoặc mặc định tại thư mục hiện tại
 // DB_PATH được Electron set vào thư mục AppData của người dùng để có quyền Ghi
-const dbFile = process.env.DB_PATH || path.join(__dirname, 'db.json');
+let dbFile = process.env.DB_PATH || path.join(__dirname, 'db.json');
+
+// Đảm bảo thư mục chứa dbFile tồn tại
+const dbDir = path.dirname(dbFile);
+if (!fs.existsSync(dbDir)) {
+    try {
+        fs.mkdirSync(dbDir, { recursive: true });
+    } catch (e) {
+        console.error('Không thể tạo thư mục lưu dữ liệu DB:', e);
+    }
+}
+
+// Đảm bảo file db.json tồn tại trước khi router(dbFile) được gọi (tránh lỗi ENOENT)
+if (!fs.existsSync(dbFile)) {
+    const defaultData = { records: [], logs: [], employees: [], holidays: [] };
+    const templateDb = path.join(__dirname, 'db.json');
+    if (fs.existsSync(templateDb) && templateDb !== dbFile) {
+        try {
+            fs.copyFileSync(templateDb, dbFile);
+        } catch (e) {
+            fs.writeFileSync(dbFile, JSON.stringify(defaultData, null, 2), 'utf8');
+        }
+    } else {
+        try {
+            fs.writeFileSync(dbFile, JSON.stringify(defaultData, null, 2), 'utf8');
+        } catch (e) {
+            console.error('Không thể khởi tạo db.json:', e);
+        }
+    }
+}
 
 console.log(`Dang su dung Database tai: ${dbFile}`);
 

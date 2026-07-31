@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { User, Employee, UserRole, Holiday } from '../../types';
+import { APP_VERSION } from '../../constants';
 import AccountSettingsView from '../AccountSettingsView';
 import UserManagement from '../UserManagement';
 import EmployeeManagement from '../EmployeeManagement';
@@ -224,7 +225,7 @@ const MobileSettingsView: React.FC<MobileSettingsViewProps> = (props) => {
         {/* Footer Info */}
         <div className="pt-4 pb-8 text-center">
           <p className="text-slate-300 text-xs font-semibold uppercase tracking-wider">
-            Phiên bản 2.1.0 • QLHS Mobile
+            Phiên bản {APP_VERSION} • QLHS Mobile
           </p>
         </div>
       </div>

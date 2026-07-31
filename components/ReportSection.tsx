@@ -380,14 +380,54 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
         onGenerate(fromDate, toDate, title, filteredData);
     };
 
+    // Compute dynamic count for shared Excel Export button
+    const activeExportCount = useMemo(() => {
+        if (activeTab === 'daily_stats') {
+            return dailyStatsRecords.length || filteredData.length;
+        }
+        if (activeTab === 'employee' && selectedEmpId) {
+            return filteredData.filter(r => r.assignedTo === selectedEmpId).length;
+        }
+        if (activeTab === 'list') {
+            return finalFilteredData.length;
+        }
+        return filteredData.length;
+    }, [activeTab, dailyStatsRecords, filteredData, finalFilteredData, selectedEmpId]);
+
     const handleExportExcelClick = () => {
         if (!fromDate || !toDate) { alert("Vui lòng chọn đầy đủ thời gian."); return; }
-        let title = mainTab === 'measurement' ? "BÁO CÁO KẾT QUẢ CÔNG TÁC ĐO ĐẠC" : "BÁO CÁO KẾT QUẢ CÔNG TÁC LƯU TRỮ";
-        if (reportType === 'today') title = mainTab === 'measurement' ? "BÁO CÁO KẾT QUẢ CÔNG TÁC ĐO ĐẠC HÔM NAY" : "BÁO CÁO KẾT QUẢ CÔNG TÁC LƯU TRỮ HÔM NAY";
-        if (reportType === 'week') title = mainTab === 'measurement' ? "BÁO CÁO KẾT QUẢ CÔNG TÁC ĐO ĐẠC TUẦN" : "BÁO CÁO KẾT QUẢ CÔNG TÁC LƯU TRỮ TUẦN";
-        if (reportType === 'month') title = mainTab === 'measurement' ? "BÁO CÁO KẾT QUẢ CÔNG TÁC ĐO ĐẠC THÁNG" : "BÁO CÁO KẾT QUẢ CÔNG TÁC LƯU TRỮ THÁNG";
         
-        onExportExcel(fromDate, toDate, selectedWard, title, filteredData);
+        let title = mainTab === 'measurement' ? "BÁO CÁO KẾT QUẢ CÔNG TÁC ĐO ĐẠC" : "BÁO CÁO KẾT QUẢ CÔNG TÁC LƯU TRỮ";
+        
+        if (activeTab === 'daily_stats') {
+            title += " - THỐNG KÊ THEO NGÀY";
+        } else if (activeTab === 'ward_stats') {
+            title += " - THỐNG KÊ THEO XÃ PHƯỜNG";
+        } else if (activeTab === 'employee') {
+            if (selectedEmpId) {
+                const emp = employees.find(e => e.id === selectedEmpId);
+                title += ` - CÁN BỘ: ${emp ? emp.name.toUpperCase() : ''}`;
+            } else {
+                title += " - TỔNG HỢP THEO NHÂN VIÊN";
+            }
+        } else if (activeTab === 'revenue') {
+            title += " - BÁO CÁO DOANH THU";
+        } else if (activeTab === 'overdue') {
+            title += " - BÁO CÁO HỒ SƠ TRỄ HẠN";
+        }
+
+        if (reportType === 'today') title += " HÔM NAY";
+        else if (reportType === 'week') title += " TUẦN NÀY";
+        else if (reportType === 'month') title += " THÁNG NÀY";
+
+        let dataToExport = finalFilteredData;
+        if (activeTab === 'daily_stats' && dailyStatsRecords.length > 0) {
+            dataToExport = dailyStatsRecords;
+        } else if (activeTab === 'employee' && selectedEmpId) {
+            dataToExport = filteredData.filter(r => r.assignedTo === selectedEmpId);
+        }
+
+        onExportExcel(fromDate, toDate, selectedWard, title, dataToExport);
     };
 
     const handlePrint = () => {
@@ -515,8 +555,18 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                             />
                         </div>
                         
-                        <button onClick={handleExportExcelClick} className="hidden md:flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 font-bold text-sm shadow-sm transition-colors" title="Xuất Excel">
-                            <FileSpreadsheet size={18} /> Xuất Excel
+                        <button 
+                            onClick={handleExportExcelClick} 
+                            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-lg font-bold text-xs md:text-sm shadow-sm transition-all cursor-pointer whitespace-nowrap active:scale-95" 
+                            title="Xuất Báo Cáo Excel Dùng Chung"
+                        >
+                            <FileSpreadsheet size={18} className="shrink-0" /> 
+                            <span>Xuất Excel</span>
+                            {activeExportCount > 0 && (
+                                <span className="bg-emerald-800 text-emerald-100 text-[10px] md:text-xs px-2 py-0.5 rounded-full font-extrabold ml-0.5">
+                                    {activeExportCount}
+                                </span>
+                            )}
                         </button>
                     </div>
                 </div>

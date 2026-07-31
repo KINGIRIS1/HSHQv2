@@ -93,7 +93,9 @@ const ExportHandoverModal: React.FC<ExportHandoverModalProps> = ({ isOpen, onClo
         wsData.push([title]);
         wsData.push([`NGÀY ${day < 10 ? '0' + day : day} THÁNG ${month < 10 ? '0' + month : month} NĂM ${year}`]);
         
-        const batchText = selectedBatch !== 'all' ? `ĐỢT: ${selectedBatch.replace(/Đợt /i, '')}` : 'TẤT CẢ CÁC ĐỢT';
+        const batchText = selectedBatch !== 'all' 
+            ? (/^đợt/i.test(selectedBatch) ? selectedBatch.toUpperCase() : `ĐỢT: ${selectedBatch}`) 
+            : 'TẤT CẢ CÁC ĐỢT';
         
         // Add Ward name to title if selected
         let fullBatchTitle = `${batchText} - TỔNG SỐ HỒ SƠ: ${data.length}`;

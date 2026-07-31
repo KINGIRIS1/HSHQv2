@@ -7,7 +7,7 @@ import { RecordStatus, Employee, RecordFile, User, UserRole, Contract } from './
 export const API_BASE_URL = 'https://dajjhubrhybodggbqapt.supabase.co'; 
 
 // PHIÊN BẢN HIỆN TẠI CỦA ỨNG DỤNG
-export const APP_VERSION = '2.1.0';
+export const APP_VERSION = '2.1.1';
 
 export const STATUS_LABELS: Record<RecordStatus, string> = {
   [RecordStatus.RECEIVED]: 'Tiếp nhận mới',

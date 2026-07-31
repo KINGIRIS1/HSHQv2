@@ -3,6 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import * as XLSX from 'xlsx-js-style';
 import { RecordFile, RecordStatus } from '../types';
 import { isArchiveRecordType, getShortRecordType } from '../constants';
+import { formatBatchName } from '../utils/appHelpers';
 import { X, FileDown, Calendar, Layers, MapPin, Printer, Eye, Filter } from 'lucide-react';
 
 interface ExportModalProps {
@@ -166,11 +167,16 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
             title = `DANH SÁCH BÀN GIAO HỒ SƠ 1 CỬA${wardTitle}`;
         }
 
-        const displayBatch = batchStr === 'NOT_BATCHED' ? 'CHƯA TẠO ĐỢT' : `ĐỢT ${batchStr}`;
+        const displayBatch = batchStr === 'NOT_BATCHED' 
+            ? 'CHƯA TẠO ĐỢT' 
+            : (/^đợt/i.test(batchStr) ? batchStr.toUpperCase() : `ĐỢT ${batchStr}`.toUpperCase());
         subTitle = `${displayBatch}  -  TỔNG SỐ HỒ SƠ: ${recordsToExport.length}`;
         const safeDate = dateStr.replace(/-/g, '');
         const catPrefix = recordCategory === 'archive' ? 'Luu_Tru_' : recordCategory === 'measurement' ? 'Do_Dac_' : '';
-        fileName = `Giao_1_Cua_${catPrefix}${batchStr === 'NOT_BATCHED' ? 'Le' : `Dot_${batchStr}`}_${safeDate}`;
+        const cleanBatchNameForFile = batchStr === 'NOT_BATCHED' 
+            ? 'Le' 
+            : (/^đợt/i.test(batchStr) ? batchStr : `Dot_${batchStr}`).replace(/[\/\s\-]+/g, '_');
+        fileName = `Giao_1_Cua_${catPrefix}${cleanBatchNameForFile}_${safeDate}`;
 
     } else {
         // Check List
@@ -512,9 +518,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
                                     {type === 'handover' 
                                       ? (opt.batch === 'Lẻ (Chưa tạo đợt)' 
                                           ? `Lẻ (Chưa tạo đợt) - Ngày ${formatDate(opt.date)} (${opt.count} HS)`
-                                          : (String(opt.batch).startsWith('Đợt')
-                                              ? `${opt.batch} (${opt.count} HS)`
-                                              : `Đợt ${opt.batch} - Ngày ${formatDate(opt.date)} (${opt.count} HS)`))
+                                          : `${formatBatchName(opt.batch, '', opt.date)} (${opt.count} HS)`)
                                       : `Ngày tiếp nhận: ${formatDate(opt.date)} (${opt.count} HS)`
                                     }
                                 </option>

@@ -1,4 +1,5 @@
 @echo off
+cd /d "%~dp0"
 chcp 65001 > nul
 title CAP NHAT THU VIEN - QUAN LY HO SO
 color 0D
