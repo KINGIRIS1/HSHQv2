@@ -216,7 +216,12 @@ export const BatchErrorDiagnosticModal: React.FC<BatchErrorDiagnosticModalProps>
       if (
         r.assignedTo &&
         employees.length > 0 &&
-        !employees.some((e) => e.name === r.assignedTo || e.id === r.assignedTo)
+        !employees.some((e) => {
+          const normalizeName = (str: string) => str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().replace(/\s+/g, ' ');
+          const empNorm = normalizeName(e.name);
+          const rNorm = normalizeName(r.assignedTo!);
+          return e.name === r.assignedTo || e.id === r.assignedTo || (e as any).employeeId === r.assignedTo || empNorm === rNorm || (rNorm.length >= 3 && empNorm.includes(rNorm));
+        })
       ) {
         errors.push({
           code: 'ERR_UNKNOWN_EMPLOYEE',

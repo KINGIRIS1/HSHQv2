@@ -311,25 +311,25 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
             const assigneeRaw = getVal(['NGƯỜI XỬ LÝ', 'NHÂN VIÊN', 'CÁN BỘ', 'assignedto', 'assigned_to', 'assignedTo']);
             if (assigneeRaw !== undefined && String(assigneeRaw).trim() !== '') {
                 const rawStr = String(assigneeRaw).trim();
-                const normalizeName = (str: string) => str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+                const normalizeName = (str: string) => str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().replace(/\s+/g, ' ');
                 const rawNorm = normalizeName(rawStr);
 
                 const emp = employees.find(e => {
                     const empNameNorm = normalizeName(e.name);
                     return empNameNorm === rawNorm || 
-                           empNameNorm.includes(rawNorm) || 
-                           rawNorm.includes(empNameNorm) || 
+                           (rawNorm.length >= 3 && empNameNorm.includes(rawNorm)) || 
+                           (empNameNorm.length >= 3 && rawNorm.includes(empNameNorm)) || 
                            e.id === rawStr || 
                            (e as any).employeeId === rawStr;
                 });
 
                 if (emp) {
                     record.assignedTo = emp.id;
+                    if (mode === 'create' && !record.assignedDate) {
+                        record.assignedDate = record.receivedDate || new Date().toISOString();
+                    }
                 } else {
-                    record.assignedTo = rawStr;
-                }
-                if (mode === 'create' && !record.assignedDate) {
-                    record.assignedDate = record.receivedDate || new Date().toISOString();
+                    errors.push(`Cán bộ xử lý "${rawStr}" không khớp với bất kỳ nhân sự nào trong hệ thống!`);
                 }
             }
 
