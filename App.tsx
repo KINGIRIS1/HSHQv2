@@ -493,126 +493,93 @@ function App() {
 
   const handleBulkUpdate = async (field: keyof RecordFile, value: any, customDateStr?: string, targetRecordIds?: string[]) => {
       const selectedIds = targetRecordIds && targetRecordIds.length > 0 ? targetRecordIds : Array.from(selectedRecordIds);
-      let baseUpdates: any = { [field]: value };
-      const targetDateStr = customDateStr || new Date().toISOString();
-
-      if (field === 'status') {
-          baseUpdates = getUpdatesForStatusChange(value as RecordStatus, targetDateStr);
-      } else if (field === 'deadline' || field === 'receivedDate') {
-          baseUpdates[field] = targetDateStr;
-      }
-      
-      if (field === 'assignedTo') {
-          const selectedRecords = records.filter(r => selectedIds.includes(r.id));
-          
-          // Kiểm tra và giữ nguyên không cho phép thay đổi người thực hiện đối với hồ sơ đã giao 1 cửa / đã trả kết quả
-          const blockedRecords = selectedRecords.filter(r => 
-              r.status === RecordStatus.HANDOVER || 
-              r.status === RecordStatus.RETURNED || 
-              r.is_handover ||
-              (r.status as string) === 'completed'
-          );
-          
-          const validRecords = selectedRecords.filter(r => 
-              r.status !== RecordStatus.HANDOVER && 
-              r.status !== RecordStatus.RETURNED && 
-              !r.is_handover &&
-              (r.status as string) !== 'completed'
-          );
-
-          if (validRecords.length === 0) {
-              setToast({ type: 'error', message: 'Hồ sơ đã giao 1 cửa / hoàn thành, giữ nguyên không thể thay đổi người thực hiện!' });
-              setIsBulkUpdateModalOpen(false);
-              return;
-          }
-
-          const updatedTargets = validRecords.map(r => ({
-              ...r,
-              ...processAssignmentTimelineCheck(r, value, targetDateStr, employees, currentUser)
-          }));
-
-          setRecords(prev => prev.map(r => {
-              const updated = updatedTargets.find(u => u.id === r.id);
-              return updated ? updated : r;
-          }));
-
-          await Promise.all(updatedTargets.map(r => updateRecordApi(r)));
-          setIsBulkUpdateModalOpen(false);
-          setSelectedRecordIds(new Set());
-
-          if (blockedRecords.length > 0) {
-              setToast({ 
-                  type: 'success', 
-                  message: `Giữ nguyên ${blockedRecords.length} hồ sơ đã giao 1 cửa. Đã cập nhật ${updatedTargets.length} hồ sơ còn lại!` 
-              });
-          } else {
-              setToast({ type: 'success', message: `Đã cập nhật giao việc cho ${updatedTargets.length} hồ sơ!` });
-          }
+      if (selectedIds.length === 0) {
+          setToast({ type: 'error', message: 'Không có hồ sơ nào được chọn để cập nhật!' });
           return;
       }
 
-      // Calculate the specific, fully-elaborated target records upfront
-      const updatedTargets = records
-          .filter(r => selectedIds.includes(r.id))
-          .map(r => {
-              let recordUpdates = { ...baseUpdates };
-              if (field === 'status') {
-                  recordUpdates.statusLogs = createStatusLog(r, value, 'Cập nhật trạng thái hàng loạt');
-                  
-                  // Tự động điền bù ngày tháng các bước trước còn thiếu bằng ngày của file/popup cập nhật hàng loạt
-                  if (value === RecordStatus.COMPLETED_WORK) {
-                      if (!r.assignedDate) recordUpdates.assignedDate = targetDateStr;
-                  } else if (value === RecordStatus.PENDING_CHECK) {
-                      if (!r.assignedDate) recordUpdates.assignedDate = targetDateStr;
-                      if (!r.completedWorkDate) recordUpdates.completedWorkDate = targetDateStr;
-                  } else if (value === RecordStatus.CHECKED) {
-                      if (!r.assignedDate) recordUpdates.assignedDate = targetDateStr;
-                      if (!r.completedWorkDate) recordUpdates.completedWorkDate = targetDateStr;
-                      if (!r.pendingCheckDate) recordUpdates.pendingCheckDate = targetDateStr;
-                  } else if (value === RecordStatus.PENDING_SIGN) {
-                      if (!r.assignedDate) recordUpdates.assignedDate = targetDateStr;
-                      if (!r.completedWorkDate) recordUpdates.completedWorkDate = targetDateStr;
-                      if (!r.pendingCheckDate) recordUpdates.pendingCheckDate = targetDateStr;
-                      if (!r.checkedDate) recordUpdates.checkedDate = targetDateStr;
-                  } else if (value === RecordStatus.SIGNED) {
-                      if (!r.assignedDate) recordUpdates.assignedDate = targetDateStr;
-                      if (!r.completedWorkDate) recordUpdates.completedWorkDate = targetDateStr;
-                      if (!r.pendingCheckDate) recordUpdates.pendingCheckDate = targetDateStr;
-                      if (!r.checkedDate) recordUpdates.checkedDate = targetDateStr;
-                      if (!r.submissionDate) recordUpdates.submissionDate = targetDateStr;
-                  } else if (value === RecordStatus.HANDOVER) {
-                      if (!r.assignedDate) recordUpdates.assignedDate = targetDateStr;
-                      if (!r.completedWorkDate) recordUpdates.completedWorkDate = targetDateStr;
-                      if (!r.pendingCheckDate) recordUpdates.pendingCheckDate = targetDateStr;
-                      if (!r.checkedDate) recordUpdates.checkedDate = targetDateStr;
-                      if (!r.submissionDate) recordUpdates.submissionDate = targetDateStr;
-                      if (!r.approvalDate) recordUpdates.approvalDate = targetDateStr;
-                  } else if (value === RecordStatus.RETURNED) {
-                      if (!r.assignedDate) recordUpdates.assignedDate = targetDateStr;
-                      if (!r.completedWorkDate) recordUpdates.completedWorkDate = targetDateStr;
-                      if (!r.pendingCheckDate) recordUpdates.pendingCheckDate = targetDateStr;
-                      if (!r.checkedDate) recordUpdates.checkedDate = targetDateStr;
-                      if (!r.submissionDate) recordUpdates.submissionDate = targetDateStr;
-                      if (!r.approvalDate) recordUpdates.approvalDate = targetDateStr;
-                      if (!r.completedDate) recordUpdates.completedDate = targetDateStr;
-                  }
+      const targetDateStr = customDateStr || new Date().toISOString();
+      const selectedRecords = records.filter(r => selectedIds.includes(r.id));
+      if (selectedRecords.length === 0) {
+          setToast({ type: 'error', message: 'Không tìm thấy hồ sơ phù hợp!' });
+          return;
+      }
 
-                  if (field === 'status' && (value === RecordStatus.REJECTED || value === RecordStatus.WITHDRAWN)) {
-                      recordUpdates.completedDate = r.completedDate || targetDateStr;
-                      const flow = [RecordStatus.RECEIVED, RecordStatus.ASSIGNED, RecordStatus.IN_PROGRESS, RecordStatus.COMPLETED_WORK, RecordStatus.PENDING_CHECK, RecordStatus.CHECKED, RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER];
-                      const prevIdx = flow.indexOf(r.status);
-                      if (prevIdx >= 0) {
-                          if (prevIdx >= flow.indexOf(RecordStatus.ASSIGNED) && !r.assignedDate) recordUpdates.assignedDate = targetDateStr;
-                          if (prevIdx >= flow.indexOf(RecordStatus.COMPLETED_WORK) && !r.completedWorkDate) recordUpdates.completedWorkDate = targetDateStr;
-                          if (prevIdx >= flow.indexOf(RecordStatus.PENDING_CHECK) && !r.pendingCheckDate) recordUpdates.pendingCheckDate = targetDateStr;
-                          if (prevIdx >= flow.indexOf(RecordStatus.CHECKED) && !r.checkedDate) recordUpdates.checkedDate = targetDateStr;
-                          if (prevIdx >= flow.indexOf(RecordStatus.PENDING_SIGN) && !r.submissionDate) recordUpdates.submissionDate = targetDateStr;
-                          if (prevIdx >= flow.indexOf(RecordStatus.SIGNED) && !r.approvalDate) recordUpdates.approvalDate = targetDateStr;
-                      }
-                  }
+      const updatedTargets = selectedRecords.map(r => {
+          let recordUpdates: any = {};
+
+          if (field === 'status') {
+              recordUpdates = { ...getUpdatesForStatusChange(value as RecordStatus, targetDateStr) };
+              recordUpdates.statusLogs = createStatusLog(r, value, 'Cập nhật trạng thái hàng loạt');
+              if (value === RecordStatus.COMPLETED_WORK) {
+                  if (!r.assignedDate) recordUpdates.assignedDate = targetDateStr;
+              } else if (value === RecordStatus.PENDING_CHECK) {
+                  if (!r.assignedDate) recordUpdates.assignedDate = targetDateStr;
+                  if (!r.completedWorkDate) recordUpdates.completedWorkDate = targetDateStr;
+              } else if (value === RecordStatus.CHECKED) {
+                  if (!r.assignedDate) recordUpdates.assignedDate = targetDateStr;
+                  if (!r.completedWorkDate) recordUpdates.completedWorkDate = targetDateStr;
+                  if (!r.pendingCheckDate) recordUpdates.pendingCheckDate = targetDateStr;
+              } else if (value === RecordStatus.PENDING_SIGN) {
+                  if (!r.assignedDate) recordUpdates.assignedDate = targetDateStr;
+                  if (!r.completedWorkDate) recordUpdates.completedWorkDate = targetDateStr;
+                  if (!r.pendingCheckDate) recordUpdates.pendingCheckDate = targetDateStr;
+                  if (!r.checkedDate) recordUpdates.checkedDate = targetDateStr;
+              } else if (value === RecordStatus.SIGNED) {
+                  if (!r.assignedDate) recordUpdates.assignedDate = targetDateStr;
+                  if (!r.completedWorkDate) recordUpdates.completedWorkDate = targetDateStr;
+                  if (!r.pendingCheckDate) recordUpdates.pendingCheckDate = targetDateStr;
+                  if (!r.checkedDate) recordUpdates.checkedDate = targetDateStr;
+                  if (!r.submissionDate) recordUpdates.submissionDate = targetDateStr;
+              } else if (value === RecordStatus.HANDOVER) {
+                  if (!r.assignedDate) recordUpdates.assignedDate = targetDateStr;
+                  if (!r.completedWorkDate) recordUpdates.completedWorkDate = targetDateStr;
+                  if (!r.pendingCheckDate) recordUpdates.pendingCheckDate = targetDateStr;
+                  if (!r.checkedDate) recordUpdates.checkedDate = targetDateStr;
+                  if (!r.submissionDate) recordUpdates.submissionDate = targetDateStr;
+                  if (!r.approvalDate) recordUpdates.approvalDate = targetDateStr;
+              } else if (value === RecordStatus.RETURNED) {
+                  if (!r.assignedDate) recordUpdates.assignedDate = targetDateStr;
+                  if (!r.completedWorkDate) recordUpdates.completedWorkDate = targetDateStr;
+                  if (!r.pendingCheckDate) recordUpdates.pendingCheckDate = targetDateStr;
+                  if (!r.checkedDate) recordUpdates.checkedDate = targetDateStr;
+                  if (!r.submissionDate) recordUpdates.submissionDate = targetDateStr;
+                  if (!r.approvalDate) recordUpdates.approvalDate = targetDateStr;
+                  if (!r.completedDate) recordUpdates.completedDate = targetDateStr;
               }
-              return { ...r, ...recordUpdates };
-          });
+
+              if (value === RecordStatus.REJECTED || value === RecordStatus.WITHDRAWN) {
+                  recordUpdates.completedDate = r.completedDate || targetDateStr;
+              }
+          } else if (field === 'assignedTo') {
+              recordUpdates.assignedTo = value;
+              recordUpdates.assignedDate = customDateStr || r.assignedDate || targetDateStr;
+              if (r.status === RecordStatus.RECEIVED) {
+                  recordUpdates.status = RecordStatus.IN_PROGRESS;
+              }
+          } else if (['deadline', 'receivedDate', 'resultReturnedDate', 'assignedDate', 'completedWorkDate', 'checkedDate', 'submissionDate', 'approvalDate', 'completedDate'].includes(field)) {
+              const formattedDate = value ? (value.includes('T') ? value : new Date(value + 'T12:00:00').toISOString()) : null;
+              recordUpdates[field] = formattedDate;
+              if (field === 'checkedDate') {
+                  recordUpdates.pendingCheckDate = formattedDate;
+              }
+          } else if (field === 'exportDate') {
+              const formattedDate = value ? (value.includes('T') ? value : new Date(value + 'T12:00:00').toISOString()) : targetDateStr;
+              recordUpdates.exportDate = formattedDate;
+              recordUpdates.handover_date = formattedDate;
+          } else if (field === 'exportBatch') {
+              recordUpdates.exportBatch = value;
+          } else if (field === 'deadline' || field === 'receivedDate' || field === 'resultReturnedDate') {
+              const formattedDate = value ? (value.includes('T') ? value : new Date(value + 'T12:00:00').toISOString()) : targetDateStr;
+              recordUpdates[field] = formattedDate;
+          } else if (field === 'returnedPrice') {
+              recordUpdates[field] = value !== '' && value !== null && value !== undefined ? Number(value) : null;
+          } else {
+              recordUpdates[field] = value;
+          }
+
+          return { ...r, ...recordUpdates };
+      });
 
       setRecords(prev => prev.map(r => {
           const updated = updatedTargets.find(u => u.id === r.id);
@@ -620,7 +587,8 @@ function App() {
       }));
       
       await Promise.all(updatedTargets.map(r => updateRecordApi(r)));
-      setToast({ type: 'success', message: `Đã cập nhật ${selectedIds.length} hồ sơ thành công!` });
+      setToast({ type: 'success', message: `Đã cập nhật ${updatedTargets.length} hồ sơ thành công!` });
+      setIsBulkUpdateModalOpen(false);
       setSelectedRecordIds(new Set()); 
   };
 

@@ -276,63 +276,65 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
             }
         }
 
-        // Logic làm sạch dữ liệu cũ khi quay lui trạng thái
-        // 1. Nếu quay về RECEIVED (Tiếp nhận) -> Xóa hết các bước sau
-        if (finalData.status === RecordStatus.RECEIVED) {
-            finalData.assignedDate = undefined;
-            finalData.completedWorkDate = undefined;
-            finalData.pendingCheckDate = undefined;
-            finalData.checkedDate = undefined;
-            finalData.submissionDate = undefined;
-            finalData.approvalDate = undefined;
-            finalData.completedDate = undefined;
-            finalData.resultReturnedDate = undefined;
-            finalData.exportBatch = undefined;
-            finalData.exportDate = undefined;
-        } 
-        // 2. Nếu quay về ASSIGNED (Đang thực hiện) -> Xóa bước quá trình sau
-        else if (finalData.status === RecordStatus.ASSIGNED || finalData.status === RecordStatus.IN_PROGRESS) {
-            finalData.completedWorkDate = undefined;
-            finalData.pendingCheckDate = undefined;
-            finalData.checkedDate = undefined;
-            finalData.submissionDate = undefined;
-            finalData.approvalDate = undefined;
-            finalData.completedDate = undefined;
-            finalData.resultReturnedDate = undefined;
-            finalData.exportBatch = undefined;
-            finalData.exportDate = undefined;
-        }
-        else if (finalData.status === RecordStatus.COMPLETED_WORK) {
-            finalData.pendingCheckDate = undefined;
-            finalData.checkedDate = undefined;
-            finalData.submissionDate = undefined;
-            finalData.approvalDate = undefined;
-            finalData.completedDate = undefined;
-            finalData.resultReturnedDate = undefined;
-        }
-        else if (finalData.status === RecordStatus.PENDING_CHECK) {
-            finalData.checkedDate = undefined;
-            finalData.submissionDate = undefined;
-            finalData.approvalDate = undefined;
-            finalData.completedDate = undefined;
-            finalData.resultReturnedDate = undefined;
-        }
-        else if (finalData.status === RecordStatus.CHECKED) {
-            finalData.submissionDate = undefined;
-            finalData.approvalDate = undefined;
-            finalData.completedDate = undefined;
-            finalData.resultReturnedDate = undefined;
-        }
-        // 3. Nếu quay về PENDING_SIGN (Chờ ký) -> Xóa bước Xong, Trả
-        else if (finalData.status === RecordStatus.PENDING_SIGN) {
-            finalData.approvalDate = undefined;
-            finalData.completedDate = undefined;
-            finalData.resultReturnedDate = undefined;
-        }
-        // 4. Nếu quay về SIGNED (Đã ký) -> Xóa bước Hoàn thành/Trả
-        else if (finalData.status === RecordStatus.SIGNED) {
-            finalData.completedDate = undefined;
-            finalData.resultReturnedDate = undefined;
+        // Logic làm sạch dữ liệu cũ khi quay lui trạng thái chỉ khi CÓ THAY ĐỔI TRẠNG THÁI
+        if (initialData?.status && finalData.status !== initialData?.status) {
+            // 1. Nếu quay về RECEIVED (Tiếp nhận) -> Xóa hết các bước sau
+            if (finalData.status === RecordStatus.RECEIVED) {
+                finalData.assignedDate = undefined;
+                finalData.completedWorkDate = undefined;
+                finalData.pendingCheckDate = undefined;
+                finalData.checkedDate = undefined;
+                finalData.submissionDate = undefined;
+                finalData.approvalDate = undefined;
+                finalData.completedDate = undefined;
+                finalData.resultReturnedDate = undefined;
+                finalData.exportBatch = undefined;
+                finalData.exportDate = undefined;
+            } 
+            // 2. Nếu quay về ASSIGNED (Đang thực hiện) -> Xóa bước quá trình sau
+            else if (finalData.status === RecordStatus.ASSIGNED || finalData.status === RecordStatus.IN_PROGRESS) {
+                finalData.completedWorkDate = undefined;
+                finalData.pendingCheckDate = undefined;
+                finalData.checkedDate = undefined;
+                finalData.submissionDate = undefined;
+                finalData.approvalDate = undefined;
+                finalData.completedDate = undefined;
+                finalData.resultReturnedDate = undefined;
+                finalData.exportBatch = undefined;
+                finalData.exportDate = undefined;
+            }
+            else if (finalData.status === RecordStatus.COMPLETED_WORK) {
+                finalData.pendingCheckDate = undefined;
+                finalData.checkedDate = undefined;
+                finalData.submissionDate = undefined;
+                finalData.approvalDate = undefined;
+                finalData.completedDate = undefined;
+                finalData.resultReturnedDate = undefined;
+            }
+            else if (finalData.status === RecordStatus.PENDING_CHECK) {
+                finalData.checkedDate = undefined;
+                finalData.submissionDate = undefined;
+                finalData.approvalDate = undefined;
+                finalData.completedDate = undefined;
+                finalData.resultReturnedDate = undefined;
+            }
+            else if (finalData.status === RecordStatus.CHECKED) {
+                finalData.submissionDate = undefined;
+                finalData.approvalDate = undefined;
+                finalData.completedDate = undefined;
+                finalData.resultReturnedDate = undefined;
+            }
+            // 3. Nếu quay về PENDING_SIGN (Chờ ký) -> Xóa bước Xong, Trả
+            else if (finalData.status === RecordStatus.PENDING_SIGN) {
+                finalData.approvalDate = undefined;
+                finalData.completedDate = undefined;
+                finalData.resultReturnedDate = undefined;
+            }
+            // 4. Nếu quay về SIGNED (Đã ký) -> Xóa bước Hoàn thành/Trả
+            else if (finalData.status === RecordStatus.SIGNED) {
+                finalData.completedDate = undefined;
+                finalData.resultReturnedDate = undefined;
+            }
         }
     }
 
@@ -466,24 +468,17 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                         </div>
                         {hasAdminRights && (
                             <>
-                                <div><label className="block text-xs font-bold text-gray-700 mb-1">Ngày nhận</label><input type="date" required className="w-full border border-gray-300 rounded-md px-3 py-2" value={dateVal(formData.receivedDate)} onChange={(e) => handleChange('receivedDate', e.target.value)} /></div>
-                                {!isCongVan && (
-                                    <div><label className="block text-xs font-bold text-gray-700 mb-1">Hẹn trả <span className="text-red-500">*</span></label><input type="date" required className="w-full border border-gray-300 rounded-md px-3 py-2 font-semibold text-red-600 bg-red-50" value={dateVal(formData.deadline)} onChange={(e) => handleChange('deadline', e.target.value)} /></div>
-                                )}
-                                <div><label className="block text-xs font-bold text-gray-700 mb-1">Ngày giao NV</label><input type="date" className="w-full border border-gray-300 rounded-md px-3 py-2" value={dateVal(formData.assignedDate)} onChange={(e) => handleChange('assignedDate', e.target.value)} /></div>
                                 <div><label className="block text-xs font-bold text-gray-700 mb-1">Trạng thái</label><select className="w-full border border-gray-300 rounded-md px-3 py-2 bg-yellow-50 font-medium" value={val(formData.status)} onChange={(e) => handleChange('status', e.target.value)}>{Object.values(RecordStatus).map(s => <option key={s} value={s}>{STATUS_LABELS[s] || s}</option>)}</select></div>
-                                
-                                {(formData.status === RecordStatus.HANDOVER || formData.status === RecordStatus.WITHDRAWN || formData.status === RecordStatus.RETURNED || formData.status === RecordStatus.REJECTED || formData.exportBatch) && (
-                                    <div><label className="block text-xs font-bold text-green-700 mb-1">{formData.status === RecordStatus.WITHDRAWN ? 'Ngày rút hồ sơ' : formData.status === RecordStatus.REJECTED ? 'Ngày trả hồ sơ' : 'Ngày hoàn thành'}</label><input type="date" className="w-full border border-green-300 rounded-md px-3 py-2 bg-green-50 font-semibold text-green-800" value={dateVal(formData.completedDate)} onChange={(e) => handleChange('completedDate', e.target.value)} /></div>
+                                <div><label className="block text-xs font-bold text-gray-700 mb-1">Ngày nhận</label><input type="date" required className="w-full border border-gray-300 rounded-md px-3 py-2" value={dateVal(formData.receivedDate)} onChange={(e) => handleChange('receivedDate', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} /></div>
+                                {!isCongVan && (
+                                    <div><label className="block text-xs font-bold text-gray-700 mb-1">Hẹn trả <span className="text-red-500">*</span></label><input type="date" required className="w-full border border-gray-300 rounded-md px-3 py-2 font-semibold text-red-600 bg-red-50" value={dateVal(formData.deadline)} onChange={(e) => handleChange('deadline', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} /></div>
                                 )}
-                                
-                                {/* Thêm trường hiển thị Ngày Trình Ký và Ngày Ký Duyệt nếu trạng thái tương ứng hoặc đã có giá trị */}
-                                {(formData.status === RecordStatus.PENDING_SIGN || formData.status === RecordStatus.SIGNED || formData.status === RecordStatus.HANDOVER || formData.status === RecordStatus.REJECTED || formData.status === RecordStatus.WITHDRAWN || !!formData.submissionDate) && (
-                                    <div><label className="block text-xs font-bold text-purple-700 mb-1">Ngày trình ký</label><input type="date" className="w-full border border-purple-300 rounded-md px-3 py-2 bg-purple-50 text-purple-800" value={dateVal(formData.submissionDate)} onChange={(e) => handleChange('submissionDate', e.target.value)} /></div>
-                                )}
-                                {(formData.status === RecordStatus.SIGNED || formData.status === RecordStatus.HANDOVER || formData.status === RecordStatus.REJECTED || formData.status === RecordStatus.WITHDRAWN || !!formData.approvalDate) && (
-                                    <div><label className="block text-xs font-bold text-indigo-700 mb-1">Ngày ký duyệt</label><input type="date" className="w-full border border-indigo-300 rounded-md px-3 py-2 bg-indigo-50 text-indigo-800" value={dateVal(formData.approvalDate)} onChange={(e) => handleChange('approvalDate', e.target.value)} /></div>
-                                )}
+                                <div><label className="block text-xs font-bold text-gray-700 mb-1">Ngày giao NV</label><input type="date" className="w-full border border-gray-300 rounded-md px-3 py-2" value={dateVal(formData.assignedDate)} onChange={(e) => handleChange('assignedDate', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} /></div>
+                                <div><label className="block text-xs font-bold text-blue-700 mb-1">Ngày xong chuyên môn</label><input type="date" className="w-full border border-blue-300 rounded-md px-3 py-2 bg-blue-50 text-blue-900 font-medium" value={dateVal(formData.completedWorkDate)} onChange={(e) => handleChange('completedWorkDate', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} /></div>
+                                <div><label className="block text-xs font-bold text-teal-700 mb-1">Ngày kiểm tra</label><input type="date" className="w-full border border-teal-300 rounded-md px-3 py-2 bg-teal-50 text-teal-900 font-medium" value={dateVal(formData.checkedDate || formData.pendingCheckDate)} onChange={(e) => { const iso = e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : ''; handleChange('checkedDate', iso); handleChange('pendingCheckDate', iso); }} /></div>
+                                <div><label className="block text-xs font-bold text-purple-700 mb-1">Ngày trình ký</label><input type="date" className="w-full border border-purple-300 rounded-md px-3 py-2 bg-purple-50 text-purple-900 font-medium" value={dateVal(formData.submissionDate)} onChange={(e) => handleChange('submissionDate', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} /></div>
+                                <div><label className="block text-xs font-bold text-indigo-700 mb-1">Ngày ký duyệt</label><input type="date" className="w-full border border-indigo-300 rounded-md px-3 py-2 bg-indigo-50 text-indigo-900 font-medium" value={dateVal(formData.approvalDate)} onChange={(e) => handleChange('approvalDate', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} /></div>
+                                <div><label className="block text-xs font-bold text-green-700 mb-1">Ngày hoàn thành</label><input type="date" className="w-full border border-green-300 rounded-md px-3 py-2 bg-green-50 font-semibold text-green-900" value={dateVal(formData.completedDate)} onChange={(e) => handleChange('completedDate', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} /></div>
                             </>
                         )}
                         {!hasAdminRights && <div className="col-span-full p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700 italic text-center">* Ngày tháng và trạng thái chỉ Admin/Subadmin được chỉnh sửa.</div>}

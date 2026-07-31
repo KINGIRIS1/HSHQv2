@@ -84,6 +84,14 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
                     >
                         <option value="status">Trạng thái hồ sơ (Quy trình)</option>
                         <option value="assignedTo">Người xử lý (Giao việc)</option>
+                        <option value="assignedDate">Ngày giao việc</option>
+                        <option value="completedWorkDate">Ngày hoàn thành chuyên môn</option>
+                        <option value="checkedDate">Ngày kiểm tra</option>
+                        <option value="submissionDate">Ngày trình ký</option>
+                        <option value="approvalDate">Ngày ký duyệt</option>
+                        <option value="completedDate">Ngày hoàn thành hồ sơ</option>
+                        <option value="exportDate">Ngày xuất (Bàn giao)</option>
+                        <option value="exportBatch">Đợt xuất (Bàn giao)</option>
                         <option value="deadline">Ngày hẹn trả (Gia hạn)</option>
                         <option value="receivedDate">Ngày nhận hồ sơ</option>
                         <option value="resultReturnedDate">Ngày trả kết quả</option>
@@ -140,9 +148,19 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
                         </select>
                     )}
 
-                    {(targetField === 'deadline' || targetField === 'receivedDate' || targetField === 'resultReturnedDate') && (
+                    {['deadline', 'receivedDate', 'resultReturnedDate', 'assignedDate', 'exportDate', 'completedWorkDate', 'checkedDate', 'submissionDate', 'approvalDate', 'completedDate'].includes(targetField) && (
                         <input 
                             type="date"
+                            className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-orange-500 outline-none"
+                            value={targetValue}
+                            onChange={(e) => setTargetValue(e.target.value)}
+                        />
+                    )}
+
+                    {targetField === 'exportBatch' && (
+                        <input 
+                            type="text"
+                            placeholder="Nhập tên/số đợt mới (vd: Đợt 1, Đợt 2...)"
                             className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-orange-500 outline-none"
                             value={targetValue}
                             onChange={(e) => setTargetValue(e.target.value)}

@@ -379,18 +379,11 @@ export function processAssignmentTimelineCheck(
 
   const updates: Partial<RecordFile> = {
     assignedTo: newEmployeeId,
-    assignedDate: newAssignedDateStr,
-    status: RecordStatus.IN_PROGRESS,
-    submissionDate: null,
-    pendingCheckDate: null,
-    checkedDate: null,
-    approvalDate: null,
-    completedWorkDate: null,
-    completedDate: null,
-    resultReturnedDate: null,
-    exportBatch: null,
-    exportDate: null,
+    assignedDate: record.assignedDate || newAssignedDateStr,
   };
+  if (record.status === RecordStatus.RECEIVED) {
+    updates.status = RecordStatus.IN_PROGRESS;
+  }
 
   const firstWard = newEmp?.managedWards?.[0];
   if (firstWard) {
