@@ -10,7 +10,7 @@ import { isConfigured } from '../services/supabaseClient';
 
 const PERMISSION_DEPARTMENTS = [
   { id: 'Tổ Lưu trữ', name: 'Tổ Lưu trữ', label: 'Tổ Lưu trữ', desc: 'Bộ phận phụ trách lưu trữ, khai thác thông tin đất đai và hồ sơ lưu trữ' },
-  { id: 'Tổ Hành chính', name: 'Tổ Hành chính', label: 'Tổ Hành chính (Một cửa)', desc: 'Bộ phận hành chính tổng hợp, văn thư, tiếp nhận Một cửa' }
+  { id: 'Tổ Đo đạc', name: 'Tổ Đo đạc', label: 'Tổ Đo đạc', desc: 'Bộ phận phụ trách đo đạc, chỉnh lý bản đồ và trích đo địa chính' }
 ];
 
 const ROLES_FOR_DEPARTMENT = [
@@ -172,12 +172,6 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
     }
     return list.length > 0 ? list : ['Tổ Lưu trữ'];
   }, [employees]);
-
-  useEffect(() => {
-    if (selectedDepartment !== 'Tổ Hành chính' && selectedRoleSub === UserRole.ONEDOOR) {
-      setSelectedRoleSub(UserRole.EMPLOYEE);
-    }
-  }, [selectedDepartment, selectedRoleSub]);
 
   // Contract Number Settings States
   const [contractPrefix, setContractPrefix] = useState('HĐ-{năm}-');
