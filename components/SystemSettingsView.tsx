@@ -60,22 +60,44 @@ const PERMISSION_GROUPS = [
   {
     id: 'dodac',
     title: '3. Đo đạc',
-    desc: 'Các quyền & chức năng để thực hiện tại Tab Đo đạc và Trích lục bản đồ',
+    desc: 'Quy trình, danh mục và các nút bấm thao tác tại Tab Đo đạc và Trích lục bản đồ',
     items: [
-      { id: 'all_records', label: 'Quy trình xử lý hồ sơ (Tab Đo đạc)' },
+      { id: 'all_records', label: 'Quy trình xử lý hồ sơ đo đạc (Tab Đo đạc)' },
       { id: 'survey_list', label: 'Danh sách kỹ thuật đo đạc (Tab Đo đạc)' },
       { id: 'VIEW_EXCERPTS', label: 'Xem trích lục bản đồ' },
-      { id: 'MANAGE_EXCERPTS', label: 'Quản lý & Cấp số trích lục bản đồ' },
+      { id: 'MANAGE_EXCERPTS', label: 'Quản lý & cấp số trích lục bản đồ' },
+      { id: 'DODAC_VIEW_DETAILS', label: '👁️ Thao tác: Xem chi tiết hồ sơ (Đo đạc)' },
+      { id: 'DODAC_EDIT_RECORDS', label: '✏️ Thao tác: Sửa thông tin hồ sơ (Đo đạc)' },
+      { id: 'DODAC_DELETE_RECORDS', label: '🗑️ Thao tác: Xóa hồ sơ (Đo đạc)' },
+      { id: 'DODAC_CHECK_RECORDS', label: '✅ Thao tác: Kiểm tra & Ký kiểm tra (Đo đạc)' },
+      { id: 'DODAC_HANDOVER_RECORDS', label: '📤 Thao tác: Bàn giao hồ sơ sang 1 cửa (Đo đạc)' },
+      { id: 'DODAC_BTN_ASSIGN_STAFF', label: '👤 Thao tác: Giao việc / Phân công cán bộ (Đo đạc)' },
+      { id: 'DODAC_BTN_SUBMIT_SIGN', label: '✍️ Thao tác: Trình ký / Phê duyệt / Ký duyệt (Đo đạc)' },
+      { id: 'DODAC_BTN_REJECT_RECORD', label: '↩️ Thao tác: Trả hồ sơ / Từ chối (Yêu cầu sửa) (Đo đạc)' },
+      { id: 'DODAC_BTN_RETURN_RESULT', label: '🎁 Thao tác: Trả kết quả hồ sơ (Đo đạc)' },
+      { id: 'DODAC_BTN_CLOSE_BATCH', label: '📦 Thao tác: Tạo đợt bàn giao / Chốt đợt (Đo đạc)' },
+      { id: 'DODAC_BTN_EXTEND_DEADLINE', label: '⏱️ Thao tác: Gia hạn ngày hẹn (Đo đạc)' },
     ]
   },
   {
     id: 'luutru',
     title: '4. Lưu trữ',
-    desc: 'Các quyền & chức năng để thực hiện tại Tab Kho lưu trữ hồ sơ & Công văn',
+    desc: 'Quy trình, danh mục và các nút bấm thao tác tại Tab Kho lưu trữ hồ sơ & Công văn',
     items: [
       { id: 'archive_records', label: 'Kho lưu trữ hồ sơ & Công văn (Tab Lưu trữ)' },
       { id: 'VIEW_ARCHIVE', label: 'Xem & Tra cứu hồ sơ lưu trữ' },
       { id: 'MANAGE_ARCHIVE', label: 'Quản lý kho lưu trữ (Mượn/trả, vị trí)' },
+      { id: 'ARCHIVE_VIEW_DETAILS', label: '👁️ Thao tác: Xem chi tiết hồ sơ (Lưu trữ)' },
+      { id: 'ARCHIVE_EDIT_RECORDS', label: '✏️ Thao tác: Sửa thông tin hồ sơ (Lưu trữ)' },
+      { id: 'ARCHIVE_DELETE_RECORDS', label: '🗑️ Thao tác: Xóa hồ sơ (Lưu trữ)' },
+      { id: 'ARCHIVE_CHECK_RECORDS', label: '✅ Thao tác: Kiểm tra & Ký kiểm tra (Lưu trữ)' },
+      { id: 'ARCHIVE_HANDOVER_RECORDS', label: '📤 Thao tác: Bàn giao hồ sơ sang 1 cửa (Lưu trữ)' },
+      { id: 'ARCHIVE_BTN_ASSIGN_STAFF', label: '👤 Thao tác: Giao việc / Phân công cán bộ (Lưu trữ)' },
+      { id: 'ARCHIVE_BTN_SUBMIT_SIGN', label: '✍️ Thao tác: Trình ký / Phê duyệt / Ký duyệt (Lưu trữ)' },
+      { id: 'ARCHIVE_BTN_REJECT_RECORD', label: '↩️ Thao tác: Trả hồ sơ / Từ chối (Yêu cầu sửa) (Lưu trữ)' },
+      { id: 'ARCHIVE_BTN_RETURN_RESULT', label: '🎁 Thao tác: Trả kết quả hồ sơ (Lưu trữ)' },
+      { id: 'ARCHIVE_BTN_CLOSE_BATCH', label: '📦 Thao tác: Tạo đợt bàn giao / Chốt đợt (Lưu trữ)' },
+      { id: 'ARCHIVE_BTN_EXTEND_DEADLINE', label: '⏱️ Thao tác: Gia hạn ngày hẹn (Lưu trữ)' },
     ]
   },
   {
@@ -95,24 +117,6 @@ const PERMISSION_GROUPS = [
       { id: 'MANAGE_EMPLOYEES', label: 'Quản lý danh sách nhân sự' },
       { id: 'MANAGE_USERS', label: 'Quản lý tài khoản người dùng' },
       { id: 'SYSTEM_SETTINGS', label: 'Cài đặt & Phân quyền hệ thống' },
-    ]
-  },
-  {
-    id: 'buttons_actions',
-    title: '6. Nhóm Thao tác & Nút chức năng',
-    desc: 'Gom nhóm các nút bấm thao tác quy trình (Xem chi tiết, Sửa, Xóa, Giao việc, Ký duyệt, Trả hồ sơ, Trả KQ, Chốt đợt, Gia hạn ngày hẹn)',
-    items: [
-      { id: 'VIEW_DETAILS', label: 'Thao tác: Xem chi tiết hồ sơ' },
-      { id: 'EDIT_RECORDS', label: 'Thao tác: Sửa thông tin hồ sơ' },
-      { id: 'DELETE_RECORDS', label: 'Thao tác: Xóa hồ sơ' },
-      { id: 'CHECK_RECORDS', label: 'Thao tác: Kiểm tra & Ký kiểm tra' },
-      { id: 'HANDOVER_RECORDS', label: 'Thao tác: Bàn giao hồ sơ sang 1 cửa' },
-      { id: 'BTN_ASSIGN_STAFF', label: 'Thao tác: Giao việc / Phân công cán bộ' },
-      { id: 'BTN_SUBMIT_SIGN', label: 'Thao tác: Trình ký / Phê duyệt / Ký duyệt' },
-      { id: 'BTN_REJECT_RECORD', label: 'Thao tác: Trả hồ sơ / Từ chối (Yêu cầu sửa)' },
-      { id: 'BTN_RETURN_RESULT', label: 'Thao tác: Trả kết quả hồ sơ' },
-      { id: 'BTN_CLOSE_BATCH', label: 'Thao tác: Tạo đợt bàn giao / Chốt đợt' },
-      { id: 'BTN_EXTEND_DEADLINE', label: 'Thao tác: Gia hạn ngày hẹn' },
     ]
   }
 ];

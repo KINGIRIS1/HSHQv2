@@ -146,7 +146,20 @@ export function hasUserPermission(
   if (user.role === UserRole.ADMIN) return true;
 
   const perms = getUserPermissions(user, employees, rolePermissions, departmentPermissions);
-  return perms.includes('*') || perms.includes(permissionId);
+  if (perms.includes('*') || perms.includes(permissionId)) return true;
+
+  // Trường hợp kiểm tra quyền nút bấm theo tab hoặc ngược lại
+  if (perms.includes(`DODAC_${permissionId}`) || perms.includes(`ARCHIVE_${permissionId}`)) {
+    return true;
+  }
+
+  // Nếu tham số truyền vào có tiền tố DODAC_ hoặc ARCHIVE_, hỗ trợ kiểm tra dự phòng đối với mã gốc
+  if (permissionId.startsWith('DODAC_') || permissionId.startsWith('ARCHIVE_')) {
+    const legacyId = permissionId.replace(/^(DODAC_|ARCHIVE_)/, '');
+    if (perms.includes(legacyId)) return true;
+  }
+
+  return false;
 }
 
 /**
