@@ -85,9 +85,10 @@ export const useRecordFilter = (
         }
         if (currentUser.role === UserRole.TEAM_LEADER) {
             const leaderEmp = employees.find(e => e.id === currentUser.employeeId);
-            if (!leaderEmp) return false; 
+            if (!leaderEmp) return true; 
             const isMyTask = r.assignedTo === currentUser.employeeId;
-            const isMyWard = leaderEmp.managedWards.some((w: string) => r.ward && r.ward.includes(w));
+            const hasManagedWards = leaderEmp.managedWards && leaderEmp.managedWards.length > 0;
+            const isMyWard = hasManagedWards ? leaderEmp.managedWards.some((w: string) => r.ward && r.ward.includes(w)) : true;
             return isMyTask || isMyWard;
         }
         return false; 
@@ -114,10 +115,10 @@ export const useRecordFilter = (
 
         if (currentUser && currentUser.role === UserRole.TEAM_LEADER && isMeasurementViewTab) {
             const leaderEmp = employees.find(e => e.id === currentUser.employeeId);
-            if (leaderEmp) {
+            if (leaderEmp && leaderEmp.managedWards && leaderEmp.managedWards.length > 0) {
                 result = result.filter(r => {
                     const isMyTask = r.assignedTo === currentUser.employeeId;
-                    const isMyWard = leaderEmp.managedWards && leaderEmp.managedWards.some((w: string) => r.ward && r.ward.includes(w));
+                    const isMyWard = leaderEmp.managedWards.some((w: string) => r.ward && r.ward.includes(w));
                     return isMyTask || isMyWard;
                 });
             }

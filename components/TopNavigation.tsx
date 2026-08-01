@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { LayoutDashboard, FileText, ClipboardList, Send, BarChart3, Settings, LogOut, UserCircle, Users, Briefcase, BookOpen, UserPlus, ShieldAlert, X, FolderInput, FileSignature, MessageSquare, Loader2, UserCog, ShieldCheck, PenTool, CalendarDays, Archive, FolderArchive, ChevronDown, Bell, FilePlus, Ruler, ChevronRight, User, Shield, Settings2, Layers } from 'lucide-react';
 import { User as UserType, UserRole, RolePermissions, DepartmentPermissions, Employee, DEFAULT_ROLE_PERMISSIONS } from '../types';
 import { matchDepartmentKey } from '../utils/appHelpers';
-import { isViewAllowedForUser } from '../config/roleConfig';
+import { isViewAllowedForUser, hasUserPermission } from '../config/roleConfig';
 
 interface TopNavigationProps {
   currentView: string;
@@ -45,33 +45,7 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
   const isEmployee = currentUser.role === UserRole.EMPLOYEE;
 
   const hasPermission = (permissionId: string) => {
-    if (isAdmin) return true;
-    
-    // Đối với vai trò Một cửa, luôn cho phép các quyền mặc định của Một cửa
-    if (currentUser.role === UserRole.ONEDOOR) {
-        const defaultOneDoor = DEFAULT_ROLE_PERMISSIONS[UserRole.ONEDOOR] || [];
-        if (defaultOneDoor.includes(permissionId)) return true;
-    }
-
-    if (currentUser.employeeId && employees) {
-        const emp = employees.find(e => e.id === currentUser.employeeId);
-        if (emp && emp.department) {
-            const compositeKey = `${emp.department}_${currentUser.role}`;
-            if (departmentPermissions && departmentPermissions[compositeKey]) {
-                const deptRolePerms = departmentPermissions[compositeKey] || [];
-                return deptRolePerms.includes('*') || deptRolePerms.includes(permissionId);
-            }
-
-            const matchingKey = Object.keys(departmentPermissions || {}).find(k => matchDepartmentKey(k, emp.department));
-            if (matchingKey && departmentPermissions[matchingKey]) {
-                const deptPerms = departmentPermissions[matchingKey] || [];
-                return deptPerms.includes('*') || deptPerms.includes(permissionId);
-            }
-        }
-    }
-
-    const rolePerms = (rolePermissions && rolePermissions[currentUser.role]) || DEFAULT_ROLE_PERMISSIONS[currentUser.role] || [];
-    return rolePerms.includes('*') || rolePerms.includes(permissionId);
+    return hasUserPermission(currentUser, employees, permissionId, rolePermissions, departmentPermissions);
   };
 
   // Cập nhật danh sách các view được phép

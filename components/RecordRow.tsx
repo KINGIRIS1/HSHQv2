@@ -339,7 +339,7 @@ const RecordRow: React.FC<RecordRowProps> = ({
               {currentUser?.role !== 'ONEDOOR' && currentUser?.role !== UserRole.ONEDOOR && (
                 <button onClick={() => onEdit(record)} className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors border border-blue-200 bg-blue-50/50" title="Sửa"><Pencil size={15} /></button>
               )}
-              {(currentUser?.role === 'ADMIN' || currentUser?.role === 'SUBADMIN') && (
+              {(currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.SUBADMIN || currentUser?.role === UserRole.TEAM_LEADER) && (
                   <button onClick={() => onDelete(record)} className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors border border-red-200 bg-red-50/50" title="Xóa"><Trash2 size={15} /></button>
               )}
             </div>

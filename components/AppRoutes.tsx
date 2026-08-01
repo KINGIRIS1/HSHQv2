@@ -1,5 +1,5 @@
 import React from "react";
-import { isViewAllowedForUser } from "../config/roleConfig";
+import { isViewAllowedForUser, hasUserPermission } from "../config/roleConfig";
 import {
   RecordFile,
   Employee,
@@ -257,10 +257,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
   }
 
   const hasPermission = (permissionId: string) => {
-    if (currentUser.role === UserRole.ADMIN) return true;
-
-    const rolePerms = (rolePermissions && rolePermissions[currentUser.role]) || DEFAULT_ROLE_PERMISSIONS[currentUser.role] || [];
-    return rolePerms.includes("*") || rolePerms.includes(permissionId);
+    return hasUserPermission(currentUser, employees, permissionId, rolePermissions, departmentPermissions);
   };
 
   const isAdmin = currentUser.role === UserRole.ADMIN;

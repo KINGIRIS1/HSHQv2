@@ -31,16 +31,18 @@ export const DEFAULT_ROLE_PERMISSIONS: RolePermissions = {
   [UserRole.SUBADMIN]: ['*'],
   [UserRole.TEAM_LEADER]: [
     'receive_record', 'receive_sub_create', 'receive_sub_bulk', 'receive_sub_list', 'receive_sub_vphc',
-    'receive_contract', 'VIEW_CONTRACTS', 'ADD_CONTRACTS', 'EDIT_CONTRACTS', 'LIQUIDATE_CONTRACTS', 'EXPORT_CONTRACTS',
-    'all_records', 'all_sub_all', 'assign_tasks', 'completed_list', 'pending_check_list', 'check_list', 'handover_list', 'director_completed',
-    'archive_records', 'archive_sub_all', 'archive_assign_tasks', 'archive_completed_list', 'archive_pending_check_list', 'archive_check_list', 'archive_handover_list', 'archive_director_completed',
+    'receive_contract', 'VIEW_CONTRACTS', 'ADD_CONTRACTS', 'EDIT_CONTRACTS', 'LIQUIDATE_CONTRACTS', 'DELETE_CONTRACTS', 'EXPORT_CONTRACTS',
+    'all_records', 'all_sub_all', 'assign_tasks', 'completed_list', 'pending_check_list', 'check_list', 'handover_list', 'director_completed', 'survey_list',
+    'archive_records', 'archive_sub_all', 'archive_assign_tasks', 'archive_completed_list', 'archive_pending_check_list', 'archive_check_list', 'archive_handover_list', 'archive_director_completed', 'VIEW_ARCHIVE', 'MANAGE_ARCHIVE',
     'registration_records',
     'other_records', 'other_sub_all', 'other_assign_tasks', 'other_check_list', 'other_handover_list', 'other_director_completed',
     'excerpt_management', 'MANAGE_EXCERPTS', 'VIEW_EXCERPTS',
     'reports', 'VIEW_REPORTS',
     'work_schedule', 'VIEW_SCHEDULE',
-    'utilities',
-    'BTN_SUBMIT_SIGN', 'BTN_REJECT_RECORD', 'BTN_CLOSE_BATCH', 'BTN_EXTEND_DEADLINE'
+    'utilities', 'VIEW_CHAT', 'VIEW_PERSONAL_PROFILE',
+    'VIEW_RECORDS', 'VIEW_DETAILS', 'ADD_RECORDS', 'EDIT_RECORDS', 'DELETE_RECORDS', 'CHECK_RECORDS', 'HANDOVER_RECORDS',
+    'BTN_ASSIGN_STAFF', 'BTN_SUBMIT_SIGN', 'BTN_REJECT_RECORD', 'BTN_RETURN_RESULT', 'BTN_CLOSE_BATCH', 'BTN_EXTEND_DEADLINE',
+    'ASSIGN_RECORDS', 'REJECT_RECORDS', 'SIGN_RECORDS', 'EXPORT_RECORDS'
   ],
   [UserRole.ONEDOOR]: [
     'receive_record', 'receive_sub_create', 'receive_sub_bulk', 'receive_sub_list', 'receive_sub_vphc', 'ADD_RECORDS',

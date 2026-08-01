@@ -178,7 +178,7 @@ export const calculateDeadlineHelper = (type: string, receivedDateStr: string, h
     let daysToAdd = 30; 
     const lowerType = (type || '').toLowerCase();
 
-    if (lowerType.includes('1.1') || lowerType.includes('cung cấp tài liệu đất đai') || lowerType.includes('cung cấp dữ liệu') ||
+    if (lowerType.includes('1.1') || lowerType.includes('1.2') || lowerType.includes('công văn') || lowerType.includes('cong van') || lowerType.includes('cung cấp tài liệu đất đai') || lowerType.includes('cung cấp dữ liệu') ||
         lowerType.includes('2.2') || lowerType.includes('quy hoạch') || 
         lowerType.includes('2.6') || lowerType.includes('số thửa') || 
         lowerType.includes('2.1') || lowerType.includes('trích lục')) {

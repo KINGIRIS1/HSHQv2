@@ -77,6 +77,79 @@ function removeDiacritics(str: string): string {
 }
 
 /**
+ * Lấy danh sách các ID quyền hạn (permissions) thực tế của người dùng
+ */
+export function getUserPermissions(
+  user: { role: UserRole; employeeId?: string } | null | undefined,
+  employees: { id: string; department: string }[] | null | undefined,
+  rolePermissions?: Record<string, string[]>,
+  departmentPermissions?: Record<string, string[]>
+): string[] {
+  if (!user) return [];
+  if (user.role === UserRole.ADMIN) return ['*'];
+
+  let activePerms: string[] | null = null;
+
+  if (user.employeeId && employees && departmentPermissions) {
+    const emp = employees.find(e => e.id === user.employeeId);
+    if (emp && emp.department) {
+      const compositeKey = `${emp.department}_${user.role}`;
+      if (departmentPermissions[compositeKey]) {
+        activePerms = departmentPermissions[compositeKey];
+      } else if (departmentPermissions[emp.department]) {
+        activePerms = departmentPermissions[emp.department];
+      } else {
+        const matchingKey = Object.keys(departmentPermissions).find(k => {
+          if (k.endsWith(`_${user.role}`)) {
+            const deptPart = k.replace(`_${user.role}`, '');
+            return matchDepartmentKey(deptPart, emp.department);
+          }
+          return matchDepartmentKey(k, emp.department);
+        });
+        if (matchingKey && departmentPermissions[matchingKey]) {
+          activePerms = departmentPermissions[matchingKey];
+        }
+      }
+    }
+  }
+
+  if (activePerms === null) {
+    if (rolePermissions && rolePermissions[user.role]) {
+      activePerms = rolePermissions[user.role];
+    } else if (DEFAULT_ROLE_PERMISSIONS[user.role]) {
+      activePerms = DEFAULT_ROLE_PERMISSIONS[user.role];
+    } else {
+      activePerms = [];
+    }
+  }
+
+  // Luôn đảm bảo vai trò ONEDOOR kế thừa toàn bộ danh sách quyền mặc định của Một cửa
+  if (user.role === UserRole.ONEDOOR) {
+    const defaultOneDoor = DEFAULT_ROLE_PERMISSIONS[UserRole.ONEDOOR] || [];
+    activePerms = Array.from(new Set([...(activePerms || []), ...defaultOneDoor]));
+  }
+
+  return activePerms || [];
+}
+
+/**
+ * Kiểm tra người dùng có một quyền hạn cụ thể hay không
+ */
+export function hasUserPermission(
+  user: { role: UserRole; employeeId?: string } | null | undefined,
+  employees: { id: string; department: string }[] | null | undefined,
+  permissionId: string,
+  rolePermissions?: Record<string, string[]>,
+  departmentPermissions?: Record<string, string[]>
+): boolean {
+  if (!user) return false;
+  if (user.role === UserRole.ADMIN) return true;
+
+  const perms = getUserPermissions(user, employees, rolePermissions, departmentPermissions);
+  return perms.includes('*') || perms.includes(permissionId);
+}
+
+/**
  * Kiểm tra xem một viewId có được phép truy cập bởi người dùng hiện tại hay không
  */
 export function isViewAllowedForUser(
@@ -158,6 +231,20 @@ export function isViewAllowedForUser(
     }
   }
 
+  // Đảm bảo đối với Tổ Lưu trữ có cấu hình tùy chỉnh, nếu không tích survey_list hay all_records thì sẽ không thấy tab Đo đạc
+  if (isCustomDeptPerm && user.employeeId && employees && activePerms) {
+    const emp = employees.find(e => e.id === user.employeeId);
+    if (emp && emp.department && matchDepartmentKey('lưu trữ', emp.department)) {
+      if (!activePerms.includes('survey_list') && !activePerms.includes('all_records')) {
+        const SURVEY_PERMS = [
+          'all_records', 'all_sub_all', 'assign_tasks', 'completed_list',
+          'pending_check_list', 'check_list', 'handover_list', 'director_completed', 'survey_list'
+        ];
+        activePerms = activePerms.filter(p => !SURVEY_PERMS.includes(p));
+      }
+    }
+  }
+
   // Luôn đảm bảo vai trò ONEDOOR kế thừa toàn bộ danh sách quyền mặc định của Một cửa
   if (user.role === UserRole.ONEDOOR) {
     const defaultOneDoor = DEFAULT_ROLE_PERMISSIONS[UserRole.ONEDOOR] || [];
@@ -201,6 +288,7 @@ export function isViewAllowedForUser(
                activePerms.includes('receive_sub_vphc');
       case 'all_records':
         return activePerms.includes('all_records') ||
+               activePerms.includes('survey_list') ||
                activePerms.includes('all_sub_all') ||
                activePerms.includes('assign_tasks') ||
                activePerms.includes('completed_list') ||

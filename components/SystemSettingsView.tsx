@@ -62,6 +62,7 @@ const PERMISSION_GROUPS = [
     title: '3. Đo đạc',
     desc: 'Các quyền & chức năng để thực hiện tại Tab Đo đạc và Trích lục bản đồ',
     items: [
+      { id: 'all_records', label: 'Quy trình xử lý hồ sơ (Tab Đo đạc)' },
       { id: 'survey_list', label: 'Danh sách kỹ thuật đo đạc (Tab Đo đạc)' },
       { id: 'VIEW_EXCERPTS', label: 'Xem trích lục bản đồ' },
       { id: 'MANAGE_EXCERPTS', label: 'Quản lý & Cấp số trích lục bản đồ' },
