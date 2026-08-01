@@ -5,6 +5,7 @@ import { generateEmployeeEvaluation } from '../../services/geminiService';
 import { User as UserIcon, AlertOctagon, Sparkles, Loader2, ListFilter, CheckCircle2, Clock, AlertTriangle, Briefcase, FileSpreadsheet } from 'lucide-react';
 import * as XLSX from 'xlsx-js-style';
 import { STATUS_LABELS } from '../../constants';
+import { parseSafeDate } from '../../utils/appHelpers';
 
 interface EmployeeStatsViewProps {
     records: RecordFile[];
@@ -52,11 +53,12 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
 
     // Filter records by date range first
     const recordsInTimeRange = useMemo(() => {
-        const start = new Date(fromDate); start.setHours(0,0,0,0);
-        const end = new Date(toDate); end.setHours(23,59,59,999);
+        const start = parseSafeDate(fromDate) || new Date(fromDate); start.setHours(0,0,0,0);
+        const end = parseSafeDate(toDate) || new Date(toDate); end.setHours(23,59,59,999);
         return records.filter(r => {
             if (!r.receivedDate) return false;
-            const rDate = new Date(r.receivedDate);
+            const rDate = parseSafeDate(r.receivedDate);
+            if (!rDate) return false;
             return rDate >= start && rDate <= end;
         });
     }, [records, fromDate, toDate]);
@@ -310,7 +312,21 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
                             ))}
                         </select>
                     </div>
-                    {/* Single shared Excel button is on top toolbar */}
+                    {selectedEmpId ? (
+                        <button
+                            onClick={handleExportEmployeeRecords}
+                            className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-bold transition-all flex items-center gap-2 shadow-sm shrink-0 cursor-pointer"
+                        >
+                            <FileSpreadsheet size={16} /> Xuất Excel Hồ Sơ Cán Bộ
+                        </button>
+                    ) : (
+                        <button
+                            onClick={handleExportSummaryExcel}
+                            className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-bold transition-all flex items-center gap-2 shadow-sm shrink-0 cursor-pointer"
+                        >
+                            <FileSpreadsheet size={16} /> Xuất Excel Tổng Hợp Cán Bộ
+                        </button>
+                    )}
                 </div>
             </div>
 

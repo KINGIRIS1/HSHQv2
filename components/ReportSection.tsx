@@ -1,11 +1,13 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { BarChart3, FileSpreadsheet, Loader2, Sparkles, Download, CalendarDays, Printer, Layout, FileText, ListFilter, CheckCircle2, Clock, AlertTriangle, Settings, Key, X, Save, MapPin, UserCheck, ChevronLeft, ChevronRight, PieChart, CheckCircle, Ruler, FolderArchive, CalendarRange, DollarSign, FileCheck } from 'lucide-react';
-import { RecordFile, RecordStatus, Employee, User } from '../types';
+import { RecordFile, RecordStatus, Employee, User, UserRole, RolePermissions, DepartmentPermissions } from '../types';
 import { getNormalizedWard, STATUS_LABELS, getShortRecordType, isArchiveRecordType } from '../constants';
 import { isRecordOverdue, removeVietnameseTones, isRecordApproaching, parseSafeDate } from '../utils/appHelpers';
 import { saveGeminiKey, getGeminiKey } from '../services/geminiService';
 import { fetchArchiveRecords } from '../services/apiArchive';
+import { hasUserPermission } from '../config/roleConfig';
+import { exportOverdueStatsToExcel } from '../utils/excelExport';
 import EmployeeStatsView from './report/EmployeeStatsView';
 import WardStatsView from './report/WardStatsView';
 import DailyStatsView from './report/DailyStatsView';
@@ -22,6 +24,8 @@ interface ReportSectionProps {
     wards: string[]; 
     employees: Employee[];
     currentUser?: User;
+    rolePermissions?: RolePermissions;
+    departmentPermissions?: DepartmentPermissions;
 }
 
 const getFormattedNotesAndDocs = (r: RecordFile): string => {
@@ -41,7 +45,7 @@ const formatDateDDMMYYYY = (isoStr?: string | null) => {
     return isoStr;
 };
 
-const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerating, onGenerate, onExportExcel, records, wards, employees, currentUser }) => {
+const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerating, onGenerate, onExportExcel, records, wards, employees, currentUser, rolePermissions, departmentPermissions }) => {
     const [fromDate, setFromDate] = useState(() => {
         return '1970-01-01';
     });
@@ -91,23 +95,59 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
         return deptLower.includes('hành chính') || deptLower.includes('một cửa');
     }, [currentUser, userDept, userRole]);
 
+    const canSeeRegistrationTab = useMemo(() => {
+        if (!currentUser) return true;
+        if (userRole === UserRole.ADMIN || userRole === UserRole.SUBADMIN) return true;
+        if (rolePermissions || departmentPermissions) {
+            return hasUserPermission(currentUser, employees, 'REPORT_TAB_REGISTRATION', rolePermissions, departmentPermissions);
+        }
+        return true;
+    }, [currentUser, employees, rolePermissions, departmentPermissions, userRole]);
+
+    const canSeeMeasurementTab = useMemo(() => {
+        if (!currentUser) return true;
+        if (userRole === UserRole.ADMIN || userRole === UserRole.SUBADMIN) return true;
+        if (rolePermissions || departmentPermissions) {
+            return hasUserPermission(currentUser, employees, 'REPORT_TAB_MEASUREMENT', rolePermissions, departmentPermissions);
+        }
+        return true;
+    }, [currentUser, employees, rolePermissions, departmentPermissions, userRole]);
+
+    const canSeeArchiveTab = useMemo(() => {
+        if (!currentUser) return true;
+        if (userRole === UserRole.ADMIN || userRole === UserRole.SUBADMIN) return true;
+        if (rolePermissions || departmentPermissions) {
+            return hasUserPermission(currentUser, employees, 'REPORT_TAB_ARCHIVE', rolePermissions, departmentPermissions);
+        }
+        return true;
+    }, [currentUser, employees, rolePermissions, departmentPermissions, userRole]);
+
+    const canSeeRevenueTab = useMemo(() => {
+        if (!currentUser) return true;
+        if (userRole === UserRole.ADMIN || userRole === UserRole.SUBADMIN) return true;
+        if (rolePermissions || departmentPermissions) {
+            return hasUserPermission(currentUser, employees, 'REPORT_TAB_REVENUE', rolePermissions, departmentPermissions);
+        }
+        return true;
+    }, [currentUser, employees, rolePermissions, departmentPermissions, userRole]);
+
     const [mainTab, setMainTab] = useState<'measurement' | 'registration' | 'archive' | 'revenue'>('measurement');
     const [archiveRecords, setArchiveRecords] = useState<RecordFile[]>([]);
     const [isArchiveLoading, setIsArchiveLoading] = useState<boolean>(false);
 
-    // Tự động chuyển tab chính nếu người dùng bị giới hạn quyền theo tổ
+    // Tự động chuyển tab chính ban đầu theo phòng ban của nhân sự
     useEffect(() => {
         if (!isHanhChinhOrAdmin && userDept) {
             const deptLower = userDept.toLowerCase();
-            if ((deptLower.includes('đo đạc') || deptLower.includes('kỹ thuật')) && mainTab !== 'measurement') {
+            if (deptLower.includes('đo đạc') || deptLower.includes('kỹ thuật')) {
                 setMainTab('measurement');
-            } else if ((deptLower.includes('cấp giấy') || deptLower.includes('đăng ký')) && mainTab !== 'registration') {
+            } else if (deptLower.includes('cấp giấy') || deptLower.includes('đăng ký')) {
                 setMainTab('registration');
-            } else if (deptLower.includes('lưu trữ') && mainTab !== 'archive') {
+            } else if (deptLower.includes('lưu trữ')) {
                 setMainTab('archive');
             }
         }
-    }, [isHanhChinhOrAdmin, userDept, mainTab]);
+    }, [isHanhChinhOrAdmin, userDept]);
 
     // Reset date filters and search states to "Tất cả" when switching report tabs or main tabs
     useEffect(() => {
@@ -246,7 +286,11 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
             if (revenueTeam === 'registration') return registrationRecords;
             if (revenueTeam === 'measurement') return measurementRecords;
             if (revenueTeam === 'archive') return archiveRecords;
-            return [...records, ...archiveRecords];
+            const recordMap = new Map<string, RecordFile>();
+            registrationRecords.forEach(r => recordMap.set(r.id, r));
+            measurementRecords.forEach(r => recordMap.set(r.id, r));
+            archiveRecords.forEach(r => recordMap.set(r.id, r));
+            return Array.from(recordMap.values());
         }
         if (mainTab === 'archive') {
             return archiveRecords;
@@ -316,8 +360,12 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
 
     // Apply card-click filter to the list of records
     const finalFilteredData = useMemo(() => {
-        if (!cardFilter || cardFilter === 'all') return filteredData;
-        return filteredData.filter(r => {
+        let baseData = filteredData;
+        if (activeTab === 'employee' && selectedEmpId) {
+            baseData = filteredData.filter(r => r.assignedTo === selectedEmpId);
+        }
+        if (!cardFilter || cardFilter === 'all') return baseData;
+        return baseData.filter(r => {
             if (cardFilter === 'completed') {
                 return r.status === RecordStatus.HANDOVER || 
                        r.status === RecordStatus.RETURNED || 
@@ -347,7 +395,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
             }
             return true;
         });
-    }, [filteredData, cardFilter]);
+    }, [filteredData, cardFilter, activeTab, selectedEmpId]);
 
     // Reset pagination when filter changes
     const [mobileVisibleCount, setMobileVisibleCount] = useState(20);
@@ -471,6 +519,31 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
         if (activeTab === 'employee' && selectedEmpId) {
             return filteredData.filter(r => r.assignedTo === selectedEmpId).length;
         }
+        if (activeTab === 'overdue') {
+            let count = 0;
+            finalFilteredData.forEach(r => {
+                if (selectedEmpId && selectedEmpId !== 'all') {
+                    if (selectedEmpId === 'unassigned') {
+                        if (r.assignedTo) return;
+                    } else if (r.assignedTo !== selectedEmpId) {
+                        return;
+                    }
+                }
+                const isDone = r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED || r.status === RecordStatus.SIGNED || !!r.exportBatch;
+                const isWithdrawnOrRejected = r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED;
+
+                if (!isDone && !isWithdrawnOrRejected) {
+                    if (isRecordOverdue(r)) count++;
+                } else if (isDone) {
+                    if (r.deadline && r.completedDate) {
+                        const d = new Date(r.deadline); d.setHours(0,0,0,0);
+                        const c = new Date(r.completedDate); c.setHours(0,0,0,0);
+                        if (c > d) count++;
+                    }
+                }
+            });
+            return count;
+        }
         if (activeTab === 'list') {
             return finalFilteredData.length;
         }
@@ -480,6 +553,42 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
     const handleExportExcelClick = () => {
         if (!fromDate || !toDate) { alert("Vui lòng chọn đầy đủ thời gian."); return; }
         
+        if (activeTab === 'overdue') {
+            const completed: RecordFile[] = [];
+            const pending: RecordFile[] = [];
+
+            finalFilteredData.forEach(r => {
+                if (selectedEmpId && selectedEmpId !== 'all') {
+                    if (selectedEmpId === 'unassigned') {
+                        if (r.assignedTo) return;
+                    } else if (r.assignedTo !== selectedEmpId) {
+                        return;
+                    }
+                }
+
+                const isDone = r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED || r.status === RecordStatus.SIGNED || !!r.exportBatch;
+                const isWithdrawnOrRejected = r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED;
+
+                if (!isDone && !isWithdrawnOrRejected) {
+                    if (isRecordOverdue(r)) {
+                        pending.push({ ...r, _overdueType: 'pending' } as any);
+                    }
+                } else if (isDone) {
+                    if (r.deadline && r.completedDate) {
+                        const d = new Date(r.deadline); d.setHours(0,0,0,0);
+                        const c = new Date(r.completedDate); c.setHours(0,0,0,0);
+                        if (c > d) {
+                            completed.push({ ...r, _overdueType: 'completed' } as any);
+                        }
+                    }
+                }
+            });
+
+            const overdueRecords = [...completed, ...pending];
+            exportOverdueStatsToExcel(overdueRecords, employees, 'all');
+            return;
+        }
+
         let teamName = "ĐO ĐẠC";
         if (mainTab === 'registration') teamName = "CẤP GIẤY";
         else if (mainTab === 'archive') teamName = "LƯU TRỮ";
@@ -500,8 +609,6 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
             }
         } else if (activeTab === 'revenue') {
             title += " - BÁO CÁO DOANH THU";
-        } else if (activeTab === 'overdue') {
-            title += " - BÁO CÁO HỒ SƠ TRỄ HẠN";
         }
 
         if (reportType === 'today') title += " HÔM NAY";
@@ -511,8 +618,6 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
         let dataToExport = finalFilteredData;
         if (activeTab === 'daily_stats' && dailyStatsRecords.length > 0) {
             dataToExport = dailyStatsRecords;
-        } else if (activeTab === 'employee' && selectedEmpId) {
-            dataToExport = filteredData.filter(r => r.assignedTo === selectedEmpId);
         }
 
         onExportExcel(fromDate, toDate, selectedWard, title, dataToExport);
@@ -563,7 +668,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
             {/* MAIN TAB SWITCHER */}
             <div className="bg-white border-b border-gray-200 flex items-center justify-between px-4 pt-2 shrink-0">
                 <div className="flex items-center gap-1 overflow-x-auto">
-                    {tabVisibility.registration && (isHanhChinhOrAdmin || (userDept && (userDept.toLowerCase().includes('cấp giấy') || userDept.toLowerCase().includes('đăng ký')))) && (
+                    {(isHanhChinhOrAdmin || canSeeRegistrationTab || (userDept && (userDept.toLowerCase().includes('cấp giấy') || userDept.toLowerCase().includes('đăng ký')))) && (
                         <button 
                             onClick={() => setMainTab('registration')}
                             className={`px-5 py-2.5 text-sm font-bold rounded-t-lg border-t border-l border-r transition-all flex items-center gap-2 shrink-0 ${mainTab === 'registration' ? 'bg-purple-50 border-gray-200 text-purple-700 border-b-transparent relative top-[1px]' : 'bg-gray-50 border-transparent text-gray-500 hover:bg-gray-100'}`}
@@ -571,7 +676,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                             <FileCheck size={18} /> Báo cáo Cấp giấy
                         </button>
                     )}
-                    {tabVisibility.measurement && (isHanhChinhOrAdmin || (userDept && (userDept.toLowerCase().includes('đo đạc') || userDept.toLowerCase().includes('kỹ thuật')))) && (
+                    {(isHanhChinhOrAdmin || canSeeMeasurementTab || (userDept && (userDept.toLowerCase().includes('đo đạc') || userDept.toLowerCase().includes('kỹ thuật')))) && (
                         <button 
                             onClick={() => setMainTab('measurement')}
                             className={`px-5 py-2.5 text-sm font-bold rounded-t-lg border-t border-l border-r transition-all flex items-center gap-2 shrink-0 ${mainTab === 'measurement' ? 'bg-blue-50 border-gray-200 text-blue-700 border-b-transparent relative top-[1px]' : 'bg-gray-50 border-transparent text-gray-500 hover:bg-gray-100'}`}
@@ -579,7 +684,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                             <Ruler size={18} /> Báo cáo Đo đạc
                         </button>
                     )}
-                    {tabVisibility.archive && (isHanhChinhOrAdmin || (userDept && userDept.toLowerCase().includes('lưu trữ'))) && (
+                    {(isHanhChinhOrAdmin || canSeeArchiveTab || (userDept && userDept.toLowerCase().includes('lưu trữ'))) && (
                         <button 
                             onClick={() => setMainTab('archive')}
                             className={`px-5 py-2.5 text-sm font-bold rounded-t-lg border-t border-l border-r transition-all flex items-center gap-2 shrink-0 ${mainTab === 'archive' ? 'bg-orange-50 border-gray-200 text-orange-700 border-b-transparent relative top-[1px]' : 'bg-gray-50 border-transparent text-gray-500 hover:bg-gray-100'}`}
@@ -587,7 +692,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                             <FolderArchive size={18} /> Báo cáo Lưu trữ
                         </button>
                     )}
-                    {tabVisibility.revenue && isHanhChinhOrAdmin && (
+                    {(isHanhChinhOrAdmin || canSeeRevenueTab) && (
                         <button 
                             onClick={() => setMainTab('revenue')}
                             className={`px-5 py-2.5 text-sm font-bold rounded-t-lg border-t border-l border-r transition-all flex items-center gap-2 shrink-0 ${mainTab === 'revenue' ? 'bg-emerald-50 border-gray-200 text-emerald-700 border-b-transparent relative top-[1px]' : 'bg-gray-50 border-transparent text-gray-500 hover:bg-gray-100'}`}
@@ -682,6 +787,13 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
             {mainTab === 'revenue' ? (
                 <div className="flex bg-white border-b border-gray-200 px-2 md:px-4 justify-start gap-1 overflow-x-auto no-scrollbar">
                     <button 
+                        onClick={() => setRevenueTeam('total')}
+                        className={`px-4 md:px-6 py-2.5 md:py-3 text-xs md:text-sm font-bold border-b-2 transition-all flex items-center justify-center gap-1.5 shrink-0 ${revenueTeam === 'total' ? 'border-emerald-600 text-emerald-700 bg-emerald-50/60 rounded-t-lg' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                    >
+                        <DollarSign size={18}/> 
+                        <span>Tổng Doanh Thu (3 Tổ)</span>
+                    </button>
+                    <button 
                         onClick={() => setRevenueTeam('registration')}
                         className={`px-4 md:px-6 py-2.5 md:py-3 text-xs md:text-sm font-bold border-b-2 transition-all flex items-center justify-center gap-1.5 shrink-0 ${revenueTeam === 'registration' ? 'border-purple-600 text-purple-700 bg-purple-50/60 rounded-t-lg' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
                     >
@@ -701,13 +813,6 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                     >
                         <FolderArchive size={18}/> 
                         <span>Tổ Lưu Trữ</span>
-                    </button>
-                    <button 
-                        onClick={() => setRevenueTeam('total')}
-                        className={`px-4 md:px-6 py-2.5 md:py-3 text-xs md:text-sm font-bold border-b-2 transition-all flex items-center justify-center gap-1.5 shrink-0 ${revenueTeam === 'total' ? 'border-emerald-600 text-emerald-700 bg-emerald-50/60 rounded-t-lg' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-                    >
-                        <DollarSign size={18}/> 
-                        <span>Tổng Doanh Thu Chi Nhánh</span>
                     </button>
                 </div>
             ) : (
@@ -751,6 +856,14 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                     >
                         <AlertTriangle size={18}/> 
                         <span className="hidden md:inline">Thống kê hồ sơ trễ</span>
+                    </button>
+                    <button 
+                        onClick={() => setActiveTab('revenue')}
+                        className={`px-3 md:px-6 py-2.5 md:py-3 text-xs md:text-sm font-bold border-b-2 transition-all flex items-center justify-center gap-1.5 shrink-0 ${activeTab === 'revenue' ? 'border-emerald-600 text-emerald-600 bg-emerald-50/60 md:bg-transparent rounded-t-lg md:rounded-none' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                        title="Báo cáo Doanh thu"
+                    >
+                        <DollarSign size={18}/> 
+                        <span className="hidden md:inline">Báo cáo Doanh thu</span>
                     </button>
                     <button 
                         onClick={() => setActiveTab('ai')}
@@ -1127,6 +1240,23 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                     />
                 )}
 
+                {activeTab === 'revenue' && mainTab !== 'revenue' && (
+                    <RevenueStatsView 
+                        records={activeRecords}
+                        employees={activeEmployees}
+                        wards={wards}
+                        selectedWard={selectedWard}
+                        fromDate={fromDate}
+                        toDate={toDate}
+                        teamTitle={
+                            mainTab === 'measurement' ? 'Tổ Đo Đạc' :
+                            mainTab === 'registration' ? 'Tổ Cấp Giấy' :
+                            mainTab === 'archive' ? 'Tổ Lưu Trữ' :
+                            'Doanh Thu'
+                        }
+                    />
+                )}
+
                 {mainTab === 'revenue' && (
                     <RevenueStatsView 
                         records={activeRecords}
@@ -1135,6 +1265,12 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                         selectedWard={selectedWard}
                         fromDate={fromDate}
                         toDate={toDate}
+                        teamTitle={
+                            revenueTeam === 'total' ? 'Tổng Doanh Thu (3 Tổ)' :
+                            revenueTeam === 'registration' ? 'Tổ Cấp Giấy' :
+                            revenueTeam === 'measurement' ? 'Tổ Đo Đạc' :
+                            'Tổ Lưu Trữ'
+                        }
                     />
                 )}
 

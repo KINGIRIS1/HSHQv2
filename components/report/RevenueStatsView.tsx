@@ -12,6 +12,7 @@ interface RevenueStatsViewProps {
     selectedWard?: string;
     fromDate?: string;
     toDate?: string;
+    teamTitle?: string;
     onFilteredRecordsChange?: (records: RecordFile[]) => void;
 }
 
@@ -22,6 +23,7 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
     selectedWard = 'all',
     fromDate, 
     toDate,
+    teamTitle,
     onFilteredRecordsChange
 }) => {
     // Card filter selection: 'all' | 'bien_lai' | 'hoa_don'
@@ -57,8 +59,9 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
         return records
             .filter(r => {
                 if (r.status === RecordStatus.RETURNED) return true;
+                if (r.resultReturnedDate && r.resultReturnedDate.trim() !== '') return true;
                 if (r.status === RecordStatus.HANDOVER) {
-                    const hasReturnDate = !!(r.resultReturnedDate || r.exportDate || r.completedDate);
+                    const hasReturnDate = !!(r.resultReturnedDate || r.completedDate);
                     const hasReceipt = !!(r.receiptNumber && r.receiptNumber.trim() !== '');
                     const hasReturnedPrice = r.returnedPrice !== undefined && r.returnedPrice !== null && String(r.returnedPrice).trim() !== '' && Number(r.returnedPrice) > 0;
                     return hasReturnDate || hasReceipt || hasReturnedPrice;
@@ -71,13 +74,11 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
                 let returned = 0;
                 if (r.returnedPrice !== undefined && r.returnedPrice !== null && String(r.returnedPrice).trim() !== '' && !isNaN(Number(r.returnedPrice))) {
                     returned = Number(r.returnedPrice);
-                } else if (r.recordType === 'Cung cấp tài liệu đất đai') {
-                    returned = 310000;
                 } else if (contractP !== undefined && contractP !== null && !isNaN(Number(contractP)) && Number(contractP) > 0) {
                     returned = Number(contractP);
                 } else if (r.price !== undefined && r.price !== null && !isNaN(Number(r.price)) && Number(r.price) > 0) {
                     returned = Number(r.price);
-                } else if (r.status === RecordStatus.RETURNED || r.status === RecordStatus.HANDOVER) {
+                } else {
                     returned = price;
                 }
                 
@@ -114,10 +115,10 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
             })
             // Only include records with revenue or receipt/invoice recorded
             .filter(r => r.calcReturned > 0 || (r.receiptNumber && r.receiptNumber.trim() !== ''))
-            // Filter strictly by resultReturnedDate or exportDate or completedDate
+            // Filter strictly by resultReturnedDate or completedDate or exportDate or receivedDate
             .filter(r => {
                 if (!dateStart || !dateEnd) return true;
-                const targetDateStr = r.resultReturnedDate || r.exportDate || r.completedDate;
+                const targetDateStr = r.resultReturnedDate || r.completedDate || r.exportDate || r.receivedDate;
                 if (!targetDateStr) return false;
                 let d: Date | null = null;
                 if (targetDateStr.includes('/')) {
@@ -275,7 +276,12 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
                 <div className="px-6 py-3.5 bg-slate-50 border-b border-gray-200 flex flex-wrap items-center justify-between gap-4 shrink-0">
                     
                     {/* Segmented Pills for Revenue Category */}
-                    <div className="flex-1 min-w-[320px]">
+                    <div className="flex-1 min-w-[320px] flex items-center gap-3 flex-wrap">
+                        {teamTitle && (
+                            <span className="px-3 py-1 bg-emerald-100 text-emerald-800 font-extrabold text-xs rounded-lg border border-emerald-200 shrink-0">
+                                {teamTitle}
+                            </span>
+                        )}
                         <div className="inline-flex items-center bg-slate-200/80 p-1 rounded-xl gap-1 text-xs font-semibold w-full sm:w-auto h-[38px]">
                             <button
                                 type="button"

@@ -463,11 +463,6 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
   };
 
   const isPermChecked = (permissionId: string): boolean => {
-      if (permissionId === 'REPORT_TAB_REGISTRATION') return reportTabVisibility.registration;
-      if (permissionId === 'REPORT_TAB_MEASUREMENT') return reportTabVisibility.measurement;
-      if (permissionId === 'REPORT_TAB_ARCHIVE') return reportTabVisibility.archive;
-      if (permissionId === 'REPORT_TAB_REVENUE') return reportTabVisibility.revenue;
-
       if (selectedRole === UserRole.ADMIN) return true;
 
       if (selectedDepartmentScope !== 'all') {
@@ -485,11 +480,6 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
   };
 
   const toggleDeptRolePerm = (permissionId: string) => {
-      if (permissionId === 'REPORT_TAB_REGISTRATION') { toggleReportTabVis('registration'); return; }
-      if (permissionId === 'REPORT_TAB_MEASUREMENT') { toggleReportTabVis('measurement'); return; }
-      if (permissionId === 'REPORT_TAB_ARCHIVE') { toggleReportTabVis('archive'); return; }
-      if (permissionId === 'REPORT_TAB_REVENUE') { toggleReportTabVis('revenue'); return; }
-
       if (selectedRole === UserRole.ADMIN) return;
 
       if (selectedDepartmentScope !== 'all') {

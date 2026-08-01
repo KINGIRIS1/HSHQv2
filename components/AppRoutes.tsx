@@ -1576,6 +1576,8 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
           employees={employees}
           wards={wards}
           currentUser={props.currentUser}
+          rolePermissions={rolePermissions}
+          departmentPermissions={departmentPermissions}
         />
       );
     default:
