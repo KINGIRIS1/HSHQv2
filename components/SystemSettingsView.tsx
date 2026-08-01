@@ -9,8 +9,11 @@ import { createFullBackupData, downloadBackupAsFile, saveBackupToServer, restore
 import { isConfigured } from '../services/supabaseClient';
 
 const PERMISSION_DEPARTMENTS = [
+  { id: 'Tổ Đo đạc', name: 'Tổ Đo đạc', label: 'Tổ Đo đạc', desc: 'Bộ phận phụ trách đo đạc, chỉnh lý bản đồ và trích đo địa chính' },
   { id: 'Tổ Lưu trữ', name: 'Tổ Lưu trữ', label: 'Tổ Lưu trữ', desc: 'Bộ phận phụ trách lưu trữ, khai thác thông tin đất đai và hồ sơ lưu trữ' },
-  { id: 'Tổ Đo đạc', name: 'Tổ Đo đạc', label: 'Tổ Đo đạc', desc: 'Bộ phận phụ trách đo đạc, chỉnh lý bản đồ và trích đo địa chính' }
+  { id: 'Tổ Cấp giấy', name: 'Tổ Cấp giấy', label: 'Tổ Cấp giấy', desc: 'Bộ phận phụ trách tiếp nhận, xử lý và thẩm định hồ sơ đăng ký cấp giấy' },
+  { id: 'Tổ Hành chính', name: 'Tổ Hành chính', label: 'Tổ Hành chính', desc: 'Bộ phận hành chính, tiếp nhận và văn thư' },
+  { id: 'Một cửa', name: 'Một cửa', label: 'Một cửa', desc: 'Bộ phận Một cửa tiếp nhận và trả kết quả' }
 ];
 
 const ROLES_FOR_DEPARTMENT = [
@@ -30,7 +33,7 @@ const ROLE_OPTIONS = [
 const PERMISSION_GROUPS = [
   {
     id: 'hoso',
-    title: '1. Hồ sơ (Chức năng tại Tab Hồ sơ)',
+    title: '1. Hồ sơ',
     desc: 'Các quyền & chức năng để thực hiện tại Tab Hồ sơ và Tiếp nhận hồ sơ',
     items: [
       { id: 'receive_record', label: 'Tiếp nhận hồ sơ mới (Tab Tiếp nhận)' },
@@ -42,7 +45,7 @@ const PERMISSION_GROUPS = [
   },
   {
     id: 'hopdong',
-    title: '2. Hợp đồng (Chức năng tại Tab Hợp đồng)',
+    title: '2. Hợp đồng',
     desc: 'Các quyền & chức năng để thực hiện tại Tab Hợp đồng dịch vụ',
     items: [
       { id: 'receive_contract', label: 'Tiếp nhận & Quản lý hợp đồng (Tab Hợp đồng)' },
@@ -56,7 +59,7 @@ const PERMISSION_GROUPS = [
   },
   {
     id: 'dodac',
-    title: '3. Đo đạc (Chức năng tại Tab Đo đạc)',
+    title: '3. Đo đạc',
     desc: 'Các quyền & chức năng để thực hiện tại Tab Đo đạc và Trích lục bản đồ',
     items: [
       { id: 'survey_list', label: 'Danh sách kỹ thuật đo đạc (Tab Đo đạc)' },
@@ -66,7 +69,7 @@ const PERMISSION_GROUPS = [
   },
   {
     id: 'luutru',
-    title: '4. Lưu trữ (Chức năng tại Tab Lưu trữ)',
+    title: '4. Lưu trữ',
     desc: 'Các quyền & chức năng để thực hiện tại Tab Kho lưu trữ hồ sơ & Công văn',
     items: [
       { id: 'archive_records', label: 'Kho lưu trữ hồ sơ & Công văn (Tab Lưu trữ)' },
@@ -76,12 +79,16 @@ const PERMISSION_GROUPS = [
   },
   {
     id: 'tienich',
-    title: '5. Tiện ích & Báo cáo (Lịch, Tiện ích, Báo cáo)',
+    title: '5. Tiện ích & Báo cáo',
     desc: 'Các chức năng Lịch công tác, Báo cáo thống kê, Chat nội bộ, Quản lý nhân sự & Hệ thống',
     items: [
       { id: 'VIEW_SCHEDULE', label: 'Xem lịch công tác tuần' },
       { id: 'MANAGE_SCHEDULE', label: 'Quản lý lịch công tác tuần' },
       { id: 'VIEW_REPORTS', label: 'Xem báo cáo & Thống kê' },
+      { id: 'REPORT_TAB_REGISTRATION', label: 'Hiển thị Tab Báo cáo Cấp giấy' },
+      { id: 'REPORT_TAB_MEASUREMENT', label: 'Hiển thị Tab Báo cáo Đo đạc' },
+      { id: 'REPORT_TAB_ARCHIVE', label: 'Hiển thị Tab Báo cáo Lưu trữ' },
+      { id: 'REPORT_TAB_REVENUE', label: 'Hiển thị Tab Báo cáo Doanh thu' },
       { id: 'VIEW_CHAT', label: 'Sử dụng chat nội bộ' },
       { id: 'VIEW_PERSONAL_PROFILE', label: 'Xem hồ sơ cá nhân' },
       { id: 'MANAGE_EMPLOYEES', label: 'Quản lý danh sách nhân sự' },
@@ -141,6 +148,25 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
   const [savingHolidays, setSavingHolidays] = useState(false);
 
   // Permissions States
+  const [reportTabVisibility, setReportTabVisibility] = useState<{
+    registration: boolean;
+    measurement: boolean;
+    archive: boolean;
+    revenue: boolean;
+  }>(() => {
+    try {
+      const saved = localStorage.getItem('report_tab_visibility');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return { registration: true, measurement: true, archive: true, revenue: true };
+  });
+
+  const toggleReportTabVis = (key: 'registration' | 'measurement' | 'archive' | 'revenue') => {
+    const updated = { ...reportTabVisibility, [key]: !reportTabVisibility[key] };
+    setReportTabVisibility(updated);
+    localStorage.setItem('report_tab_visibility', JSON.stringify(updated));
+  };
+
   const [rolePermissions, setRolePermissions] = useState<RolePermissions>(DEFAULT_ROLE_PERMISSIONS);
   const [departmentPermissions, setDepartmentPermissions] = useState<DepartmentPermissions>({});
   const [selectedRole, setSelectedRole] = useState<UserRole | string>(UserRole.TEAM_LEADER);
@@ -152,26 +178,8 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
   const [permissionTab, setPermissionTab] = useState<'department' | 'role'>('department');
 
   const allDepartmentOptions = React.useMemo(() => {
-    const excludedNormalized = [
-      'tổ đăng ký cấp giấy',
-      'quản trị hệ thống',
-      'tổ đo đạc',
-      'ban giám đốc'
-    ];
-
-    const list = PERMISSION_DEPARTMENTS.map(d => d.id).filter(id => !excludedNormalized.includes(id.toLowerCase().trim()));
-    if (employees && employees.length > 0) {
-      employees.forEach(emp => {
-        if (emp.department && emp.department.trim()) {
-          const deptName = emp.department.trim();
-          if (!excludedNormalized.includes(deptName.toLowerCase()) && !list.includes(deptName)) {
-            list.push(deptName);
-          }
-        }
-      });
-    }
-    return list.length > 0 ? list : ['Tổ Lưu trữ'];
-  }, [employees]);
+    return PERMISSION_DEPARTMENTS.map(d => d.id);
+  }, []);
 
   // Contract Number Settings States
   const [contractPrefix, setContractPrefix] = useState('HĐ-{năm}-');
@@ -450,6 +458,11 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
   };
 
   const isPermChecked = (permissionId: string): boolean => {
+      if (permissionId === 'REPORT_TAB_REGISTRATION') return reportTabVisibility.registration;
+      if (permissionId === 'REPORT_TAB_MEASUREMENT') return reportTabVisibility.measurement;
+      if (permissionId === 'REPORT_TAB_ARCHIVE') return reportTabVisibility.archive;
+      if (permissionId === 'REPORT_TAB_REVENUE') return reportTabVisibility.revenue;
+
       if (selectedRole === UserRole.ADMIN) return true;
 
       if (selectedDepartmentScope !== 'all') {
@@ -467,6 +480,11 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
   };
 
   const toggleDeptRolePerm = (permissionId: string) => {
+      if (permissionId === 'REPORT_TAB_REGISTRATION') { toggleReportTabVis('registration'); return; }
+      if (permissionId === 'REPORT_TAB_MEASUREMENT') { toggleReportTabVis('measurement'); return; }
+      if (permissionId === 'REPORT_TAB_ARCHIVE') { toggleReportTabVis('archive'); return; }
+      if (permissionId === 'REPORT_TAB_REVENUE') { toggleReportTabVis('revenue'); return; }
+
       if (selectedRole === UserRole.ADMIN) return;
 
       if (selectedDepartmentScope !== 'all') {
@@ -698,7 +716,7 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
             </button>
         </div>
 
-        <div className="p-4 md:p-6 overflow-y-auto flex-1 bg-slate-50/30">
+        <div className={`overflow-y-auto flex-1 bg-slate-50/30 ${activeTab === 'permissions' ? '' : 'p-4 md:p-6'}`}>
             {activeTab === 'general' && (
                 <div className="space-y-6 max-w-4xl mx-auto">
                     {/* Cloud Database Info */}
@@ -854,174 +872,192 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
             )}
 
             {activeTab === 'permissions' && (
-                <div className="bg-slate-50 border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex flex-col h-[calc(100vh-170px)] min-h-[550px] relative">
-                    {/* Header tabs: Theo Vai trò | Theo Phòng ban */}
-                    <div className="bg-slate-100/90 border-b border-slate-200 px-4 pt-3 flex items-center justify-between flex-wrap gap-2">
-                        <div className="flex items-center gap-2">
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setPermissionTab('role');
-                                    setSelectedDepartmentScope('all');
-                                }}
-                                className={`px-5 py-2.5 text-xs font-black transition-all border-b-2 ${
-                                    permissionTab === 'role'
-                                        ? 'border-purple-600 text-purple-800 bg-white rounded-t-xl shadow-2xs'
-                                        : 'border-transparent text-slate-500 hover:text-slate-800'
-                                }`}
-                            >
-                                Theo Vai trò
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setPermissionTab('department');
-                                    if (selectedDepartmentScope === 'all' || !allDepartmentOptions.includes(selectedDepartmentScope)) {
-                                        setSelectedDepartmentScope(allDepartmentOptions[0] || 'Tổ Lưu trữ');
-                                    }
-                                }}
-                                className={`px-5 py-2.5 text-xs font-black transition-all border-b-2 ${
-                                    permissionTab === 'department'
-                                        ? 'border-purple-600 text-purple-800 bg-white rounded-t-xl shadow-2xs'
-                                        : 'border-transparent text-slate-500 hover:text-slate-800'
-                                }`}
-                            >
-                                Theo Phòng ban
-                            </button>
-                        </div>
-
-                        {/* Search Filter Box */}
-                        <div className="relative w-full sm:w-64 pb-2 sm:pb-0">
-                            <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
-                            <input
-                                type="text"
-                                placeholder="Tìm kiếm quyền..."
-                                value={permSearchQuery}
-                                onChange={(e) => setPermSearchQuery(e.target.value)}
-                                className="w-full bg-white text-slate-800 placeholder-slate-400 text-xs rounded-xl pl-8 pr-7 py-1.5 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all shadow-2xs"
-                            />
-                            {permSearchQuery && (
-                                <button 
+                <div className="bg-slate-50 relative">
+                    {/* Top Sticky Header Container (stuck flush below main tabs bar) */}
+                    <div className="sticky top-0 z-20 bg-white border-b border-slate-200 shadow-xs">
+                        {/* Row 1: Header tabs (Theo Vai trò | Theo Phòng ban) + Search + Floating Pill Buttons */}
+                        <div className="bg-slate-100/90 border-b border-slate-200 px-4 py-2 flex items-center justify-between flex-wrap gap-2">
+                            <div className="flex items-center gap-2">
+                                <button
                                     type="button"
-                                    onClick={() => setPermSearchQuery('')}
-                                    className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600 text-xs font-bold"
+                                    onClick={() => {
+                                        setPermissionTab('role');
+                                        setSelectedDepartmentScope('all');
+                                    }}
+                                    className={`px-4 py-2 text-xs font-black transition-all border-b-2 ${
+                                        permissionTab === 'role'
+                                            ? 'border-purple-600 text-purple-800 bg-white rounded-t-xl shadow-2xs'
+                                            : 'border-transparent text-slate-500 hover:text-slate-800'
+                                    }`}
                                 >
-                                    ✕
+                                    Theo Vai trò
                                 </button>
-                            )}
-                        </div>
-                    </div>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setPermissionTab('department');
+                                        if (selectedDepartmentScope === 'all' || !allDepartmentOptions.includes(selectedDepartmentScope)) {
+                                            setSelectedDepartmentScope(allDepartmentOptions[0] || 'Tổ Đo đạc');
+                                        }
+                                    }}
+                                    className={`px-4 py-2 text-xs font-black transition-all border-b-2 ${
+                                        permissionTab === 'department'
+                                            ? 'border-purple-600 text-purple-800 bg-white rounded-t-xl shadow-2xs'
+                                            : 'border-transparent text-slate-500 hover:text-slate-800'
+                                    }`}
+                                >
+                                    Theo Phòng ban
+                                </button>
+                            </div>
 
-                    {/* Sub-navigation bar */}
-                    {permissionTab === 'role' ? (
-                        <div className="bg-white border-b border-slate-200 px-6 py-3 flex items-center gap-6 overflow-x-auto no-scrollbar shrink-0">
-                            {[
-                                { role: UserRole.SUBADMIN, label: 'SUBADMIN' },
-                                { role: UserRole.TEAM_LEADER, label: 'TEAM_LEADER' },
-                                { role: UserRole.EMPLOYEE, label: 'EMPLOYEE' },
-                                { role: UserRole.ONEDOOR, label: 'ONEDOOR' },
-                                { role: UserRole.ADMIN, label: 'ADMIN' },
-                            ].map((item) => {
-                                const isSelected = selectedRole === item.role;
-                                return (
+                            <div className="flex items-center gap-3">
+                                {/* Search Filter Box */}
+                                <div className="relative w-36 sm:w-48">
+                                    <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
+                                    <input
+                                        type="text"
+                                        placeholder="Tìm kiếm quyền..."
+                                        value={permSearchQuery}
+                                        onChange={(e) => setPermSearchQuery(e.target.value)}
+                                        className="w-full bg-white text-slate-800 placeholder-slate-400 text-xs rounded-full pl-8 pr-7 py-1.5 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all shadow-2xs"
+                                    />
+                                    {permSearchQuery && (
+                                        <button 
+                                            type="button"
+                                            onClick={() => setPermSearchQuery('')}
+                                            className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600 text-xs font-bold"
+                                        >
+                                            ✕
+                                        </button>
+                                    )}
+                                </div>
+
+                                {/* Floating Action Buttons: Mặc định & Lưu */}
+                                <div className="flex items-center gap-2">
                                     <button
-                                        key={item.role}
+                                        onClick={handleResetPermissions}
                                         type="button"
-                                        onClick={() => setSelectedRole(item.role)}
-                                        className={`text-xs font-black tracking-wider uppercase transition-all pb-1 border-b-2 ${
-                                            isSelected
-                                                ? 'border-purple-600 text-purple-800 font-extrabold'
-                                                : 'border-transparent text-slate-400 hover:text-slate-600 font-bold'
-                                        }`}
+                                        title="Khôi phục quyền mặc định"
+                                        className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-full transition-all border border-slate-300 flex items-center gap-1.5 active:scale-95 shadow-2xs cursor-pointer"
                                     >
-                                        {item.label}
+                                        <RotateCcw size={14} />
+                                        <span>Mặc định</span>
                                     </button>
-                                );
-                            })}
-                        </div>
-                    ) : (
-                        <div className="bg-white border-b border-slate-200 px-6 py-2.5 flex flex-col gap-2 shrink-0">
-                            {/* Department selector */}
-                            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
-                                <span className="text-[11px] font-black uppercase tracking-wider text-slate-500 shrink-0 mr-1">
-                                    Phòng / Tổ:
-                                </span>
-                                {allDepartmentOptions.map((deptName) => {
-                                    const isSelected = selectedDepartmentScope === deptName;
-                                    const compositeKey = `${deptName}_${selectedRole}`;
-                                    const hasCustomOverride = !!(departmentPermissions && departmentPermissions[compositeKey]);
-                                    return (
-                                        <button
-                                            key={deptName}
-                                            type="button"
-                                            onClick={() => setSelectedDepartmentScope(deptName)}
-                                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border flex items-center gap-1.5 ${
-                                                isSelected
-                                                    ? 'bg-purple-700 text-white border-purple-800 shadow-sm font-black'
-                                                    : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                                            }`}
-                                        >
-                                            <span>{deptName}</span>
-                                            {hasCustomOverride && (
-                                                <span className={`w-2 h-2 rounded-full ${isSelected ? 'bg-amber-300 animate-pulse' : 'bg-purple-500'}`} title="Đã có cấu hình riêng" />
-                                            )}
-                                        </button>
-                                    );
-                                })}
-                            </div>
-
-                            {/* Role selector within Department */}
-                            <div className="flex items-center gap-4 pt-1.5 border-t border-slate-100">
-                                <span className="text-[11px] font-black uppercase tracking-wider text-slate-500 shrink-0">
-                                    Vai trò trong tổ:
-                                </span>
-                                {[
-                                    { role: UserRole.TEAM_LEADER, label: 'TEAM_LEADER' },
-                                    { role: UserRole.EMPLOYEE, label: 'EMPLOYEE' },
-                                    { role: UserRole.ONEDOOR, label: 'ONEDOOR' }
-                                ].map((item) => {
-                                    const isSelected = selectedRole === item.role;
-                                    return (
-                                        <button
-                                            key={item.role}
-                                            type="button"
-                                            onClick={() => setSelectedRole(item.role)}
-                                            className={`text-xs font-black tracking-wider uppercase transition-all pb-0.5 border-b-2 ${
-                                                isSelected
-                                                    ? 'border-purple-600 text-purple-800'
-                                                    : 'border-transparent text-slate-400 hover:text-slate-600 font-bold'
-                                            }`}
-                                        >
-                                            {item.label}
-                                        </button>
-                                    );
-                                })}
+                                    <button
+                                        onClick={handleSavePermissions}
+                                        disabled={isSavingPermissions}
+                                        title="Lưu cấu hình phân quyền"
+                                        className="px-4 py-1.5 bg-gradient-to-r from-purple-700 to-indigo-800 hover:from-purple-800 hover:to-indigo-900 text-white font-black text-xs rounded-full transition-all shadow-md disabled:opacity-50 flex items-center gap-1.5 active:scale-95 cursor-pointer"
+                                    >
+                                        {isSavingPermissions ? <Loader2 className="animate-spin" size={14} /> : <Save size={14} />}
+                                        <span>Lưu</span>
+                                    </button>
+                                </div>
                             </div>
                         </div>
-                    )}
 
-                    {/* Banner info */}
-                    <div className="bg-purple-50/50 border-b border-purple-100/60 px-6 py-2 flex items-center justify-between text-xs text-purple-950 shrink-0">
-                        <div className="flex items-center gap-2">
-                            <span className="font-extrabold uppercase text-[10px] bg-purple-200/80 px-2 py-0.5 rounded text-purple-900">
-                                {selectedRole}
-                            </span>
-                            <span className="text-slate-600 text-[11px]">
-                                {permissionTab === 'role'
-                                    ? `Đang thiết lập quyền mặc định cho Vai trò [${selectedRole}]`
-                                    : `Đang thiết lập quyền riêng cho [${selectedDepartmentScope}] - [${selectedRole}]`
-                                }
-                            </span>
-                        </div>
-                        {selectedRole === UserRole.ADMIN && (
-                            <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-full">
-                                🔒 ADMIN có toàn bộ quyền mặc định
-                            </span>
+                        {/* Row 2 (if role tab): Role selector row */}
+                        {permissionTab === 'role' ? (
+                            <div className="bg-white border-b border-slate-200 px-6 py-2.5 flex items-center justify-between gap-4 overflow-x-auto no-scrollbar">
+                                <div className="flex items-center gap-6">
+                                    {[
+                                        { role: UserRole.SUBADMIN, label: 'SUBADMIN' },
+                                        { role: UserRole.TEAM_LEADER, label: 'TEAM_LEADER' },
+                                        { role: UserRole.EMPLOYEE, label: 'EMPLOYEE' },
+                                        { role: UserRole.ONEDOOR, label: 'ONEDOOR' },
+                                        { role: UserRole.ADMIN, label: 'ADMIN' },
+                                    ].map((item) => {
+                                        const isSelected = selectedRole === item.role;
+                                        return (
+                                            <button
+                                                key={item.role}
+                                                type="button"
+                                                onClick={() => setSelectedRole(item.role)}
+                                                className={`text-xs font-black tracking-wider uppercase transition-all pb-0.5 border-b-2 cursor-pointer ${
+                                                    isSelected
+                                                        ? 'border-purple-600 text-purple-800 font-extrabold'
+                                                        : 'border-transparent text-slate-400 hover:text-slate-600 font-bold'
+                                                }`}
+                                            >
+                                                {item.label}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                                <div className="text-[11px] font-medium text-slate-500 hidden md:block">
+                                    Đang cấu hình: <strong className="text-purple-900 uppercase font-black">{selectedRole}</strong>
+                                    {selectedRole === UserRole.ADMIN && (
+                                        <span className="ml-2 text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+                                            🔒 ADMIN có toàn bộ quyền mặc định
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                        ) : (
+                            /* Row 2 & 3 (if department tab): Department selector & Role within department */
+                            <div className="bg-white border-b border-slate-200 px-6 py-2 flex flex-col gap-2">
+                                {/* Department selector */}
+                                <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+                                    <span className="text-[11px] font-black uppercase tracking-wider text-slate-500 shrink-0 mr-1">
+                                        Phòng / Tổ:
+                                    </span>
+                                    {allDepartmentOptions.map((deptName) => {
+                                        const isSelected = selectedDepartmentScope === deptName;
+                                        const compositeKey = `${deptName}_${selectedRole}`;
+                                        const hasCustomOverride = !!(departmentPermissions && departmentPermissions[compositeKey]);
+                                        return (
+                                            <button
+                                                key={deptName}
+                                                type="button"
+                                                onClick={() => setSelectedDepartmentScope(deptName)}
+                                                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all border flex items-center gap-1.5 cursor-pointer ${
+                                                    isSelected
+                                                        ? 'bg-purple-700 text-white border-purple-800 shadow-sm font-black'
+                                                        : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                                                }`}
+                                            >
+                                                <span>{deptName}</span>
+                                                {hasCustomOverride && (
+                                                    <span className={`w-2 h-2 rounded-full ${isSelected ? 'bg-amber-300 animate-pulse' : 'bg-purple-500'}`} title="Đã có cấu hình riêng" />
+                                                )}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+
+                                {/* Role selector within Department */}
+                                <div className="flex items-center gap-4 pt-1.5 border-t border-slate-100">
+                                    <span className="text-[11px] font-black uppercase tracking-wider text-slate-500 shrink-0">
+                                        Vai trò trong tổ:
+                                    </span>
+                                    {[
+                                        { role: UserRole.TEAM_LEADER, label: 'TEAM_LEADER' },
+                                        { role: UserRole.EMPLOYEE, label: 'EMPLOYEE' },
+                                        { role: UserRole.ONEDOOR, label: 'ONEDOOR' }
+                                    ].map((item) => {
+                                        const isSelected = selectedRole === item.role;
+                                        return (
+                                            <button
+                                                key={item.role}
+                                                type="button"
+                                                onClick={() => setSelectedRole(item.role)}
+                                                className={`text-xs font-black tracking-wider uppercase transition-all pb-0.5 border-b-2 cursor-pointer ${
+                                                    isSelected
+                                                        ? 'border-purple-600 text-purple-800'
+                                                        : 'border-transparent text-slate-400 hover:text-slate-600 font-bold'
+                                                }`}
+                                            >
+                                                {item.label}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
                         )}
                     </div>
 
                     {/* Categorized Permissions Grid */}
-                    <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-slate-50/60 custom-scrollbar space-y-6">
+                    <div className="p-4 md:p-6 bg-slate-50/60 space-y-6">
                         {PERMISSION_GROUPS.map((group) => {
                             const filteredItems = group.items.filter(item => {
                                 if (!permSearchQuery.trim()) return true;
@@ -1063,7 +1099,7 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                                                             if (!isPermChecked(item.id)) toggleDeptRolePerm(item.id);
                                                         });
                                                     }}
-                                                    className="text-[11px] font-bold text-purple-700 hover:text-purple-900 bg-purple-50 hover:bg-purple-100 px-2.5 py-1 rounded-lg border border-purple-200 transition-all"
+                                                    className="text-[11px] font-bold text-purple-700 hover:text-purple-900 bg-purple-50 hover:bg-purple-100 px-2.5 py-1 rounded-lg border border-purple-200 transition-all cursor-pointer"
                                                 >
                                                     Chọn tất cả
                                                 </button>
@@ -1074,7 +1110,7 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                                                             if (isPermChecked(item.id)) toggleDeptRolePerm(item.id);
                                                         });
                                                     }}
-                                                    className="text-[11px] font-bold text-slate-600 hover:text-slate-800 bg-white hover:bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200 transition-all"
+                                                    className="text-[11px] font-bold text-slate-600 hover:text-slate-800 bg-white hover:bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200 transition-all cursor-pointer"
                                                 >
                                                     Bỏ chọn
                                                 </button>
@@ -1122,31 +1158,6 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                                 </div>
                             );
                         })}
-                    </div>
-
-                    {/* Bottom Sticky Action Bar */}
-                    <div className="bg-white border-t border-slate-200 p-4 px-6 flex items-center justify-between gap-3 shadow-md shrink-0">
-                        <div className="text-xs text-slate-600 font-medium flex items-center gap-2">
-                            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                            <span>Đang cấu hình: <strong className="text-purple-900">{selectedRole}</strong></span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                            <button
-                                onClick={handleResetPermissions}
-                                type="button"
-                                className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-all border border-slate-200 flex items-center gap-1.5 active:scale-95"
-                            >
-                                <RotateCcw size={15} /> Mặc định
-                            </button>
-                            <button
-                                onClick={handleSavePermissions}
-                                disabled={isSavingPermissions}
-                                className="px-6 py-2.5 bg-gradient-to-r from-purple-700 to-indigo-800 hover:from-purple-800 hover:to-indigo-900 text-white font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-md disabled:opacity-50 flex items-center gap-2 active:scale-95"
-                            >
-                                {isSavingPermissions ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />}
-                                Lưu cấu hình phân quyền
-                            </button>
-                        </div>
                     </div>
                 </div>
             )}

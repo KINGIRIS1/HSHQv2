@@ -188,7 +188,7 @@ export function isViewAllowedForUser(
         return activePerms.includes('all_records') || activePerms.includes('all_sub_all') || activePerms.includes('assign_tasks') || activePerms.includes('check_list') || activePerms.includes('handover_list') || activePerms.includes('completed_list') || activePerms.includes('pending_check_list') || activePerms.includes('director_completed') ||
                activePerms.includes('archive_records') || activePerms.includes('registration_records') || activePerms.includes('other_records');
       case 'tools_group':
-        return activePerms.includes('reports') || activePerms.includes('VIEW_REPORTS') || activePerms.includes('excerpt_management') || activePerms.includes('MANAGE_EXCERPTS') || activePerms.includes('utilities') || activePerms.includes('work_schedule');
+        return activePerms.includes('reports') || activePerms.includes('VIEW_REPORTS') || activePerms.includes('excerpt_management') || activePerms.includes('MANAGE_EXCERPTS') || activePerms.includes('utilities') || activePerms.includes('work_schedule') || activePerms.includes('system_dashboard') || activePerms.includes('SYSTEM_SETTINGS');
       case 'management_group':
         return activePerms.includes('work_schedule') || activePerms.includes('VIEW_SCHEDULE') || activePerms.includes('personal_profile');
 

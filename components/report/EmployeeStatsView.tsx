@@ -13,7 +13,7 @@ interface EmployeeStatsViewProps {
     toDate: string;
     selectedEmpId: string;
     setSelectedEmpId: (id: string) => void;
-    defaultDeptFilter?: 'all' | 'archive' | 'onedoor' | 'measurement';
+    defaultDeptFilter?: 'all' | 'archive' | 'onedoor' | 'measurement' | 'registration';
 }
 
 const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({ 
@@ -21,7 +21,7 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
 }) => {
     const [aiEvaluation, setAiEvaluation] = useState<string>('');
     const [isGenerating, setIsGenerating] = useState(false);
-    const [deptFilter, setDeptFilter] = useState<'all' | 'archive' | 'onedoor' | 'measurement'>(defaultDeptFilter);
+    const [deptFilter, setDeptFilter] = useState<'all' | 'archive' | 'onedoor' | 'measurement' | 'registration'>(defaultDeptFilter);
 
     // Synchronize deptFilter if defaultDeptFilter changes
     React.useEffect(() => {
@@ -42,6 +42,9 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
             }
             if (deptFilter === 'measurement') {
                 return d.includes('đo đạc') || d.includes('kỹ thuật');
+            }
+            if (deptFilter === 'registration') {
+                return d.includes('cấp giấy') || d.includes('đăng ký');
             }
             return true;
         });

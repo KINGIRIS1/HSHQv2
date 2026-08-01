@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { BarChart3, FileSpreadsheet, Loader2, Sparkles, Download, CalendarDays, Printer, Layout, FileText, ListFilter, CheckCircle2, Clock, AlertTriangle, Settings, Key, X, Save, MapPin, UserCheck, ChevronLeft, ChevronRight, PieChart, CheckCircle, Ruler, FolderArchive, CalendarRange, DollarSign } from 'lucide-react';
+import { BarChart3, FileSpreadsheet, Loader2, Sparkles, Download, CalendarDays, Printer, Layout, FileText, ListFilter, CheckCircle2, Clock, AlertTriangle, Settings, Key, X, Save, MapPin, UserCheck, ChevronLeft, ChevronRight, PieChart, CheckCircle, Ruler, FolderArchive, CalendarRange, DollarSign, FileCheck } from 'lucide-react';
 import { RecordFile, RecordStatus, Employee, User } from '../types';
 import { getNormalizedWard, STATUS_LABELS, getShortRecordType, isArchiveRecordType } from '../constants';
 import { isRecordOverdue, removeVietnameseTones, isRecordApproaching, parseSafeDate } from '../utils/appHelpers';
@@ -91,7 +91,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
         return deptLower.includes('hành chính') || deptLower.includes('một cửa');
     }, [currentUser, userDept, userRole]);
 
-    const [mainTab, setMainTab] = useState<'measurement' | 'archive'>('measurement');
+    const [mainTab, setMainTab] = useState<'measurement' | 'registration' | 'archive' | 'revenue'>('measurement');
     const [archiveRecords, setArchiveRecords] = useState<RecordFile[]>([]);
     const [isArchiveLoading, setIsArchiveLoading] = useState<boolean>(false);
 
@@ -101,6 +101,8 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
             const deptLower = userDept.toLowerCase();
             if ((deptLower.includes('đo đạc') || deptLower.includes('kỹ thuật')) && mainTab !== 'measurement') {
                 setMainTab('measurement');
+            } else if ((deptLower.includes('cấp giấy') || deptLower.includes('đăng ký')) && mainTab !== 'registration') {
+                setMainTab('registration');
             } else if (deptLower.includes('lưu trữ') && mainTab !== 'archive') {
                 setMainTab('archive');
             }
@@ -119,7 +121,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
     }, [activeTab, mainTab]);
 
     useEffect(() => {
-        if (mainTab === 'archive') {
+        if (mainTab === 'archive' || mainTab === 'revenue') {
             const loadArchive = async () => {
                 setIsArchiveLoading(true);
                 try {
@@ -179,20 +181,96 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
         }
     }, [mainTab, records]);
 
+    const [tabVisibility, setTabVisibility] = useState<{
+        registration: boolean;
+        measurement: boolean;
+        archive: boolean;
+        revenue: boolean;
+    }>(() => {
+        try {
+            const saved = localStorage.getItem('report_tab_visibility');
+            if (saved) return JSON.parse(saved);
+        } catch (e) {}
+        return { registration: true, measurement: true, archive: true, revenue: true };
+    });
+
+    // Sub-team selection for Revenue tab
+    const [revenueTeam, setRevenueTeam] = useState<'registration' | 'measurement' | 'archive' | 'total'>('total');
+
+    const registrationRecords = useMemo(() => {
+        return records.filter(r => {
+            const shortType = getShortRecordType(r.recordType);
+            if (isArchiveRecordType(r.recordType)) return false;
+
+            const excludedCodes = ['1.1', '1.2', '2.1', '2.2', '2.3', '2.4', '2.5', '2.6'];
+            if (excludedCodes.some(code => shortType.startsWith(code))) {
+                return false;
+            }
+
+            const typeLower = (r.recordType || '').toLowerCase();
+            if (typeLower.includes('trích đo') || 
+                typeLower.includes('cắm mốc') || 
+                typeLower.includes('tách thửa') || 
+                typeLower.includes('hợp thửa') || 
+                typeLower.includes('số thửa') || 
+                typeLower.includes('sao lục') || 
+                typeLower.includes('trích lục') ||
+                typeLower.includes('công văn')) {
+                return false;
+            }
+
+            return true;
+        });
+    }, [records]);
+
+    const measurementRecords = useMemo(() => {
+        return records.filter(r => {
+            const shortType = getShortRecordType(r.recordType);
+            if (isArchiveRecordType(r.recordType)) return false;
+
+            const isMeasurementCode = ['2.3', '2.4', '2.5', '2.6'].some(code => shortType.startsWith(code));
+            const typeLower = (r.recordType || '').toLowerCase();
+            const isMeasurementKeyword = typeLower.includes('trích đo') || 
+                                         typeLower.includes('cắm mốc') || 
+                                         typeLower.includes('tách thửa') || 
+                                         typeLower.includes('hợp thửa') || 
+                                         typeLower.includes('số thửa') || 
+                                         typeLower.includes('đo đạc');
+
+            return isMeasurementCode || isMeasurementKeyword;
+        });
+    }, [records]);
+
     const activeRecords = useMemo(() => {
-        return mainTab === 'measurement' 
-            ? records.filter(r => {
-                const shortType = getShortRecordType(r.recordType);
-                return !isArchiveRecordType(r.recordType) && !['CMD', 'Tòa án', 'Thi hành án'].includes(shortType);
-            }) 
-            : archiveRecords;
-    }, [records, mainTab, archiveRecords]);
+        if (mainTab === 'revenue') {
+            if (revenueTeam === 'registration') return registrationRecords;
+            if (revenueTeam === 'measurement') return measurementRecords;
+            if (revenueTeam === 'archive') return archiveRecords;
+            return [...records, ...archiveRecords];
+        }
+        if (mainTab === 'archive') {
+            return archiveRecords;
+        }
+        if (mainTab === 'registration') {
+            return registrationRecords;
+        }
+        // mainTab === 'measurement'
+        return measurementRecords;
+    }, [records, mainTab, archiveRecords, revenueTeam, registrationRecords, measurementRecords]);
 
     const activeEmployees = useMemo(() => {
+        if (mainTab === 'revenue') {
+            return employees;
+        }
         if (mainTab === 'measurement') {
             return employees.filter(e => {
                 const dept = e.department?.toLowerCase() || '';
                 return dept.includes('đo đạc') || dept.includes('kỹ thuật');
+            });
+        } else if (mainTab === 'registration') {
+            return employees.filter(e => {
+                const dept = e.department?.toLowerCase() || '';
+                return dept.includes('cấp giấy') || dept.includes('đăng ký');
             });
         } else {
             return employees.filter(e => {
@@ -371,10 +449,15 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
 
         setActiveTab('ai');
         
-        let title = mainTab === 'measurement' ? "BÁO CÁO KẾT QUẢ CÔNG TÁC ĐO ĐẠC" : "BÁO CÁO KẾT QUẢ CÔNG TÁC LƯU TRỮ";
-        if (reportType === 'today') title = mainTab === 'measurement' ? "BÁO CÁO KẾT QUẢ CÔNG TÁC ĐO ĐẠC HÔM NAY" : "BÁO CÁO KẾT QUẢ CÔNG TÁC LƯU TRỮ HÔM NAY";
-        if (reportType === 'week') title = mainTab === 'measurement' ? "BÁO CÁO KẾT QUẢ CÔNG TÁC ĐO ĐẠC TUẦN" : "BÁO CÁO KẾT QUẢ CÔNG TÁC LƯU TRỮ TUẦN";
-        if (reportType === 'month') title = mainTab === 'measurement' ? "BÁO CÁO KẾT QUẢ CÔNG TÁC ĐO ĐẠC THÁNG" : "BÁO CÁO KẾT QUẢ CÔNG TÁC LƯU TRỮ THÁNG";
+        let teamName = "ĐO ĐẠC";
+        if (mainTab === 'registration') teamName = "CẤP GIẤY";
+        else if (mainTab === 'archive') teamName = "LƯU TRỮ";
+        else if (mainTab === 'revenue') teamName = "TỔNG HỢP DOANH THU";
+
+        let title = `BÁO CÁO KẾT QUẢ CÔNG TÁC ${teamName}`;
+        if (reportType === 'today') title += " HÔM NAY";
+        if (reportType === 'week') title += " TUẦN";
+        if (reportType === 'month') title += " THÁNG";
 
         // Pass filteredData to onGenerate
         onGenerate(fromDate, toDate, title, filteredData);
@@ -397,7 +480,12 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
     const handleExportExcelClick = () => {
         if (!fromDate || !toDate) { alert("Vui lòng chọn đầy đủ thời gian."); return; }
         
-        let title = mainTab === 'measurement' ? "BÁO CÁO KẾT QUẢ CÔNG TÁC ĐO ĐẠC" : "BÁO CÁO KẾT QUẢ CÔNG TÁC LƯU TRỮ";
+        let teamName = "ĐO ĐẠC";
+        if (mainTab === 'registration') teamName = "CẤP GIẤY";
+        else if (mainTab === 'archive') teamName = "LƯU TRỮ";
+        else if (mainTab === 'revenue') teamName = "TỔNG HỢP DOANH THU";
+
+        let title = `BÁO CÁO KẾT QUẢ CÔNG TÁC ${teamName}`;
         
         if (activeTab === 'daily_stats') {
             title += " - THỐNG KÊ THEO NGÀY";
@@ -473,27 +561,45 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
     return (
         <div className="flex flex-col h-full overflow-y-auto md:overflow-hidden relative bg-slate-50">
             {/* MAIN TAB SWITCHER */}
-            <div className="bg-white border-b border-gray-200 flex px-4 pt-2 gap-1 shrink-0">
-                {(isHanhChinhOrAdmin || (userDept && (userDept.toLowerCase().includes('đo đạc') || userDept.toLowerCase().includes('kỹ thuật')))) && (
-                    <button 
-                        onClick={() => setMainTab('measurement')}
-                        className={`px-6 py-3 text-sm font-bold rounded-t-lg border-t border-l border-r transition-all flex items-center gap-2 ${mainTab === 'measurement' ? 'bg-blue-50 border-gray-200 text-blue-700 border-b-transparent relative top-[1px]' : 'bg-gray-50 border-transparent text-gray-500 hover:bg-gray-100'}`}
-                    >
-                        <Ruler size={18} /> Báo cáo Đo đạc
-                    </button>
-                )}
-                {(isHanhChinhOrAdmin || (userDept && userDept.toLowerCase().includes('lưu trữ'))) && (
-                    <button 
-                        onClick={() => setMainTab('archive')}
-                        className={`px-6 py-3 text-sm font-bold rounded-t-lg border-t border-l border-r transition-all flex items-center gap-2 ${mainTab === 'archive' ? 'bg-orange-50 border-gray-200 text-orange-700 border-b-transparent relative top-[1px]' : 'bg-gray-50 border-transparent text-gray-500 hover:bg-gray-100'}`}
-                    >
-                        <FolderArchive size={18} /> Báo cáo Lưu trữ
-                    </button>
-                )}
+            <div className="bg-white border-b border-gray-200 flex items-center justify-between px-4 pt-2 shrink-0">
+                <div className="flex items-center gap-1 overflow-x-auto">
+                    {tabVisibility.registration && (isHanhChinhOrAdmin || (userDept && (userDept.toLowerCase().includes('cấp giấy') || userDept.toLowerCase().includes('đăng ký')))) && (
+                        <button 
+                            onClick={() => setMainTab('registration')}
+                            className={`px-5 py-2.5 text-sm font-bold rounded-t-lg border-t border-l border-r transition-all flex items-center gap-2 shrink-0 ${mainTab === 'registration' ? 'bg-purple-50 border-gray-200 text-purple-700 border-b-transparent relative top-[1px]' : 'bg-gray-50 border-transparent text-gray-500 hover:bg-gray-100'}`}
+                        >
+                            <FileCheck size={18} /> Báo cáo Cấp giấy
+                        </button>
+                    )}
+                    {tabVisibility.measurement && (isHanhChinhOrAdmin || (userDept && (userDept.toLowerCase().includes('đo đạc') || userDept.toLowerCase().includes('kỹ thuật')))) && (
+                        <button 
+                            onClick={() => setMainTab('measurement')}
+                            className={`px-5 py-2.5 text-sm font-bold rounded-t-lg border-t border-l border-r transition-all flex items-center gap-2 shrink-0 ${mainTab === 'measurement' ? 'bg-blue-50 border-gray-200 text-blue-700 border-b-transparent relative top-[1px]' : 'bg-gray-50 border-transparent text-gray-500 hover:bg-gray-100'}`}
+                        >
+                            <Ruler size={18} /> Báo cáo Đo đạc
+                        </button>
+                    )}
+                    {tabVisibility.archive && (isHanhChinhOrAdmin || (userDept && userDept.toLowerCase().includes('lưu trữ'))) && (
+                        <button 
+                            onClick={() => setMainTab('archive')}
+                            className={`px-5 py-2.5 text-sm font-bold rounded-t-lg border-t border-l border-r transition-all flex items-center gap-2 shrink-0 ${mainTab === 'archive' ? 'bg-orange-50 border-gray-200 text-orange-700 border-b-transparent relative top-[1px]' : 'bg-gray-50 border-transparent text-gray-500 hover:bg-gray-100'}`}
+                        >
+                            <FolderArchive size={18} /> Báo cáo Lưu trữ
+                        </button>
+                    )}
+                    {tabVisibility.revenue && isHanhChinhOrAdmin && (
+                        <button 
+                            onClick={() => setMainTab('revenue')}
+                            className={`px-5 py-2.5 text-sm font-bold rounded-t-lg border-t border-l border-r transition-all flex items-center gap-2 shrink-0 ${mainTab === 'revenue' ? 'bg-emerald-50 border-gray-200 text-emerald-700 border-b-transparent relative top-[1px]' : 'bg-gray-50 border-transparent text-gray-500 hover:bg-gray-100'}`}
+                        >
+                            <DollarSign size={18} /> Báo cáo Doanh thu
+                        </button>
+                    )}
+                </div>
             </div>
 
             {/* Toolbar */}
-            <div className={`p-4 border-b border-gray-200 shadow-sm flex flex-col gap-4 shrink-0 z-10 ${mainTab === 'measurement' ? 'bg-blue-50' : 'bg-orange-50'}`}>
+            <div className={`p-4 border-b border-gray-200 shadow-sm flex flex-col gap-4 shrink-0 z-10 ${mainTab === 'measurement' ? 'bg-blue-50' : mainTab === 'registration' ? 'bg-purple-50' : mainTab === 'archive' ? 'bg-orange-50' : 'bg-emerald-50'}`}>
                 <div className="flex flex-wrap items-center justify-between gap-4">
                     <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-lg border border-slate-200">
                         <button 
@@ -572,76 +678,111 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                 </div>
             </div>
 
-            {/* Content Tabs */}
-            <div className="flex bg-white border-b border-gray-200 px-2 md:px-4 justify-between md:justify-start gap-1 overflow-x-auto no-scrollbar">
-                <button 
-                    onClick={() => setActiveTab('list')}
-                    className={`px-3 md:px-6 py-2.5 md:py-3 text-xs md:text-sm font-bold border-b-2 transition-all flex items-center justify-center gap-1.5 shrink-0 ${activeTab === 'list' ? 'border-blue-600 text-blue-600 bg-blue-50/60 md:bg-transparent rounded-t-lg md:rounded-none' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-                    title={`Danh sách kết quả (${filteredData.length})`}
-                >
-                    <ListFilter size={18}/> 
-                    <span className="hidden md:inline">Danh sách kết quả ({filteredData.length})</span>
-                </button>
-                <button 
-                    onClick={() => setActiveTab('ward_stats')}
-                    className={`px-3 md:px-6 py-2.5 md:py-3 text-xs md:text-sm font-bold border-b-2 transition-all flex items-center justify-center gap-1.5 shrink-0 ${activeTab === 'ward_stats' ? 'border-teal-600 text-teal-600 bg-teal-50/60 md:bg-transparent rounded-t-lg md:rounded-none' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-                    title="Thống kê theo Xã"
-                >
-                    <PieChart size={18}/> 
-                    <span className="hidden md:inline">Thống kê theo Xã</span>
-                </button>
-                <button 
-                    onClick={() => setActiveTab('revenue')}
-                    className={`px-3 md:px-6 py-2.5 md:py-3 text-xs md:text-sm font-bold border-b-2 transition-all flex items-center justify-center gap-1.5 shrink-0 ${activeTab === 'revenue' ? 'border-emerald-600 text-emerald-600 bg-emerald-50/60 md:bg-transparent rounded-t-lg md:rounded-none' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-                    title="Báo cáo Doanh thu"
-                >
-                    <DollarSign size={18}/> 
-                    <span className="hidden md:inline">Báo cáo Doanh thu</span>
-                </button>
-                <button 
-                    onClick={() => setActiveTab('employee')}
-                    className={`px-3 md:px-6 py-2.5 md:py-3 text-xs md:text-sm font-bold border-b-2 transition-all flex items-center justify-center gap-1.5 shrink-0 ${activeTab === 'employee' ? 'border-orange-600 text-orange-600 bg-orange-50/60 md:bg-transparent rounded-t-lg md:rounded-none' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-                    title="Thống kê nhân viên"
-                >
-                    <UserCheck size={18}/> 
-                    <span className="hidden md:inline">Thống kê nhân viên</span>
-                </button>
-                <button 
-                    onClick={() => setActiveTab('daily_stats')}
-                    className={`px-3 md:px-6 py-2.5 md:py-3 text-xs md:text-sm font-bold border-b-2 transition-all flex items-center justify-center gap-1.5 shrink-0 ${activeTab === 'daily_stats' ? 'border-pink-600 text-pink-600 bg-pink-50/60 md:bg-transparent rounded-t-lg md:rounded-none' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-                    title="Thống kê theo ngày"
-                >
-                    <CalendarDays size={18}/> 
-                    <span className="hidden md:inline">Thống kê theo ngày</span>
-                </button>
-                <button 
-                    onClick={() => setActiveTab('overdue')}
-                    className={`px-3 md:px-6 py-2.5 md:py-3 text-xs md:text-sm font-bold border-b-2 transition-all flex items-center justify-center gap-1.5 shrink-0 ${activeTab === 'overdue' ? 'border-red-600 text-red-600 bg-red-50/60 md:bg-transparent rounded-t-lg md:rounded-none' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-                    title="Thống kê hồ sơ trễ"
-                >
-                    <AlertTriangle size={18}/> 
-                    <span className="hidden md:inline">Thống kê hồ sơ trễ</span>
-                </button>
-                <button 
-                    onClick={() => setActiveTab('ai')}
-                    className={`px-3 md:px-6 py-2.5 md:py-3 text-xs md:text-sm font-bold border-b-2 transition-all flex items-center justify-center gap-1.5 shrink-0 ${activeTab === 'ai' ? 'border-purple-600 text-purple-600 bg-purple-50/60 md:bg-transparent rounded-t-lg md:rounded-none' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-                    title="Văn bản Báo cáo (AI)"
-                >
-                    <Sparkles size={18}/> 
-                    <span className="hidden md:inline">Văn bản Báo cáo (AI)</span>
-                </button>
-            </div>
+            {/* Content Sub-Tabs */}
+            {mainTab === 'revenue' ? (
+                <div className="flex bg-white border-b border-gray-200 px-2 md:px-4 justify-start gap-1 overflow-x-auto no-scrollbar">
+                    <button 
+                        onClick={() => setRevenueTeam('registration')}
+                        className={`px-4 md:px-6 py-2.5 md:py-3 text-xs md:text-sm font-bold border-b-2 transition-all flex items-center justify-center gap-1.5 shrink-0 ${revenueTeam === 'registration' ? 'border-purple-600 text-purple-700 bg-purple-50/60 rounded-t-lg' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                    >
+                        <FileCheck size={18}/> 
+                        <span>Tổ Cấp Giấy</span>
+                    </button>
+                    <button 
+                        onClick={() => setRevenueTeam('measurement')}
+                        className={`px-4 md:px-6 py-2.5 md:py-3 text-xs md:text-sm font-bold border-b-2 transition-all flex items-center justify-center gap-1.5 shrink-0 ${revenueTeam === 'measurement' ? 'border-blue-600 text-blue-700 bg-blue-50/60 rounded-t-lg' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                    >
+                        <Ruler size={18}/> 
+                        <span>Tổ Đo Đạc</span>
+                    </button>
+                    <button 
+                        onClick={() => setRevenueTeam('archive')}
+                        className={`px-4 md:px-6 py-2.5 md:py-3 text-xs md:text-sm font-bold border-b-2 transition-all flex items-center justify-center gap-1.5 shrink-0 ${revenueTeam === 'archive' ? 'border-orange-600 text-orange-700 bg-orange-50/60 rounded-t-lg' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                    >
+                        <FolderArchive size={18}/> 
+                        <span>Tổ Lưu Trữ</span>
+                    </button>
+                    <button 
+                        onClick={() => setRevenueTeam('total')}
+                        className={`px-4 md:px-6 py-2.5 md:py-3 text-xs md:text-sm font-bold border-b-2 transition-all flex items-center justify-center gap-1.5 shrink-0 ${revenueTeam === 'total' ? 'border-emerald-600 text-emerald-700 bg-emerald-50/60 rounded-t-lg' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                    >
+                        <DollarSign size={18}/> 
+                        <span>Tổng Doanh Thu Chi Nhánh</span>
+                    </button>
+                </div>
+            ) : (
+                <div className="flex bg-white border-b border-gray-200 px-2 md:px-4 justify-between md:justify-start gap-1 overflow-x-auto no-scrollbar">
+                    <button 
+                        onClick={() => setActiveTab('list')}
+                        className={`px-3 md:px-6 py-2.5 md:py-3 text-xs md:text-sm font-bold border-b-2 transition-all flex items-center justify-center gap-1.5 shrink-0 ${activeTab === 'list' ? 'border-blue-600 text-blue-600 bg-blue-50/60 md:bg-transparent rounded-t-lg md:rounded-none' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                        title={`Danh sách kết quả (${filteredData.length})`}
+                    >
+                        <ListFilter size={18}/> 
+                        <span className="hidden md:inline">Danh sách kết quả ({filteredData.length})</span>
+                    </button>
+                    <button 
+                        onClick={() => setActiveTab('ward_stats')}
+                        className={`px-3 md:px-6 py-2.5 md:py-3 text-xs md:text-sm font-bold border-b-2 transition-all flex items-center justify-center gap-1.5 shrink-0 ${activeTab === 'ward_stats' ? 'border-teal-600 text-teal-600 bg-teal-50/60 md:bg-transparent rounded-t-lg md:rounded-none' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                        title="Thống kê theo Xã"
+                    >
+                        <PieChart size={18}/> 
+                        <span className="hidden md:inline">Thống kê theo Xã</span>
+                    </button>
+                    <button 
+                        onClick={() => setActiveTab('employee')}
+                        className={`px-3 md:px-6 py-2.5 md:py-3 text-xs md:text-sm font-bold border-b-2 transition-all flex items-center justify-center gap-1.5 shrink-0 ${activeTab === 'employee' ? 'border-orange-600 text-orange-600 bg-orange-50/60 md:bg-transparent rounded-t-lg md:rounded-none' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                        title="Thống kê nhân viên"
+                    >
+                        <UserCheck size={18}/> 
+                        <span className="hidden md:inline">Thống kê nhân viên</span>
+                    </button>
+                    <button 
+                        onClick={() => setActiveTab('daily_stats')}
+                        className={`px-3 md:px-6 py-2.5 md:py-3 text-xs md:text-sm font-bold border-b-2 transition-all flex items-center justify-center gap-1.5 shrink-0 ${activeTab === 'daily_stats' ? 'border-pink-600 text-pink-600 bg-pink-50/60 md:bg-transparent rounded-t-lg md:rounded-none' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                        title="Thống kê theo ngày"
+                    >
+                        <CalendarDays size={18}/> 
+                        <span className="hidden md:inline">Thống kê theo ngày</span>
+                    </button>
+                    <button 
+                        onClick={() => setActiveTab('overdue')}
+                        className={`px-3 md:px-6 py-2.5 md:py-3 text-xs md:text-sm font-bold border-b-2 transition-all flex items-center justify-center gap-1.5 shrink-0 ${activeTab === 'overdue' ? 'border-red-600 text-red-600 bg-red-50/60 md:bg-transparent rounded-t-lg md:rounded-none' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                        title="Thống kê hồ sơ trễ"
+                    >
+                        <AlertTriangle size={18}/> 
+                        <span className="hidden md:inline">Thống kê hồ sơ trễ</span>
+                    </button>
+                    <button 
+                        onClick={() => setActiveTab('ai')}
+                        className={`px-3 md:px-6 py-2.5 md:py-3 text-xs md:text-sm font-bold border-b-2 transition-all flex items-center justify-center gap-1.5 shrink-0 ${activeTab === 'ai' ? 'border-purple-600 text-purple-600 bg-purple-50/60 md:bg-transparent rounded-t-lg md:rounded-none' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                        title="Văn bản Báo cáo (AI)"
+                    >
+                        <Sparkles size={18}/> 
+                        <span className="hidden md:inline">Văn bản Báo cáo (AI)</span>
+                    </button>
+                </div>
+            )}
 
             {/* Active Tab Subtitle Banner on Mobile */}
             <div className="md:hidden px-3 py-1.5 bg-slate-100 border-b border-slate-200 text-xs font-bold text-slate-700 flex justify-between items-center shrink-0">
                 <span>
-                    {activeTab === 'list' && `Danh sách kết quả (${filteredData.length})`}
-                    {activeTab === 'ward_stats' && 'Thống kê theo Xã/Phường'}
-                    {activeTab === 'revenue' && 'Báo cáo Doanh thu'}
-                    {activeTab === 'employee' && 'Thống kê Nhân viên'}
-                    {activeTab === 'daily_stats' && 'Thống kê theo Ngày'}
-                    {activeTab === 'overdue' && 'Thống kê Hồ sơ Trễ'}
-                    {activeTab === 'ai' && 'Văn bản Báo cáo (AI)'}
+                    {mainTab === 'revenue' ? (
+                        <>
+                            {revenueTeam === 'registration' && 'Báo cáo Doanh thu - Tổ Cấp Giấy'}
+                            {revenueTeam === 'measurement' && 'Báo cáo Doanh thu - Tổ Đo Đạc'}
+                            {revenueTeam === 'archive' && 'Báo cáo Doanh thu - Tổ Lưu Trữ'}
+                            {revenueTeam === 'total' && 'Tổng Doanh thu Chi Nhánh'}
+                        </>
+                    ) : (
+                        <>
+                            {activeTab === 'list' && `Danh sách kết quả (${filteredData.length})`}
+                            {activeTab === 'ward_stats' && 'Thống kê theo Xã/Phường'}
+                            {activeTab === 'employee' && 'Thống kê Nhân viên'}
+                            {activeTab === 'daily_stats' && 'Thống kê theo Ngày'}
+                            {activeTab === 'overdue' && 'Thống kê Hồ sơ Trễ'}
+                            {activeTab === 'ai' && 'Văn bản Báo cáo (AI)'}
+                        </>
+                    )}
                 </span>
                 <span className="text-[10px] text-slate-400 font-normal">Chạm icon trên để đổi</span>
             </div>
@@ -701,7 +842,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                             <span className="font-bold text-amber-600">({generalStats.processing})</span>
                         </button>
 
-                        {/* Trễ hạn chưa xong */}
+                        {/* Trễ hạn */}
                         <button
                             type="button"
                             onClick={() => {
@@ -714,7 +855,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                                     : 'text-slate-600 hover:text-slate-900'
                             }`}
                         >
-                            <span>Trễ hạn chưa xong</span>
+                            <span>Trễ hạn</span>
                             <span className="font-bold text-red-600">({generalStats.overduePending})</span>
                         </button>
                     </div>
@@ -916,7 +1057,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                         toDate={toDate}
                         selectedEmpId={selectedEmpId}
                         setSelectedEmpId={setSelectedEmpId}
-                        defaultDeptFilter={mainTab === 'archive' ? 'archive' : mainTab === 'measurement' ? 'measurement' : 'all'}
+                        defaultDeptFilter={mainTab === 'archive' ? 'archive' : mainTab === 'measurement' ? 'measurement' : mainTab === 'registration' ? 'registration' : 'all'}
                     />
                 )}
 
@@ -986,7 +1127,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                     />
                 )}
 
-                {activeTab === 'revenue' && (
+                {mainTab === 'revenue' && (
                     <RevenueStatsView 
                         records={activeRecords}
                         employees={activeEmployees}

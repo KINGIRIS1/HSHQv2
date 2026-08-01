@@ -571,12 +571,12 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
         </div>
 
         {/* BUTTONS CỐ ĐỊNH STICKY DƯỚI CÙNG */}
-        <div className="sticky bottom-0 left-0 right-0 z-20 bg-slate-50/95 backdrop-blur-md border-t border-slate-200 py-2.5 px-4 -mx-4 flex flex-col sm:flex-row justify-end gap-2.5 shadow-sm rounded-b-xl mt-3">
-            <button type="button" onClick={() => handleReset(false)} className="px-5 py-2 bg-white text-slate-600 rounded-lg hover:bg-slate-100 transition-colors shadow-sm text-xs md:text-sm font-bold border border-slate-200 flex items-center justify-center gap-1.5">
+        <div className="sticky bottom-0 left-0 right-0 z-20 bg-white/85 backdrop-blur-md border-t border-slate-200/80 py-2 px-4 -mx-2.5 -mb-2.5 md:-mx-3.5 md:-mb-3.5 flex flex-col sm:flex-row justify-end gap-2.5 shadow-lg mt-1.5">
+            <button type="button" onClick={() => handleReset(false)} className="px-5 py-2.5 bg-white text-slate-700 rounded-xl hover:bg-slate-50 transition-all shadow-sm hover:shadow text-xs md:text-sm font-bold border border-slate-300 flex items-center justify-center gap-1.5">
                 {initialData ? <><XCircle size={16} className="text-red-500" /> Hủy</> : <><RotateCcw size={16} /> Làm mới</>}
             </button>
-            <button type="submit" disabled={loading} className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-md text-xs md:text-sm font-bold transition-all active:scale-95 disabled:opacity-70 flex items-center justify-center gap-1.5">
-                <Save size={16} /> {loading ? 'Đang xử lý...' : (initialData ? 'CẬP NHẬT' : 'LƯU VÀ IN')}
+            <button type="submit" disabled={loading} className="px-6 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 shadow-md hover:shadow-lg text-xs md:text-sm font-bold transition-all active:scale-95 disabled:opacity-70 flex items-center justify-center gap-1.5">
+                <Save size={16} /> {loading ? 'Đang xử lý...' : (initialData ? 'Cập nhật & In' : 'Lưu & In')}
             </button>
         </div>
     </form>

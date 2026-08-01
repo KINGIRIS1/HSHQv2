@@ -14,6 +14,9 @@ interface ExcerptRecord {
   createdAt: string;
   createdBy: string;
   linkedRecordCode?: string; 
+  ownerName?: string;
+  address?: string;
+  assignedTo?: string;
 }
 
 interface ExcerptManagementProps {
@@ -173,7 +176,10 @@ const ExcerptManagement: React.FC<ExcerptManagementProps> = ({ currentUser, reco
           excerptNumber: nextCount,
           createdAt: new Date().toISOString(),
           createdBy: currentUser.name,
-          linkedRecordCode: linkedRecord?.code
+          linkedRecordCode: linkedRecord?.code,
+          ownerName: (linkedRecord as any)?.ownerName || linkedRecord?.customerName,
+          address: (linkedRecord as any)?.address || linkedRecord?.customerAddress || undefined,
+          assignedTo: linkedRecord?.assignedTo || undefined,
         };
 
         // Lưu lịch sử
@@ -523,41 +529,50 @@ const ExcerptManagement: React.FC<ExcerptManagementProps> = ({ currentUser, reco
                         <table className="w-full text-left border-collapse table-fixed">
                             <thead className="bg-white sticky top-0 shadow-sm z-10 text-xs font-semibold text-gray-500 uppercase">
                                 <tr>
-                                    <th className="p-3 border-b text-center w-20">STL</th>
-                                    <th className="p-3 border-b w-[200px]">Xã / Phường</th>
+                                    <th className="p-3 border-b text-center w-20">{activeTab === 'trichluc' ? 'STL' : 'STĐ'}</th>
+                                    <th className="p-3 border-b w-[180px]">Chủ hồ sơ</th>
+                                    <th className="p-3 border-b w-[160px]">Xã / Phường</th>
                                     <th className="p-3 border-b text-center w-16">Tờ</th>
                                     <th className="p-3 border-b text-center w-16">Thửa</th>
-                                    <th className="p-3 border-b w-[150px]">Hồ sơ liên kết</th>
-                                    <th className="p-3 border-b w-[150px]">Thời gian</th>
-                                    <th className="p-3 border-b w-[150px]">Người cấp</th>
+                                    <th className="p-3 border-b w-[140px]">Hồ sơ liên kết</th>
+                                    <th className="p-3 border-b w-[130px]">Thời gian</th>
+                                    <th className="p-3 border-b w-[130px]">Người cấp</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100 text-sm text-gray-700">
                                 {filteredHistory.length > 0 ? (
-                                    filteredHistory.map((item) => (
-                                        <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                                            <td className="p-3 text-center font-bold text-orange-600 bg-orange-50/50 align-middle">
-                                                {item.excerptNumber}
-                                            </td>
-                                            <td className="p-3 font-medium truncate align-middle" title={item.ward}>{item.ward}</td>
-                                            <td className="p-3 text-center font-mono align-middle">{item.mapSheet}</td>
-                                            <td className="p-3 text-center font-mono align-middle">{item.landPlot}</td>
-                                            <td className="p-3 truncate align-middle" title={item.linkedRecordCode}>
-                                                {item.linkedRecordCode ? (
-                                                    <span className="text-blue-600 font-medium text-xs bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
-                                                        {item.linkedRecordCode}
-                                                    </span>
-                                                ) : <span className="text-gray-400 text-xs italic">--</span>}
-                                            </td>
-                                            <td className="p-3 text-gray-500 text-xs align-middle">{formatDate(item.createdAt)}</td>
-                                            <td className="p-3 text-xs text-blue-600 font-medium align-middle">
-                                                <div className="truncate w-full" title={item.createdBy}>{item.createdBy}</div>
-                                            </td>
-                                        </tr>
-                                    ))
+                                    filteredHistory.map((item) => {
+                                        const matchedRecord = item.linkedRecordCode ? records.find(r => r.code === item.linkedRecordCode) : null;
+                                        const owner = item.ownerName || (matchedRecord as any)?.ownerName || matchedRecord?.customerName || '---';
+
+                                        return (
+                                            <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+                                                <td className="p-3 text-center font-bold text-orange-600 bg-orange-50/50 align-middle">
+                                                    {item.excerptNumber}
+                                                </td>
+                                                <td className="p-3 font-semibold text-slate-800 truncate align-middle" title={owner}>
+                                                    {owner}
+                                                </td>
+                                                <td className="p-3 font-medium truncate align-middle" title={item.ward}>{item.ward}</td>
+                                                <td className="p-3 text-center font-mono align-middle">{item.mapSheet}</td>
+                                                <td className="p-3 text-center font-mono align-middle">{item.landPlot}</td>
+                                                <td className="p-3 truncate align-middle" title={item.linkedRecordCode}>
+                                                    {item.linkedRecordCode ? (
+                                                        <span className="text-blue-600 font-medium text-xs bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
+                                                            {item.linkedRecordCode}
+                                                        </span>
+                                                    ) : <span className="text-gray-400 text-xs italic">--</span>}
+                                                </td>
+                                                <td className="p-3 text-gray-500 text-xs align-middle">{formatDate(item.createdAt)}</td>
+                                                <td className="p-3 text-xs text-blue-600 font-medium align-middle">
+                                                    <div className="truncate w-full" title={item.createdBy}>{item.createdBy}</div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })
                                 ) : (
                                     <tr>
-                                        <td colSpan={7} className="p-10 text-center text-gray-400 italic">
+                                        <td colSpan={8} className="p-10 text-center text-gray-400 italic">
                                             Chưa có dữ liệu lịch sử cho năm {currentYear}.
                                         </td>
                                     </tr>

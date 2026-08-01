@@ -704,7 +704,7 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
       : (formData.totalAmount || derivedPricing.totalAmount);
 
   return (
-    <form onSubmit={handleSubmit} className="w-full max-w-[1800px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-3.5 md:gap-4 2xl:gap-6 animate-fade-in relative pb-6">
+    <form onSubmit={handleSubmit} className="w-full max-w-[1800px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-2.5 md:gap-3 2xl:gap-4 animate-fade-in relative">
         <div ref={topRef} className="absolute -top-20" />
         
         {/* NOTIFICATION */}
@@ -889,21 +889,6 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
                                 <div className="flex gap-1.5 items-center">
                                     <input type="date" className={inputClass} value={dateVal(formData.liquidationDate)} onChange={e => handleChange('liquidationDate', e.target.value)} />
                                 </div>
-                            </div>
-                        )}
-
-                        {/* CẢNH BÁO KIỂM TRA NGÀY BẤT THƯỜNG / SAI SO VỚI THỜI GIAN HIỆN TẠI */}
-                        {dateCheck.messages.length > 0 && (
-                            <div className={`col-span-full p-3 rounded-xl border text-xs space-y-1 animate-fade-in ${dateCheck.hasError ? 'bg-red-50 border-red-200 text-red-800' : 'bg-amber-50 border-amber-200 text-amber-800'}`}>
-                                <div className="flex items-center gap-1.5 font-bold text-sm">
-                                    <AlertTriangle size={16} className={dateCheck.hasError ? 'text-red-600' : 'text-amber-600'} />
-                                    <span>Cảnh báo ngày bất thường (So với thời gian hiện tại: {getTodayDateString()}):</span>
-                                </div>
-                                <ul className="list-disc list-inside pl-1 space-y-1 font-medium">
-                                    {dateCheck.messages.map((m, idx) => (
-                                        <li key={idx}>{m}</li>
-                                    ))}
-                                </ul>
                             </div>
                         )}
                     </div>
@@ -1260,22 +1245,22 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
             </div>
         </div>
 
-        {/* ACTION BAR AT BOTTOM - COMPACT STYLE MATCHING RECORD FORM */}
-        <div className="lg:col-span-12 bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-end gap-2.5 transition-all mt-1">
+        {/* ACTION BAR AT BOTTOM - FIXED STICKY AT BOTTOM OF CONTAINER */}
+        <div className="lg:col-span-12 sticky bottom-0 z-20 bg-white/85 backdrop-blur-md border-t border-slate-200/80 py-2 px-4 md:px-6 shadow-lg flex items-center justify-end gap-2.5 transition-all mt-1.5 -mx-2.5 -mb-2.5 md:-mx-3.5 md:-mb-3.5">
             <button 
                 type="submit" 
                 disabled={loading} 
-                className={`px-5 py-1.5 text-white rounded-lg font-bold text-xs shadow-md transition-all active:scale-95 disabled:opacity-70 flex items-center justify-center gap-1.5 ${isLiquidationMode ? 'bg-orange-600 hover:bg-orange-700 shadow-orange-500/20' : 'bg-purple-600 hover:bg-purple-700 shadow-purple-500/20'}`}
+                className={`px-6 py-2.5 text-white rounded-xl font-bold text-xs md:text-sm shadow-md hover:shadow-lg transition-all active:scale-95 disabled:opacity-70 flex items-center justify-center gap-1.5 ${isLiquidationMode ? 'bg-orange-600 hover:bg-orange-700 shadow-orange-500/30' : 'bg-purple-600 hover:bg-purple-700 shadow-purple-500/30'}`}
             >
-                <Save size={15} /> {loading ? 'Đang xử lý...' : (initialData ? (isLiquidationMode ? 'CẬP NHẬT VÀ IN THANH LÝ' : 'CẬP NHẬT VÀ IN HỢP ĐỒNG') : (isLiquidationMode ? 'LƯU VÀ IN THANH LÝ' : 'LƯU VÀ IN HỢP ĐỒNG'))}
+                <Save size={16} /> {loading ? 'Đang xử lý...' : (initialData ? 'Cập nhật & In' : 'Lưu & In')}
             </button>
             <button 
                 type="button" 
                 onClick={() => handleReset(false)} 
-                className="px-3.5 py-1.5 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors shadow-2xs font-bold border border-slate-200 flex items-center gap-1.5 text-xs" 
+                className="px-5 py-2.5 bg-white text-slate-700 rounded-xl hover:bg-slate-50 transition-all shadow-sm hover:shadow font-bold border border-slate-300 flex items-center gap-1.5 text-xs md:text-sm" 
                 title="Làm mới form"
             >
-                {initialData ? <X size={15} className="text-red-500" /> : <RotateCcw size={15} />}
+                {initialData ? <X size={16} className="text-red-500" /> : <RotateCcw size={16} />}
                 <span>Làm mới</span>
             </button>
         </div>

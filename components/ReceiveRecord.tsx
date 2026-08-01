@@ -346,7 +346,7 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col h-full animate-fade-in-up overflow-hidden">
-      <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-blue-50/50 shrink-0 z-10">
+      <div className="px-3 py-1 md:px-4 md:py-1 border-b border-gray-100 flex justify-between items-center bg-blue-50/50 shrink-0 z-10">
         <div className="flex bg-white p-1 rounded-lg border border-gray-200">
             {canCreate && (
               <button 
@@ -382,7 +382,7 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto p-3.5 md:p-4 min-h-0">
+      <div className="flex-1 overflow-y-auto px-2.5 pt-1.5 pb-0 md:px-3.5 md:pt-2 min-h-0">
         {viewMode === 'create' && (
             <RecordForm 
                 initialData={editingRecord}

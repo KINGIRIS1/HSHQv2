@@ -5,19 +5,10 @@ import { updateRecordFieldsApi } from '../services/api';
 const REMINDER_INTERVAL = 60000; // Kiểm tra mỗi 1 phút
 const REPEAT_HOURS = 2; // Nhắc lại mỗi 2 giờ
 
-// Helper gửi thông báo hệ thống (Notification API)
-const triggerSystemNotification = (title: string, body: string) => {
-    if (window.electronAPI && window.electronAPI.showNotification) {
-        window.electronAPI.showNotification(title, body);
-    } else if (Notification.permission === 'granted') {
-        new Notification(title, { body });
-    } else if (Notification.permission !== 'denied') {
-        Notification.requestPermission().then(permission => {
-            if (permission === 'granted') {
-                new Notification(title, { body });
-            }
-        });
-    }
+// Helper gửi thông báo hệ thống (Notification API) - Đã tắt hoàn toàn theo yêu cầu của người dùng
+const triggerSystemNotification = (_title: string, _body: string) => {
+    // Đã tắt hoàn toàn tất cả thông báo thời gian thực / hệ thống khi có hồ sơ mới chuyển tới hoặc trễ hạn
+    return;
 };
 
 export const useReminderSystem = (

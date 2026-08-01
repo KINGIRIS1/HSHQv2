@@ -6,7 +6,7 @@ import StatusBadge from './StatusBadge';
 import { X, MapPin, FileText, User as UserIcon, Receipt, DollarSign, CheckCircle2, Circle, Send, FileSignature, CheckSquare, CalendarClock, FileCheck, Calculator, Loader2, StickyNote, Save, Bell, Printer, Pencil, Trash2, Info, FileDown, Undo2 } from 'lucide-react';
 import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../services/docxService';
 import DocxPreviewModal from './DocxPreviewModal';
-import { updateRecordApi, fetchContracts } from '../services/api';
+import { updateRecordApi, fetchContracts, fetchExcerptHistory, saveExcerptRecord, fetchExcerptCounters, saveExcerptCounters, fetchTrichDoHistory, saveTrichDoRecord, fetchTrichDoCounters, saveTrichDoCounters } from '../services/api';
 import SystemReceiptTemplate from './receive-record/SystemReceiptTemplate';
 import SystemAnnexTemplate from './receive-record/SystemAnnexTemplate';
 import { getBatchDisplayParts } from '../utils/appHelpers';
@@ -58,6 +58,9 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
   const [isAnnexModalOpen, setIsAnnexModalOpen] = useState(false);
   const [contracts, setContracts] = useState<any[]>([]);
   const [matchedContract, setMatchedContract] = useState<any | null>(null);
+
+  // State cho Tự động lấy số Trích lục / Trích đo
+  const [isGettingAutoNumber, setIsGettingAutoNumber] = useState(false);
 
   useEffect(() => {
       if (record) {
@@ -274,6 +277,76 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
       } finally {
           setIsExtending(false);
       }
+  };
+
+  const handleAutoGetNumber = async () => {
+    if (!record) return;
+    setIsGettingAutoNumber(true);
+    try {
+        const recordTypeLower = (record.recordType || '').toLowerCase();
+        const isTrichLuc = recordTypeLower.includes('trích lục') || recordTypeLower.includes('tl');
+        const currentYear = new Date().getFullYear();
+        const getCounterKey = (yr: number) => yr <= 2025 ? 'GLOBAL' : `GLOBAL_${yr}`;
+
+        const serverHistory = isTrichLuc ? await fetchExcerptHistory() : await fetchTrichDoHistory();
+        let maxNumberInHistory = 0;
+        serverHistory.forEach((r: any) => {
+            const itemYear = new Date(r.createdAt).getFullYear();
+            const yearMatch = currentYear <= 2025 ? itemYear <= 2025 : itemYear === currentYear;
+            if (yearMatch && r.excerptNumber > maxNumberInHistory) {
+                maxNumberInHistory = r.excerptNumber;
+            }
+        });
+
+        const serverCounters = isTrichLuc ? await fetchExcerptCounters() : await fetchTrichDoCounters();
+        const counterKey = getCounterKey(currentYear);
+        const currentCountOnServer = serverCounters[counterKey] || 0;
+        const nextCount = Math.max(currentCountOnServer, maxNumberInHistory) + 1;
+
+        const newExcerptRecord = {
+            id: Math.random().toString(36).substr(2, 9),
+            ward: record.ward || 'Chưa xác định',
+            mapSheet: record.mapSheet || '---',
+            landPlot: record.landPlot || '---',
+            excerptNumber: nextCount,
+            createdAt: new Date().toISOString(),
+            createdBy: currentUser?.name || 'Hệ thống',
+            linkedRecordCode: record.code,
+            ownerName: (record as any).ownerName || record.customerName,
+            address: (record as any).address || record.customerAddress,
+            assignedTo: record.assignedTo || undefined
+        };
+
+        if (isTrichLuc) {
+            await saveExcerptRecord(newExcerptRecord);
+            await saveExcerptCounters({ ...serverCounters, [counterKey]: nextCount });
+        } else {
+            await saveTrichDoRecord(newExcerptRecord);
+            await saveTrichDoCounters({ ...serverCounters, [counterKey]: nextCount });
+        }
+
+        const numStr = nextCount.toString();
+        const updatedRecord: RecordFile = {
+            ...record,
+            excerptNumber: isTrichLuc ? numStr : (record.excerptNumber || numStr),
+            measurementNumber: !isTrichLuc ? numStr : (record.measurementNumber || numStr)
+        };
+
+        const res = await updateRecordApi(updatedRecord);
+        if (res) {
+            if (isTrichLuc) record.excerptNumber = numStr;
+            else record.measurementNumber = numStr;
+            if (onRefreshData) onRefreshData();
+            alert(`Đã cấp thành công ${isTrichLuc ? 'Số trích lục' : 'Số trích đo'}: ${numStr}`);
+        } else {
+            alert('Không thể lưu số vào hồ sơ. Vui lòng thử lại.');
+        }
+    } catch (error) {
+        console.error('Lỗi lấy số tự động:', error);
+        alert('Không thể lấy số tự động. Vui lòng thử lại!');
+    } finally {
+        setIsGettingAutoNumber(false);
+    }
   };
 
   const handlePrintReceipt = async () => {
@@ -807,23 +880,43 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                                     )}
 
                                     {/* CỘT SỐ TRÍCH ĐO / SỐ TRÍCH LỤC */}
-                                    {hasExcerptOrMeasurement && (
-                                        <div className="bg-purple-50/80 border border-purple-100 rounded-xl p-3 flex items-center gap-2.5">
-                                            <div className="bg-purple-200 text-purple-700 p-2 rounded-lg shrink-0">
-                                                <FileCheck size={16} />
+                                    {hasExcerptOrMeasurement && (() => {
+                                        const isTrichLuc = recordTypeLower.includes('trích lục') || recordTypeLower.includes('tl');
+                                        const existingNum = isTrichLuc 
+                                            ? record.excerptNumber 
+                                            : (record.measurementNumber || record.excerptNumber);
+                                        const hasNumber = !!(existingNum && existingNum !== '---' && existingNum !== '');
+
+                                        return (
+                                            <div className="bg-purple-50/80 border border-purple-100 rounded-xl p-3 flex items-center justify-between gap-2 min-w-0">
+                                                <div className="flex items-center gap-2.5 min-w-0">
+                                                    <div className="bg-purple-200 text-purple-700 p-2 rounded-lg shrink-0">
+                                                        <FileCheck size={16} />
+                                                    </div>
+                                                    <div className="text-left truncate">
+                                                        <span className="text-[10px] text-purple-600 uppercase font-bold block">
+                                                            {isTrichLuc ? 'Số trích lục' : 'Số trích đo'}
+                                                        </span>
+                                                        <p className="text-xs font-bold text-purple-950 truncate">
+                                                            {hasNumber ? existingNum : 'Chưa có số'}
+                                                        </p>
+                                                    </div>
+                                                </div>
+
+                                                {!hasNumber && (
+                                                    <button
+                                                        onClick={handleAutoGetNumber}
+                                                        disabled={isGettingAutoNumber}
+                                                        className="inline-flex items-center gap-1 text-[11px] font-bold bg-purple-600 text-white hover:bg-purple-700 px-2.5 py-1.5 rounded-lg transition-colors shadow-sm whitespace-nowrap shrink-0 disabled:opacity-50"
+                                                        title="Cấp số trích lục/trích đo tự động tiếp theo"
+                                                    >
+                                                        {isGettingAutoNumber ? <Loader2 size={13} className="animate-spin" /> : <Calculator size={13} />}
+                                                        <span>Lấy số tự động</span>
+                                                    </button>
+                                                )}
                                             </div>
-                                            <div className="text-left truncate">
-                                                <span className="text-[10px] text-purple-600 uppercase font-bold block">
-                                                    {recordTypeLower.includes('trích lục') ? 'Số trích lục' : 'Số trích đo'}
-                                                </span>
-                                                <p className="text-xs font-bold text-purple-950 truncate">
-                                                    {recordTypeLower.includes('trích lục') 
-                                                        ? (record.excerptNumber || '---') 
-                                                        : (record.measurementNumber || record.excerptNumber || '---')}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    )}
+                                        );
+                                    })()}
                                 </div>
                             );
                         })()}
