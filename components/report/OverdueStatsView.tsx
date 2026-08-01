@@ -1,16 +1,16 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { RecordFile, RecordStatus, Employee } from '../../types';
 import { getNormalizedWard, STATUS_LABELS } from '../../constants';
 import { isRecordOverdue } from '../../utils/appHelpers';
-import { exportOverdueStatsToExcel } from '../../utils/excelExport';
-import { AlertTriangle, CheckCircle2, Clock, MapPin, ChevronLeft, ChevronRight, Download } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Clock, MapPin, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface OverdueStatsViewProps {
     records: RecordFile[];
     employees: Employee[];
+    onFilteredRecordsChange?: (records: RecordFile[]) => void;
 }
 
-const OverdueStatsView: React.FC<OverdueStatsViewProps> = ({ records, employees }) => {
+const OverdueStatsView: React.FC<OverdueStatsViewProps> = ({ records, employees, onFilteredRecordsChange }) => {
     const [filterType, setFilterType] = useState<'all' | 'completed' | 'pending'>('all');
     const [selectedEmployee, setSelectedEmployee] = useState<string>('all');
     const [currentPage, setCurrentPage] = useState(1);
@@ -89,6 +89,12 @@ const OverdueStatsView: React.FC<OverdueStatsViewProps> = ({ records, employees 
         setMobileVisibleCount(20);
     }, [filterType, selectedEmployee]);
 
+    useEffect(() => {
+        if (onFilteredRecordsChange) {
+            onFilteredRecordsChange(overdueData.filteredRecords);
+        }
+    }, [overdueData.filteredRecords, onFilteredRecordsChange]);
+
     const formatDate = (d?: string | null) => {
         if (!d) return '-';
         const cleanStr = d.split('T')[0];
@@ -157,14 +163,6 @@ const OverdueStatsView: React.FC<OverdueStatsViewProps> = ({ records, employees 
                                 ))}
                             </select>
                         </div>
-
-                        <button
-                            onClick={() => exportOverdueStatsToExcel(overdueData.filteredRecords, employees, filterType)}
-                            className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm shrink-0 cursor-pointer h-[36px]"
-                            title="Xuất danh sách hồ sơ trễ hạn đang lọc ra file Excel"
-                        >
-                            <Download size={15} /> Xuất Excel Trễ Hạn ({overdueData.filteredRecords.length})
-                        </button>
                     </div>
                 </div>
                 <div className="hidden md:block flex-1 overflow-auto">

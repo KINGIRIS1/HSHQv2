@@ -149,7 +149,7 @@ export const fetchArchiveRecords = async (type: 'saoluc' | 'vaoso' | 'congvan'):
         }
         return allData;
     } catch (error) {
-        logError(`fetchArchiveRecords-${type}`, error);
+        logError(`fetchArchiveRecords-${type}`, error, true);
         return MOCK_ARCHIVE.filter(r => r.type === type);
     }
 };

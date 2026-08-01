@@ -2,9 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { RecordFile, Employee, RecordStatus } from '../../types';
 import { generateEmployeeEvaluation } from '../../services/geminiService';
-import { User as UserIcon, AlertOctagon, Sparkles, Loader2, ListFilter, CheckCircle2, Clock, AlertTriangle, Briefcase, FileSpreadsheet } from 'lucide-react';
-import * as XLSX from 'xlsx-js-style';
-import { STATUS_LABELS } from '../../constants';
+import { User as UserIcon, AlertOctagon, Sparkles, Loader2, ListFilter, CheckCircle2, Clock, AlertTriangle, Briefcase } from 'lucide-react';
 import { parseSafeDate } from '../../utils/appHelpers';
 
 interface EmployeeStatsViewProps {
@@ -173,35 +171,6 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
         }).sort((a, b) => b.totalAssigned - a.totalAssigned);
     }, [filteredEmployeesByDept, recordsInTimeRange]);
 
-    const handleExportSummaryExcel = () => {
-        const dataToExport = employeeSummaryList.map((item, idx) => ({
-            'STT': idx + 1,
-            'Tên cán bộ': item.employee.name,
-            'Phòng / Tổ': item.employee.department || 'Tổ chuyên môn',
-            'Hồ sơ giao': item.totalAssigned,
-            'Đã xong': item.completed,
-            'Đang xử lý': item.processing,
-            'Trễ đã xong': item.overdueCompleted,
-            'Trễ chưa xong': item.overduePending
-        }));
-
-        const ws = XLSX.utils.json_to_sheet(dataToExport);
-        ws['!cols'] = [
-            { wch: 5 },
-            { wch: 25 },
-            { wch: 20 },
-            { wch: 12 },
-            { wch: 12 },
-            { wch: 12 },
-            { wch: 12 },
-            { wch: 12 }
-        ];
-
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "ThongKeNhanVien");
-        XLSX.writeFile(wb, `Bao_Cao_Thong_Ke_Nhan_Vien_${fromDate}_${toDate}.xlsx`);
-    };
-
     const handleGenerateReview = async () => {
         if (!stats || !selectedEmpId) return;
         setIsGenerating(true);
@@ -233,56 +202,6 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
         setIsGenerating(false);
     };
 
-    const handleExportEmployeeRecords = () => {
-        if (!selectedEmpId) return;
-        
-        const emp = employees.find(e => e.id === selectedEmpId);
-        const empName = emp ? emp.name : "NhanVien";
-        
-        const targetRecords = recordsInTimeRange.filter(r => r.assignedTo === selectedEmpId);
-        
-        if (targetRecords.length === 0) {
-            alert("Không có hồ sơ nào trong khoảng thời gian này.");
-            return;
-        }
-
-        const dataToExport = targetRecords.map((r, idx) => ({
-            'STT': idx + 1,
-            'Mã hồ sơ': r.code,
-            'Tên khách hàng': r.customerName,
-            'Địa chỉ': r.address,
-            'Xã/Phường': r.ward,
-            'Ngày nhận': r.receivedDate ? new Date(r.receivedDate).toLocaleDateString('vi-VN') : '',
-            'Hẹn trả': r.deadline ? new Date(r.deadline).toLocaleDateString('vi-VN') : '',
-            'Ngày xong': r.completedDate ? new Date(r.completedDate).toLocaleDateString('vi-VN') : '',
-            'Trạng thái': STATUS_LABELS[r.status] || r.status,
-            'Ghi chú': r.notes || r.content
-        }));
-
-        const ws = XLSX.utils.json_to_sheet(dataToExport);
-        
-        // Auto-width columns
-        const wscols = [
-            { wch: 5 }, // STT
-            { wch: 15 }, // Ma HS
-            { wch: 25 }, // Ten KH
-            { wch: 30 }, // Dia chi
-            { wch: 15 }, // Xa
-            { wch: 12 }, // Ngay nhan
-            { wch: 12 }, // Hen tra
-            { wch: 12 }, // Ngay xong
-            { wch: 15 }, // Trang thai
-            { wch: 30 }  // Ghi chu
-        ];
-        ws['!cols'] = wscols;
-
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "DanhSachHoSo");
-        
-        const fileName = `DS_HoSo_${empName}_${fromDate}_${toDate}.xlsx`;
-        XLSX.writeFile(wb, fileName);
-    };
-
     return (
         <div className="flex flex-col h-full bg-slate-100 p-6 overflow-y-auto">
             
@@ -312,21 +231,6 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
                             ))}
                         </select>
                     </div>
-                    {selectedEmpId ? (
-                        <button
-                            onClick={handleExportEmployeeRecords}
-                            className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-bold transition-all flex items-center gap-2 shadow-sm shrink-0 cursor-pointer"
-                        >
-                            <FileSpreadsheet size={16} /> Xuất Excel Hồ Sơ Cán Bộ
-                        </button>
-                    ) : (
-                        <button
-                            onClick={handleExportSummaryExcel}
-                            className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-bold transition-all flex items-center gap-2 shadow-sm shrink-0 cursor-pointer"
-                        >
-                            <FileSpreadsheet size={16} /> Xuất Excel Tổng Hợp Cán Bộ
-                        </button>
-                    )}
                 </div>
             </div>
 

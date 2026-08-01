@@ -76,6 +76,8 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
     const [itemsPerPage, setItemsPerPage] = useState(20);
 
     const [dailyStatsRecords, setDailyStatsRecords] = useState<RecordFile[]>([]);
+    const [revenueStatsRecords, setRevenueStatsRecords] = useState<RecordFile[]>([]);
+    const [overdueStatsRecords, setOverdueStatsRecords] = useState<RecordFile[]>([]);
 
     // --- NEW LOGIC FOR MAIN TABS (Đo đạc vs Lưu trữ) ---
     // Tìm nhân sự ứng với tài khoản hiện tại
@@ -500,7 +502,12 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
         let teamName = "ĐO ĐẠC";
         if (mainTab === 'registration') teamName = "CẤP GIẤY";
         else if (mainTab === 'archive') teamName = "LƯU TRỮ";
-        else if (mainTab === 'revenue') teamName = "TỔNG HỢP DOANH THU";
+        else if (mainTab === 'revenue') {
+            if (revenueTeam === 'registration') teamName = "DOANH THU TỔ CẤP GIẤY";
+            else if (revenueTeam === 'measurement') teamName = "DOANH THU TỔ ĐO ĐẠC";
+            else if (revenueTeam === 'archive') teamName = "DOANH THU TỔ LƯU TRỮ";
+            else teamName = "NGUỒN THU TỔNG HỢP";
+        }
 
         let title = `BÁO CÁO KẾT QUẢ CÔNG TÁC ${teamName}`;
         if (reportType === 'today') title += " HÔM NAY";
@@ -513,86 +520,42 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
 
     // Compute dynamic count for shared Excel Export button
     const activeExportCount = useMemo(() => {
+        if (mainTab === 'revenue') {
+            return revenueStatsRecords.length || filteredData.length;
+        }
         if (activeTab === 'daily_stats') {
             return dailyStatsRecords.length || filteredData.length;
         }
+        if (activeTab === 'overdue') {
+            return overdueStatsRecords.length || filteredData.length;
+        }
         if (activeTab === 'employee' && selectedEmpId) {
             return filteredData.filter(r => r.assignedTo === selectedEmpId).length;
-        }
-        if (activeTab === 'overdue') {
-            let count = 0;
-            finalFilteredData.forEach(r => {
-                if (selectedEmpId && selectedEmpId !== 'all') {
-                    if (selectedEmpId === 'unassigned') {
-                        if (r.assignedTo) return;
-                    } else if (r.assignedTo !== selectedEmpId) {
-                        return;
-                    }
-                }
-                const isDone = r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED || r.status === RecordStatus.SIGNED || !!r.exportBatch;
-                const isWithdrawnOrRejected = r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED;
-
-                if (!isDone && !isWithdrawnOrRejected) {
-                    if (isRecordOverdue(r)) count++;
-                } else if (isDone) {
-                    if (r.deadline && r.completedDate) {
-                        const d = new Date(r.deadline); d.setHours(0,0,0,0);
-                        const c = new Date(r.completedDate); c.setHours(0,0,0,0);
-                        if (c > d) count++;
-                    }
-                }
-            });
-            return count;
         }
         if (activeTab === 'list') {
             return finalFilteredData.length;
         }
         return filteredData.length;
-    }, [activeTab, dailyStatsRecords, filteredData, finalFilteredData, selectedEmpId]);
+    }, [activeTab, mainTab, dailyStatsRecords, revenueStatsRecords, overdueStatsRecords, filteredData, finalFilteredData, selectedEmpId]);
 
     const handleExportExcelClick = () => {
         if (!fromDate || !toDate) { alert("Vui lòng chọn đầy đủ thời gian."); return; }
-        
+
         if (activeTab === 'overdue') {
-            const completed: RecordFile[] = [];
-            const pending: RecordFile[] = [];
-
-            finalFilteredData.forEach(r => {
-                if (selectedEmpId && selectedEmpId !== 'all') {
-                    if (selectedEmpId === 'unassigned') {
-                        if (r.assignedTo) return;
-                    } else if (r.assignedTo !== selectedEmpId) {
-                        return;
-                    }
-                }
-
-                const isDone = r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED || r.status === RecordStatus.SIGNED || !!r.exportBatch;
-                const isWithdrawnOrRejected = r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED;
-
-                if (!isDone && !isWithdrawnOrRejected) {
-                    if (isRecordOverdue(r)) {
-                        pending.push({ ...r, _overdueType: 'pending' } as any);
-                    }
-                } else if (isDone) {
-                    if (r.deadline && r.completedDate) {
-                        const d = new Date(r.deadline); d.setHours(0,0,0,0);
-                        const c = new Date(r.completedDate); c.setHours(0,0,0,0);
-                        if (c > d) {
-                            completed.push({ ...r, _overdueType: 'completed' } as any);
-                        }
-                    }
-                }
-            });
-
-            const overdueRecords = [...completed, ...pending];
-            exportOverdueStatsToExcel(overdueRecords, employees, 'all');
+            const dataToExport = overdueStatsRecords.length > 0 ? overdueStatsRecords : filteredData;
+            exportOverdueStatsToExcel(dataToExport, activeEmployees, 'all');
             return;
         }
-
+        
         let teamName = "ĐO ĐẠC";
         if (mainTab === 'registration') teamName = "CẤP GIẤY";
         else if (mainTab === 'archive') teamName = "LƯU TRỮ";
-        else if (mainTab === 'revenue') teamName = "TỔNG HỢP DOANH THU";
+        else if (mainTab === 'revenue') {
+            if (revenueTeam === 'registration') teamName = "DOANH THU TỔ CẤP GIẤY";
+            else if (revenueTeam === 'measurement') teamName = "DOANH THU TỔ ĐO ĐẠC";
+            else if (revenueTeam === 'archive') teamName = "DOANH THU TỔ LƯU TRỮ";
+            else teamName = "NGUỒN THU TỔNG HỢP";
+        }
 
         let title = `BÁO CÁO KẾT QUẢ CÔNG TÁC ${teamName}`;
         
@@ -607,8 +570,10 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
             } else {
                 title += " - TỔNG HỢP THEO NHÂN VIÊN";
             }
-        } else if (activeTab === 'revenue') {
-            title += " - BÁO CÁO DOANH THU";
+        } else if (mainTab === 'revenue') {
+            title += " - BÁO CÁO NGUỒN THU";
+        } else if (activeTab === 'overdue') {
+            title += " - BÁO CÁO HỒ SƠ TRỄ HẠN";
         }
 
         if (reportType === 'today') title += " HÔM NAY";
@@ -616,7 +581,9 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
         else if (reportType === 'month') title += " THÁNG NÀY";
 
         let dataToExport = finalFilteredData;
-        if (activeTab === 'daily_stats' && dailyStatsRecords.length > 0) {
+        if (mainTab === 'revenue' && revenueStatsRecords.length > 0) {
+            dataToExport = revenueStatsRecords;
+        } else if (activeTab === 'daily_stats' && dailyStatsRecords.length > 0) {
             dataToExport = dailyStatsRecords;
         }
 
@@ -697,7 +664,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                             onClick={() => setMainTab('revenue')}
                             className={`px-5 py-2.5 text-sm font-bold rounded-t-lg border-t border-l border-r transition-all flex items-center gap-2 shrink-0 ${mainTab === 'revenue' ? 'bg-emerald-50 border-gray-200 text-emerald-700 border-b-transparent relative top-[1px]' : 'bg-gray-50 border-transparent text-gray-500 hover:bg-gray-100'}`}
                         >
-                            <DollarSign size={18} /> Báo cáo Doanh thu
+                            <DollarSign size={18} /> Báo cáo Nguồn thu
                         </button>
                     )}
                 </div>
@@ -791,28 +758,28 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                         className={`px-4 md:px-6 py-2.5 md:py-3 text-xs md:text-sm font-bold border-b-2 transition-all flex items-center justify-center gap-1.5 shrink-0 ${revenueTeam === 'total' ? 'border-emerald-600 text-emerald-700 bg-emerald-50/60 rounded-t-lg' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
                     >
                         <DollarSign size={18}/> 
-                        <span>Tổng Doanh Thu (3 Tổ)</span>
+                        <span>Báo cáo nguồn thu tổng hợp</span>
                     </button>
                     <button 
                         onClick={() => setRevenueTeam('registration')}
                         className={`px-4 md:px-6 py-2.5 md:py-3 text-xs md:text-sm font-bold border-b-2 transition-all flex items-center justify-center gap-1.5 shrink-0 ${revenueTeam === 'registration' ? 'border-purple-600 text-purple-700 bg-purple-50/60 rounded-t-lg' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
                     >
                         <FileCheck size={18}/> 
-                        <span>Tổ Cấp Giấy</span>
+                        <span>Báo cáo doanh thu tổ Cấp giấy</span>
                     </button>
                     <button 
                         onClick={() => setRevenueTeam('measurement')}
                         className={`px-4 md:px-6 py-2.5 md:py-3 text-xs md:text-sm font-bold border-b-2 transition-all flex items-center justify-center gap-1.5 shrink-0 ${revenueTeam === 'measurement' ? 'border-blue-600 text-blue-700 bg-blue-50/60 rounded-t-lg' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
                     >
                         <Ruler size={18}/> 
-                        <span>Tổ Đo Đạc</span>
+                        <span>Báo cáo doanh thu tổ Đo đạc</span>
                     </button>
                     <button 
                         onClick={() => setRevenueTeam('archive')}
                         className={`px-4 md:px-6 py-2.5 md:py-3 text-xs md:text-sm font-bold border-b-2 transition-all flex items-center justify-center gap-1.5 shrink-0 ${revenueTeam === 'archive' ? 'border-orange-600 text-orange-700 bg-orange-50/60 rounded-t-lg' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
                     >
                         <FolderArchive size={18}/> 
-                        <span>Tổ Lưu Trữ</span>
+                        <span>Báo cáo doanh thu tổ Lưu trữ</span>
                     </button>
                 </div>
             ) : (
@@ -858,14 +825,6 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                         <span className="hidden md:inline">Thống kê hồ sơ trễ</span>
                     </button>
                     <button 
-                        onClick={() => setActiveTab('revenue')}
-                        className={`px-3 md:px-6 py-2.5 md:py-3 text-xs md:text-sm font-bold border-b-2 transition-all flex items-center justify-center gap-1.5 shrink-0 ${activeTab === 'revenue' ? 'border-emerald-600 text-emerald-600 bg-emerald-50/60 md:bg-transparent rounded-t-lg md:rounded-none' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-                        title="Báo cáo Doanh thu"
-                    >
-                        <DollarSign size={18}/> 
-                        <span className="hidden md:inline">Báo cáo Doanh thu</span>
-                    </button>
-                    <button 
                         onClick={() => setActiveTab('ai')}
                         className={`px-3 md:px-6 py-2.5 md:py-3 text-xs md:text-sm font-bold border-b-2 transition-all flex items-center justify-center gap-1.5 shrink-0 ${activeTab === 'ai' ? 'border-purple-600 text-purple-600 bg-purple-50/60 md:bg-transparent rounded-t-lg md:rounded-none' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
                         title="Văn bản Báo cáo (AI)"
@@ -881,10 +840,10 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                 <span>
                     {mainTab === 'revenue' ? (
                         <>
-                            {revenueTeam === 'registration' && 'Báo cáo Doanh thu - Tổ Cấp Giấy'}
-                            {revenueTeam === 'measurement' && 'Báo cáo Doanh thu - Tổ Đo Đạc'}
-                            {revenueTeam === 'archive' && 'Báo cáo Doanh thu - Tổ Lưu Trữ'}
-                            {revenueTeam === 'total' && 'Tổng Doanh thu Chi Nhánh'}
+                            {revenueTeam === 'registration' && 'Báo cáo Doanh thu - Tổ Cấp giấy'}
+                            {revenueTeam === 'measurement' && 'Báo cáo Doanh thu - Tổ Đo đạc'}
+                            {revenueTeam === 'archive' && 'Báo cáo Doanh thu - Tổ Lưu trữ'}
+                            {revenueTeam === 'total' && 'Báo cáo Nguồn thu Tổng hợp'}
                         </>
                     ) : (
                         <>
@@ -1237,23 +1196,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                     <OverdueStatsView 
                         records={filteredData}
                         employees={activeEmployees}
-                    />
-                )}
-
-                {activeTab === 'revenue' && mainTab !== 'revenue' && (
-                    <RevenueStatsView 
-                        records={activeRecords}
-                        employees={activeEmployees}
-                        wards={wards}
-                        selectedWard={selectedWard}
-                        fromDate={fromDate}
-                        toDate={toDate}
-                        teamTitle={
-                            mainTab === 'measurement' ? 'Tổ Đo Đạc' :
-                            mainTab === 'registration' ? 'Tổ Cấp Giấy' :
-                            mainTab === 'archive' ? 'Tổ Lưu Trữ' :
-                            'Doanh Thu'
-                        }
+                        onFilteredRecordsChange={setOverdueStatsRecords}
                     />
                 )}
 
@@ -1266,11 +1209,12 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                         fromDate={fromDate}
                         toDate={toDate}
                         teamTitle={
-                            revenueTeam === 'total' ? 'Tổng Doanh Thu (3 Tổ)' :
-                            revenueTeam === 'registration' ? 'Tổ Cấp Giấy' :
-                            revenueTeam === 'measurement' ? 'Tổ Đo Đạc' :
-                            'Tổ Lưu Trữ'
+                            revenueTeam === 'total' ? 'Báo cáo nguồn thu tổng hợp' :
+                            revenueTeam === 'registration' ? 'Báo cáo doanh thu tổ Cấp giấy' :
+                            revenueTeam === 'measurement' ? 'Báo cáo doanh thu tổ Đo đạc' :
+                            'Báo cáo doanh thu tổ Lưu trữ'
                         }
+                        onFilteredRecordsChange={setRevenueStatsRecords}
                     />
                 )}
 

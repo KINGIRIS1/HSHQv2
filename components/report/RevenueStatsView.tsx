@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { RecordFile, RecordStatus, Employee } from '../../types';
 import { getShortRecordType } from '../../constants';
 import { removeVietnameseTones } from '../../utils/appHelpers';
@@ -59,9 +59,8 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
         return records
             .filter(r => {
                 if (r.status === RecordStatus.RETURNED) return true;
-                if (r.resultReturnedDate && r.resultReturnedDate.trim() !== '') return true;
                 if (r.status === RecordStatus.HANDOVER) {
-                    const hasReturnDate = !!(r.resultReturnedDate || r.completedDate);
+                    const hasReturnDate = !!(r.resultReturnedDate || r.exportDate || r.completedDate);
                     const hasReceipt = !!(r.receiptNumber && r.receiptNumber.trim() !== '');
                     const hasReturnedPrice = r.returnedPrice !== undefined && r.returnedPrice !== null && String(r.returnedPrice).trim() !== '' && Number(r.returnedPrice) > 0;
                     return hasReturnDate || hasReceipt || hasReturnedPrice;
@@ -74,11 +73,13 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
                 let returned = 0;
                 if (r.returnedPrice !== undefined && r.returnedPrice !== null && String(r.returnedPrice).trim() !== '' && !isNaN(Number(r.returnedPrice))) {
                     returned = Number(r.returnedPrice);
+                } else if (r.recordType === 'Cung cấp tài liệu đất đai') {
+                    returned = 310000;
                 } else if (contractP !== undefined && contractP !== null && !isNaN(Number(contractP)) && Number(contractP) > 0) {
                     returned = Number(contractP);
                 } else if (r.price !== undefined && r.price !== null && !isNaN(Number(r.price)) && Number(r.price) > 0) {
                     returned = Number(r.price);
-                } else {
+                } else if (r.status === RecordStatus.RETURNED || r.status === RecordStatus.HANDOVER) {
                     returned = price;
                 }
                 
@@ -115,10 +116,10 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
             })
             // Only include records with revenue or receipt/invoice recorded
             .filter(r => r.calcReturned > 0 || (r.receiptNumber && r.receiptNumber.trim() !== ''))
-            // Filter strictly by resultReturnedDate or completedDate or exportDate or receivedDate
+            // Filter strictly by resultReturnedDate or exportDate or completedDate
             .filter(r => {
                 if (!dateStart || !dateEnd) return true;
-                const targetDateStr = r.resultReturnedDate || r.completedDate || r.exportDate || r.receivedDate;
+                const targetDateStr = r.resultReturnedDate || r.exportDate || r.completedDate;
                 if (!targetDateStr) return false;
                 let d: Date | null = null;
                 if (targetDateStr.includes('/')) {
@@ -199,6 +200,12 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
             return true;
         });
     }, [wardFilteredRevenueRecords, activeCardFilter, searchTerm]);
+
+    useEffect(() => {
+        if (onFilteredRecordsChange) {
+            onFilteredRecordsChange(filteredRecords);
+        }
+    }, [filteredRecords, onFilteredRecordsChange]);
 
     // Total & sub-totals collected for filtered set
     const filteredStats = useMemo(() => {

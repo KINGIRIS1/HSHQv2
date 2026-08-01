@@ -106,8 +106,8 @@ export const logError = (context: string, error: any, silent: boolean = false) =
     }
 
     if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('configuration') || msg.includes('Load failed')) {
-        console.error(`❌ [Lỗi kết nối] ${context}: Không thể kết nối tới cơ sở dữ liệu Cloud Supabase. Vui lòng kiểm tra lại mạng.`);
-        alert(`LỖI KẾT NỐI: Không thể kết nối tới cơ sở dữ liệu Cloud Supabase. Vui lòng kiểm tra kết nối mạng của bạn.`);
+        console.warn(`⚠️ [Lỗi kết nối] ${context}: Không thể kết nối tới cơ sở dữ liệu Cloud Supabase. Vui lòng kiểm tra lại mạng.`);
+        return;
     } else if (code === '42P01') {
         console.error(`❌ Lỗi tại ${context}: Bảng dữ liệu chưa tồn tại trên Supabase! (Code: 42P01)`);
         alert(`LỖI BẢNG DỮ LIỆU: Bảng '${context.includes('Contract') ? 'contracts' : 'land_records'}' chưa tồn tại trên Supabase!\n\nVui lòng truy cập SQL Editor trên trang quản trị Supabase và tạo bảng tương ứng.`);

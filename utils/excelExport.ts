@@ -618,7 +618,7 @@ export const exportOverdueStatsToExcel = (records: any[], employees: Employee[],
 
     const dataRows = records.map((r, i) => {
         const emp = employees.find(e => e.id === r.assignedTo);
-        const isPendingOverdue = (r as any)._overdueType ? (r as any)._overdueType === 'pending' : (!r.completedDate && r.status !== RecordStatus.HANDOVER && r.status !== RecordStatus.RETURNED);
+        const isPendingOverdue = r._overdueType === 'pending';
         return [
             i + 1,
             r.code,
