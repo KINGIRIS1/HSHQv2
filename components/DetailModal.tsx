@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { RecordFile, Employee, User, UserRole, SplitItem, RecordStatus } from '../types';
-import { getNormalizedWard, getShortRecordType } from '../constants';
+import { getNormalizedWard, getShortRecordType, isCapGiayRecord, CAP_GIAY_SUB_STEPS, getCapGiaySubStepLabel, getCapGiaySubStepBadgeColor } from '../constants';
 import StatusBadge from './StatusBadge';
 import { X, MapPin, FileText, User as UserIcon, Receipt, DollarSign, CheckCircle2, Circle, Send, FileSignature, CheckSquare, CalendarClock, FileCheck, Calculator, Loader2, StickyNote, Save, Bell, Printer, Pencil, Trash2, Info, FileDown, Undo2 } from 'lucide-react';
 import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../services/docxService';
@@ -10,6 +10,7 @@ import { updateRecordApi, fetchContracts, fetchExcerptHistory, saveExcerptRecord
 import SystemReceiptTemplate from './receive-record/SystemReceiptTemplate';
 import SystemAnnexTemplate from './receive-record/SystemAnnexTemplate';
 import { getBatchDisplayParts } from '../utils/appHelpers';
+import { RecordTimelineProgress } from './RecordTimelineProgress';
 
 interface DetailModalProps {
   isOpen: boolean;
@@ -1010,199 +1011,127 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
 
                 {/* COLUMN 3: TIẾN ĐỘ & NHẮC VIỆC */}
                 <div className="space-y-6">
+                    {/* QUY TRÌNH BƯỚC NHỎ CẤP GIẤY (CHỈ DÀNH RIÊNG HỒ SƠ CẤP GIẤY) */}
+                    {isCapGiayRecord(record) && (
+                        <div className="bg-white rounded-xl border border-teal-200 shadow-sm overflow-hidden p-4 bg-gradient-to-br from-teal-50/50 to-white">
+                            <div className="flex items-center justify-between mb-3">
+                                <span className="text-xs font-extrabold text-teal-800 uppercase flex items-center gap-1.5">
+                                    <FileText size={16} className="text-teal-600" />
+                                    Tiến độ xử lý Cấp Giấy
+                                </span>
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${getCapGiaySubStepBadgeColor(record.capGiaySubStep)}`}>
+                                    {getCapGiaySubStepLabel(record.capGiaySubStep)}
+                                </span>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                {CAP_GIAY_SUB_STEPS.map((step, idx) => {
+                                    const isSelected = (record.capGiaySubStep || 'tham_dinh') === step.id;
+                                    return (
+                                        <button
+                                            key={step.id}
+                                            disabled={!canPerformAction}
+                                            onClick={async () => {
+                                                if (!canPerformAction) return;
+                                                const updated = { ...record, capGiaySubStep: step.id };
+                                                const res = await updateRecordApi(updated);
+                                                if (res) {
+                                                    record.capGiaySubStep = step.id;
+                                                    if (onRefreshData) onRefreshData();
+                                                }
+                                            }}
+                                            className={`px-3 py-2 rounded-lg text-left text-xs font-bold transition-all flex items-center gap-2 border ${
+                                                isSelected
+                                                    ? 'bg-teal-600 text-white border-teal-600 shadow-sm'
+                                                    : 'bg-white text-gray-700 border-gray-200 hover:bg-teal-50 hover:border-teal-300'
+                                            }`}
+                                        >
+                                            <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] shrink-0 font-black ${
+                                                isSelected ? 'bg-white text-teal-700' : 'bg-gray-100 text-gray-600'
+                                            }`}>
+                                                {idx + 1}
+                                            </span>
+                                            <span className="truncate">{step.shortLabel}</span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+
                     {/* TIMELINE */}
                     <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-                        <div className="bg-indigo-600 px-5 py-3 flex items-center gap-2">
-                            <CalendarClock size={16} className="text-white"/>
-                            <span className="text-xs font-bold text-white uppercase">Tiến độ & Thời gian</span>
+                        <div className="bg-indigo-600 px-5 py-3 flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                                <CalendarClock size={16} className="text-white"/>
+                                <span className="text-xs font-bold text-white uppercase">Tiến độ & Thời gian</span>
+                            </div>
                         </div>
+
+                        {/* Extension Form section */}
+                        {currentUser && (currentUser.role === UserRole.ONEDOOR || currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.SUBADMIN || currentUser.role === UserRole.TEAM_LEADER) && (
+                            <div className="p-4 border-b border-gray-100 bg-slate-50/50 flex flex-col items-center">
+                                {!showExtendForm ? (
+                                    <button 
+                                        onClick={() => {
+                                            setExtendDate(record.deadline ? record.deadline.split('T')[0] : '');
+                                            setShowExtendForm(true);
+                                        }}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 text-purple-700 hover:bg-purple-100 rounded-lg text-xs font-bold transition-all border border-purple-200 cursor-pointer"
+                                    >
+                                        <CalendarClock size={14} />
+                                        Gia hạn ngày hẹn
+                                    </button>
+                                ) : (
+                                    <div className="w-full bg-white p-3 rounded-lg border border-slate-200 text-left animate-fade-in-up">
+                                        <h4 className="text-xs font-bold text-slate-700 mb-2 uppercase tracking-wide">Gia hạn hồ sơ</h4>
+                                        <div className="space-y-3">
+                                            <div>
+                                                <label className="text-[10px] text-gray-400 uppercase font-bold block mb-1">Ngày hẹn mới</label>
+                                                <input 
+                                                    type="date" 
+                                                    value={extendDate} 
+                                                    onChange={(e) => setExtendDate(e.target.value)}
+                                                    className="w-full text-xs font-semibold px-2 py-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-purple-500 outline-none"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] text-gray-400 uppercase font-bold block mb-1">Lý do gia hạn</label>
+                                                <textarea 
+                                                    rows={2}
+                                                    value={extendReason}
+                                                    onChange={(e) => setExtendReason(e.target.value)}
+                                                    placeholder="Nhập lý do gia hạn..."
+                                                    className="w-full text-xs p-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-purple-500 outline-none resize-none"
+                                                />
+                                            </div>
+                                            <div className="flex gap-2 justify-end">
+                                                <button 
+                                                    onClick={() => setShowExtendForm(false)}
+                                                    className="px-2.5 py-1 text-gray-600 hover:bg-gray-100 rounded text-xs font-medium cursor-pointer"
+                                                >
+                                                    Hủy
+                                                </button>
+                                                <button 
+                                                    onClick={handleSaveExtension}
+                                                    disabled={isExtending}
+                                                    className="px-2.5 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded text-xs font-bold flex items-center gap-1 shadow-sm cursor-pointer disabled:opacity-50"
+                                                >
+                                                    {isExtending ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+                                                    Lưu
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                         
-                        <div className="p-6 text-center border-b border-gray-100">
-                             <label className="text-[10px] text-gray-400 uppercase font-bold block mb-1">Hạn trả kết quả</label>
-                             <p className="text-2xl font-black text-gray-800">{formatDate(record.deadline)}</p>
-                             <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded mt-2 inline-block">
-                                Ngày nhận: {formatDate(record.receivedDate)}
-                             </span>
-
-                             {/* Tính năng gia hạn hạn trả cho Một cửa / Admin */}
-                             {currentUser && (currentUser.role === UserRole.ONEDOOR || currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.SUBADMIN || currentUser.role === UserRole.TEAM_LEADER) && (
-                                 <div className="mt-4 pt-4 border-t border-gray-100 flex flex-col items-center">
-                                     {!showExtendForm ? (
-                                         <button 
-                                             onClick={() => {
-                                                 setExtendDate(record.deadline ? record.deadline.split('T')[0] : '');
-                                                 setShowExtendForm(true);
-                                             }}
-                                             className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 text-purple-700 hover:bg-purple-100 rounded-lg text-xs font-bold transition-all border border-purple-200"
-                                         >
-                                             <CalendarClock size={14} />
-                                             Gia hạn ngày hẹn
-                                         </button>
-                                     ) : (
-                                         <div className="w-full bg-slate-50 p-3 rounded-lg border border-slate-200 text-left animate-fade-in-up">
-                                             <h4 className="text-xs font-bold text-slate-700 mb-2 uppercase tracking-wide">Gia hạn hồ sơ</h4>
-                                             <div className="space-y-3">
-                                                 <div>
-                                                     <label className="text-[10px] text-gray-400 uppercase font-bold block mb-1">Ngày hẹn mới</label>
-                                                     <input 
-                                                         type="date" 
-                                                         value={extendDate} 
-                                                         onChange={(e) => setExtendDate(e.target.value)}
-                                                         className="w-full text-xs font-semibold px-2 py-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-purple-500 outline-none"
-                                                     />
-                                                 </div>
-                                                 <div>
-                                                     <label className="text-[10px] text-gray-400 uppercase font-bold block mb-1">Lý do gia hạn</label>
-                                                     <textarea 
-                                                         rows={2}
-                                                         value={extendReason}
-                                                         onChange={(e) => setExtendReason(e.target.value)}
-                                                         placeholder="Nhập lý do gia hạn..."
-                                                         className="w-full text-xs p-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-purple-500 outline-none resize-none"
-                                                     />
-                                                 </div>
-                                                 <div className="flex gap-2 justify-end">
-                                                     <button 
-                                                         onClick={() => setShowExtendForm(false)}
-                                                         className="px-2.5 py-1 text-gray-600 hover:bg-gray-100 rounded text-xs font-medium"
-                                                     >
-                                                         Hủy
-                                                     </button>
-                                                     <button 
-                                                         onClick={handleSaveExtension}
-                                                         disabled={isExtending}
-                                                         className="px-2.5 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded text-xs font-bold flex items-center gap-1 shadow-sm"
-                                                     >
-                                                         {isExtending ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
-                                                         Lưu
-                                                     </button>
-                                                 </div>
-                                             </div>
-                                         </div>
-                                     )}
-                                 </div>
-                             )}
-                        </div>
-
-                        <div className="p-6 space-y-0">
-                             <TimelineItem 
-                                date={record.receivedDate} 
-                                label="NHẬN HỒ SƠ" 
-                                icon={UserIcon}
-                                colorClass={{text: 'text-emerald-700', border: 'border-emerald-600', bg: 'bg-emerald-600'}}
-                                subText={record.receivedBy ? (() => {
-                                    const receiver = users.find(u => u.employeeId === record.receivedBy);
-                                    if (!receiver) return undefined;
-                                    const emp = employees.find(e => e.id === receiver.employeeId);
-                                    return `${receiver.name} (${emp?.position || 'Nhân viên'})`;
-                                })() : undefined}
-                            />
-
-                            <TimelineItem 
-                                date={record.assignedDate} 
-                                label="GIAO NHÂN VIÊN" 
-                                icon={UserIcon}
-                                colorClass={{text: 'text-blue-700', border: 'border-blue-600', bg: 'bg-blue-600'}}
-                                subText={record.assignedTo ? (() => {
-                                    const emp = employees.find(e => e.id === record.assignedTo);
-                                    if (!emp) return undefined;
-                                    return `${emp.name} (${emp.department})`;
-                                })() : undefined}
-                            />
-                            
-                            <TimelineItem 
-                                date={record.completedWorkDate} 
-                                forceActive={isWorkDone}
-                                label="ĐÃ THỰC HIỆN" 
-                                icon={CheckSquare}
-                                colorClass={{text: 'text-cyan-700', border: 'border-cyan-600', bg: 'bg-cyan-600'}}
-                                subText={record.completedWorkDate ? (() => {
-                                    const emp = employees.find(e => e.id === record.assignedTo);
-                                    if (!emp) return undefined;
-                                    return `${emp.name} (${emp.department})`;
-                                })() : undefined}
-                            />
-
-                            {/* Ẩn mốc kiểm tra cho một số loại hồ sơ */}
-                            {!(record.recordType === 'Cung cấp tài liệu đất đai' || record.recordType === 'Sao lục' || record.recordType === 'Công văn') && (
-                                <>
-                                    <TimelineItem 
-                                        date={record.pendingCheckDate} 
-                                        forceActive={isPendingCheckActive}
-                                        label="TRÌNH KIỂM TRA" 
-                                        icon={Send}
-                                        colorClass={{text: 'text-orange-700', border: 'border-orange-600', bg: 'bg-orange-600'}}
-                                        subText={record.checkedBy ? (() => {
-                                            const checker = employees.find(e => e.id === record.checkedBy);
-                                            if (!checker) return undefined;
-                                            return `${checker.name} (${checker?.position || 'Người kiểm tra'})`;
-                                        })() : undefined}
-                                    />
-
-                                    <TimelineItem 
-                                        date={record.checkedDate} 
-                                        forceActive={isCheckedActive}
-                                        label="ĐÃ KIỂM TRA" 
-                                        icon={CheckSquare}
-                                        colorClass={{text: 'text-orange-700', border: 'border-orange-600', bg: 'bg-orange-600'}}
-                                        subText={record.checkedDate && record.checkedBy ? (() => {
-                                            const checker = employees.find(e => e.id === record.checkedBy);
-                                            if (!checker) return undefined;
-                                            return `${checker.name} (${checker?.position || 'Người kiểm tra'})`;
-                                        })() : undefined}
-                                    />
-                                </>
-                            )}
-
-                            <TimelineItem 
-                                date={record.submissionDate} 
-                                forceActive={isPendingSignActive}
-                                label="TRÌNH KÝ" 
-                                icon={Send}
-                                colorClass={{text: 'text-purple-700', border: 'border-purple-600', bg: 'bg-purple-600'}}
-                                subText={record.submittedTo ? (() => {
-                                    const director = users.find(u => u.employeeId === record.submittedTo);
-                                    if (!director) return undefined;
-                                    const emp = employees.find(e => e.id === director.employeeId);
-                                    return `${director.name} (${emp?.position || (director.role === UserRole.ADMIN ? 'Giám đốc' : 'Phó giám đốc')})`;
-                                })() : undefined}
-                            />
-                            
-                            <TimelineItem 
-                                date={record.approvalDate} 
-                                forceActive={isSignedActive}
-                                label="KÝ DUYỆT" 
-                                icon={FileSignature}
-                                colorClass={{text: 'text-indigo-700', border: 'border-indigo-600', bg: 'bg-indigo-600'}}
-                                subText={record.approvalDate && record.submittedTo ? (() => {
-                                    const director = users.find(u => u.employeeId === record.submittedTo);
-                                    if (!director) return undefined;
-                                    const emp = employees.find(e => e.id === director.employeeId);
-                                    return `${director.name} (${emp?.position || (director.role === UserRole.ADMIN ? 'Giám đốc' : 'Phó giám đốc')})`;
-                                })() : undefined}
-                            />
-                            
-                            <TimelineItem 
-                                date={record.completedDate || record.exportDate} 
-                                forceActive={!!record.completedDate || !!record.exportDate || !!record.exportBatch}
-                                label={record.status === RecordStatus.REJECTED ? "HỒ SƠ TRẢ" : record.status === RecordStatus.WITHDRAWN ? "RÚT HỒ SƠ" : "HOÀN THÀNH"} 
-                                icon={CheckSquare}
-                                isLast={false}
-                                colorClass={{text: record.status === RecordStatus.REJECTED ? 'text-red-700' : 'text-green-700', border: record.status === RecordStatus.REJECTED ? 'border-red-600' : 'border-green-600', bg: record.status === RecordStatus.REJECTED ? 'bg-red-600' : 'bg-green-600'}}
-                                subText={(() => {
-                                    if (!record.exportBatch) return undefined;
-                                    const bName = getBatchDisplayParts(record.exportBatch).batchName || `Đợt ${record.exportBatch}`;
-                                    return bName.toLowerCase().startsWith('giao') ? bName : `Giao ${bName}`;
-                                })()}
-                            />
-                            
-                            <TimelineItem 
-                                date={record.resultReturnedDate} 
-                                label="TRẢ KẾT QUẢ" 
-                                icon={FileCheck}
-                                isLast={true}
-                                colorClass={{text: 'text-emerald-700', border: 'border-emerald-600', bg: 'bg-emerald-600'}}
-                                subText={record.resultReturnedDate && record.receiverName ? `Người nhận: ${record.receiverName}` : undefined}
+                        <div className="p-4">
+                            <RecordTimelineProgress 
+                                record={record}
+                                employees={employees}
+                                users={users}
+                                formatDate={formatDate}
                             />
                         </div>
                     </div>

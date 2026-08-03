@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { RecordFile, RecordStatus, Employee, UserRole } from '../types';
-import { getNormalizedWard, getShortRecordType, getWardLabel } from '../constants';
+import { getNormalizedWard, getShortRecordType, getWardLabel, isCapGiayRecord, getCapGiaySubStepLabel, getCapGiaySubStepBadgeColor } from '../constants';
 import { isRecordOverdue, isRecordApproaching, toTitleCase, formatBatchName, getBatchDisplayParts } from '../utils/appHelpers';
 import StatusBadge from './StatusBadge';
 import { CheckSquare, Square, AlertCircle, Clock, Eye, ArrowRight, Pencil, Trash2, Bell, FileCheck, Phone, Map } from 'lucide-react';
@@ -274,6 +274,33 @@ const RecordRow: React.FC<RecordRowProps> = ({
           <td key="status" className={`${cellClass} text-center`}>
               <div className="transform origin-top pt-1 flex flex-col items-center">
                   <StatusBadge status={displayStatus} />
+                  
+                  {/* HIỂN THỊ / CHỌN BƯỚC NHỎ DÀNH RIÊNG CHO HỒ SƠ CẤP GIẤY */}
+                  {isCapGiayRecord(record) && (
+                    <div className="mt-1 flex flex-col items-center">
+                      {canPerformAction ? (
+                        <select
+                          value={record.capGiaySubStep || 'tham_dinh'}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            onQuickUpdate(record.id, 'capGiaySubStep', e.target.value);
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          className={`text-[11px] font-bold px-1.5 py-0.5 rounded border outline-none cursor-pointer transition-colors shadow-2xs ${getCapGiaySubStepBadgeColor(record.capGiaySubStep)}`}
+                          title="Chuyển bước nhỏ Cấp giấy"
+                        >
+                          <option value="tham_dinh">1. Thẩm định</option>
+                          <option value="phieu_chuyen_thue">2. Chuyển thuế</option>
+                          <option value="cho_nop_thue">3. Chờ nộp thuế</option>
+                          <option value="hoan_thien_trinh_duyet">4. Hoàn thiện & Trình</option>
+                        </select>
+                      ) : (
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${getCapGiaySubStepBadgeColor(record.capGiaySubStep)}`}>
+                          {getCapGiaySubStepLabel(record.capGiaySubStep)}
+                        </span>
+                      )}
+                    </div>
+                  )}
               </div>
               
               {/* NÚT CHỈNH LÝ (Thay thế checkbox) */}

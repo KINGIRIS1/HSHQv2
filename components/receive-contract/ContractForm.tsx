@@ -4,6 +4,7 @@ import { Contract, PriceItem, SplitItem, RecordFile } from '../../types';
 import { Save, Calculator, Search, Plus, Trash2, Printer, FileCheck, CheckCircle, AlertCircle, AlertTriangle, X, RotateCcw, MapPin, Ruler, Grid, Banknote, User, FileText, Calendar, Wand2, ChevronDown, ChevronUp, Copy, ExternalLink, RefreshCw } from 'lucide-react';
 import { confirmAction } from '../../utils/appHelpers';
 import { checkContractDateErrors, getTodayDateString } from '../../utils/contractDateUtils';
+import { getRecordPlotCount } from '../../constants';
 
 interface ContractFormProps {
   initialData?: Contract;
@@ -504,6 +505,7 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
               landPlot: found.landPlot, 
               mapSheet: found.mapSheet, 
               area: found.area || 0,
+              plotCount: getRecordPlotCount(found),
               serviceType: suggestedService || prev.serviceType
               // TUYỆT ĐỐI không ghi đè code (Mã hợp đồng tự nhảy), giữ nguyên prev.code đang nạp sẵn trên form
           }));
@@ -754,7 +756,23 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                         <div><label className={labelClass}>Tờ bản đồ</label><input className={`${inputClass} text-center`} value={formData.mapSheet ?? ''} onChange={e => handleChange('mapSheet', e.target.value)} /></div>
-                        <div><label className={labelClass}>Thửa đất</label><input className={`${inputClass} text-center`} value={formData.landPlot ?? ''} onChange={e => handleChange('landPlot', e.target.value)} /></div>
+                        <div>
+                            <label className={labelClass}>Thửa đất</label>
+                            <input 
+                                className={`${inputClass} text-center`} 
+                                value={formData.landPlot ?? ''} 
+                                onChange={e => {
+                                    const newLandPlot = e.target.value;
+                                    const autoCount = getRecordPlotCount({ landPlot: newLandPlot });
+                                    setFormData(p => ({
+                                        ...p,
+                                        landPlot: newLandPlot,
+                                        plotCount: autoCount
+                                    }));
+                                }} 
+                                placeholder="VD: 12, 13, 14"
+                            />
+                        </div>
                     </div>
                     {!isLiquidationMode && (
                         <div>
@@ -942,9 +960,25 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
 
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <label className="block text-xs font-bold text-purple-800/70 mb-1 uppercase">
-                                            {activeTab === 'dd' ? 'Số thửa' : activeTab === 'cm' ? 'Số mốc' : 'Số lượng'}
-                                        </label>
+                                        <div className="flex justify-between items-center mb-1">
+                                            <label className="block text-xs font-bold text-purple-800/70 uppercase">
+                                                {activeTab === 'dd' ? 'Số thửa' : activeTab === 'cm' ? 'Số mốc' : 'Số lượng'}
+                                            </label>
+                                            {activeTab === 'dd' && (
+                                                <button 
+                                                    type="button" 
+                                                    onClick={() => {
+                                                        const autoCount = getRecordPlotCount({ landPlot: formData.landPlot });
+                                                        handleChange('plotCount', autoCount);
+                                                        setNotification({ type: 'success', message: `Đã tự động tính ${autoCount} thửa từ thông tin thửa đất: "${formData.landPlot || 'Mặc định'}"` });
+                                                    }}
+                                                    className="text-[10px] text-purple-700 hover:text-purple-900 font-bold bg-purple-100 hover:bg-purple-200 px-2 py-0.5 rounded transition-all flex items-center gap-1 border border-purple-200"
+                                                    title="Tự động tính lại số thửa từ ô Thửa đất"
+                                                >
+                                                    <Wand2 size={11} /> Tự động tính
+                                                </button>
+                                            )}
+                                        </div>
                                         <input 
                                             type="number" 
                                             className={`${inputClass} border-purple-200 bg-white/80`} 

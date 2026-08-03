@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { RecordFile, RecordStatus, User, Employee, Contract } from "../types";
+import { RecordFile, RecordStatus, User, Employee, Contract, UserRole } from "../types";
 import StatusBadge from "./StatusBadge";
 import {
   Briefcase,
@@ -163,31 +163,16 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
           r.submittedTo === user.employeeId || r.assignedTo === user.employeeId
         );
       }
-      // Nếu là người kiểm tra, họ có thể thấy hồ sơ được giao cho họ HOẶC hồ sơ trình cho họ kiểm tra
-      const isCheckerUser =
-        employees
-          .find((e) => e.id === user.employeeId)
-          ?.position?.toLowerCase()
-          .includes("tổ") &&
-        (employees
-          .find((e) => e.id === user.employeeId)
-          ?.department?.toLowerCase()
-          .includes("đo đạc") ||
-          employees
-            .find((e) => e.id === user.employeeId)
-            ?.department?.toLowerCase()
-            .includes("kỹ thuật"));
+      // Nếu là người kiểm tra (Tổ trưởng / Tổ phó), họ có thể thấy hồ sơ được giao cho họ HOẶC hồ sơ trình cho họ kiểm tra
+      const emp = employees.find((e) => e.id === user.employeeId);
+      const isCheckerUser = (user.role === UserRole.TEAM_LEADER) || (emp && (
+        emp.position?.toLowerCase().includes("tổ") ||
+        emp.position?.toLowerCase().includes("nhóm") ||
+        emp.position?.toLowerCase().includes("trưởng") ||
+        emp.position?.toLowerCase().includes("phó")
+      ));
       if (isCheckerUser) {
-        // Chỉ hiển thị hồ sơ giao xử lý (assignedTo) HOẶC hồ sơ đã tới khâu kiểm tra (status >= PENDING_CHECK) nếu họ là người kiểm tra (checkedBy)
-        if (r.assignedTo === user.employeeId) return true;
-        if (r.checkedBy === user.employeeId) {
-          const reachedCheckStage =
-            r.status !== RecordStatus.RECEIVED &&
-            r.status !== RecordStatus.ASSIGNED &&
-            r.status !== RecordStatus.IN_PROGRESS &&
-            r.status !== RecordStatus.COMPLETED_WORK;
-          return reachedCheckStage;
-        }
+        if (r.assignedTo === user.employeeId || r.checkedBy === user.employeeId) return true;
         return false;
       }
       return r.assignedTo === user.employeeId;
@@ -202,36 +187,15 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
             r.data?.assigned_to === user.employeeId
           );
         }
-        const isCheckerUser =
-          employees
-            .find((e) => e.id === user.employeeId)
-            ?.position?.toLowerCase()
-            .includes("tổ") &&
-          (employees
-            .find((e) => e.id === user.employeeId)
-            ?.department?.toLowerCase()
-            .includes("đo đạc") ||
-            employees
-              .find((e) => e.id === user.employeeId)
-              ?.department?.toLowerCase()
-              .includes("kỹ thuật"));
+        const emp = employees.find((e) => e.id === user.employeeId);
+        const isCheckerUser = (user.role === UserRole.TEAM_LEADER) || (emp && (
+          emp.position?.toLowerCase().includes("tổ") ||
+          emp.position?.toLowerCase().includes("nhóm") ||
+          emp.position?.toLowerCase().includes("trưởng") ||
+          emp.position?.toLowerCase().includes("phó")
+        ));
         if (isCheckerUser) {
-          if (r.data?.assigned_to === user.employeeId) return true;
-          if (r.data?.checked_by === user.employeeId) {
-            // Map status của archive để kiểm tra xem đã tới khâu kiểm tra chưa
-            let status: RecordStatus = RecordStatus.RECEIVED;
-            if (r.status === "assigned") status = RecordStatus.ASSIGNED;
-            else if (r.status === "executed") status = RecordStatus.COMPLETED_WORK;
-            else if (r.status === "pending_sign") status = RecordStatus.PENDING_SIGN;
-            else if (r.status === "signed") status = RecordStatus.SIGNED;
-            else if (r.status === "completed") status = RecordStatus.RETURNED;
-
-            const reachedCheckStage =
-              status === RecordStatus.PENDING_SIGN ||
-              status === RecordStatus.SIGNED ||
-              status === RecordStatus.RETURNED;
-            return reachedCheckStage;
-          }
+          if (r.data?.assigned_to === user.employeeId || r.data?.checked_by === user.employeeId) return true;
           return false;
         }
         return r.data?.assigned_to === user.employeeId;

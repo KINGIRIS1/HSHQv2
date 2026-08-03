@@ -424,7 +424,7 @@ export function processAssignmentTimelineCheck(
 
 // --- HÀM XỬ LÝ VÀ ĐỊNH DẠNG ĐỢT GIAO 1 CỬA ---
 
-export function getDepartmentForRecord(r: RecordFile): string {
+export function getDepartmentForRecord(r: RecordFile): 'Tổ Đo đạc' | 'Tổ Lưu trữ' | 'Tổ Cấp giấy' {
     if (r.returnHandoverDept) {
         const d = r.returnHandoverDept.toLowerCase();
         if (d.includes('lưu trữ') || d.includes('thông tin')) return 'Tổ Lưu trữ';
@@ -437,14 +437,13 @@ export function getDepartmentForRecord(r: RecordFile): string {
     if (type.includes('1.1') || type.includes('1.2') || type.includes('công văn') || type.includes('sao lục') || code.startsWith('1.')) {
         return 'Tổ Lưu trữ';
     }
-    if (type.includes('2.1') || type.includes('2.2') || type.includes('trích lục')) {
-        return 'Tổ Cấp giấy';
-    }
-    if (type.includes('2.3') || type.includes('2.4') || type.includes('2.5') || type.includes('2.6') || type.includes('số thửa') || type.includes('trích đo') || type.includes('đo đạc') || code.startsWith('2.')) {
+    if (type.includes('2.1') || type.includes('2.2') || type.includes('2.3') || type.includes('2.4') || type.includes('2.5') || type.includes('2.6') || type.includes('trích lục') || type.includes('số thửa') || type.includes('trích đo') || type.includes('đo đạc') || code.startsWith('2.')) {
         return 'Tổ Đo đạc';
     }
     return 'Tổ Cấp giấy';
 }
+
+export const getRecordDepartment = getDepartmentForRecord;
 
 export function getDeptAbbr(deptName: string): string {
     if (!deptName) return 'CG';

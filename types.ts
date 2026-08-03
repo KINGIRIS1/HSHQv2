@@ -185,6 +185,9 @@ export interface RecordFile {
   measurementNumber?: string | null; 
   excerptNumber?: string | null;
   
+  // Bước nhỏ xử lý quy trình Cấp Giấy (Chỉ dành riêng cho Hồ sơ Cấp Giấy)
+  capGiaySubStep?: 'tham_dinh' | 'phieu_chuyen_thue' | 'cho_nop_thue' | 'hoan_thien_trinh_duyet' | string | null;
+  
   // Tính năng nhắc nhở
   reminderDate?: string | null;      // Thời gian đặt lịch nhắc
   lastRemindedAt?: string | null;    // Thời gian đã thông báo lần cuối

@@ -1,7 +1,7 @@
 
-import React, { useState } from 'react';
-import { RecordFile, Employee, RecordStatus } from '../types';
-import { STATUS_LABELS } from '../constants';
+import React, { useState, useMemo } from 'react';
+import { RecordFile, Employee, RecordStatus, UserRole } from '../types';
+import { STATUS_LABELS, isCapGiayRecord, getRecordPlotCount } from '../constants';
 import { X, CheckCircle2, Layers, ArrowRight } from 'lucide-react';
 
 interface BulkUpdateModalProps {
@@ -15,13 +15,44 @@ interface BulkUpdateModalProps {
 }
 
 const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({ 
-  isOpen, onClose, selectedRecords, employees, wards, onConfirm 
+  isOpen, onClose, selectedRecords, allRecords, employees, wards, onConfirm 
 }) => {
   const [targetField, setTargetField] = useState<string>('status');
   const [targetValue, setTargetValue] = useState<string>('');
   const [useCustomDate, setUseCustomDate] = useState<boolean>(false);
   const [customDate, setCustomDate] = useState<string>('');
   const [isProcessing, setIsProcessing] = useState(false);
+
+  // Map employee workload
+  const empWorkloadMap = useMemo(() => {
+    const map: Record<string, { activeCount: number; activePlotCount: number }> = {};
+    const recordsToScan = allRecords || selectedRecords || [];
+    employees.forEach(emp => {
+      const isLeader = emp && (
+        emp.position?.toLowerCase().includes('tổ') ||
+        emp.position?.toLowerCase().includes('nhóm') ||
+        emp.position?.toLowerCase().includes('trưởng') ||
+        emp.position?.toLowerCase().includes('phó')
+      );
+      const assigned = recordsToScan.filter(r => 
+        (r.assignedTo === emp.id || r.assignedTo === emp.name || (isLeader && (r.checkedBy === emp.id || r.checkedBy === emp.name))) && isCapGiayRecord(r)
+      );
+      const active = assigned.filter(r => {
+        const statusStr = String(r.status || '');
+        return (
+          r.status !== RecordStatus.RETURNED &&
+          r.status !== RecordStatus.WITHDRAWN &&
+          r.status !== RecordStatus.REJECTED &&
+          statusStr !== 'HOAN_THANH'
+        );
+      });
+      map[emp.id] = {
+        activeCount: active.length,
+        activePlotCount: active.reduce((sum, r) => sum + getRecordPlotCount(r), 0)
+      };
+    });
+    return map;
+  }, [employees, allRecords, selectedRecords]);
 
   // Determine active target records
   const activeRecordsToUpdate = selectedRecords;
@@ -83,6 +114,7 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
                         }}
                     >
                         <option value="status">Trạng thái hồ sơ (Quy trình)</option>
+                        <option value="capGiaySubStep">Bước xử lý Cấp giấy (Chỉ Cấp giấy)</option>
                         <option value="assignedTo">Người xử lý (Giao việc)</option>
                         <option value="assignedDate">Ngày giao việc</option>
                         <option value="checkedDate">Ngày kiểm tra</option>
@@ -123,16 +155,36 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
                         </select>
                     )}
 
-                    {targetField === 'assignedTo' && (
+                    {targetField === 'capGiaySubStep' && (
                         <select 
-                            className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-orange-500 outline-none bg-white"
+                            className="w-full border border-teal-300 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-teal-500 outline-none bg-teal-50 font-bold text-teal-900"
                             value={targetValue}
                             onChange={(e) => setTargetValue(e.target.value)}
                         >
-                            <option value="">-- Chọn nhân viên --</option>
-                            {employees.map(emp => (
-                                <option key={emp.id} value={emp.id}>{emp.name} - {emp.department}</option>
-                            ))}
+                            <option value="">-- Chọn bước nhỏ Cấp giấy --</option>
+                            <option value="tham_dinh">1. Thẩm định hồ sơ</option>
+                            <option value="phieu_chuyen_thue">2. Lập & Gửi phiếu chuyển thuế</option>
+                            <option value="cho_nop_thue">3. Chờ người dân nộp thuế</option>
+                            <option value="hoan_thien_trinh_duyet">4. Hoàn thiện hồ sơ & Tr trình duyệt</option>
+                        </select>
+                    )}
+
+                    {targetField === 'assignedTo' && (
+                        <select 
+                            className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-orange-500 outline-none bg-white font-medium"
+                            value={targetValue}
+                            onChange={(e) => setTargetValue(e.target.value)}
+                        >
+                            <option value="">-- Chọn nhân viên (Kèm tải công việc) --</option>
+                            {employees.map(emp => {
+                                const wl = empWorkloadMap[emp.id];
+                                const wlStr = wl ? ` [Đang xử lý: ${wl.activeCount} HS - ${wl.activePlotCount} thửa]` : '';
+                                return (
+                                    <option key={emp.id} value={emp.id}>
+                                        {emp.name} ({emp.department}){wlStr}
+                                    </option>
+                                );
+                            })}
                         </select>
                     )}
 

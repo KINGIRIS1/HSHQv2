@@ -21,6 +21,7 @@ interface MobileSettingsViewProps {
   employees: Employee[];
   users: User[];
   wards: string[];
+  initialSubView?: string | null;
   onUpdateAccount: (data: any) => Promise<boolean>;
   onAddUser: (user: Omit<User, 'id'>) => void;
   onUpdateUser: (user: User) => void;
@@ -35,19 +36,19 @@ interface MobileSettingsViewProps {
 }
 
 const MobileSettingsView: React.FC<MobileSettingsViewProps> = (props) => {
-  const { currentUser, employees, users, wards, onLogout } = props;
-  const [activeSubView, setActiveSubView] = useState<string | null>(null);
+  const { currentUser, employees, users, wards, onLogout, initialSubView } = props;
+  const [activeSubView, setActiveSubView] = useState<string | null>(initialSubView || null);
   const isAdmin = currentUser.role === UserRole.ADMIN;
   const isSubAdmin = currentUser.role === UserRole.SUBADMIN;
 
   const menuItems = [
     { id: 'account', label: 'Tài khoản của tôi', icon: UserIcon, color: 'text-blue-600', bg: 'bg-blue-50' },
     ...(isAdmin || isSubAdmin ? [
+      { id: 'system', label: 'Cài đặt hệ thống', icon: Settings2, color: 'text-orange-600', bg: 'bg-orange-50' },
       { id: 'employees', label: 'Quản lý nhân sự', icon: Users, color: 'text-teal-600', bg: 'bg-teal-50' }
     ] : []),
     ...(isAdmin ? [
-      { id: 'users', label: 'Quản lý người dùng', icon: Shield, color: 'text-indigo-600', bg: 'bg-indigo-50' },
-      { id: 'system', label: 'Cấu hình hệ thống', icon: Settings2, color: 'text-orange-600', bg: 'bg-orange-50' }
+      { id: 'users', label: 'Quản lý người dùng', icon: Shield, color: 'text-indigo-600', bg: 'bg-indigo-50' }
     ] : []),
   ];
 

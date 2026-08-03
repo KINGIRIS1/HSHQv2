@@ -70,6 +70,20 @@ const DailyStatsView: React.FC<DailyStatsViewProps> = ({
     const [mobileVisibleCount, setMobileVisibleCount] = useState(20);
 
     // Dynamic filtering helper per category (to update card counts reactively based on general filters)
+    const checkEmpMatch = (rec: RecordFile) => {
+        if (modalEmployee === 'all') return true;
+        if (modalEmployee === 'unassigned') return !rec.assignedTo && !rec.checkedBy;
+        if (rec.assignedTo === modalEmployee) return true;
+        const emp = employees.find(e => e.id === modalEmployee);
+        const isLeader = emp && (
+            emp.position?.toLowerCase().includes('tổ') ||
+            emp.position?.toLowerCase().includes('nhóm') ||
+            emp.position?.toLowerCase().includes('trưởng') ||
+            emp.position?.toLowerCase().includes('phó')
+        );
+        return isLeader ? rec.checkedBy === modalEmployee : false;
+    };
+
     const filteredReceivedRecords = useMemo(() => {
         return records.filter(r => {
             let matchDate = true;
@@ -88,10 +102,10 @@ const DailyStatsView: React.FC<DailyStatsViewProps> = ({
                 }
             }
             const matchWard = isWardMatch(r.ward || undefined);
-            const matchEmployee = modalEmployee === 'all' || (modalEmployee === 'unassigned' ? !r.assignedTo : r.assignedTo === modalEmployee);
+            const matchEmployee = checkEmpMatch(r);
             return matchDate && matchWard && matchEmployee;
         });
-    }, [records, effectiveFrom, effectiveTo, selectedWard, modalEmployee]);
+    }, [records, effectiveFrom, effectiveTo, selectedWard, modalEmployee, employees]);
 
     const filteredAssignedRecords = useMemo(() => {
         return records.filter(r => {
@@ -111,10 +125,10 @@ const DailyStatsView: React.FC<DailyStatsViewProps> = ({
                 }
             }
             const matchWard = isWardMatch(r.ward || undefined);
-            const matchEmployee = modalEmployee === 'all' || (modalEmployee === 'unassigned' ? !r.assignedTo : r.assignedTo === modalEmployee);
+            const matchEmployee = checkEmpMatch(r);
             return matchDate && matchWard && matchEmployee;
         });
-    }, [records, effectiveFrom, effectiveTo, selectedWard, modalEmployee]);
+    }, [records, effectiveFrom, effectiveTo, selectedWard, modalEmployee, employees]);
 
     const filteredHandoverRecords = useMemo(() => {
         return records.filter(r => {
@@ -134,10 +148,10 @@ const DailyStatsView: React.FC<DailyStatsViewProps> = ({
                 }
             }
             const matchWard = isWardMatch(r.ward || undefined);
-            const matchEmployee = modalEmployee === 'all' || (modalEmployee === 'unassigned' ? !r.assignedTo : r.assignedTo === modalEmployee);
+            const matchEmployee = checkEmpMatch(r);
             return matchDate && matchWard && matchEmployee;
         });
-    }, [records, effectiveFrom, effectiveTo, selectedWard, modalEmployee]);
+    }, [records, effectiveFrom, effectiveTo, selectedWard, modalEmployee, employees]);
 
     // Main records for the selected card/type
     const modalFilteredRecords = useMemo(() => {

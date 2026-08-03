@@ -2,7 +2,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { RecordFile, User, UserRole, RecordStatus, Employee } from '../types';
 import { removeVietnameseTones, isRecordOverdue, isRecordApproaching } from '../utils/appHelpers';
-import { getShortRecordType, isArchiveRecordType } from '../constants';
+import { getShortRecordType, isArchiveRecordType, isCapGiayRecord } from '../constants';
 
 export const useRecordFilter = (
     records: RecordFile[],
@@ -34,6 +34,7 @@ export const useRecordFilter = (
         setFilterStatus('all');
         setFilterEmployee('all');
         setWarningFilter('none');
+        setCapGiaySubStepFilter('all');
         setFilterSpecificDate('');
         setFilterAssignedDate('');
         setFilterFromDate('');
@@ -55,6 +56,7 @@ export const useRecordFilter = (
     const [filterRecordType, setFilterRecordType] = useState('all');
     const [filterStatus, setFilterStatus] = useState('all');
     const [filterEmployee, setFilterEmployee] = useState('all');
+    const [capGiaySubStepFilter, setCapGiaySubStepFilter] = useState<string>('all');
     const [warningFilter, setWarningFilter] = useState<'none' | 'overdue' | 'approaching'>('none');
     
     // Cập nhật type cho handoverTab để hỗ trợ 'returned'
@@ -86,7 +88,7 @@ export const useRecordFilter = (
         if (currentUser.role === UserRole.TEAM_LEADER) {
             const leaderEmp = employees.find(e => e.id === currentUser.employeeId);
             if (!leaderEmp) return true; 
-            const isMyTask = r.assignedTo === currentUser.employeeId;
+            const isMyTask = r.assignedTo === currentUser.employeeId || r.checkedBy === currentUser.employeeId;
             const hasManagedWards = leaderEmp.managedWards && leaderEmp.managedWards.length > 0;
             const isMyWard = hasManagedWards ? leaderEmp.managedWards.some((w: string) => r.ward && r.ward.includes(w)) : true;
             return isMyTask || isMyWard;
@@ -179,7 +181,7 @@ export const useRecordFilter = (
         }
 
         // Filter by recordType based on view group
-        const isOtherView = ['other_records', 'other_assign_tasks', 'other_check_list', 'other_handover_list', 'other_director_completed'].includes(currentView);
+        const isOtherView = ['other_records', 'other_assign_tasks', 'other_completed_list', 'other_pending_check_list', 'other_check_list', 'other_handover_list', 'registration_records'].includes(currentView);
         const isArchiveMeasurementView = ['archive_records', 'archive_assign_tasks', 'archive_completed_list', 'archive_pending_check_list', 'archive_check_list', 'archive_handover_list', 'archive_director_completed'].includes(currentView);
         const isMeasurementView = ['all_records', 'assign_tasks', 'completed_list', 'pending_check_list', 'check_list', 'handover_list', 'director_completed'].includes(currentView);
         
@@ -191,15 +193,18 @@ export const useRecordFilter = (
         } else if (isOtherView) {
             result = result.filter(r => {
                 const shortType = getShortRecordType(r.recordType);
-                return ['CMD', 'Tòa án', 'Thi hành án'].includes(shortType);
+                if (['CMD', 'Tòa án', 'Thi hành án'].includes(shortType)) return false;
+                if (isArchiveRecordType(r.recordType)) return false;
+                if (shortType.startsWith('2.')) return false;
+                return true;
             });
         } else if (isMeasurementView) {
             result = result.filter(r => {
                 const shortType = getShortRecordType(r.recordType);
-                return (
-                    !isArchiveRecordType(r.recordType) &&
-                    !['CMD', 'Tòa án', 'Thi hành án'].includes(shortType)
-                );
+                if (isArchiveRecordType(r.recordType)) return false;
+                if (['CMD', 'Tòa án', 'Thi hành án'].includes(shortType)) return false;
+                if (isCapGiayRecord(r)) return false;
+                return true;
             });
             if (filterRecordType !== 'all') {
                 result = result.filter(r => getShortRecordType(r.recordType) === filterRecordType || r.recordType === filterRecordType);
@@ -230,8 +235,31 @@ export const useRecordFilter = (
             result = result.filter(r => r.status === filterStatus);
         }
         if (filterEmployee !== 'all' && currentView !== 'assign_tasks') {
-            if (filterEmployee === 'unassigned') result = result.filter(r => !r.assignedTo);
-            else result = result.filter(r => r.assignedTo === filterEmployee);
+            if (filterEmployee === 'unassigned') {
+                result = result.filter(r => !r.assignedTo && !r.checkedBy);
+            } else {
+                const emp = employees.find(e => e.id === filterEmployee);
+                const isLeader = emp && (
+                    emp.position?.toLowerCase().includes('tổ') ||
+                    emp.position?.toLowerCase().includes('nhóm') ||
+                    emp.position?.toLowerCase().includes('trưởng') ||
+                    emp.position?.toLowerCase().includes('phó')
+                );
+                if (isLeader) {
+                    result = result.filter(r => r.assignedTo === filterEmployee || r.checkedBy === filterEmployee);
+                } else {
+                    result = result.filter(r => r.assignedTo === filterEmployee);
+                }
+            }
+        }
+
+        // Cap Giay Sub-step Filter (Chỉ áp dụng trong tab Đang thực hiện)
+        if (currentView === 'other_completed_list') {
+            const activeSubStep = (capGiaySubStepFilter === 'all' || !capGiaySubStepFilter) ? 'tham_dinh' : capGiaySubStepFilter;
+            result = result.filter(r => {
+                const currentSubStep = r.capGiaySubStep || 'tham_dinh';
+                return currentSubStep === activeSubStep;
+            });
         }
 
         // Date Filters (General for other views)
@@ -281,7 +309,7 @@ export const useRecordFilter = (
         });
 
         return result;
-    }, [records, searchTerm, filterWard, filterRecordType, filterStatus, filterEmployee, filterDate, filterSpecificDate, filterAssignedDate, filterFromDate, filterToDate, showAdvancedDateFilter, warningFilter, currentView, sortConfig, handoverTab, currentUser, employees]);
+    }, [records, searchTerm, filterWard, filterRecordType, filterStatus, filterEmployee, capGiaySubStepFilter, filterDate, filterSpecificDate, filterAssignedDate, filterFromDate, filterToDate, showAdvancedDateFilter, warningFilter, currentView, sortConfig, handoverTab, currentUser, employees]);
 
     const paginatedRecords = useMemo(() => {
         const start = (currentPage - 1) * itemsPerPage;
@@ -333,6 +361,7 @@ export const useRecordFilter = (
         filterRecordType, setFilterRecordType,
         filterStatus, setFilterStatus,
         filterEmployee, setFilterEmployee,
+        capGiaySubStepFilter, setCapGiaySubStepFilter,
         warningFilter, setWarningFilter,
         handoverTab, setHandoverTab,
         sortConfig, setSortConfig,

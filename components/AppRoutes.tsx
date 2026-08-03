@@ -10,7 +10,7 @@ import {
   DepartmentPermissions,
   DEFAULT_ROLE_PERMISSIONS,
 } from "../types";
-import { STATUS_LABELS } from "../constants";
+import { STATUS_LABELS, CAP_GIAY_SUB_STEPS } from "../constants";
 import { COLUMN_DEFS, removeVietnameseTones, matchDepartmentKey } from "../utils/appHelpers";
 
 // Components
@@ -76,6 +76,8 @@ import {
   Send,
   RefreshCw,
   Undo2,
+  BookOpen,
+  RotateCcw,
 } from "lucide-react";
 
 interface AppRoutesProps {
@@ -172,6 +174,8 @@ interface AppRoutesProps {
   setFilterStatus: (s: string) => void;
   filterEmployee: string;
   setFilterEmployee: (s: string) => void;
+  capGiaySubStepFilter?: string;
+  setCapGiaySubStepFilter?: (s: string) => void;
   warningFilter: string;
   setWarningFilter: React.Dispatch<React.SetStateAction<any>>;
   handoverTab: string;
@@ -349,10 +353,12 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
     ].includes(currentView);
     const isOtherView = [
       "other_records",
+      "registration_records",
       "other_assign_tasks",
+      "other_completed_list",
+      "other_pending_check_list",
       "other_check_list",
       "other_handover_list",
-      "other_director_completed",
     ].includes(currentView);
     const isArchiveMeasurementView = [
       "archive_records",
@@ -404,7 +410,8 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
     )
       title = "Hồ sơ chờ kiểm tra";
     else if (currentView === "all_records") title = "Hồ sơ đo đạc";
-    else if (currentView === "other_records") title = "Hồ sơ khác";
+    else if (currentView === "other_records") title = "Cấp giấy - Tất cả hồ sơ";
+    else if (currentView === "registration_records") title = "Cấp giấy - Vô số GCN";
     else if (currentView === "archive_records")
       title = "Lưu trữ (Cung cấp TLĐĐ)";
     else if (currentView === "archive_completed_list") title = "Đang thực hiện";
@@ -413,8 +420,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
 
     return (
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col flex-1 h-full animate-fade-in-up">
-          <>
-            {/* SUB-HEADER TABS FOR MEASUREMENT RECORDS */}
+        {/* SUB-HEADER TABS FOR MEASUREMENT RECORDS */}
             {isMeasurementView && (
           <div className="flex border-b border-gray-200 bg-gray-50 px-4 overflow-x-auto">
             {!isDirector && (
@@ -560,50 +566,70 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
           </div>
         )}
 
-        {/* SUB-HEADER TABS FOR OTHER RECORDS */}
+        {/* SUB-HEADER TABS FOR OTHER RECORDS & CAP GIAY SUB-STEPS */}
         {isOtherView && (
-          <div className="flex border-b border-gray-200 bg-gray-50 px-4 overflow-x-auto">
-            {!isDirector && (
-              <>
-                {isViewAllowedForUser(currentUser, employees, "other_records", rolePermissions, departmentPermissions) && (
-                  <button
-                    onClick={() => props.setCurrentView("other_records")}
-                    className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "other_records" ? "border-blue-600 text-blue-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
-                  >
-                    <FileText size={16} /> Tất cả hồ sơ
-                  </button>
-                )}
+          <>
+            <div className="flex border-b border-gray-200 bg-gray-50 px-4 overflow-x-auto">
+              {!isDirector && (
+                <>
+                  {isViewAllowedForUser(currentUser, employees, "other_records", rolePermissions, departmentPermissions) && (
+                    <button
+                      onClick={() => props.setCurrentView("other_records")}
+                      className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "other_records" ? "border-blue-600 text-blue-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
+                    >
+                      <FileText size={16} /> Tất cả hồ sơ
+                    </button>
+                  )}
 
-                {isViewAllowedForUser(currentUser, employees, "other_assign_tasks", rolePermissions, departmentPermissions) && (
-                  <button
-                    onClick={() => props.setCurrentView("other_assign_tasks")}
-                    className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "other_assign_tasks" ? "border-blue-600 text-blue-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
-                  >
-                    <UserPlusIcon size={16} /> Chưa giao
-                  </button>
-                )}
-              </>
-            )}
+                  {isViewAllowedForUser(currentUser, employees, "other_assign_tasks", rolePermissions, departmentPermissions) && (
+                    <button
+                      onClick={() => props.setCurrentView("other_assign_tasks")}
+                      className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "other_assign_tasks" ? "border-blue-600 text-blue-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
+                    >
+                      <UserPlusIcon size={16} /> Chưa giao
+                    </button>
+                  )}
 
-            {isViewAllowedForUser(currentUser, employees, "other_check_list", rolePermissions, departmentPermissions) && (
-              <button
-                onClick={() => props.setCurrentView("other_check_list")}
-                className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "other_check_list" ? "border-purple-600 text-purple-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
-              >
-                <ClipboardList size={16} /> {isDirector ? "Chờ ký" : "Trình ký"}
-              </button>
-            )}
+                  {isViewAllowedForUser(currentUser, employees, "other_completed_list", rolePermissions, departmentPermissions) && (
+                    <button
+                      onClick={() => props.setCurrentView("other_completed_list")}
+                      className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "other_completed_list" ? "border-blue-600 text-blue-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
+                    >
+                      <CheckSquare size={16} /> Đang thực hiện
+                    </button>
+                  )}
 
-            {isDirector && isViewAllowedForUser(currentUser, employees, "other_director_completed", rolePermissions, departmentPermissions) && (
-              <button
-                onClick={() => props.setCurrentView("other_director_completed")}
-                className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "other_director_completed" ? "border-green-600 text-green-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
-              >
-                <CheckSquare size={16} /> Hoàn thành
-              </button>
-            )}
+                  {isViewAllowedForUser(currentUser, employees, "other_pending_check_list", rolePermissions, departmentPermissions) && (
+                    <button
+                      onClick={() => props.setCurrentView("other_pending_check_list")}
+                      className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "other_pending_check_list" ? "border-orange-600 text-orange-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
+                    >
+                      <ClipboardList size={16} /> Kiểm tra
+                    </button>
+                  )}
+                </>
+              )}
 
-            {!isDirector && isViewAllowedForUser(currentUser, employees, "other_handover_list", rolePermissions, departmentPermissions) && (
+              {isViewAllowedForUser(currentUser, employees, "other_check_list", rolePermissions, departmentPermissions) && (
+                <button
+                  onClick={() => props.setCurrentView("other_check_list")}
+                  className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "other_check_list" ? "border-purple-600 text-purple-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
+                >
+                  <ClipboardList size={16} /> {isDirector ? "Chờ ký" : "Trình ký"}
+                </button>
+              )}
+
+              {/* TAB VÔ SỐ GCN - Đặt trước tab Giao 1 cửa (Thay thế tab Hoàn thành) */}
+              {isViewAllowedForUser(currentUser, employees, "registration_records", rolePermissions, departmentPermissions) && (
+                <button
+                  onClick={() => props.setCurrentView("registration_records")}
+                  className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "registration_records" ? "border-teal-600 text-teal-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
+                >
+                  <BookOpen size={16} /> Vô số GCN
+                </button>
+              )}
+
+              {!isDirector && isViewAllowedForUser(currentUser, employees, "other_handover_list", rolePermissions, departmentPermissions) && (
                 <button
                   onClick={() => props.setCurrentView("other_handover_list")}
                   className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "other_handover_list" ? "border-green-600 text-green-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
@@ -611,8 +637,18 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                   <Send size={16} /> Giao 1 cửa
                 </button>
               )}
-          </div>
+            </div>
+
+            {/* CẤP GIẤY SUB-STEP TABS REMOVED FROM TOP LEVEL, MOVED TO TOOLBAR */}
+          </>
         )}
+
+        {currentView === "registration_records" ? (
+          <div className="flex-1 overflow-hidden flex flex-col p-2">
+            <RegistrationRecords currentUser={currentUser} wards={wards} />
+          </div>
+        ) : (
+          <div className="flex-1 overflow-hidden flex flex-col">
 
         <div className="p-4 border-b border-gray-100 flex flex-col gap-4">
           <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
@@ -665,216 +701,318 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
               </div>
             )}
 
+            {/* UNIFIED POPOVER FILTER DROPDOWN FOR ALL WORKFLOW TABS */}
             {currentView !== "handover_list" &&
               currentView !== "other_handover_list" &&
               currentView !== "archive_handover_list" && (
-                <button
-                  onClick={() =>
-                    props.setShowAdvancedDateFilter(
-                      !props.showAdvancedDateFilter,
-                    )
-                  }
-                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium transition-colors shadow-sm border ${
-                    props.showAdvancedDateFilter
-                      ? "bg-blue-600 text-white border-blue-600"
-                      : (props.filterFromDate || props.filterToDate || props.filterAssignedFromDate || props.filterAssignedToDate)
-                      ? "bg-blue-50 text-blue-700 border-blue-300 font-bold"
-                      : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
-                  }`}
-                  title="Mở / đóng bộ lọc ngày nhận và ngày giao"
-                >
-                  <CalendarRange size={16} />
-                  {(props.filterFromDate || props.filterToDate || props.filterAssignedFromDate || props.filterAssignedToDate) && (
-                    <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
-                  )}
-                </button>
-              )}
+                <div className="relative">
+                  <button
+                    onClick={() =>
+                      props.setShowAdvancedDateFilter(
+                        !props.showAdvancedDateFilter,
+                      )
+                    }
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border cursor-pointer ${
+                      props.showAdvancedDateFilter
+                        ? "bg-blue-600 text-white border-blue-600 shadow-xs"
+                        : (props.filterFromDate ||
+                           props.filterToDate ||
+                           props.filterAssignedFromDate ||
+                           props.filterAssignedToDate ||
+                           (props.filterWard && props.filterWard !== "all") ||
+                           (props.filterRecordType && props.filterRecordType !== "all") ||
+                           (props.filterStatus && props.filterStatus !== "all") ||
+                           (props.filterEmployee && props.filterEmployee !== "all") ||
+                           (props.warningFilter && props.warningFilter !== "none"))
+                        ? "bg-blue-50 text-blue-700 border-blue-300 shadow-xs"
+                        : "bg-white text-slate-700 border-gray-200 hover:bg-gray-100"
+                    }`}
+                    title="Mở bộ lọc tìm kiếm"
+                  >
+                    <Filter
+                      size={15}
+                      className={
+                        (props.filterFromDate ||
+                         props.filterToDate ||
+                         props.filterAssignedFromDate ||
+                         props.filterAssignedToDate ||
+                         (props.filterWard && props.filterWard !== "all") ||
+                         (props.filterRecordType && props.filterRecordType !== "all") ||
+                         (props.filterStatus && props.filterStatus !== "all") ||
+                         (props.filterEmployee && props.filterEmployee !== "all") ||
+                         (props.warningFilter && props.warningFilter !== "none"))
+                          ? "text-blue-600"
+                          : "text-gray-500"
+                      }
+                    />
+                    <span>Lọc</span>
+                    {(props.filterFromDate ||
+                      props.filterToDate ||
+                      props.filterAssignedFromDate ||
+                      props.filterAssignedToDate ||
+                      (props.filterWard && props.filterWard !== "all") ||
+                      (props.filterRecordType && props.filterRecordType !== "all") ||
+                      (props.filterStatus && props.filterStatus !== "all") ||
+                      (props.filterEmployee && props.filterEmployee !== "all") ||
+                      (props.warningFilter && props.warningFilter !== "none")) && (
+                      <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse"></span>
+                    )}
+                    <ChevronDown
+                      size={14}
+                      className={`transition-transform duration-200 ${
+                        props.showAdvancedDateFilter ? "rotate-180" : ""
+                      }`}
+                    />
+                  </button>
 
-            {props.showAdvancedDateFilter && (
-              <>
-                {!isSpecializedTab &&
-                  currentView !== "handover_list" &&
-                  currentView !== "other_handover_list" &&
-                  currentView !== "archive_handover_list" && (
-                    <div className="flex items-center gap-1.5 bg-white px-2.5 py-1.5 border border-gray-200 rounded-md shadow-sm text-xs font-semibold text-gray-700">
-                      <Calendar size={15} className="text-gray-500 shrink-0" />
-                      <span className="text-xs text-gray-500 font-bold uppercase mr-0.5">
-                        Nhận:
-                      </span>
-                      <input
-                        type="date"
-                        value={props.filterFromDate}
-                        onChange={(e) => props.setFilterFromDate(e.target.value)}
-                        className="border border-gray-300 rounded px-1.5 py-0.5 text-xs outline-none focus:ring-1 focus:ring-blue-500 font-medium bg-white text-gray-800"
-                        title="Nhận từ ngày"
-                      />
-                      <span className="text-gray-400 font-bold text-xs">-</span>
-                      <input
-                        type="date"
-                        value={props.filterToDate}
-                        onChange={(e) => props.setFilterToDate(e.target.value)}
-                        className="border border-gray-300 rounded px-1.5 py-0.5 text-xs outline-none focus:ring-1 focus:ring-blue-500 font-medium bg-white text-gray-800"
-                        title="Nhận đến ngày"
-                      />
-                      {(props.filterFromDate || props.filterToDate) && (
+                  {/* Filter Popover Panel */}
+                  {props.showAdvancedDateFilter && (
+                    <div className="absolute left-0 mt-1 w-80 bg-white rounded-xl shadow-xl border border-gray-200 p-3.5 z-50 animate-in fade-in zoom-in-95 duration-100 space-y-3">
+                      <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+                        <span className="text-xs font-extrabold text-gray-700 flex items-center gap-1.5">
+                          <Filter size={14} className="text-blue-600" /> Bộ lọc tìm kiếm
+                        </span>
+                        <button
+                          onClick={() => props.setShowAdvancedDateFilter(false)}
+                          className="text-gray-400 hover:text-gray-600 p-0.5 rounded-md hover:bg-gray-100 cursor-pointer"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+
+                      <div className="space-y-3 max-h-[75vh] overflow-y-auto pr-0.5">
+                        {/* 1. Lọc Xã / Phường */}
+                        <div>
+                          <label className="block text-[11px] font-bold text-gray-500 mb-1 flex items-center gap-1">
+                            <MapPin size={13} /> Địa danh (Xã/Phường):
+                          </label>
+                          <select
+                            value={props.filterWard}
+                            onChange={(e) => props.setFilterWard(e.target.value)}
+                            className="w-full text-xs border border-gray-200 rounded-md p-1.5 outline-none focus:border-blue-500 bg-gray-50 font-medium text-gray-800 cursor-pointer"
+                          >
+                            <option value="all">Tất cả Xã/Phường</option>
+                            {wards.map((w) => (
+                              <option key={w} value={w}>
+                                {w}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* 2. Lọc thời gian nhận hồ sơ */}
+                        {!isSpecializedTab && (
+                          <div>
+                            <label className="block text-[11px] font-bold text-gray-500 mb-1 flex items-center gap-1">
+                              <Calendar size={13} /> Thời gian nhận hồ sơ:
+                            </label>
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <span className="text-[10px] text-gray-400">Từ ngày</span>
+                                <input
+                                  type="date"
+                                  value={props.filterFromDate}
+                                  onChange={(e) => props.setFilterFromDate(e.target.value)}
+                                  className="w-full text-xs border border-gray-200 rounded-md p-1.5 outline-none focus:border-blue-500 bg-gray-50 font-medium text-gray-800"
+                                />
+                              </div>
+                              <div>
+                                <span className="text-[10px] text-gray-400">Đến ngày</span>
+                                <input
+                                  type="date"
+                                  value={props.filterToDate}
+                                  onChange={(e) => props.setFilterToDate(e.target.value)}
+                                  className="w-full text-xs border border-gray-200 rounded-md p-1.5 outline-none focus:border-blue-500 bg-gray-50 font-medium text-gray-800"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* 3. Lọc thời gian giao nhân viên */}
+                        {(currentView === "all_records" ||
+                          currentView === "other_records" ||
+                          currentView === "archive_records") && (
+                          <div>
+                            <label className="block text-[11px] font-bold text-gray-500 mb-1 flex items-center gap-1">
+                              <Calendar size={13} /> Thời gian giao NV:
+                            </label>
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <span className="text-[10px] text-gray-400">Từ ngày</span>
+                                <input
+                                  type="date"
+                                  value={props.filterAssignedFromDate || ""}
+                                  onChange={(e) =>
+                                    props.setFilterAssignedFromDate &&
+                                    props.setFilterAssignedFromDate(e.target.value)
+                                  }
+                                  className="w-full text-xs border border-gray-200 rounded-md p-1.5 outline-none focus:border-blue-500 bg-gray-50 font-medium text-gray-800"
+                                />
+                              </div>
+                              <div>
+                                <span className="text-[10px] text-gray-400">Đến ngày</span>
+                                <input
+                                  type="date"
+                                  value={props.filterAssignedToDate || ""}
+                                  onChange={(e) =>
+                                    props.setFilterAssignedToDate &&
+                                    props.setFilterAssignedToDate(e.target.value)
+                                  }
+                                  className="w-full text-xs border border-gray-200 rounded-md p-1.5 outline-none focus:border-blue-500 bg-gray-50 font-medium text-gray-800"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* 4. Lọc Loại hồ sơ */}
+                        {isMeasurementView && (
+                          <div>
+                            <label className="block text-[11px] font-bold text-gray-500 mb-1 flex items-center gap-1">
+                              <Filter size={13} /> Loại hồ sơ Đo đạc:
+                            </label>
+                            <select
+                              value={props.filterRecordType}
+                              onChange={(e) => props.setFilterRecordType(e.target.value)}
+                              className="w-full text-xs border border-gray-200 rounded-md p-1.5 outline-none focus:border-blue-500 bg-gray-50 font-medium text-gray-800 cursor-pointer"
+                            >
+                              <option value="all">Tất cả loại HS</option>
+                              <option value="2.1 Trích lục">2.1 Trích lục</option>
+                              <option value="2.2 Trích lục QH">2.2 Trích lục QH</option>
+                              <option value="2.3 Trích đo">2.3 Trích đo</option>
+                              <option value="2.4 Cắm mốc">2.4 Cắm mốc</option>
+                              <option value="2.5 Tách-Hợp thửa">2.5 Tách-Hợp thửa</option>
+                              <option value="2.6 CN Số Thửa">2.6 CN Số Thửa</option>
+                            </select>
+                          </div>
+                        )}
+
+                        {isArchiveMeasurementView && (
+                          <div>
+                            <label className="block text-[11px] font-bold text-gray-500 mb-1 flex items-center gap-1">
+                              <Filter size={13} /> Loại hồ sơ Lưu trữ:
+                            </label>
+                            <select
+                              value={props.filterRecordType}
+                              onChange={(e) => props.setFilterRecordType(e.target.value)}
+                              className="w-full text-xs border border-gray-200 rounded-md p-1.5 outline-none focus:border-blue-500 bg-gray-50 font-medium text-gray-800 cursor-pointer"
+                            >
+                              <option value="all">Tất cả loại HS</option>
+                              <option value="1.1 Sao lục">1.1 Sao lục</option>
+                              <option value="1.2 Công văn">1.2 Công văn</option>
+                            </select>
+                          </div>
+                        )}
+
+                        {/* 5. Lọc Trạng thái hồ sơ */}
+                        {(currentView === "all_records" ||
+                          currentView === "other_records" ||
+                          currentView === "archive_records") && (
+                          <div>
+                            <label className="block text-[11px] font-bold text-gray-500 mb-1 flex items-center gap-1">
+                              <SlidersHorizontal size={13} /> Trạng thái hồ sơ:
+                            </label>
+                            <select
+                              value={props.filterStatus}
+                              onChange={(e) => props.setFilterStatus(e.target.value)}
+                              className="w-full text-xs border border-gray-200 rounded-md p-1.5 outline-none focus:border-blue-500 bg-gray-50 font-medium text-gray-800 cursor-pointer"
+                            >
+                              <option value="all">Mọi trạng thái</option>
+                              {Object.entries(STATUS_LABELS).map(([key, label]) => (
+                                <option key={key} value={key}>
+                                  {label}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+
+                        {/* 6. Lọc Cán bộ / Nhân viên */}
+                        {canPerformAction &&
+                          (currentView === "all_records" ||
+                            currentView === "other_records" ||
+                            currentView === "archive_records") && (
+                            <div>
+                              <label className="block text-[11px] font-bold text-gray-500 mb-1 flex items-center gap-1">
+                                <UserIcon size={13} /> Cán bộ xử lý:
+                              </label>
+                              <select
+                                value={props.filterEmployee}
+                                onChange={(e) => props.setFilterEmployee(e.target.value)}
+                                className="w-full text-xs border border-gray-200 rounded-md p-1.5 outline-none focus:border-blue-500 bg-gray-50 font-medium text-gray-800 cursor-pointer"
+                              >
+                                <option value="all">Tất cả cán bộ</option>
+                                <option value="unassigned">Chưa giao</option>
+                                {employees
+                                  .filter((emp) => {
+                                    const d = removeVietnameseTones((emp.department || '').toLowerCase());
+                                    if (isArchiveMeasurementView) return d.includes('luu tru');
+                                    if (isMeasurementView)
+                                      return (
+                                        d.includes('do dac') ||
+                                        d.includes('ky thuat') ||
+                                        d.includes('to do') ||
+                                        d.includes('dia chinh') ||
+                                        d.includes('noi nghiep') ||
+                                        d.includes('ngoai nghiep')
+                                      );
+                                    return true;
+                                  })
+                                  .map((emp) => (
+                                    <option key={emp.id} value={emp.id}>
+                                      {emp.name}
+                                    </option>
+                                  ))}
+                              </select>
+                            </div>
+                          )}
+
+                        {/* Nút Xóa tất cả bộ lọc */}
                         <button
                           onClick={() => {
                             props.setFilterFromDate("");
                             props.setFilterToDate("");
+                            if (props.setFilterAssignedFromDate) props.setFilterAssignedFromDate("");
+                            if (props.setFilterAssignedToDate) props.setFilterAssignedToDate("");
+                            props.setFilterWard("all");
+                            props.setFilterRecordType("all");
+                            props.setFilterStatus("all");
+                            props.setFilterEmployee("all");
+                            if (props.setWarningFilter) props.setWarningFilter("none");
                           }}
-                          className="text-gray-400 hover:text-red-500 ml-1"
-                          title="Xóa bộ lọc ngày nhận"
+                          className="w-full mt-2 py-1.5 text-xs text-red-600 hover:bg-red-50 border border-red-200 rounded-lg font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                         >
-                          <X size={14} />
+                          <RotateCcw size={13} /> Xóa tất cả bộ lọc
                         </button>
-                      )}
+                      </div>
                     </div>
                   )}
-
-                {(currentView === "all_records" ||
-                  currentView === "other_records" ||
-                  currentView === "archive_records") && (
-                    <div className="flex items-center gap-1.5 bg-white px-2.5 py-1.5 border border-gray-200 rounded-md shadow-sm text-xs font-semibold text-gray-700">
-                      <Calendar size={15} className="text-gray-500 shrink-0" />
-                      <span className="text-xs text-gray-500 font-bold uppercase mr-0.5">
-                        Giao NV:
-                      </span>
-                      <input
-                        type="date"
-                        value={props.filterAssignedFromDate || ""}
-                        onChange={(e) =>
-                          props.setFilterAssignedFromDate &&
-                          props.setFilterAssignedFromDate(e.target.value)
-                        }
-                        className="border border-gray-300 rounded px-1.5 py-0.5 text-xs outline-none focus:ring-1 focus:ring-blue-500 font-medium bg-white text-gray-800"
-                        title="Giao từ ngày"
-                      />
-                      <span className="text-gray-400 font-bold text-xs">-</span>
-                      <input
-                        type="date"
-                        value={props.filterAssignedToDate || ""}
-                        onChange={(e) =>
-                          props.setFilterAssignedToDate &&
-                          props.setFilterAssignedToDate(e.target.value)
-                        }
-                        className="border border-gray-300 rounded px-1.5 py-0.5 text-xs outline-none focus:ring-1 focus:ring-blue-500 font-medium bg-white text-gray-800"
-                        title="Giao đến ngày"
-                      />
-                      {(props.filterAssignedFromDate || props.filterAssignedToDate) && (
-                        <button
-                          onClick={() => {
-                            props.setFilterAssignedFromDate &&
-                              props.setFilterAssignedFromDate("");
-                            props.setFilterAssignedToDate &&
-                              props.setFilterAssignedToDate("");
-                          }}
-                          className="text-gray-400 hover:text-red-500 ml-1"
-                          title="Xóa bộ lọc ngày giao"
-                        >
-                          <X size={14} />
-                        </button>
-                      )}
-                    </div>
-                  )}
-              </>
-            )}
-
-            {isMeasurementView && (
-              <div className="flex items-center gap-2 bg-white px-2 py-1.5 border border-gray-200 rounded-md shadow-sm">
-                <Filter size={16} className="text-gray-500" />
-                <select
-                  value={props.filterRecordType}
-                  onChange={(e) => props.setFilterRecordType(e.target.value)}
-                  className="text-sm outline-none bg-transparent text-gray-700 font-medium cursor-pointer border-none focus:ring-0 max-w-[150px]"
-                >
-                  <option value="all">Tất cả loại HS</option>
-                  <option value="2.1 Trích lục">2.1 Trích lục</option>
-                  <option value="2.2 Trích lục QH">2.2 Trích lục QH</option>
-                  <option value="2.3 Trích đo">2.3 Trích đo</option>
-                  <option value="2.4 Cắm mốc">2.4 Cắm mốc</option>
-                  <option value="2.5 Tách-Hợp thửa">2.5 Tách-Hợp thửa</option>
-                  <option value="2.6 CN Số Thửa">2.6 CN Số Thửa</option>
-                </select>
-              </div>
-            )}
-
-            {isArchiveMeasurementView && (
-              <div className="flex items-center gap-2 bg-white px-2 py-1.5 border border-gray-200 rounded-md shadow-sm">
-                <Filter size={16} className="text-gray-500" />
-                <select
-                  value={props.filterRecordType}
-                  onChange={(e) => props.setFilterRecordType(e.target.value)}
-                  className="text-sm outline-none bg-transparent text-gray-700 font-medium cursor-pointer border-none focus:ring-0 max-w-[150px]"
-                >
-                  <option value="all">Tất cả loại HS</option>
-                  <option value="1.1 Sao lục">1.1 Sao lục</option>
-                  <option value="1.2 Công văn">1.2 Công văn</option>
-                </select>
-              </div>
-            )}
-
-            <div className="flex items-center gap-2 bg-white px-2 py-1.5 border border-gray-200 rounded-md shadow-sm">
-              <MapPin size={16} className="text-gray-500" />
-              <select
-                value={props.filterWard}
-                onChange={(e) => props.setFilterWard(e.target.value)}
-                className="text-sm outline-none bg-transparent text-gray-700 font-medium cursor-pointer border-none focus:ring-0 max-w-[120px]"
-              >
-                <option value="all">Tất cả Xã</option>
-                {wards.map((w) => (
-                  <option key={w} value={w}>
-                    {w}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {(currentView === "all_records" ||
-              currentView === "other_records" ||
-              currentView === "archive_records") && (
-              <div className="flex items-center gap-2 bg-white px-2 py-1.5 border border-gray-200 rounded-md shadow-sm">
-                <Filter size={16} className="text-gray-500" />
-                <select
-                  value={props.filterStatus}
-                  onChange={(e) => props.setFilterStatus(e.target.value)}
-                  className="text-sm outline-none bg-transparent text-gray-700 font-medium cursor-pointer border-none focus:ring-0 max-w-[120px]"
-                >
-                  <option value="all">Mọi trạng thái</option>
-                  {Object.entries(STATUS_LABELS).map(([key, label]) => (
-                    <option key={key} value={key}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            {canPerformAction &&
-              (currentView === "all_records" ||
-                currentView === "other_records" ||
-                currentView === "archive_records") && (
-                <div className="flex items-center gap-2 bg-white px-2 py-1.5 border border-gray-200 rounded-md shadow-sm">
-                  <UserIcon size={16} className="text-gray-500" />
-                  <select
-                    value={props.filterEmployee}
-                    onChange={(e) => props.setFilterEmployee(e.target.value)}
-                    className="text-sm outline-none bg-transparent text-gray-700 font-medium cursor-pointer border-none focus:ring-0 max-w-[120px]"
-                  >
-                    <option value="all">Tất cả NV</option>
-                    <option value="unassigned">Chưa giao</option>
-                    {employees.filter((emp) => {
-                      const d = removeVietnameseTones((emp.department || '').toLowerCase());
-                      if (isArchiveMeasurementView) return d.includes('luu tru');
-                      if (isMeasurementView) return d.includes('do dac') || d.includes('ky thuat') || d.includes('to do') || d.includes('dia chinh') || d.includes('noi nghiep') || d.includes('ngoai nghiep');
-                      return true;
-                    }).map((emp) => (
-                      <option key={emp.id} value={emp.id}>
-                        {emp.name}
-                      </option>
-                    ))}
-                  </select>
                 </div>
               )}
+
+            {/* CẤP GIẤY SUB-STEP TABS (ĐẶT NGAY CẠNH NÚT MỞ/ĐÓNG LỌC) */}
+            {currentView === "other_completed_list" && (
+              <div className="flex items-center gap-1.5 overflow-x-auto border-l border-gray-300 pl-2">
+                {CAP_GIAY_SUB_STEPS.map((step) => {
+                  const activeSubStep = (!props.capGiaySubStepFilter || props.capGiaySubStepFilter === 'all') ? 'tham_dinh' : props.capGiaySubStepFilter;
+                  const isActive = activeSubStep === step.id;
+                  return (
+                    <button
+                      key={step.id}
+                      onClick={() => props.setCapGiaySubStepFilter && props.setCapGiaySubStepFilter(step.id)}
+                      className={`px-3 py-1 rounded-md text-xs font-bold transition-all whitespace-nowrap border cursor-pointer ${
+                        isActive
+                          ? 'bg-teal-700 text-white border-teal-700 shadow-xs'
+                          : 'bg-white text-slate-700 border-slate-200 hover:bg-teal-50 hover:border-teal-300'
+                      }`}
+                    >
+                      {step.label}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
 
             {(currentView === "all_records" ||
               currentView === "other_records" ||
@@ -1101,7 +1239,8 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                   currentView === "archive_assign_tasks" ||
                   currentView === "all_records" ||
                   currentView === "other_records" ||
-                  currentView === "archive_records") &&
+                  currentView === "archive_records" ||
+                  isOtherView) &&
                   props.selectedRecordIds.size > 0 && (
                     <>
                       {hasPermission('BTN_REJECT_RECORD') && (
@@ -1401,7 +1540,8 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
             </div>
           </div>
         )}
-          </>
+          </div>
+        )}
       </div>
     );
   };
@@ -1521,7 +1661,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
         />
       );
     case "registration_records":
-      return <RegistrationRecords currentUser={currentUser} wards={wards} />;
+      return renderRecordList();
     case "congvan_records":
       return <CongVanView currentUser={currentUser} />;
     case "barcode_generator":

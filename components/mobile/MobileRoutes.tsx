@@ -110,8 +110,10 @@ const MobileRoutes: React.FC<MobileRoutesProps> = (props) => {
       );
 
     case 'account_settings':
+    case 'system_settings':
       return (
         <MobileSettingsView
+          initialSubView={currentView === 'system_settings' ? 'system' : null}
           currentUser={currentUser}
           employees={employees}
           users={users}

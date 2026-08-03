@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { RecordFile, RecordStatus, Employee, User, UserRole } from '../types';
-import { GROUPS, EXTENDED_RECORD_TYPES, STATUS_LABELS, getShortRecordType, getWardLabel, getNormalizedWard } from '../constants';
+import { GROUPS, EXTENDED_RECORD_TYPES, STATUS_LABELS, getShortRecordType, getWardLabel, getNormalizedWard, isCapGiayRecord } from '../constants';
 import { X, Save, Lock, User as UserIcon, MapPin, FileText, Calendar, FileCheck, ChevronDown, ChevronUp, History } from 'lucide-react';
 import { calculateDeadlineHelper } from '../utils/appHelpers';
 
@@ -466,6 +466,17 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                                 {allowedRecordTypes.map(t => <option key={t} value={t}>{t}</option>)}
                             </select>
                         </div>
+                        {isCapGiayRecord(formData) && (
+                            <div>
+                                <label className="block text-xs font-bold text-teal-700 mb-1">Bước xử lý Cấp giấy</label>
+                                <select className="w-full border border-teal-300 rounded-md px-3 py-2 bg-teal-50 font-bold text-teal-900" value={formData.capGiaySubStep || 'tham_dinh'} onChange={(e) => handleChange('capGiaySubStep', e.target.value)}>
+                                    <option value="tham_dinh">1. Thẩm định hồ sơ</option>
+                                    <option value="phieu_chuyen_thue">2. Lập & Gửi phiếu chuyển thuế</option>
+                                    <option value="cho_nop_thue">3. Chờ người dân nộp thuế</option>
+                                    <option value="hoan_thien_trinh_duyet">4. Hoàn thiện hồ sơ & Trình duyệt</option>
+                                </select>
+                            </div>
+                        )}
                         {hasAdminRights && (
                             <>
                                 <div><label className="block text-xs font-bold text-gray-700 mb-1">Trạng thái</label><select className="w-full border border-gray-300 rounded-md px-3 py-2 bg-yellow-50 font-medium" value={val(formData.status)} onChange={(e) => handleChange('status', e.target.value)}>{Object.values(RecordStatus).map(s => <option key={s} value={s}>{STATUS_LABELS[s] || s}</option>)}</select></div>

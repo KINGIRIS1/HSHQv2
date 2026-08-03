@@ -23,8 +23,8 @@ export const ROLE_VIEWS_CONFIG: Record<UserRole, RoleConfig> = {
     role: UserRole.ONEDOOR,
     allowedViews: [
       'dashboard', 'receive_record', 'receive_contract', 
-      'all_records', 'registration_records', 'other_records', 'personal_profile', 
-      'account_settings', 'utilities', 'handover_list', 'archive_handover_list', 'other_handover_list', 'work_schedule', 
+      'all_records', 'registration_records', 'other_records', 'other_assign_tasks', 'other_completed_list', 'other_pending_check_list', 'other_check_list', 'other_handover_list', 'personal_profile', 
+      'account_settings', 'utilities', 'handover_list', 'archive_handover_list', 'work_schedule', 
       'archive_records', 'receive_group', 'records_group', 'management_group',
       'reports', 'tools_group', 'barcode_generator'
     ]
@@ -51,7 +51,7 @@ export const ROLE_VIEWS_CONFIG: Record<UserRole, RoleConfig> = {
       },
       {
         keyword: 'đăng ký',
-        views: ['registration_records']
+        views: ['registration_records', 'other_records', 'other_assign_tasks', 'other_completed_list', 'other_pending_check_list', 'other_check_list', 'other_handover_list']
       },
       {
         keyword: 'lưu trữ',

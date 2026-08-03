@@ -135,6 +135,7 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
                 onConfirm={props.confirmAssign} 
                 employees={props.employees} 
                 selectedRecords={props.assignTargetRecords} 
+                allRecords={props.records}
                 currentView={props.currentView}
                 currentUser={props.currentUser}
                 filterDepartment={(() => {

@@ -133,7 +133,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
         return true;
     }, [currentUser, employees, rolePermissions, departmentPermissions, userRole]);
 
-    const [mainTab, setMainTab] = useState<'measurement' | 'registration' | 'archive' | 'revenue'>('measurement');
+    const [mainTab, setMainTab] = useState<'measurement' | 'registration' | 'archive'>('measurement');
     const [archiveRecords, setArchiveRecords] = useState<RecordFile[]>([]);
     const [isArchiveLoading, setIsArchiveLoading] = useState<boolean>(false);
 
@@ -163,7 +163,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
     }, [activeTab, mainTab]);
 
     useEffect(() => {
-        if (mainTab === 'archive' || mainTab === 'revenue') {
+        if (mainTab === 'archive') {
             const loadArchive = async () => {
                 setIsArchiveLoading(true);
                 try {
@@ -223,22 +223,6 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
         }
     }, [mainTab, records]);
 
-    const [tabVisibility, setTabVisibility] = useState<{
-        registration: boolean;
-        measurement: boolean;
-        archive: boolean;
-        revenue: boolean;
-    }>(() => {
-        try {
-            const saved = localStorage.getItem('report_tab_visibility');
-            if (saved) return JSON.parse(saved);
-        } catch (e) {}
-        return { registration: true, measurement: true, archive: true, revenue: true };
-    });
-
-    // Sub-team selection for Revenue tab
-    const [revenueTeam, setRevenueTeam] = useState<'registration' | 'measurement' | 'archive' | 'total'>('total');
-
     const registrationRecords = useMemo(() => {
         return records.filter(r => {
             const shortType = getShortRecordType(r.recordType);
@@ -270,9 +254,10 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
             const shortType = getShortRecordType(r.recordType);
             if (isArchiveRecordType(r.recordType)) return false;
 
-            const isMeasurementCode = ['2.3', '2.4', '2.5', '2.6'].some(code => shortType.startsWith(code));
+            const isMeasurementCode = ['2.1', '2.2', '2.3', '2.4', '2.5', '2.6'].some(code => shortType.startsWith(code));
             const typeLower = (r.recordType || '').toLowerCase();
-            const isMeasurementKeyword = typeLower.includes('trích đo') || 
+            const isMeasurementKeyword = typeLower.includes('trích lục') ||
+                                         typeLower.includes('trích đo') || 
                                          typeLower.includes('cắm mốc') || 
                                          typeLower.includes('tách thửa') || 
                                          typeLower.includes('hợp thửa') || 
@@ -284,16 +269,6 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
     }, [records]);
 
     const activeRecords = useMemo(() => {
-        if (mainTab === 'revenue') {
-            if (revenueTeam === 'registration') return registrationRecords;
-            if (revenueTeam === 'measurement') return measurementRecords;
-            if (revenueTeam === 'archive') return archiveRecords;
-            const recordMap = new Map<string, RecordFile>();
-            registrationRecords.forEach(r => recordMap.set(r.id, r));
-            measurementRecords.forEach(r => recordMap.set(r.id, r));
-            archiveRecords.forEach(r => recordMap.set(r.id, r));
-            return Array.from(recordMap.values());
-        }
         if (mainTab === 'archive') {
             return archiveRecords;
         }
@@ -302,12 +277,9 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
         }
         // mainTab === 'measurement'
         return measurementRecords;
-    }, [records, mainTab, archiveRecords, revenueTeam, registrationRecords, measurementRecords]);
+    }, [records, mainTab, archiveRecords, registrationRecords, measurementRecords]);
 
     const activeEmployees = useMemo(() => {
-        if (mainTab === 'revenue') {
-            return employees;
-        }
         if (mainTab === 'measurement') {
             return employees.filter(e => {
                 const dept = e.department?.toLowerCase() || '';
@@ -360,11 +332,23 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
         });
     }, [activeRecords, fromDate, toDate, selectedWard]);
 
+    const isEmpMatch = (r: RecordFile, empId: string) => {
+        if (r.assignedTo === empId) return true;
+        const emp = employees.find(e => e.id === empId);
+        const isLeader = emp && (
+            emp.position?.toLowerCase().includes('tổ') ||
+            emp.position?.toLowerCase().includes('nhóm') ||
+            emp.position?.toLowerCase().includes('trưởng') ||
+            emp.position?.toLowerCase().includes('phó')
+        );
+        return isLeader ? r.checkedBy === empId : false;
+    };
+
     // Apply card-click filter to the list of records
     const finalFilteredData = useMemo(() => {
         let baseData = filteredData;
         if (activeTab === 'employee' && selectedEmpId) {
-            baseData = filteredData.filter(r => r.assignedTo === selectedEmpId);
+            baseData = filteredData.filter(r => isEmpMatch(r, selectedEmpId));
         }
         if (!cardFilter || cardFilter === 'all') return baseData;
         return baseData.filter(r => {
@@ -425,7 +409,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
         }
         // Nếu đang ở tab Nhân viên và đã chọn nhân viên -> Lọc theo nhân viên đó
         else if (activeTab === 'employee' && selectedEmpId) {
-            sourceData = filteredData.filter(r => r.assignedTo === selectedEmpId);
+            sourceData = filteredData.filter(r => isEmpMatch(r, selectedEmpId));
         }
 
         const total = sourceData.length;
@@ -502,14 +486,11 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
         let teamName = "ĐO ĐẠC";
         if (mainTab === 'registration') teamName = "CẤP GIẤY";
         else if (mainTab === 'archive') teamName = "LƯU TRỮ";
-        else if (mainTab === 'revenue') {
-            if (revenueTeam === 'registration') teamName = "DOANH THU TỔ CẤP GIẤY";
-            else if (revenueTeam === 'measurement') teamName = "DOANH THU TỔ ĐO ĐẠC";
-            else if (revenueTeam === 'archive') teamName = "DOANH THU TỔ LƯU TRỮ";
-            else teamName = "NGUỒN THU TỔNG HỢP";
-        }
 
         let title = `BÁO CÁO KẾT QUẢ CÔNG TÁC ${teamName}`;
+        if (activeTab === 'revenue') {
+            title = `BÁO CÁO DOANH THU TỔ ${teamName}`;
+        }
         if (reportType === 'today') title += " HÔM NAY";
         if (reportType === 'week') title += " TUẦN";
         if (reportType === 'month') title += " THÁNG";
@@ -520,7 +501,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
 
     // Compute dynamic count for shared Excel Export button
     const activeExportCount = useMemo(() => {
-        if (mainTab === 'revenue') {
+        if (activeTab === 'revenue') {
             return revenueStatsRecords.length || filteredData.length;
         }
         if (activeTab === 'daily_stats') {
@@ -530,13 +511,13 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
             return overdueStatsRecords.length || filteredData.length;
         }
         if (activeTab === 'employee' && selectedEmpId) {
-            return filteredData.filter(r => r.assignedTo === selectedEmpId).length;
+            return filteredData.filter(r => isEmpMatch(r, selectedEmpId)).length;
         }
         if (activeTab === 'list') {
             return finalFilteredData.length;
         }
         return filteredData.length;
-    }, [activeTab, mainTab, dailyStatsRecords, revenueStatsRecords, overdueStatsRecords, filteredData, finalFilteredData, selectedEmpId]);
+    }, [activeTab, dailyStatsRecords, revenueStatsRecords, overdueStatsRecords, filteredData, finalFilteredData, selectedEmpId]);
 
     const handleExportExcelClick = () => {
         if (!fromDate || !toDate) { alert("Vui lòng chọn đầy đủ thời gian."); return; }
@@ -550,12 +531,6 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
         let teamName = "ĐO ĐẠC";
         if (mainTab === 'registration') teamName = "CẤP GIẤY";
         else if (mainTab === 'archive') teamName = "LƯU TRỮ";
-        else if (mainTab === 'revenue') {
-            if (revenueTeam === 'registration') teamName = "DOANH THU TỔ CẤP GIẤY";
-            else if (revenueTeam === 'measurement') teamName = "DOANH THU TỔ ĐO ĐẠC";
-            else if (revenueTeam === 'archive') teamName = "DOANH THU TỔ LƯU TRỮ";
-            else teamName = "NGUỒN THU TỔNG HỢP";
-        }
 
         let title = `BÁO CÁO KẾT QUẢ CÔNG TÁC ${teamName}`;
         
@@ -570,10 +545,8 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
             } else {
                 title += " - TỔNG HỢP THEO NHÂN VIÊN";
             }
-        } else if (mainTab === 'revenue') {
-            title += " - BÁO CÁO NGUỒN THU";
-        } else if (activeTab === 'overdue') {
-            title += " - BÁO CÁO HỒ SƠ TRỄ HẠN";
+        } else if (activeTab === 'revenue') {
+            title += " - BÁO CÁO DOANH THU";
         }
 
         if (reportType === 'today') title += " HÔM NAY";
@@ -581,7 +554,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
         else if (reportType === 'month') title += " THÁNG NÀY";
 
         let dataToExport = finalFilteredData;
-        if (mainTab === 'revenue' && revenueStatsRecords.length > 0) {
+        if (activeTab === 'revenue' && revenueStatsRecords.length > 0) {
             dataToExport = revenueStatsRecords;
         } else if (activeTab === 'daily_stats' && dailyStatsRecords.length > 0) {
             dataToExport = dailyStatsRecords;
@@ -659,19 +632,11 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                             <FolderArchive size={18} /> Báo cáo Lưu trữ
                         </button>
                     )}
-                    {(isHanhChinhOrAdmin || canSeeRevenueTab) && (
-                        <button 
-                            onClick={() => setMainTab('revenue')}
-                            className={`px-5 py-2.5 text-sm font-bold rounded-t-lg border-t border-l border-r transition-all flex items-center gap-2 shrink-0 ${mainTab === 'revenue' ? 'bg-emerald-50 border-gray-200 text-emerald-700 border-b-transparent relative top-[1px]' : 'bg-gray-50 border-transparent text-gray-500 hover:bg-gray-100'}`}
-                        >
-                            <DollarSign size={18} /> Báo cáo Nguồn thu
-                        </button>
-                    )}
                 </div>
             </div>
 
             {/* Toolbar */}
-            <div className={`p-4 border-b border-gray-200 shadow-sm flex flex-col gap-4 shrink-0 z-10 ${mainTab === 'measurement' ? 'bg-blue-50' : mainTab === 'registration' ? 'bg-purple-50' : mainTab === 'archive' ? 'bg-orange-50' : 'bg-emerald-50'}`}>
+            <div className={`p-4 border-b border-gray-200 shadow-sm flex flex-col gap-4 shrink-0 z-10 ${mainTab === 'measurement' ? 'bg-blue-50' : mainTab === 'registration' ? 'bg-purple-50' : 'bg-orange-50'}`}>
                 <div className="flex flex-wrap items-center justify-between gap-4">
                     <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-lg border border-slate-200">
                         <button 
@@ -751,110 +716,75 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
             </div>
 
             {/* Content Sub-Tabs */}
-            {mainTab === 'revenue' ? (
-                <div className="flex bg-white border-b border-gray-200 px-2 md:px-4 justify-start gap-1 overflow-x-auto no-scrollbar">
-                    <button 
-                        onClick={() => setRevenueTeam('total')}
-                        className={`px-4 md:px-6 py-2.5 md:py-3 text-xs md:text-sm font-bold border-b-2 transition-all flex items-center justify-center gap-1.5 shrink-0 ${revenueTeam === 'total' ? 'border-emerald-600 text-emerald-700 bg-emerald-50/60 rounded-t-lg' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-                    >
-                        <DollarSign size={18}/> 
-                        <span>Báo cáo nguồn thu tổng hợp</span>
-                    </button>
-                    <button 
-                        onClick={() => setRevenueTeam('registration')}
-                        className={`px-4 md:px-6 py-2.5 md:py-3 text-xs md:text-sm font-bold border-b-2 transition-all flex items-center justify-center gap-1.5 shrink-0 ${revenueTeam === 'registration' ? 'border-purple-600 text-purple-700 bg-purple-50/60 rounded-t-lg' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-                    >
-                        <FileCheck size={18}/> 
-                        <span>Báo cáo doanh thu tổ Cấp giấy</span>
-                    </button>
-                    <button 
-                        onClick={() => setRevenueTeam('measurement')}
-                        className={`px-4 md:px-6 py-2.5 md:py-3 text-xs md:text-sm font-bold border-b-2 transition-all flex items-center justify-center gap-1.5 shrink-0 ${revenueTeam === 'measurement' ? 'border-blue-600 text-blue-700 bg-blue-50/60 rounded-t-lg' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-                    >
-                        <Ruler size={18}/> 
-                        <span>Báo cáo doanh thu tổ Đo đạc</span>
-                    </button>
-                    <button 
-                        onClick={() => setRevenueTeam('archive')}
-                        className={`px-4 md:px-6 py-2.5 md:py-3 text-xs md:text-sm font-bold border-b-2 transition-all flex items-center justify-center gap-1.5 shrink-0 ${revenueTeam === 'archive' ? 'border-orange-600 text-orange-700 bg-orange-50/60 rounded-t-lg' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-                    >
-                        <FolderArchive size={18}/> 
-                        <span>Báo cáo doanh thu tổ Lưu trữ</span>
-                    </button>
-                </div>
-            ) : (
-                <div className="flex bg-white border-b border-gray-200 px-2 md:px-4 justify-between md:justify-start gap-1 overflow-x-auto no-scrollbar">
-                    <button 
-                        onClick={() => setActiveTab('list')}
-                        className={`px-3 md:px-6 py-2.5 md:py-3 text-xs md:text-sm font-bold border-b-2 transition-all flex items-center justify-center gap-1.5 shrink-0 ${activeTab === 'list' ? 'border-blue-600 text-blue-600 bg-blue-50/60 md:bg-transparent rounded-t-lg md:rounded-none' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-                        title={`Danh sách kết quả (${filteredData.length})`}
-                    >
-                        <ListFilter size={18}/> 
-                        <span className="hidden md:inline">Danh sách kết quả ({filteredData.length})</span>
-                    </button>
-                    <button 
-                        onClick={() => setActiveTab('ward_stats')}
-                        className={`px-3 md:px-6 py-2.5 md:py-3 text-xs md:text-sm font-bold border-b-2 transition-all flex items-center justify-center gap-1.5 shrink-0 ${activeTab === 'ward_stats' ? 'border-teal-600 text-teal-600 bg-teal-50/60 md:bg-transparent rounded-t-lg md:rounded-none' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-                        title="Thống kê theo Xã"
-                    >
-                        <PieChart size={18}/> 
-                        <span className="hidden md:inline">Thống kê theo Xã</span>
-                    </button>
-                    <button 
-                        onClick={() => setActiveTab('employee')}
-                        className={`px-3 md:px-6 py-2.5 md:py-3 text-xs md:text-sm font-bold border-b-2 transition-all flex items-center justify-center gap-1.5 shrink-0 ${activeTab === 'employee' ? 'border-orange-600 text-orange-600 bg-orange-50/60 md:bg-transparent rounded-t-lg md:rounded-none' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-                        title="Thống kê nhân viên"
-                    >
-                        <UserCheck size={18}/> 
-                        <span className="hidden md:inline">Thống kê nhân viên</span>
-                    </button>
-                    <button 
-                        onClick={() => setActiveTab('daily_stats')}
-                        className={`px-3 md:px-6 py-2.5 md:py-3 text-xs md:text-sm font-bold border-b-2 transition-all flex items-center justify-center gap-1.5 shrink-0 ${activeTab === 'daily_stats' ? 'border-pink-600 text-pink-600 bg-pink-50/60 md:bg-transparent rounded-t-lg md:rounded-none' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-                        title="Thống kê theo ngày"
-                    >
-                        <CalendarDays size={18}/> 
-                        <span className="hidden md:inline">Thống kê theo ngày</span>
-                    </button>
-                    <button 
-                        onClick={() => setActiveTab('overdue')}
-                        className={`px-3 md:px-6 py-2.5 md:py-3 text-xs md:text-sm font-bold border-b-2 transition-all flex items-center justify-center gap-1.5 shrink-0 ${activeTab === 'overdue' ? 'border-red-600 text-red-600 bg-red-50/60 md:bg-transparent rounded-t-lg md:rounded-none' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-                        title="Thống kê hồ sơ trễ"
-                    >
-                        <AlertTriangle size={18}/> 
-                        <span className="hidden md:inline">Thống kê hồ sơ trễ</span>
-                    </button>
-                    <button 
-                        onClick={() => setActiveTab('ai')}
-                        className={`px-3 md:px-6 py-2.5 md:py-3 text-xs md:text-sm font-bold border-b-2 transition-all flex items-center justify-center gap-1.5 shrink-0 ${activeTab === 'ai' ? 'border-purple-600 text-purple-600 bg-purple-50/60 md:bg-transparent rounded-t-lg md:rounded-none' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-                        title="Văn bản Báo cáo (AI)"
-                    >
-                        <Sparkles size={18}/> 
-                        <span className="hidden md:inline">Văn bản Báo cáo (AI)</span>
-                    </button>
-                </div>
-            )}
+            <div className="flex bg-white border-b border-gray-200 px-2 md:px-4 justify-between md:justify-start gap-1 overflow-x-auto no-scrollbar">
+                <button 
+                    onClick={() => setActiveTab('list')}
+                    className={`px-3 md:px-6 py-2.5 md:py-3 text-xs md:text-sm font-bold border-b-2 transition-all flex items-center justify-center gap-1.5 shrink-0 ${activeTab === 'list' ? 'border-blue-600 text-blue-600 bg-blue-50/60 md:bg-transparent rounded-t-lg md:rounded-none' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                    title={`Danh sách kết quả (${filteredData.length})`}
+                >
+                    <ListFilter size={18}/> 
+                    <span className="hidden md:inline">Danh sách kết quả ({filteredData.length})</span>
+                </button>
+                <button 
+                    onClick={() => setActiveTab('ward_stats')}
+                    className={`px-3 md:px-6 py-2.5 md:py-3 text-xs md:text-sm font-bold border-b-2 transition-all flex items-center justify-center gap-1.5 shrink-0 ${activeTab === 'ward_stats' ? 'border-teal-600 text-teal-600 bg-teal-50/60 md:bg-transparent rounded-t-lg md:rounded-none' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                    title="Thống kê theo Xã"
+                >
+                    <PieChart size={18}/> 
+                    <span className="hidden md:inline">Thống kê theo Xã</span>
+                </button>
+                <button 
+                    onClick={() => setActiveTab('employee')}
+                    className={`px-3 md:px-6 py-2.5 md:py-3 text-xs md:text-sm font-bold border-b-2 transition-all flex items-center justify-center gap-1.5 shrink-0 ${activeTab === 'employee' ? 'border-orange-600 text-orange-600 bg-orange-50/60 md:bg-transparent rounded-t-lg md:rounded-none' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                    title="Thống kê nhân viên"
+                >
+                    <UserCheck size={18}/> 
+                    <span className="hidden md:inline">Thống kê nhân viên</span>
+                </button>
+                <button 
+                    onClick={() => setActiveTab('daily_stats')}
+                    className={`px-3 md:px-6 py-2.5 md:py-3 text-xs md:text-sm font-bold border-b-2 transition-all flex items-center justify-center gap-1.5 shrink-0 ${activeTab === 'daily_stats' ? 'border-pink-600 text-pink-600 bg-pink-50/60 md:bg-transparent rounded-t-lg md:rounded-none' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                    title="Thống kê theo ngày"
+                >
+                    <CalendarDays size={18}/> 
+                    <span className="hidden md:inline">Thống kê theo ngày</span>
+                </button>
+                <button 
+                    onClick={() => setActiveTab('revenue')}
+                    className={`px-3 md:px-6 py-2.5 md:py-3 text-xs md:text-sm font-bold border-b-2 transition-all flex items-center justify-center gap-1.5 shrink-0 ${activeTab === 'revenue' ? 'border-emerald-600 text-emerald-600 bg-emerald-50/60 md:bg-transparent rounded-t-lg md:rounded-none' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                    title="Báo cáo doanh thu"
+                >
+                    <DollarSign size={18}/> 
+                    <span className="hidden md:inline">Báo cáo doanh thu</span>
+                </button>
+                <button 
+                    onClick={() => setActiveTab('overdue')}
+                    className={`px-3 md:px-6 py-2.5 md:py-3 text-xs md:text-sm font-bold border-b-2 transition-all flex items-center justify-center gap-1.5 shrink-0 ${activeTab === 'overdue' ? 'border-red-600 text-red-600 bg-red-50/60 md:bg-transparent rounded-t-lg md:rounded-none' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                    title="Thống kê hồ sơ trễ"
+                >
+                    <AlertTriangle size={18}/> 
+                    <span className="hidden md:inline">Thống kê hồ sơ trễ</span>
+                </button>
+                <button 
+                    onClick={() => setActiveTab('ai')}
+                    className={`px-3 md:px-6 py-2.5 md:py-3 text-xs md:text-sm font-bold border-b-2 transition-all flex items-center justify-center gap-1.5 shrink-0 ${activeTab === 'ai' ? 'border-purple-600 text-purple-600 bg-purple-50/60 md:bg-transparent rounded-t-lg md:rounded-none' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                    title="Văn bản Báo cáo (AI)"
+                >
+                    <Sparkles size={18}/> 
+                    <span className="hidden md:inline">Văn bản Báo cáo (AI)</span>
+                </button>
+            </div>
 
             {/* Active Tab Subtitle Banner on Mobile */}
             <div className="md:hidden px-3 py-1.5 bg-slate-100 border-b border-slate-200 text-xs font-bold text-slate-700 flex justify-between items-center shrink-0">
                 <span>
-                    {mainTab === 'revenue' ? (
-                        <>
-                            {revenueTeam === 'registration' && 'Báo cáo Doanh thu - Tổ Cấp giấy'}
-                            {revenueTeam === 'measurement' && 'Báo cáo Doanh thu - Tổ Đo đạc'}
-                            {revenueTeam === 'archive' && 'Báo cáo Doanh thu - Tổ Lưu trữ'}
-                            {revenueTeam === 'total' && 'Báo cáo Nguồn thu Tổng hợp'}
-                        </>
-                    ) : (
-                        <>
-                            {activeTab === 'list' && `Danh sách kết quả (${filteredData.length})`}
-                            {activeTab === 'ward_stats' && 'Thống kê theo Xã/Phường'}
-                            {activeTab === 'employee' && 'Thống kê Nhân viên'}
-                            {activeTab === 'daily_stats' && 'Thống kê theo Ngày'}
-                            {activeTab === 'overdue' && 'Thống kê Hồ sơ Trễ'}
-                            {activeTab === 'ai' && 'Văn bản Báo cáo (AI)'}
-                        </>
-                    )}
+                    {activeTab === 'list' && `Danh sách kết quả (${filteredData.length})`}
+                    {activeTab === 'ward_stats' && 'Thống kê theo Xã/Phường'}
+                    {activeTab === 'employee' && 'Thống kê Nhân viên'}
+                    {activeTab === 'daily_stats' && 'Thống kê theo Ngày'}
+                    {activeTab === 'revenue' && 'Báo cáo Doanh thu'}
+                    {activeTab === 'overdue' && 'Thống kê Hồ sơ Trễ'}
+                    {activeTab === 'ai' && 'Văn bản Báo cáo (AI)'}
                 </span>
                 <span className="text-[10px] text-slate-400 font-normal">Chạm icon trên để đổi</span>
             </div>
@@ -1200,7 +1130,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                     />
                 )}
 
-                {mainTab === 'revenue' && (
+                {activeTab === 'revenue' && (
                     <RevenueStatsView 
                         records={activeRecords}
                         employees={activeEmployees}
@@ -1209,9 +1139,8 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                         fromDate={fromDate}
                         toDate={toDate}
                         teamTitle={
-                            revenueTeam === 'total' ? 'Báo cáo nguồn thu tổng hợp' :
-                            revenueTeam === 'registration' ? 'Báo cáo doanh thu tổ Cấp giấy' :
-                            revenueTeam === 'measurement' ? 'Báo cáo doanh thu tổ Đo đạc' :
+                            mainTab === 'registration' ? 'Báo cáo doanh thu tổ Cấp giấy' :
+                            mainTab === 'measurement' ? 'Báo cáo doanh thu tổ Đo đạc' :
                             'Báo cáo doanh thu tổ Lưu trữ'
                         }
                         onFilteredRecordsChange={setRevenueStatsRecords}

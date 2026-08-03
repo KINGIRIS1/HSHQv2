@@ -9,6 +9,7 @@ import TemplateConfigModal from './TemplateConfigModal';
 import DocxPreviewModal from './DocxPreviewModal';
 import GetContractNumberModal from './GetContractNumberModal';
 import { confirmAction, removeVietnameseTones } from '../utils/appHelpers';
+import { getRecordPlotCount } from '../constants';
 import saveAs from 'file-saver'; // Import saveAs
 
 // Child Components
@@ -193,7 +194,7 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
                       serviceType: serviceType, 
                       areaType: areaType,       
                       
-                      plotCount: 1,
+                      plotCount: getRecordPlotCount(record),
                       markerCount: 1,
                       quantity: 1, 
                       unitPrice: 0, // Form sẽ tự tính lại dựa trên serviceType
@@ -297,7 +298,7 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
                   contractType: contractType,
                   serviceType: serviceType, 
                   areaType: areaType,       
-                  plotCount: 1,
+                  plotCount: getRecordPlotCount(record),
                   markerCount: 1,
                   quantity: 1, 
                   unitPrice: 0, 

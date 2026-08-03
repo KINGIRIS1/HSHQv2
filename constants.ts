@@ -251,6 +251,67 @@ export const MOCK_RECORDS: RecordFile[] = [
   }
 ];
 
+export const CAP_GIAY_SUB_STEPS = [
+  { id: 'tham_dinh', label: '1. Thẩm định hồ sơ', shortLabel: '1. Thẩm định', color: 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100' },
+  { id: 'phieu_chuyen_thue', label: '2. Phiếu chuyển thuế', shortLabel: '2. Chuyển thuế', color: 'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100' },
+  { id: 'cho_nop_thue', label: '3. Chờ nộp thuế', shortLabel: '3. Chờ nộp thuế', color: 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100' },
+  { id: 'hoan_thien_trinh_duyet', label: '4. Hoàn thiện in GCN', shortLabel: '4. Hoàn thiện in', color: 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' },
+] as const;
+
+export const isCapGiayRecord = (record: RecordFile | Partial<RecordFile> | null | undefined): boolean => {
+  if (!record || !record.recordType) return false;
+  const t = record.recordType.toLowerCase();
+  const shortType = getShortRecordType(record.recordType).toLowerCase();
+  if (['cmd', 'tòa án', 'toa an', 'thi hành án', 'thi hanh an'].some(x => t.includes(x) || shortType.includes(x))) {
+    return false;
+  }
+  return (
+    t.includes('cấp giấy') ||
+    t.includes('gcn') ||
+    t.includes('đăng ký') ||
+    t.includes('dang ky') ||
+    t.includes('biến động') ||
+    t.includes('bien dong') ||
+    t.includes('cấp đổi') ||
+    t.includes('cấp lại') ||
+    t.includes('3.')
+  );
+};
+
+export const getRecordPlotCount = (record: RecordFile | Partial<RecordFile> | null | undefined): number => {
+  if (!record) return 0;
+  if (!record.landPlot || typeof record.landPlot !== 'string' || !record.landPlot.trim()) {
+    return 1; // Mặc định tính 1 thửa đất
+  }
+  const str = record.landPlot.trim();
+  const parts = str.split(/[,;+\n]|\bvà\b/i).map(p => p.trim()).filter(Boolean);
+  return parts.length > 0 ? parts.length : 1;
+};
+
+export const getCapGiaySubStepLabel = (subStep?: string | null): string => {
+  if (!subStep || subStep === 'tham_dinh') return '1. Thẩm định';
+  if (subStep === 'phieu_chuyen_thue') return '2. Chuyển thuế';
+  if (subStep === 'cho_nop_thue') return '3. Chờ nộp thuế';
+  if (subStep === 'hoan_thien_trinh_duyet') return '4. Hoàn thiện in GCN';
+  return subStep;
+};
+
+export const getCapGiaySubStepFullLabel = (subStep?: string | null): string => {
+  if (!subStep || subStep === 'tham_dinh') return '1. Thẩm định hồ sơ';
+  if (subStep === 'phieu_chuyen_thue') return '2. Phiếu chuyển thuế';
+  if (subStep === 'cho_nop_thue') return '3. Chờ nộp thuế';
+  if (subStep === 'hoan_thien_trinh_duyet') return '4. Hoàn thiện in GCN';
+  return subStep;
+};
+
+export const getCapGiaySubStepBadgeColor = (subStep?: string | null): string => {
+  if (!subStep || subStep === 'tham_dinh') return 'bg-blue-50 text-blue-700 border-blue-200';
+  if (subStep === 'phieu_chuyen_thue') return 'bg-purple-50 text-purple-700 border-purple-200';
+  if (subStep === 'cho_nop_thue') return 'bg-amber-50 text-amber-700 border-amber-200';
+  if (subStep === 'hoan_thien_trinh_duyet') return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+  return 'bg-slate-100 text-slate-700 border-slate-200';
+};
+
 export const MOCK_CONTRACTS: Contract[] = [
   {
     id: 'c1',

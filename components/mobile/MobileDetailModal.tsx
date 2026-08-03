@@ -16,6 +16,7 @@ import { updateRecordApi, fetchContracts } from '../../services/api';
 import SystemReceiptTemplate from '../receive-record/SystemReceiptTemplate';
 import SystemAnnexTemplate from '../receive-record/SystemAnnexTemplate';
 import { getBatchDisplayParts } from '../../utils/appHelpers';
+import { RecordTimelineProgress } from '../RecordTimelineProgress';
 
 interface MobileDetailModalProps {
   isOpen: boolean;
@@ -728,192 +729,95 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
 
         {activeTab === 'timeline' && (
           <div className="p-4 space-y-4">
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-              <div className="flex flex-col items-center text-center mb-8 pb-6 border-b border-slate-50">
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">Hạn trả kết quả</p>
-                <p className="text-3xl font-black text-slate-800">{formatDate(record.deadline)}</p>
-                <div className="mt-3 flex items-center gap-2 text-[10px] font-bold text-slate-500 bg-slate-50 px-3 py-1 rounded-full">
-                  <Calendar size={12} /> Ngày nhận: {formatDate(record.receivedDate)}
-                </div>
+            <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 space-y-4">
+              {/* Tính năng gia hạn ngày hẹn cho Một cửa / Admin */}
+              {currentUser && (currentUser.role === UserRole.ONEDOOR || currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.SUBADMIN || currentUser.role === UserRole.TEAM_LEADER) && (
+                  <div className="w-full flex flex-col items-center border-b border-slate-100 pb-3">
+                      {!showExtendForm ? (
+                          <button 
+                              onClick={() => {
+                                  setExtendDate(record.deadline ? record.deadline.split('T')[0] : '');
+                                  setShowExtendForm(true);
+                              }}
+                              className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 text-purple-700 hover:bg-purple-100 rounded-lg text-xs font-bold transition-all border border-purple-200"
+                          >
+                              <CalendarClock size={14} />
+                              Gia hạn ngày hẹn
+                          </button>
+                      ) : (
+                          <div className="w-full bg-slate-50 p-3 rounded-lg border border-slate-200 text-left animate-fade-in-up mt-2">
+                              <h4 className="text-xs font-bold text-slate-700 mb-2 uppercase tracking-wide">Gia hạn hồ sơ</h4>
+                              <div className="space-y-3">
+                                  <div>
+                                      <label className="text-[10px] text-gray-400 uppercase font-bold block mb-1">Ngày hẹn mới</label>
+                                      <input 
+                                          type="date" 
+                                          value={extendDate} 
+                                          onChange={(e) => setExtendDate(e.target.value)}
+                                          className="w-full text-xs font-semibold px-2 py-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-purple-500 outline-none bg-white"
+                                      />
+                                  </div>
+                                  <div>
+                                      <label className="text-[10px] text-gray-400 uppercase font-bold block mb-1">Lý do gia hạn</label>
+                                      <textarea 
+                                          rows={2}
+                                          value={extendReason}
+                                          onChange={(e) => setExtendReason(e.target.value)}
+                                          placeholder="Nhập lý do gia hạn..."
+                                          className="w-full text-xs p-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-purple-500 outline-none resize-none bg-white"
+                                      />
+                                  </div>
+                                  <div className="flex gap-2 justify-end">
+                                      <button 
+                                          onClick={() => setShowExtendForm(false)}
+                                          className="px-2.5 py-1 text-gray-600 hover:bg-gray-100 rounded text-xs font-medium"
+                                      >
+                                          Hủy
+                                      </button>
+                                      <button 
+                                          onClick={handleSaveExtension}
+                                          disabled={isExtending}
+                                          className="px-2.5 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded text-xs font-bold flex items-center gap-1 shadow-sm"
+                                      >
+                                          {isExtending ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+                                          Lưu
+                                      </button>
+                                  </div>
+                              </div>
+                          </div>
+                      )}
+                  </div>
+              )}
 
-                {/* Tính năng gia hạn ngày hẹn cho Một cửa / Admin */}
-                {currentUser && (currentUser.role === UserRole.ONEDOOR || currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.SUBADMIN || currentUser.role === UserRole.TEAM_LEADER) && (
-                    <div className="mt-4 w-full flex flex-col items-center">
-                        {!showExtendForm ? (
-                            <button 
-                                onClick={() => {
-                                    setExtendDate(record.deadline ? record.deadline.split('T')[0] : '');
-                                    setShowExtendForm(true);
-                                }}
-                                className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 text-purple-700 hover:bg-purple-100 rounded-lg text-xs font-bold transition-all border border-purple-200"
-                            >
-                                <CalendarClock size={14} />
-                                Gia hạn ngày hẹn
-                            </button>
-                        ) : (
-                            <div className="w-full bg-slate-50 p-3 rounded-lg border border-slate-200 text-left animate-fade-in-up mt-3">
-                                <h4 className="text-xs font-bold text-slate-700 mb-2 uppercase tracking-wide">Gia hạn hồ sơ</h4>
-                                <div className="space-y-3">
-                                    <div>
-                                        <label className="text-[10px] text-gray-400 uppercase font-bold block mb-1">Ngày hẹn mới</label>
-                                        <input 
-                                            type="date" 
-                                            value={extendDate} 
-                                            onChange={(e) => setExtendDate(e.target.value)}
-                                            className="w-full text-xs font-semibold px-2 py-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-purple-500 outline-none bg-white"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="text-[10px] text-gray-400 uppercase font-bold block mb-1">Lý do gia hạn</label>
-                                        <textarea 
-                                            rows={2}
-                                            value={extendReason}
-                                            onChange={(e) => setExtendReason(e.target.value)}
-                                            placeholder="Nhập lý do gia hạn..."
-                                            className="w-full text-xs p-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-purple-500 outline-none resize-none bg-white"
-                                        />
-                                    </div>
-                                    <div className="flex gap-2 justify-end">
-                                        <button 
-                                            onClick={() => setShowExtendForm(false)}
-                                            className="px-2.5 py-1 text-gray-600 hover:bg-gray-100 rounded text-xs font-medium"
-                                        >
-                                            Hủy
-                                        </button>
-                                        <button 
-                                            onClick={handleSaveExtension}
-                                            disabled={isExtending}
-                                            className="px-2.5 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded text-xs font-bold flex items-center gap-1 shadow-sm"
-                                        >
-                                            {isExtending ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
-                                            Lưu
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                )}
-              </div>
+              <RecordTimelineProgress 
+                record={record}
+                employees={employees}
+                users={users}
+                formatDate={formatDate}
+              />
 
-              <div className="space-y-0">
-                <TimelineItem 
-                  date={record.receivedDate} 
-                  label="NHẬN HỒ SƠ" 
-                  icon={UserIcon}
-                  colorClass={{text: 'text-emerald-600', border: 'border-emerald-600', bg: 'bg-emerald-600'}}
-                  subText={record.receivedBy ? (() => {
-                      const receiver = users.find(u => u.employeeId === record.receivedBy);
-                      if (!receiver) return undefined;
-                      const emp = employees.find(e => e.id === receiver.employeeId);
-                      return `${receiver.name} (${emp?.position || 'Nhân viên'})`;
-                  })() : undefined}
-                />
-                <TimelineItem 
-                  date={record.assignedDate} 
-                  label="GIAO NHÂN VIÊN" 
-                  icon={UserIcon}
-                  colorClass={{text: 'text-blue-600', border: 'border-blue-600', bg: 'bg-blue-600'}}
-                />
-                <TimelineItem 
-                  date={record.completedWorkDate} 
-                  forceActive={isWorkDone}
-                  label="ĐÃ THỰC HIỆN" 
-                  icon={CheckSquare}
-                  colorClass={{text: 'text-cyan-600', border: 'border-cyan-600', bg: 'bg-cyan-600'}}
-                />
-
-                {/* Ẩn mốc kiểm tra cho một số loại hồ sơ */}
-                {!(record.recordType === 'Cung cấp tài liệu đất đai' || record.recordType === 'Sao lục' || record.recordType === 'Công văn') && (
-                  <>
-                    <TimelineItem 
-                      date={record.pendingCheckDate} 
-                      forceActive={isPendingCheckActive}
-                      label="TRÌNH KIỂM TRA" 
-                      icon={Send}
-                      colorClass={{text: 'text-orange-600', border: 'border-orange-600', bg: 'bg-orange-600'}}
-                      subText={record.checkedBy ? (() => {
-                          const checker = employees.find(e => e.id === record.checkedBy);
-                          if (!checker) return undefined;
-                          return `${checker.name} (${checker?.position || 'Người kiểm tra'})`;
-                      })() : undefined}
-                    />
-                    <TimelineItem 
-                      date={record.checkedDate} 
-                      forceActive={isCheckedActive}
-                      label="ĐÃ KIỂM TRA" 
-                      icon={CheckSquare}
-                      colorClass={{text: 'text-orange-600', border: 'border-orange-600', bg: 'bg-orange-600'}}
-                    />
-                  </>
-                )}
-
-                <TimelineItem 
-                  date={record.submissionDate} 
-                  forceActive={isPendingSignActive}
-                  label="TRÌNH KÝ" 
-                  icon={Send}
-                  colorClass={{text: 'text-purple-600', border: 'border-purple-600', bg: 'bg-purple-600'}}
-                  subText={record.submittedTo ? (() => {
-                      const director = users.find(u => u.employeeId === record.submittedTo);
-                      if (!director) return undefined;
-                      const emp = employees.find(e => e.id === director.employeeId);
-                      return `${director.name} (${emp?.position || (director.role === UserRole.ADMIN ? 'Giám đốc' : 'Phó giám đốc')})`;
-                  })() : undefined}
-                />
-                
-                <TimelineItem 
-                  date={record.approvalDate} 
-                  forceActive={isSignedActive}
-                  label="KÝ DUYỆT" 
-                  icon={FileSignature}
-                  colorClass={{text: 'text-indigo-600', border: 'border-indigo-600', bg: 'bg-indigo-600'}}
-                />
-
-                <TimelineItem 
-                  date={record.completedDate} 
-                  label={record.status === RecordStatus.REJECTED ? "HỒ SƠ TRẢ" : record.status === RecordStatus.WITHDRAWN ? "RÚT HỒ SƠ" : "HOÀN THÀNH"} 
-                  icon={CheckSquare}
-                  isLast={false}
-                  colorClass={{text: record.status === RecordStatus.REJECTED ? 'text-red-700' : 'text-green-700', border: record.status === RecordStatus.REJECTED ? 'border-red-600' : 'border-green-600', bg: record.status === RecordStatus.REJECTED ? 'bg-red-600' : 'bg-green-600'}}
-                  subText={(() => {
-                    if (!record.exportBatch) return undefined;
-                    const bName = getBatchDisplayParts(record.exportBatch).batchName || `Đợt ${record.exportBatch}`;
-                    return bName.toLowerCase().startsWith('giao') ? bName : `Giao ${bName}`;
-                  })()}
-                />
-
-                <TimelineItem 
-                  date={record.resultReturnedDate} 
-                  label="TRẢ KẾT QUẢ" 
-                  icon={FileCheck}
-                  isLast={true}
-                  colorClass={{text: 'text-emerald-600', border: 'border-emerald-600', bg: 'bg-emerald-600'}}
-                />
-              </div>
-            </div>
-
-            <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
-              <div className="w-12 h-12 rounded-full bg-slate-50 flex items-center justify-center text-slate-400">
-                <UserIcon size={24} />
-              </div>
-              <div>
-                <p className="text-[10px] text-slate-400 font-bold uppercase">Nhân viên xử lý</p>
-                <p className="text-sm font-bold text-slate-800">{getEmployeeName(record.assignedTo)}</p>
-              </div>
-            </div>
-
-            {(record.status === RecordStatus.PENDING_CHECK || record.status === RecordStatus.CHECKED) && (
-              <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4 mt-4">
-                <div className="w-12 h-12 rounded-full bg-orange-50 flex items-center justify-center text-orange-400">
-                  <UserIcon size={24} />
+              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex items-center gap-4 mt-2">
+                <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-slate-500 shadow-2xs">
+                  <UserIcon size={20} />
                 </div>
                 <div>
-                  <p className="text-[10px] text-orange-400 font-bold uppercase">Người kiểm tra</p>
-                  <p className="text-sm font-bold text-orange-800">{getEmployeeName(record.checkedBy)}</p>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase">Nhân viên xử lý</p>
+                  <p className="text-xs font-bold text-slate-800">{getEmployeeName(record.assignedTo)}</p>
                 </div>
               </div>
-            )}
+
+              {(record.status === RecordStatus.PENDING_CHECK || record.status === RecordStatus.CHECKED) && (
+                <div className="bg-orange-50/60 p-4 rounded-2xl border border-orange-100 flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-orange-500 shadow-2xs">
+                    <UserIcon size={20} />
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-orange-500 font-bold uppercase">Người kiểm tra</p>
+                    <p className="text-xs font-bold text-orange-800">{getEmployeeName(record.checkedBy)}</p>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
 

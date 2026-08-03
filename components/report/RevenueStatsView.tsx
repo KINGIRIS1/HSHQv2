@@ -1,8 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { RecordFile, RecordStatus, Employee } from '../../types';
 import { getShortRecordType } from '../../constants';
-import { removeVietnameseTones } from '../../utils/appHelpers';
-import { FileSpreadsheet, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import { removeVietnameseTones, getRecordDepartment } from '../../utils/appHelpers';
+import { FileSpreadsheet, Search, ChevronLeft, ChevronRight, Ruler, FolderArchive, FileCheck, DollarSign } from 'lucide-react';
 import * as XLSX from 'xlsx-js-style';
 
 interface RevenueStatsViewProps {
@@ -26,9 +26,9 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
     teamTitle,
     onFilteredRecordsChange
 }) => {
-    // Card filter selection: 'all' | 'bien_lai' | 'hoa_don'
+    // Card filter selection for receipt type: 'all' | 'bien_lai' | 'hoa_don'
     const [activeCardFilter, setActiveCardFilter] = useState<'all' | 'bien_lai' | 'hoa_don'>('all');
-    
+
     // Additional filters
     const [searchTerm, setSearchTerm] = useState<string>('');
     const [currentPage, setCurrentPage] = useState<number>(1);
@@ -73,14 +73,6 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
                 let returned = 0;
                 if (r.returnedPrice !== undefined && r.returnedPrice !== null && String(r.returnedPrice).trim() !== '' && !isNaN(Number(r.returnedPrice))) {
                     returned = Number(r.returnedPrice);
-                } else if (r.recordType === 'Cung cấp tài liệu đất đai') {
-                    returned = 310000;
-                } else if (contractP !== undefined && contractP !== null && !isNaN(Number(contractP)) && Number(contractP) > 0) {
-                    returned = Number(contractP);
-                } else if (r.price !== undefined && r.price !== null && !isNaN(Number(r.price)) && Number(r.price) > 0) {
-                    returned = Number(r.price);
-                } else if (r.status === RecordStatus.RETURNED || r.status === RecordStatus.HANDOVER) {
-                    returned = price;
                 }
                 
                 const receiptType = getRecordReceiptType(r);
@@ -148,7 +140,47 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
         });
     }, [revenueRecords, selectedWard]);
 
-    // KPI Summary for 3 Top Controls
+    // Department revenue metrics summary
+    const departmentMetrics = useMemo(() => {
+        let totalSum = 0;
+        let totalCount = 0;
+        let doDacSum = 0;
+        let doDacCount = 0;
+        let luuTruSum = 0;
+        let luuTruCount = 0;
+        let capGiaySum = 0;
+        let capGiayCount = 0;
+
+        wardFilteredRevenueRecords.forEach(r => {
+            totalSum += r.calcReturned;
+            totalCount++;
+
+            const dept = getRecordDepartment(r);
+            if (dept === 'Tổ Đo đạc') {
+                doDacSum += r.calcReturned;
+                doDacCount++;
+            } else if (dept === 'Tổ Lưu trữ') {
+                luuTruSum += r.calcReturned;
+                luuTruCount++;
+            } else {
+                capGiaySum += r.calcReturned;
+                capGiayCount++;
+            }
+        });
+
+        return {
+            totalSum,
+            totalCount,
+            doDacSum,
+            doDacCount,
+            luuTruSum,
+            luuTruCount,
+            capGiaySum,
+            capGiayCount
+        };
+    }, [wardFilteredRevenueRecords]);
+
+    // KPI Summary for Receipt Type Controls
     const cardMetrics = useMemo(() => {
         let totalSum = 0;
         let totalCount = 0;
@@ -183,7 +215,7 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
     // Filtered records for table & search
     const filteredRecords = useMemo(() => {
         return wardFilteredRevenueRecords.filter(r => {
-            // Card filter
+            // Receipt type filter
             if (activeCardFilter === 'bien_lai' && r.computedReceiptType !== 'Biên Lai') return false;
             if (activeCardFilter === 'hoa_don' && r.computedReceiptType !== 'Hóa Đơn') return false;
 
@@ -194,7 +226,8 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
                 const matchName = removeVietnameseTones(r.customerName || '').toLowerCase().includes(term);
                 const matchReceipt = removeVietnameseTones(r.receiptNumber || '').toLowerCase().includes(term);
                 const matchWard = removeVietnameseTones(r.assignedWard || '').toLowerCase().includes(term);
-                if (!matchCode && !matchName && !matchReceipt && !matchWard) return false;
+                const matchType = removeVietnameseTones(r.recordType || '').toLowerCase().includes(term);
+                if (!matchCode && !matchName && !matchReceipt && !matchWard && !matchType) return false;
             }
 
             return true;
@@ -206,36 +239,6 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
             onFilteredRecordsChange(filteredRecords);
         }
     }, [filteredRecords, onFilteredRecordsChange]);
-
-    // Total & sub-totals collected for filtered set
-    const filteredStats = useMemo(() => {
-        let totalAmount = 0;
-        let totalCount = filteredRecords.length;
-        let bienLaiAmount = 0;
-        let bienLaiCount = 0;
-        let hoaDonAmount = 0;
-        let hoaDonCount = 0;
-
-        filteredRecords.forEach(r => {
-            totalAmount += r.calcReturned;
-            if (r.computedReceiptType === 'Hóa Đơn') {
-                hoaDonAmount += r.calcReturned;
-                hoaDonCount++;
-            } else {
-                bienLaiAmount += r.calcReturned;
-                bienLaiCount++;
-            }
-        });
-
-        return {
-            totalAmount,
-            totalCount,
-            bienLaiAmount,
-            bienLaiCount,
-            hoaDonAmount,
-            hoaDonCount
-        };
-    }, [filteredRecords]);
 
     // Pagination
     const totalPages = Math.ceil(filteredRecords.length / pageSize) || 1;
@@ -257,6 +260,7 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
             STT: index + 1,
             'Mã hồ sơ': r.code || '',
             'Thông tin chủ sử dụng': r.customerName || '',
+            'Tổ phụ trách': getRecordDepartment(r),
             'Loại hồ sơ': getShortRecordType(r.recordType) || '',
             'Ngày thu tiền': r.resultReturnedDate ? new Date(r.resultReturnedDate).toLocaleDateString('vi-VN') : '—',
             'Loại chứng từ': r.computedReceiptType,
@@ -274,7 +278,7 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
     };
 
     return (
-        <div className="flex flex-col h-full bg-white p-4 md:p-6 animate-fade-in-up overflow-y-auto">
+        <div className="flex flex-col h-full bg-slate-50 p-4 md:p-6 animate-fade-in-up overflow-y-auto space-y-4">
             
             {/* MAIN DETAIL REVENUE TABLE CARD */}
             <div className="border border-slate-200 rounded-2xl overflow-hidden bg-white shadow-sm flex flex-col flex-1 min-h-[450px]">
@@ -289,6 +293,7 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
                                 {teamTitle}
                             </span>
                         )}
+
                         <div className="inline-flex items-center bg-slate-200/80 p-1 rounded-xl gap-1 text-xs font-semibold w-full sm:w-auto h-[38px]">
                             <button
                                 type="button"
@@ -299,7 +304,7 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
                                         : 'text-slate-600 hover:text-slate-900'
                                 }`}
                             >
-                                <span>Tất cả:</span>
+                                <span>Tất cả chứng từ:</span>
                                 <span className="font-bold text-teal-600 font-mono">{cardMetrics.totalSum.toLocaleString('vi-VN')} đ</span>
                                 <span className="text-[10px] text-slate-500 font-normal">({cardMetrics.totalCount})</span>
                             </button>
@@ -334,20 +339,27 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
                         </div>
                     </div>
 
-                    {/* Search Input & Export Button */}
-                    <div className="flex items-center gap-3 w-full sm:w-auto">
+                    {/* Search Input & Export */}
+                    <div className="flex items-center gap-2.5 w-full sm:w-auto">
                         <div className="relative flex-1 sm:w-56">
                             <Search size={14} className="absolute left-3 top-3 text-slate-400" />
                             <input 
                                 type="text"
-                                placeholder="Tìm hồ sơ, BL..."
+                                placeholder="Tìm hồ sơ, BL, tổ..."
                                 value={searchTerm}
                                 onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
                                 className="w-full pl-8 pr-3 py-1.5 text-xs border border-slate-300 rounded-xl outline-none focus:border-emerald-500 bg-white h-[38px] font-medium"
                             />
                         </div>
-
-                        {/* Single shared Excel button is on top toolbar */}
+                        <button 
+                            type="button"
+                            onClick={handleExportExcel}
+                            className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl font-bold text-xs shadow-xs transition-all cursor-pointer h-[38px] whitespace-nowrap active:scale-95"
+                            title="Xuất Báo Cáo Doanh Thu Excel"
+                        >
+                            <FileSpreadsheet size={16} className="shrink-0" />
+                            <span>Xuất Excel ({filteredRecords.length})</span>
+                        </button>
                     </div>
                 </div>
 
@@ -359,6 +371,7 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
                                 <th className="p-3.5 w-12 text-center">STT</th>
                                 <th className="p-3.5 w-32">MÃ HỒ SƠ</th>
                                 <th className="p-3.5 min-w-[180px]">THÔNG TIN CHỦ SỬ DỤNG</th>
+                                <th className="p-3.5 w-32 text-center">TỔ BỘ PHẬN</th>
                                 <th className="p-3.5 w-36">LOẠI HỒ SƠ</th>
                                 <th className="p-3.5 w-32 text-center">NGÀY THU TIỀN</th>
                                 <th className="p-3.5 w-32 text-center">LOẠI CHỨNG TỪ</th>
@@ -372,6 +385,7 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
                                 paginatedRecords.map((r, idx) => {
                                     const itemNumber = (currentPage - 1) * pageSize + idx + 1;
                                     const isHoaDon = r.computedReceiptType === 'Hóa Đơn';
+                                    const recordDept = getRecordDepartment(r);
 
                                     return (
                                         <tr key={r.id || idx} className="hover:bg-slate-50/80 transition-colors group">
@@ -381,6 +395,23 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
                                             </td>
                                             <td className="p-3.5 font-bold text-slate-800">
                                                 {r.customerName || '---'}
+                                            </td>
+                                            <td className="p-3.5 text-center">
+                                                {recordDept === 'Tổ Đo đạc' && (
+                                                    <span className="px-2.5 py-1 rounded-md text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200/80 inline-block">
+                                                        Tổ Đo đạc
+                                                    </span>
+                                                )}
+                                                {recordDept === 'Tổ Lưu trữ' && (
+                                                    <span className="px-2.5 py-1 rounded-md text-[10px] font-bold bg-orange-50 text-orange-700 border border-orange-200/80 inline-block">
+                                                        Tổ Lưu trữ
+                                                    </span>
+                                                )}
+                                                {recordDept === 'Tổ Cấp giấy' && (
+                                                    <span className="px-2.5 py-1 rounded-md text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200/80 inline-block">
+                                                        Tổ Cấp giấy
+                                                    </span>
+                                                )}
                                             </td>
                                             <td className="p-3.5 text-slate-600 font-medium">
                                                 {getShortRecordType(r.recordType)}
@@ -425,7 +456,7 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
                                 })
                             ) : (
                                 <tr>
-                                    <td colSpan={9} className="p-12 text-center text-slate-400 italic">
+                                    <td colSpan={10} className="p-12 text-center text-slate-400 italic">
                                         Không tìm thấy dữ liệu nguồn thu phù hợp.
                                     </td>
                                 </tr>
@@ -441,6 +472,7 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
                             {filteredRecords.slice(0, mobileVisibleCount).map((r, idx) => {
                                 const itemNumber = idx + 1;
                                 const isHoaDon = r.computedReceiptType === 'Hóa Đơn';
+                                const recordDept = getRecordDepartment(r);
                                 const dateStr = (() => {
                                     const dStr = r.resultReturnedDate || r.exportDate || r.completedDate;
                                     if (!dStr) return '-';
@@ -457,8 +489,9 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
                                     <div key={r.id || idx} className="bg-white rounded-xl border border-slate-200 p-3 shadow-xs space-y-2">
                                         <div className="flex justify-between items-start gap-2">
                                             <div className="flex-1 min-w-0">
-                                                <div className="flex items-center gap-1.5">
+                                                <div className="flex items-center gap-1.5 flex-wrap">
                                                     <span className="text-[10px] bg-slate-100 text-slate-500 font-bold px-1.5 py-0.5 rounded">#{itemNumber}</span>
+                                                    <span className="text-[10px] bg-slate-100 text-slate-700 font-bold px-1.5 py-0.5 rounded border border-slate-200">{recordDept}</span>
                                                     <h3 className="font-bold text-slate-800 text-sm truncate">{r.customerName || '---'}</h3>
                                                 </div>
                                                 <div className="text-xs text-teal-600 font-bold font-mono mt-0.5">{r.code}</div>
@@ -538,3 +571,4 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
 };
 
 export default RevenueStatsView;
+

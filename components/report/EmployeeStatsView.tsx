@@ -63,8 +63,15 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
 
     // Calculate Stats (Used for AI and Lists, visual cards are handled by parent ReportSection)
     const stats = useMemo(() => {
+        const selectedEmp = employees.find(e => e.id === selectedEmpId);
+        const isSelectedLeader = selectedEmp && (
+            selectedEmp.position?.toLowerCase().includes('tổ') ||
+            selectedEmp.position?.toLowerCase().includes('nhóm') ||
+            selectedEmp.position?.toLowerCase().includes('trưởng') ||
+            selectedEmp.position?.toLowerCase().includes('phó')
+        );
         const targetRecords = selectedEmpId 
-            ? recordsInTimeRange.filter(r => r.assignedTo === selectedEmpId)
+            ? recordsInTimeRange.filter(r => r.assignedTo === selectedEmpId || (isSelectedLeader && r.checkedBy === selectedEmpId))
             : recordsInTimeRange;
 
         const total = targetRecords.length;
@@ -128,7 +135,13 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
         const today = new Date(); today.setHours(0,0,0,0);
 
         return filteredEmployeesByDept.map(emp => {
-            const empRecords = recordsInTimeRange.filter(r => r.assignedTo === emp.id);
+            const isLeader = emp && (
+                emp.position?.toLowerCase().includes('tổ') ||
+                emp.position?.toLowerCase().includes('nhóm') ||
+                emp.position?.toLowerCase().includes('trưởng') ||
+                emp.position?.toLowerCase().includes('phó')
+            );
+            const empRecords = recordsInTimeRange.filter(r => r.assignedTo === emp.id || (isLeader && r.checkedBy === emp.id));
             const totalAssigned = empRecords.length;
 
             let completed = 0;
