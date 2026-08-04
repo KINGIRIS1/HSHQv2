@@ -1,9 +1,10 @@
 import React from 'react';
 import { RecordFile, Employee, User, UserRole, RecordStatus } from '../types';
 import { getNormalizedWard, getShortRecordType } from '../constants';
+import { getBatchDisplayParts } from '../utils/appHelpers';
 import { 
   CheckCircle2, Circle, Clock, AlertTriangle, Calendar, User as UserIcon, 
-  Send, FileSignature, CheckSquare, FileCheck, Timer, ArrowRight
+  Send, FileSignature, CheckSquare, FileCheck, Timer, ArrowRight, CalendarClock
 } from 'lucide-react';
 
 interface RecordTimelineProgressProps {
@@ -195,7 +196,7 @@ export const RecordTimelineProgress: React.FC<RecordTimelineProgressProps> = ({
         forceActive: isPendingCheckActive,
         icon: Send,
         colorClass: { text: 'text-orange-700', border: 'border-orange-600', bg: 'bg-orange-600' },
-        subText: record.checkedBy ? (() => {
+        subText: (record.pendingCheckDate || isPendingCheckActive) && record.checkedBy ? (() => {
           const checker = employees.find(e => e.id === record.checkedBy);
           if (!checker) return undefined;
           return `${checker.name} (${checker?.position || 'Người kiểm tra'})`;
@@ -224,7 +225,7 @@ export const RecordTimelineProgress: React.FC<RecordTimelineProgressProps> = ({
       forceActive: isPendingSignActive,
       icon: Send,
       colorClass: { text: 'text-purple-700', border: 'border-purple-600', bg: 'bg-purple-600' },
-      subText: record.submittedTo ? (() => {
+      subText: (record.submissionDate || isPendingSignActive) && record.submittedTo ? (() => {
         const director = users.find(u => u.employeeId === record.submittedTo);
         if (!director) return undefined;
         const emp = employees.find(e => e.id === director.employeeId);
@@ -258,7 +259,10 @@ export const RecordTimelineProgress: React.FC<RecordTimelineProgressProps> = ({
         border: record.status === RecordStatus.REJECTED ? 'border-red-600' : 'border-green-600', 
         bg: record.status === RecordStatus.REJECTED ? 'bg-red-600' : 'bg-green-600' 
       },
-      subText: record.exportBatch ? `Đợt: ${record.exportBatch}` : undefined,
+      subText: record.exportBatch ? (() => {
+        const parts = getBatchDisplayParts(record.exportBatch, record.exportDate || record.completedDate);
+        return parts?.batchName || `Đợt ${record.exportBatch}`;
+      })() : undefined,
       durationLabel: (record.completedDate || record.exportDate) ? getStepDurationText(record.completedDate || record.exportDate, record.resultReturnedDate) : null
     },
     {
@@ -275,38 +279,30 @@ export const RecordTimelineProgress: React.FC<RecordTimelineProgressProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* Overview Progress & Duration Card */}
-      <div className="bg-gradient-to-br from-indigo-50/80 via-white to-blue-50/50 p-4 rounded-xl border border-indigo-100 shadow-xs">
-        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+      {/* Deadline Header Card matching design */}
+      <div className="bg-white rounded-xl border border-gray-200 shadow-xs overflow-hidden">
+        <div className="bg-indigo-600 px-4 py-2.5 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <Timer size={18} className="text-indigo-600 shrink-0" />
-            <span className="text-xs font-bold text-slate-800 uppercase tracking-wide">
-              Thời gian xử lý tổng cộng
+            <CalendarClock size={16} className="text-white shrink-0" />
+            <span className="text-xs font-bold text-white uppercase tracking-wide">
+              TIẾN ĐỘ & THỜI GIAN
             </span>
           </div>
-          <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${deadlineStatusBadge.className}`}>
-            {deadlineStatusBadge.text}
-          </span>
+          {deadlineStatusBadge.text && (
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border bg-white/90 ${deadlineStatusBadge.className}`}>
+              {deadlineStatusBadge.text}
+            </span>
+          )}
         </div>
-
-        {/* Progress Bar */}
-        <div className="space-y-1.5 mb-3">
-          <div className="flex justify-between items-center text-[11px] font-semibold text-slate-600">
-            <span>Ngày nhận: <strong className="text-slate-800">{formatDate(record.receivedDate)}</strong></span>
-            <span>Đã dùng: <strong className="text-indigo-700">{getStepDurationText(record.receivedDate, finishDateStr) || '---'}</strong></span>
-            <span>Hẹn trả: <strong className="text-slate-800">{formatDate(record.deadline)}</strong></span>
+        <div className="p-4 flex flex-col items-center justify-center text-center space-y-1">
+          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+            HẠN TRẢ KẾT QUẢ
+          </span>
+          <div className="text-2xl sm:text-3xl font-black text-slate-800 tracking-tight my-1">
+            {formatDate(record.deadline) || '---'}
           </div>
-          <div className="w-full h-2.5 bg-slate-200 rounded-full overflow-hidden p-0.5">
-            <div 
-              className={`h-full rounded-full transition-all duration-500 ${
-                rawPercent > 100 
-                  ? 'bg-rose-500' 
-                  : rawPercent >= 80 
-                  ? 'bg-amber-500' 
-                  : 'bg-indigo-600'
-              }`}
-              style={{ width: `${progressPercent}%` }}
-            />
+          <div className="inline-block bg-slate-100 text-slate-500 text-xs font-medium px-3 py-1 rounded-md">
+            Ngày nhận: {formatDate(record.receivedDate) || '---'}
           </div>
         </div>
       </div>

@@ -15,6 +15,7 @@ import BulkUpdateModal from './BulkUpdateModal';
 import ReturnResultModal from './ReturnResultModal';
 import BatchErrorDiagnosticModal from './BatchErrorDiagnosticModal';
 import RejectReturnStepModal from './RejectReturnStepModal';
+import { ExtendDeadlineModal } from './ExtendDeadlineModal';
 import * as XLSX from 'xlsx-js-style';
 
 interface AppModalsProps {
@@ -33,12 +34,14 @@ interface AppModalsProps {
     isReturnModalOpen: boolean;
     isDiagnosticModalOpen?: boolean;
     isRejectReturnStepModalOpen?: boolean;
+    isExtendModalOpen?: boolean;
     
     // Data States
     editingRecord: RecordFile | null;
     viewingRecord: RecordFile | null;
     deletingRecord: RecordFile | null;
     returnRecord: RecordFile | null;
+    extendTargetRecord?: RecordFile | null;
     assignTargetRecords: RecordFile[];
     rejectReturnTargetRecords?: RecordFile[];
     exportModalType: 'handover' | 'check_list';
@@ -61,11 +64,13 @@ interface AppModalsProps {
     setIsReturnModalOpen: (v: boolean) => void;
     setIsDiagnosticModalOpen?: (v: boolean) => void;
     setIsRejectReturnStepModalOpen?: (v: boolean) => void;
+    setIsExtendModalOpen?: (v: boolean) => void;
     
     setEditingRecord: (r: RecordFile | null) => void;
     setViewingRecord: (r: RecordFile | null) => void;
     setDeletingRecord: (r: RecordFile | null) => void;
     setReturnRecord: (r: RecordFile | null) => void;
+    setExtendTargetRecord?: (r: RecordFile | null) => void;
 
     // Handlers
     handleAddOrUpdate: (data: any) => Promise<RecordFile | null>;
@@ -263,6 +268,17 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
                 employees={props.employees}
                 users={props.users}
                 onConfirm={props.onConfirmRejectReturnStep || (async () => {})}
+            />
+
+            <ExtendDeadlineModal
+                isOpen={!!props.isExtendModalOpen}
+                onClose={() => {
+                    if (props.setIsExtendModalOpen) props.setIsExtendModalOpen(false);
+                    if (props.setExtendTargetRecord) props.setExtendTargetRecord(null);
+                }}
+                record={props.extendTargetRecord || null}
+                currentUser={props.currentUser}
+                onRefreshData={props.onRefreshData}
             />
         </>
     );

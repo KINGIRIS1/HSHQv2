@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { getNormalizedWard, STATUS_LABELS } from '../../constants';
 import { exportDailyStatsToExcel } from '../../utils/excelExport';
-import { parseSafeDate, removeVietnameseTones } from '../../utils/appHelpers';
+import { parseSafeDate, getRecordReceivedDate, removeVietnameseTones } from '../../utils/appHelpers';
 
 interface DailyStatsViewProps {
     records: RecordFile[];
@@ -87,7 +87,7 @@ const DailyStatsView: React.FC<DailyStatsViewProps> = ({
     const filteredReceivedRecords = useMemo(() => {
         return records.filter(r => {
             let matchDate = true;
-            const rDate = parseSafeDate(r.receivedDate);
+            const rDate = getRecordReceivedDate(r);
             if (!rDate) {
                 matchDate = false;
             } else {

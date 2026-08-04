@@ -3,8 +3,9 @@ import React from 'react';
 import { RecordFile, RecordStatus, Employee, UserRole } from '../types';
 import { getNormalizedWard, getShortRecordType, getWardLabel, isCapGiayRecord, getCapGiaySubStepLabel, getCapGiaySubStepBadgeColor } from '../constants';
 import { isRecordOverdue, isRecordApproaching, toTitleCase, formatBatchName, getBatchDisplayParts } from '../utils/appHelpers';
+import { hasUserPermission } from '../config/roleConfig';
 import StatusBadge from './StatusBadge';
-import { CheckSquare, Square, AlertCircle, Clock, Eye, ArrowRight, Pencil, Trash2, Bell, FileCheck, Phone, Map } from 'lucide-react';
+import { CheckSquare, Square, AlertCircle, Clock, Eye, ArrowRight, Pencil, Trash2, Bell, FileCheck, Phone, Map, CalendarClock } from 'lucide-react';
 
 interface RecordRowProps {
   record: RecordFile;
@@ -14,6 +15,8 @@ interface RecordRowProps {
   canPerformAction: boolean;
   isSpecializedTab?: boolean;
   currentUser?: any;
+  rolePermissions?: Record<string, string[]>;
+  departmentPermissions?: Record<string, string[]>;
   onToggleSelect: (id: string) => void;
   onView: (record: RecordFile) => void;
   onEdit: (record: RecordFile) => void;
@@ -22,6 +25,7 @@ interface RecordRowProps {
   onQuickUpdate: (id: string, field: keyof RecordFile, value: string) => void;
   onReturnResult?: (record: RecordFile) => void;
   onMapCorrection?: (record: RecordFile) => void; // New Handler
+  onExtendDeadline?: (record: RecordFile) => void;
   columnOrder?: string[];
   canSelect?: boolean;
 }
@@ -29,7 +33,7 @@ interface RecordRowProps {
 const formatDate = (dateStr?: string | null) => {
     if (!dateStr) return '';
     const d = new Date(dateStr);
-    return isNaN(d.getTime()) ? '' : `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getFullYear()).slice(-2)}`;
+    return isNaN(d.getTime()) ? '' : `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
 };
 
 const RecordRow: React.FC<RecordRowProps> = ({
@@ -40,6 +44,8 @@ const RecordRow: React.FC<RecordRowProps> = ({
   canPerformAction,
   isSpecializedTab = false,
   currentUser,
+  rolePermissions,
+  departmentPermissions,
   onToggleSelect,
   onView,
   onEdit,
@@ -48,9 +54,17 @@ const RecordRow: React.FC<RecordRowProps> = ({
   onQuickUpdate,
   onReturnResult,
   onMapCorrection,
+  onExtendDeadline,
   columnOrder,
   canSelect
 }) => {
+  const canExtendDeadline = hasUserPermission(
+    currentUser,
+    employees,
+    'BTN_EXTEND_DEADLINE',
+    rolePermissions,
+    departmentPermissions
+  );
   const [localMsr, setLocalMsr] = React.useState(record.measurementNumber || "");
   const [localExc, setLocalExc] = React.useState(record.excerptNumber || "");
   const [localRec, setLocalRec] = React.useState(record.receiptNumber || "");
@@ -139,8 +153,8 @@ const RecordRow: React.FC<RecordRowProps> = ({
                </div>
                
                <div className={`flex items-center justify-between px-2.5 py-1.5 ${isOverdue ? 'bg-red-50' : isApproaching ? 'bg-orange-50' : 'bg-white'}`} title="Hẹn trả kết quả">
-                  <span className={`text-[10px] font-extrabold uppercase tracking-tight mr-3 ${isOverdue ? 'text-red-500' : isApproaching ? 'text-orange-500' : 'text-blue-500'}`}>Trả</span>
-                  <div className="flex items-center gap-1.5">
+                  <span className={`text-[10px] font-extrabold uppercase tracking-tight mr-1 ${isOverdue ? 'text-red-500' : isApproaching ? 'text-orange-500' : 'text-blue-500'}`}>Trả</span>
+                  <div className="flex items-center gap-1">
                       <span className={`text-sm font-bold font-mono whitespace-nowrap ${isOverdue ? 'text-red-600' : isApproaching ? 'text-orange-600' : 'text-blue-700'}`}>
                           {formatDate(record.deadline)}
                       </span>

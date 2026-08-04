@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { RecordFile, Holiday, RecordStatus, User, Employee } from '../../types';
-import { RECORD_TYPES, EXTENDED_RECORD_TYPES, getShortRecordType, getWardLabel } from '../../constants';
+import { RECORD_TYPES, EXTENDED_RECORD_TYPES, CAP_GIAY_RECORD_TYPES, CAP_GIAY_RECORD_TYPE_DESCRIPTIONS, getShortRecordType, getWardLabel, isCapGiayRecord, isTaxDefaultRecordType } from '../../constants';
 import { Save, User as UserIcon, Calendar, MapPin, FileCheck, Loader2, Printer, RotateCcw, XCircle, CheckCircle, AlertCircle, X, Phone, FileText, BookOpen, Clock, Hash, Map, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface AttachedDocItem {
@@ -94,6 +94,12 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
   });
 
   const [attachedDocs, setAttachedDocs] = useState<AttachedDocItem[]>([]);
+  const [recordTypeGroup, setRecordTypeGroup] = useState<'all' | 'cap_giay' | 'do_dac'>(() => {
+    if (linkedEmp?.department?.toLowerCase().includes('cấp giấy')) {
+      return 'cap_giay';
+    }
+    return 'cap_giay'; // Default to cap_giay for fast selection of Cấp giấy procedures
+  });
   const [authCccd, setAuthCccd] = useState('');
   const [authAddress, setAuthAddress] = useState('');
   const [isAuthOpen, setIsAuthOpen] = useState(false);
@@ -176,6 +182,10 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
             } else {
                 setAttachedDocs([]);
                 newData.otherDocs = '';
+            }
+
+            if (isCapGiayRecord({ recordType: value })) {
+                newData.capGiaySubStep = isTaxDefaultRecordType(value) ? 'phieu_chuyen_thue' : 'tham_dinh';
             }
         }
         return newData;
@@ -294,14 +304,57 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
         <div className="bg-white p-3 md:p-4 2xl:p-5 rounded-xl border border-slate-200 shadow-sm">
             <div className={`grid grid-cols-1 sm:grid-cols-2 ${isCongVan ? 'lg:grid-cols-3' : 'lg:grid-cols-4'} gap-3 md:gap-4 items-end`}>
                 <div>
-                    <label className={`${labelClass} uppercase flex items-center gap-1.5`}>
-                        <span className="p-1 bg-blue-100 text-blue-600 rounded"><FileCheck size={14} /></span>
-                        Loại hồ sơ <span className="text-red-500">*</span>
-                    </label>
+                    <div className="flex items-center justify-between mb-1">
+                        <label className={`${labelClass} uppercase flex items-center gap-1.5 !mb-0`}>
+                            <span className="p-1 bg-blue-100 text-blue-600 rounded"><FileCheck size={14} /></span>
+                            Loại hồ sơ <span className="text-red-500">*</span>
+                        </label>
+                        <div className="inline-flex rounded-lg p-0.5 bg-slate-100 border border-slate-200 text-[10px] font-bold">
+                            <button
+                                type="button"
+                                onClick={() => setRecordTypeGroup('cap_giay')}
+                                className={`px-2 py-0.5 rounded transition-all ${recordTypeGroup === 'cap_giay' ? 'bg-teal-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+                            >
+                                Cấp giấy
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setRecordTypeGroup('do_dac')}
+                                className={`px-2 py-0.5 rounded transition-all ${recordTypeGroup === 'do_dac' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+                            >
+                                Đo đạc
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setRecordTypeGroup('all')}
+                                className={`px-2 py-0.5 rounded transition-all ${recordTypeGroup === 'all' ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+                            >
+                                Tất cả
+                            </button>
+                        </div>
+                    </div>
                     <select className={`${inputClass} font-semibold`} value={formData.recordType || ''} onChange={(e) => handleChange('recordType', e.target.value)}>
-                        <option value="">-- Chọn loại hồ sơ --</option>
-                        {RECORD_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                        <option value="">
+                            {recordTypeGroup === 'cap_giay' ? '-- Chọn thủ tục Cấp giấy --' : recordTypeGroup === 'do_dac' ? '-- Chọn thủ tục Đo đạc --' : '-- Chọn loại hồ sơ --'}
+                        </option>
+                        {recordTypeGroup === 'cap_giay' && CAP_GIAY_RECORD_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                        {recordTypeGroup === 'do_dac' && RECORD_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                        {recordTypeGroup === 'all' && (
+                            <>
+                                <optgroup label="Cấp giấy / Đăng ký biến động">
+                                    {CAP_GIAY_RECORD_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                                </optgroup>
+                                <optgroup label="Hồ sơ Thông thường / Đo đạc">
+                                    {RECORD_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                                </optgroup>
+                            </>
+                        )}
                     </select>
+                    {formData.recordType && CAP_GIAY_RECORD_TYPE_DESCRIPTIONS[formData.recordType] && (
+                        <p className="text-[11px] text-blue-600 font-medium mt-1 italic">
+                            💡 {CAP_GIAY_RECORD_TYPE_DESCRIPTIONS[formData.recordType]}
+                        </p>
+                    )}
                 </div>
 
                 <div>

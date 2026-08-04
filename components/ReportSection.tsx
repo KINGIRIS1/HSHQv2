@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { BarChart3, FileSpreadsheet, Loader2, Sparkles, Download, CalendarDays, Printer, Layout, FileText, ListFilter, CheckCircle2, Clock, AlertTriangle, Settings, Key, X, Save, MapPin, UserCheck, ChevronLeft, ChevronRight, PieChart, CheckCircle, Ruler, FolderArchive, CalendarRange, DollarSign, FileCheck } from 'lucide-react';
 import { RecordFile, RecordStatus, Employee, User, UserRole, RolePermissions, DepartmentPermissions } from '../types';
 import { getNormalizedWard, STATUS_LABELS, getShortRecordType, isArchiveRecordType } from '../constants';
-import { isRecordOverdue, removeVietnameseTones, isRecordApproaching, parseSafeDate } from '../utils/appHelpers';
+import { isRecordOverdue, removeVietnameseTones, isRecordApproaching, parseSafeDate, getRecordReceivedDate } from '../utils/appHelpers';
 import { saveGeminiKey, getGeminiKey } from '../services/geminiService';
 import { fetchArchiveRecords } from '../services/apiArchive';
 import { hasUserPermission } from '../config/roleConfig';
@@ -151,11 +151,8 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
         }
     }, [isHanhChinhOrAdmin, userDept]);
 
-    // Reset date filters and search states to "Tất cả" when switching report tabs or main tabs
+    // Reset search states when switching report tabs or main tabs
     useEffect(() => {
-        setFromDate('1970-01-01');
-        setToDate(new Date().toISOString().split('T')[0]);
-        setReportType('custom');
         setSelectedWard('all');
         setSelectedEmpId('');
         setCardFilter(null);
@@ -316,7 +313,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
         const end = parseSafeDate(toDate) || new Date(toDate); end.setHours(23,59,59,999);
 
         return activeRecords.filter(r => {
-            const rDate = parseSafeDate(r.receivedDate);
+            const rDate = getRecordReceivedDate(r);
             if (!rDate) return false;
             rDate.setHours(12,0,0,0); // Dùng giữa ngày để tránh lệch múi giờ
             const matchDate = rDate >= start && rDate <= end;
@@ -465,11 +462,6 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
         setFromDate(fromStr);
         setToDate(toStr);
         setReportType(type);
-        if (activeTab === 'employee' || activeTab === 'ward_stats') {
-            // Keep tab
-        } else {
-            setActiveTab('list');
-        }
     };
 
     const handleGenerateClick = () => {

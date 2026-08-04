@@ -948,25 +948,25 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                             
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 {/* Thẻ Số tiền */}
-                                <div className="bg-emerald-50/80 p-3 rounded-xl border border-emerald-200/80 flex flex-col justify-center min-w-0">
-                                    <label className="text-[10px] text-emerald-700 uppercase font-bold block whitespace-nowrap truncate">
+                                <div className="bg-emerald-50/80 p-3 rounded-xl border border-emerald-200/80 flex flex-col items-center justify-center text-center min-w-0">
+                                    <label className="text-[10px] text-emerald-700 uppercase font-bold block whitespace-nowrap truncate text-center">
                                         Số tiền thu
                                     </label>
-                                    <p className="text-sm font-black text-emerald-800 whitespace-nowrap truncate mt-0.5">
+                                    <p className="text-sm font-black text-emerald-800 whitespace-nowrap truncate mt-0.5 text-center">
                                         {record.returnedPrice !== undefined && record.returnedPrice !== null
-                                            ? record.returnedPrice.toLocaleString('vi-VN') + ' đ'
+                                            ? record.returnedPrice.toLocaleString('vi-VN')
                                             : (record.recordType === 'Cung cấp tài liệu đất đai' 
-                                                ? '310.000 đ' 
-                                                : (contractPrice !== null && contractPrice !== undefined ? contractPrice.toLocaleString('vi-VN') + ' đ' : '---'))}
+                                                ? '310.000' 
+                                                : (contractPrice !== null && contractPrice !== undefined ? contractPrice.toLocaleString('vi-VN') : '---'))}
                                     </p>
                                 </div>
 
                                 {/* Thẻ Số BL/HĐ */}
-                                <div className="bg-blue-50/80 p-3 rounded-xl border border-blue-200/80 flex flex-col justify-center min-w-0">
-                                    <label className="text-[10px] text-blue-700 uppercase font-bold block whitespace-nowrap truncate">
+                                <div className="bg-blue-50/80 p-3 rounded-xl border border-blue-200/80 flex flex-col items-center justify-center text-center min-w-0">
+                                    <label className="text-[10px] text-blue-700 uppercase font-bold block whitespace-nowrap truncate text-center">
                                         {record.receiptType === 'Biên Lai' ? 'SỐ BIÊN LAI' : record.receiptType === 'Hóa Đơn' ? 'SỐ HÓA ĐƠN' : 'SỐ BIÊN LAI / HÓA ĐƠN'}
                                     </label>
-                                    <p className="text-xs font-black text-blue-900 font-mono whitespace-nowrap truncate mt-0.5">
+                                    <p className="text-xs font-black text-blue-900 font-mono whitespace-nowrap truncate mt-0.5 text-center">
                                         {record.receiptNumber || '---'}
                                     </p>
                                 </div>
@@ -1059,81 +1059,13 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                     )}
 
                     {/* TIMELINE */}
-                    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-                        <div className="bg-indigo-600 px-5 py-3 flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-2">
-                                <CalendarClock size={16} className="text-white"/>
-                                <span className="text-xs font-bold text-white uppercase">Tiến độ & Thời gian</span>
-                            </div>
-                        </div>
-
-                        {/* Extension Form section */}
-                        {currentUser && (currentUser.role === UserRole.ONEDOOR || currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.SUBADMIN || currentUser.role === UserRole.TEAM_LEADER) && (
-                            <div className="p-4 border-b border-gray-100 bg-slate-50/50 flex flex-col items-center">
-                                {!showExtendForm ? (
-                                    <button 
-                                        onClick={() => {
-                                            setExtendDate(record.deadline ? record.deadline.split('T')[0] : '');
-                                            setShowExtendForm(true);
-                                        }}
-                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 text-purple-700 hover:bg-purple-100 rounded-lg text-xs font-bold transition-all border border-purple-200 cursor-pointer"
-                                    >
-                                        <CalendarClock size={14} />
-                                        Gia hạn ngày hẹn
-                                    </button>
-                                ) : (
-                                    <div className="w-full bg-white p-3 rounded-lg border border-slate-200 text-left animate-fade-in-up">
-                                        <h4 className="text-xs font-bold text-slate-700 mb-2 uppercase tracking-wide">Gia hạn hồ sơ</h4>
-                                        <div className="space-y-3">
-                                            <div>
-                                                <label className="text-[10px] text-gray-400 uppercase font-bold block mb-1">Ngày hẹn mới</label>
-                                                <input 
-                                                    type="date" 
-                                                    value={extendDate} 
-                                                    onChange={(e) => setExtendDate(e.target.value)}
-                                                    className="w-full text-xs font-semibold px-2 py-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-purple-500 outline-none"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="text-[10px] text-gray-400 uppercase font-bold block mb-1">Lý do gia hạn</label>
-                                                <textarea 
-                                                    rows={2}
-                                                    value={extendReason}
-                                                    onChange={(e) => setExtendReason(e.target.value)}
-                                                    placeholder="Nhập lý do gia hạn..."
-                                                    className="w-full text-xs p-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-purple-500 outline-none resize-none"
-                                                />
-                                            </div>
-                                            <div className="flex gap-2 justify-end">
-                                                <button 
-                                                    onClick={() => setShowExtendForm(false)}
-                                                    className="px-2.5 py-1 text-gray-600 hover:bg-gray-100 rounded text-xs font-medium cursor-pointer"
-                                                >
-                                                    Hủy
-                                                </button>
-                                                <button 
-                                                    onClick={handleSaveExtension}
-                                                    disabled={isExtending}
-                                                    className="px-2.5 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded text-xs font-bold flex items-center gap-1 shadow-sm cursor-pointer disabled:opacity-50"
-                                                >
-                                                    {isExtending ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
-                                                    Lưu
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                        
-                        <div className="p-4">
-                            <RecordTimelineProgress 
-                                record={record}
-                                employees={employees}
-                                users={users}
-                                formatDate={formatDate}
-                            />
-                        </div>
+                    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+                        <RecordTimelineProgress 
+                            record={record}
+                            employees={employees}
+                            users={users}
+                            formatDate={formatDate}
+                        />
                     </div>
                 </div>
 

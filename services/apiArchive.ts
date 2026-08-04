@@ -27,19 +27,25 @@ export const migrateCungCapTaiLieu = async () => {
     // Reverse migration: move 'Cung cấp tài liệu đất đai' from archive_records to land_records
     if (!isConfigured) return;
     try {
-        const { data: archiveData, error: fetchError } = await supabase
+        const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Migration Timeout')), 5000)
+        );
+
+        const fetchPromise = supabase
             .from('archive_records')
             .select('*')
             .eq('type', 'saoluc');
+
+        const res: any = await Promise.race([fetchPromise, timeoutPromise]);
+        const { data: archiveData, error: fetchError } = res || {};
             
-        if (fetchError) throw fetchError;
-        if (!archiveData || archiveData.length === 0) return;
+        if (fetchError || !archiveData || archiveData.length === 0) return;
 
         // Di chuyển toàn bộ các hồ sơ Sao Lục cũ, chuyển đổi sang loại 'Cung cấp tài liệu đất đai' chuẩn
         const cungCapRecords = archiveData;
         console.log(`Found ${cungCapRecords.length} records to reverse migrate.`);
 
-        const landRecordsToInsert = cungCapRecords.map(r => {
+        const landRecordsToInsert = cungCapRecords.map((r: any) => {
             const rData = r.data || {};
             const { xa_phuong, to_ban_do, thua_dat, hen_tra, ...originalData } = rData;
             
@@ -102,7 +108,7 @@ export const migrateCungCapTaiLieu = async () => {
             
         if (insertError) throw insertError;
 
-        const idsToDelete = cungCapRecords.map(r => r.id);
+        const idsToDelete = cungCapRecords.map((r: any) => r.id);
         const { error: deleteError } = await supabase
             .from('archive_records')
             .delete()
@@ -111,8 +117,8 @@ export const migrateCungCapTaiLieu = async () => {
         if (deleteError) throw deleteError;
 
         console.log('Reverse migration completed successfully.');
-    } catch (error) {
-        console.error('Reverse migration failed:', error);
+    } catch (error: any) {
+        console.warn('Reverse migration skipped or failed:', error?.message || error);
     }
 };
 

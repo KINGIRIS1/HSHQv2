@@ -2,7 +2,7 @@
 import * as XLSX from 'xlsx-js-style';
 import { RecordFile, RecordStatus, Employee } from '../types';
 import { getNormalizedWard, getShortRecordType, STATUS_LABELS } from '../constants';
-import { isRecordOverdue, removeVietnameseTones, parseSafeDate } from './appHelpers';
+import { isRecordOverdue, removeVietnameseTones, parseSafeDate, getRecordReceivedDate } from './appHelpers';
 import { fetchContracts } from '../services/api';
 
 export const exportReportToExcel = async (
@@ -20,8 +20,7 @@ export const exportReportToExcel = async (
 
     // Filter records safely
     const filtered = records.filter(r => {
-        if (!r.receivedDate) return true; // Keep record if date is missing but explicitly passed in pre-filtered list
-        const rDate = parseSafeDate(r.receivedDate);
+        const rDate = getRecordReceivedDate(r);
         if (!rDate) return true;
         rDate.setHours(12, 0, 0, 0);
         const matchDate = rDate >= from && rDate <= to;

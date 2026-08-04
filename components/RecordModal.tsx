@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { RecordFile, RecordStatus, Employee, User, UserRole } from '../types';
-import { GROUPS, EXTENDED_RECORD_TYPES, STATUS_LABELS, getShortRecordType, getWardLabel, getNormalizedWard, isCapGiayRecord } from '../constants';
+import { GROUPS, EXTENDED_RECORD_TYPES, CAP_GIAY_RECORD_TYPES, STATUS_LABELS, getShortRecordType, getWardLabel, getNormalizedWard, isCapGiayRecord, isTaxDefaultRecordType } from '../constants';
 import { X, Save, Lock, User as UserIcon, MapPin, FileText, Calendar, FileCheck, ChevronDown, ChevronUp, History } from 'lucide-react';
 import { calculateDeadlineHelper } from '../utils/appHelpers';
 
@@ -91,8 +91,8 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
   const isOneDoor = currentUser.role === UserRole.ONEDOOR;
   const canEditResult = hasAdminRights || isOneDoor;
 
-  const isOtherView = currentView?.startsWith('other_') || currentView === 'other_records';
-  
+  const isOtherView = currentView?.startsWith('other_') || currentView === 'other_records' || currentView === 'registration_records';
+
   const isArchiveView = [
     "archive_records",
     "archive_assign_tasks",
@@ -113,14 +113,26 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
     "director_completed",
   ].includes(currentView || "");
 
+  const isCapGiayView = [
+    "capgiay_records",
+    "capgiay_assign_tasks",
+    "capgiay_completed_list",
+    "capgiay_pending_check_list",
+    "capgiay_check_list",
+    "capgiay_handover_list",
+    "capgiay_director_completed",
+  ].includes(currentView || "");
+
   let allowedRecordTypes: string[] = [];
-  if (isOtherView) {
-    allowedRecordTypes = ['CMD', 'Thi hành án', 'Tòa án'];
+  if (isOtherView || isCapGiayView) {
+    allowedRecordTypes = CAP_GIAY_RECORD_TYPES;
   } else if (isArchiveView) {
     allowedRecordTypes = [
       '1.1 Sao lục',
       '1.2 Công văn'
     ];
+  } else if (isCapGiayView) {
+    allowedRecordTypes = CAP_GIAY_RECORD_TYPES;
   } else if (isMeasurementView) {
     allowedRecordTypes = [
       '2.1 Trích lục',
@@ -131,19 +143,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
       '2.6 CC số thửa'
     ];
   } else {
-    allowedRecordTypes = [
-      '1.1 Sao lục',
-      '1.2 Công văn',
-      '2.1 Trích lục',
-      '2.2 Trích lục QH',
-      '2.3 Trích đo',
-      '2.4 Cắm mốc',
-      '2.5 Tách-Hợp thửa',
-      '2.6 CC số thửa',
-      'CMD',
-      'Thi hành án',
-      'Tòa án'
-    ];
+    allowedRecordTypes = EXTENDED_RECORD_TYPES;
   }
 
   const filteredEmployees = useMemo(() => {
@@ -421,6 +421,9 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
           const rLower = String(value || '').toLowerCase();
           if (rLower.includes('1.2') || rLower.includes('công văn') || rLower.includes('cong van') || rLower.includes('sao lục') || value === '1.1 Sao lục' || value === '1.1 CC DL ĐĐ' || value === '1.1 Sao lục hồ sơ' || value === '1.1 Cung cấp dữ liệu đất đai') {
             updated.price = 310000;
+          }
+          if (isCapGiayRecord({ recordType: value })) {
+            updated.capGiaySubStep = isTaxDefaultRecordType(value) ? 'phieu_chuyen_thue' : 'tham_dinh';
           }
         }
       }
@@ -773,14 +776,24 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                                         <input type="date" className="w-full border border-emerald-300 rounded-md px-3 py-2 bg-white font-bold text-emerald-800" value={dateVal(formData.resultReturnedDate)} onChange={(e) => handleChange('resultReturnedDate', e.target.value)} />
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-bold text-emerald-700 mb-1">
-                                            {formData.receiptType === 'Biên Lai' ? 'Số Biên lai' : formData.receiptType === 'Hóa Đơn' ? 'Số Hóa đơn' : 'Số Biên lai / Hóa đơn'}
-                                        </label>
-                                        <input type="text" className="w-full border border-emerald-300 rounded-md px-3 py-2 font-mono bg-white" value={val(formData.receiptNumber)} onChange={(e) => handleChange('receiptNumber', e.target.value)} placeholder="Nhập số biên lai/hóa đơn..." />
+                                        <div className="flex items-center justify-between mb-1">
+                                            <label className="block text-xs font-bold text-emerald-700">
+                                                {formData.receiptType === 'Biên Lai' ? 'Số Biên lai' : formData.receiptType === 'Hóa Đơn' ? 'Số Hóa đơn' : 'Số Chứng từ'}
+                                            </label>
+                                            <select 
+                                                className="text-[10px] font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 rounded px-1 py-0.5 outline-none cursor-pointer"
+                                                value={formData.receiptType || 'Biên Lai'}
+                                                onChange={(e) => handleChange('receiptType', e.target.value)}
+                                            >
+                                                <option value="Biên Lai">Biên Lai</option>
+                                                <option value="Hóa Đơn">Hóa Đơn</option>
+                                            </select>
+                                        </div>
+                                        <input type="text" className="w-full border border-emerald-300 rounded-md px-3 py-2 font-mono text-center font-bold bg-white" value={val(formData.receiptNumber)} onChange={(e) => handleChange('receiptNumber', e.target.value)} placeholder={`Nhập số ${formData.receiptType === 'Hóa Đơn' ? 'hóa đơn' : 'biên lai'}...`} />
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-bold text-emerald-700 mb-1">Số tiền (VNĐ)</label>
-                                        <input type="number" className="w-full border border-emerald-300 rounded-md px-3 py-2 font-bold text-emerald-900 bg-white" value={formData.returnedPrice !== undefined && formData.returnedPrice !== null ? formData.returnedPrice : ''} onChange={(e) => handleChange('returnedPrice', parseFloat(e.target.value) || 0)} placeholder="Nhập số tiền..." />
+                                        <label className="block text-xs font-bold text-emerald-700 mb-1">Số tiền</label>
+                                        <input type="number" className="w-full border border-emerald-300 rounded-md px-3 py-2 font-bold text-center text-emerald-900 bg-white" value={formData.returnedPrice !== undefined && formData.returnedPrice !== null ? formData.returnedPrice : ''} onChange={(e) => handleChange('returnedPrice', parseFloat(e.target.value) || 0)} placeholder="Nhập số tiền..." />
                                     </div>
                                 </div>
                             </div>

@@ -6,8 +6,8 @@ import { fetchRecords, fetchEmployees, fetchUsers, fetchUpdateInfo, fetchHoliday
     saveEmployeeApi, deleteEmployeeApi, saveUserApi, deleteUserApi, deleteAllDataApi, getSystemSetting
 } from '../services/api';
 import { supabase } from '../services/supabaseClient';
-import { mapRecordFromDb } from '../services/apiCore';
-import { DEFAULT_WARDS as STATIC_WARDS, APP_VERSION } from '../constants';
+import { mapRecordFromDb, getFromCache, CACHE_KEYS } from '../services/apiCore';
+import { DEFAULT_WARDS as STATIC_WARDS, APP_VERSION, MOCK_EMPLOYEES, MOCK_USERS } from '../constants';
 import { migrateUnbatchedRecords } from '../utils/appHelpers';
 
 export const useAppData = (currentUser: User | null) => {
@@ -32,30 +32,40 @@ export const useAppData = (currentUser: User | null) => {
 
     const loadData = useCallback(async () => {
         try {
-            // Tạo timeout promise để tránh việc fetch bị treo mãi mãi
-            // Tăng timeout lên 30s để xử lý trường hợp mạng chậm hoặc DB bị sleep
-            const timeoutPromise = new Promise((_, reject) => 
-                setTimeout(() => reject(new Error("Timeout")), 30000)
-            );
+            const safeFetch = async <T>(fn: () => Promise<T>, timeoutMs: number, fallback: T): Promise<T> => {
+                try {
+                    let timer: any;
+                    const timeoutPromise = new Promise<T>((resolve) => {
+                        timer = setTimeout(() => {
+                            console.warn(`Request timed out after ${timeoutMs}ms, using fallback.`);
+                            resolve(fallback);
+                        }, timeoutMs);
+                    });
+                    const res = await Promise.race([fn(), timeoutPromise]);
+                    clearTimeout(timer);
+                    return res ?? fallback;
+                } catch {
+                    return fallback;
+                }
+            };
 
-            const dataPromise = Promise.all([
-                fetchRecords(),
-                fetchEmployees(),
-                fetchUsers(),
-                fetchUpdateInfo(),
-                fetchHolidays(), // Tải thêm danh sách ngày nghỉ
-                getSystemSetting('role_permissions'),
-                getSystemSetting('department_permissions')
+            const [recData, empData, userData, updateInfo, holidayData, permsData, deptPermsData] = await Promise.all([
+                safeFetch(() => fetchRecords(), 12000, getFromCache(CACHE_KEYS.RECORDS, [])),
+                safeFetch(() => fetchEmployees(), 10000, getFromCache(CACHE_KEYS.EMPLOYEES, MOCK_EMPLOYEES)),
+                safeFetch(() => fetchUsers(), 10000, getFromCache(CACHE_KEYS.USERS, MOCK_USERS)),
+                safeFetch(() => fetchUpdateInfo(), 5000, null),
+                safeFetch(() => fetchHolidays(), 5000, getFromCache(CACHE_KEYS.HOLIDAYS, [])),
+                safeFetch(() => getSystemSetting('role_permissions'), 5000, null),
+                safeFetch(() => getSystemSetting('department_permissions'), 5000, null)
             ]);
 
-            // Race giữa fetch data và timeout
-            const [recData, empData, userData, updateInfo, holidayData, permsData, deptPermsData] = await Promise.race([dataPromise, timeoutPromise]) as any;
+            const rawList = Array.isArray(recData) ? recData : [];
+            const { migratedRecords } = migrateUnbatchedRecords(rawList);
+            setRecords(migratedRecords.length > 0 ? migratedRecords : getFromCache(CACHE_KEYS.RECORDS, []));
+            setEmployees(empData && empData.length > 0 ? empData : getFromCache(CACHE_KEYS.EMPLOYEES, MOCK_EMPLOYEES));
+            setUsers(userData && userData.length > 0 ? userData : getFromCache(CACHE_KEYS.USERS, MOCK_USERS));
+            setHolidays(holidayData || []);
 
-            const { migratedRecords } = migrateUnbatchedRecords(Array.isArray(recData) ? recData : []);
-            setRecords(migratedRecords);
-            setEmployees(empData);
-            setUsers(userData);
-            setHolidays(holidayData); // Cập nhật state holidays
             if (permsData) {
                 try {
                     const parsed = JSON.parse(permsData);
@@ -64,7 +74,7 @@ export const useAppData = (currentUser: User | null) => {
                     parsed[UserRole.ONEDOOR] = Array.from(new Set([...existingOneDoor, ...defaultOneDoor]));
                     setRolePermissions(parsed);
                 } catch (e) {
-                    console.error("Failed to parse role_permissions", e);
+                    console.warn("Failed to parse role_permissions", e);
                 }
             }
             if (deptPermsData) {
@@ -78,7 +88,7 @@ export const useAppData = (currentUser: User | null) => {
                     });
                     setDepartmentPermissions(parsedDept);
                 } catch (e) {
-                    console.error("Failed to parse department_permissions", e);
+                    console.warn("Failed to parse department_permissions", e);
                 }
             }
             setConnectionStatus('connected');
@@ -89,20 +99,13 @@ export const useAppData = (currentUser: User | null) => {
                 setUpdateUrl(updateInfo.url);
             }
         } catch (error) {
-            console.error("Lỗi tải dữ liệu hoặc Timeout:", error);
-            // Quan trọng: Khi lỗi, chuyển sang OFFLINE nhưng vẫn cho phép App hoạt động
+            console.warn("Lỗi tải dữ liệu cloud, chuyển sang chế độ cache offline:", error);
             setConnectionStatus('offline');
             
-            // Nếu cache cũng rỗng (lần đầu chạy) hoặc bị timeout nên không nhận được data, 
-            // ta sẽ chủ động đọc lại từ Cache để người dùng có thể Đăng nhập và làm việc.
-            import('../services/apiCore').then(({ getFromCache, CACHE_KEYS }) => {
-                import('../constants').then(({ MOCK_EMPLOYEES, MOCK_USERS }) => {
-                    setRecords((prev) => prev.length > 0 ? prev : getFromCache(CACHE_KEYS.RECORDS, []));
-                    setEmployees((prev) => prev.length > 0 ? prev : getFromCache(CACHE_KEYS.EMPLOYEES, MOCK_EMPLOYEES));
-                    setUsers((prev) => prev.length > 0 ? prev : getFromCache(CACHE_KEYS.USERS, MOCK_USERS));
-                    setHolidays((prev) => prev.length > 0 ? prev : getFromCache(CACHE_KEYS.HOLIDAYS, []));
-                });
-            });
+            setRecords((prev) => prev.length > 0 ? prev : getFromCache(CACHE_KEYS.RECORDS, []));
+            setEmployees((prev) => prev.length > 0 ? prev : getFromCache(CACHE_KEYS.EMPLOYEES, MOCK_EMPLOYEES));
+            setUsers((prev) => prev.length > 0 ? prev : getFromCache(CACHE_KEYS.USERS, MOCK_USERS));
+            setHolidays((prev) => prev.length > 0 ? prev : getFromCache(CACHE_KEYS.HOLIDAYS, []));
         }
     }, []);
 

@@ -183,7 +183,11 @@ export const calculateDeadlineHelper = (type: string, receivedDateStr: string, h
         lowerType.includes('2.6') || lowerType.includes('số thửa') || 
         lowerType.includes('2.1') || lowerType.includes('trích lục')) {
         daysToAdd = 10;
-    } else if (lowerType.includes('trích đo chỉnh lý') || lowerType.includes('chỉnh lý bản đồ')) {
+    } else if (lowerType.includes('3.2.1') || lowerType.includes('3.2.2') || lowerType.includes('3.5.1') || lowerType.includes('gia hạn') || (lowerType.includes('cấp đổi') && !lowerType.includes('trích đo'))) {
+        daysToAdd = 7;
+    } else if (lowerType.includes('3.1.1') || lowerType.includes('3.1.2') || lowerType.includes('3.1.3') || lowerType.includes('3.1.4') || lowerType.includes('3.3.1') || lowerType.includes('3.3.2') || lowerType.includes('3.6.1') || lowerType.includes('37.1') || lowerType.includes('chuyển nhượng') || lowerType.includes('tặng cho') || lowerType.includes('thừa kế') || lowerType.includes('thỏa thuận') || lowerType.includes('chuyển mục đích') || lowerType.includes('đính chính')) {
+        daysToAdd = 10;
+    } else if (lowerType.includes('3.4.1') || lowerType.includes('trích đo chỉnh lý') || lowerType.includes('chỉnh lý bản đồ')) {
         daysToAdd = 15;
     } else if (lowerType.includes('2.3') || lowerType.includes('trích đo') || 
                lowerType.includes('2.4') || lowerType.includes('cắm mốc') || 
@@ -303,6 +307,58 @@ export function parseSafeDate(dateStr: any): Date | null {
 
     const d = new Date(s);
     return isNaN(d.getTime()) ? null : d;
+}
+
+export function extractDateFromRecordCode(code?: string | null): Date | null {
+    if (!code) return null;
+    const s = String(code).trim();
+    if (!s) return null;
+
+    // Case 1: YYMMDD-xxxx or prefix-YYMMDD-xxxx e.g. 240815-0001 or WARD-240815-0001
+    const yymmddMatch = s.match(/(?:^|[^\d])(\d{2})(\d{2})(\d{2})(?:[^\d]|$)/);
+    if (yymmddMatch) {
+        const yy = parseInt(yymmddMatch[1], 10);
+        const mm = parseInt(yymmddMatch[2], 10);
+        const dd = parseInt(yymmddMatch[3], 10);
+        if (mm >= 1 && mm <= 12 && dd >= 1 && dd <= 31) {
+            const year = yy >= 50 ? 1900 + yy : 2000 + yy;
+            const date = new Date(year, mm - 1, dd);
+            if (!isNaN(date.getTime())) return date;
+        }
+    }
+
+    // Case 2: DD.MM.YYYY or DD/MM/YYYY
+    const dmyMatch = s.match(/(\d{1,2})[\/\.-](\d{1,2})[\/\.-](\d{4})/);
+    if (dmyMatch) {
+        const d = parseInt(dmyMatch[1], 10);
+        const m = parseInt(dmyMatch[2], 10);
+        const y = parseInt(dmyMatch[3], 10);
+        if (m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+            const date = new Date(y, m - 1, d);
+            if (!isNaN(date.getTime())) return date;
+        }
+    }
+
+    // Case 3: YYYY.MM.DD or YYYY/MM/DD
+    const ymdMatch = s.match(/(\d{4})[\/\.-](\d{1,2})[\/\.-](\d{1,2})/);
+    if (ymdMatch) {
+        const y = parseInt(ymdMatch[1], 10);
+        const m = parseInt(ymdMatch[2], 10);
+        const d = parseInt(ymdMatch[3], 10);
+        if (m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+            const date = new Date(y, m - 1, d);
+            if (!isNaN(date.getTime())) return date;
+        }
+    }
+
+    return null;
+}
+
+export function getRecordReceivedDate(r: any): Date | null {
+    if (!r) return null;
+    const parsed = parseSafeDate(r.receivedDate || r.ngay_thang || r.created_at);
+    if (parsed) return parsed;
+    return extractDateFromRecordCode(r.code);
 }
 
 export function processAssignmentTimelineCheck(
@@ -455,31 +511,44 @@ export function getDeptAbbr(deptName: string): string {
 }
 
 export function formatDateDDMMYYYY(d?: string | null): string {
-    if (!d) {
-        const today = new Date();
-        return `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
+    if (!d) return '';
+    const clean = String(d).trim();
+    if (!clean) return '';
+    
+    const isoPart = clean.split('T')[0];
+    const parts = isoPart.split('-');
+    if (parts.length === 3 && parts[0].length >= 2) {
+        let y = parts[0];
+        if (y.length === 2) y = '20' + y;
+        const m = parts[1].padStart(2, '0');
+        const day = parts[2].padStart(2, '0');
+        return `${day}/${m}/${y}`;
     }
-    const clean = d.split('T')[0];
-    const parts = clean.split('-');
-    if (parts.length === 3) {
-        return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    
+    if (clean.includes('/')) {
+        const slashParts = clean.split('/');
+        if (slashParts.length === 3) {
+            const day = slashParts[0].padStart(2, '0');
+            const m = slashParts[1].padStart(2, '0');
+            let y = slashParts[2];
+            if (y.length === 2) y = '20' + y;
+            return `${day}/${m}/${y}`;
+        }
     }
-    return d;
+    
+    const parsed = new Date(clean);
+    if (!isNaN(parsed.getTime())) {
+        const day = String(parsed.getDate()).padStart(2, '0');
+        const m = String(parsed.getMonth() + 1).padStart(2, '0');
+        const y = parsed.getFullYear();
+        return `${day}/${m}/${y}`;
+    }
+    
+    return clean;
 }
 
 export function formatDateDDMMYY(d?: string | null): string {
-    if (!d) {
-        const today = new Date();
-        const yy = String(today.getFullYear()).slice(-2);
-        return `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${yy}`;
-    }
-    const clean = d.split('T')[0];
-    const parts = clean.split('-');
-    if (parts.length === 3) {
-        const yy = parts[0].length === 4 ? parts[0].slice(-2) : parts[0];
-        return `${parts[2]}/${parts[1]}/${yy}`;
-    }
-    return d;
+    return formatDateDDMMYYYY(d);
 }
 
 export function formatBatchName(batch: number | string | null | undefined, deptName?: string, dateStr?: string | null): string {

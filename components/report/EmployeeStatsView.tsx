@@ -3,7 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { RecordFile, Employee, RecordStatus } from '../../types';
 import { generateEmployeeEvaluation } from '../../services/geminiService';
 import { User as UserIcon, AlertOctagon, Sparkles, Loader2, ListFilter, CheckCircle2, Clock, AlertTriangle, Briefcase } from 'lucide-react';
-import { parseSafeDate } from '../../utils/appHelpers';
+import { parseSafeDate, getRecordReceivedDate } from '../../utils/appHelpers';
 
 interface EmployeeStatsViewProps {
     records: RecordFile[];
@@ -54,8 +54,7 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
         const start = parseSafeDate(fromDate) || new Date(fromDate); start.setHours(0,0,0,0);
         const end = parseSafeDate(toDate) || new Date(toDate); end.setHours(23,59,59,999);
         return records.filter(r => {
-            if (!r.receivedDate) return false;
-            const rDate = parseSafeDate(r.receivedDate);
+            const rDate = getRecordReceivedDate(r);
             if (!rDate) return false;
             return rDate >= start && rDate <= end;
         });
@@ -71,7 +70,7 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
             selectedEmp.position?.toLowerCase().includes('phó')
         );
         const targetRecords = selectedEmpId 
-            ? recordsInTimeRange.filter(r => r.assignedTo === selectedEmpId || (isSelectedLeader && r.checkedBy === selectedEmpId))
+            ? recordsInTimeRange.filter(r => r.assignedTo === selectedEmpId || r.submittedTo === selectedEmpId || (isSelectedLeader && r.checkedBy === selectedEmpId))
             : recordsInTimeRange;
 
         const total = targetRecords.length;
@@ -141,7 +140,7 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
                 emp.position?.toLowerCase().includes('trưởng') ||
                 emp.position?.toLowerCase().includes('phó')
             );
-            const empRecords = recordsInTimeRange.filter(r => r.assignedTo === emp.id || (isLeader && r.checkedBy === emp.id));
+            const empRecords = recordsInTimeRange.filter(r => r.assignedTo === emp.id || r.submittedTo === emp.id || (isLeader && r.checkedBy === emp.id));
             const totalAssigned = empRecords.length;
 
             let completed = 0;

@@ -43,11 +43,35 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
         return 'Hóa Đơn';
     };
 
+    // Helper to robustly parse currency strings like "53.163 đ", "1.500.000", "53,163" or raw numbers
+    const parseNumericValue = (val: any): number => {
+        if (val === undefined || val === null) return 0;
+        if (typeof val === 'number') return isNaN(val) ? 0 : val;
+        const str = String(val).trim();
+        if (!str) return 0;
+        const cleanStr = str.replace(/[^\d]/g, '');
+        if (!cleanStr) return 0;
+        const num = Number(cleanStr);
+        return isNaN(num) ? 0 : num;
+    };
+
+    // Helper to extract receipt/invoice number from root or nested data
+    const getReceiptNumber = (r: any): string => {
+        if (r.receiptNumber && String(r.receiptNumber).trim() !== '') return String(r.receiptNumber).trim();
+        if (r.data) {
+            const d = r.data;
+            const bl = d.so_bien_lai || d.so_hoa_don || d.so_bl || d.so_hd || d.bien_lai || d.hoa_don || d.receiptNumber;
+            if (bl && String(bl).trim() !== '') return String(bl).trim();
+        }
+        return '';
+    };
+
     // Calculate revenue records filtered strictly by resultReturnedDate / exportDate
     const revenueRecords = useMemo(() => {
         let dateStart: Date | null = null;
         let dateEnd: Date | null = null;
-        if (fromDate) {
+        const isAllTime = !fromDate || fromDate === '1970-01-01';
+        if (fromDate && !isAllTime) {
             dateStart = new Date(fromDate);
             dateStart.setHours(0, 0, 0, 0);
         }
@@ -58,24 +82,82 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
 
         return records
             .filter(r => {
-                if (r.status === RecordStatus.RETURNED) return true;
-                if (r.status === RecordStatus.HANDOVER) {
-                    const hasReturnDate = !!(r.resultReturnedDate || r.exportDate || r.completedDate);
-                    const hasReceipt = !!(r.receiptNumber && r.receiptNumber.trim() !== '');
-                    const hasReturnedPrice = r.returnedPrice !== undefined && r.returnedPrice !== null && String(r.returnedPrice).trim() !== '' && Number(r.returnedPrice) > 0;
-                    return hasReturnDate || hasReceipt || hasReturnedPrice;
+                const typeLower = (r.recordType || '').toLowerCase();
+                // 2.6 CN Số Thửa is a free non-revenue procedure, exclude from revenue report
+                if (typeLower.includes('2.6') || typeLower.includes('cn số thửa') || typeLower.includes('cn so thua')) {
+                    return false;
                 }
-                return false;
+
+                // Must have BOTH receipt/invoice number AND a positive numeric price entered or computed
+                const receiptNo = getReceiptNumber(r);
+                const hasReceipt = receiptNo !== '';
+                
+                const retNum = parseNumericValue(r.returnedPrice);
+                const priceNum = parseNumericValue(r.price);
+                const contractP = parseNumericValue((r as any).contractPrice);
+                const archivePrice = parseNumericValue(
+                    (r as any).data?.so_tien || 
+                    (r as any).data?.don_gia || 
+                    (r as any).data?.phi_le_phi || 
+                    (r as any).data?.thanh_tien ||
+                    (r as any).data?.tong_tien ||
+                    (r as any).data?.don_gia_tam_tinh
+                );
+
+                let amount = 0;
+                if (retNum > 0) {
+                    amount = retNum;
+                } else if (priceNum > 0) {
+                    amount = priceNum;
+                } else if (contractP > 0) {
+                    amount = contractP;
+                } else if (archivePrice > 0) {
+                    amount = archivePrice;
+                } else if (hasReceipt) {
+                    // Fallback unit price if missing
+                    const typeLower = (r.recordType || '').toLowerCase();
+                    if (typeLower.includes('trích đo') || typeLower.includes('đo đạc') || typeLower.includes('cung cấp')) {
+                        amount = 310000;
+                    } else {
+                        amount = 53163;
+                    }
+                }
+
+                return hasReceipt && amount > 0;
             })
             .map(r => {
-                const contractP = (r as any).contractPrice;
-                const price = Number(r.price) || Number(contractP) || 0;
-                let returned = 0;
-                if (r.returnedPrice !== undefined && r.returnedPrice !== null && String(r.returnedPrice).trim() !== '' && !isNaN(Number(r.returnedPrice))) {
-                    returned = Number(r.returnedPrice);
+                const receiptNo = getReceiptNumber(r);
+                const retNum = parseNumericValue(r.returnedPrice);
+                const priceNum = parseNumericValue(r.price);
+                const contractP = parseNumericValue((r as any).contractPrice);
+                const archivePrice = parseNumericValue(
+                    (r as any).data?.so_tien || 
+                    (r as any).data?.don_gia || 
+                    (r as any).data?.phi_le_phi || 
+                    (r as any).data?.thanh_tien ||
+                    (r as any).data?.tong_tien ||
+                    (r as any).data?.don_gia_tam_tinh
+                );
+
+                let amount = 0;
+                if (retNum > 0) {
+                    amount = retNum;
+                } else if (priceNum > 0) {
+                    amount = priceNum;
+                } else if (contractP > 0) {
+                    amount = contractP;
+                } else if (archivePrice > 0) {
+                    amount = archivePrice;
+                } else if (receiptNo !== '') {
+                    const typeLower = (r.recordType || '').toLowerCase();
+                    if (typeLower.includes('trích đo') || typeLower.includes('đo đạc') || typeLower.includes('cung cấp')) {
+                        amount = 310000;
+                    } else {
+                        amount = 53163;
+                    }
                 }
-                
-                const receiptType = getRecordReceiptType(r);
+
+                const receiptType = getRecordReceiptType({ ...r, receiptNumber: receiptNo });
 
                 // Determine assigned ward for resolving the record
                 let assignedWard = r.ward || r.handoverWard || '';
@@ -100,29 +182,34 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
 
                 return {
                     ...r,
-                    calcPrice: price,
-                    calcReturned: returned,
+                    receiptNumber: receiptNo,
+                    calcPrice: amount,
+                    calcReturned: amount,
                     computedReceiptType: receiptType,
                     assignedWard
                 };
             })
-            // Only include records with revenue or receipt/invoice recorded
-            .filter(r => r.calcReturned > 0 || (r.receiptNumber && r.receiptNumber.trim() !== ''))
-            // Filter strictly by resultReturnedDate or exportDate or completedDate
+            // Only include records with both valid positive revenue and receipt/invoice number recorded
+            .filter(r => r.calcReturned > 0 && !!(r.receiptNumber && r.receiptNumber.trim() !== ''))
+            // Filter strictly by resultReturnedDate or exportDate or completedDate or receivedDate
             .filter(r => {
-                if (!dateStart || !dateEnd) return true;
-                const targetDateStr = r.resultReturnedDate || r.exportDate || r.completedDate;
-                if (!targetDateStr) return false;
+                if (isAllTime || !dateStart || !dateEnd) return true;
+                const targetDateStr = r.resultReturnedDate || r.exportDate || r.completedDate || r.receivedDate;
+                if (!targetDateStr) return true;
                 let d: Date | null = null;
                 if (targetDateStr.includes('/')) {
                     const parts = targetDateStr.split('/');
                     if (parts.length === 3) {
-                        d = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]), 12, 0, 0);
+                        let y = parseInt(parts[2]);
+                        if (y < 100) y += 2000;
+                        const m = parseInt(parts[1]) - 1;
+                        const day = parseInt(parts[0]);
+                        d = new Date(y, m, day, 12, 0, 0);
                     }
                 } else {
                     d = new Date(targetDateStr);
                 }
-                if (!d || isNaN(d.getTime())) return false;
+                if (!d || isNaN(d.getTime())) return true;
                 d.setHours(12, 0, 0, 0);
                 return d >= dateStart && d <= dateEnd;
             });
@@ -288,12 +375,6 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
                     
                     {/* Segmented Pills for Revenue Category */}
                     <div className="flex-1 min-w-[320px] flex items-center gap-3 flex-wrap">
-                        {teamTitle && (
-                            <span className="px-3 py-1 bg-emerald-100 text-emerald-800 font-extrabold text-xs rounded-lg border border-emerald-200 shrink-0">
-                                {teamTitle}
-                            </span>
-                        )}
-
                         <div className="inline-flex items-center bg-slate-200/80 p-1 rounded-xl gap-1 text-xs font-semibold w-full sm:w-auto h-[38px]">
                             <button
                                 type="button"
@@ -305,7 +386,7 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
                                 }`}
                             >
                                 <span>Tất cả chứng từ:</span>
-                                <span className="font-bold text-teal-600 font-mono">{cardMetrics.totalSum.toLocaleString('vi-VN')} đ</span>
+                                <span className="font-bold text-teal-600 font-mono">{cardMetrics.totalSum.toLocaleString('vi-VN')}</span>
                                 <span className="text-[10px] text-slate-500 font-normal">({cardMetrics.totalCount})</span>
                             </button>
 
@@ -319,7 +400,7 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
                                 }`}
                             >
                                 <span>Biên lai:</span>
-                                <span className="font-bold text-blue-600 font-mono">{cardMetrics.bienLaiSum.toLocaleString('vi-VN')} đ</span>
+                                <span className="font-bold text-blue-600 font-mono">{cardMetrics.bienLaiSum.toLocaleString('vi-VN')}</span>
                                 <span className="text-[10px] text-slate-500 font-normal">({cardMetrics.bienLaiCount})</span>
                             </button>
 
@@ -333,7 +414,7 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
                                 }`}
                             >
                                 <span>Hóa đơn:</span>
-                                <span className="font-bold text-orange-600 font-mono">{cardMetrics.hoaDonSum.toLocaleString('vi-VN')} đ</span>
+                                <span className="font-bold text-orange-600 font-mono">{cardMetrics.hoaDonSum.toLocaleString('vi-VN')}</span>
                                 <span className="text-[10px] text-slate-500 font-normal">({cardMetrics.hoaDonCount})</span>
                             </button>
                         </div>
@@ -509,7 +590,7 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
                                                 <span className="text-slate-400">Ngày thu:</span> <span className="font-medium text-slate-800">{dateStr}</span>
                                             </div>
                                             <div>
-                                                <span className="text-slate-400">Số tiền:</span> <span className="font-mono font-bold text-emerald-600">{r.calcReturned.toLocaleString('vi-VN')} đ</span>
+                                                <span className="text-slate-400">Số tiền:</span> <span className="font-mono font-bold text-emerald-600">{r.calcReturned.toLocaleString('vi-VN')}</span>
                                             </div>
                                             <div>
                                                 <span className="text-slate-400">Địa bàn:</span> <span className="font-medium text-slate-800">{r.assignedWard}</span>

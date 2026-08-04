@@ -112,6 +112,8 @@ function App() {
   const [isDiagnosticModalOpen, setIsDiagnosticModalOpen] = useState(false);
   const [isRejectReturnStepModalOpen, setIsRejectReturnStepModalOpen] = useState(false);
   const [rejectReturnTargetRecords, setRejectReturnTargetRecords] = useState<RecordFile[]>([]);
+  const [isExtendModalOpen, setIsExtendModalOpen] = useState(false);
+  const [extendTargetRecord, setExtendTargetRecord] = useState<RecordFile | null>(null);
 
   // Report States
   const [globalReportContent, setGlobalReportContent] = useState('');
@@ -692,7 +694,7 @@ function App() {
       if (!returnRecord) return;
       const nowStr = new Date().toISOString();
       const typeLabel = receiptType || 'Biên Lai';
-      const statusLogs = createStatusLog(returnRecord, RecordStatus.RETURNED, `Trả kết quả cho người dân: ${receiverName} (${typeLabel} số: ${receiptNumber}, Số tiền: ${returnedPrice.toLocaleString('vi-VN')}đ)`);
+      const statusLogs = createStatusLog(returnRecord, RecordStatus.RETURNED, `Trả kết quả cho người dân: ${receiverName} (${typeLabel} số: ${receiptNumber}, Số tiền: ${returnedPrice.toLocaleString('vi-VN')})`);
       const updates = { 
           resultReturnedDate: nowStr, 
           status: RecordStatus.RETURNED, 
@@ -1056,11 +1058,13 @@ function App() {
             isExcelPreviewOpen={isExcelPreviewOpen} setIsExcelPreviewOpen={setIsExcelPreviewOpen}
             isBulkUpdateModalOpen={isBulkUpdateModalOpen} setIsBulkUpdateModalOpen={setIsBulkUpdateModalOpen}
             isReturnModalOpen={isReturnModalOpen} setIsReturnModalOpen={setIsReturnModalOpen}
+            isExtendModalOpen={isExtendModalOpen} setIsExtendModalOpen={setIsExtendModalOpen}
             
             editingRecord={editingRecord} setEditingRecord={setEditingRecord}
             viewingRecord={viewingRecord} setViewingRecord={setViewingRecord}
             deletingRecord={deletingRecord} setDeletingRecord={setDeletingRecord}
             returnRecord={returnRecord} setReturnRecord={setReturnRecord}
+            extendTargetRecord={extendTargetRecord} setExtendTargetRecord={setExtendTargetRecord}
             assignTargetRecords={assignTargetRecords}
             exportModalType={exportModalType}
             
@@ -1252,6 +1256,8 @@ function App() {
             setIsDeleteModalOpen={setIsDeleteModalOpen}
             isDiagnosticModalOpen={isDiagnosticModalOpen}
             setIsDiagnosticModalOpen={setIsDiagnosticModalOpen}
+            setIsExtendModalOpen={setIsExtendModalOpen}
+            setExtendTargetRecord={setExtendTargetRecord}
             advanceStatus={advanceStatus}
             handleOpenReturnModal={handleOpenReturnModal}
             handleOpenRejectReturnModal={handleOpenRejectReturnModal}
@@ -1272,11 +1278,13 @@ function App() {
             isReturnModalOpen={isReturnModalOpen} setIsReturnModalOpen={setIsReturnModalOpen}
             isDiagnosticModalOpen={isDiagnosticModalOpen} setIsDiagnosticModalOpen={setIsDiagnosticModalOpen}
             isRejectReturnStepModalOpen={isRejectReturnStepModalOpen} setIsRejectReturnStepModalOpen={setIsRejectReturnStepModalOpen}
+            isExtendModalOpen={isExtendModalOpen} setIsExtendModalOpen={setIsExtendModalOpen}
             
             editingRecord={editingRecord} setEditingRecord={setEditingRecord}
             viewingRecord={viewingRecord} setViewingRecord={setViewingRecord}
             deletingRecord={deletingRecord} setDeletingRecord={setDeletingRecord}
             returnRecord={returnRecord} setReturnRecord={setReturnRecord}
+            extendTargetRecord={extendTargetRecord} setExtendTargetRecord={setExtendTargetRecord}
             assignTargetRecords={assignTargetRecords}
             rejectReturnTargetRecords={rejectReturnTargetRecords}
             exportModalType={exportModalType}

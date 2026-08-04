@@ -127,7 +127,7 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
                         <option value="receivedDate">Ngày nhận hồ sơ</option>
                         <option value="resultReturnedDate">Ngày trả kết quả</option>
                         <option value="receiptNumber">Số BL/HĐ</option>
-                        <option value="returnedPrice">Số tiền (VNĐ)</option>
+                        <option value="returnedPrice">Số tiền</option>
                         <option value="ward">Xã / Phường (Địa bàn)</option>
                     </select>
                 </div>

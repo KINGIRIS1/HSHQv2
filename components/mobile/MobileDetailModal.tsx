@@ -617,10 +617,10 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                   </div>
                   <span className="text-sm font-bold text-green-800">
                     {record.returnedPrice !== undefined && record.returnedPrice !== null
-                      ? record.returnedPrice.toLocaleString('vi-VN') + ' đ'
+                      ? record.returnedPrice.toLocaleString('vi-VN')
                       : (record.recordType === 'Cung cấp tài liệu đất đai'
-                          ? (record.price ? record.price.toLocaleString('vi-VN') + ' đ' : '310.000 đ')
-                          : (contractPrice !== null ? contractPrice.toLocaleString('vi-VN') + ' đ' : '---'))}
+                          ? (record.price ? record.price.toLocaleString('vi-VN') : '310.000')
+                          : (contractPrice !== null ? contractPrice.toLocaleString('vi-VN') : '---'))}
                   </span>
                 </div>
                 {liquidationInfo && (
@@ -629,7 +629,7 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                       <Calculator size={16} className="text-orange-600" />
                       <span className="text-xs font-bold text-orange-700">{liquidationInfo.content}</span>
                     </div>
-                    <span className="text-sm font-bold text-orange-800">{liquidationInfo.amount.toLocaleString('vi-VN')} đ</span>
+                    <span className="text-sm font-bold text-orange-800">{liquidationInfo.amount.toLocaleString('vi-VN')}</span>
                   </div>
                 )}
 
@@ -730,64 +730,7 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
         {activeTab === 'timeline' && (
           <div className="p-4 space-y-4">
             <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 space-y-4">
-              {/* Tính năng gia hạn ngày hẹn cho Một cửa / Admin */}
-              {currentUser && (currentUser.role === UserRole.ONEDOOR || currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.SUBADMIN || currentUser.role === UserRole.TEAM_LEADER) && (
-                  <div className="w-full flex flex-col items-center border-b border-slate-100 pb-3">
-                      {!showExtendForm ? (
-                          <button 
-                              onClick={() => {
-                                  setExtendDate(record.deadline ? record.deadline.split('T')[0] : '');
-                                  setShowExtendForm(true);
-                              }}
-                              className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 text-purple-700 hover:bg-purple-100 rounded-lg text-xs font-bold transition-all border border-purple-200"
-                          >
-                              <CalendarClock size={14} />
-                              Gia hạn ngày hẹn
-                          </button>
-                      ) : (
-                          <div className="w-full bg-slate-50 p-3 rounded-lg border border-slate-200 text-left animate-fade-in-up mt-2">
-                              <h4 className="text-xs font-bold text-slate-700 mb-2 uppercase tracking-wide">Gia hạn hồ sơ</h4>
-                              <div className="space-y-3">
-                                  <div>
-                                      <label className="text-[10px] text-gray-400 uppercase font-bold block mb-1">Ngày hẹn mới</label>
-                                      <input 
-                                          type="date" 
-                                          value={extendDate} 
-                                          onChange={(e) => setExtendDate(e.target.value)}
-                                          className="w-full text-xs font-semibold px-2 py-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-purple-500 outline-none bg-white"
-                                      />
-                                  </div>
-                                  <div>
-                                      <label className="text-[10px] text-gray-400 uppercase font-bold block mb-1">Lý do gia hạn</label>
-                                      <textarea 
-                                          rows={2}
-                                          value={extendReason}
-                                          onChange={(e) => setExtendReason(e.target.value)}
-                                          placeholder="Nhập lý do gia hạn..."
-                                          className="w-full text-xs p-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-purple-500 outline-none resize-none bg-white"
-                                      />
-                                  </div>
-                                  <div className="flex gap-2 justify-end">
-                                      <button 
-                                          onClick={() => setShowExtendForm(false)}
-                                          className="px-2.5 py-1 text-gray-600 hover:bg-gray-100 rounded text-xs font-medium"
-                                      >
-                                          Hủy
-                                      </button>
-                                      <button 
-                                          onClick={handleSaveExtension}
-                                          disabled={isExtending}
-                                          className="px-2.5 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded text-xs font-bold flex items-center gap-1 shadow-sm"
-                                      >
-                                          {isExtending ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
-                                          Lưu
-                                      </button>
-                                  </div>
-                              </div>
-                          </div>
-                      )}
-                  </div>
-              )}
+
 
               <RecordTimelineProgress 
                 record={record}

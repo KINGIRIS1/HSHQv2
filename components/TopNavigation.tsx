@@ -127,7 +127,11 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
   };
 
   const handleMenuClick = (viewId: string) => {
-    setCurrentView(viewId);
+    let targetView = viewId;
+    if (viewId === 'registration_records') {
+      targetView = 'other_records';
+    }
+    setCurrentView(targetView);
     setMobileOpen(false);
   };
 
@@ -183,7 +187,9 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
                        if (!isAllowed) return null;
                        if (!sub.visible) return null;
     
-                       const isSubActive = currentView === sub.id;
+                       const isSubActive = (sub.id === 'registration_records' || sub.id === 'other_records')
+                         ? ['other_records', 'other_assign_tasks', 'other_completed_list', 'other_pending_check_list', 'other_check_list', 'other_handover_list', 'registration_records'].includes(currentView)
+                         : currentView === sub.id;
                        return (
                         <button
                           key={sub.id}

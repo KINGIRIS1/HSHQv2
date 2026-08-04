@@ -62,13 +62,41 @@ export const RECORD_TYPES = [
   '2.6 Cập nhập số thửa'
 ];
 
+// Danh sách loại hồ sơ CẤP GIẤY / ĐĂNG KÝ BIẾN ĐỘNG ĐẤT ĐAI
+export const CAP_GIAY_RECORD_TYPES = [
+  '3.1.1 Chuyển nhượng',
+  '3.1.2 Tặng cho',
+  '3.1.3 Thừa kế',
+  '3.1.4 Thỏa thuận',
+  '3.2.1 Cấp đổi',
+  '3.2.2 Cấp đổi (có thuế)',
+  '3.3.1 Cấp lại',
+  '3.3.2 Cấp lại (có thuế)',
+  '3.4.1 Tách - hợp thửa',
+  '3.5.1 Gia hạn',
+  '3.6.1 Chuyển mục đích không xin phép',
+  '37.1 Đính chính - Biến động'
+];
+
+export const CAP_GIAY_RECORD_TYPE_DESCRIPTIONS: Record<string, string> = {
+  '3.1.1 Chuyển nhượng': 'Đăng ký chuyển nhượng quyền sử dụng đất, quyền sở hữu nhà ở',
+  '3.1.2 Tặng cho': 'Đăng ký biến động do tặng cho quyền sử dụng đất, tài sản',
+  '3.1.3 Thừa kế': 'Đăng ký biến động do thừa kế quyền sử dụng đất, tài sản gắn liền với đất',
+  '3.1.4 Thỏa thuận': 'Thỏa thuận phân chia, hợp nhất hoặc biến động tài sản theo thỏa thuận',
+  '3.2.1 Cấp đổi': 'Cấp đổi Giấy chứng nhận quyền sử dụng đất, sở hữu nhà ở',
+  '3.2.2 Cấp đổi (có thuế)': 'Cấp đổi Giấy chứng nhận quyền sử dụng đất, sở hữu nhà ở (có thuế)',
+  '3.3.1 Cấp lại': 'Cấp lại Giấy chứng nhận do bị mất, hư hỏng',
+  '3.3.2 Cấp lại (có thuế)': 'Cấp lại Giấy chứng nhận do bị mất, hư hỏng (có thuế)',
+  '3.4.1 Tách - hợp thửa': 'Đăng ký biến động do tách thửa, hợp thửa đất',
+  '3.5.1 Gia hạn': 'Gia hạn thời hạn sử dụng đất',
+  '3.6.1 Chuyển mục đích không xin phép': 'Đăng ký chuyển mục đích sử dụng đất đối với trường hợp không phải xin phép',
+  '37.1 Đính chính - Biến động': 'Đính chính - Biến động đất đai'
+};
+
 // Danh sách loại hồ sơ MỞ RỘNG (Dùng cho form Thêm mới trong "Tất cả hồ sơ" - Admin/Nội bộ)
 export const EXTENDED_RECORD_TYPES = [
   ...RECORD_TYPES,
-  '1.2 Công văn',
-  'CMD',
-  'Thi hành án',
-  'Tòa án'
+  ...CAP_GIAY_RECORD_TYPES
 ];
 
 // Hàm chuẩn hóa hiển thị tên Xã/Phường (Xóa Xã/Phường/TT)
@@ -121,6 +149,20 @@ export const getShortRecordType = (type: string | null | undefined): string => {
   if (t.startsWith('2.5') || t === 'tách thửa' || t === 'tách-hợp thửa' || t === 'trích đo tách - hợp thửa') return '2.5 Tách-Hợp thửa';
   if (t.startsWith('2.6') || t === 'cung cấp số thửa đất' || t === 'cung cấp số thửa' || t === 'cc số thửa' || t === 'cập nhập số thửa' || t === 'cập nhật số thửa' || t === 'cn số thửa') return '2.6 CN Số Thửa';
 
+  // Các thủ tục Cấp giấy / Biến động mới
+  if (t.startsWith('3.1.1') || (t.includes('chuyển nhượng') && !t.includes('trích đo'))) return '3.1.1 Chuyển nhượng';
+  if (t.startsWith('3.1.2') || t.includes('tặng cho')) return '3.1.2 Tặng cho';
+  if (t.startsWith('3.1.3') || t.includes('thừa kế')) return '3.1.3 Thừa kế';
+  if (t.startsWith('3.1.4') || (t.includes('thỏa thuận') && !t.includes('phân chia'))) return '3.1.4 Thỏa thuận';
+  if (t.startsWith('3.2.1') || t === '3.2.1 cấp đổi' || (t.includes('cấp đổi') && !t.includes('thuế'))) return '3.2.1 Cấp đổi';
+  if (t.startsWith('3.2.2') || (t.includes('cấp đổi') && t.includes('thuế'))) return '3.2.2 Cấp đổi (có thuế)';
+  if (t.startsWith('3.3.1') || t === '3.3.1 cấp lại' || (t.includes('cấp lại') && !t.includes('thuế'))) return '3.3.1 Cấp lại';
+  if (t.startsWith('3.3.2') || (t.includes('cấp lại') && t.includes('thuế'))) return '3.3.2 Cấp lại (có thuế)';
+  if (t.startsWith('3.4.1') || t.includes('tách - hợp thửa') || (t.includes('tách') && t.includes('hợp') && !t.includes('trích đo'))) return '3.4.1 Tách - hợp thửa';
+  if (t.startsWith('3.5.1') || t.includes('gia hạn')) return '3.5.1 Gia hạn';
+  if (t.startsWith('3.6.1') || t.includes('chuyển mục đích')) return '3.6.1 Chuyển mục đích không xin phép';
+  if (t.startsWith('37.1') || t.startsWith('3.5.2') || t.includes('đính chính')) return '37.1 Đính chính - Biến động';
+
   // Fallbacks for legacy other categories
   if (t.includes('cung cấp tài liệu đất đai') || t.includes('cung cấp dữ liệu') || t.includes('sao lục') || t.includes('sao luc') || t.includes('cc dl đđ')) return '1.1 Sao lục';
   if (t.includes('trích lục quy hoạch')) return '2.2 Trích lục QH';
@@ -130,13 +172,6 @@ export const getShortRecordType = (type: string | null | undefined): string => {
   if (t.includes('trích đo')) return '2.3 Trích đo';
   if (t.includes('cắm mốc')) return '2.4 Cắm mốc';
   if (t.includes('trích lục')) return '2.1 Trích lục';
-  if (t.includes('tách thửa')) return '2.5 Tách-Hợp thửa';
-  if (t.includes('hợp thửa')) return '2.5 Tách-Hợp thửa';
-
-  // Legacy fallback
-  if (t.includes('thi hành án')) return 'Thi hành án';
-  if (t.includes('tòa án')) return 'Tòa án';
-  if (t.includes('cmd')) return 'CMD';
 
   return type; // Trả về nguyên bản nếu không khớp quy tắc rút gọn
 };
@@ -274,7 +309,39 @@ export const isCapGiayRecord = (record: RecordFile | Partial<RecordFile> | null 
     t.includes('bien dong') ||
     t.includes('cấp đổi') ||
     t.includes('cấp lại') ||
-    t.includes('3.')
+    t.includes('chuyển nhượng') ||
+    t.includes('tặng cho') ||
+    t.includes('thừa kế') ||
+    t.includes('thỏa thuận') ||
+    t.includes('gia hạn') ||
+    t.includes('đính chính') ||
+    t.includes('chuyển mục đích') ||
+    t.startsWith('3.') ||
+    t.startsWith('37.') ||
+    shortType.startsWith('3.') ||
+    shortType.startsWith('37.')
+  );
+};
+
+// Các thủ tục có thuế mặc định: 3.6.1, 3.1.1 đến 3.1.4, 3.2.2, 3.3.2
+export const isTaxDefaultRecordType = (type: string | null | undefined): boolean => {
+  if (!type) return false;
+  const t = type.toLowerCase().trim();
+  const short = getShortRecordType(type);
+  return (
+    short.startsWith('3.1.1') ||
+    short.startsWith('3.1.2') ||
+    short.startsWith('3.1.3') ||
+    short.startsWith('3.1.4') ||
+    short.startsWith('3.6.1') ||
+    short.startsWith('3.2.2') ||
+    short.startsWith('3.3.2') ||
+    t.includes('chuyển nhượng') ||
+    t.includes('tặng cho') ||
+    t.includes('thừa kế') ||
+    t.includes('thỏa thuận') ||
+    t.includes('chuyển mục đích') ||
+    t.includes('có thuế')
   );
 };
 

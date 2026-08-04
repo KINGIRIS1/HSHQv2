@@ -169,7 +169,7 @@ const ReturnResultModal: React.FC<ReturnResultModalProps> = ({
                     <input 
                         type="text"
                         required
-                        className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none font-medium text-gray-800 placeholder:text-gray-400"
+                        className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm text-center focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none font-bold text-gray-800 placeholder:text-gray-400 font-mono"
                         placeholder={`Nhập số ${receiptType.toLowerCase()}...`}
                         value={receiptNumber}
                         onChange={(e) => setReceiptNumber(e.target.value)}
@@ -180,7 +180,7 @@ const ReturnResultModal: React.FC<ReturnResultModalProps> = ({
                 <div>
                     <label className="block text-sm font-bold text-gray-800 mb-2 flex items-center gap-2">
                         <DollarSign size={18} className="text-amber-500"/> 
-                        <span>Số tiền (VNĐ)</span> 
+                        <span>Số tiền thu</span> 
                         <span className="text-red-500">*</span>
                     </label>
                     <div className="relative">
@@ -188,20 +188,22 @@ const ReturnResultModal: React.FC<ReturnResultModalProps> = ({
                             type="number"
                             required
                             min="0"
-                            className="w-full border border-gray-300 rounded-xl pl-4 pr-12 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none font-bold text-emerald-700 placeholder:text-gray-400"
+                            className="w-full border border-gray-300 rounded-xl px-12 py-2.5 text-sm text-center focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none font-bold text-emerald-700 placeholder:text-gray-400"
                             placeholder="Nhập số tiền..."
                             value={returnedPrice}
                             onChange={(e) => setReturnedPrice(e.target.value)}
                             disabled={isLoadingPrice}
                         />
                         <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">
-                            {isLoadingPrice ? <Loader2 size={16} className="animate-spin text-emerald-500" /> : 'đ'}
+                            {isLoadingPrice ? <Loader2 size={16} className="animate-spin text-emerald-500" /> : null}
                         </div>
                     </div>
                     {returnedPrice.trim() && !isNaN(parseFloat(returnedPrice)) && (
-                        <p className="text-xs text-emerald-700 font-bold mt-1.5 bg-emerald-50 px-2.5 py-1 rounded-lg inline-block border border-emerald-100">
-                            Thành tiền: {parseFloat(returnedPrice).toLocaleString('vi-VN')} đ
-                        </p>
+                        <div className="text-center mt-1.5">
+                            <p className="text-xs text-emerald-700 font-bold bg-emerald-50 px-2.5 py-1 rounded-lg inline-block border border-emerald-100">
+                                Thành tiền: {parseFloat(returnedPrice).toLocaleString('vi-VN')}
+                            </p>
+                        </div>
                     )}
                 </div>
 

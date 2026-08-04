@@ -193,16 +193,13 @@ export const useRecordFilter = (
         } else if (isOtherView) {
             result = result.filter(r => {
                 const shortType = getShortRecordType(r.recordType);
-                if (['CMD', 'Tòa án', 'Thi hành án'].includes(shortType)) return false;
                 if (isArchiveRecordType(r.recordType)) return false;
                 if (shortType.startsWith('2.')) return false;
                 return true;
             });
         } else if (isMeasurementView) {
             result = result.filter(r => {
-                const shortType = getShortRecordType(r.recordType);
                 if (isArchiveRecordType(r.recordType)) return false;
-                if (['CMD', 'Tòa án', 'Thi hành án'].includes(shortType)) return false;
                 if (isCapGiayRecord(r)) return false;
                 return true;
             });
@@ -333,11 +330,7 @@ export const useRecordFilter = (
                 
                 // Filter by recordType based on view group
                 if (isArchiveMeasurementView && !isArchiveRecordType(r.recordType)) return;
-                if (isOtherView && !['CMD', 'Tòa án', 'Thi hành án'].includes(getShortRecordType(r.recordType))) return;
-                if (isMeasurementView && (
-                    isArchiveRecordType(r.recordType) ||
-                    ['CMD', 'Tòa án', 'Thi hành án'].includes(getShortRecordType(r.recordType))
-                )) return;
+                if (isMeasurementView && isArchiveRecordType(r.recordType)) return;
 
                 if (isRecordOverdue(r)) overdue++;
                 else if (isRecordApproaching(r)) approaching++;

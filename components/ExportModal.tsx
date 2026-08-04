@@ -40,7 +40,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
       return records.filter(r => isArchiveRecordType(r.recordType));
     }
     if (recordCategory === 'measurement') {
-      return records.filter(r => !isArchiveRecordType(r.recordType) && !['CMD', 'Tòa án', 'Thi hành án'].includes(getShortRecordType(r.recordType)));
+      return records.filter(r => !isArchiveRecordType(r.recordType));
     }
     return records;
   }, [records, recordCategory]);

@@ -138,7 +138,7 @@ const DailyList: React.FC<DailyListProps> = ({ records, wards, currentUser, empl
       
       const tableHeader = ["STT", "Mã Hồ Sơ", "Chủ Sử Dụng", "Xã / Phường", "Tờ", "Thửa", "Loại Hồ Sơ", "Hẹn Trả", "Ngày Trả KQ", "Số BL/HĐ", "Số Tiền", "Ghi Chú"];
       
-      const formatPrice = (p: any) => p ? new Intl.NumberFormat('vi-VN').format(Number(p)) + ' đ' : '';
+      const formatPrice = (p: any) => p ? new Intl.NumberFormat('vi-VN').format(Number(p)) : '';
       const formatDateStr = (d: any) => d ? new Date(d).toLocaleDateString('vi-VN') : '';
 
       const dataRows = filteredDailyRecords.map((r, i) => [

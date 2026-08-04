@@ -41,6 +41,7 @@ const PERMISSION_GROUPS = [
       { id: 'VIEW_RECORDS', label: 'Xem danh sách hồ sơ' },
       { id: 'ADD_RECORDS', label: 'Thêm / Nhập mới hồ sơ' },
       { id: 'EXPORT_RECORDS', label: 'Xuất danh sách hồ sơ (Excel)' },
+      { id: 'BTN_EXTEND_DEADLINE', label: '⏱️ Thao tác: Gia hạn ngày hẹn (Hồ sơ)' },
     ]
   },
   {

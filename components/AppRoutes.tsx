@@ -78,6 +78,7 @@ import {
   Undo2,
   BookOpen,
   RotateCcw,
+  CalendarClock,
 } from "lucide-react";
 
 interface AppRoutesProps {
@@ -218,6 +219,9 @@ interface AppRoutesProps {
   setIsDeleteModalOpen: (b: boolean) => void;
   isDiagnosticModalOpen?: boolean;
   setIsDiagnosticModalOpen?: (b: boolean) => void;
+  setIsExtendModalOpen?: (b: boolean) => void;
+  setExtendTargetRecord?: (r: RecordFile | null) => void;
+  onExtendDeadline?: (record: RecordFile) => void;
   advanceStatus: (r: RecordFile) => void;
   handleOpenReturnModal: (r: RecordFile) => void;
   columnOrder: string[];
@@ -1108,6 +1112,25 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                       </div>
                     )}
                   </div>
+
+                  {props.selectedRecordIds.size > 0 &&
+                    (currentView === "all_records" ||
+                      currentView === "other_records" ||
+                      currentView === "archive_records") && (
+                    <button
+                      onClick={() => {
+                        const targets = records.filter((r) => props.selectedRecordIds.has(r.id));
+                        if (targets.length > 0 && props.setExtendTargetRecord && props.setIsExtendModalOpen) {
+                          props.setExtendTargetRecord(targets[0]);
+                          props.setIsExtendModalOpen(true);
+                        }
+                      }}
+                      className="flex items-center gap-1.5 bg-purple-600 text-white px-3 py-1.5 rounded-md hover:bg-purple-700 text-sm font-bold shadow-sm transition-all"
+                      title="Gia hạn ngày hẹn trả kết quả cho hồ sơ đang chọn"
+                    >
+                      <CalendarClock size={16} /> Gia hạn ({props.selectedRecordIds.size})
+                    </button>
+                  )}
                 </div>
 
                 {/* Tác vụ tab con được chuyển lên cạnh Excel */}
@@ -1457,6 +1480,8 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                     canPerformAction={canPerformAction}
                     isSpecializedTab={isSpecializedTab}
                     currentUser={currentUser}
+                    rolePermissions={rolePermissions}
+                    departmentPermissions={departmentPermissions}
                     onToggleSelect={props.toggleSelectRecord}
                     onView={props.handleViewRecord}
                     onEdit={(rec) => {
@@ -1471,6 +1496,12 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                     onQuickUpdate={props.handleQuickUpdate}
                     onReturnResult={props.handleOpenReturnModal}
                     onMapCorrection={props.handleMapCorrectionRequest}
+                    onExtendDeadline={props.onExtendDeadline || ((rec) => {
+                      if (props.setExtendTargetRecord && props.setIsExtendModalOpen) {
+                        props.setExtendTargetRecord(rec);
+                        props.setIsExtendModalOpen(true);
+                      }
+                    })}
                     canSelect={canPerformAction || hasPermission('BTN_SUBMIT_SIGN')}
                   />
                 ))

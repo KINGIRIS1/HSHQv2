@@ -241,7 +241,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ records, currentUser, emp
                 });
             } else if (dept.includes('đăng ký') || dept.includes('cap giay')) {
                 modules.push({
-                    id: 'registration_records',
+                    id: 'other_records',
                     label: 'Quản lý Hồ sơ Đăng ký',
                     description: 'Kiểm tra, xét duyệt hồ sơ đăng ký biến động, cấp giấy chứng nhận quyền sử dụng đất, đăng ký thế chấp.',
                     icon: FileText,
