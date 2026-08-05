@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { RecordFile, RecordStatus, Employee, User, UserRole } from '../types';
-import { GROUPS, EXTENDED_RECORD_TYPES, CAP_GIAY_RECORD_TYPES, STATUS_LABELS, getShortRecordType, getWardLabel, getNormalizedWard, isCapGiayRecord, isTaxDefaultRecordType } from '../constants';
+import { GROUPS, EXTENDED_RECORD_TYPES, CAP_GIAY_RECORD_TYPES, STATUS_LABELS, getShortRecordType, getWardLabel, getNormalizedWard, isCapGiayRecord, isTaxDefaultRecordType, getDefaultCapGiaySubStep } from '../constants';
 import { X, Save, Lock, User as UserIcon, MapPin, FileText, Calendar, FileCheck, ChevronDown, ChevronUp, History } from 'lucide-react';
 import { calculateDeadlineHelper } from '../utils/appHelpers';
 
@@ -136,11 +136,10 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
   } else if (isMeasurementView) {
     allowedRecordTypes = [
       '2.1 Trích lục',
-      '2.2 Trích lục QH',
-      '2.3 Trích đo',
+      '2.2 Trích đo',
       '2.4 Cắm mốc',
       '2.5 Tách-Hợp thửa',
-      '2.6 CC số thửa'
+      '2.3 CC số thửa'
     ];
   } else {
     allowedRecordTypes = EXTENDED_RECORD_TYPES;
@@ -423,7 +422,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
             updated.price = 310000;
           }
           if (isCapGiayRecord({ recordType: value })) {
-            updated.capGiaySubStep = isTaxDefaultRecordType(value) ? 'phieu_chuyen_thue' : 'tham_dinh';
+            updated.capGiaySubStep = getDefaultCapGiaySubStep(value);
           }
         }
       }
@@ -473,10 +472,10 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                             <div>
                                 <label className="block text-xs font-bold text-teal-700 mb-1">Bước xử lý Cấp giấy</label>
                                 <select className="w-full border border-teal-300 rounded-md px-3 py-2 bg-teal-50 font-bold text-teal-900" value={formData.capGiaySubStep || 'tham_dinh'} onChange={(e) => handleChange('capGiaySubStep', e.target.value)}>
-                                    <option value="tham_dinh">1. Thẩm định hồ sơ</option>
-                                    <option value="phieu_chuyen_thue">2. Lập & Gửi phiếu chuyển thuế</option>
-                                    <option value="cho_nop_thue">3. Chờ người dân nộp thuế</option>
-                                    <option value="hoan_thien_trinh_duyet">4. Hoàn thiện hồ sơ & Trình duyệt</option>
+                                    <option value="tham_dinh">1. Thẩm tra</option>
+                                    <option value="phieu_chuyen_thue">2. Phiếu chuyển thuế</option>
+                                    <option value="cho_nop_thue">3. Chờ giấy nộp tiền</option>
+                                    <option value="hoan_thien_trinh_duyet">4. In & Hoàn thiện</option>
                                 </select>
                             </div>
                         )}

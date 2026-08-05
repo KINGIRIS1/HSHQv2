@@ -4,7 +4,7 @@ import { getNormalizedWard, getShortRecordType } from '../constants';
 import { getBatchDisplayParts } from '../utils/appHelpers';
 import { 
   CheckCircle2, Circle, Clock, AlertTriangle, Calendar, User as UserIcon, 
-  Send, FileSignature, CheckSquare, FileCheck, Timer, ArrowRight, CalendarClock
+  Send, FileSignature, CheckSquare, FileCheck, Timer, ArrowRight, CalendarClock, Hash
 } from 'lucide-react';
 
 interface RecordTimelineProgressProps {

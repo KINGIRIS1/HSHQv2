@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import * as XLSX from 'xlsx-js-style';
 import { RecordFile, RecordStatus } from '../../types';
-import { RECORD_TYPES, CAP_GIAY_RECORD_TYPES } from '../../constants';
+import { RECORD_TYPES, CAP_GIAY_RECORD_TYPES, ARCHIVE_RECORD_TYPES, MEASUREMENT_RECORD_TYPES } from '../../constants';
 import { Upload, FileSpreadsheet, Wand2, Save, Printer, X, Check, Download } from 'lucide-react';
 import { confirmAction } from '../../utils/appHelpers';
 
@@ -275,8 +275,11 @@ const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calc
                                 <td className="p-3"><input type="text" className="w-full border border-gray-300 rounded px-2 py-1 text-sm" value={item.customerName ?? ''} onChange={(e) => updateBulkRecord(idx, 'customerName', e.target.value)} readOnly={item.isSaved} /></td>
                                 <td className="p-3">
                                     <select className="w-full border border-gray-300 rounded px-2 py-1 text-sm outline-none" value={item.recordType ?? ''} onChange={(e) => updateBulkRecord(idx, 'recordType', e.target.value)} disabled={item.isSaved}>
-                                        <optgroup label="Hồ sơ Thông thường / Đo đạc">
-                                            {RECORD_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                                        <optgroup label="Tổ Thông tin lưu trữ">
+                                            {ARCHIVE_RECORD_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                                        </optgroup>
+                                        <optgroup label="Tổ Đo đạc">
+                                            {MEASUREMENT_RECORD_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                                         </optgroup>
                                         <optgroup label="Cấp giấy / Đăng ký biến động">
                                             {CAP_GIAY_RECORD_TYPES.map(t => <option key={t} value={t}>{t}</option>)}

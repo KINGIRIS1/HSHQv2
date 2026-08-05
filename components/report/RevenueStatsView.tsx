@@ -83,8 +83,8 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
         return records
             .filter(r => {
                 const typeLower = (r.recordType || '').toLowerCase();
-                // 2.6 CN Số Thửa is a free non-revenue procedure, exclude from revenue report
-                if (typeLower.includes('2.6') || typeLower.includes('cn số thửa') || typeLower.includes('cn so thua')) {
+                // 2.3 CN Số Thửa (formerly 2.6) is a free non-revenue procedure, exclude from revenue report
+                if (typeLower.includes('2.6') || (typeLower.includes('2.3') && !typeLower.includes('trích đo')) || typeLower.includes('cn số thửa') || typeLower.includes('cn so thua') || typeLower.includes('cập nhật số thửa')) {
                     return false;
                 }
 

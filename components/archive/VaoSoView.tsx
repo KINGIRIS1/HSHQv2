@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { ArchiveRecord, fetchArchiveRecords, saveArchiveRecord, deleteArchiveRecord, importArchiveRecords, updateArchiveRecordsBatch } from '../../services/apiArchive';
 import { useArchiveRealtime } from '../../hooks/useArchiveRealtime';
-import { User } from '../../types';
+import { User, RecordStatus } from '../../types';
+import { fetchCapGiayRecordsForVaoSo, updateRecordFieldsApi } from '../../services/apiRecords';
+import { isCapGiayRecord } from '../../constants';
 import { Loader2, Plus, Search, Trash2, Upload, FileSpreadsheet, Send, CheckCircle2, X, History, Calendar, FileOutput, Settings, Hash, Edit, FileText, ChevronDown, Filter, MapPin, RotateCcw } from 'lucide-react';
 import * as XLSX from 'xlsx-js-style';
 import { confirmAction, matchDepartmentKey } from '../../utils/appHelpers';
@@ -32,13 +34,20 @@ const COLUMNS = [
 interface VaoSoViewProps {
     currentUser: User;
     wards: string[];
+    activeTab?: 'pending_entry' | 'completed_entry' | 'all';
+    onTabChange?: (tab: 'pending_entry' | 'completed_entry' | 'all') => void;
 }
 
-const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
+const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards, activeTab: propActiveTab, onTabChange }) => {
     const [records, setRecords] = useState<ArchiveRecord[]>([]);
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
-    const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'scanned'>('all');
+    const [internalActiveTab, setInternalActiveTab] = useState<'pending_entry' | 'completed_entry' | 'all'>('pending_entry');
+    const activeTab = propActiveTab ?? internalActiveTab;
+    const setActiveTab = (tab: 'pending_entry' | 'completed_entry' | 'all') => {
+        setInternalActiveTab(tab);
+        if (onTabChange) onTabChange(tab);
+    };
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [savingId, setSavingId] = useState<string | null>(null);
     const [editingId, setEditingId] = useState<string | null>(null);
@@ -125,13 +134,56 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
 
     const loadData = async () => {
         setLoading(true);
-        const [data, savedPerms, savedDeptPerms, empData] = await Promise.all([
+        const [data, savedPerms, savedDeptPerms, empData, landRecords] = await Promise.all([
             fetchArchiveRecords('vaoso'),
             getSystemSetting('role_permissions'),
             getSystemSetting('department_permissions'),
-            fetchEmployees()
+            fetchEmployees(),
+            fetchCapGiayRecordsForVaoSo().catch(() => [])
         ]);
-        setRecords(data || []);
+
+        const existingIds = new Set((data || []).map(r => r.id));
+        const existingCodeSet = new Set((data || []).map(r => r.data?.ma_ho_so).filter(Boolean));
+
+        const mappedLandRecords: ArchiveRecord[] = (landRecords || [])
+            .filter(r => {
+                const isCapGiay = isCapGiayRecord(r) || r.recordGroup === 'cap_giay';
+                const isApprovedOrSignedOrHandover = r.status === RecordStatus.SIGNED || r.status === RecordStatus.HANDOVER || !!r.approvalDate || !!r.entryNumber;
+                return isCapGiay && isApprovedOrSignedOrHandover && !existingIds.has(r.id) && !existingCodeSet.has(r.recordCode);
+            })
+            .map(r => ({
+                id: r.id,
+                type: 'vaoso' as const,
+                status: r.status === RecordStatus.HANDOVER ? 'completed' : 'pending',
+                so_hieu: r.issueNumber || '',
+                trich_yeu: r.content || r.recordType || '',
+                ngay_thang: r.receivedDate || r.created_at || new Date().toISOString(),
+                noi_nhan_gui: r.customerName || '',
+                created_by: r.receivedBy || 'Hệ thống',
+                data: {
+                    so_vao_so: r.entryNumber || '',
+                    ma_ho_so: r.recordCode || '',
+                    ten_chu_su_dung: r.customerName || '',
+                    cccd: r.customerCcid || '',
+                    dia_chi_chu: r.customerAddress || '',
+                    loai_bien_dong: r.recordType || '',
+                    loai_gcn: r.issueNumber ? 'GCN mới' : 'GCN cũ',
+                    ngay_nhan: r.receivedDate || '',
+                    so_to: r.mapSheetNumber || '',
+                    so_thua: r.parcelNumber || '',
+                    tong_dien_tich: r.area ? String(r.area) : '',
+                    dien_tich_tho_cu: r.residentialArea ? String(r.residentialArea) : '',
+                    dia_danh: r.ward || '',
+                    so_phat_hanh: r.issueNumber || '',
+                    ngay_ky_gcn: r.issueDate || r.approvalDate || '',
+                    ngay_ky_phieu_tk: r.submissionDate || '',
+                    ghi_chu: r.privateNotes || '',
+                    is_land_record: true
+                }
+            }));
+
+        const mergedRecords = [...(data || []), ...mappedLandRecords];
+        setRecords(mergedRecords);
         
         if (savedPerms) {
             try { setRolePermissions(JSON.parse(savedPerms)); } catch(e) {}
@@ -145,7 +197,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
         
         // Calculate max book number from existing records
         let maxNum = 0;
-        (data || []).forEach(r => {
+        mergedRecords.forEach(r => {
             const val = r.data?.so_vao_so || '';
             if (val.startsWith('CN ')) {
                 const numPart = val.replace('CN ', '');
@@ -181,15 +233,15 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
         // Let's make the dropdown control the activeTab state for consistency.
         // But here we use activeTab directly.
         
-        if (activeTab === 'all') {
-            // Danh sách tổng: Hiển thị tối đa 1000 dòng mới nhất
+        if (activeTab === 'pending_entry') {
+            // Chờ vô sổ: Các hồ sơ chưa có số vào sổ
+            filtered = records.filter(r => !r.data?.so_vao_so || r.data?.so_vao_so.trim() === '');
+        } else if (activeTab === 'completed_entry') {
+            // Đã vô sổ: Các hồ sơ đã có số vào sổ
+            filtered = records.filter(r => r.data?.so_vao_so && r.data?.so_vao_so.trim() !== '');
+        } else if (activeTab === 'all') {
+            // Tất cả hồ sơ: Hiển thị tối đa 1000 dòng mới nhất
             filtered = records.slice(0, 1000);
-        } else if (activeTab === 'pending') {
-            // Chờ chuyển Scan: Đã được đánh dấu chuyển scan NHƯNG chưa có đợt scan (chưa scan xong)
-            filtered = records.filter(r => r.data?.is_pending_scan && !r.data?.is_scanned);
-        } else if (activeTab === 'scanned') {
-            // Đã chuyển Scan: Đã có đợt scan
-            filtered = records.filter(r => r.data?.is_scanned);
         }
 
         // Filter by Date (Ngày nhận)
@@ -276,9 +328,25 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
         }));
     };
 
+    const syncLandRecordOnVaoSo = async (record: ArchiveRecord, newSoVaoSo: string) => {
+        if (!newSoVaoSo || !newSoVaoSo.trim()) return;
+        try {
+            await updateRecordFieldsApi(record.id, {
+                entryNumber: newSoVaoSo,
+                status: RecordStatus.HANDOVER,
+                capGiaySubStep: 'cho_ban_giao'
+            });
+        } catch (e) {
+            console.warn("Lỗi đồng bộ hồ sơ cấp giấy sang Giao 1 cửa:", e);
+        }
+    };
+
     const handleBlur = async (record: ArchiveRecord) => {
         setSavingId(record.id);
         await saveArchiveRecord(record);
+        if (record.data?.so_vao_so) {
+            await syncLandRecordOnVaoSo(record, record.data.so_vao_so);
+        }
         setSavingId(null);
     };
 
@@ -320,6 +388,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
 
         setSavingId(record.id);
         await saveArchiveRecord(updatedRecord);
+        await syncLandRecordOnVaoSo(updatedRecord, formattedNum);
         setSavingId(null);
     };
 
@@ -958,57 +1027,47 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                         )}
                     </div>
 
-                    {/* 2. Sub-tabs Vô sổ GCN */}
-                    <div className="flex bg-white rounded-lg border border-gray-200 p-0.5 shadow-xs overflow-x-auto shrink-0">
-                        <button 
-                            onClick={() => setActiveTab('all')}
-                            className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
-                                activeTab === 'all' ? 'bg-teal-700 text-white shadow-xs' : 'text-slate-700 hover:bg-gray-100'
-                            }`}
-                        >
-                            Danh sách Vô sổ
-                        </button>
-                        <button 
-                            onClick={() => setActiveTab('pending')}
-                            className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
-                                activeTab === 'pending' ? 'bg-orange-600 text-white shadow-xs' : 'text-slate-700 hover:bg-gray-100'
-                            }`}
-                        >
-                            Chờ chuyển Scan/1 Cửa
-                        </button>
-                        <button 
-                            onClick={() => setActiveTab('scanned')}
-                            className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
-                                activeTab === 'scanned' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-700 hover:bg-gray-100'
-                            }`}
-                        >
-                            Đã chuyển Scan/1 Cửa
-                        </button>
-                    </div>
+                    {/* 2. Sub-tabs Vô sổ GCN (chỉ hiển thị nếu không truyền propActiveTab) */}
+                    {!propActiveTab && (
+                        <div className="flex bg-white rounded-lg border border-gray-200 p-0.5 shadow-xs overflow-x-auto shrink-0">
+                            <button 
+                                onClick={() => setActiveTab('pending_entry')}
+                                className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                                    activeTab === 'pending_entry' ? 'bg-amber-600 text-white shadow-xs' : 'text-slate-700 hover:bg-gray-100'
+                                }`}
+                            >
+                                Chờ vô sổ
+                            </button>
+                            <button 
+                                onClick={() => setActiveTab('completed_entry')}
+                                className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                                    activeTab === 'completed_entry' ? 'bg-teal-700 text-white shadow-xs' : 'text-slate-700 hover:bg-gray-100'
+                                }`}
+                            >
+                                Đã vô sổ
+                            </button>
+                            <button 
+                                onClick={() => setActiveTab('all')}
+                                className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                                    activeTab === 'all' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-700 hover:bg-gray-100'
+                                }`}
+                            >
+                                Lưu kho
+                            </button>
+                        </div>
+                    )}
 
-                    {/* 3. Nút Thêm mới (nếu activeTab === 'all') */}
-                    {activeTab === 'all' && (
+                    {/* 3. Nút Thêm mới */}
+                    {(activeTab === 'pending_entry' || activeTab === 'all') && (
                         <button onClick={handleAddNew} className="flex items-center gap-1.5 bg-teal-600 text-white px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-teal-700 shadow-xs cursor-pointer transition-colors shrink-0">
                             <Plus size={16}/> Thêm mới
                         </button>
                     )}
 
-                    {/* 4. Nút Hành động ngữ cảnh (Chuyển scan / Tạo đợt / Xuất danh sách) */}
-                    {activeTab === 'all' && selectedIds.size > 0 && (
+                    {/* 4. Nút Chuyển Scan khi chọn hồ sơ */}
+                    {selectedIds.size > 0 && (
                         <button onClick={handleMoveToPending} className="flex items-center gap-1.5 bg-indigo-600 text-white px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-indigo-700 shadow-xs animate-pulse cursor-pointer shrink-0">
                             <Send size={15}/> Chuyển Scan ({selectedIds.size})
-                        </button>
-                    )}
-
-                    {activeTab === 'pending' && selectedIds.size > 0 && hasBatchPermission() && (
-                        <button onClick={handleOpenBatchModal} className="flex items-center gap-1.5 bg-orange-600 text-white px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-orange-700 shadow-xs animate-pulse cursor-pointer shrink-0">
-                            <CheckCircle2 size={15}/> Tạo đợt ({selectedIds.size})
-                        </button>
-                    )}
-
-                    {activeTab === 'scanned' && (
-                        <button onClick={() => setShowExportHandoverModal(true)} className="flex items-center gap-1.5 bg-purple-600 text-white px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-purple-700 shadow-xs cursor-pointer shrink-0">
-                            <FileOutput size={15}/> Xuất danh sách
                         </button>
                     )}
 
@@ -1372,9 +1431,9 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                                 )) : (
                                     <tr>
                                         <td colSpan={COLUMNS.length + 5} className="p-8 text-center text-gray-400 italic">
-                                            {activeTab === 'all' ? 'Chưa có dữ liệu. Nhấn "Import Excel" hoặc "Thêm mới".' : 
-                                             activeTab === 'pending' ? 'Chưa có hồ sơ chờ chuyển scan.' :
-                                             'Chưa có hồ sơ nào được chuyển Scan.'}
+                                            {activeTab === 'pending_entry' ? 'Chưa có hồ sơ chờ vô sổ.' : 
+                                             activeTab === 'completed_entry' ? 'Chưa có hồ sơ đã vô sổ.' :
+                                             'Chưa có dữ liệu. Nhấn "Import Excel" hoặc "Thêm mới".'}
                                         </td>
                                     </tr>
                                 )}

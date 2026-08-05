@@ -1,13 +1,13 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { RecordFile, RecordStatus, Employee, User, UserRole, Message, RecordStatusLog } from './types';
-import { DEFAULT_WARDS as STATIC_WARDS, isArchiveRecordType, STATUS_LABELS, APP_VERSION } from './constants';
+import { DEFAULT_WARDS as STATIC_WARDS, isArchiveRecordType, STATUS_LABELS, APP_VERSION, isCapGiayRecord, isTaxDefaultRecordType, getDefaultCapGiaySubStep, getCapGiaySubStepLabel } from './constants';
 import Login from './components/Login'; 
 import MainLayout from './components/layout/MainLayout';
 import AppRoutes from './components/AppRoutes';
 import AppModals from './components/AppModals';
 
-import { DEFAULT_VISIBLE_COLUMNS, confirmAction, COLUMN_DEFS, processAssignmentTimelineCheck } from './utils/appHelpers';
+import { DEFAULT_VISIBLE_COLUMNS, confirmAction, COLUMN_DEFS, processAssignmentTimelineCheck, calculateDeadlineHelperByDays, getCapGiayStepSLA } from './utils/appHelpers';
 import { exportReportToExcel, exportReturnedListToExcel } from './utils/excelExport';
 import { generateReport } from './services/geminiService';
 import { syncTemplatesFromCloud } from './services/docxService'; 
@@ -401,12 +401,34 @@ function App() {
       return [newLog, ...existing];
   }, [currentUser]);
 
-  const confirmAssign = async (employeeId: string) => {
+  const confirmAssign = async (employeeId: string, selectedSubStep?: string) => {
       const nowStr = new Date().toISOString();
-      const updatedTargets = assignTargetRecords.map(r => ({
-          ...r,
-          ...processAssignmentTimelineCheck(r, employeeId, nowStr, employees, currentUser)
-      }));
+      const todayStr = nowStr.split('T')[0];
+
+      const updatedTargets = assignTargetRecords.map(r => {
+          const isCG = isCapGiayRecord(r);
+          let updatedSubStep = r.capGiaySubStep;
+
+          if (isCG) {
+              if (selectedSubStep) {
+                  updatedSubStep = selectedSubStep;
+              } else if (!updatedSubStep) {
+                  updatedSubStep = getDefaultCapGiaySubStep(r.recordType);
+              }
+          }
+
+          const hasThamdinh = r.capGiaySubStep === 'tham_dinh' || selectedSubStep === 'tham_dinh';
+          const stepSLA = getCapGiayStepSLA(updatedSubStep, hasThamdinh);
+          const newDeadline = isCG ? calculateDeadlineHelperByDays(stepSLA, todayStr, holidays) : r.deadline;
+
+          const baseAssignment = processAssignmentTimelineCheck(r, employeeId, nowStr, employees, currentUser);
+
+          return {
+              ...r,
+              ...baseAssignment,
+              ...(isCG ? { capGiaySubStep: updatedSubStep, deadline: newDeadline } : {})
+          };
+      });
 
       setRecords(prev => prev.map(r => {
           const updated = updatedTargets.find(u => u.id === r.id);
@@ -559,6 +581,9 @@ function App() {
                   if (!r.pendingCheckDate) recordUpdates.pendingCheckDate = targetDateStr;
                   if (!r.checkedDate) recordUpdates.checkedDate = targetDateStr;
                   if (!r.submissionDate) recordUpdates.submissionDate = targetDateStr;
+                  if (isCapGiayRecord(r)) {
+                      recordUpdates.capGiaySubStep = 'vo_so_gcn';
+                  }
               } else if (value === RecordStatus.HANDOVER) {
                   if (!r.assignedDate) recordUpdates.assignedDate = targetDateStr;
                   if (!r.completedWorkDate) recordUpdates.completedWorkDate = targetDateStr;
@@ -627,6 +652,18 @@ function App() {
       const nowStr = new Date().toISOString();
       let updates: any = { [field]: value };
       
+      if (field === 'capGiaySubStep') {
+          if (value === 'hoan_thien_trinh_duyet' && (record.capGiaySubStep === 'cho_nop_thue' || record.capGiaySubStep === 'cho_giay_nop_tien')) {
+              const todayStr = nowStr.split('T')[0];
+              const newDeadline = calculateDeadlineHelperByDays(5, todayStr, holidays || []);
+              updates.status = RecordStatus.RECEIVED;
+              updates.assignedTo = "";
+              updates.deadline = newDeadline;
+              updates.statusLogs = createStatusLog(record, record.status, 'Xác nhận đã nộp tiền thuế → Trả về bước giao việc (chờ phân công in & hoàn thiện, SLA 5 ngày)');
+              setToast({ type: 'success', message: `Hồ sơ ${record.code} đã xác nhận nộp thuế, đã trả về bước giao việc cho người in!` });
+          }
+      }
+
       if (field === 'status') {
           const VALID_STATUSES = [
               RecordStatus.RECEIVED,
@@ -749,7 +786,52 @@ function App() {
           return; 
       }
       if (record.status === RecordStatus.ASSIGNED || record.status === RecordStatus.IN_PROGRESS) {
-          // Các loại đi thẳng sang trình kiểm tra (bỏ qua bước trung gian là đã thực hiện)
+          if (isCapGiayRecord(record)) {
+              const currentSubStep = record.capGiaySubStep || 'tham_dinh';
+              let nextSubStep = '';
+              if (currentSubStep === 'tham_dinh' || currentSubStep === 'tham_tra') {
+                  nextSubStep = isTaxDefaultRecordType(record.recordType) ? 'phieu_chuyen_thue' : 'hoan_thien_trinh_duyet';
+              } else if (currentSubStep === 'phieu_chuyen_thue') {
+                  nextSubStep = 'cho_nop_thue';
+              } else if (currentSubStep === 'cho_nop_thue' || currentSubStep === 'cho_giay_nop_tien') {
+                  nextSubStep = 'hoan_thien_trinh_duyet';
+              } else if (currentSubStep === 'hoan_thien_trinh_duyet' || currentSubStep === 'in_hoan_thien') {
+                  // Đã hoàn thành các bước nhỏ trong Đang thực hiện -> Trình kiểm tra
+                  setSubmitTargetRecords([record]);
+                  setIsSubmitCheckModalOpen(true);
+                  return;
+              } else {
+                  // Fallback
+                  setSubmitTargetRecords([record]);
+                  setIsSubmitCheckModalOpen(true);
+                  return;
+              }
+
+              if (nextSubStep) {
+                  const subStepLabel = getCapGiaySubStepLabel(nextSubStep);
+                  const updates: Partial<RecordFile> = {
+                      capGiaySubStep: nextSubStep,
+                      statusLogs: createStatusLog(record, record.status, `Chuyển bước nhỏ: ${subStepLabel}`)
+                  };
+
+                  if (nextSubStep === 'hoan_thien_trinh_duyet' && (currentSubStep === 'cho_nop_thue' || currentSubStep === 'cho_giay_nop_tien')) {
+                      const nowStr = new Date().toISOString();
+                      const todayStr = nowStr.split('T')[0];
+                      const newDeadline = calculateDeadlineHelperByDays(5, todayStr, holidays || []);
+                      updates.status = RecordStatus.RECEIVED;
+                      updates.assignedTo = "";
+                      updates.deadline = newDeadline;
+                      updates.statusLogs = createStatusLog(record, record.status, 'Xác nhận đã nộp tiền thuế → Trả về bước giao việc (chờ phân công in & hoàn thiện, SLA 5 ngày)');
+                  }
+
+                  setRecords(prev => prev.map(r => r.id === record.id ? { ...r, ...updates } : r));
+                  await updateRecordApi({ ...record, ...updates });
+                  setToast({ type: 'success', message: `Hồ sơ ${record.code} đã xác nhận nộp thuế, đã trả về bước giao việc cho người in!` });
+                  return;
+              }
+          }
+
+          // Các loại không phải cấp giấy đi thẳng sang trình kiểm tra
           setSubmitTargetRecords([record]);
           setIsSubmitCheckModalOpen(true);
           return;
@@ -842,6 +924,7 @@ function App() {
               status: RecordStatus.SIGNED,
               approvalDate: nowStr,
               completedDate: null,
+              ...(isCapGiayRecord(r) ? { capGiaySubStep: 'vo_so_gcn' } : {}),
               statusLogs: createStatusLog(r, RecordStatus.SIGNED, 'Ký duyệt đợt')
           }));
           setRecords(prev => prev.map(r => {

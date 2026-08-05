@@ -27,8 +27,8 @@ import {
   FileX,
 } from "lucide-react";
 import * as XLSX from "xlsx-js-style";
-import { getShortRecordType, isArchiveRecordType } from "../constants";
-import { confirmAction } from "../utils/appHelpers";
+import { getShortRecordType, isArchiveRecordType, isCapGiayRecord } from "../constants";
+import { confirmAction, calculateDeadlineHelperByDays } from "../utils/appHelpers";
 import { updateRecordApi, fetchContracts } from "../services/api";
 import {
   fetchArchiveRecords,
@@ -55,6 +55,7 @@ interface PersonalProfileProps {
   onViewRecord: (record: RecordFile) => void;
   onCreateLiquidation?: (record: RecordFile) => void;
   onMapCorrection?: (record: RecordFile) => void; // New Handler Prop
+  onAssignRecord?: (record: RecordFile) => void;
 }
 
 function removeVietnameseTones(str: string): string {
@@ -159,6 +160,10 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
   const myRecords = useMemo(() => {
     const mainRecords = records.filter((r) => {
       if (!user.employeeId) return false;
+      // Hồ sơ Cấp giấy đang ở bước Chờ nộp tiền thuế thì KHÔNG xuất hiện ở Tab cá nhân
+      if (isCapGiayRecord(r) && (r.capGiaySubStep === 'cho_nop_thue' || r.capGiaySubStep === 'cho_giay_nop_tien')) {
+        return false;
+      }
       if (isDirector) {
         return (
           r.submittedTo === user.employeeId || r.assignedTo === user.employeeId
@@ -1243,6 +1248,31 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                                 Chi tiết
                               </button>
 
+                              {/* Nút Xác nhận đã nộp thuế nếu hồ sơ đang ở bước Chờ nộp thuế */}
+                              {isCapGiayRecord(r) && (r.capGiaySubStep === 'cho_nop_thue' || r.capGiaySubStep === 'cho_giay_nop_tien') && (
+                                <button
+                                  onClick={async () => {
+                                    const nowStr = new Date().toISOString();
+                                    const todayStr = nowStr.split('T')[0];
+                                    const newDeadline = calculateDeadlineHelperByDays(5, todayStr, []);
+                                    const updated: RecordFile = {
+                                      ...r,
+                                      capGiaySubStep: 'hoan_thien_trinh_duyet',
+                                      status: RecordStatus.RECEIVED,
+                                      deadline: newDeadline
+                                    };
+                                    const res = await updateRecordApi(updated);
+                                    if (res && onUpdateRecord) {
+                                      await onUpdateRecord(updated);
+                                    }
+                                  }}
+                                  title="Xác nhận người dân đã nộp tiền thuế → Chuyển bước In & Hoàn thiện"
+                                  className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-xs font-bold flex items-center gap-1 shadow-sm transition-all cursor-pointer"
+                                >
+                                  <CheckCircle size={14} /> Đã nộp thuế
+                                </button>
+                              )}
+
                               {/* Nút Trả hồ sơ (Ghi chú nội bộ) cho cá nhân */}
                               {activeTab === "pending" && (
                                 <button
@@ -1388,6 +1418,30 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                           >
                             Chi tiết
                           </button>
+
+                          {isCapGiayRecord(r) && (r.capGiaySubStep === 'cho_nop_thue' || r.capGiaySubStep === 'cho_giay_nop_tien') && (
+                            <button
+                              onClick={async () => {
+                                const nowStr = new Date().toISOString();
+                                const todayStr = nowStr.split('T')[0];
+                                const newDeadline = calculateDeadlineHelperByDays(5, todayStr, []);
+                                const updated: RecordFile = {
+                                  ...r,
+                                  capGiaySubStep: 'hoan_thien_trinh_duyet',
+                                  status: RecordStatus.RECEIVED,
+                                  deadline: newDeadline
+                                };
+                                const res = await updateRecordApi(updated);
+                                if (res && onUpdateRecord) {
+                                  await onUpdateRecord(updated);
+                                }
+                              }}
+                              className="px-2.5 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-bold flex items-center gap-1 shadow-sm"
+                              title="Đã nộp thuế"
+                            >
+                              <CheckCircle size={14} /> Đã nộp thuế
+                            </button>
+                          )}
 
                           {activeTab === "pending" && (
                             <button

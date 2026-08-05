@@ -3,13 +3,13 @@ import React, { useState, useEffect } from 'react';
 import { RecordFile, Employee, User, UserRole, SplitItem, RecordStatus } from '../types';
 import { getNormalizedWard, getShortRecordType, isCapGiayRecord, CAP_GIAY_SUB_STEPS, getCapGiaySubStepLabel, getCapGiaySubStepBadgeColor } from '../constants';
 import StatusBadge from './StatusBadge';
-import { X, MapPin, FileText, User as UserIcon, Receipt, DollarSign, CheckCircle2, Circle, Send, FileSignature, CheckSquare, CalendarClock, FileCheck, Calculator, Loader2, StickyNote, Save, Bell, Printer, Pencil, Trash2, Info, FileDown, Undo2 } from 'lucide-react';
+import { X, MapPin, FileText, User as UserIcon, Receipt, DollarSign, CheckCircle2, Circle, Send, FileSignature, CheckSquare, CalendarClock, FileCheck, Calculator, Loader2, StickyNote, Save, Bell, Printer, Pencil, Trash2, Info, FileDown, Undo2, Check } from 'lucide-react';
 import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../services/docxService';
 import DocxPreviewModal from './DocxPreviewModal';
 import { updateRecordApi, fetchContracts, fetchExcerptHistory, saveExcerptRecord, fetchExcerptCounters, saveExcerptCounters, fetchTrichDoHistory, saveTrichDoRecord, fetchTrichDoCounters, saveTrichDoCounters } from '../services/api';
 import SystemReceiptTemplate from './receive-record/SystemReceiptTemplate';
 import SystemAnnexTemplate from './receive-record/SystemAnnexTemplate';
-import { getBatchDisplayParts } from '../utils/appHelpers';
+import { getBatchDisplayParts, calculateDeadlineHelperByDays } from '../utils/appHelpers';
 import { RecordTimelineProgress } from './RecordTimelineProgress';
 
 interface DetailModalProps {
@@ -60,12 +60,20 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
   const [contracts, setContracts] = useState<any[]>([]);
   const [matchedContract, setMatchedContract] = useState<any | null>(null);
 
+  // State cho Vô Số GCN
+  const [voSoIssueNumber, setVoSoIssueNumber] = useState('');
+  const [voSoEntryNumber, setVoSoEntryNumber] = useState('');
+  const [voSoIssueDate, setVoSoIssueDate] = useState('');
+
   // State cho Tự động lấy số Trích lục / Trích đo
   const [isGettingAutoNumber, setIsGettingAutoNumber] = useState(false);
 
   useEffect(() => {
       if (record) {
           setPersonalNote(record.personalNotes || '');
+          setVoSoIssueNumber(record.issueNumber || '');
+          setVoSoEntryNumber(record.entryNumber || '');
+          setVoSoIssueDate(record.issueDate ? record.issueDate.split('T')[0] : '');
           // Set reminder date (yyyy-MM-dd)
           if (record.reminderDate) {
               setReminderDate(record.reminderDate.split('T')[0]);
@@ -1055,6 +1063,115 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                                     );
                                 })}
                             </div>
+
+                            {(record.capGiaySubStep === 'cho_nop_thue' || record.capGiaySubStep === 'cho_giay_nop_tien') && (
+                                <div className="mt-3 p-3 bg-amber-50 rounded-xl border border-amber-200 flex flex-col gap-2 animate-fade-in">
+                                    <div className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
+                                        <CheckSquare size={16} className="text-amber-600" />
+                                        <span>Xác nhận hoàn tất nộp tiền thuế (1 cửa / Thuế)</span>
+                                    </div>
+                                    <p className="text-[11px] text-amber-700 leading-snug">
+                                        Khi xác nhận đã nộp tiền thuế, hồ sơ tự động chuyển về tab Giao việc để phân công cho người in với SLA 5 ngày.
+                                    </p>
+                                    <button
+                                        type="button"
+                                        disabled={!canPerformAction}
+                                        onClick={async () => {
+                                            if (!canPerformAction) return;
+                                            const nowStr = new Date().toISOString();
+                                            const todayStr = nowStr.split('T')[0];
+                                            const newDeadline = calculateDeadlineHelperByDays(5, todayStr, []);
+                                            const updated = { 
+                                                ...record, 
+                                                capGiaySubStep: 'hoan_thien_trinh_duyet', 
+                                                status: RecordStatus.RECEIVED,
+                                                assignedTo: "",
+                                                deadline: newDeadline
+                                            };
+                                            const res = await updateRecordApi(updated);
+                                            if (res) {
+                                                record.capGiaySubStep = 'hoan_thien_trinh_duyet';
+                                                record.status = RecordStatus.RECEIVED;
+                                                record.assignedTo = "";
+                                                record.deadline = newDeadline;
+                                                if (onRefreshData) onRefreshData();
+                                            }
+                                        }}
+                                        className="w-full py-2 bg-amber-600 hover:bg-amber-700 active:scale-98 text-white rounded-lg text-xs font-black shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
+                                    >
+                                        <Check size={16} className="stroke-[3]" />
+                                        <span>Xác nhận đã nộp tiền thuế → Chuyển về Giao việc (Bước 4)</span>
+                                    </button>
+                                </div>
+                            )}
+
+                            {(record.capGiaySubStep === 'vo_so_gcn' || record.status === RecordStatus.SIGNED) && (
+                                <div className="mt-3 p-3 bg-teal-50 rounded-xl border border-teal-200 flex flex-col gap-3 animate-fade-in">
+                                    <div className="text-xs font-bold text-teal-900 flex items-center justify-between">
+                                        <span className="flex items-center gap-1.5"><FileCheck size={16} className="text-teal-600" /> Nhập thông tin Vô sổ GCN & Chuyển Chờ bàn giao</span>
+                                        <span className="text-[10px] bg-teal-100 text-teal-800 px-2 py-0.5 rounded font-bold">Bước 5</span>
+                                    </div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                        <div>
+                                            <label className="text-[10px] font-bold text-teal-800 block mb-1">Số phát hành GCN</label>
+                                            <input 
+                                                type="text" 
+                                                placeholder="VD: CD 123456" 
+                                                className="w-full text-xs font-bold border border-teal-300 rounded px-2.5 py-1.5 bg-white text-gray-800 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                                                value={voSoIssueNumber}
+                                                onChange={(e) => setVoSoIssueNumber(e.target.value)}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] font-bold text-teal-800 block mb-1">Số vào sổ GCN</label>
+                                            <input 
+                                                type="text" 
+                                                placeholder="VD: CH 01234" 
+                                                className="w-full text-xs font-bold border border-teal-300 rounded px-2.5 py-1.5 bg-white text-gray-800 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                                                value={voSoEntryNumber}
+                                                onChange={(e) => setVoSoEntryNumber(e.target.value)}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] font-bold text-teal-800 block mb-1">Ngày ký GCN</label>
+                                            <input 
+                                                type="date" 
+                                                className="w-full text-xs font-bold border border-teal-300 rounded px-2.5 py-1.5 bg-white text-gray-800 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                                                value={voSoIssueDate}
+                                                onChange={(e) => setVoSoIssueDate(e.target.value)}
+                                            />
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        disabled={!canPerformAction}
+                                        onClick={async () => {
+                                            if (!canPerformAction) return;
+                                            const updated = { 
+                                                ...record, 
+                                                issueNumber: voSoIssueNumber || record.issueNumber,
+                                                entryNumber: voSoEntryNumber || record.entryNumber,
+                                                issueDate: voSoIssueDate || record.issueDate,
+                                                capGiaySubStep: 'cho_ban_giao', 
+                                                status: RecordStatus.HANDOVER
+                                            };
+                                            const res = await updateRecordApi(updated);
+                                            if (res) {
+                                                record.issueNumber = updated.issueNumber;
+                                                record.entryNumber = updated.entryNumber;
+                                                record.issueDate = updated.issueDate;
+                                                record.capGiaySubStep = 'cho_ban_giao';
+                                                record.status = RecordStatus.HANDOVER;
+                                                if (onRefreshData) onRefreshData();
+                                            }
+                                        }}
+                                        className="w-full py-2 bg-teal-600 hover:bg-teal-700 active:scale-98 text-white rounded-lg text-xs font-black shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
+                                    >
+                                        <Check size={16} className="stroke-[3]" />
+                                        <span>Hoàn tất Vô sổ GCN → Chuyển sang Chờ bàn giao (1 cửa)</span>
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     )}
 

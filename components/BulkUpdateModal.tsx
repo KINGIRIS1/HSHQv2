@@ -162,10 +162,10 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
                             onChange={(e) => setTargetValue(e.target.value)}
                         >
                             <option value="">-- Chọn bước nhỏ Cấp giấy --</option>
-                            <option value="tham_dinh">1. Thẩm định hồ sơ</option>
-                            <option value="phieu_chuyen_thue">2. Lập & Gửi phiếu chuyển thuế</option>
-                            <option value="cho_nop_thue">3. Chờ người dân nộp thuế</option>
-                            <option value="hoan_thien_trinh_duyet">4. Hoàn thiện hồ sơ & Tr trình duyệt</option>
+                            <option value="tham_dinh">1. Thẩm tra</option>
+                            <option value="phieu_chuyen_thue">2. Phiếu chuyển thuế</option>
+                            <option value="cho_nop_thue">3. Chờ giấy nộp tiền</option>
+                            <option value="hoan_thien_trinh_duyet">4. In & Hoàn thiện</option>
                         </select>
                     )}
 

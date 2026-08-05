@@ -5,7 +5,7 @@ import { getNormalizedWard, getShortRecordType, getWardLabel, isCapGiayRecord, g
 import { isRecordOverdue, isRecordApproaching, toTitleCase, formatBatchName, getBatchDisplayParts } from '../utils/appHelpers';
 import { hasUserPermission } from '../config/roleConfig';
 import StatusBadge from './StatusBadge';
-import { CheckSquare, Square, AlertCircle, Clock, Eye, ArrowRight, Pencil, Trash2, Bell, FileCheck, Phone, Map, CalendarClock } from 'lucide-react';
+import { CheckSquare, Square, AlertCircle, Clock, Eye, ArrowRight, Pencil, Trash2, Bell, FileCheck, Phone, Map, CalendarClock, Check } from 'lucide-react';
 
 interface RecordRowProps {
   record: RecordFile;
@@ -28,6 +28,7 @@ interface RecordRowProps {
   onExtendDeadline?: (record: RecordFile) => void;
   columnOrder?: string[];
   canSelect?: boolean;
+  holidays?: any[];
 }
 
 const formatDate = (dateStr?: string | null) => {
@@ -56,7 +57,8 @@ const RecordRow: React.FC<RecordRowProps> = ({
   onMapCorrection,
   onExtendDeadline,
   columnOrder,
-  canSelect
+  canSelect,
+  holidays
 }) => {
   const canExtendDeadline = hasUserPermission(
     currentUser,
@@ -154,12 +156,14 @@ const RecordRow: React.FC<RecordRowProps> = ({
                
                <div className={`flex items-center justify-between px-2.5 py-1.5 ${isOverdue ? 'bg-red-50' : isApproaching ? 'bg-orange-50' : 'bg-white'}`} title="Hẹn trả kết quả">
                   <span className={`text-[10px] font-extrabold uppercase tracking-tight mr-1 ${isOverdue ? 'text-red-500' : isApproaching ? 'text-orange-500' : 'text-blue-500'}`}>Trả</span>
-                  <div className="flex items-center gap-1">
-                      <span className={`text-sm font-bold font-mono whitespace-nowrap ${isOverdue ? 'text-red-600' : isApproaching ? 'text-orange-600' : 'text-blue-700'}`}>
-                          {formatDate(record.deadline)}
-                      </span>
-                      {isOverdue && <AlertCircle size={13} className="text-red-500 animate-pulse shrink-0" />}
-                      {isApproaching && <Clock size={13} className="text-orange-500 shrink-0" />}
+                  <div className="flex flex-col items-end gap-0.5">
+                      <div className="flex items-center gap-1">
+                          <span className={`text-sm font-bold font-mono whitespace-nowrap ${isOverdue ? 'text-red-600' : isApproaching ? 'text-orange-600' : 'text-blue-700'}`}>
+                              {formatDate(record.deadline)}
+                          </span>
+                          {isOverdue && <AlertCircle size={13} className="text-red-500 animate-pulse shrink-0" />}
+                          {isApproaching && <Clock size={13} className="text-orange-500 shrink-0" />}
+                      </div>
                   </div>
                </div>
             </div>
@@ -291,7 +295,7 @@ const RecordRow: React.FC<RecordRowProps> = ({
                   
                   {/* HIỂN THỊ / CHỌN BƯỚC NHỎ DÀNH RIÊNG CHO HỒ SƠ CẤP GIẤY */}
                   {isCapGiayRecord(record) && (
-                    <div className="mt-1 flex flex-col items-center">
+                    <div className="mt-1 flex flex-col items-center gap-1">
                       {canPerformAction ? (
                         <select
                           value={record.capGiaySubStep || 'tham_dinh'}
@@ -303,15 +307,29 @@ const RecordRow: React.FC<RecordRowProps> = ({
                           className={`text-[11px] font-bold px-1.5 py-0.5 rounded border outline-none cursor-pointer transition-colors shadow-2xs ${getCapGiaySubStepBadgeColor(record.capGiaySubStep)}`}
                           title="Chuyển bước nhỏ Cấp giấy"
                         >
-                          <option value="tham_dinh">1. Thẩm định</option>
-                          <option value="phieu_chuyen_thue">2. Chuyển thuế</option>
-                          <option value="cho_nop_thue">3. Chờ nộp thuế</option>
-                          <option value="hoan_thien_trinh_duyet">4. Hoàn thiện & Trình</option>
+                          <option value="tham_dinh">Thẩm tra</option>
+                          <option value="phieu_chuyen_thue">Chuyển thuế</option>
+                          <option value="cho_nop_thue">Chờ nộp thuế</option>
+                          <option value="hoan_thien_trinh_duyet">In & Hoàn thiện</option>
                         </select>
                       ) : (
                         <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${getCapGiaySubStepBadgeColor(record.capGiaySubStep)}`}>
                           {getCapGiaySubStepLabel(record.capGiaySubStep)}
                         </span>
+                      )}
+
+                      {(record.capGiaySubStep === 'cho_nop_thue' || record.capGiaySubStep === 'cho_giay_nop_tien') && canPerformAction && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onQuickUpdate(record.id, 'capGiaySubStep', 'hoan_thien_trinh_duyet');
+                          }}
+                          className="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10px] font-black shadow-xs transition-all flex items-center gap-1 active:scale-95 cursor-pointer"
+                          title="Xác nhận người dân đã nộp tiền thuế -> Chuyển In & Hoàn thiện"
+                        >
+                          <Check size={12} className="stroke-[3]" />
+                          <span>Đã nộp thuế</span>
+                        </button>
                       )}
                     </div>
                   )}

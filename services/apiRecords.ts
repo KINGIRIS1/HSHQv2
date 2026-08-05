@@ -90,6 +90,24 @@ export const fetchRecords = async (): Promise<RecordFile[]> => {
   }
 };
 
+export const fetchCapGiayRecordsForVaoSo = async (): Promise<RecordFile[]> => {
+  if (!isConfigured) return [];
+  try {
+    const { data, error } = await supabase
+      .from('land_records')
+      .select('*')
+      .or('group.eq.cap_giay,group.eq.other,recordType.ilike.%cấp giấy%')
+      .order('receivedDate', { ascending: false })
+      .limit(1000);
+
+    if (error) throw error;
+    return (data || []).map(mapRecordFromDb) as RecordFile[];
+  } catch (error) {
+    logError("fetchCapGiayRecordsForVaoSo", error);
+    return [];
+  }
+};
+
 export const getShortCode = (ward: string) => {
     const normalized = ward.toLowerCase().trim();
     const cleanName = normalized

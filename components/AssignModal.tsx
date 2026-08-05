@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Employee, RecordFile, User as AppUser, RecordStatus, UserRole } from '../types';
 import { X, Check, MapPin, User, Users, Search, Briefcase, Star, Clock, FileCheck, Sparkles, ArrowUpDown } from 'lucide-react';
 import { removeVietnameseTones } from '../utils/appHelpers';
-import { isCapGiayRecord, getRecordPlotCount } from '../constants';
+import { isCapGiayRecord, getRecordPlotCount, isTaxDefaultRecordType, getDefaultCapGiaySubStep } from '../constants';
 
 interface DeptConfig {
     id: string;
@@ -54,7 +54,7 @@ interface EmployeeWorkload {
 interface AssignModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (employeeId: string) => void;
+  onConfirm: (employeeId: string, subStep?: string) => void;
   employees: Employee[];
   selectedRecords: RecordFile[];
   allRecords?: RecordFile[];
@@ -238,10 +238,10 @@ const AssignModal: React.FC<AssignModalProps> = ({
           if (type.includes('1.1') || type.includes('1.2') || type.includes('công văn') || type.includes('lưu trữ')) {
               return 'Tổ Lưu trữ';
           }
-          if (type.includes('2.1') || type.includes('2.2') || type.includes('trích lục')) {
+          if (type.includes('2.1') || type.includes('trích lục')) {
               return 'Tổ Cấp giấy';
           }
-          if (type.includes('2.3') || type.includes('2.4') || type.includes('2.5') || type.includes('2.6') || type.includes('số thửa') || type.includes('trích đo') || type.includes('đo đạc')) {
+          if (type.includes('2.2') || type.includes('2.3') || type.includes('2.4') || type.includes('2.5') || type.includes('2.6') || type.includes('số thửa') || type.includes('trích đo') || type.includes('đo đạc')) {
               return 'Tổ Đo đạc';
           }
       }
@@ -302,12 +302,23 @@ const AssignModal: React.FC<AssignModalProps> = ({
       return map;
   }, [employees, allRecords, selectedRecords, selectedDept]);
 
-  // Mỗi khi mở modal, tự động đặt tổ chuyên môn mặc định
+  const [selectedSubStep, setSelectedSubStep] = useState<string>('tham_dinh');
+
+  // Mỗi khi mở modal, tự động đặt tổ chuyên môn mặc định & bước SLA Cấp Giấy
   useEffect(() => {
       if (isOpen) {
           const defaultDept = getRecordDefaultDepartment(selectedRecords, currentView, filterDepartment);
           setSelectedDept(defaultDept);
           setSearchTerm('');
+
+          if (selectedRecords && selectedRecords.length > 0) {
+              const firstRecord = selectedRecords[0];
+              if (firstRecord.capGiaySubStep) {
+                  setSelectedSubStep(firstRecord.capGiaySubStep);
+              } else {
+                  setSelectedSubStep(getDefaultCapGiaySubStep(firstRecord.recordType));
+              }
+          }
       }
   }, [isOpen, selectedRecords, currentView, filterDepartment]);
 
@@ -385,7 +396,7 @@ const AssignModal: React.FC<AssignModalProps> = ({
   const handleConfirmAssign = () => {
       if (selectedEmpId && selectedDept) {
           localStorage.setItem(`last_assigned_${selectedDept}`, selectedEmpId);
-          onConfirm(selectedEmpId);
+          onConfirm(selectedEmpId, isCapGiayView ? selectedSubStep : undefined);
       }
   };
 
@@ -448,6 +459,80 @@ const AssignModal: React.FC<AssignModalProps> = ({
                 </button>
             </div>
         </div>
+
+        {/* BƯỚC QUY TRÌNH GIAO VIỆC SLA (DÀNH RIÊNG TỔ CẤP GIẤY) */}
+        {isCapGiayView && (
+            <div className="px-6 py-3 bg-gradient-to-r from-teal-50/90 via-sky-50/80 to-indigo-50/90 border-b border-teal-100 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 shrink-0">
+                <div className="flex items-center gap-2">
+                    <Sparkles size={18} className="text-teal-600 shrink-0" />
+                    <div>
+                        <span className="text-xs font-black text-teal-900 uppercase tracking-tight block">
+                            Chọn bước quy trình Cấp Giấy (SLA định mức)
+                        </span>
+                        <span className="text-[11px] text-slate-600 font-semibold">
+                            {selectedSubStep === 'tham_dinh' && 'Bước: Thẩm tra hồ sơ'}
+                            {selectedSubStep === 'phieu_chuyen_thue' && 'Bước: Phiếu chuyển thuế'}
+                            {selectedSubStep === 'cho_nop_thue' && 'Bước: Chờ giấy nộp tiền'}
+                            {selectedSubStep === 'hoan_thien_trinh_duyet' && 'Bước: In & Hoàn thiện'}
+                        </span>
+                    </div>
+                </div>
+
+                <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto pb-1 md:pb-0">
+                    <button
+                        type="button"
+                        onClick={() => setSelectedSubStep('tham_dinh')}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all border flex items-center gap-1.5 shrink-0 ${
+                            selectedSubStep === 'tham_dinh'
+                                ? 'bg-blue-600 text-white border-blue-600 shadow-md ring-2 ring-blue-200'
+                                : 'bg-white text-slate-700 border-slate-200 hover:bg-blue-50 hover:border-blue-300'
+                        }`}
+                        title="Thẩm tra"
+                    >
+                        <span>Thẩm tra</span>
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={() => setSelectedSubStep('phieu_chuyen_thue')}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all border flex items-center gap-1.5 shrink-0 ${
+                            selectedSubStep === 'phieu_chuyen_thue'
+                                ? 'bg-purple-600 text-white border-purple-600 shadow-md ring-2 ring-purple-200'
+                                : 'bg-white text-slate-700 border-slate-200 hover:bg-purple-50 hover:border-purple-300'
+                        }`}
+                        title="Phiếu chuyển thuế"
+                    >
+                        <span>Phiếu chuyển thuế</span>
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={() => setSelectedSubStep('cho_nop_thue')}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all border flex items-center gap-1.5 shrink-0 ${
+                            selectedSubStep === 'cho_nop_thue'
+                                ? 'bg-amber-600 text-white border-amber-600 shadow-md ring-2 ring-amber-200'
+                                : 'bg-white text-slate-700 border-slate-200 hover:bg-amber-50 hover:border-amber-300'
+                        }`}
+                        title="Chờ giấy nộp tiền"
+                    >
+                        <span>Chờ giấy nộp tiền</span>
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={() => setSelectedSubStep('hoan_thien_trinh_duyet')}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all border flex items-center gap-1.5 shrink-0 ${
+                            selectedSubStep === 'hoan_thien_trinh_duyet'
+                                ? 'bg-emerald-600 text-white border-emerald-600 shadow-md ring-2 ring-emerald-200'
+                                : 'bg-white text-slate-700 border-slate-200 hover:bg-emerald-50 hover:border-emerald-300'
+                        }`}
+                        title="In & Hoàn thiện"
+                    >
+                        <span>In & Hoàn thiện</span>
+                    </button>
+                </div>
+            </div>
+        )}
 
         {/* Modal Body */}
         <div className="flex-1 flex overflow-hidden">

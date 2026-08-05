@@ -79,7 +79,7 @@ interface AppModalsProps {
     handleDeleteEmployee: (id: string) => void;
     handleDeleteAllData: () => void;
     onRefreshData?: () => void; // New callback
-    confirmAssign: (empId: string) => void;
+    confirmAssign: (empId: string, subStep?: string) => void;
     handleDeleteRecord: () => void;
     confirmDelete: (r: RecordFile) => void;
     handleExcelPreview: (wb: XLSX.WorkBook, name: string) => void;

@@ -80,7 +80,8 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
       isTabGroup: true,
       subItems: [
         { id: 'all_records', label: 'Đo đạc', icon: Ruler, visible: true },
-        { id: 'registration_records', label: 'Cấp giấy', icon: FileCheck, visible: true },
+        { id: 'other_records', label: 'Cấp giấy', icon: FileCheck, visible: true },
+        { id: 'registration_records', label: 'Vô số GCN', icon: BookOpen, visible: true },
         { id: 'archive_records', label: 'Lưu trữ', icon: FolderArchive, visible: true },
       ]
     },
@@ -127,11 +128,7 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
   };
 
   const handleMenuClick = (viewId: string) => {
-    let targetView = viewId;
-    if (viewId === 'registration_records') {
-      targetView = 'other_records';
-    }
-    setCurrentView(targetView);
+    setCurrentView(viewId);
     setMobileOpen(false);
   };
 
@@ -187,8 +184,8 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
                        if (!isAllowed) return null;
                        if (!sub.visible) return null;
     
-                       const isSubActive = (sub.id === 'registration_records' || sub.id === 'other_records')
-                         ? ['other_records', 'other_assign_tasks', 'other_completed_list', 'other_pending_check_list', 'other_check_list', 'other_handover_list', 'registration_records'].includes(currentView)
+                       const isSubActive = sub.id === 'other_records'
+                         ? ['other_records', 'other_assign_tasks', 'other_completed_list', 'other_pending_check_list', 'other_check_list', 'other_handover_list'].includes(currentView)
                          : currentView === sub.id;
                        return (
                         <button

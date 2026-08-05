@@ -79,6 +79,9 @@ import {
   BookOpen,
   RotateCcw,
   CalendarClock,
+  ArrowRight,
+  CheckCircle2,
+  Archive,
 } from "lucide-react";
 
 interface AppRoutesProps {
@@ -292,6 +295,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
   const [showColumnSelector, setShowColumnSelector] = React.useState(false);
   const [isAddMenuOpen, setIsAddMenuOpen] = React.useState(false);
   const [receiveRecordSubTab, setReceiveRecordSubTab] = React.useState<'create' | 'list' | 'bulk' | 'update' | 'vphc'>('create');
+  const [vaoSoTab, setVaoSoTab] = React.useState<'pending_entry' | 'completed_entry' | 'all'>('pending_entry');
   const addMenuRef = React.useRef<HTMLDivElement>(null);
   const ignoreSubTabResetRef = React.useRef(false);
 
@@ -357,7 +361,6 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
     ].includes(currentView);
     const isOtherView = [
       "other_records",
-      "registration_records",
       "other_assign_tasks",
       "other_completed_list",
       "other_pending_check_list",
@@ -415,7 +418,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
       title = "Hồ sơ chờ kiểm tra";
     else if (currentView === "all_records") title = "Hồ sơ đo đạc";
     else if (currentView === "other_records") title = "Cấp giấy - Tất cả hồ sơ";
-    else if (currentView === "registration_records") title = "Cấp giấy - Vô số GCN";
+    else if (currentView === "registration_records") title = "Vô số GCN";
     else if (currentView === "archive_records")
       title = "Lưu trữ (Cung cấp TLĐĐ)";
     else if (currentView === "archive_completed_list") title = "Đang thực hiện";
@@ -623,16 +626,6 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                 </button>
               )}
 
-              {/* TAB VÔ SỐ GCN - Đặt trước tab Giao 1 cửa (Thay thế tab Hoàn thành) */}
-              {isViewAllowedForUser(currentUser, employees, "registration_records", rolePermissions, departmentPermissions) && (
-                <button
-                  onClick={() => props.setCurrentView("registration_records")}
-                  className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "registration_records" ? "border-teal-600 text-teal-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
-                >
-                  <BookOpen size={16} /> Vô số GCN
-                </button>
-              )}
-
               {!isDirector && isViewAllowedForUser(currentUser, employees, "other_handover_list", rolePermissions, departmentPermissions) && (
                 <button
                   onClick={() => props.setCurrentView("other_handover_list")}
@@ -647,9 +640,45 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
           </>
         )}
 
+        {/* SUB-HEADER TABS FOR VAO SO GCN */}
+        {currentView === "registration_records" && (
+          <div className="flex border-b border-gray-200 bg-gray-50 px-4 overflow-x-auto">
+            <button
+              onClick={() => setVaoSoTab("pending_entry")}
+              className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${
+                vaoSoTab === "pending_entry"
+                  ? "border-amber-600 text-amber-700 bg-white"
+                  : "border-transparent text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              <Clock size={16} /> Chờ vô sổ
+            </button>
+            <button
+              onClick={() => setVaoSoTab("completed_entry")}
+              className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${
+                vaoSoTab === "completed_entry"
+                  ? "border-teal-600 text-teal-700 bg-white"
+                  : "border-transparent text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              <CheckCircle2 size={16} /> Đã vô sổ
+            </button>
+            <button
+              onClick={() => setVaoSoTab("all")}
+              className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${
+                vaoSoTab === "all"
+                  ? "border-blue-600 text-blue-700 bg-white"
+                  : "border-transparent text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              <Archive size={16} /> Lưu kho
+            </button>
+          </div>
+        )}
+
         {currentView === "registration_records" ? (
           <div className="flex-1 overflow-hidden flex flex-col p-2">
-            <RegistrationRecords currentUser={currentUser} wards={wards} />
+            <RegistrationRecords currentUser={currentUser} wards={wards} activeTab={vaoSoTab} onTabChange={setVaoSoTab} />
           </div>
         ) : (
           <div className="flex-1 overflow-hidden flex flex-col">
@@ -883,11 +912,10 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                             >
                               <option value="all">Tất cả loại HS</option>
                               <option value="2.1 Trích lục">2.1 Trích lục</option>
-                              <option value="2.2 Trích lục QH">2.2 Trích lục QH</option>
-                              <option value="2.3 Trích đo">2.3 Trích đo</option>
+                              <option value="2.2 Trích đo">2.2 Trích đo</option>
                               <option value="2.4 Cắm mốc">2.4 Cắm mốc</option>
                               <option value="2.5 Tách-Hợp thửa">2.5 Tách-Hợp thửa</option>
-                              <option value="2.6 CN Số Thửa">2.6 CN Số Thửa</option>
+                              <option value="2.3 CN Số Thửa">2.3 CN Số Thửa</option>
                             </select>
                           </div>
                         )}
@@ -1206,7 +1234,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
 
 
                 {hasPermission('BTN_SUBMIT_SIGN') &&
-                  (currentView === "completed_list") &&
+                  (currentView === "completed_list" || currentView === "other_completed_list") &&
                   props.selectedRecordIds.size > 0 && (
                     <button
                       onClick={() => {
@@ -1219,6 +1247,26 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                       className="flex items-center gap-1.5 bg-orange-600 text-white px-3 py-1.5 rounded-md hover:bg-orange-700 text-sm font-bold shadow-sm transition-all animate-pulse"
                     >
                       <ClipboardList size={16} /> Trình Kiểm Tra ({props.selectedRecordIds.size})
+                    </button>
+                  )}
+
+                {currentView === "other_completed_list" &&
+                  props.selectedRecordIds.size > 0 && (
+                    <button
+                      onClick={async () => {
+                        const targets = records.filter((r) =>
+                          props.selectedRecordIds.has(r.id),
+                        );
+                        for (const r of targets) {
+                          if (props.advanceStatus) {
+                            await props.advanceStatus(r);
+                          }
+                        }
+                      }}
+                      className="flex items-center gap-1.5 bg-teal-600 text-white px-3 py-1.5 rounded-md hover:bg-teal-700 text-sm font-bold shadow-sm transition-all"
+                      title="Chuyển các hồ sơ đã chọn sang bước nhỏ tiếp theo"
+                    >
+                      <ArrowRight size={16} /> Chuyển Bước ({props.selectedRecordIds.size})
                     </button>
                   )}
 
@@ -1607,6 +1655,10 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
             props.setCurrentView("receive_contract");
           }}
           onMapCorrection={props.handleMapCorrectionRequest}
+          onAssignRecord={(r) => {
+            props.setAssignTargetRecords([r]);
+            props.setIsAssignModalOpen(true);
+          }}
         />
       );
     case "receive_record":

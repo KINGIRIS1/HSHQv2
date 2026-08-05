@@ -50,16 +50,25 @@ export const DEFAULT_WARDS = [
 
 export const WARDS = DEFAULT_WARDS;
 
-// Danh sách loại hồ sơ CƠ BẢN (Dùng cho form Tiếp nhận hồ sơ thường xuyên)
-export const RECORD_TYPES = [
+// Danh sách loại hồ sơ THÔNG TIN LƯU TRỮ (1.x)
+export const ARCHIVE_RECORD_TYPES = [
   '1.1 Sao lục hồ sơ',
-  '1.2 Công văn',
+  '1.2 Công văn'
+];
+
+// Danh sách loại hồ sơ ĐO ĐẠC / CẮM MỐC (2.x)
+export const MEASUREMENT_RECORD_TYPES = [
   '2.1 Trích lục',
-  '2.2 Trích lục Quy hoạch',
-  '2.3 Trích đo',
+  '2.2 Trích đo',
   '2.4 Trích đo Cắm mốc',
   '2.5 Trích đo Tách - Hợp thửa',
-  '2.6 Cập nhập số thửa'
+  '2.3 Cập nhật số thửa'
+];
+
+// Danh sách loại hồ sơ CƠ BẢN (Gồm Lưu trữ & Đo đạc)
+export const RECORD_TYPES = [
+  ...ARCHIVE_RECORD_TYPES,
+  ...MEASUREMENT_RECORD_TYPES
 ];
 
 // Danh sách loại hồ sơ CẤP GIẤY / ĐĂNG KÝ BIẾN ĐỘNG ĐẤT ĐAI
@@ -75,6 +84,7 @@ export const CAP_GIAY_RECORD_TYPES = [
   '3.4.1 Tách - hợp thửa',
   '3.5.1 Gia hạn',
   '3.6.1 Chuyển mục đích không xin phép',
+  '3.6.2 Chuyển mục đích không xin phép (có thuế)',
   '37.1 Đính chính - Biến động'
 ];
 
@@ -90,6 +100,7 @@ export const CAP_GIAY_RECORD_TYPE_DESCRIPTIONS: Record<string, string> = {
   '3.4.1 Tách - hợp thửa': 'Đăng ký biến động do tách thửa, hợp thửa đất',
   '3.5.1 Gia hạn': 'Gia hạn thời hạn sử dụng đất',
   '3.6.1 Chuyển mục đích không xin phép': 'Đăng ký chuyển mục đích sử dụng đất đối với trường hợp không phải xin phép',
+  '3.6.2 Chuyển mục đích không xin phép (có thuế)': 'Đăng ký chuyển mục đích sử dụng đất không xin phép (có nghĩa vụ tài chính)',
   '37.1 Đính chính - Biến động': 'Đính chính - Biến động đất đai'
 };
 
@@ -142,12 +153,11 @@ export const getShortRecordType = (type: string | null | undefined): string => {
   
   if (t.startsWith('1.1') || t === 'cung cấp tài liệu đất đai' || t === 'cung cấp dữ liệu đất đai' || t === 'sao lục' || t === 'sao luc' || t === 'sao lục hồ sơ' || t === '1.1 cc dl đđ' || t === '1.1 sao lục') return '1.1 Sao lục';
   if (t.startsWith('1.2') || t === 'công văn') return '1.2 Công văn';
-  if (t.startsWith('2.1') || t === 'trích lục') return '2.1 Trích lục';
-  if (t.startsWith('2.2') || t === 'trích lục quy hoạch' || t === 'trích lục qh') return '2.2 Trích lục QH';
-  if (t.startsWith('2.3') || t === 'trích đo') return '2.3 Trích đo';
+  if (t.includes('trích lục quy hoạch') || t.includes('trích lục qh') || t === '2.2 trích lục qh' || t === '2.2 trích lục quy hoạch' || t.startsWith('2.1') || t === 'trích lục') return '2.1 Trích lục';
+  if (t.startsWith('2.3') || t.startsWith('2.2') || t === 'trích đo') return '2.2 Trích đo';
   if (t.startsWith('2.4') || t === 'cắm mốc' || t === 'trích đo cắm mốc') return '2.4 Cắm mốc';
   if (t.startsWith('2.5') || t === 'tách thửa' || t === 'tách-hợp thửa' || t === 'trích đo tách - hợp thửa') return '2.5 Tách-Hợp thửa';
-  if (t.startsWith('2.6') || t === 'cung cấp số thửa đất' || t === 'cung cấp số thửa' || t === 'cc số thửa' || t === 'cập nhập số thửa' || t === 'cập nhật số thửa' || t === 'cn số thửa') return '2.6 CN Số Thửa';
+  if (t.startsWith('2.6') || t.startsWith('2.3') || t === 'cung cấp số thửa đất' || t === 'cung cấp số thửa' || t === 'cc số thửa' || t === 'cập nhập số thửa' || t === 'cập nhật số thửa' || t === 'cn số thửa') return '2.3 CN Số Thửa';
 
   // Các thủ tục Cấp giấy / Biến động mới
   if (t.startsWith('3.1.1') || (t.includes('chuyển nhượng') && !t.includes('trích đo'))) return '3.1.1 Chuyển nhượng';
@@ -160,16 +170,17 @@ export const getShortRecordType = (type: string | null | undefined): string => {
   if (t.startsWith('3.3.2') || (t.includes('cấp lại') && t.includes('thuế'))) return '3.3.2 Cấp lại (có thuế)';
   if (t.startsWith('3.4.1') || t.includes('tách - hợp thửa') || (t.includes('tách') && t.includes('hợp') && !t.includes('trích đo'))) return '3.4.1 Tách - hợp thửa';
   if (t.startsWith('3.5.1') || t.includes('gia hạn')) return '3.5.1 Gia hạn';
+  if (t.startsWith('3.6.2') || (t.includes('chuyển mục đích') && t.includes('có thuế'))) return '3.6.2 Chuyển mục đích (có thuế)';
   if (t.startsWith('3.6.1') || t.includes('chuyển mục đích')) return '3.6.1 Chuyển mục đích không xin phép';
   if (t.startsWith('37.1') || t.startsWith('3.5.2') || t.includes('đính chính')) return '37.1 Đính chính - Biến động';
 
   // Fallbacks for legacy other categories
   if (t.includes('cung cấp tài liệu đất đai') || t.includes('cung cấp dữ liệu') || t.includes('sao lục') || t.includes('sao luc') || t.includes('cc dl đđ')) return '1.1 Sao lục';
-  if (t.includes('trích lục quy hoạch')) return '2.2 Trích lục QH';
-  if (t.includes('cung cấp số thửa đất') || t.includes('số thửa') || t.includes('cập nhập số thửa') || t.includes('cập nhật số thửa')) return '2.6 CN Số Thửa';
+  if (t.includes('trích lục quy hoạch') || t.includes('trích lục qh')) return '2.1 Trích lục';
+  if (t.includes('cung cấp số thửa đất') || t.includes('số thửa') || t.includes('cập nhập số thửa') || t.includes('cập nhật số thửa')) return '2.3 CN Số Thửa';
   if (t.includes('trích đo') && t.includes('cắm mốc')) return '2.4 Cắm mốc';
   if (t.includes('trích đo') && (t.includes('tách') || t.includes('hợp'))) return '2.5 Tách-Hợp thửa';
-  if (t.includes('trích đo')) return '2.3 Trích đo';
+  if (t.includes('trích đo')) return '2.2 Trích đo';
   if (t.includes('cắm mốc')) return '2.4 Cắm mốc';
   if (t.includes('trích lục')) return '2.1 Trích lục';
 
@@ -287,10 +298,10 @@ export const MOCK_RECORDS: RecordFile[] = [
 ];
 
 export const CAP_GIAY_SUB_STEPS = [
-  { id: 'tham_dinh', label: '1. Thẩm định hồ sơ', shortLabel: '1. Thẩm định', color: 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100' },
-  { id: 'phieu_chuyen_thue', label: '2. Phiếu chuyển thuế', shortLabel: '2. Chuyển thuế', color: 'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100' },
-  { id: 'cho_nop_thue', label: '3. Chờ nộp thuế', shortLabel: '3. Chờ nộp thuế', color: 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100' },
-  { id: 'hoan_thien_trinh_duyet', label: '4. Hoàn thiện in GCN', shortLabel: '4. Hoàn thiện in', color: 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' },
+  { id: 'tham_dinh', label: 'Thẩm tra', shortLabel: 'Thẩm tra', slaDays: 1, color: 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100' },
+  { id: 'phieu_chuyen_thue', label: 'Phiếu chuyển thuế', shortLabel: 'Phiếu chuyển thuế', slaDays: 2, color: 'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100' },
+  { id: 'cho_nop_thue', label: 'Chờ giấy nộp tiền', shortLabel: 'Chờ giấy nộp tiền', slaDays: 0, color: 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100' },
+  { id: 'hoan_thien_trinh_duyet', label: 'In & Hoàn thiện', shortLabel: 'In & Hoàn thiện', slaDays: 5, color: 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' },
 ] as const;
 
 export const isCapGiayRecord = (record: RecordFile | Partial<RecordFile> | null | undefined): boolean => {
@@ -323,7 +334,7 @@ export const isCapGiayRecord = (record: RecordFile | Partial<RecordFile> | null 
   );
 };
 
-// Các thủ tục có thuế mặc định: 3.6.1, 3.1.1 đến 3.1.4, 3.2.2, 3.3.2
+// Các thủ tục có thuế mặc định: 3.6.1, 3.6.2, 3.1.1 đến 3.1.4, 3.2.2, 3.3.2
 export const isTaxDefaultRecordType = (type: string | null | undefined): boolean => {
   if (!type) return false;
   const t = type.toLowerCase().trim();
@@ -334,6 +345,7 @@ export const isTaxDefaultRecordType = (type: string | null | undefined): boolean
     short.startsWith('3.1.3') ||
     short.startsWith('3.1.4') ||
     short.startsWith('3.6.1') ||
+    short.startsWith('3.6.2') ||
     short.startsWith('3.2.2') ||
     short.startsWith('3.3.2') ||
     t.includes('chuyển nhượng') ||
@@ -343,6 +355,30 @@ export const isTaxDefaultRecordType = (type: string | null | undefined): boolean
     t.includes('chuyển mục đích') ||
     t.includes('có thuế')
   );
+};
+
+// Xác định bước mặc định ban đầu cho hồ sơ Cấp giấy:
+// - Hồ sơ có thuế: Phiếu chuyển thuế (phieu_chuyen_thue)
+// - Hồ sơ Cấp lại GCN (3.3.1 - không thuế nhưng cần thẩm định): Thẩm định (tham_dinh)
+// - Các hồ sơ không thuế còn lại (Cấp đổi 3.2.1, Tách - hợp thửa 3.4.1, Gia hạn 3.5.1, Đính chính 37.1...): Hoàn thiện in GCN (hoan_thien_trinh_duyet)
+export const getDefaultCapGiaySubStep = (type?: string | null): string => {
+  if (!type) return 'tham_dinh';
+  const t = type.toLowerCase().trim();
+  const short = getShortRecordType(type);
+
+  // 1. Nếu là thủ tục Cấp lại (3.3.1 - không thuế) -> Mặc định cần Thẩm định (Bước 1)
+  if (short.startsWith('3.3.1') || (t.includes('cấp lại') && !t.includes('thuế'))) {
+    return 'tham_dinh';
+  }
+
+  // 2. Nếu là thủ tục Có thuế -> Mặc định Phiếu chuyển thuế (Bước 2)
+  if (isTaxDefaultRecordType(type)) {
+    return 'phieu_chuyen_thue';
+  }
+
+  // 3. Với các hồ sơ không thuế còn lại (3.2.1 Cấp đổi, 3.4.1 Tách - hợp thửa, 3.5.1 Gia hạn, 37.1 Đính chính...)
+  // Mặc định giao việc tại In và Hoàn thiện GCN (Bước 4: hoan_thien_trinh_duyet)
+  return 'hoan_thien_trinh_duyet';
 };
 
 export const getRecordPlotCount = (record: RecordFile | Partial<RecordFile> | null | undefined): number => {
@@ -356,18 +392,22 @@ export const getRecordPlotCount = (record: RecordFile | Partial<RecordFile> | nu
 };
 
 export const getCapGiaySubStepLabel = (subStep?: string | null): string => {
-  if (!subStep || subStep === 'tham_dinh') return '1. Thẩm định';
-  if (subStep === 'phieu_chuyen_thue') return '2. Chuyển thuế';
-  if (subStep === 'cho_nop_thue') return '3. Chờ nộp thuế';
-  if (subStep === 'hoan_thien_trinh_duyet') return '4. Hoàn thiện in GCN';
+  if (!subStep || subStep === 'tham_dinh' || subStep === 'tham_tra') return 'Thẩm tra';
+  if (subStep === 'phieu_chuyen_thue') return 'Phiếu chuyển thuế';
+  if (subStep === 'cho_nop_thue' || subStep === 'cho_giay_nop_tien') return 'Chờ giấy nộp tiền';
+  if (subStep === 'hoan_thien_trinh_duyet' || subStep === 'in_hoan_thien') return 'In & Hoàn thiện';
+  if (subStep === 'vo_so_gcn') return 'Vô số GCN';
+  if (subStep === 'cho_ban_giao') return 'Chờ bàn giao';
   return subStep;
 };
 
 export const getCapGiaySubStepFullLabel = (subStep?: string | null): string => {
-  if (!subStep || subStep === 'tham_dinh') return '1. Thẩm định hồ sơ';
-  if (subStep === 'phieu_chuyen_thue') return '2. Phiếu chuyển thuế';
-  if (subStep === 'cho_nop_thue') return '3. Chờ nộp thuế';
-  if (subStep === 'hoan_thien_trinh_duyet') return '4. Hoàn thiện in GCN';
+  if (!subStep || subStep === 'tham_dinh' || subStep === 'tham_tra') return 'Thẩm tra';
+  if (subStep === 'phieu_chuyen_thue') return 'Phiếu chuyển thuế';
+  if (subStep === 'cho_nop_thue' || subStep === 'cho_giay_nop_tien') return 'Chờ giấy nộp tiền';
+  if (subStep === 'hoan_thien_trinh_duyet' || subStep === 'in_hoan_thien') return 'In & Hoàn thiện';
+  if (subStep === 'vo_so_gcn') return 'Vô số GCN & Ngày ký';
+  if (subStep === 'cho_ban_giao') return 'Chờ bàn giao 1 cửa';
   return subStep;
 };
 
@@ -376,6 +416,8 @@ export const getCapGiaySubStepBadgeColor = (subStep?: string | null): string => 
   if (subStep === 'phieu_chuyen_thue') return 'bg-purple-50 text-purple-700 border-purple-200';
   if (subStep === 'cho_nop_thue') return 'bg-amber-50 text-amber-700 border-amber-200';
   if (subStep === 'hoan_thien_trinh_duyet') return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+  if (subStep === 'vo_so_gcn') return 'bg-teal-50 text-teal-700 border-teal-200';
+  if (subStep === 'cho_ban_giao') return 'bg-indigo-50 text-indigo-700 border-indigo-200';
   return 'bg-slate-100 text-slate-700 border-slate-200';
 };
 

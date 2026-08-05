@@ -254,6 +254,123 @@ export const calculateDeadlineHelper = (type: string, receivedDateStr: string, h
     return formatDateKey(currentDate);
 };
 
+// Tính deadline khi biết số ngày làm việc
+export const calculateDeadlineHelperByDays = (daysToAdd: number, startDateStr: string, holidays: any[]): string => {
+    if (!startDateStr || daysToAdd <= 0) return startDateStr || formatDateKey(new Date());
+    const startDate = new Date(startDateStr);
+    let count = 0;
+    let currentDate = new Date(startDate);
+
+    const holidaySet = new Set<string>();
+    const currentYear = startDate.getFullYear();
+    const yearsToCheck = [currentYear, currentYear + 1];
+
+    if (holidays && holidays.length > 0) {
+        holidays.forEach(h => {
+            yearsToCheck.forEach(year => {
+                if (h.isLunar) {
+                    const solarDate = getSolarDateFromLunar(h.day, h.month, year);
+                    if (solarDate) holidaySet.add(formatDateKey(solarDate));
+                } else {
+                    const solarDate = new Date(year, h.month - 1, h.day);
+                    holidaySet.add(formatDateKey(solarDate));
+                }
+            });
+        });
+    }
+
+    while (count < daysToAdd) {
+        currentDate.setDate(currentDate.getDate() + 1);
+        const dayOfWeek = currentDate.getDay();
+        const dateString = formatDateKey(currentDate);
+        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+        const isHoliday = holidaySet.has(dateString);
+
+        if (!isWeekend && !isHoliday) {
+            count++;
+        }
+    }
+
+    return formatDateKey(currentDate);
+};
+
+// Lấy SLA theo từng bước quy trình Cấp Giấy (tính bằng số ngày làm việc)
+export const getCapGiayStepSLA = (subStep?: string | null, hasThamdinh?: boolean): number => {
+    if (!subStep || subStep === 'tham_dinh') return 1; // Bước 1: Thẩm định (1 ngày)
+    if (subStep === 'phieu_chuyen_thue') return hasThamdinh ? 2 : 3; // Bước 2: 2 ngày nếu qua thẩm định, 3 ngày nếu không qua
+    if (subStep === 'cho_nop_thue') return 0; // Chờ người dân nộp thuế (Một cửa)
+    if (subStep === 'hoan_thien_trinh_duyet') return 5; // Bước 4: Hoàn thiện in GCN (5 ngày)
+    if (subStep === 'trinh_kiem_tra') return 1; // Trình kiểm tra (1 ngày)
+    if (subStep === 'trinh_ky') return 1; // Trình ký (1 ngày)
+    if (subStep === 'vo_so_gcn') return 1; // Vô số GCN (1 ngày)
+    return 1;
+};
+
+// Lấy thông tin SLA và trạng thái hạn dùng cho hồ sơ
+export const getRecordSLADetails = (record: RecordFile, holidays: any[] = []) => {
+    const isFinished = [RecordStatus.HANDOVER, RecordStatus.RETURNED, RecordStatus.WITHDRAWN, RecordStatus.REJECTED].includes(record.status) || !!record.resultReturnedDate;
+    if (isFinished) {
+        return {
+            slaStatus: 'COMPLETED' as const,
+            statusText: 'Đã hoàn thành',
+            badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+            remainingDays: 0,
+            currentStepSLA: 0
+        };
+    }
+
+    const subStep = record.capGiaySubStep || 'tham_dinh';
+    const hasThamdinh = record.capGiaySubStep === 'tham_dinh';
+    const stepSLA = getCapGiayStepSLA(subStep, hasThamdinh);
+
+    const deadline = parseSafeDate(record.deadline);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (!deadline) {
+        return {
+            slaStatus: 'ON_TIME' as const,
+            statusText: 'Đang thực hiện',
+            badgeClass: 'bg-blue-50 text-blue-700 border-blue-200',
+            remainingDays: 0,
+            currentStepSLA: stepSLA
+        };
+    }
+
+    const targetDate = new Date(deadline);
+    targetDate.setHours(0, 0, 0, 0);
+
+    const diffTime = targetDate.getTime() - today.getTime();
+    const remainingDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (remainingDays < 0) {
+        const overdueDays = Math.abs(remainingDays);
+        return {
+            slaStatus: 'EXPIRED' as const,
+            statusText: `Quá hạn ${overdueDays} ngày`,
+            badgeClass: 'bg-rose-100 text-rose-800 border-rose-300 font-extrabold animate-pulse',
+            remainingDays,
+            currentStepSLA: stepSLA
+        };
+    } else if (remainingDays <= 1) {
+        return {
+            slaStatus: 'WARNING' as const,
+            statusText: remainingDays === 0 ? 'Hạn chót hôm nay!' : 'Còn 1 ngày SLA',
+            badgeClass: 'bg-amber-100 text-amber-800 border-amber-300 font-extrabold shadow-2xs',
+            remainingDays,
+            currentStepSLA: stepSLA
+        };
+    } else {
+        return {
+            slaStatus: 'ON_TIME' as const,
+            statusText: `Còn ${remainingDays} ngày`,
+            badgeClass: 'bg-teal-50 text-teal-800 border-teal-200 font-bold',
+            remainingDays,
+            currentStepSLA: stepSLA
+        };
+    }
+};
+
 // --- HÀM TIỆN ÍCH SO KHỚP PHÒNG BAN ---
 export function matchDepartmentKey(key: string, empDept: string): boolean {
     if (!key || !empDept) return false;

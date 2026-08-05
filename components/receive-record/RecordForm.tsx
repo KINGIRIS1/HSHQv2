@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { RecordFile, Holiday, RecordStatus, User, Employee } from '../../types';
-import { RECORD_TYPES, EXTENDED_RECORD_TYPES, CAP_GIAY_RECORD_TYPES, CAP_GIAY_RECORD_TYPE_DESCRIPTIONS, getShortRecordType, getWardLabel, isCapGiayRecord, isTaxDefaultRecordType } from '../../constants';
+import { RECORD_TYPES, EXTENDED_RECORD_TYPES, CAP_GIAY_RECORD_TYPES, ARCHIVE_RECORD_TYPES, MEASUREMENT_RECORD_TYPES, CAP_GIAY_RECORD_TYPE_DESCRIPTIONS, getShortRecordType, getWardLabel, isCapGiayRecord, isTaxDefaultRecordType, getDefaultCapGiaySubStep } from '../../constants';
 import { Save, User as UserIcon, Calendar, MapPin, FileCheck, Loader2, Printer, RotateCcw, XCircle, CheckCircle, AlertCircle, X, Phone, FileText, BookOpen, Clock, Hash, Map, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface AttachedDocItem {
@@ -94,11 +94,17 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
   });
 
   const [attachedDocs, setAttachedDocs] = useState<AttachedDocItem[]>([]);
-  const [recordTypeGroup, setRecordTypeGroup] = useState<'all' | 'cap_giay' | 'do_dac'>(() => {
+  const [recordTypeGroup, setRecordTypeGroup] = useState<'all' | 'cap_giay' | 'do_dac' | 'luu_tru'>(() => {
     if (linkedEmp?.department?.toLowerCase().includes('cấp giấy')) {
       return 'cap_giay';
     }
-    return 'cap_giay'; // Default to cap_giay for fast selection of Cấp giấy procedures
+    if (linkedEmp?.department?.toLowerCase().includes('lưu trữ') || linkedEmp?.department?.toLowerCase().includes('thông tin')) {
+      return 'luu_tru';
+    }
+    if (linkedEmp?.department?.toLowerCase().includes('đo đạc')) {
+      return 'do_dac';
+    }
+    return 'cap_giay';
   });
   const [authCccd, setAuthCccd] = useState('');
   const [authAddress, setAuthAddress] = useState('');
@@ -185,7 +191,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
             }
 
             if (isCapGiayRecord({ recordType: value })) {
-                newData.capGiaySubStep = isTaxDefaultRecordType(value) ? 'phieu_chuyen_thue' : 'tham_dinh';
+                newData.capGiaySubStep = getDefaultCapGiaySubStep(value);
             }
         }
         return newData;
@@ -326,6 +332,13 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
                             </button>
                             <button
                                 type="button"
+                                onClick={() => setRecordTypeGroup('luu_tru')}
+                                className={`px-2 py-0.5 rounded transition-all ${recordTypeGroup === 'luu_tru' ? 'bg-purple-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+                            >
+                                Lưu trữ
+                            </button>
+                            <button
+                                type="button"
                                 onClick={() => setRecordTypeGroup('all')}
                                 className={`px-2 py-0.5 rounded transition-all ${recordTypeGroup === 'all' ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
                             >
@@ -335,17 +348,21 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
                     </div>
                     <select className={`${inputClass} font-semibold`} value={formData.recordType || ''} onChange={(e) => handleChange('recordType', e.target.value)}>
                         <option value="">
-                            {recordTypeGroup === 'cap_giay' ? '-- Chọn thủ tục Cấp giấy --' : recordTypeGroup === 'do_dac' ? '-- Chọn thủ tục Đo đạc --' : '-- Chọn loại hồ sơ --'}
+                            {recordTypeGroup === 'cap_giay' ? '-- Chọn thủ tục Cấp giấy --' : recordTypeGroup === 'do_dac' ? '-- Chọn thủ tục Đo đạc --' : recordTypeGroup === 'luu_tru' ? '-- Chọn thủ tục Lưu trữ --' : '-- Chọn loại hồ sơ --'}
                         </option>
                         {recordTypeGroup === 'cap_giay' && CAP_GIAY_RECORD_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                        {recordTypeGroup === 'do_dac' && RECORD_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                        {recordTypeGroup === 'do_dac' && MEASUREMENT_RECORD_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                        {recordTypeGroup === 'luu_tru' && ARCHIVE_RECORD_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                         {recordTypeGroup === 'all' && (
                             <>
                                 <optgroup label="Cấp giấy / Đăng ký biến động">
                                     {CAP_GIAY_RECORD_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                                 </optgroup>
-                                <optgroup label="Hồ sơ Thông thường / Đo đạc">
-                                    {RECORD_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                                <optgroup label="Tổ Đo đạc">
+                                    {MEASUREMENT_RECORD_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                                </optgroup>
+                                <optgroup label="Tổ Thông tin lưu trữ">
+                                    {ARCHIVE_RECORD_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                                 </optgroup>
                             </>
                         )}

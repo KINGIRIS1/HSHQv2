@@ -81,6 +81,15 @@ const PERMISSION_GROUPS = [
     ]
   },
   {
+    id: 'capgiay',
+    title: '3.1 Cấp giấy & Vô số GCN',
+    desc: 'Quy trình xử lý hồ sơ Cấp giấy và Quản lý Vô số GCN',
+    items: [
+      { id: 'other_records', label: 'Quy trình xử lý hồ sơ (Tab Cấp giấy)' },
+      { id: 'registration_records', label: 'Quản lý Vô số GCN (Tab Vô số GCN)' },
+    ]
+  },
+  {
     id: 'luutru',
     title: '4. Lưu trữ',
     desc: 'Quy trình, danh mục và các nút bấm thao tác tại Tab Kho lưu trữ hồ sơ & Công văn',
