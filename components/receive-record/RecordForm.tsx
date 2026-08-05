@@ -94,18 +94,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
   });
 
   const [attachedDocs, setAttachedDocs] = useState<AttachedDocItem[]>([]);
-  const [recordTypeGroup, setRecordTypeGroup] = useState<'all' | 'cap_giay' | 'do_dac' | 'luu_tru'>(() => {
-    if (linkedEmp?.department?.toLowerCase().includes('cấp giấy')) {
-      return 'cap_giay';
-    }
-    if (linkedEmp?.department?.toLowerCase().includes('lưu trữ') || linkedEmp?.department?.toLowerCase().includes('thông tin')) {
-      return 'luu_tru';
-    }
-    if (linkedEmp?.department?.toLowerCase().includes('đo đạc')) {
-      return 'do_dac';
-    }
-    return 'cap_giay';
-  });
+  const [recordTypeGroup, setRecordTypeGroup] = useState<'all' | 'cap_giay' | 'do_dac' | 'luu_tru'>('all');
   const [authCccd, setAuthCccd] = useState('');
   const [authAddress, setAuthAddress] = useState('');
   const [isAuthOpen, setIsAuthOpen] = useState(false);
@@ -355,14 +344,14 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
                         {recordTypeGroup === 'luu_tru' && ARCHIVE_RECORD_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                         {recordTypeGroup === 'all' && (
                             <>
-                                <optgroup label="Cấp giấy / Đăng ký biến động">
-                                    {CAP_GIAY_RECORD_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                                <optgroup label="1. Tổ Thông tin lưu trữ">
+                                    {ARCHIVE_RECORD_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                                 </optgroup>
-                                <optgroup label="Tổ Đo đạc">
+                                <optgroup label="2. Tổ Đo đạc">
                                     {MEASUREMENT_RECORD_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                                 </optgroup>
-                                <optgroup label="Tổ Thông tin lưu trữ">
-                                    {ARCHIVE_RECORD_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                                <optgroup label="3. Cấp giấy / Đăng ký biến động">
+                                    {CAP_GIAY_RECORD_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                                 </optgroup>
                             </>
                         )}

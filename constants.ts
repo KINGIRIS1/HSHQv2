@@ -60,18 +60,12 @@ export const ARCHIVE_RECORD_TYPES = [
 export const MEASUREMENT_RECORD_TYPES = [
   '2.1 Trích lục',
   '2.2 Trích đo',
+  '2.3 Cập nhật số thửa',
   '2.4 Trích đo Cắm mốc',
-  '2.5 Trích đo Tách - Hợp thửa',
-  '2.3 Cập nhật số thửa'
+  '2.5 Trích đo Tách - Hợp thửa'
 ];
 
-// Danh sách loại hồ sơ CƠ BẢN (Gồm Lưu trữ & Đo đạc)
-export const RECORD_TYPES = [
-  ...ARCHIVE_RECORD_TYPES,
-  ...MEASUREMENT_RECORD_TYPES
-];
-
-// Danh sách loại hồ sơ CẤP GIẤY / ĐĂNG KÝ BIẾN ĐỘNG ĐẤT ĐAI
+// Danh sách loại hồ sơ CẤP GIẤY / ĐĂNG KÝ BIẾN ĐỘNG ĐẤT ĐAI (3.x)
 export const CAP_GIAY_RECORD_TYPES = [
   '3.1.1 Chuyển nhượng',
   '3.1.2 Tặng cho',
@@ -85,7 +79,14 @@ export const CAP_GIAY_RECORD_TYPES = [
   '3.5.1 Gia hạn',
   '3.6.1 Chuyển mục đích không xin phép',
   '3.6.2 Chuyển mục đích không xin phép (có thuế)',
-  '37.1 Đính chính - Biến động'
+  '3.7.1 Đính chính GCN'
+];
+
+// Danh sách loại hồ sơ CHÍNH DÙNG CHO TIẾP NHẬN (Tất cả từ 1.1 đến 3.7.1)
+export const RECORD_TYPES = [
+  ...ARCHIVE_RECORD_TYPES,
+  ...MEASUREMENT_RECORD_TYPES,
+  ...CAP_GIAY_RECORD_TYPES
 ];
 
 export const CAP_GIAY_RECORD_TYPE_DESCRIPTIONS: Record<string, string> = {
@@ -101,14 +102,12 @@ export const CAP_GIAY_RECORD_TYPE_DESCRIPTIONS: Record<string, string> = {
   '3.5.1 Gia hạn': 'Gia hạn thời hạn sử dụng đất',
   '3.6.1 Chuyển mục đích không xin phép': 'Đăng ký chuyển mục đích sử dụng đất đối với trường hợp không phải xin phép',
   '3.6.2 Chuyển mục đích không xin phép (có thuế)': 'Đăng ký chuyển mục đích sử dụng đất không xin phép (có nghĩa vụ tài chính)',
+  '3.7.1 Đính chính GCN': 'Đính chính - Biến động thông tin Giấy chứng nhận',
   '37.1 Đính chính - Biến động': 'Đính chính - Biến động đất đai'
 };
 
-// Danh sách loại hồ sơ MỞ RỘNG (Dùng cho form Thêm mới trong "Tất cả hồ sơ" - Admin/Nội bộ)
-export const EXTENDED_RECORD_TYPES = [
-  ...RECORD_TYPES,
-  ...CAP_GIAY_RECORD_TYPES
-];
+// Danh sách loại hồ sơ MỞ RỘNG
+export const EXTENDED_RECORD_TYPES = RECORD_TYPES;
 
 // Hàm chuẩn hóa hiển thị tên Xã/Phường (Xóa Xã/Phường/TT)
 export const getNormalizedWard = (ward: string | null | undefined): string => {
@@ -172,7 +171,7 @@ export const getShortRecordType = (type: string | null | undefined): string => {
   if (t.startsWith('3.5.1') || t.includes('gia hạn')) return '3.5.1 Gia hạn';
   if (t.startsWith('3.6.2') || (t.includes('chuyển mục đích') && t.includes('có thuế'))) return '3.6.2 Chuyển mục đích (có thuế)';
   if (t.startsWith('3.6.1') || t.includes('chuyển mục đích')) return '3.6.1 Chuyển mục đích không xin phép';
-  if (t.startsWith('37.1') || t.startsWith('3.5.2') || t.includes('đính chính')) return '37.1 Đính chính - Biến động';
+  if (t.startsWith('3.7.1') || t.startsWith('37.1') || t.startsWith('3.5.2') || t.includes('đính chính')) return '3.7.1 Đính chính GCN';
 
   // Fallbacks for legacy other categories
   if (t.includes('cung cấp tài liệu đất đai') || t.includes('cung cấp dữ liệu') || t.includes('sao lục') || t.includes('sao luc') || t.includes('cc dl đđ')) return '1.1 Sao lục';

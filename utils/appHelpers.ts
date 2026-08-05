@@ -185,7 +185,7 @@ export const calculateDeadlineHelper = (type: string, receivedDateStr: string, h
         daysToAdd = 10;
     } else if (lowerType.includes('3.2.1') || lowerType.includes('3.2.2') || lowerType.includes('3.5.1') || lowerType.includes('gia hạn') || (lowerType.includes('cấp đổi') && !lowerType.includes('trích đo'))) {
         daysToAdd = 7;
-    } else if (lowerType.includes('3.1.1') || lowerType.includes('3.1.2') || lowerType.includes('3.1.3') || lowerType.includes('3.1.4') || lowerType.includes('3.3.1') || lowerType.includes('3.3.2') || lowerType.includes('3.6.1') || lowerType.includes('37.1') || lowerType.includes('chuyển nhượng') || lowerType.includes('tặng cho') || lowerType.includes('thừa kế') || lowerType.includes('thỏa thuận') || lowerType.includes('chuyển mục đích') || lowerType.includes('đính chính')) {
+    } else if (lowerType.includes('3.1.1') || lowerType.includes('3.1.2') || lowerType.includes('3.1.3') || lowerType.includes('3.1.4') || lowerType.includes('3.3.1') || lowerType.includes('3.3.2') || lowerType.includes('3.6.1') || lowerType.includes('3.7.1') || lowerType.includes('37.1') || lowerType.includes('chuyển nhượng') || lowerType.includes('tặng cho') || lowerType.includes('thừa kế') || lowerType.includes('thỏa thuận') || lowerType.includes('chuyển mục đích') || lowerType.includes('đính chính')) {
         daysToAdd = 10;
     } else if (lowerType.includes('3.4.1') || lowerType.includes('trích đo chỉnh lý') || lowerType.includes('chỉnh lý bản đồ')) {
         daysToAdd = 15;
