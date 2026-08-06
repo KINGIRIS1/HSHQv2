@@ -192,11 +192,11 @@ export const RecordTimelineProgress: React.FC<RecordTimelineProgressProps> = ({
         id: 'tham_dinh',
         label: 'THẨM ĐỊNH / THẨM TRA',
         date: ['tham_dinh', 'phieu_chuyen_thue', 'cho_nop_thue', 'cho_giay_nop_tien', 'hoan_thien_trinh_duyet', 'vo_so_gcn', 'cho_ban_giao', 'da_ban_giao'].includes(record.capGiaySubStep || '') ? record.assignedDate : null,
-        forceActive: ['tham_dinh', 'phieu_chuyen_thue', 'cho_nop_thue', 'cho_giay_nop_tien', 'hoan_thien_trinh_duyet', 'vo_so_gcn', 'cho_ban_giao', 'da_ban_giao'].includes(record.capGiaySubStep || '') || !!record.assignedDate,
+        forceActive: record.capGiaySubStep === 'tham_dinh' || (['phieu_chuyen_thue', 'cho_nop_thue', 'cho_giay_nop_tien', 'hoan_thien_trinh_duyet', 'vo_so_gcn', 'cho_ban_giao', 'da_ban_giao'].includes(record.capGiaySubStep || '') && !!record.initialAssignedTo && record.initialAssignedTo !== record.assignedTo),
         icon: ClipboardList,
         colorClass: { text: 'text-blue-700', border: 'border-blue-600', bg: 'bg-blue-600' },
-        subText: (record.initialAssignedTo || record.assignedTo) ? (() => {
-          const empId = record.initialAssignedTo || record.assignedTo;
+        subText: (record.capGiaySubStep === 'tham_dinh' || record.initialAssignedTo) ? (() => {
+          const empId = record.capGiaySubStep === 'tham_dinh' ? record.assignedTo : (record.initialAssignedTo || record.assignedTo);
           const emp = employees.find(e => e.id === empId);
           return emp ? `${emp.name} (${emp.department})` : undefined;
         })() : undefined,
@@ -205,11 +205,11 @@ export const RecordTimelineProgress: React.FC<RecordTimelineProgressProps> = ({
       {
         id: 'phieu_chuyen_thue',
         label: 'PHIẾU CHUYỂN THUẾ',
-        date: ['phieu_chuyen_thue', 'cho_nop_thue', 'cho_giay_nop_tien', 'hoan_thien_trinh_duyet', 'vo_so_gcn', 'cho_ban_giao', 'da_ban_giao'].includes(record.capGiaySubStep || '') ? (record.pendingCheckDate || record.assignedDate) : null,
+        date: ['phieu_chuyen_thue', 'cho_nop_thue', 'cho_giay_nop_tien', 'hoan_thien_trinh_duyet', 'vo_so_gcn', 'cho_ban_giao', 'da_ban_giao'].includes(record.capGiaySubStep || '') ? (record.assignedDate) : null,
         forceActive: ['phieu_chuyen_thue', 'cho_nop_thue', 'cho_giay_nop_tien', 'hoan_thien_trinh_duyet', 'vo_so_gcn', 'cho_ban_giao', 'da_ban_giao'].includes(record.capGiaySubStep || ''),
         icon: FileText,
         colorClass: { text: 'text-purple-700', border: 'border-purple-600', bg: 'bg-purple-600' },
-        subText: (record.capGiaySubStep === 'phieu_chuyen_thue' && record.assignedTo && record.assignedTo !== record.initialAssignedTo)
+        subText: (['phieu_chuyen_thue', 'cho_nop_thue', 'cho_giay_nop_tien', 'hoan_thien_trinh_duyet', 'vo_so_gcn', 'cho_ban_giao', 'da_ban_giao'].includes(record.capGiaySubStep || '') && record.assignedTo)
           ? (() => {
               const emp = employees.find(e => e.id === record.assignedTo);
               return emp ? `${emp.name} (${emp.department})` : undefined;
@@ -220,21 +220,23 @@ export const RecordTimelineProgress: React.FC<RecordTimelineProgressProps> = ({
       {
         id: 'cho_nop_thue',
         label: 'CHỜ GIẤY NỘP TIỀN',
-        date: ['cho_nop_thue', 'cho_giay_nop_tien', 'hoan_thien_trinh_duyet', 'vo_so_gcn', 'cho_ban_giao', 'da_ban_giao'].includes(record.capGiaySubStep || '') ? (record.pendingCheckDate || record.assignedDate) : null,
+        date: ['cho_nop_thue', 'cho_giay_nop_tien', 'hoan_thien_trinh_duyet', 'vo_so_gcn', 'cho_ban_giao', 'da_ban_giao'].includes(record.capGiaySubStep || '') ? (record.assignedDate) : null,
         forceActive: ['cho_nop_thue', 'cho_giay_nop_tien', 'hoan_thien_trinh_duyet', 'vo_so_gcn', 'cho_ban_giao', 'da_ban_giao'].includes(record.capGiaySubStep || ''),
         icon: Clock,
         colorClass: { text: 'text-emerald-700', border: 'border-emerald-600', bg: 'bg-emerald-600' },
-        subText: (record.capGiaySubStep === 'cho_nop_thue' || record.capGiaySubStep === 'cho_giay_nop_tien') ? 'Chờ người dân nộp thuế/tiền' : undefined,
+        subText: (record.capGiaySubStep === 'cho_nop_thue' || record.capGiaySubStep === 'cho_giay_nop_tien')
+          ? 'Chờ người dân nộp thuế/tiền'
+          : (['hoan_thien_trinh_duyet', 'vo_so_gcn', 'cho_ban_giao', 'da_ban_giao'].includes(record.capGiaySubStep || '') ? 'Đã hoàn tất nộp thuế' : undefined),
         durationLabel: null
       },
       {
         id: 'hoan_thien_trinh_duyet',
         label: 'IN & HOÀN THIỆN HỒ SƠ',
-        date: ['hoan_thien_trinh_duyet', 'vo_so_gcn', 'cho_ban_giao', 'da_ban_giao'].includes(record.capGiaySubStep || '') ? record.submissionDate : null,
+        date: ['hoan_thien_trinh_duyet', 'vo_so_gcn', 'cho_ban_giao', 'da_ban_giao'].includes(record.capGiaySubStep || '') ? (record.submissionDate || record.assignedDate) : null,
         forceActive: ['hoan_thien_trinh_duyet', 'vo_so_gcn', 'cho_ban_giao', 'da_ban_giao'].includes(record.capGiaySubStep || ''),
         icon: FileCheck,
         colorClass: { text: 'text-amber-700', border: 'border-amber-600', bg: 'bg-amber-600' },
-        subText: (record.capGiaySubStep === 'hoan_thien_trinh_duyet' && record.assignedTo && record.assignedTo !== record.initialAssignedTo)
+        subText: (['hoan_thien_trinh_duyet', 'vo_so_gcn', 'cho_ban_giao', 'da_ban_giao'].includes(record.capGiaySubStep || '') && record.assignedTo)
           ? (() => {
               const emp = employees.find(e => e.id === record.assignedTo);
               return emp ? `${emp.name} (${emp.department})` : undefined;
