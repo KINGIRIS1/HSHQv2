@@ -153,8 +153,8 @@ export const getShortRecordType = (type: string | null | undefined): string => {
   if (t.startsWith('1.1') || t === 'cung cấp tài liệu đất đai' || t === 'cung cấp dữ liệu đất đai' || t === 'sao lục' || t === 'sao luc' || t === 'sao lục hồ sơ' || t === '1.1 cc dl đđ' || t === '1.1 sao lục') return '1.1 Sao lục';
   if (t.startsWith('1.2') || t === 'công văn') return '1.2 Công văn';
   if (t.includes('trích lục quy hoạch') || t.includes('trích lục qh') || t === '2.1 trích lục qh' || t === '2.1 trích lục quy hoạch' || t.startsWith('2.1') || t === 'trích lục') return '2.1 Trích lục';
-  if (t.startsWith('2.2') || t === 'trích đo') return '2.2 Trích đo';
-  if (t.startsWith('2.3') || t === 'cung cấp số thửa đất' || t === 'cung cấp số thửa' || t === 'cc số thửa' || t === 'cập nhập số thửa' || t === 'cập nhật số thửa' || t === 'cn số thửa') return '2.3 CN Số Thửa';
+  if (t.startsWith('2.2') || (t.includes('trích đo') && !t.includes('cắm mốc') && !t.includes('tách') && !t.includes('hợp') && !t.includes('chỉnh lý') && !t.includes('số thửa') && !t.includes('cập nhật')) || t.includes('2.3 trích đo') || t === 'trích đo') return '2.2 Trích đo';
+  if (t.startsWith('2.3') || t === 'cung cấp số thửa đất' || t === 'cung cấp số thửa' || t === 'cc số thửa' || t === 'cập nhập số thửa' || t === 'cập nhật số thửa' || t === 'cn số thửa' || t.includes('số thửa')) return '2.3 CN Số Thửa';
   if (t.startsWith('2.4') || t === 'cắm mốc' || t === 'trích đo cắm mốc') return '2.4 Cắm mốc';
   if (t.startsWith('2.5') || t === 'tách thửa' || t === 'tách-hợp thửa' || t === 'trích đo tách - hợp thửa') return '2.5 Tách-Hợp thửa';
 

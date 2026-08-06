@@ -137,9 +137,9 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
     allowedRecordTypes = [
       '2.1 Trích lục',
       '2.2 Trích đo',
+      '2.3 Cập nhật số thửa',
       '2.4 Cắm mốc',
-      '2.5 Tách-Hợp thửa',
-      '2.3 CC số thửa'
+      '2.5 Tách-Hợp thửa'
     ];
   } else {
     allowedRecordTypes = EXTENDED_RECORD_TYPES;
