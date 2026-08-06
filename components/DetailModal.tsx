@@ -853,7 +853,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                         {/* HÀNG BÁO HỢP ĐỒNG (CHỈ ÁP DỤNG CHO 2.3 VÀ 2.4) & SỐ TRÍCH ĐO / TRÍCH LỤC */}
                         {(() => {
                             const isContractProcedure = !!(record?.recordType && (getShortRecordType(record.recordType).startsWith('2.3') || getShortRecordType(record.recordType).startsWith('2.4')));
-                            const hasExcerptOrMeasurement = !!(recordTypeLower.includes('trích đo') || recordTypeLower.includes('trích lục') || record?.measurementNumber || record?.excerptNumber);
+                            const hasExcerptOrMeasurement = !isCapGiayRecord(record) && !!(recordTypeLower.includes('trích đo') || recordTypeLower.includes('trích lục') || record?.measurementNumber || record?.excerptNumber);
 
                             if (!isContractProcedure && !hasExcerptOrMeasurement) return null;
 
@@ -1019,112 +1019,27 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
 
                 {/* COLUMN 3: TIẾN ĐỘ & NHẮC VIỆC */}
                 <div className="space-y-6">
-                    {/* QUY TRÌNH BƯỚC NHỎ CẤP GIẤY (CHỈ DÀNH RIÊNG HỒ SƠ CẤP GIẤY) */}
-                    {isCapGiayRecord(record) && (
-                        <div className="bg-white rounded-xl border border-teal-200 shadow-sm overflow-hidden p-4 bg-gradient-to-br from-teal-50/50 to-white">
-                            <div className="flex items-center justify-between mb-3">
-                                <span className="text-xs font-extrabold text-teal-800 uppercase flex items-center gap-1.5">
-                                    <FileText size={16} className="text-teal-600" />
-                                    Tiến độ xử lý Cấp Giấy
-                                </span>
-                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${getCapGiaySubStepBadgeColor(record.capGiaySubStep)}`}>
-                                    {getCapGiaySubStepLabel(record.capGiaySubStep)}
-                                </span>
+                    {/* KHU VỰC NHẬP THÔNG TIN VÔ SỔ GCN KHI KÝ XONG */}
+                    {isCapGiayRecord(record) && (record.capGiaySubStep === 'vo_so_gcn' || record.status === RecordStatus.SIGNED) && (
+                        <div className="bg-white rounded-xl border border-teal-200 shadow-sm overflow-hidden p-3 bg-gradient-to-br from-teal-50/50 to-white flex flex-col gap-3 animate-fade-in">
+                            <div className="text-xs font-bold text-teal-900 flex items-center justify-between">
+                                <span className="flex items-center gap-1.5"><FileCheck size={16} className="text-teal-600" /> Nhập thông tin Vô sổ GCN & Chuyển Chờ bàn giao</span>
+                                <span className="text-[10px] bg-teal-100 text-teal-800 px-2 py-0.5 rounded font-bold">Vô sổ GCN</span>
                             </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                {CAP_GIAY_SUB_STEPS.map((step, idx) => {
-                                    const isSelected = (record.capGiaySubStep || 'tham_dinh') === step.id;
-                                    return (
-                                        <button
-                                            key={step.id}
-                                            disabled={!canPerformAction}
-                                            onClick={async () => {
-                                                if (!canPerformAction) return;
-                                                const updated = { ...record, capGiaySubStep: step.id };
-                                                const res = await updateRecordApi(updated);
-                                                if (res) {
-                                                    record.capGiaySubStep = step.id;
-                                                    if (onRefreshData) onRefreshData();
-                                                }
-                                            }}
-                                            className={`px-3 py-2 rounded-lg text-left text-xs font-bold transition-all flex items-center gap-2 border ${
-                                                isSelected
-                                                    ? 'bg-teal-600 text-white border-teal-600 shadow-sm'
-                                                    : 'bg-white text-gray-700 border-gray-200 hover:bg-teal-50 hover:border-teal-300'
-                                            }`}
-                                        >
-                                            <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] shrink-0 font-black ${
-                                                isSelected ? 'bg-white text-teal-700' : 'bg-gray-100 text-gray-600'
-                                            }`}>
-                                                {idx + 1}
-                                            </span>
-                                            <span className="truncate">{step.shortLabel}</span>
-                                        </button>
-                                    );
-                                })}
-                            </div>
-
-                            {(record.capGiaySubStep === 'cho_nop_thue' || record.capGiaySubStep === 'cho_giay_nop_tien') && (
-                                <div className="mt-3 p-3 bg-amber-50 rounded-xl border border-amber-200 flex flex-col gap-2 animate-fade-in">
-                                    <div className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
-                                        <CheckSquare size={16} className="text-amber-600" />
-                                        <span>Xác nhận hoàn tất nộp tiền thuế (1 cửa / Thuế)</span>
-                                    </div>
-                                    <p className="text-[11px] text-amber-700 leading-snug">
-                                        Khi xác nhận đã nộp tiền thuế, hồ sơ tự động chuyển về tab Giao việc để phân công cho người in với SLA 5 ngày.
-                                    </p>
-                                    <button
-                                        type="button"
-                                        disabled={!canPerformAction}
-                                        onClick={async () => {
-                                            if (!canPerformAction) return;
-                                            const nowStr = new Date().toISOString();
-                                            const todayStr = nowStr.split('T')[0];
-                                            const newDeadline = calculateDeadlineHelperByDays(5, todayStr, []);
-                                            const updated = { 
-                                                ...record, 
-                                                capGiaySubStep: 'hoan_thien_trinh_duyet', 
-                                                status: RecordStatus.RECEIVED,
-                                                assignedTo: "",
-                                                deadline: newDeadline
-                                            };
-                                            const res = await updateRecordApi(updated);
-                                            if (res) {
-                                                record.capGiaySubStep = 'hoan_thien_trinh_duyet';
-                                                record.status = RecordStatus.RECEIVED;
-                                                record.assignedTo = "";
-                                                record.deadline = newDeadline;
-                                                if (onRefreshData) onRefreshData();
-                                            }
-                                        }}
-                                        className="w-full py-2 bg-amber-600 hover:bg-amber-700 active:scale-98 text-white rounded-lg text-xs font-black shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
-                                    >
-                                        <Check size={16} className="stroke-[3]" />
-                                        <span>Xác nhận đã nộp tiền thuế → Chuyển về Giao việc (Bước 4)</span>
-                                    </button>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                <div>
+                                    <label className="text-[10px] font-bold text-teal-800 block mb-1">Số phát hành GCN</label>
+                                    <input 
+                                        type="text" 
+                                        placeholder="VD: CD 123456" 
+                                        className="w-full text-xs font-bold border border-teal-300 rounded px-2.5 py-1.5 bg-white text-gray-800 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                                        value={voSoIssueNumber}
+                                        onChange={(e) => setVoSoIssueNumber(e.target.value)}
+                                    />
                                 </div>
-                            )}
-
-                            {(record.capGiaySubStep === 'vo_so_gcn' || record.status === RecordStatus.SIGNED) && (
-                                <div className="mt-3 p-3 bg-teal-50 rounded-xl border border-teal-200 flex flex-col gap-3 animate-fade-in">
-                                    <div className="text-xs font-bold text-teal-900 flex items-center justify-between">
-                                        <span className="flex items-center gap-1.5"><FileCheck size={16} className="text-teal-600" /> Nhập thông tin Vô sổ GCN & Chuyển Chờ bàn giao</span>
-                                        <span className="text-[10px] bg-teal-100 text-teal-800 px-2 py-0.5 rounded font-bold">Bước 5</span>
-                                    </div>
-                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                                        <div>
-                                            <label className="text-[10px] font-bold text-teal-800 block mb-1">Số phát hành GCN</label>
-                                            <input 
-                                                type="text" 
-                                                placeholder="VD: CD 123456" 
-                                                className="w-full text-xs font-bold border border-teal-300 rounded px-2.5 py-1.5 bg-white text-gray-800 focus:outline-none focus:ring-1 focus:ring-teal-500"
-                                                value={voSoIssueNumber}
-                                                onChange={(e) => setVoSoIssueNumber(e.target.value)}
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="text-[10px] font-bold text-teal-800 block mb-1">Số vào sổ GCN</label>
-                                            <input 
+                                <div>
+                                    <label className="text-[10px] font-bold text-teal-800 block mb-1">Số vào sổ GCN</label>
+                                    <input 
                                                 type="text" 
                                                 placeholder="VD: CH 01234" 
                                                 className="w-full text-xs font-bold border border-teal-300 rounded px-2.5 py-1.5 bg-white text-gray-800 focus:outline-none focus:ring-1 focus:ring-teal-500"
@@ -1172,8 +1087,6 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                                     </button>
                                 </div>
                             )}
-                        </div>
-                    )}
 
                     {/* TIMELINE */}
                     <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">

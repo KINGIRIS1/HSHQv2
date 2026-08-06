@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { RecordFile, Employee, User, UserRole, SplitItem, RecordStatus } from '../../types';
-import { getNormalizedWard, getShortRecordType } from '../../constants';
+import { getNormalizedWard, getShortRecordType, isCapGiayRecord } from '../../constants';
 import StatusBadge from '../StatusBadge';
 import { 
   X, MapPin, FileText, User as UserIcon, Receipt, DollarSign, 
@@ -574,13 +574,13 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                 </div>
                 
                 {/* Số trích đo & trích lục */}
-                {recordTypeLower.includes('trích đo') && (
+                {!isCapGiayRecord(record) && recordTypeLower.includes('trích đo') && (
                   <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
                     <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">Số trích đo</p>
                     <p className="text-sm font-bold text-slate-800">{record.measurementNumber || '---'}</p>
                   </div>
                 )}
-                {recordTypeLower.includes('trích lục') && (
+                {!isCapGiayRecord(record) && recordTypeLower.includes('trích lục') && (
                   <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
                     <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">Số trích lục</p>
                     <p className="text-sm font-bold text-slate-800">{record.excerptNumber || '---'}</p>

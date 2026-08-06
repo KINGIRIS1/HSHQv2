@@ -42,11 +42,11 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards, activeTab: pr
     const [records, setRecords] = useState<ArchiveRecord[]>([]);
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
-    const [internalActiveTab, setInternalActiveTab] = useState<'pending_entry' | 'completed_entry' | 'all'>('pending_entry');
+    const [internalActiveTab, setInternalActiveTab] = useState<'pending_entry' | 'completed_entry' | 'all' | 'scanned'>('pending_entry');
     const activeTab = propActiveTab ?? internalActiveTab;
-    const setActiveTab = (tab: 'pending_entry' | 'completed_entry' | 'all') => {
+    const setActiveTab = (tab: 'pending_entry' | 'completed_entry' | 'all' | 'scanned') => {
         setInternalActiveTab(tab);
-        if (onTabChange) onTabChange(tab);
+        if (onTabChange) onTabChange(tab as any);
     };
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [savingId, setSavingId] = useState<string | null>(null);
@@ -147,30 +147,31 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards, activeTab: pr
 
         const mappedLandRecords: ArchiveRecord[] = (landRecords || [])
             .filter(r => {
-                const isCapGiay = isCapGiayRecord(r) || r.recordGroup === 'cap_giay';
+                const isCapGiay = isCapGiayRecord(r) || (r as any).recordGroup === 'cap_giay';
                 const isApprovedOrSignedOrHandover = r.status === RecordStatus.SIGNED || r.status === RecordStatus.HANDOVER || !!r.approvalDate || !!r.entryNumber;
-                return isCapGiay && isApprovedOrSignedOrHandover && !existingIds.has(r.id) && !existingCodeSet.has(r.recordCode);
+                return isCapGiay && isApprovedOrSignedOrHandover && !existingIds.has(r.id) && !existingCodeSet.has(r.code);
             })
             .map(r => ({
                 id: r.id,
                 type: 'vaoso' as const,
-                status: r.status === RecordStatus.HANDOVER ? 'completed' : 'pending',
+                status: r.status === RecordStatus.HANDOVER ? 'completed' : 'executed',
                 so_hieu: r.issueNumber || '',
                 trich_yeu: r.content || r.recordType || '',
-                ngay_thang: r.receivedDate || r.created_at || new Date().toISOString(),
+                ngay_thang: r.receivedDate || (r as any).created_at || new Date().toISOString(),
                 noi_nhan_gui: r.customerName || '',
                 created_by: r.receivedBy || 'Hệ thống',
+                created_at: (r as any).created_at || new Date().toISOString(),
                 data: {
                     so_vao_so: r.entryNumber || '',
-                    ma_ho_so: r.recordCode || '',
+                    ma_ho_so: r.code || '',
                     ten_chu_su_dung: r.customerName || '',
-                    cccd: r.customerCcid || '',
+                    cccd: r.cccd || '',
                     dia_chi_chu: r.customerAddress || '',
                     loai_bien_dong: r.recordType || '',
                     loai_gcn: r.issueNumber ? 'GCN mới' : 'GCN cũ',
                     ngay_nhan: r.receivedDate || '',
-                    so_to: r.mapSheetNumber || '',
-                    so_thua: r.parcelNumber || '',
+                    so_to: r.mapSheet || '',
+                    so_thua: r.landPlot || '',
                     tong_dien_tich: r.area ? String(r.area) : '',
                     dien_tich_tho_cu: r.residentialArea ? String(r.residentialArea) : '',
                     dia_danh: r.ward || '',
@@ -1139,14 +1140,13 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards, activeTab: pr
                         )}
                     </div>
 
-                    {/* 6. Nút Cài đặt sổ nằm ngoài cùng bên tay phải */}
+                    {/* 6. Nút Cài đặt sổ nằm ngoài cùng bên tay phải (Chỉ hiển thị icon) */}
                     <button 
                         onClick={() => setShowSettingsModal(true)} 
-                        className="flex items-center gap-1.5 bg-slate-700 text-white px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-slate-800 shadow-xs transition-colors cursor-pointer shrink-0 ml-auto"
+                        className="p-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 shadow-xs transition-colors cursor-pointer shrink-0 ml-auto flex items-center justify-center"
                         title="Cài đặt số vào sổ"
                     >
-                        <Settings size={15}/>
-                        <span>Cài đặt sổ</span>
+                        <Settings size={16}/>
                     </button>
                 </div>
             </div>

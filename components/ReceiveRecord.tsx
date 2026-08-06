@@ -146,20 +146,45 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
       return 'CT';
   };
 
-  const calculateNextCode = (wardName: string, dateStr: string, existingCodes: string[] = []) => {
-    if (!dateStr) return '';
+  const calculateNextCode = (wardName: string, dateStr: string, existingCodes: string[] = [], recordType?: string) => {
+    let dateObj = dateStr ? new Date(dateStr) : new Date();
+    if (isNaN(dateObj.getTime())) dateObj = new Date();
 
-    const d = new Date(dateStr);
-    const year = d.getFullYear().toString();
+    const year = dateObj.getFullYear().toString();
+
+    // Check for 1.2 Công văn
+    if (recordType && (recordType.startsWith('1.2') || recordType.includes('Công văn'))) {
+      const prefix = `CV-${year}-`;
+      let maxSeq = 0;
+
+      const checkCvSeq = (code: string | undefined | null) => {
+        if (!code) return;
+        if (code.startsWith(prefix)) {
+          const numPart = code.substring(prefix.length);
+          const seqNum = parseInt(numPart, 10);
+          if (!isNaN(seqNum) && seqNum > maxSeq) {
+            maxSeq = seqNum;
+          }
+        }
+      };
+
+      combinedRecords.forEach((r: RecordFile) => checkCvSeq(r.code));
+      existingCodes.forEach(checkCvSeq);
+
+      const nextSeq = (maxSeq + 1).toString().padStart(4, '0');
+      return `${prefix}${nextSeq}`;
+    }
+
     const yy = year.slice(-2);
-    const mm = ('0' + (d.getMonth() + 1)).slice(-2);
-    const dd = ('0' + d.getDate()).slice(-2);
+    const mm = ('0' + (dateObj.getMonth() + 1)).slice(-2);
+    const dd = ('0' + dateObj.getDate()).slice(-2);
     const datePrefix = `${yy}${mm}${dd}`;
     
     let maxSeq = 0;
     
     const checkSeq = (code: string | undefined | null) => {
         if (!code) return;
+        if (code.startsWith('CV-')) return;
         const parts = code.split('-');
         if (parts.length === 2 || parts.length === 3) {
             const rDate = parts.length === 2 ? parts[0] : parts[1];

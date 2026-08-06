@@ -170,6 +170,7 @@ export interface RecordFile {
   
   status: RecordStatus;   
   assignedTo?: string | null;    
+  lastAssignedTo?: string | null; // Ghi nhớ người thụ lý cũ để gợi ý phân công khi giao lại
   notes?: string | null;         
   privateNotes?: string | null;  
   personalNotes?: string | null; // Ghi chú cá nhân của nhân viên

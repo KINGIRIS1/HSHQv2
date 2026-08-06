@@ -87,7 +87,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
   onCreateLiquidation,
   onMapCorrection,
 }) => {
-  // Thêm tab 'all'
+  // Thêm tab 'all', 'overdue', 'upcoming'
   const [activeTab, setActiveTab] = useState<
     | "all"
     | "pending"
@@ -95,6 +95,8 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
     | "pending_sign"
     | "finished"
     | "reminder"
+    | "overdue"
+    | "upcoming"
   >(isDirector ? "pending_sign" : "pending");
   const [currentPage, setCurrentPage] = useState(1);
   const [mobileVisibleCount, setMobileVisibleCount] = useState(20);
@@ -293,6 +295,83 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
     }
   }, [isChecker]);
 
+  // Helper tính số ngày còn lại đến hạn
+  function getDaysRemaining(r: RecordFile): number | null {
+    const isFinished =
+      r.status === RecordStatus.HANDOVER ||
+      r.status === RecordStatus.RETURNED ||
+      r.status === RecordStatus.REJECTED ||
+      r.status === RecordStatus.WITHDRAWN ||
+      Boolean(r.completedDate) ||
+      Boolean(r.exportDate) ||
+      Boolean(r.resultReturnedDate);
+
+    if (isFinished || !r.deadline) return null;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const dl = new Date(r.deadline);
+    dl.setHours(0, 0, 0, 0);
+    return Math.ceil((dl.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  }
+
+  // Helper filter & sort chung (Sắp xếp thông minh đưa hồ sơ trễ hạn lên đầu tiên, sắp xếp giảm dần theo mức độ trễ)
+  function filterAndSort(list: RecordFile[], term: string, sort: any) {
+    if (term) {
+      const lowerSearch = removeVietnameseTones(term);
+      const rawSearch = term.toLowerCase();
+      list = list.filter((r) => {
+        const nameNorm = removeVietnameseTones(r.customerName || "");
+        const codeRaw = (r.code || "").toLowerCase();
+        const wardNorm = removeVietnameseTones(r.ward || "");
+        return (
+          nameNorm.includes(lowerSearch) ||
+          codeRaw.includes(rawSearch) ||
+          wardNorm.includes(lowerSearch)
+        );
+      });
+    }
+
+    return list.sort((a, b) => {
+      // Nếu người dùng chọn sắp xếp thủ công theo cột khác không phải deadline
+      if (sort.key && sort.key !== "deadline") {
+        const aValue = a[sort.key as keyof RecordFile];
+        const bValue = b[sort.key as keyof RecordFile];
+        if (!aValue) return 1;
+        if (!bValue) return -1;
+        if (aValue < bValue) return sort.direction === "asc" ? -1 : 1;
+        if (aValue > bValue) return sort.direction === "asc" ? 1 : -1;
+        return 0;
+      }
+
+      // SẮP XẾP THÔNG MINH (Default hoặc khi xếp theo hạn xử lý):
+      // 1. Hồ sơ trễ hạn (days < 0): Lên đầu tiên! Sắp xếp trễ nhiều ngày nhất trước (-15 ngày, -10 ngày, -2 ngày, -1 ngày)
+      // 2. Hồ sơ còn hạn/sắp tới hạn (days >= 0): Sắp xếp theo hạn gần nhất trước (0 ngày, 1 ngày, 2 ngày...)
+      // 3. Hồ sơ đã hoàn thành / không có hạn: Đưa xuống cuối
+      const daysA = getDaysRemaining(a);
+      const daysB = getDaysRemaining(b);
+
+      const isOverdueA = daysA !== null && daysA < 0;
+      const isOverdueB = daysB !== null && daysB < 0;
+
+      if (isOverdueA && isOverdueB) {
+        return daysA! - daysB!; // -15 trước -2 (vì -15 < -2 => trễ nhiều hơn lên trước)
+      }
+      if (isOverdueA && !isOverdueB) return -1;
+      if (!isOverdueA && isOverdueB) return 1;
+
+      if (daysA !== null && daysB !== null) {
+        return daysA - daysB; // 0 ngày, 1 ngày, 2 ngày...
+      }
+      if (daysA !== null && daysB === null) return -1;
+      if (daysA === null && daysB !== null) return 1;
+
+      const timeA = a.deadline ? new Date(a.deadline).getTime() : 0;
+      const timeB = b.deadline ? new Date(b.deadline).getTime() : 0;
+      return sort.direction === "desc" ? timeB - timeA : timeA - timeB;
+    });
+  }
+
   // 0. Tất cả hồ sơ được giao
   const allRecords = useMemo(() => {
     return filterAndSort(myRecords, searchTerm, sortConfig);
@@ -339,6 +418,24 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
     return filterAndSort(list, searchTerm, sortConfig);
   }, [myRecords, searchTerm, sortConfig]);
 
+  // 6. Hồ sơ Trễ hạn (chưa hoàn thành và quá hạn)
+  const overdueRecords = useMemo(() => {
+    let list = myRecords.filter((r) => {
+      const days = getDaysRemaining(r);
+      return days !== null && days < 0;
+    });
+    return filterAndSort(list, searchTerm, sortConfig);
+  }, [myRecords, searchTerm, sortConfig]);
+
+  // 7. Hồ sơ Sắp tới hạn (chưa hoàn thành và còn 0 - 2 ngày)
+  const upcomingRecords = useMemo(() => {
+    let list = myRecords.filter((r) => {
+      const days = getDaysRemaining(r);
+      return days !== null && days >= 0 && days <= 2;
+    });
+    return filterAndSort(list, searchTerm, sortConfig);
+  }, [myRecords, searchTerm, sortConfig]);
+
   // 5. Hồ sơ Có hẹn nhắc việc
   const reminderRecords = useMemo(() => {
     let list = myRecords.filter(
@@ -366,33 +463,6 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
     });
   }, [myRecords, searchTerm]);
 
-  // Helper filter & sort chung
-  function filterAndSort(list: RecordFile[], term: string, sort: any) {
-    if (term) {
-      const lowerSearch = removeVietnameseTones(term);
-      const rawSearch = term.toLowerCase();
-      list = list.filter((r) => {
-        const nameNorm = removeVietnameseTones(r.customerName || "");
-        const codeRaw = (r.code || "").toLowerCase();
-        const wardNorm = removeVietnameseTones(r.ward || "");
-        return (
-          nameNorm.includes(lowerSearch) ||
-          codeRaw.includes(rawSearch) ||
-          wardNorm.includes(lowerSearch)
-        );
-      });
-    }
-    return list.sort((a, b) => {
-      const aValue = a[sort.key as keyof RecordFile];
-      const bValue = b[sort.key as keyof RecordFile];
-      if (!aValue) return 1;
-      if (!bValue) return -1;
-      if (aValue < bValue) return sort.direction === "asc" ? -1 : 1;
-      if (aValue > bValue) return sort.direction === "asc" ? 1 : -1;
-      return 0;
-    });
-  }
-
   // Tổng hợp các chỉ số
   const completedTotal = finishedRecords.length;
 
@@ -408,7 +478,11 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
             ? reviewRecords
             : activeTab === "finished"
               ? finishedRecords
-              : reminderRecords;
+              : activeTab === "overdue"
+                ? overdueRecords
+                : activeTab === "upcoming"
+                  ? upcomingRecords
+                  : reminderRecords;
 
   const totalPages = Math.ceil(displayRecords.length / itemsPerPage);
 
@@ -684,6 +758,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
               : [];
             const newHistory = [...oldHistory, historyEntry];
 
+            const nowIso = new Date().toISOString();
             await saveArchiveRecord({
               id: record.id,
               status: "pending_sign",
@@ -691,6 +766,8 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                 ...currentArchive.data,
                 history: newHistory,
                 submitted_to: directorId,
+                assigned_to: directorId,
+                assigned_date: nowIso,
               },
             });
           }
@@ -704,6 +781,8 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
             checkedDate: record.checkedDate || nowIso,
             submittedTo: directorId,
             submissionDate: nowIso,
+            assignedTo: directorId,
+            assignedDate: nowIso,
           };
 
           if (onUpdateRecord) {
@@ -937,6 +1016,12 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
         return "Chờ kiểm tra";
       case "pending_sign":
         return "Chờ ký";
+      case "finished":
+        return "Hoàn thành";
+      case "overdue":
+        return "Trễ hạn";
+      case "upcoming":
+        return "Sắp tới hạn";
       case "reminder":
         return "Nhắc việc";
       default:
@@ -974,13 +1059,13 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
             Danh sách hồ sơ bạn đang phụ trách.
           </p>
         </div>
-        <div className={`grid ${isChecker || isMeasurementTeam ? "grid-cols-5" : "grid-cols-4"} sm:flex gap-1.5 md:gap-3 w-full md:w-auto justify-center`}>
+        <div className="flex flex-wrap gap-1.5 md:gap-2.5 w-full md:w-auto justify-center md:justify-end">
           <div 
             onClick={() => { setActiveTab("all"); setCurrentPage(1); setSearchTerm(""); }}
-            className={`cursor-pointer active:scale-95 transition-all text-center p-1.5 md:px-3 md:py-2 bg-slate-100 rounded-lg border ${activeTab === "all" ? "ring-2 ring-slate-600 border-slate-500 font-extrabold shadow-sm bg-slate-200" : "border-slate-200 hover:border-slate-300"} min-w-0 md:min-w-[90px] flex flex-col justify-center`}
+            className={`cursor-pointer active:scale-95 transition-all text-center p-1.5 md:px-3 md:py-2 bg-slate-100 rounded-lg border ${activeTab === "all" ? "ring-2 ring-slate-600 border-slate-500 font-extrabold shadow-sm bg-slate-200" : "border-slate-200 hover:border-slate-300"} min-w-[70px] md:min-w-[85px] flex flex-col justify-center`}
             title="Xem tất cả hồ sơ được giao"
           >
-            <div className="text-base md:text-2xl font-bold text-slate-800">
+            <div className="text-base md:text-xl font-bold text-slate-800">
               {myRecords.length}
             </div>
             <div className="text-[9px] md:text-xs text-slate-700 uppercase font-bold leading-tight mt-0.5">
@@ -989,10 +1074,10 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
           </div>
           <div 
             onClick={() => { setActiveTab("pending"); setCurrentPage(1); setSearchTerm(""); }}
-            className={`cursor-pointer active:scale-95 transition-all text-center p-1.5 md:px-3 md:py-2 bg-blue-50 rounded-lg border ${activeTab === "pending" ? "ring-2 ring-blue-500 border-blue-400 font-extrabold shadow-sm" : "border-blue-100 hover:border-blue-300"} min-w-0 md:min-w-[90px] flex flex-col justify-center`}
+            className={`cursor-pointer active:scale-95 transition-all text-center p-1.5 md:px-3 md:py-2 bg-blue-50 rounded-lg border ${activeTab === "pending" ? "ring-2 ring-blue-500 border-blue-400 font-extrabold shadow-sm bg-blue-100" : "border-blue-100 hover:border-blue-300"} min-w-[70px] md:min-w-[85px] flex flex-col justify-center`}
             title="Xem danh sách đang thực hiện"
           >
-            <div className="text-base md:text-2xl font-bold text-blue-700">
+            <div className="text-base md:text-xl font-bold text-blue-700">
               {pendingRecords.length}
             </div>
             <div className="text-[9px] md:text-xs text-blue-600 uppercase font-bold leading-tight mt-0.5">
@@ -1002,23 +1087,23 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
           {(isChecker || isMeasurementTeam) && (
             <div 
               onClick={() => { setActiveTab("pending_check"); setCurrentPage(1); setSearchTerm(""); }}
-              className={`cursor-pointer active:scale-95 transition-all text-center p-1.5 md:px-4 md:py-2 bg-orange-50 rounded-lg border ${activeTab === "pending_check" ? "ring-2 ring-orange-500 border-orange-400 font-extrabold shadow-sm" : "border-orange-100 hover:border-orange-300"} min-w-0 md:min-w-[100px] flex flex-col justify-center`}
+              className={`cursor-pointer active:scale-95 transition-all text-center p-1.5 md:px-3 md:py-2 bg-orange-50 rounded-lg border ${activeTab === "pending_check" ? "ring-2 ring-orange-500 border-orange-400 font-extrabold shadow-sm bg-orange-100" : "border-orange-100 hover:border-orange-300"} min-w-[70px] md:min-w-[85px] flex flex-col justify-center`}
               title="Xem danh sách chờ kiểm tra"
             >
-              <div className="text-base md:text-2xl font-bold text-orange-700">
+              <div className="text-base md:text-xl font-bold text-orange-700">
                 {pendingCheckRecords.length}
               </div>
               <div className="text-[9px] md:text-xs text-orange-600 uppercase font-bold leading-tight mt-0.5">
-                Chờ kiểm tra
+                Chờ KT
               </div>
             </div>
           )}
           <div 
             onClick={() => { setActiveTab("pending_sign"); setCurrentPage(1); setSearchTerm(""); }}
-            className={`cursor-pointer active:scale-95 transition-all text-center p-1.5 md:px-4 md:py-2 bg-purple-50 rounded-lg border ${activeTab === "pending_sign" ? "ring-2 ring-purple-500 border-purple-400 font-extrabold shadow-sm" : "border-purple-100 hover:border-purple-300"} min-w-0 md:min-w-[100px] flex flex-col justify-center`}
+            className={`cursor-pointer active:scale-95 transition-all text-center p-1.5 md:px-3 md:py-2 bg-purple-50 rounded-lg border ${activeTab === "pending_sign" ? "ring-2 ring-purple-500 border-purple-400 font-extrabold shadow-sm bg-purple-100" : "border-purple-100 hover:border-purple-300"} min-w-[70px] md:min-w-[85px] flex flex-col justify-center`}
             title="Xem danh sách chờ ký"
           >
-            <div className="text-base md:text-2xl font-bold text-purple-700">
+            <div className="text-base md:text-xl font-bold text-purple-700">
               {reviewRecords.length}
             </div>
             <div className="text-[9px] md:text-xs text-purple-600 uppercase font-bold leading-tight mt-0.5">
@@ -1027,10 +1112,10 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
           </div>
           <div 
             onClick={() => { setActiveTab("finished"); setCurrentPage(1); setSearchTerm(""); }}
-            className={`cursor-pointer active:scale-95 transition-all text-center p-1.5 md:px-4 md:py-2 bg-green-50 rounded-lg border ${activeTab === "finished" ? "ring-2 ring-green-500 border-green-400 font-extrabold shadow-sm" : "border-green-100 hover:border-green-300"} min-w-0 md:min-w-[100px] flex flex-col justify-center`}
+            className={`cursor-pointer active:scale-95 transition-all text-center p-1.5 md:px-3 md:py-2 bg-green-50 rounded-lg border ${activeTab === "finished" ? "ring-2 ring-green-500 border-green-400 font-extrabold shadow-sm bg-green-100" : "border-green-100 hover:border-green-300"} min-w-[70px] md:min-w-[85px] flex flex-col justify-center`}
             title="Xem danh sách hoàn thành"
           >
-            <div className="text-base md:text-2xl font-bold text-green-700">
+            <div className="text-base md:text-xl font-bold text-green-700">
               {finishedRecords.length}
             </div>
             <div className="text-[9px] md:text-xs text-green-600 uppercase font-bold leading-tight mt-0.5">
@@ -1043,9 +1128,9 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
       {/* MAIN CONTENT */}
       <div className="flex-1 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col min-h-0">
         {/* SEARCH & ACTIONS */}
-        <div className="p-4 border-b border-gray-100 bg-gray-50 flex flex-col md:flex-row justify-between items-center gap-3 shrink-0">
-          <div className="flex items-center gap-2 w-full md:w-auto">
-            <div className="relative flex-1 md:w-72">
+        <div className="p-3 md:p-4 border-b border-gray-100 bg-gray-50 flex flex-col md:flex-row justify-between items-center gap-2.5 shrink-0">
+          <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+            <div className="relative flex-1 min-w-[200px] md:w-64">
               <Search
                 className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
                 size={16}
@@ -1053,7 +1138,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
               <input
                 type="text"
                 placeholder={`Tìm trong ${getTabLabel()}...`}
-                className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white shadow-sm"
+                className="w-full pl-9 pr-4 py-1.5 md:py-2 border border-gray-200 rounded-lg text-xs md:text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white shadow-sm"
                 value={searchTerm}
                 onChange={(e) => {
                   setSearchTerm(e.target.value);
@@ -1062,6 +1147,46 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
               />
             </div>
 
+            {/* Nút lọc nhanh Trễ hạn (Thiết kế chuẩn theo mẫu hình ảnh) */}
+            <button
+              onClick={() => {
+                setActiveTab(activeTab === "overdue" ? "pending" : "overdue");
+                setCurrentPage(1);
+                setSearchTerm("");
+              }}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all cursor-pointer shadow-xs border ${
+                activeTab === "overdue"
+                  ? "bg-red-50 border-red-500 ring-2 ring-red-400"
+                  : "bg-white border-gray-200 hover:border-red-300 hover:bg-red-50/30"
+              }`}
+              title="Chỉ hiển thị hồ sơ trễ hạn"
+            >
+              <AlertTriangle className="text-red-500 shrink-0" size={18} />
+              <span className="text-red-600 font-extrabold text-sm md:text-base leading-none">
+                {overdueRecords.length}
+              </span>
+            </button>
+
+            {/* Nút lọc nhanh Sắp tới hạn (Thiết kế chuẩn theo mẫu hình ảnh) */}
+            <button
+              onClick={() => {
+                setActiveTab(activeTab === "upcoming" ? "pending" : "upcoming");
+                setCurrentPage(1);
+                setSearchTerm("");
+              }}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all cursor-pointer shadow-xs border ${
+                activeTab === "upcoming"
+                  ? "bg-orange-50 border-orange-500 ring-2 ring-orange-400"
+                  : "bg-white border-gray-200 hover:border-orange-300 hover:bg-orange-50/30"
+              }`}
+              title="Chỉ hiển thị hồ sơ sắp tới hạn (0 - 2 ngày)"
+            >
+              <Clock className="text-orange-500 shrink-0" size={18} />
+              <span className="text-orange-600 font-extrabold text-sm md:text-base leading-none">
+                {upcomingRecords.length}
+              </span>
+            </button>
+
             {!isDirector && (
               <button
                 onClick={() => {
@@ -1069,7 +1194,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                   setCurrentPage(1);
                   setSearchTerm("");
                 }}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap shadow-sm border ${
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap shadow-xs border cursor-pointer ${
                   activeTab === "reminder"
                     ? "bg-pink-600 text-white border-pink-700"
                     : "bg-white text-pink-700 border-pink-200 hover:bg-pink-50"
@@ -1572,10 +1697,11 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                 isArchiveRecordType(record.recordType)
               ) {
                 // Xử lý hồ sơ lưu trữ
+                const nowIso = new Date().toISOString();
                 const historyEntry = {
                   action: "Trình kiểm tra",
                   status: "pending_check",
-                  timestamp: new Date().toISOString(),
+                  timestamp: nowIso,
                   user: user.name,
                 };
 
@@ -1595,6 +1721,8 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                       ...currentArchive.data,
                       history: newHistory,
                       checked_by: checkerId,
+                      assigned_to: checkerId,
+                      assigned_date: nowIso,
                     },
                   });
                 }
@@ -1607,6 +1735,8 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                   completedWorkDate: record.completedWorkDate || nowIso,
                   pendingCheckDate: nowIso,
                   checkedBy: checkerId,
+                  assignedTo: checkerId,
+                  assignedDate: nowIso,
                 });
               }
             }

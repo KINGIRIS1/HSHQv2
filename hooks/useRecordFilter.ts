@@ -320,7 +320,7 @@ export const useRecordFilter = (
         let overdue = 0;
         let approaching = 0;
         if (records.length > 0 && currentUser) {
-            const isOtherView = ['other_records', 'other_assign_tasks', 'other_check_list', 'other_handover_list', 'other_director_completed'].includes(currentView);
+            const isOtherView = ['other_records', 'other_assign_tasks', 'other_completed_list', 'other_pending_check_list', 'other_check_list', 'other_handover_list', 'other_director_completed', 'registration_records'].includes(currentView);
             const isArchiveMeasurementView = ['archive_records', 'archive_assign_tasks', 'archive_completed_list', 'archive_pending_check_list', 'archive_check_list', 'archive_handover_list', 'archive_director_completed'].includes(currentView);
             const isMeasurementView = ['all_records', 'assign_tasks', 'completed_list', 'pending_check_list', 'check_list', 'handover_list', 'director_completed'].includes(currentView);
 
@@ -329,8 +329,16 @@ export const useRecordFilter = (
                 if (!checkWarningPermission(r)) return; 
                 
                 // Filter by recordType based on view group
-                if (isArchiveMeasurementView && !isArchiveRecordType(r.recordType)) return;
-                if (isMeasurementView && isArchiveRecordType(r.recordType)) return;
+                if (isArchiveMeasurementView) {
+                    if (!isArchiveRecordType(r.recordType)) return;
+                } else if (isOtherView) {
+                    const shortType = getShortRecordType(r.recordType);
+                    if (isArchiveRecordType(r.recordType)) return;
+                    if (shortType.startsWith('2.')) return;
+                } else if (isMeasurementView) {
+                    if (isArchiveRecordType(r.recordType)) return;
+                    if (isCapGiayRecord(r)) return;
+                }
 
                 if (isRecordOverdue(r)) overdue++;
                 else if (isRecordApproaching(r)) approaching++;

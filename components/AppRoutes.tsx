@@ -366,6 +366,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
       "other_pending_check_list",
       "other_check_list",
       "other_handover_list",
+      "registration_records",
     ].includes(currentView);
     const isArchiveMeasurementView = [
       "archive_records",
@@ -626,6 +627,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                 </button>
               )}
 
+
               {!isDirector && isViewAllowedForUser(currentUser, employees, "other_handover_list", rolePermissions, departmentPermissions) && (
                 <button
                   onClick={() => props.setCurrentView("other_handover_list")}
@@ -634,51 +636,24 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                   <Send size={16} /> Giao 1 cửa
                 </button>
               )}
+
+              {isViewAllowedForUser(currentUser, employees, "registration_records", rolePermissions, departmentPermissions) && (
+                <button
+                  onClick={() => props.setCurrentView("registration_records")}
+                  className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "registration_records" ? "border-teal-600 text-teal-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
+                >
+                  <BookOpen size={16} /> Vô số GCN
+                </button>
+              )}
             </div>
 
             {/* CẤP GIẤY SUB-STEP TABS REMOVED FROM TOP LEVEL, MOVED TO TOOLBAR */}
           </>
         )}
 
-        {/* SUB-HEADER TABS FOR VAO SO GCN */}
-        {currentView === "registration_records" && (
-          <div className="flex border-b border-gray-200 bg-gray-50 px-4 overflow-x-auto">
-            <button
-              onClick={() => setVaoSoTab("pending_entry")}
-              className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${
-                vaoSoTab === "pending_entry"
-                  ? "border-amber-600 text-amber-700 bg-white"
-                  : "border-transparent text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              <Clock size={16} /> Chờ vô sổ
-            </button>
-            <button
-              onClick={() => setVaoSoTab("completed_entry")}
-              className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${
-                vaoSoTab === "completed_entry"
-                  ? "border-teal-600 text-teal-700 bg-white"
-                  : "border-transparent text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              <CheckCircle2 size={16} /> Đã vô sổ
-            </button>
-            <button
-              onClick={() => setVaoSoTab("all")}
-              className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${
-                vaoSoTab === "all"
-                  ? "border-blue-600 text-blue-700 bg-white"
-                  : "border-transparent text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              <Archive size={16} /> Lưu kho
-            </button>
-          </div>
-        )}
-
         {currentView === "registration_records" ? (
           <div className="flex-1 overflow-hidden flex flex-col p-2">
-            <RegistrationRecords currentUser={currentUser} wards={wards} activeTab={vaoSoTab} onTabChange={setVaoSoTab} />
+            <RegistrationRecords currentUser={currentUser} wards={wards} />
           </div>
         ) : (
           <div className="flex-1 overflow-hidden flex flex-col">
@@ -1023,17 +998,26 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                 </div>
               )}
 
-            {/* CẤP GIẤY SUB-STEP TABS (ĐẶT NGAY CẠNH NÚT MỞ/ĐÓNG LỌC) */}
-            {currentView === "other_completed_list" && (
+            {/* CẤP GIẤY SUB-STEP TABS (ĐẶT NGAY CẠNH NÚT MỞ/ĐÓNG LỌC - CHỈ HIỂN THỊ TRONG TAB CẤP GIẤY) */}
+            {(currentView === "other_completed_list" || currentView === "other_records") && (
               <div className="flex items-center gap-1.5 overflow-x-auto border-l border-gray-300 pl-2">
+                <button
+                  onClick={() => props.setCapGiaySubStepFilter && props.setCapGiaySubStepFilter('all')}
+                  className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all whitespace-nowrap border cursor-pointer ${
+                    (!props.capGiaySubStepFilter || props.capGiaySubStepFilter === 'all')
+                      ? 'bg-slate-700 text-white border-slate-700 shadow-xs'
+                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  Tất cả bước
+                </button>
                 {CAP_GIAY_SUB_STEPS.map((step) => {
-                  const activeSubStep = (!props.capGiaySubStepFilter || props.capGiaySubStepFilter === 'all') ? 'tham_dinh' : props.capGiaySubStepFilter;
-                  const isActive = activeSubStep === step.id;
+                  const isActive = props.capGiaySubStepFilter === step.id;
                   return (
                     <button
                       key={step.id}
                       onClick={() => props.setCapGiaySubStepFilter && props.setCapGiaySubStepFilter(step.id)}
-                      className={`px-3 py-1 rounded-md text-xs font-bold transition-all whitespace-nowrap border cursor-pointer ${
+                      className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all whitespace-nowrap border cursor-pointer ${
                         isActive
                           ? 'bg-teal-700 text-white border-teal-700 shadow-xs'
                           : 'bg-white text-slate-700 border-slate-200 hover:bg-teal-50 hover:border-teal-300'
@@ -1323,20 +1307,24 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                           <ClipboardList size={16} /> Hồ sơ trả ({props.selectedRecordIds.size})
                         </button>
                       )}
-                      {(hasPermission('BTN_ASSIGN_STAFF') || hasPermission('ASSIGN_RECORDS')) && (
-                        <button
-                          onClick={() => {
-                            const targets = records.filter((r) =>
-                              props.selectedRecordIds.has(r.id),
-                            );
-                            props.setAssignTargetRecords(targets);
-                            props.setIsAssignModalOpen(true);
-                          }}
-                          className="flex items-center gap-1.5 bg-blue-600 text-white px-3 py-1.5 rounded-md hover:bg-blue-700 text-sm font-bold shadow-sm transition-all animate-pulse"
-                        >
-                          <UserPlus size={16} /> Giao việc ({props.selectedRecordIds.size})
-                        </button>
-                      )}
+                      {(hasPermission('BTN_ASSIGN_STAFF') || hasPermission('ASSIGN_RECORDS')) && (() => {
+                        const unassignedTargets = records.filter((r) =>
+                          props.selectedRecordIds.has(r.id) && !r.assignedTo
+                        );
+                        if (unassignedTargets.length === 0) return null;
+                        return (
+                          <button
+                            onClick={() => {
+                              props.setAssignTargetRecords(unassignedTargets);
+                              props.setIsAssignModalOpen(true);
+                            }}
+                            className="flex items-center gap-1.5 bg-blue-600 text-white px-3 py-1.5 rounded-md hover:bg-blue-700 text-sm font-bold shadow-sm transition-all animate-pulse"
+                            title="Chỉ giao việc cho các hồ sơ chưa có cán bộ phụ trách"
+                          >
+                            <UserPlus size={16} /> Giao việc ({unassignedTargets.length})
+                          </button>
+                        );
+                      })()}
                     </>
                   )}
               </>

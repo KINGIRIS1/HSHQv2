@@ -239,15 +239,18 @@ const RecordRow: React.FC<RecordRowProps> = ({
         );
       case 'tech':
         const recTypeLower = (record.recordType || '').toLowerCase();
+        const isCG = isCapGiayRecord(record);
         const isMeasurement = recTypeLower.includes('trích đo') || recTypeLower.includes('đo đạc') || recTypeLower.includes('đo') || recTypeLower.includes('tách thửa');
         const isExcerpt = recTypeLower.includes('trích lục');
-        const showMsr = isMeasurement || (!isMeasurement && !isExcerpt);
-        const showExc = isExcerpt || (!isMeasurement && !isExcerpt);
+        const showMsr = !isCG && (isMeasurement || (!isMeasurement && !isExcerpt));
+        const showExc = !isCG && (isExcerpt || (!isMeasurement && !isExcerpt));
 
         return (
           <td key="tech" className={cellClass}>
             <div className="flex flex-col gap-1.5 items-center">
-              {canPerformAction ? (
+              {!showMsr && !showExc ? (
+                <span className="text-gray-400 text-xs font-mono block text-center">-</span>
+              ) : canPerformAction ? (
                   <>
                       {showMsr && (
                           <input type="text" className="w-full text-sm border border-gray-200 rounded px-1 py-1 focus:border-blue-500 outline-none bg-white/50 text-center" value={localMsr} onChange={(e) => setLocalMsr(e.target.value)} onBlur={() => localMsr !== (record.measurementNumber || '') && onQuickUpdate(record.id, 'measurementNumber', localMsr)} placeholder="TĐ" title="Số Trích Đo" />
@@ -388,9 +391,50 @@ const RecordRow: React.FC<RecordRowProps> = ({
                   </button>
               )}
 
-              {displayStatus !== RecordStatus.HANDOVER && displayStatus !== RecordStatus.RETURNED && displayStatus !== RecordStatus.WITHDRAWN && displayStatus !== RecordStatus.REJECTED && record.status !== RecordStatus.RETURNED && record.status !== RecordStatus.HANDOVER && record.status !== RecordStatus.WITHDRAWN && record.status !== RecordStatus.REJECTED && !record.resultReturnedDate && currentUser?.role !== 'ONEDOOR' && (
-                <button onClick={() => onAdvanceStatus(record)} className="p-1 text-green-700 hover:bg-green-100 rounded transition-colors border border-green-200 bg-green-50" title="Chuyển bước"><ArrowRight size={15} /></button>
-              )}
+              {/* NÚT CHUYỂN BƯỚC / CHUYỂN VỀ GIAO VIỆC / XÁC NHẬN NỘP THUẾ */}
+              {(() => {
+                const isCG = isCapGiayRecord(record);
+                const isReturnedOrRejected = record.status === RecordStatus.REJECTED || record.status === RecordStatus.RETURNED || displayStatus === RecordStatus.REJECTED || displayStatus === RecordStatus.RETURNED || record.capGiaySubStep === 'cho_bo_sung';
+                const isTaxWaiting = isCG && (record.capGiaySubStep === 'cho_nop_thue' || record.capGiaySubStep === 'cho_giay_nop_tien');
+                
+                if (isReturnedOrRejected) {
+                  return (
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); onAdvanceStatus(record); }} 
+                      className="p-1 text-amber-700 hover:bg-amber-100 rounded transition-colors border border-amber-300 bg-amber-50 font-bold" 
+                      title="Chuyển về bước Chờ giao việc (Phân công lại/Gợi ý người thụ lý cũ)"
+                    >
+                      <ArrowRight size={15} />
+                    </button>
+                  );
+                }
+
+                if (isTaxWaiting) {
+                  return (
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); onAdvanceStatus(record); }} 
+                      className="p-1 text-purple-700 hover:bg-purple-100 rounded transition-colors border border-purple-300 bg-purple-50 font-bold" 
+                      title="Xác nhận nộp thuế → Trả về bước Chờ giao việc (Chờ phân công người in)"
+                    >
+                      <ArrowRight size={15} />
+                    </button>
+                  );
+                }
+
+                if (displayStatus !== RecordStatus.HANDOVER && displayStatus !== RecordStatus.WITHDRAWN && record.status !== RecordStatus.HANDOVER && record.status !== RecordStatus.WITHDRAWN && !record.resultReturnedDate) {
+                  return (
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); onAdvanceStatus(record); }} 
+                      className="p-1 text-green-700 hover:bg-green-100 rounded transition-colors border border-green-200 bg-green-50" 
+                      title="Chuyển bước"
+                    >
+                      <ArrowRight size={15} />
+                    </button>
+                  );
+                }
+
+                return null;
+              })()}
             </div>
 
             {/* Hàng dưới: Sửa & Xóa */}

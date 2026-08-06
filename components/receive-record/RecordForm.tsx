@@ -66,7 +66,7 @@ interface RecordFormProps {
   records: RecordFile[];
   holidays: Holiday[];
   calculateDeadline: (type: string, date: string) => string;
-  generateCode: (ward: string, date: string) => string;
+  generateCode: (ward: string, date: string, existingCodes?: string[], recordType?: string) => string;
   onPrint?: (data: Partial<RecordFile>) => void;
   initialData?: RecordFile | null;
   onCancelEdit?: () => void;
@@ -125,13 +125,17 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
 
   useEffect(() => {
     if (!initialData) {
-        const newCode = generateCode(processingWard, formData.receivedDate || '');
+        const isCapGiay = isCapGiayRecord(formData);
+        const newCode = generateCode(processingWard, formData.receivedDate || '', [], formData.recordType || undefined);
         setFormData(prev => {
+            if (isCapGiay && prev.code && prev.code.trim() !== '' && prev.code !== newCode && !prev.code.startsWith('CV-')) {
+                return prev;
+            }
             if (prev.code === newCode) return prev;
             return { ...prev, code: newCode };
         });
     }
-  }, [processingWard, formData.receivedDate, records, initialData]);
+  }, [processingWard, formData.receivedDate, formData.recordType, records, initialData]);
 
   const handleChange = (field: keyof RecordFile, value: any) => {
     setFormData(prev => {
@@ -356,16 +360,27 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
                             </>
                         )}
                     </select>
-                    {formData.recordType && CAP_GIAY_RECORD_TYPE_DESCRIPTIONS[formData.recordType] && (
-                        <p className="text-[11px] text-blue-600 font-medium mt-1 italic">
-                            💡 {CAP_GIAY_RECORD_TYPE_DESCRIPTIONS[formData.recordType]}
-                        </p>
-                    )}
                 </div>
 
                 <div>
-                    <label className={labelClass}>Mã hồ sơ</label>
-                    <input type="text" readOnly={!initialData} className={`${inputClass} font-mono ${initialData ? 'bg-white font-bold text-blue-700' : 'bg-slate-100 text-slate-500 cursor-not-allowed'}`} value={formData.code || ''} onChange={(e) => initialData && handleChange('code', e.target.value)} />
+                    <label className={labelClass}>
+                        Mã hồ sơ
+                        {isCapGiayRecord(formData) && (
+                            <span className="text-[11px] font-normal text-teal-600 ml-1 font-sans">(Nhập mã từ PM khác)</span>
+                        )}
+                    </label>
+                    <input 
+                        type="text" 
+                        readOnly={!isCapGiayRecord(formData) && !initialData} 
+                        className={`${inputClass} font-mono ${
+                            isCapGiayRecord(formData) || initialData 
+                                ? 'bg-white font-bold text-blue-700 border-teal-400 focus:border-teal-500' 
+                                : 'bg-slate-100 text-slate-500 cursor-not-allowed'
+                        }`} 
+                        value={formData.code || ''} 
+                        onChange={(e) => (isCapGiayRecord(formData) || initialData) && handleChange('code', e.target.value)} 
+                        placeholder={isCapGiayRecord(formData) ? "Nhập mã hồ sơ..." : "Mã tự động"}
+                    />
                 </div>
 
                 <div>

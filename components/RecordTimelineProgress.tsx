@@ -1,10 +1,11 @@
 import React from 'react';
 import { RecordFile, Employee, User, UserRole, RecordStatus } from '../types';
-import { getNormalizedWard, getShortRecordType } from '../constants';
+import { getNormalizedWard, getShortRecordType, isCapGiayRecord } from '../constants';
 import { getBatchDisplayParts } from '../utils/appHelpers';
 import { 
   CheckCircle2, Circle, Clock, AlertTriangle, Calendar, User as UserIcon, 
-  Send, FileSignature, CheckSquare, FileCheck, Timer, ArrowRight, CalendarClock, Hash
+  Send, FileSignature, CheckSquare, FileCheck, Timer, ArrowRight, CalendarClock, Hash,
+  ClipboardList, FileText
 } from 'lucide-react';
 
 interface RecordTimelineProgressProps {
@@ -143,6 +144,16 @@ export const RecordTimelineProgress: React.FC<RecordTimelineProgressProps> = ({
 
   const isHideCheckSteps = record.recordType === 'Cung cấp tài liệu đất đai' || record.recordType === 'Sao lục' || record.recordType === 'Công văn';
 
+  const isCG = isCapGiayRecord(record);
+
+  const isVoSoGcnActive = isCG && (
+    record.capGiaySubStep === 'vo_so_gcn' || 
+    record.capGiaySubStep === 'cho_ban_giao' || 
+    record.capGiaySubStep === 'da_ban_giao' || 
+    [RecordStatus.SIGNED, RecordStatus.HANDOVER, RecordStatus.RETURNED].includes(record.status) ||
+    !!record.completedDate || !!record.exportDate
+  );
+
   // Build timeline steps array
   const steps = [
     {
@@ -158,7 +169,7 @@ export const RecordTimelineProgress: React.FC<RecordTimelineProgressProps> = ({
         const emp = employees.find(e => e.id === receiver.employeeId);
         return `${receiver.name} (${emp?.position || 'Nhân viên'})`;
       })() : undefined,
-      durationLabel: getStepDurationText(record.receivedDate, record.assignedDate || record.completedWorkDate)
+      durationLabel: getStepDurationText(record.receivedDate, record.assignedDate || record.pendingCheckDate || record.submissionDate)
     },
     {
       id: 'assigned',
@@ -172,22 +183,43 @@ export const RecordTimelineProgress: React.FC<RecordTimelineProgressProps> = ({
         if (!emp) return undefined;
         return `${emp.name} (${emp.department})`;
       })() : undefined,
-      durationLabel: record.assignedDate ? getStepDurationText(record.assignedDate, record.completedWorkDate) : null
+      durationLabel: record.assignedDate ? getStepDurationText(record.assignedDate, record.pendingCheckDate || record.submissionDate) : null
     },
-    {
-      id: 'completed_work',
-      label: 'ĐÃ THỰC HIỆN',
-      date: record.completedWorkDate,
-      forceActive: isWorkDone,
-      icon: CheckSquare,
-      colorClass: { text: 'text-cyan-700', border: 'border-cyan-600', bg: 'bg-cyan-600' },
-      subText: record.completedWorkDate ? (() => {
-        const emp = employees.find(e => e.id === record.assignedTo);
-        if (!emp) return undefined;
-        return `${emp.name} (${emp.department})`;
-      })() : undefined,
-      durationLabel: record.completedWorkDate ? getStepDurationText(record.completedWorkDate, record.pendingCheckDate || record.submissionDate) : null
-    },
+    ...(isCG ? [
+      {
+        id: 'tham_dinh',
+        label: 'THẨM ĐỊNH',
+        date: ['tham_dinh', 'phieu_chuyen_thue', 'cho_nop_thue', 'cho_giay_nop_tien', 'hoan_thien_trinh_duyet', 'vo_so_gcn', 'cho_ban_giao', 'da_ban_giao'].includes(record.capGiaySubStep || '') ? record.assignedDate : null,
+        forceActive: ['tham_dinh', 'phieu_chuyen_thue', 'cho_nop_thue', 'cho_giay_nop_tien', 'hoan_thien_trinh_duyet', 'vo_so_gcn', 'cho_ban_giao', 'da_ban_giao'].includes(record.capGiaySubStep || '') || !!record.assignedDate,
+        icon: ClipboardList,
+        colorClass: { text: 'text-blue-700', border: 'border-blue-600', bg: 'bg-blue-600' },
+        subText: record.assignedTo ? (() => {
+          const emp = employees.find(e => e.id === record.assignedTo);
+          return emp ? `${emp.name} (${emp.department})` : undefined;
+        })() : undefined,
+        durationLabel: null
+      },
+      {
+        id: 'phieu_chuyen_thue',
+        label: 'PHIẾU CHUYỂN THUẾ',
+        date: ['phieu_chuyen_thue', 'cho_nop_thue', 'cho_giay_nop_tien', 'hoan_thien_trinh_duyet', 'vo_so_gcn', 'cho_ban_giao', 'da_ban_giao'].includes(record.capGiaySubStep || '') ? (record.pendingCheckDate || record.assignedDate) : null,
+        forceActive: ['phieu_chuyen_thue', 'cho_nop_thue', 'cho_giay_nop_tien', 'hoan_thien_trinh_duyet', 'vo_so_gcn', 'cho_ban_giao', 'da_ban_giao'].includes(record.capGiaySubStep || ''),
+        icon: FileText,
+        colorClass: { text: 'text-purple-700', border: 'border-purple-600', bg: 'bg-purple-600' },
+        subText: record.capGiaySubStep === 'cho_nop_thue' || record.capGiaySubStep === 'cho_giay_nop_tien' ? 'Chờ giấy nộp tiền' : undefined,
+        durationLabel: null
+      },
+      {
+        id: 'hoan_thien_trinh_duyet',
+        label: 'IN & HOÀN THIỆN',
+        date: ['hoan_thien_trinh_duyet', 'vo_so_gcn', 'cho_ban_giao', 'da_ban_giao'].includes(record.capGiaySubStep || '') ? record.submissionDate : null,
+        forceActive: ['hoan_thien_trinh_duyet', 'vo_so_gcn', 'cho_ban_giao', 'da_ban_giao'].includes(record.capGiaySubStep || ''),
+        icon: FileCheck,
+        colorClass: { text: 'text-amber-700', border: 'border-amber-600', bg: 'bg-amber-600' },
+        subText: undefined,
+        durationLabel: null
+      }
+    ] : []),
     ...(!isHideCheckSteps ? [
       {
         id: 'pending_check',
@@ -201,21 +233,7 @@ export const RecordTimelineProgress: React.FC<RecordTimelineProgressProps> = ({
           if (!checker) return undefined;
           return `${checker.name} (${checker?.position || 'Người kiểm tra'})`;
         })() : undefined,
-        durationLabel: record.pendingCheckDate ? getStepDurationText(record.pendingCheckDate, record.checkedDate) : null
-      },
-      {
-        id: 'checked',
-        label: 'ĐÃ KIỂM TRA',
-        date: record.checkedDate,
-        forceActive: isCheckedActive,
-        icon: CheckSquare,
-        colorClass: { text: 'text-orange-700', border: 'border-orange-600', bg: 'bg-orange-600' },
-        subText: record.checkedDate && record.checkedBy ? (() => {
-          const checker = employees.find(e => e.id === record.checkedBy);
-          if (!checker) return undefined;
-          return `${checker.name} (${checker?.position || 'Người kiểm tra'})`;
-        })() : undefined,
-        durationLabel: record.checkedDate ? getStepDurationText(record.checkedDate, record.submissionDate) : null
+        durationLabel: record.pendingCheckDate ? getStepDurationText(record.pendingCheckDate, record.submissionDate) : null
       }
     ] : []),
     {
@@ -224,30 +242,27 @@ export const RecordTimelineProgress: React.FC<RecordTimelineProgressProps> = ({
       date: record.submissionDate,
       forceActive: isPendingSignActive,
       icon: Send,
-      colorClass: { text: 'text-purple-700', border: 'border-purple-600', bg: 'bg-purple-600' },
+      colorClass: { text: 'text-indigo-700', border: 'border-indigo-600', bg: 'bg-indigo-600' },
       subText: (record.submissionDate || isPendingSignActive) && record.submittedTo ? (() => {
         const director = users.find(u => u.employeeId === record.submittedTo);
         if (!director) return undefined;
         const emp = employees.find(e => e.id === director.employeeId);
         return `${director.name} (${emp?.position || (director.role === UserRole.ADMIN ? 'Giám đốc' : 'Phó giám đốc')})`;
       })() : undefined,
-      durationLabel: record.submissionDate ? getStepDurationText(record.submissionDate, record.approvalDate) : null
+      durationLabel: record.submissionDate ? getStepDurationText(record.submissionDate, isCG ? (record.completedDate || record.exportDate) : (record.approvalDate || record.completedDate)) : null
     },
-    {
-      id: 'approval',
-      label: 'KÝ DUYỆT',
-      date: record.approvalDate,
-      forceActive: isSignedActive,
-      icon: FileSignature,
-      colorClass: { text: 'text-indigo-700', border: 'border-indigo-600', bg: 'bg-indigo-600' },
-      subText: record.approvalDate && record.submittedTo ? (() => {
-        const director = users.find(u => u.employeeId === record.submittedTo);
-        if (!director) return undefined;
-        const emp = employees.find(e => e.id === director.employeeId);
-        return `${director.name} (${emp?.position || (director.role === UserRole.ADMIN ? 'Giám đốc' : 'Phó giám đốc')})`;
-      })() : undefined,
-      durationLabel: record.approvalDate ? getStepDurationText(record.approvalDate, record.completedDate || record.exportDate) : null
-    },
+    ...(isCG ? [
+      {
+        id: 'vo_so_gcn',
+        label: 'VÔ SỔ GCN',
+        date: isVoSoGcnActive ? (record.completedDate || record.exportDate) : null,
+        forceActive: isVoSoGcnActive,
+        icon: Hash,
+        colorClass: { text: 'text-teal-700', border: 'border-teal-600', bg: 'bg-teal-600' },
+        subText: record.issueNumber ? `Số GCN: ${record.issueNumber}` : undefined,
+        durationLabel: null
+      }
+    ] : []),
     {
       id: 'completion',
       label: record.status === RecordStatus.REJECTED ? "HỒ SƠ TRẢ" : record.status === RecordStatus.WITHDRAWN ? "RÚT HỒ SƠ" : "HOÀN THÀNH",

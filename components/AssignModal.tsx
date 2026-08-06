@@ -69,6 +69,7 @@ interface EmployeeItemProps {
     isTargetWardMatch: boolean;
     isSelected: boolean;
     isLowestWorkload?: boolean;
+    isPreviousProcessor?: boolean;
     workload?: EmployeeWorkload;
     isCapGiayView?: boolean;
     onSelect: (id: string) => void;
@@ -76,12 +77,16 @@ interface EmployeeItemProps {
 
 // Component hiển thị một dòng nhân viên trong danh sách tổ chuyên môn
 const EmployeeItem: React.FC<EmployeeItemProps> = ({ 
-    emp, isLastAssigned, isTargetWardMatch, isSelected, isLowestWorkload, workload, isCapGiayView, onSelect 
+    emp, isLastAssigned, isTargetWardMatch, isSelected, isLowestWorkload, isPreviousProcessor, workload, isCapGiayView, onSelect 
 }) => (
     <div 
         onClick={() => onSelect(emp.id)}
         className={`relative flex flex-col justify-between p-3 rounded-xl border cursor-pointer transition-all duration-200 group h-full ${
-            isTargetWardMatch 
+            isPreviousProcessor
+                ? (isSelected
+                    ? 'bg-amber-100/90 border-amber-500 shadow-md ring-2 ring-amber-300'
+                    : 'bg-amber-50 border-amber-300 hover:border-amber-400 hover:bg-amber-100/70 shadow-sm')
+                : isTargetWardMatch 
                 ? (isSelected 
                     ? 'bg-emerald-100/90 border-emerald-600 shadow-md ring-2 ring-emerald-300' 
                     : 'bg-emerald-50 border-emerald-300 hover:border-emerald-500 hover:bg-emerald-100/70 shadow-sm')
@@ -94,7 +99,9 @@ const EmployeeItem: React.FC<EmployeeItemProps> = ({
         <div>
             <div className="flex items-start gap-2.5">
                 <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-black shrink-0 transition-colors ${
-                    isSelected 
+                    isPreviousProcessor
+                        ? 'bg-amber-600 text-white'
+                        : isSelected 
                         ? 'bg-indigo-600 text-white' 
                         : isTargetWardMatch 
                             ? 'bg-emerald-600 text-white' 
@@ -105,10 +112,10 @@ const EmployeeItem: React.FC<EmployeeItemProps> = ({
                 
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-1 mb-0.5">
-                        <span className={`font-black text-sm truncate ${isSelected ? 'text-indigo-900' : isTargetWardMatch ? 'text-emerald-950 font-extrabold' : 'text-gray-800'}`}>
+                        <span className={`font-black text-sm truncate ${isPreviousProcessor ? 'text-amber-950 font-extrabold' : isSelected ? 'text-indigo-900' : isTargetWardMatch ? 'text-emerald-950 font-extrabold' : 'text-gray-800'}`}>
                             {emp.name}
                         </span>
-                        {/* Dấu tích chọn nổi bật màu tím indigo khi nhân viên được chọn */}
+                        {/* Dấu tích chọn nổi bật khi nhân viên được chọn */}
                         {isSelected && (
                             <div className="bg-indigo-600 text-white p-1 rounded-full shadow-xs shrink-0 flex items-center justify-center">
                                 <Check size={14} strokeWidth={3} />
@@ -116,7 +123,7 @@ const EmployeeItem: React.FC<EmployeeItemProps> = ({
                         )}
                     </div>
                     
-                    {/* Chức vụ và Tổ thể hiện ví dụ: Chuyên viên - Tổ Đo đạc */}
+                    {/* Chức vụ và Tổ */}
                     <div className="text-xs font-semibold text-gray-600 flex items-center gap-1">
                         <Briefcase size={12} className="text-gray-400 shrink-0" />
                         <span className="truncate">{emp.position || 'Nhân viên'} - <span className="text-indigo-700 font-bold">{emp.department || 'Tổ chuyên môn'}</span></span>
@@ -124,7 +131,7 @@ const EmployeeItem: React.FC<EmployeeItemProps> = ({
                 </div>
             </div>
 
-            {/* THÔNG TIN CÂN BẰNG TẢI (HIỂN THỊ CHI TIẾT SỐ HỒ SƠ VÀ SỐ THỬA ĐẤT) */}
+            {/* THÔNG TIN CÂN BẰNG TẢI */}
             {workload && (
                 <div className="mt-2.5 pt-2 border-t border-slate-200/80 w-full space-y-1.5">
                     <div className="flex items-center justify-between text-xs font-bold">
@@ -147,7 +154,14 @@ const EmployeeItem: React.FC<EmployeeItemProps> = ({
                         </span>
                     </div>
 
-                    {isLowestWorkload && (
+                    {isPreviousProcessor && (
+                        <div className="mt-1 text-[11px] font-black text-amber-900 bg-amber-100/90 px-2 py-0.5 rounded text-center border border-amber-300 flex items-center justify-center gap-1 shadow-2xs">
+                            <Sparkles size={12} className="text-amber-600" />
+                            <span>Gợi ý: Người thụ lý cũ</span>
+                        </div>
+                    )}
+
+                    {!isPreviousProcessor && isLowestWorkload && (
                         <div className="mt-1 text-[11px] font-black text-emerald-800 bg-emerald-100/90 px-2 py-0.5 rounded text-center border border-emerald-300 flex items-center justify-center gap-1 shadow-2xs">
                             <Sparkles size={12} className="text-emerald-600" />
                             <span>Gợi ý: Tải ít nhất ({workload.activePlotCount} thửa)</span>
@@ -322,6 +336,16 @@ const AssignModal: React.FC<AssignModalProps> = ({
       }
   }, [isOpen, selectedRecords, currentView, filterDepartment]);
 
+  // Xác định ID người thụ lý cũ (nếu có) để ưu tiên gợi ý phân công lại
+  const previousProcessorId = useMemo(() => {
+      if (!selectedRecords || selectedRecords.length === 0) return null;
+      const rec = selectedRecords[0];
+      const prev = rec.lastAssignedTo || rec.assignedTo;
+      if (!prev) return null;
+      const matched = employees.find(e => e.id === prev || e.name === prev || (e as any).employeeId === prev);
+      return matched ? matched.id : prev;
+  }, [selectedRecords, employees]);
+
   // Xác định người được giao việc gần nhất
   const lastAssignedIdForCurrentDept = useMemo(() => {
       if (!selectedDept) return null;
@@ -330,6 +354,16 @@ const AssignModal: React.FC<AssignModalProps> = ({
 
   useEffect(() => {
       if (isOpen && selectedDept) {
+          if (previousProcessorId) {
+              const isValidPrev = employees.some(e => (e.id === previousProcessorId || e.name === previousProcessorId) && isEmployeeInDept(e, selectedDept));
+              if (isValidPrev) {
+                  const empObj = employees.find(e => (e.id === previousProcessorId || e.name === previousProcessorId));
+                  if (empObj) {
+                      setSelectedEmpId(empObj.id);
+                      return;
+                  }
+              }
+          }
           if (lastAssignedIdForCurrentDept) {
               const isValid = employees.some(e => e.id === lastAssignedIdForCurrentDept && isEmployeeInDept(e, selectedDept));
               if (isValid) {
@@ -339,7 +373,7 @@ const AssignModal: React.FC<AssignModalProps> = ({
           }
           setSelectedEmpId('');
       }
-  }, [isOpen, selectedDept, employees, lastAssignedIdForCurrentDept]);
+  }, [isOpen, selectedDept, employees, lastAssignedIdForCurrentDept, previousProcessorId]);
 
   // Lọc và tìm kiếm nhân viên thuộc tổ chuyên môn
   const filteredEmployees = useMemo(() => {
@@ -634,14 +668,15 @@ const AssignModal: React.FC<AssignModalProps> = ({
                             Thống kê khối lượng dựa trên Số hồ sơ & Số thửa đất được giao xử lý
                         </p>
                      </div>
-                 </div>
+                  </div>
 
-                 <div className="p-6 overflow-y-auto flex-1 custom-scrollbar bg-slate-50/50">
-                     {filteredEmployees.length > 0 ? (
-                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {filteredEmployees.map(emp => {
+                  <div className="p-6 overflow-y-auto flex-1 custom-scrollbar bg-slate-50/50">
+                      {filteredEmployees.length > 0 ? (
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                             {filteredEmployees.map(emp => {
                                 const wl = workloadMap[emp.id];
                                 const isLowest = lowestActivePlotCountInDept !== null && wl && wl.activePlotCount === lowestActivePlotCountInDept;
+                                const isPrev = Boolean(previousProcessorId === emp.id || previousProcessorId === emp.name || (selectedRecords[0]?.lastAssignedTo && (emp.id === selectedRecords[0].lastAssignedTo || emp.name === selectedRecords[0].lastAssignedTo)));
                                 return (
                                     <EmployeeItem 
                                         key={emp.id} 
@@ -649,14 +684,15 @@ const AssignModal: React.FC<AssignModalProps> = ({
                                         isLastAssigned={lastAssignedIdForCurrentDept === emp.id}
                                         isTargetWardMatch={isWardMatch(emp)}
                                         isSelected={selectedEmpId === emp.id}
+                                        isPreviousProcessor={isPrev}
                                         workload={wl}
                                         isLowestWorkload={isLowest}
                                         isCapGiayView={isCapGiayView}
                                         onSelect={setSelectedEmpId}
                                     />
                                 );
-                            })}
-                         </div>
+                             })}
+                          </div>
                      ) : (
                          <div className="h-full flex flex-col items-center justify-center text-slate-400 border-2 border-dashed border-slate-200 rounded-2xl m-2 bg-white p-8">
                             <Users size={40} className="mb-3 opacity-30 text-teal-600" />

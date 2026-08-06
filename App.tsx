@@ -777,9 +777,31 @@ function App() {
   }, [loadData]);
 
   const advanceStatus = useCallback(async (record: RecordFile) => {
-      if (record.status === RecordStatus.RETURNED || record.status === RecordStatus.HANDOVER || record.status === RecordStatus.WITHDRAWN || record.status === RecordStatus.REJECTED || record.resultReturnedDate) {
+      // 1. Nếu là Hồ sơ bị trả / tạm dừng / bổ sung -> Chuyển về bước Chờ giao việc
+      if (record.status === RecordStatus.RETURNED || record.status === RecordStatus.REJECTED || record.capGiaySubStep === 'cho_bo_sung') {
+          const oldAssigned = record.assignedTo || record.lastAssignedTo || null;
+          const updates: Partial<RecordFile> = {
+              status: RecordStatus.RECEIVED,
+              lastAssignedTo: oldAssigned,
+              assignedTo: null,
+              assignedDate: null,
+              completedDate: null,
+              resultReturnedDate: null,
+              statusLogs: createStatusLog(record, RecordStatus.RECEIVED, 'Chuyển về bước Chờ giao việc để phân công thực hiện tiếp')
+          };
+          setRecords(prev => prev.map(r => r.id === record.id ? { ...r, ...updates } : r));
+          await updateRecordApi({ ...record, ...updates });
+          setToast({ 
+              type: 'success', 
+              message: `Hồ sơ ${record.code} đã chuyển về bước Chờ giao việc.${oldAssigned ? ' (Hệ thống đã ghi nhớ người thụ lý cũ)' : ''}` 
+          });
           return;
       }
+
+      if (record.status === RecordStatus.HANDOVER || record.status === RecordStatus.WITHDRAWN || record.resultReturnedDate) {
+          return;
+      }
+
       if (record.status === RecordStatus.RECEIVED) { 
           setAssignTargetRecords([record]); 
           setIsAssignModalOpen(true); 
@@ -989,52 +1011,49 @@ function App() {
       setIsRejectReturnStepModalOpen(true);
   }, []);
 
-  const handleConfirmRejectReturnStep = useCallback(async (reason: string, returnDateStr: string) => {
+  const handleConfirmRejectReturnStep = useCallback(async (reason: string, returnDateStr: string, returnOption: 'REJECT' | 'PAUSE' | 'PREVIOUS_STEP' = 'PAUSE') => {
       if (rejectReturnTargetRecords.length === 0) return;
       const targetDateISO = returnDateStr ? new Date(returnDateStr).toISOString() : new Date().toISOString();
-      
-      const formatDateVN = (dStr: string) => {
-          try {
-              const d = new Date(dStr);
-              const day = String(d.getDate()).padStart(2, '0');
-              const month = String(d.getMonth() + 1).padStart(2, '0');
-              const year = d.getFullYear();
-              const hours = String(d.getHours()).padStart(2, '0');
-              const mins = String(d.getMinutes()).padStart(2, '0');
-              return `${hours}:${mins} ngày ${day}/${month}/${year}`;
-          } catch {
-              return dStr;
-          }
-      };
+      const nowStr = targetDateISO;
 
       const updatedTargets = rejectReturnTargetRecords.map(r => {
-          const formattedReturnDate = formatDateVN(targetDateISO);
-          const prevStatusLabel = STATUS_LABELS[r.status] || r.status;
-          const internalLogNote = `[TRẢ HỒ SƠ KHÔNG ĐẠT - ${formattedReturnDate}] Trả từ bước "${prevStatusLabel}" về Đang thực hiện. Lý do: ${reason} (Người trả: ${currentUser?.name || currentUser?.username || 'Hệ thống'})`;
-
+          const oldAssigned = r.assignedTo || r.lastAssignedTo || null;
+          const internalLogNote = `[TRẢ HỒ SƠ - ${new Date(targetDateISO).toLocaleDateString('vi-VN')}] Lý do: ${reason}`;
           const existingNotes = r.privateNotes || '';
           const updatedPrivateNotes = existingNotes ? `${existingNotes}\n${internalLogNote}` : internalLogNote;
 
-          const newLog: RecordStatusLog = {
-              id: `${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-              recordId: r.id,
-              previousStatus: r.status,
-              newStatus: RecordStatus.IN_PROGRESS,
-              changedBy: currentUser?.name || currentUser?.username || 'Hệ thống',
-              changedAt: targetDateISO,
-              note: `Trả về bước Đang thực hiện. Lý do: ${reason}`
-          };
-
-          return {
-              ...r,
-              status: RecordStatus.IN_PROGRESS,
-              pendingCheckDate: null,
-              submissionDate: null,
-              checkedDate: null,
-              approvalDate: null,
-              privateNotes: updatedPrivateNotes,
-              statusLogs: [...(r.statusLogs || []), newLog]
-          };
+          if (returnOption === 'REJECT') {
+              return {
+                  ...r,
+                  status: RecordStatus.REJECTED,
+                  completedDate: r.completedDate || nowStr,
+                  lastAssignedTo: oldAssigned,
+                  assignedTo: null,
+                  assignedDate: null,
+                  privateNotes: updatedPrivateNotes
+              };
+          } else if (returnOption === 'PAUSE') {
+              return {
+                  ...r,
+                  status: RecordStatus.RETURNED,
+                  lastAssignedTo: oldAssigned,
+                  assignedTo: null,
+                  assignedDate: null,
+                  privateNotes: updatedPrivateNotes
+              };
+          } else {
+              // PREVIOUS_STEP
+              return {
+                  ...r,
+                  status: RecordStatus.IN_PROGRESS,
+                  assignedTo: oldAssigned,
+                  pendingCheckDate: null,
+                  submissionDate: null,
+                  checkedDate: null,
+                  approvalDate: null,
+                  privateNotes: updatedPrivateNotes
+              };
+          }
       });
 
       setRecords(prev => prev.map(r => {
@@ -1046,8 +1065,13 @@ function App() {
       setIsRejectReturnStepModalOpen(false);
       setRejectReturnTargetRecords([]);
       setSelectedRecordIds(new Set());
-      setToast({ type: 'success', message: `Đã trả ${updatedTargets.length} hồ sơ về bước Đang thực hiện thành công!` });
-  }, [rejectReturnTargetRecords, currentUser]);
+      const msg = returnOption === 'REJECT' 
+          ? `Đã trả hủy ${updatedTargets.length} hồ sơ thành công!` 
+          : returnOption === 'PAUSE' 
+          ? `Đã tạm dừng quy trình ${updatedTargets.length} hồ sơ chờ người dân bổ sung!` 
+          : `Đã trả ${updatedTargets.length} hồ sơ về bước Đang thực hiện cho cán bộ xử lý!`;
+      setToast({ type: 'success', message: msg });
+  }, [rejectReturnTargetRecords]);
 
   if (!currentUser) return (
     <>
@@ -1422,7 +1446,9 @@ function App() {
                         completedWorkDate: r.completedWorkDate || nowIso,
                         checkedDate: r.checkedDate || nowIso,
                         submissionDate: nowIso,
-                        submittedTo: directorId
+                        submittedTo: directorId,
+                        assignedTo: directorId,
+                        assignedDate: nowIso
                     }));
                     await updateRecordsBatchById(updates);
                     setToast({ type: 'success', message: `Đã trình ký ${updates.length} hồ sơ thành công!` });
@@ -1452,7 +1478,9 @@ function App() {
                         status: RecordStatus.PENDING_CHECK,
                         completedWorkDate: r.completedWorkDate || nowIso,
                         pendingCheckDate: nowIso,
-                        checkedBy: checkerId
+                        checkedBy: checkerId,
+                        assignedTo: checkerId,
+                        assignedDate: nowIso
                     }));
                     await updateRecordsBatchById(updates);
                     setToast({ type: 'success', message: `Đã trình kiểm tra ${updates.length} hồ sơ thành công!` });

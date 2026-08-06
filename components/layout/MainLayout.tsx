@@ -1,10 +1,11 @@
 
 import React, { useState } from 'react';
 import TopNavigation from '../TopNavigation';
-import { Menu, WifiOff, ShieldCheck, UserCircle, LogOut, UserCog, ChevronDown, Settings, HelpCircle, Shield, Headphones, X, UserCheck, Phone, Mail, Clock, CheckCircle2 } from 'lucide-react';
+import { Menu, WifiOff, ShieldCheck, UserCircle, LogOut, UserCog, ChevronDown, Settings, HelpCircle, Shield, Headphones, X, UserCheck, Phone, Mail, Clock, CheckCircle2, Sun, Moon } from 'lucide-react';
 import { User, UserRole, RolePermissions, DepartmentPermissions, Employee } from '../../types';
 import { isViewAllowedForUser } from '../../config/roleConfig';
 import UpdateRequiredModal from '../UpdateRequiredModal';
+import { useTheme } from '../../hooks/useTheme';
 
 interface MainLayoutProps {
     children: React.ReactNode;
@@ -72,13 +73,14 @@ const MainLayout: React.FC<MainLayoutProps> = ({
 }) => {
     const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
     const [showHelpModal, setShowHelpModal] = useState(false);
+    const { theme, toggleTheme } = useTheme();
 
     if (!currentUser) return <>{children}</>;
 
     const linkedEmployee = currentUser.employeeId ? employees.find(e => e.id === currentUser.employeeId) : null;
 
     return (
-        <div className="flex flex-col h-screen bg-slate-50 overflow-hidden font-sans">
+        <div className="flex flex-col h-screen bg-slate-50 dark:bg-slate-900 overflow-hidden font-sans transition-colors duration-200">
             {/* Modal Cập nhật Bắt buộc */}
             <UpdateRequiredModal 
                 visible={showUpdateModal}
@@ -107,8 +109,28 @@ const MainLayout: React.FC<MainLayoutProps> = ({
                     </div>
                 </div>
 
-                {/* RIGHT: USER INFO */}
-                <div className="relative flex items-center gap-3">
+                {/* RIGHT: USER INFO & THEME TOGGLE */}
+                <div className="relative flex items-center gap-2 md:gap-3">
+                    {/* Theme Toggle Button in Header */}
+                    <button
+                        onClick={toggleTheme}
+                        className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-all flex items-center gap-1.5 text-xs font-bold shadow-xs active:scale-95"
+                        title={theme === 'dark' ? 'Chuyển sang giao diện Sáng' : 'Chuyển sang giao diện Tối'}
+                        aria-label="Chế độ giao diện"
+                    >
+                        {theme === 'dark' ? (
+                            <>
+                                <Sun size={18} className="text-amber-300 animate-spin-slow" />
+                                <span className="hidden sm:inline text-amber-200 text-[11px]">Sáng</span>
+                            </>
+                        ) : (
+                            <>
+                                <Moon size={18} className="text-blue-200" />
+                                <span className="hidden sm:inline text-blue-100 text-[11px]">Tối</span>
+                            </>
+                        )}
+                    </button>
+
                     <button 
                         onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
                         className="flex items-center gap-3 group cursor-pointer hover:bg-white/10 p-1.5 rounded-lg transition-colors outline-none focus:ring-2 focus:ring-blue-400/50"
@@ -129,23 +151,37 @@ const MainLayout: React.FC<MainLayoutProps> = ({
                     {isUserMenuOpen && (
                         <>
                             <div className="fixed inset-0 z-40" onClick={() => setIsUserMenuOpen(false)}></div>
-                            <div className="absolute top-full right-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden z-50 animate-in fade-in zoom-in-95 duration-200 origin-top-right">
-                                <div className="p-4 border-b border-gray-100 bg-gray-50/50">
-                                    <p className="text-sm font-bold text-gray-800 truncate">{currentUser.name}</p>
-                                    <p className="text-xs text-gray-500 truncate mt-0.5">@{currentUser.username}</p>
-                                    <div className="mt-2 text-[10px] font-bold uppercase tracking-wider text-blue-600 bg-blue-50 px-2 py-1 rounded inline-block border border-blue-100">
+                            <div className="absolute top-full right-0 mt-2 w-64 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-gray-100 dark:border-slate-700 overflow-hidden z-50 animate-in fade-in zoom-in-95 duration-200 origin-top-right">
+                                <div className="p-4 border-b border-gray-100 dark:border-slate-700 bg-gray-50/50 dark:bg-slate-900/50">
+                                    <p className="text-sm font-bold text-gray-800 dark:text-slate-100 truncate">{currentUser.name}</p>
+                                    <p className="text-xs text-gray-500 dark:text-slate-400 truncate mt-0.5">@{currentUser.username}</p>
+                                    <div className="mt-2 text-[10px] font-bold uppercase tracking-wider text-blue-600 bg-blue-50 dark:bg-blue-900/40 dark:text-blue-300 px-2 py-1 rounded inline-block border border-blue-100 dark:border-blue-800">
                                         {currentUser.role === UserRole.ADMIN ? 'Administrator' : currentUser.role === UserRole.SUBADMIN ? 'Phó quản trị' : currentUser.role === UserRole.TEAM_LEADER ? 'Nhóm trưởng' : currentUser.role === UserRole.ONEDOOR ? 'Một cửa' : 'Nhân viên'}
                                     </div>
                                 </div>
                                 <div className="p-2 space-y-1">
                                     <button 
+                                        onClick={toggleTheme}
+                                        className="w-full text-left px-3 py-2.5 text-sm font-medium text-gray-700 dark:text-slate-200 hover:bg-blue-50 dark:hover:bg-slate-700 hover:text-blue-700 rounded-lg flex items-center justify-between transition-colors group"
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <div className="bg-amber-50 dark:bg-slate-700 p-1.5 rounded-md text-amber-600 dark:text-amber-300">
+                                                {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+                                            </div>
+                                            <span>Giao diện: {theme === 'dark' ? 'Tối' : 'Sáng'}</span>
+                                        </div>
+                                        <span className="text-[11px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-slate-700 px-2 py-0.5 rounded-full">
+                                            {theme === 'dark' ? 'Đang bật Tối' : 'Đang bật Sáng'}
+                                        </span>
+                                    </button>
+                                    <button 
                                         onClick={() => {
                                             setShowHelpModal(true);
                                             setIsUserMenuOpen(false);
                                         }}
-                                        className="w-full text-left px-3 py-2.5 text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700 rounded-lg flex items-center gap-3 transition-colors group"
+                                        className="w-full text-left px-3 py-2.5 text-sm font-medium text-gray-700 dark:text-slate-200 hover:bg-blue-50 dark:hover:bg-slate-700 hover:text-blue-700 rounded-lg flex items-center gap-3 transition-colors group"
                                     >
-                                        <div className="bg-blue-50 p-1.5 rounded-md group-hover:bg-blue-100 transition-colors text-blue-600">
+                                        <div className="bg-blue-50 dark:bg-slate-700 p-1.5 rounded-md group-hover:bg-blue-100 transition-colors text-blue-600 dark:text-blue-300">
                                             <HelpCircle size={16} />
                                         </div>
                                         Trợ giúp & Phân quyền
@@ -155,22 +191,22 @@ const MainLayout: React.FC<MainLayoutProps> = ({
                                             setCurrentView('account_settings');
                                             setIsUserMenuOpen(false);
                                         }}
-                                        className="w-full text-left px-3 py-2.5 text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700 rounded-lg flex items-center gap-3 transition-colors group"
+                                        className="w-full text-left px-3 py-2.5 text-sm font-medium text-gray-700 dark:text-slate-200 hover:bg-blue-50 dark:hover:bg-slate-700 hover:text-blue-700 rounded-lg flex items-center gap-3 transition-colors group"
                                     >
-                                        <div className="bg-gray-100 p-1.5 rounded-md group-hover:bg-blue-100 transition-colors text-gray-500 group-hover:text-blue-600">
+                                        <div className="bg-gray-100 dark:bg-slate-700 p-1.5 rounded-md group-hover:bg-blue-100 transition-colors text-gray-500 dark:text-slate-300 group-hover:text-blue-600">
                                             <UserCog size={16} />
                                         </div>
                                         Cài đặt tài khoản
                                     </button>
-                                    <div className="h-px bg-gray-100 my-1 mx-2"></div>
+                                    <div className="h-px bg-gray-100 dark:bg-slate-700 my-1 mx-2"></div>
                                     <button 
                                         onClick={() => {
                                             onLogout();
                                             setIsUserMenuOpen(false);
                                         }}
-                                        className="w-full text-left px-3 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg flex items-center gap-3 transition-colors group"
+                                        className="w-full text-left px-3 py-2.5 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg flex items-center gap-3 transition-colors group"
                                     >
-                                        <div className="bg-red-50 p-1.5 rounded-md group-hover:bg-red-100 transition-colors text-red-500 group-hover:text-red-600">
+                                        <div className="bg-red-50 dark:bg-red-900/40 p-1.5 rounded-md group-hover:bg-red-100 transition-colors text-red-500 group-hover:text-red-600">
                                             <LogOut size={16} />
                                         </div>
                                         Đăng xuất
