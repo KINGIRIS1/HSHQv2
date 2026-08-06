@@ -37,6 +37,7 @@ const UtilitiesView: React.FC<UtilitiesViewProps> = ({
     onAddWard,
     onDeleteWard,
     onResetWards,
+    onRefreshData,
 }) => {
   const isSotltdAllowed = isViewAllowedForUser(currentUser, employees || [], 'excerpt_management');
   const [activeTab, setActiveTab] = useState<'bienban' | 'thongtin' | 'vphc' | 'saiso' | 'chinhly' | 'tachthua' | 'chuyendoi' | 'sotltd'>(() => {

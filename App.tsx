@@ -421,7 +421,7 @@ function App() {
           const stepSLA = getCapGiayStepSLA(updatedSubStep, hasThamdinh);
           const newDeadline = isCG ? calculateDeadlineHelperByDays(stepSLA, todayStr, holidays) : r.deadline;
 
-          const baseAssignment = processAssignmentTimelineCheck(r, employeeId, nowStr, employees, currentUser);
+          const baseAssignment = processAssignmentTimelineCheck(r, employeeId, nowStr, employees, currentUser, updatedSubStep);
 
           return {
               ...r,
@@ -782,6 +782,7 @@ function App() {
           const oldAssigned = record.assignedTo || record.lastAssignedTo || null;
           const updates: Partial<RecordFile> = {
               status: RecordStatus.RECEIVED,
+              capGiaySubStep: record.capGiaySubStep === 'cho_bo_sung' ? 'tham_dinh' : record.capGiaySubStep,
               lastAssignedTo: oldAssigned,
               assignedTo: null,
               assignedDate: null,
@@ -799,6 +800,20 @@ function App() {
       }
 
       if (record.status === RecordStatus.HANDOVER || record.status === RecordStatus.WITHDRAWN || record.resultReturnedDate) {
+          return;
+      }
+
+      // Xử lý riêng trường hợp Chờ giấy nộp tiền -> Đưa về bước Giao việc / Thực hiện (In & Hoàn thiện)
+      if (isCapGiayRecord(record) && (record.capGiaySubStep === 'cho_nop_thue' || record.capGiaySubStep === 'cho_giay_nop_tien')) {
+          const todayStr = new Date().toISOString().split('T')[0];
+          const newDeadline = calculateDeadlineHelperByDays(5, todayStr, holidays || []);
+          setAssignTargetRecords([{
+              ...record,
+              status: RecordStatus.RECEIVED,
+              capGiaySubStep: 'hoan_thien_trinh_duyet',
+              deadline: newDeadline
+          }]);
+          setIsAssignModalOpen(true);
           return;
       }
 

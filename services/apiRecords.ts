@@ -17,7 +17,9 @@ const RECORD_DB_COLUMNS = [
     'needsMapCorrection', 'explanationPlan',
     'issueNumber', 'entryNumber', 'issueDate', 'residentialArea',
     'price', 'advancePayment', 'isHandedOver',
-    'statusLogs', 'archiveHandoverDate', 'archiveHandoverBatch'
+    'statusLogs', 'stepAssignments', 'capGiaySubStep', 
+    'thamDinhDate', 'thamDinhBy', 'chuyenThueDate', 'chuyenThueBy', 'hoanThienDate', 'hoanThienBy',
+    'initialAssignedTo', 'lastAssignedTo', 'archiveHandoverDate', 'archiveHandoverBatch'
 ];
 
 const OPTIONAL_NEW_COLUMNS = [
@@ -27,7 +29,9 @@ const OPTIONAL_NEW_COLUMNS = [
     'authorizedBy', 'authDocType', 'otherDocs',
     'privateNotes', 'personalNotes', 'checkedBy', 'pendingCheckDate', 'checkedDate', 'completedWorkDate',
     'price', 'advancePayment', 'isHandedOver',
-    'statusLogs', 'archiveHandoverDate', 'archiveHandoverBatch'
+    'statusLogs', 'stepAssignments', 'capGiaySubStep', 
+    'thamDinhDate', 'thamDinhBy', 'chuyenThueDate', 'chuyenThueBy', 'hoanThienDate', 'hoanThienBy',
+    'initialAssignedTo', 'lastAssignedTo', 'archiveHandoverDate', 'archiveHandoverBatch'
 ];
 
 export const fetchRecords = async (): Promise<RecordFile[]> => {

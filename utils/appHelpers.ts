@@ -25,6 +25,43 @@ export function toTitleCase(str: string | null | undefined): string {
     return str.toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 }
 
+// --- HÀM LÀM SẠCH GHI CHÚ (Loại bỏ log hệ thống & chuỗi JSON thô) ---
+export function cleanNoteText(note?: string | null): string {
+    if (!note) return '';
+    const str = String(note).trim();
+    if (!str) return '';
+
+    // Nếu toàn bộ chuỗi là JSON object chứa thông tin hệ thống (như dob, landUserType, customerProvince...)
+    if ((str.startsWith('{') && str.endsWith('}')) || str.includes('"landUserType"') || str.includes('"customerProvince"')) {
+        try {
+            const parsed = JSON.parse(str);
+            if (typeof parsed === 'object' && parsed !== null) {
+                return '';
+            }
+        } catch (e) {
+            if (/\{.*"landUserType".*\}/.test(str) || /\{.*"dob".*\}/.test(str)) {
+                return '';
+            }
+        }
+    }
+
+    // Tách theo dòng để loại bỏ các dòng ghi chú hệ thống
+    const lines = str.split(/\r?\n/).map(l => l.trim()).filter(line => {
+        if (!line) return false;
+        // Loại bỏ các dòng dạng [Đồng bộ thủ tục]: Đổi từ... hoặc [Đồng bộ...]
+        if (line.startsWith('[Đồng bộ') || line.toLowerCase().startsWith('[đồng bộ') || line.includes('[Đồng bộ thủ tục]:')) {
+            return false;
+        }
+        // Loại bỏ dòng chứa chuỗi JSON
+        if ((line.startsWith('{') && line.endsWith('}')) || line.includes('"landUserType":')) {
+            return false;
+        }
+        return true;
+    });
+
+    return lines.join('\n').trim();
+}
+
 // --- CONFIRM ACTION WRAPPER ---
 let globalConfirmCallback: null | ((message: string, title: string) => Promise<boolean>) = null;
 
@@ -484,7 +521,8 @@ export function processAssignmentTimelineCheck(
   newEmployeeId: string,
   newAssignedDateStr: string,
   employees: Employee[],
-  currentUser: any
+  currentUser: any,
+  subStep?: string | null
 ): Partial<RecordFile> {
   const newDate = parseSafeDate(newAssignedDateStr) || new Date();
   const formatDateVN = (dStr?: string | null) => {
@@ -505,6 +543,36 @@ export function processAssignmentTimelineCheck(
   const newEmpName = newEmp ? newEmp.name : newEmployeeId;
 
   const isEmployeeChanged = !!(record.assignedTo && record.assignedTo !== newEmployeeId);
+
+  // Maintain stepAssignments history
+  const currentSubStep = subStep || record.capGiaySubStep || 'tham_dinh';
+  const existingAssignments = Array.isArray(record.stepAssignments) ? [...record.stepAssignments] : [];
+
+  if (existingAssignments.length === 0 && record.initialAssignedTo && record.initialAssignedTo !== newEmployeeId) {
+    const initEmp = employees.find(e => e.id === record.initialAssignedTo);
+    existingAssignments.push({
+      step: 'tham_dinh',
+      employeeId: record.initialAssignedTo,
+      employeeName: initEmp ? initEmp.name : record.initialAssignedTo,
+      assignedAt: record.assignedDate || newAssignedDateStr,
+      assignedBy: 'Hệ thống'
+    });
+  }
+
+  const existingStepIdx = existingAssignments.findIndex(s => s.step === currentSubStep);
+  const newStepAssignment = {
+    step: currentSubStep,
+    employeeId: newEmployeeId,
+    employeeName: newEmpName,
+    assignedAt: newAssignedDateStr,
+    assignedBy: currentUser?.name || 'Hệ thống'
+  };
+
+  if (existingStepIdx >= 0) {
+    existingAssignments[existingStepIdx] = newStepAssignment;
+  } else {
+    existingAssignments.push(newStepAssignment);
+  }
 
   // List previous milestones
   const historyParts: string[] = [];
@@ -527,41 +595,26 @@ export function processAssignmentTimelineCheck(
     historyParts.push(`Ký duyệt ngày ${formatDateVN(record.approvalDate)}`);
   }
 
-  const hasSubsequentSteps = !!(
-    record.submissionDate ||
-    record.pendingCheckDate ||
-    record.checkedDate ||
-    record.approvalDate ||
-    record.completedWorkDate ||
-    record.status === RecordStatus.PENDING_CHECK ||
-    record.status === RecordStatus.CHECKED ||
-    record.status === RecordStatus.PENDING_SIGN ||
-    record.status === RecordStatus.SIGNED ||
-    record.status === RecordStatus.COMPLETED_WORK
-  );
-
-  let isLaterDate = false;
-  if (record.assignedDate) {
-    const oldAssignedDate = parseSafeDate(record.assignedDate);
-    if (oldAssignedDate && newDate > oldAssignedDate) isLaterDate = true;
-  }
-  if (record.submissionDate) {
-    const oldSubDate = parseSafeDate(record.submissionDate);
-    if (oldSubDate && newDate > oldSubDate) isLaterDate = true;
-  }
-  if (record.pendingCheckDate) {
-    const oldCheckDate = parseSafeDate(record.pendingCheckDate);
-    if (oldCheckDate && newDate > oldCheckDate) isLaterDate = true;
-  }
-
   const firstProcessor = record.initialAssignedTo || record.assignedTo || newEmployeeId;
 
   const updates: Partial<RecordFile> = {
     initialAssignedTo: firstProcessor,
     assignedTo: newEmployeeId,
     assignedDate: (record.status === RecordStatus.RECEIVED || isEmployeeChanged) ? newAssignedDateStr : (record.assignedDate || newAssignedDateStr),
-    lastAssignedTo: record.assignedTo || record.lastAssignedTo || newEmployeeId
+    lastAssignedTo: record.assignedTo || record.lastAssignedTo || newEmployeeId,
+    stepAssignments: existingAssignments
   };
+
+  if (currentSubStep === 'tham_dinh' || currentSubStep === 'tham_tra') {
+    updates.thamDinhDate = newAssignedDateStr;
+    updates.thamDinhBy = newEmployeeId;
+  } else if (currentSubStep === 'phieu_chuyen_thue') {
+    updates.chuyenThueDate = newAssignedDateStr;
+    updates.chuyenThueBy = newEmployeeId;
+  } else if (currentSubStep === 'hoan_thien_trinh_duyet' || currentSubStep === 'in_hoan_thien') {
+    updates.hoanThienDate = newAssignedDateStr;
+    updates.hoanThienBy = newEmployeeId;
+  }
   if (record.status === RecordStatus.RECEIVED) {
     updates.status = RecordStatus.IN_PROGRESS;
   }

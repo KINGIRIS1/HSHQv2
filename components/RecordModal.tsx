@@ -735,6 +735,64 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                             </div>
                         </div>
 
+                        {isCapGiayRecord(formData as any) && (
+                            <div className="bg-blue-50/70 p-3.5 rounded-lg border border-blue-200">
+                                <h4 className="text-xs font-bold text-blue-900 uppercase flex items-center gap-1.5 mb-2.5">
+                                    <FileCheck size={14} className="text-blue-700" />
+                                    Mốc ngày & Cán bộ thụ lý từng bước (Cấp Giấy)
+                                </h4>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                                    {/* Thẩm định */}
+                                    <div className="bg-white p-2.5 rounded border border-blue-100 shadow-sm space-y-1.5">
+                                        <div className="font-bold text-blue-800">1. Thẩm định / Thẩm tra</div>
+                                        <div>
+                                            <label className="block text-[10px] text-gray-500 font-medium">Ngày thẩm định</label>
+                                            <input type="date" className="w-full border border-gray-300 rounded px-2 py-1 text-xs" value={dateVal(formData.thamDinhDate)} onChange={(e) => handleChange('thamDinhDate', e.target.value)} />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] text-gray-500 font-medium">Cán bộ thẩm định</label>
+                                            <select className="w-full border border-gray-300 rounded px-2 py-1 text-xs bg-white" value={val(formData.thamDinhBy)} onChange={(e) => handleChange('thamDinhBy', e.target.value)}>
+                                                <option value="">-- Chọn cán bộ --</option>
+                                                {filteredEmployees.map(emp => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    {/* Chuyển thuế */}
+                                    <div className="bg-white p-2.5 rounded border border-purple-100 shadow-sm space-y-1.5">
+                                        <div className="font-bold text-purple-800">2. Chuyển thuế</div>
+                                        <div>
+                                            <label className="block text-[10px] text-gray-500 font-medium">Ngày chuyển thuế</label>
+                                            <input type="date" className="w-full border border-gray-300 rounded px-2 py-1 text-xs" value={dateVal(formData.chuyenThueDate)} onChange={(e) => handleChange('chuyenThueDate', e.target.value)} />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] text-gray-500 font-medium">Cán bộ chuyển thuế</label>
+                                            <select className="w-full border border-gray-300 rounded px-2 py-1 text-xs bg-white" value={val(formData.chuyenThueBy)} onChange={(e) => handleChange('chuyenThueBy', e.target.value)}>
+                                                <option value="">-- Chọn cán bộ --</option>
+                                                {filteredEmployees.map(emp => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    {/* In & Hoàn thiện */}
+                                    <div className="bg-white p-2.5 rounded border border-amber-100 shadow-sm space-y-1.5">
+                                        <div className="font-bold text-amber-800">3. In & Hoàn thiện</div>
+                                        <div>
+                                            <label className="block text-[10px] text-gray-500 font-medium">Ngày in & hoàn thiện</label>
+                                            <input type="date" className="w-full border border-gray-300 rounded px-2 py-1 text-xs" value={dateVal(formData.hoanThienDate)} onChange={(e) => handleChange('hoanThienDate', e.target.value)} />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] text-gray-500 font-medium">Cán bộ in & hoàn thiện</label>
+                                            <select className="w-full border border-gray-300 rounded px-2 py-1 text-xs bg-white" value={val(formData.hoanThienBy)} onChange={(e) => handleChange('hoanThienBy', e.target.value)}>
+                                                <option value="">-- Chọn cán bộ --</option>
+                                                {filteredEmployees.map(emp => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         {hasAdminRights && (
                             <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
                                 <div className="flex items-center gap-2 mb-1"><Lock size={14} className="text-yellow-600" /><label className="text-xs font-bold text-yellow-800 uppercase">Ghi chú nội bộ</label></div>

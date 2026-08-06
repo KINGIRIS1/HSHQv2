@@ -297,10 +297,11 @@ export const MOCK_RECORDS: RecordFile[] = [
 ];
 
 export const CAP_GIAY_SUB_STEPS = [
-  { id: 'tham_dinh', label: 'Thẩm tra', shortLabel: 'Thẩm tra', slaDays: 1, color: 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100' },
+  { id: 'tham_dinh', label: 'Thẩm tra / Thẩm định', shortLabel: 'Thẩm tra / Thẩm định', slaDays: 1, color: 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100' },
   { id: 'phieu_chuyen_thue', label: 'Phiếu chuyển thuế', shortLabel: 'Phiếu chuyển thuế', slaDays: 2, color: 'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100' },
   { id: 'cho_nop_thue', label: 'Chờ giấy nộp tiền', shortLabel: 'Chờ giấy nộp tiền', slaDays: 0, color: 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100' },
   { id: 'hoan_thien_trinh_duyet', label: 'In & Hoàn thiện', shortLabel: 'In & Hoàn thiện', slaDays: 5, color: 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' },
+  { id: 'cho_bo_sung', label: 'Chờ bổ sung', shortLabel: 'Chờ bổ sung', slaDays: 0, color: 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100' },
 ] as const;
 
 export const isCapGiayRecord = (record: RecordFile | Partial<RecordFile> | null | undefined): boolean => {
@@ -391,20 +392,22 @@ export const getRecordPlotCount = (record: RecordFile | Partial<RecordFile> | nu
 };
 
 export const getCapGiaySubStepLabel = (subStep?: string | null): string => {
-  if (!subStep || subStep === 'tham_dinh' || subStep === 'tham_tra') return 'Thẩm tra';
+  if (!subStep || subStep === 'tham_dinh' || subStep === 'tham_tra') return 'Thẩm tra / Thẩm định';
   if (subStep === 'phieu_chuyen_thue') return 'Phiếu chuyển thuế';
   if (subStep === 'cho_nop_thue' || subStep === 'cho_giay_nop_tien') return 'Chờ giấy nộp tiền';
   if (subStep === 'hoan_thien_trinh_duyet' || subStep === 'in_hoan_thien') return 'In & Hoàn thiện';
+  if (subStep === 'cho_bo_sung') return 'Chờ bổ sung';
   if (subStep === 'vo_so_gcn') return 'Vô số GCN';
   if (subStep === 'cho_ban_giao') return 'Chờ bàn giao';
   return subStep;
 };
 
 export const getCapGiaySubStepFullLabel = (subStep?: string | null): string => {
-  if (!subStep || subStep === 'tham_dinh' || subStep === 'tham_tra') return 'Thẩm tra';
+  if (!subStep || subStep === 'tham_dinh' || subStep === 'tham_tra') return 'Thẩm tra / Thẩm định';
   if (subStep === 'phieu_chuyen_thue') return 'Phiếu chuyển thuế';
   if (subStep === 'cho_nop_thue' || subStep === 'cho_giay_nop_tien') return 'Chờ giấy nộp tiền';
   if (subStep === 'hoan_thien_trinh_duyet' || subStep === 'in_hoan_thien') return 'In & Hoàn thiện';
+  if (subStep === 'cho_bo_sung') return 'Chờ bổ sung';
   if (subStep === 'vo_so_gcn') return 'Vô số GCN & Ngày ký';
   if (subStep === 'cho_ban_giao') return 'Chờ bàn giao 1 cửa';
   return subStep;

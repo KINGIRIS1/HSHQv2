@@ -15,7 +15,7 @@ import DocxPreviewModal from '../DocxPreviewModal';
 import { updateRecordApi, fetchContracts } from '../../services/api';
 import SystemReceiptTemplate from '../receive-record/SystemReceiptTemplate';
 import SystemAnnexTemplate from '../receive-record/SystemAnnexTemplate';
-import { getBatchDisplayParts } from '../../utils/appHelpers';
+import { getBatchDisplayParts, cleanNoteText } from '../../utils/appHelpers';
 import { RecordTimelineProgress } from '../RecordTimelineProgress';
 
 interface MobileDetailModalProps {
@@ -400,7 +400,7 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
           <div className="flex items-center gap-2">
             <Icon size={14} className={isActive ? 'text-gray-500' : 'text-gray-300'} />
             <span className={`text-sm font-medium ${isActive ? 'text-gray-800' : 'text-gray-400 italic'}`}>
-              {date ? formatDate(date) : (forceActive ? 'Đã hoàn tất' : 'Chưa thực hiện')}
+              {date ? formatDate(date) : (isActive ? 'Đang thực hiện' : 'Chưa thực hiện')}
             </span>
           </div>
           {subText && <p className="text-[11px] text-indigo-600 mt-1 italic">{subText}</p>}
@@ -777,13 +777,13 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
             </div>
 
             {/* Ghi chú hồ sơ */}
-            {record.notes && (
+            {cleanNoteText(record.notes) && (
               <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 space-y-3">
                 <h3 className="text-xs font-bold text-blue-600 uppercase flex items-center gap-2">
                   <StickyNote size={16} /> Ghi chú hồ sơ
                 </h3>
                 <div className="bg-blue-50/40 p-4 rounded-xl border border-blue-100 text-slate-800 text-sm font-medium leading-relaxed whitespace-pre-line">
-                  {record.notes}
+                  {cleanNoteText(record.notes)}
                 </div>
               </div>
             )}
@@ -829,13 +829,13 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
             })()}
 
             {/* Ghi chú nội bộ (Private notes / Read only) */}
-            {record.privateNotes && (
+            {cleanNoteText(record.privateNotes) && (
               <div className="bg-yellow-50 p-4 rounded-2xl border border-yellow-100 space-y-2">
                 <div className="flex items-center gap-2 text-yellow-800 font-bold text-xs uppercase">
                   <Info size={14} />
                   <span>Ghi chú nội bộ</span>
                 </div>
-                <p className="text-yellow-900 text-xs italic leading-relaxed whitespace-pre-line">"{record.privateNotes}"</p>
+                <p className="text-yellow-900 text-xs italic leading-relaxed whitespace-pre-line">"{cleanNoteText(record.privateNotes)}"</p>
               </div>
             )}
 

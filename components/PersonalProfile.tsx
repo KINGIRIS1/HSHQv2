@@ -28,7 +28,7 @@ import {
 } from "lucide-react";
 import * as XLSX from "xlsx-js-style";
 import { getShortRecordType, isArchiveRecordType, isCapGiayRecord } from "../constants";
-import { confirmAction, calculateDeadlineHelperByDays } from "../utils/appHelpers";
+import { confirmAction, calculateDeadlineHelperByDays, cleanNoteText } from "../utils/appHelpers";
 import { updateRecordApi, fetchContracts } from "../services/api";
 import {
   fetchArchiveRecords,
@@ -523,8 +523,8 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
       "Ngày trả kết quả": r.resultReturnedDate
         ? r.resultReturnedDate.split("T")[0]
         : "",
-      "Ghi chú": r.notes || "",
-      "Ghi chú cá nhân": r.personalNotes || "",
+      "Ghi chú": cleanNoteText(r.notes),
+      "Ghi chú cá nhân": cleanNoteText(r.personalNotes),
       "Số trích đo": r.measurementNumber || "",
       "Số trích lục": r.excerptNumber || "",
     }));
@@ -1339,7 +1339,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                           </td>
 
                           <td className="p-3 text-center align-middle">
-                            {onMapCorrection && (
+                            {onMapCorrection && !isArchiveRecordType(r.recordType) && !isCapGiayRecord(r) && (
                               <button
                                 onClick={() => onMapCorrection(r)}
                                 className={`flex items-center justify-center gap-1 px-2 py-1 rounded border transition-all text-[10px] font-bold shadow-sm mx-auto ${
@@ -1522,7 +1522,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
 
                       {/* Action buttons */}
                       <div className="border-t border-gray-100 pt-3 flex justify-between items-center gap-2">
-                        {onMapCorrection && (
+                        {onMapCorrection && !isArchiveRecordType(r.recordType) && !isCapGiayRecord(r) && (
                           <button
                             onClick={() => onMapCorrection(r)}
                             className={`p-1.5 rounded-lg border transition-all ${

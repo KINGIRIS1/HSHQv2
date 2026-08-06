@@ -2,6 +2,7 @@
 import { supabase, isConfigured } from './supabaseClient';
 import { Contract, PriceItem, Employee, User } from '../types';
 import { API_BASE_URL } from '../constants'; 
+import { cleanNoteText } from '../utils/appHelpers'; 
 
 // --- CACHE KEYS ---
 export const CACHE_KEYS = {
@@ -354,8 +355,9 @@ export const mapRecordFromDb = (item: any): any => {
     r.lastRemindedAt = val(r.lastRemindedAt, r.lastremindedat, r.last_reminded_at);
     r.deadlineReminded = val(r.deadlineReminded, r.deadlinereminded, r.deadline_reminded);
     
-    r.privateNotes = val(r.privateNotes, r.privatenotes, r.private_notes);
-    r.personalNotes = val(r.personalNotes, r.personalnotes, r.personal_notes);
+    r.notes = cleanNoteText(val(r.notes, r.notes, r.notes));
+    r.privateNotes = cleanNoteText(val(r.privateNotes, r.privatenotes, r.private_notes));
+    r.personalNotes = cleanNoteText(val(r.personalNotes, r.personalnotes, r.personal_notes));
     r.isHandedOver = val(r.isHandedOver, r.ishandedover, r.is_handed_over);
     r.deadline = keepOnlyDate(val(r.deadline, r.deadline, r.dead_line));
     
@@ -364,6 +366,23 @@ export const mapRecordFromDb = (item: any): any => {
         try { rawLogs = JSON.parse(rawLogs); } catch (e) { rawLogs = []; }
     }
     r.statusLogs = Array.isArray(rawLogs) ? rawLogs : [];
+
+    let rawStepAssigns = val(r.stepAssignments, r.stepassignments, r.step_assignments);
+    if (typeof rawStepAssigns === 'string') {
+        try { rawStepAssigns = JSON.parse(rawStepAssigns); } catch (e) { rawStepAssigns = []; }
+    }
+    r.stepAssignments = Array.isArray(rawStepAssigns) ? rawStepAssigns : [];
+
+    r.capGiaySubStep = val(r.capGiaySubStep, r.capgiaysubstep, r.cap_giay_sub_step);
+    r.thamDinhDate = keepOnlyDate(val(r.thamDinhDate, r.thamdinhdate, r.tham_dinh_date));
+    r.thamDinhBy = val(r.thamDinhBy, r.thamdinhby, r.tham_dinh_by);
+    r.chuyenThueDate = keepOnlyDate(val(r.chuyenThueDate, r.chuyenthuedate, r.chuyen_thue_date));
+    r.chuyenThueBy = val(r.chuyenThueBy, r.chuyenthueby, r.chuyen_thue_by);
+    r.hoanThienDate = keepOnlyDate(val(r.hoanThienDate, r.hoanthiendate, r.hoan_thien_date));
+    r.hoanThienBy = val(r.hoanThienBy, r.hoanthienby, r.hoan_thien_by);
+    r.initialAssignedTo = val(r.initialAssignedTo, r.initialassignedto, r.initial_assigned_to);
+    r.lastAssignedTo = val(r.lastAssignedTo, r.lastassignedto, r.last_assigned_to);
+
     r.archiveHandoverDate = keepOnlyDate(val(r.archiveHandoverDate, r.archivehandoverdate, r.archive_handover_date));
     r.archiveHandoverBatch = val(r.archiveHandoverBatch, r.archivehandoverbatch, r.archive_handover_batch);
 

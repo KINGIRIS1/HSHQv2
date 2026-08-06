@@ -74,13 +74,29 @@ const RecordRow: React.FC<RecordRowProps> = ({
   React.useEffect(() => { setLocalExc(record.excerptNumber || ""); }, [record.excerptNumber]);
   React.useEffect(() => { setLocalRec(record.receiptNumber || ""); }, [record.receiptNumber]);
   const normalizeName = (str: string) => str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
-  const employee = employees.find(e => 
-      e.id === record.assignedTo || 
-      (e as any).employeeId === record.assignedTo || 
-      e.name === record.assignedTo ||
-      (record.assignedTo && normalizeName(e.name) === normalizeName(record.assignedTo))
-  );
-  const assignedDisplayName = employee ? employee.name : record.assignedTo;
+  
+  const getCurrentHandlerInfo = (r: RecordFile) => {
+      let handlerId = r.assignedTo;
+      let handlerDate = r.assignedDate;
+      
+      if ((r.status === RecordStatus.PENDING_SIGN || r.status === RecordStatus.SIGNED) && r.submittedTo) {
+          handlerId = r.submittedTo;
+          handlerDate = r.submissionDate || r.assignedDate;
+      } else if ((r.status === RecordStatus.PENDING_CHECK || r.status === RecordStatus.CHECKED) && r.checkedBy) {
+          handlerId = r.checkedBy;
+          handlerDate = r.pendingCheckDate || r.assignedDate;
+      }
+      
+      const emp = employees.find(e => 
+          e.id === handlerId || 
+          (e as any).employeeId === handlerId || 
+          e.name === handlerId ||
+          (handlerId && normalizeName(e.name) === normalizeName(handlerId))
+      );
+      const name = emp ? emp.name : handlerId;
+      return { name, date: handlerDate };
+  };
+
   const isOverdue = isRecordOverdue(record);
   const isApproaching = isRecordApproaching(record);
   
@@ -189,16 +205,20 @@ const RecordRow: React.FC<RecordRowProps> = ({
       case 'landPlot':
         return <td key="landPlot" className={`${cellClass} text-center font-mono text-sm font-bold text-slate-700`}>{record.landPlot || '-'}</td>;
       case 'assigned':
+        const handlerInfo = getCurrentHandlerInfo(record);
+        const formattedHandlerDate = formatDate(handlerInfo.date);
         return (
           <td key="assigned" className={`${cellClass} text-center`}>
-              {assignedDisplayName || record.assignedDate ? (
+              {handlerInfo.name || formattedHandlerDate ? (
                   <div className="flex flex-col items-center gap-0.5">
-                      {record.assignedDate && (
-                          <span className="text-xs text-gray-500">{formatDate(record.assignedDate)}</span>
-                      )}
-                      {assignedDisplayName && (
-                          <span className="text-xs text-indigo-600 font-bold bg-indigo-50 px-1.5 py-0.5 rounded break-words max-w-full leading-tight" title={assignedDisplayName}>{assignedDisplayName}</span>
-                      )}
+                      {formattedHandlerDate ? (
+                          <span className="text-xs text-gray-500">{formattedHandlerDate}</span>
+                      ) : null}
+                      {handlerInfo.name ? (
+                          <span className="text-xs text-indigo-600 font-bold bg-indigo-50 px-1.5 py-0.5 rounded break-words max-w-full leading-tight" title={handlerInfo.name}>
+                              {handlerInfo.name}
+                          </span>
+                      ) : null}
                   </div>
               ) : '--'}
           </td>
@@ -306,8 +326,8 @@ const RecordRow: React.FC<RecordRowProps> = ({
                   )}
               </div>
               
-              {/* NÚT CHỈNH LÝ (Thay thế checkbox) */}
-              {onMapCorrection && (
+              {/* NÚT CHỈNH LÝ (Thay thế checkbox - KHÔNG hiển thị ở Hồ sơ lưu trữ và Hồ sơ cấp giấy) */}
+              {onMapCorrection && !isArchiveRecordType(record.recordType) && !isCapGiayRecord(record) && (
                   <div className="mt-2 flex justify-center">
                       <button 
                           onClick={(e) => { e.stopPropagation(); onMapCorrection(record); }}
@@ -362,16 +382,24 @@ const RecordRow: React.FC<RecordRowProps> = ({
               {/* NÚT CHUYỂN BƯỚC / CHUYỂN VỀ GIAO VIỆC / XÁC NHẬN NỘP THUẾ */}
               {(() => {
                 const isCG = isCapGiayRecord(record);
-                const isReturnedOrRejected = record.status === RecordStatus.REJECTED || record.status === RecordStatus.RETURNED || displayStatus === RecordStatus.REJECTED || displayStatus === RecordStatus.RETURNED || record.capGiaySubStep === 'cho_bo_sung';
+                // Hồ sơ đã trả kết quả (không hiển thị nút chuyển bước)
+                const isReturned = record.status === RecordStatus.RETURNED || displayStatus === RecordStatus.RETURNED || !!record.resultReturnedDate;
+                // Hồ sơ bị trả về / từ chối / cần bổ sung
+                const isRejectedOrSupplement = record.status === RecordStatus.REJECTED || displayStatus === RecordStatus.REJECTED || record.capGiaySubStep === 'cho_bo_sung';
                 const isTaxWaiting = isCG && (record.capGiaySubStep === 'cho_nop_thue' || record.capGiaySubStep === 'cho_giay_nop_tien');
                 const isOneDoorUser = currentUser?.role === UserRole.ONEDOOR || currentUser?.role === 'ONEDOOR';
 
+                // Nếu hồ sơ đã trả kết quả -> Loại bỏ nút chuyển bước hoàn toàn
+                if (isReturned) {
+                  return null;
+                }
+
                 // Đối với tài khoản Một Cửa (ONEDOOR): Chỉ cho phép bấm chuyển bước khi hồ sơ thuộc trạng thái Bổ sung hoặc Chờ nộp thuế
-                if (isOneDoorUser && !isReturnedOrRejected && !isTaxWaiting) {
+                if (isOneDoorUser && !isRejectedOrSupplement && !isTaxWaiting) {
                   return null;
                 }
                 
-                if (isReturnedOrRejected) {
+                if (isRejectedOrSupplement) {
                   return (
                     <button 
                       onClick={(e) => { e.stopPropagation(); onAdvanceStatus(record); }} 
@@ -395,7 +423,7 @@ const RecordRow: React.FC<RecordRowProps> = ({
                   );
                 }
 
-                if (displayStatus !== RecordStatus.HANDOVER && displayStatus !== RecordStatus.WITHDRAWN && record.status !== RecordStatus.HANDOVER && record.status !== RecordStatus.WITHDRAWN && !record.resultReturnedDate) {
+                if (displayStatus !== RecordStatus.HANDOVER && displayStatus !== RecordStatus.WITHDRAWN && record.status !== RecordStatus.HANDOVER && record.status !== RecordStatus.WITHDRAWN) {
                   return (
                     <button 
                       onClick={(e) => { e.stopPropagation(); onAdvanceStatus(record); }} 

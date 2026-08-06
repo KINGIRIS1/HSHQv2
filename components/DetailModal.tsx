@@ -9,7 +9,7 @@ import DocxPreviewModal from './DocxPreviewModal';
 import { updateRecordApi, fetchContracts, fetchExcerptHistory, saveExcerptRecord, fetchExcerptCounters, saveExcerptCounters, fetchTrichDoHistory, saveTrichDoRecord, fetchTrichDoCounters, saveTrichDoCounters } from '../services/api';
 import SystemReceiptTemplate from './receive-record/SystemReceiptTemplate';
 import SystemAnnexTemplate from './receive-record/SystemAnnexTemplate';
-import { getBatchDisplayParts, calculateDeadlineHelperByDays } from '../utils/appHelpers';
+import { getBatchDisplayParts, calculateDeadlineHelperByDays, cleanNoteText } from '../utils/appHelpers';
 import { RecordTimelineProgress } from './RecordTimelineProgress';
 
 interface DetailModalProps {
@@ -544,7 +544,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                   <div className="flex items-center gap-2">
                       <Icon size={14} className={isActive ? 'text-gray-500' : 'text-gray-300'} />
                       <span className={`text-sm font-medium ${isActive ? 'text-gray-800' : 'text-gray-400 italic'}`}>
-                          {date ? formatDate(date) : (forceActive ? 'Đã hoàn tất' : 'Chưa thực hiện')}
+                          {date ? formatDate(date) : (isActive ? 'Đang thực hiện' : 'Chưa thực hiện')}
                       </span>
                   </div>
                   {subText && <p className="text-[11px] text-indigo-600 mt-1 italic">{subText}</p>}
@@ -776,26 +776,57 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                     </div>
 
                     {/* NGƯỜI XỬ LÝ */}
-                    <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
-                        <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Người xử lý hồ sơ</label>
-                        <div className="flex items-center gap-3 bg-gray-50 p-3 rounded-lg border border-gray-100">
-                            <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-500">
-                                <UserIcon size={16}/>
-                            </div>
-                            <span className="font-bold text-sm text-gray-700">{getEmployeeName(record.assignedTo)}</span>
-                        </div>
-
-                        {record.status === RecordStatus.PENDING_CHECK || record.status === RecordStatus.CHECKED ? (
-                            <div className="mt-4">
-                                <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Người kiểm tra</label>
-                                <div className="flex items-center gap-3 bg-orange-50 p-3 rounded-lg border border-orange-100">
-                                    <div className="w-8 h-8 rounded-full bg-orange-200 flex items-center justify-center text-orange-600">
+                    <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm space-y-3">
+                        {record.assignedTo && (
+                            <div>
+                                <label className="text-[10px] text-gray-400 uppercase font-bold block mb-1">Cán bộ thụ lý / thực hiện</label>
+                                <div className="flex items-center gap-3 bg-gray-50 p-2.5 rounded-lg border border-gray-100">
+                                    <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 shrink-0 font-bold">
                                         <UserIcon size={16}/>
                                     </div>
-                                    <span className="font-bold text-sm text-orange-800">{getEmployeeName(record.checkedBy)}</span>
+                                    <div className="flex flex-col min-w-0">
+                                        <span className="font-bold text-sm text-gray-800 truncate">{getEmployeeName(record.assignedTo)}</span>
+                                        {record.assignedDate && (
+                                            <span className="text-[11px] text-gray-500">Ngày giao: {formatDate(record.assignedDate)}</span>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
-                        ) : null}
+                        )}
+
+                        {record.checkedBy && (
+                            <div>
+                                <label className="text-[10px] text-gray-400 uppercase font-bold block mb-1">Cán bộ kiểm tra</label>
+                                <div className="flex items-center gap-3 bg-orange-50 p-2.5 rounded-lg border border-orange-100">
+                                    <div className="w-8 h-8 rounded-full bg-orange-200 flex items-center justify-center text-orange-700 shrink-0 font-bold">
+                                        <UserIcon size={16}/>
+                                    </div>
+                                    <div className="flex flex-col min-w-0">
+                                        <span className="font-bold text-sm text-orange-900 truncate">{getEmployeeName(record.checkedBy)}</span>
+                                        {record.pendingCheckDate && (
+                                            <span className="text-[11px] text-orange-600">Ngày trình: {formatDate(record.pendingCheckDate)}</span>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {record.submittedTo && (
+                            <div>
+                                <label className="text-[10px] text-gray-400 uppercase font-bold block mb-1">Lãnh đạo ký duyệt</label>
+                                <div className="flex items-center gap-3 bg-indigo-50 p-2.5 rounded-lg border border-indigo-100">
+                                    <div className="w-8 h-8 rounded-full bg-indigo-200 flex items-center justify-center text-indigo-700 shrink-0 font-bold">
+                                        <UserIcon size={16}/>
+                                    </div>
+                                    <div className="flex flex-col min-w-0">
+                                        <span className="font-bold text-sm text-indigo-900 truncate">{getEmployeeName(record.submittedTo)}</span>
+                                        {record.submissionDate && (
+                                            <span className="text-[11px] text-indigo-600">Ngày trình: {formatDate(record.submissionDate)}</span>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* REMINDER */}
@@ -1003,14 +1034,14 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                         )}
 
                         {/* Ghi chú nội bộ */}
-                        {record.privateNotes && (
+                        {cleanNoteText(record.privateNotes) && (
                             <div className="mt-4 pt-4 border-t border-dashed border-gray-200">
                                 <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
                                     <div className="flex items-center gap-2 mb-1 text-yellow-800 font-bold text-xs">
                                         <Info size={14} />
                                         <span>Ghi chú nội bộ</span>
                                     </div>
-                                    <p className="text-yellow-900 text-xs italic">"{record.privateNotes}"</p>
+                                    <p className="text-yellow-900 text-xs italic">"{cleanNoteText(record.privateNotes)}"</p>
                                 </div>
                             </div>
                         )}

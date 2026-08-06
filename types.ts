@@ -190,6 +190,14 @@ export interface RecordFile {
   // Bước nhỏ xử lý quy trình Cấp Giấy (Chỉ dành riêng cho Hồ sơ Cấp Giấy)
   capGiaySubStep?: 'tham_dinh' | 'phieu_chuyen_thue' | 'cho_nop_thue' | 'hoan_thien_trinh_duyet' | string | null;
   
+  // Các mốc ngày và cán bộ xử lý theo từng bước (Cấp giấy)
+  thamDinhDate?: string | null;
+  thamDinhBy?: string | null;
+  chuyenThueDate?: string | null;
+  chuyenThueBy?: string | null;
+  hoanThienDate?: string | null;
+  hoanThienBy?: string | null;
+  
   // Tính năng nhắc nhở
   reminderDate?: string | null;      // Thời gian đặt lịch nhắc
   lastRemindedAt?: string | null;    // Thời gian đã thông báo lần cuối
@@ -222,8 +230,17 @@ export interface RecordFile {
 
   // Lịch sử trạng thái và Bàn giao kho lưu
   statusLogs?: RecordStatusLog[];
+  stepAssignments?: StepAssignment[];
   archiveHandoverDate?: string | null;
   archiveHandoverBatch?: number | null;
+}
+
+export interface StepAssignment {
+  step: string;
+  employeeId: string;
+  employeeName?: string;
+  assignedAt: string;
+  assignedBy?: string;
 }
 
 export interface RecordStatusLog {
