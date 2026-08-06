@@ -317,7 +317,7 @@ const DailyList: React.FC<DailyListProps> = ({ records, wards, currentUser, empl
                                             <button onClick={() => onEdit(r)} className="p-1.5 text-blue-600 hover:bg-blue-100 rounded transition-colors" title="Sửa">
                                                 <Pencil size={15} />
                                             </button>
-                                            {r.recordType && (getShortRecordType(r.recordType).startsWith('2.3') || getShortRecordType(r.recordType).startsWith('2.4')) && onCreateContract && (
+                                            {r.recordType && (getShortRecordType(r.recordType).startsWith('2.2') || getShortRecordType(r.recordType).startsWith('2.4')) && onCreateContract && (
                                                 <button onClick={() => onCreateContract(r)} className="p-1.5 text-amber-600 hover:bg-amber-100 rounded transition-colors" title="Lập hợp đồng">
                                                     <FileSignature size={15} />
                                                 </button>

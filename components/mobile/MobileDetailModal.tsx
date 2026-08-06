@@ -634,7 +634,7 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                 )}
 
                 {/* LIÊN KẾT HỢP ĐỒNG */}
-                {record && record.recordType && (getShortRecordType(record.recordType).startsWith('2.3') || getShortRecordType(record.recordType).startsWith('2.4')) && (
+                {record && record.recordType && (getShortRecordType(record.recordType).startsWith('2.2') || getShortRecordType(record.recordType).startsWith('2.4')) && (
                   <div className="pt-3 border-t border-dashed border-slate-100">
                     {matchedContract ? (
                       <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3 flex flex-col gap-2.5">

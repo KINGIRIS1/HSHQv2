@@ -611,7 +611,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                     </button>
                 )}
 
-                {onCreateLiquidation && record && record.recordType && (getShortRecordType(record.recordType).startsWith('2.3') || getShortRecordType(record.recordType).startsWith('2.4')) && (
+                {onCreateLiquidation && record && record.recordType && (getShortRecordType(record.recordType).startsWith('2.2') || getShortRecordType(record.recordType).startsWith('2.4')) && (
                     <button
                         onClick={() => { onClose(); onCreateLiquidation(record); }}
                         className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-200 text-gray-600 rounded hover:bg-gray-50 transition-colors text-sm font-medium"
@@ -621,7 +621,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                     </button>
                 )}
 
-                {record && record.recordType && (getShortRecordType(record.recordType).startsWith('2.3') || getShortRecordType(record.recordType).startsWith('2.4')) && (
+                {record && record.recordType && (getShortRecordType(record.recordType).startsWith('2.2') || getShortRecordType(record.recordType).startsWith('2.4')) && (
                     <button
                         onClick={() => {
                             const hasAnnexTemplate = hasTemplate(STORAGE_KEYS.CONTRACT_TEMPLATE_ANNEX);
@@ -852,14 +852,14 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                     <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm h-full flex flex-col">
                         {/* HÀNG BÁO HỢP ĐỒNG (CHỈ ÁP DỤNG CHO 2.3 VÀ 2.4) & SỐ TRÍCH ĐO / TRÍCH LỤC */}
                         {(() => {
-                            const isContractProcedure = !!(record?.recordType && (getShortRecordType(record.recordType).startsWith('2.3') || getShortRecordType(record.recordType).startsWith('2.4')));
+                            const isContractProcedure = !!(record?.recordType && (getShortRecordType(record.recordType).startsWith('2.2') || getShortRecordType(record.recordType).startsWith('2.4')));
                             const hasExcerptOrMeasurement = !isCapGiayRecord(record) && !!(recordTypeLower.includes('trích đo') || recordTypeLower.includes('trích lục') || record?.measurementNumber || record?.excerptNumber);
 
                             if (!isContractProcedure && !hasExcerptOrMeasurement) return null;
 
                             return (
                                 <div className={`grid grid-cols-1 ${isContractProcedure && hasExcerptOrMeasurement ? 'sm:grid-cols-2' : ''} gap-3 mb-4`}>
-                                    {/* CỘT HỢP ĐỒNG LIÊN KẾT - CHỈ XUẤT HIỆN CHO THỦ TỤC 2.3 & 2.4 */}
+                                    {/* CỘT HỢP ĐỒNG LIÊN KẾT - CHỈ XUẤT HIỆN CHO THỦ TỤC 2.2 & 2.4 */}
                                     {isContractProcedure && (
                                         <div className="bg-indigo-50/80 border border-indigo-100 rounded-xl p-3 flex items-center justify-between gap-2">
                                             <div className="flex items-center gap-2.5 min-w-0">
