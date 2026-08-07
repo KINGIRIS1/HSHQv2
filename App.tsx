@@ -636,7 +636,7 @@ function App() {
           if (assignedToValue) {
               recordUpdates.assignedTo = assignedToValue;
               recordUpdates.assignedDate = customDateStr || r.assignedDate || targetDateStr;
-              if (r.status === RecordStatus.RECEIVED) {
+              if (field !== 'status' && r.status === RecordStatus.RECEIVED) {
                   recordUpdates.status = RecordStatus.IN_PROGRESS;
               }
           }

@@ -143,9 +143,9 @@ export const useRecordFilter = (
             result = result.filter(r => r.submittedTo === currentUser?.employeeId && r.status !== RecordStatus.PENDING_SIGN && r.status !== RecordStatus.RECEIVED && r.status !== RecordStatus.ASSIGNED && r.status !== RecordStatus.IN_PROGRESS);
         } else if (currentView === 'handover_list' || currentView === 'other_handover_list' || currentView === 'archive_handover_list') {
             if (handoverTab === 'today') {
-                // Tab chờ giao: Bao gồm Đã ký/Chờ giao (HANDOVER hoặc PENDING_SIGN đã ký) HOẶC (Đã rút VÀ chưa có đợt xuất) HOẶC Hồ sơ trả (REJECTED)
+                // Tab chờ bàn giao: Chỉ hồ sơ đã ký sẵn sàng bàn giao (SIGNED) hoặc (Đã rút/Hồ sơ trả chưa có đợt xuất)
                 result = result.filter(r => 
-                    r.status === RecordStatus.HANDOVER || r.status === RecordStatus.PENDING_SIGN || 
+                    r.status === RecordStatus.SIGNED || 
                     ((r.status === RecordStatus.REJECTED || r.status === RecordStatus.WITHDRAWN) && !r.exportBatch)
                 );
             } else if (handoverTab === 'returned') {
@@ -163,12 +163,13 @@ export const useRecordFilter = (
                     });
                 }
             } else {
-                // Tab Lịch sử giao: Bao gồm Đã giao HOẶC (Đã rút VÀ đã có đợt xuất)
+                // Tab Chờ trả kết quả (history): Hồ sơ đã bàn giao 1 cửa (HANDOVER hoặc đã xuất đợt) và chưa trả kết quả dân
                 result = result.filter(r => 
-                    r.status === RecordStatus.HANDOVER || 
-                    ((r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED) && r.exportBatch)
+                    (r.status === RecordStatus.HANDOVER || 
+                    ((r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED) && r.exportBatch)) &&
+                    !r.resultReturnedDate
                 );
-                // Giữ nguyên logic lọc ngày đơn cho Lịch sử giao (theo đợt)
+                // Giữ nguyên logic lọc ngày đơn cho Chờ trả kết quả (theo đợt)
                 if (filterDate) {
                     result = result.filter(r => {
                         const dateToCheck = r.exportDate || r.completedDate;
