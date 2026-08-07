@@ -11,7 +11,7 @@ interface BulkUpdateModalProps {
   allRecords?: RecordFile[];
   employees: Employee[];
   wards: string[];
-  onConfirm: (field: keyof RecordFile, value: any, customDate?: string, targetRecordIds?: string[]) => Promise<void>;
+  onConfirm: (field: keyof RecordFile, value: any, customDate?: string, targetRecordIds?: string[], assignedTo?: string) => Promise<void>;
 }
 
 const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({ 
@@ -19,6 +19,7 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
 }) => {
   const [targetField, setTargetField] = useState<string>('status');
   const [targetValue, setTargetValue] = useState<string>('');
+  const [selectedAssignee, setSelectedAssignee] = useState<string>('');
   const [useCustomDate, setUseCustomDate] = useState<boolean>(false);
   const [customDate, setCustomDate] = useState<string>('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -54,14 +55,54 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
     return map;
   }, [employees, allRecords, selectedRecords]);
 
+  // Xác định tổ chuyên môn / phòng ban của hồ sơ đang chọn
+  const recordDept = useMemo(() => {
+      if (!selectedRecords || selectedRecords.length === 0) return 'Tổ Cấp giấy';
+      const record = selectedRecords[0];
+      const type = (record.recordType || '').toLowerCase();
+      
+      if (type.includes('1.1') || type.includes('1.2') || type.includes('công văn') || type.includes('lưu trữ')) {
+          return 'Tổ Lưu trữ';
+      }
+      if (type.includes('2.1') || type.includes('trích lục')) {
+          return 'Tổ Cấp giấy';
+      }
+      if (type.includes('2.2') || type.includes('2.3') || type.includes('2.4') || type.includes('2.5') || type.includes('2.6') || type.includes('số thửa') || type.includes('trích đo') || type.includes('đo đạc')) {
+          return 'Tổ Đo đạc';
+      }
+      return 'Tổ Cấp giấy';
+  }, [selectedRecords]);
+
+  // Lọc danh sách nhân viên theo yêu cầu:
+  // - Nếu đang tổ đo đạc: chỉ nhân viên tổ đo đạc và ban giám đốc
+  // - Nếu tổ lưu trữ: toàn bộ nhân viên tổ lưu trữ và ban giám đốc
+  // - Không gồm nhân viên bộ phận khác
+  const filteredEmployeesForAssignment = useMemo(() => {
+      const isDoDac = recordDept.toLowerCase().includes('đo đạc');
+      const isLuuTru = recordDept.toLowerCase().includes('lưu trữ');
+
+      return employees.filter(emp => {
+          const dept = (emp.department || '').toLowerCase();
+          const isBgd = dept.includes('ban giám đốc') || dept.includes('giám đốc');
+          if (isBgd) return true;
+
+          if (isDoDac) {
+              return dept.includes('đo đạc') || dept.includes('kỹ thuật');
+          } else if (isLuuTru) {
+              return dept.includes('lưu trữ') || dept.includes('thông tin');
+          }
+          return dept.includes('cấp giấy') || dept.includes('đăng ký');
+      });
+  }, [employees, recordDept]);
+
   // Determine active target records
   const activeRecordsToUpdate = selectedRecords;
 
   if (!isOpen) return null;
 
   const handleConfirm = async () => {
-    if (!targetValue) {
-        alert("Vui lòng chọn giá trị cần cập nhật.");
+    if (!targetValue && !selectedAssignee) {
+        alert("Vui lòng chọn thông tin thay đổi hoặc chọn người xử lý.");
         return;
     }
     if (activeRecordsToUpdate.length === 0) {
@@ -74,13 +115,13 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
         setIsProcessing(true);
         const isoDate = useCustomDate && customDate ? new Date(customDate + "T12:00:00").toISOString() : undefined;
         const targetIds = activeRecordsToUpdate.map(r => r.id);
-        await onConfirm(targetField as keyof RecordFile, targetValue, isoDate, targetIds);
+        await onConfirm(targetField as keyof RecordFile, targetValue, isoDate, targetIds, selectedAssignee || undefined);
         setIsProcessing(false);
         onClose();
     }
   };
 
-  const showDatePicker = targetField === 'status' || targetField === 'assignedTo';
+  const showDatePicker = targetField === 'status' || !!selectedAssignee;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[70] p-2 sm:p-4 backdrop-blur-sm">
@@ -90,7 +131,7 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
         <div className="p-5 border-b bg-gradient-to-r from-orange-50 to-orange-100 flex justify-between items-center">
             <div>
                 <h3 className="font-bold text-orange-800 text-lg flex items-center gap-2">
-                    <Layers size={20} /> ADMIN: Xử lý hàng loạt
+                    <Layers size={20} /> ADMIN: Xử lý hàng loạt ({recordDept})
                 </h3>
                 <p className="text-xs text-orange-700 mt-1">
                     Số lượng hồ sơ sẽ cập nhật: <strong className="text-sm font-black text-orange-900">{activeRecordsToUpdate.length}</strong> hồ sơ
@@ -100,6 +141,8 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
         </div>
 
         <div className="p-6 space-y-5 max-h-[75vh] overflow-y-auto">
+
+
             <div className="space-y-4">
                 <div>
                     <label className="block text-sm font-bold text-gray-700 mb-2">1. Chọn thông tin cần thay đổi</label>
@@ -115,17 +158,7 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
                     >
                         <option value="status">Trạng thái hồ sơ (Quy trình)</option>
                         <option value="capGiaySubStep">Bước xử lý Cấp giấy (Chỉ Cấp giấy)</option>
-                        <option value="assignedTo">Người xử lý (Giao việc)</option>
-                        <option value="assignedDate">Ngày giao việc</option>
-                        <option value="checkedDate">Ngày kiểm tra</option>
-                        <option value="submissionDate">Ngày trình ký</option>
-                        <option value="approvalDate">Ngày ký duyệt</option>
-                        <option value="completedDate">Ngày hoàn thành hồ sơ</option>
-                        <option value="exportDate">Ngày xuất (Bàn giao)</option>
                         <option value="exportBatch">Đợt xuất (Bàn giao)</option>
-                        <option value="deadline">Ngày hẹn trả (Gia hạn)</option>
-                        <option value="receivedDate">Ngày nhận hồ sơ</option>
-                        <option value="resultReturnedDate">Ngày trả kết quả</option>
                         <option value="receiptNumber">Số BL/HĐ</option>
                         <option value="returnedPrice">Số tiền</option>
                         <option value="ward">Xã / Phường (Địa bàn)</option>
@@ -169,25 +202,6 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
                         </select>
                     )}
 
-                    {targetField === 'assignedTo' && (
-                        <select 
-                            className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-orange-500 outline-none bg-white font-medium"
-                            value={targetValue}
-                            onChange={(e) => setTargetValue(e.target.value)}
-                        >
-                            <option value="">-- Chọn nhân viên (Kèm tải công việc) --</option>
-                            {employees.map(emp => {
-                                const wl = empWorkloadMap[emp.id];
-                                const wlStr = wl ? ` [Đang xử lý: ${wl.activeCount} HS - ${wl.activePlotCount} thửa]` : '';
-                                return (
-                                    <option key={emp.id} value={emp.id}>
-                                        {emp.name} ({emp.department}){wlStr}
-                                    </option>
-                                );
-                            })}
-                        </select>
-                    )}
-
                     {targetField === 'ward' && (
                         <select 
                             className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-orange-500 outline-none bg-white"
@@ -199,15 +213,6 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
                                 <option key={w} value={w}>{w}</option>
                             ))}
                         </select>
-                    )}
-
-                    {['deadline', 'receivedDate', 'resultReturnedDate', 'assignedDate', 'exportDate', 'completedWorkDate', 'checkedDate', 'submissionDate', 'approvalDate', 'completedDate'].includes(targetField) && (
-                        <input 
-                            type="date"
-                            className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-orange-500 outline-none"
-                            value={targetValue}
-                            onChange={(e) => setTargetValue(e.target.value)}
-                        />
                     )}
 
                     {targetField === 'exportBatch' && (
@@ -239,6 +244,26 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
                             onChange={(e) => setTargetValue(e.target.value)}
                         />
                     )}
+                </div>
+
+                <div className="pt-2 border-t border-gray-100">
+                    <label className="block text-sm font-bold text-gray-700 mb-2">3. Người xử lý (Tùy chọn)</label>
+                    <select 
+                        className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-orange-500 outline-none bg-white font-medium"
+                        value={selectedAssignee}
+                        onChange={(e) => setSelectedAssignee(e.target.value)}
+                    >
+                        <option value="">-- Giữ nguyên người xử lý cũ / Không đổi --</option>
+                        {filteredEmployeesForAssignment.map(emp => {
+                            const wl = empWorkloadMap[emp.id];
+                            const wlStr = wl ? ` [Đang xử lý: ${wl.activeCount} HS - ${wl.activePlotCount} thửa]` : '';
+                            return (
+                                <option key={emp.id} value={emp.id}>
+                                    {emp.name} ({emp.department}){wlStr}
+                                </option>
+                            );
+                        })}
+                    </select>
                 </div>
 
                 {showDatePicker && (

@@ -1,5 +1,6 @@
 
 import PizZip from 'pizzip';
+import { parseSafeDate } from '../utils/appHelpers';
 
 // --- TYPES ---
 export interface PhieuInfoData {
@@ -130,15 +131,15 @@ export const formatAreaLabel = (val: string) => {
 
 export const formatDateVN = (dateStr: string): string => {
     if (!dateStr) return '...';
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return '...';
+    const d = parseSafeDate(dateStr);
+    if (!d || isNaN(d.getTime())) return '...';
     return `ngày ${d.getDate().toString().padStart(2, '0')} tháng ${(d.getMonth() + 1).toString().padStart(2, '0')} năm ${d.getFullYear()}`;
 };
 
 export const formatDateShort = (dateStr: string): string => {
     if (!dateStr) return '...';
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return '...';
+    const d = parseSafeDate(dateStr);
+    if (!d || isNaN(d.getTime())) return '...';
     return `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}`;
 };
 

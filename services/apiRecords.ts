@@ -3,6 +3,7 @@ import { supabase, isConfigured } from './supabaseClient';
 import { RecordFile } from '../types';
 import { MOCK_RECORDS, API_BASE_URL } from '../constants';
 import { logError, getFromCache, saveToCache, CACHE_KEYS, sanitizeData, sanitizePayloadFor22P02, normalizeCode, mapRecordFromDb } from './apiCore';
+import { parseSafeDate } from '../utils/appHelpers';
 
 const RECORD_DB_COLUMNS = [
     'id', 'code', 'customerName', 'phoneNumber', 'cccd', 'customerAddress', 'ward', 'landPlot', 'mapSheet', 
@@ -132,15 +133,14 @@ export const getShortCode = (ward: string) => {
 };
 
 export const getNextGlobalRecordCode = async (dateStr: string): Promise<string> => {
+    const d = parseSafeDate(dateStr) || new Date();
     if (!isConfigured) {
-        const d = new Date(dateStr);
         const yy = d.getFullYear().toString().slice(-2);
         const mm = ('0' + (d.getMonth() + 1)).slice(-2);
         const dd = ('0' + d.getDate()).slice(-2);
         return `${yy}${mm}${dd}-${Math.floor(Math.random() * 1000).toString().padStart(4, '0')}`;
     }
 
-    const d = new Date(dateStr);
     const year = d.getFullYear().toString();
     const yy = year.slice(-2);
     const mm = ('0' + (d.getMonth() + 1)).slice(-2);

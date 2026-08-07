@@ -87,7 +87,7 @@ interface AppModalsProps {
     executeReturnBatchHandover?: (batch: number, date: string, deptName: string) => void;
     onCreateLiquidation: (record: RecordFile) => void;
     onCreateContract?: (record: Partial<RecordFile>) => void;
-    handleBulkUpdate: (field: keyof RecordFile, value: any, customDateStr?: string, targetRecordIds?: string[]) => Promise<void>;
+    handleBulkUpdate: (field: keyof RecordFile, value: any, customDateStr?: string, targetRecordIds?: string[], assignedTo?: string) => Promise<void>;
     handleBatchUpdateRecords?: (updates: Partial<RecordFile>[]) => Promise<void>;
     confirmReturnResult: (receiptNumber: string, receiverName: string, returnedPrice: number, receiptType?: 'Biên Lai' | 'Hóa Đơn') => void;
     onConfirmRejectReturnStep?: (reason: string, returnDateStr: string) => Promise<void>;

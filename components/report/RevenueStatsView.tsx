@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { RecordFile, RecordStatus, Employee } from '../../types';
 import { getShortRecordType } from '../../constants';
-import { removeVietnameseTones, getRecordDepartment } from '../../utils/appHelpers';
+import { removeVietnameseTones, getRecordDepartment, parseSafeDate } from '../../utils/appHelpers';
 import { FileSpreadsheet, Search, ChevronLeft, ChevronRight, Ruler, FolderArchive, FileCheck, DollarSign } from 'lucide-react';
 import * as XLSX from 'xlsx-js-style';
 
@@ -72,12 +72,12 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
         let dateEnd: Date | null = null;
         const isAllTime = !fromDate || fromDate === '1970-01-01';
         if (fromDate && !isAllTime) {
-            dateStart = new Date(fromDate);
-            dateStart.setHours(0, 0, 0, 0);
+            dateStart = parseSafeDate(fromDate);
+            if (dateStart) dateStart.setHours(0, 0, 0, 0);
         }
         if (toDate) {
-            dateEnd = new Date(toDate);
-            dateEnd.setHours(23, 59, 59, 999);
+            dateEnd = parseSafeDate(toDate);
+            if (dateEnd) dateEnd.setHours(23, 59, 59, 999);
         }
 
         return records

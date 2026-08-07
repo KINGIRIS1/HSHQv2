@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { RecordFile, RecordStatus, User, UserRole } from '../types';
 import { updateRecordFieldsApi } from '../services/api';
+import { parseSafeDate } from '../utils/appHelpers';
 
 const REMINDER_INTERVAL = 60000; // Kiểm tra mỗi 1 phút
 const REPEAT_HOURS = 2; // Nhắc lại mỗi 2 giờ
@@ -186,8 +187,8 @@ export const useReminderSystem = (
                     ].includes(r.status);
 
                     if (!isFinishedOrWithdrawn) {
-                        const deadlineDate = new Date(r.deadline);
-                        const deadlineTime = deadlineDate.getTime();
+                        const deadlineDate = parseSafeDate(r.deadline);
+                        const deadlineTime = deadlineDate ? deadlineDate.getTime() : NaN;
                         
                         if (!isNaN(deadlineTime) && now >= deadlineTime) {
                             const isAssignedToCurrentUser = currentUser && currentUser.employeeId === r.assignedTo;

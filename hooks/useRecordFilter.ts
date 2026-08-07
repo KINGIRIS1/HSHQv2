@@ -135,17 +135,17 @@ export const useRecordFilter = (
                 result = result.filter(r => r.status === RecordStatus.PENDING_SIGN);
             }
         } else if (currentView === 'pending_check_list' || currentView === 'archive_pending_check_list') {
-            // Tab Kiểm tra: Hiển thị hồ sơ Chờ kiểm tra và Đã kiểm tra
-            result = result.filter(r => r.status === RecordStatus.PENDING_CHECK || r.status === RecordStatus.CHECKED);
+            // Tab Kiểm tra: Hiển thị hồ sơ Chờ kiểm tra
+            result = result.filter(r => r.status === RecordStatus.PENDING_CHECK);
         } else if (currentView === 'completed_list' || currentView === 'archive_completed_list') {
-            result = result.filter(r => r.status === RecordStatus.ASSIGNED || r.status === RecordStatus.IN_PROGRESS || r.status === RecordStatus.COMPLETED_WORK);
+            result = result.filter(r => r.status === RecordStatus.ASSIGNED || r.status === RecordStatus.IN_PROGRESS);
         } else if (currentView === 'director_completed' || currentView === 'other_director_completed' || currentView === 'archive_director_completed') {
-            result = result.filter(r => r.submittedTo === currentUser?.employeeId && r.status !== RecordStatus.PENDING_SIGN && r.status !== RecordStatus.RECEIVED && r.status !== RecordStatus.ASSIGNED && r.status !== RecordStatus.IN_PROGRESS && r.status !== RecordStatus.COMPLETED_WORK);
+            result = result.filter(r => r.submittedTo === currentUser?.employeeId && r.status !== RecordStatus.PENDING_SIGN && r.status !== RecordStatus.RECEIVED && r.status !== RecordStatus.ASSIGNED && r.status !== RecordStatus.IN_PROGRESS);
         } else if (currentView === 'handover_list' || currentView === 'other_handover_list' || currentView === 'archive_handover_list') {
             if (handoverTab === 'today') {
-                // Tab chờ giao: Bao gồm Đã ký HOẶC (Đã rút VÀ chưa có đợt xuất) HOẶC Hồ sơ trả (REJECTED)
+                // Tab chờ giao: Bao gồm Đã ký/Chờ giao (HANDOVER hoặc PENDING_SIGN đã ký) HOẶC (Đã rút VÀ chưa có đợt xuất) HOẶC Hồ sơ trả (REJECTED)
                 result = result.filter(r => 
-                    r.status === RecordStatus.SIGNED || 
+                    r.status === RecordStatus.HANDOVER || r.status === RecordStatus.PENDING_SIGN || 
                     ((r.status === RecordStatus.REJECTED || r.status === RecordStatus.WITHDRAWN) && !r.exportBatch)
                 );
             } else if (handoverTab === 'returned') {

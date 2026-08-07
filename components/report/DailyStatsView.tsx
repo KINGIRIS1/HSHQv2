@@ -93,11 +93,11 @@ const DailyStatsView: React.FC<DailyStatsViewProps> = ({
             } else {
                 rDate.setHours(0,0,0,0);
                 if (effectiveFrom) {
-                    const from = parseSafeDate(effectiveFrom) || new Date(effectiveFrom); from.setHours(0,0,0,0);
+                    const from = parseSafeDate(effectiveFrom) || new Date(); from.setHours(0,0,0,0);
                     if (rDate < from) matchDate = false;
                 }
                 if (effectiveTo) {
-                    const to = parseSafeDate(effectiveTo) || new Date(effectiveTo); to.setHours(23,59,59,999);
+                    const to = parseSafeDate(effectiveTo) || new Date(); to.setHours(23,59,59,999);
                     if (rDate > to) matchDate = false;
                 }
             }
@@ -116,11 +116,11 @@ const DailyStatsView: React.FC<DailyStatsViewProps> = ({
             } else {
                 rDate.setHours(0,0,0,0);
                 if (effectiveFrom) {
-                    const from = parseSafeDate(effectiveFrom) || new Date(effectiveFrom); from.setHours(0,0,0,0);
+                    const from = parseSafeDate(effectiveFrom) || new Date(); from.setHours(0,0,0,0);
                     if (rDate < from) matchDate = false;
                 }
                 if (effectiveTo) {
-                    const to = parseSafeDate(effectiveTo) || new Date(effectiveTo); to.setHours(23,59,59,999);
+                    const to = parseSafeDate(effectiveTo) || new Date(); to.setHours(23,59,59,999);
                     if (rDate > to) matchDate = false;
                 }
             }
@@ -139,11 +139,11 @@ const DailyStatsView: React.FC<DailyStatsViewProps> = ({
             } else {
                 rDate.setHours(0,0,0,0);
                 if (effectiveFrom) {
-                    const from = parseSafeDate(effectiveFrom) || new Date(effectiveFrom); from.setHours(0,0,0,0);
+                    const from = parseSafeDate(effectiveFrom) || new Date(); from.setHours(0,0,0,0);
                     if (rDate < from) matchDate = false;
                 }
                 if (effectiveTo) {
-                    const to = parseSafeDate(effectiveTo) || new Date(effectiveTo); to.setHours(23,59,59,999);
+                    const to = parseSafeDate(effectiveTo) || new Date(); to.setHours(23,59,59,999);
                     if (rDate > to) matchDate = false;
                 }
             }

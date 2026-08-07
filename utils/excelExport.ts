@@ -13,15 +13,15 @@ export const exportReportToExcel = async (
     employees: Employee[],
     customTitle?: string
 ) => {
-    const from = parseSafeDate(fromDateStr) || new Date(fromDateStr);
+    const from = parseSafeDate(fromDateStr) || new Date();
     from.setHours(0, 0, 0, 0);
-    const to = parseSafeDate(toDateStr) || new Date(toDateStr);
+    const to = parseSafeDate(toDateStr) || new Date();
     to.setHours(23, 59, 59, 999);
 
     // Filter records safely
     const filtered = records.filter(r => {
         const rDate = getRecordReceivedDate(r);
-        if (!rDate) return true;
+        if (!rDate || isNaN(rDate.getTime())) return true;
         rDate.setHours(12, 0, 0, 0);
         const matchDate = rDate >= from && rDate <= to;
         

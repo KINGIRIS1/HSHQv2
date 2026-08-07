@@ -4,11 +4,11 @@ export enum RecordStatus {
   RECEIVED = 'RECEIVED',         // Tiếp nhận
   ASSIGNED = 'ASSIGNED',         // Giao nhân viên
   IN_PROGRESS = 'IN_PROGRESS',   // Đang thực hiện
-  COMPLETED_WORK = 'COMPLETED_WORK', // Đã thực hiện (Mới: Nhân viên làm xong, chưa trình)
+  COMPLETED_WORK = 'COMPLETED_WORK', // Đã thực hiện (Legacy)
   PENDING_CHECK = 'PENDING_CHECK', // Chờ kiểm tra
-  CHECKED = 'CHECKED',           // Đã kiểm tra
+  CHECKED = 'CHECKED',           // Đã kiểm tra (Legacy)
   PENDING_SIGN = 'PENDING_SIGN', // Chờ ký duyệt (Đã trình)
-  SIGNED = 'SIGNED',             // Đã ký (Lập danh sách ký)
+  SIGNED = 'SIGNED',             // Đã ký (Legacy)
   HANDOVER = 'HANDOVER',         // Giao 1 cửa (Hoàn thành nội bộ)
   RETURNED = 'RETURNED',         // Đã trả kết quả (Hoàn thành trả dân)
   WITHDRAWN = 'WITHDRAWN',       // CSD rút hồ sơ (Kết thúc)

@@ -120,27 +120,18 @@ export const RecordTimelineProgress: React.FC<RecordTimelineProgressProps> = ({
 
   // Active status checks
   const isWorkDone = [
-    RecordStatus.COMPLETED_WORK, RecordStatus.PENDING_CHECK, RecordStatus.CHECKED, 
-    RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER, RecordStatus.RETURNED
+    RecordStatus.PENDING_CHECK, 
+    RecordStatus.PENDING_SIGN, RecordStatus.HANDOVER, RecordStatus.RETURNED
   ].includes(record.status) || !!record.completedWorkDate;
 
   const isPendingCheckActive = [
-    RecordStatus.PENDING_CHECK, RecordStatus.CHECKED, RecordStatus.PENDING_SIGN, 
-    RecordStatus.SIGNED, RecordStatus.HANDOVER, RecordStatus.RETURNED
+    RecordStatus.PENDING_CHECK, RecordStatus.PENDING_SIGN, 
+    RecordStatus.HANDOVER, RecordStatus.RETURNED
   ].includes(record.status) || !!record.pendingCheckDate;
 
-  const isCheckedActive = [
-    RecordStatus.CHECKED, RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, 
-    RecordStatus.HANDOVER, RecordStatus.RETURNED
-  ].includes(record.status) || !!record.checkedDate;
-
   const isPendingSignActive = [
-    RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER, RecordStatus.RETURNED
+    RecordStatus.PENDING_SIGN, RecordStatus.HANDOVER, RecordStatus.RETURNED
   ].includes(record.status) || !!record.submissionDate;
-
-  const isSignedActive = [
-    RecordStatus.SIGNED, RecordStatus.HANDOVER, RecordStatus.RETURNED
-  ].includes(record.status) || !!record.approvalDate;
 
   const isHideCheckSteps = record.recordType === 'Cung cấp tài liệu đất đai' || record.recordType === 'Sao lục' || record.recordType === 'Công văn';
 
@@ -150,7 +141,7 @@ export const RecordTimelineProgress: React.FC<RecordTimelineProgressProps> = ({
     record.capGiaySubStep === 'vo_so_gcn' || 
     record.capGiaySubStep === 'cho_ban_giao' || 
     record.capGiaySubStep === 'da_ban_giao' || 
-    [RecordStatus.SIGNED, RecordStatus.HANDOVER, RecordStatus.RETURNED].includes(record.status) ||
+    [RecordStatus.HANDOVER, RecordStatus.RETURNED].includes(record.status) ||
     !!record.completedDate || !!record.exportDate
   );
 

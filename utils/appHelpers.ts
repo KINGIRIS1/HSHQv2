@@ -92,8 +92,7 @@ export const isRecordOverdue = (record: RecordFile): boolean => {
       RecordStatus.HANDOVER,
       RecordStatus.RETURNED,
       RecordStatus.WITHDRAWN,
-      RecordStatus.REJECTED,
-      RecordStatus.SIGNED
+      RecordStatus.REJECTED
   ];
 
   if (completedStatuses.includes(record.status)) return false;
@@ -117,8 +116,7 @@ export const isRecordApproaching = (record: RecordFile): boolean => {
       RecordStatus.HANDOVER,
       RecordStatus.RETURNED,
       RecordStatus.WITHDRAWN,
-      RecordStatus.REJECTED,
-      RecordStatus.SIGNED
+      RecordStatus.REJECTED
   ];
 
   if (completedStatuses.includes(record.status)) return false;
@@ -527,14 +525,9 @@ export function processAssignmentTimelineCheck(
   const hasSubsequentSteps = !!(
     record.submissionDate ||
     record.pendingCheckDate ||
-    record.checkedDate ||
     record.approvalDate ||
-    record.completedWorkDate ||
     record.status === RecordStatus.PENDING_CHECK ||
-    record.status === RecordStatus.CHECKED ||
-    record.status === RecordStatus.PENDING_SIGN ||
-    record.status === RecordStatus.SIGNED ||
-    record.status === RecordStatus.COMPLETED_WORK
+    record.status === RecordStatus.PENDING_SIGN
   );
 
   let isLaterDate = false;

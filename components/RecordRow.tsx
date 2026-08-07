@@ -88,10 +88,6 @@ const RecordRow: React.FC<RecordRowProps> = ({
                             record.status !== RecordStatus.HANDOVER && 
                             record.status !== RecordStatus.WITHDRAWN;
 
-  const resultReturnedDateStr = record.resultReturnedDate ? formatDate(record.resultReturnedDate) : '';
-
-  // LOGIC MỚI: Tự động xác định trạng thái hiển thị
-  // Nếu có thông tin xuất (Batch/Date) và chưa hoàn thành (Trả/Rút/Từ chối), coi như là Đã giao 1 cửa
   const getDisplayStatus = (r: RecordFile) => {
       if (r.resultReturnedDate) {
           return RecordStatus.RETURNED;
@@ -103,6 +99,8 @@ const RecordRow: React.FC<RecordRowProps> = ({
   };
   
   const displayStatus = getDisplayStatus(record);
+
+  const isReturned = displayStatus === RecordStatus.RETURNED || record.status === RecordStatus.RETURNED || !!record.resultReturnedDate;
 
   // Class chung cho các ô: Căn giữa cho sự cân đối, tăng padding thông thoáng hơn trên PC
   const cellClass = "p-3 md:p-3.5 align-middle text-slate-700 border-b border-slate-100/80 transition-colors duration-200";
@@ -385,19 +383,19 @@ const RecordRow: React.FC<RecordRowProps> = ({
             <div className="flex items-center gap-1">
               <button onClick={(e) => { e.stopPropagation(); onView(record); }} className="p-1 text-slate-600 hover:text-green-700 hover:bg-green-100/80 rounded transition-colors border border-slate-200/80 bg-white" title="Xem chi tiết"><Eye size={15} /></button>
               
-              {onReturnResult && (displayStatus === RecordStatus.HANDOVER || displayStatus === RecordStatus.SIGNED) && !record.resultReturnedDate && (
+              {onReturnResult && displayStatus === RecordStatus.HANDOVER && !isReturned && !record.resultReturnedDate && (
                   <button onClick={(e) => { e.stopPropagation(); onReturnResult(record); }} className="p-1 text-emerald-700 hover:bg-emerald-100 rounded transition-colors border border-emerald-200 bg-emerald-50" title="Trả kết quả">
                       <FileCheck size={15} />
                   </button>
               )}
 
               {/* NÚT CHUYỂN BƯỚC / CHUYỂN VỀ GIAO VIỆC / XÁC NHẬN NỘP THUẾ */}
-              {(() => {
+              {!isReturned && (() => {
                 const isCG = isCapGiayRecord(record);
-                const isReturnedOrRejected = record.status === RecordStatus.REJECTED || record.status === RecordStatus.RETURNED || displayStatus === RecordStatus.REJECTED || displayStatus === RecordStatus.RETURNED || record.capGiaySubStep === 'cho_bo_sung';
+                const isRejectedOnly = record.status === RecordStatus.REJECTED || displayStatus === RecordStatus.REJECTED || record.capGiaySubStep === 'cho_bo_sung';
                 const isTaxWaiting = isCG && (record.capGiaySubStep === 'cho_nop_thue' || record.capGiaySubStep === 'cho_giay_nop_tien');
                 
-                if (isReturnedOrRejected) {
+                if (isRejectedOnly) {
                   return (
                     <button 
                       onClick={(e) => { e.stopPropagation(); onAdvanceStatus(record); }} 
@@ -442,7 +440,7 @@ const RecordRow: React.FC<RecordRowProps> = ({
               {currentUser?.role !== 'ONEDOOR' && currentUser?.role !== UserRole.ONEDOOR && (
                 <button onClick={() => onEdit(record)} className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors border border-blue-200 bg-blue-50/50" title="Sửa"><Pencil size={15} /></button>
               )}
-              {(currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.SUBADMIN || currentUser?.role === UserRole.TEAM_LEADER) && (
+              {(currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.SUBADMIN || currentUser?.role === UserRole.TEAM_LEADER) && !isReturned && (
                   <button onClick={() => onDelete(record)} className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors border border-red-200 bg-red-50/50" title="Xóa"><Trash2 size={15} /></button>
               )}
             </div>

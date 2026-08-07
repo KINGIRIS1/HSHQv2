@@ -238,6 +238,16 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const finalData = { ...formData };
+
+    const explicitCleared = {
+        assignedDate: initialData?.assignedDate && !finalData.assignedDate,
+        completedWorkDate: initialData?.completedWorkDate && !finalData.completedWorkDate,
+        pendingCheckDate: initialData?.pendingCheckDate && !finalData.pendingCheckDate,
+        checkedDate: initialData?.checkedDate && !finalData.checkedDate,
+        submissionDate: initialData?.submissionDate && !finalData.submissionDate,
+        approvalDate: initialData?.approvalDate && !finalData.approvalDate,
+        completedDate: initialData?.completedDate && !finalData.completedDate,
+    };
     
     // Logic tự động set ngày khi trạng thái thay đổi hoặc xóa ngày khi quay lui
     // Chỉ áp dụng logic này nếu trạng thái khác với ban đầu (hoặc là tạo mới)
@@ -256,22 +266,22 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
             // Tạm dùng initialData.status để lấp ngày (để đóng băng tiến độ cũ)
             const prevIdx = flow.indexOf(initialData.status);
             if (prevIdx >= 0) {
-                if (prevIdx >= flow.indexOf(RecordStatus.ASSIGNED) && !finalData.assignedDate) finalData.assignedDate = now;
-                if (prevIdx >= flow.indexOf(RecordStatus.COMPLETED_WORK) && !finalData.completedWorkDate) finalData.completedWorkDate = now;
-                if (prevIdx >= flow.indexOf(RecordStatus.PENDING_CHECK) && !finalData.pendingCheckDate) finalData.pendingCheckDate = now;
-                if (prevIdx >= flow.indexOf(RecordStatus.CHECKED) && !finalData.checkedDate) finalData.checkedDate = now;
-                if (prevIdx >= flow.indexOf(RecordStatus.PENDING_SIGN) && !finalData.submissionDate) finalData.submissionDate = now;
-                if (prevIdx >= flow.indexOf(RecordStatus.SIGNED) && !finalData.approvalDate) finalData.approvalDate = now;
+                if (prevIdx >= flow.indexOf(RecordStatus.ASSIGNED) && !finalData.assignedDate && !explicitCleared.assignedDate) finalData.assignedDate = now;
+                if (prevIdx >= flow.indexOf(RecordStatus.COMPLETED_WORK) && !finalData.completedWorkDate && !explicitCleared.completedWorkDate) finalData.completedWorkDate = now;
+                if (prevIdx >= flow.indexOf(RecordStatus.PENDING_CHECK) && !finalData.pendingCheckDate && !explicitCleared.pendingCheckDate) finalData.pendingCheckDate = now;
+                if (prevIdx >= flow.indexOf(RecordStatus.CHECKED) && !finalData.checkedDate && !explicitCleared.checkedDate) finalData.checkedDate = now;
+                if (prevIdx >= flow.indexOf(RecordStatus.PENDING_SIGN) && !finalData.submissionDate && !explicitCleared.submissionDate) finalData.submissionDate = now;
+                if (prevIdx >= flow.indexOf(RecordStatus.SIGNED) && !finalData.approvalDate && !explicitCleared.approvalDate) finalData.approvalDate = now;
             }
             // Auto fill current forward progress as well if going forward
             const newIdx = flow.indexOf(finalData.status);
             if (newIdx >= 0) {
-                if (newIdx >= flow.indexOf(RecordStatus.ASSIGNED) && !finalData.assignedDate) finalData.assignedDate = now;
-                if (newIdx >= flow.indexOf(RecordStatus.COMPLETED_WORK) && !finalData.completedWorkDate) finalData.completedWorkDate = now;
-                if (newIdx >= flow.indexOf(RecordStatus.PENDING_CHECK) && !finalData.pendingCheckDate) finalData.pendingCheckDate = now;
-                if (newIdx >= flow.indexOf(RecordStatus.CHECKED) && !finalData.checkedDate) finalData.checkedDate = now;
-                if (newIdx >= flow.indexOf(RecordStatus.PENDING_SIGN) && !finalData.submissionDate) finalData.submissionDate = now;
-                if (newIdx >= flow.indexOf(RecordStatus.SIGNED) && !finalData.approvalDate) finalData.approvalDate = now;
+                if (newIdx >= flow.indexOf(RecordStatus.ASSIGNED) && !finalData.assignedDate && !explicitCleared.assignedDate) finalData.assignedDate = now;
+                if (newIdx >= flow.indexOf(RecordStatus.COMPLETED_WORK) && !finalData.completedWorkDate && !explicitCleared.completedWorkDate) finalData.completedWorkDate = now;
+                if (newIdx >= flow.indexOf(RecordStatus.PENDING_CHECK) && !finalData.pendingCheckDate && !explicitCleared.pendingCheckDate) finalData.pendingCheckDate = now;
+                if (newIdx >= flow.indexOf(RecordStatus.CHECKED) && !finalData.checkedDate && !explicitCleared.checkedDate) finalData.checkedDate = now;
+                if (newIdx >= flow.indexOf(RecordStatus.PENDING_SIGN) && !finalData.submissionDate && !explicitCleared.submissionDate) finalData.submissionDate = now;
+                if (newIdx >= flow.indexOf(RecordStatus.SIGNED) && !finalData.approvalDate && !explicitCleared.approvalDate) finalData.approvalDate = now;
             }
         }
 
@@ -302,35 +312,15 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                 finalData.exportBatch = undefined;
                 finalData.exportDate = undefined;
             }
-            else if (finalData.status === RecordStatus.COMPLETED_WORK) {
-                finalData.pendingCheckDate = undefined;
-                finalData.checkedDate = undefined;
-                finalData.submissionDate = undefined;
-                finalData.approvalDate = undefined;
-                finalData.completedDate = undefined;
-                finalData.resultReturnedDate = undefined;
-            }
             else if (finalData.status === RecordStatus.PENDING_CHECK) {
-                finalData.checkedDate = undefined;
                 finalData.submissionDate = undefined;
                 finalData.approvalDate = undefined;
                 finalData.completedDate = undefined;
                 finalData.resultReturnedDate = undefined;
             }
-            else if (finalData.status === RecordStatus.CHECKED) {
-                finalData.submissionDate = undefined;
-                finalData.approvalDate = undefined;
-                finalData.completedDate = undefined;
-                finalData.resultReturnedDate = undefined;
-            }
-            // 3. Nếu quay về PENDING_SIGN (Chờ ký) -> Xóa bước Xong, Trả
+            // 3. Nếu quay về PENDING_SIGN (Chờ ký) -> Xóa bước Trả
             else if (finalData.status === RecordStatus.PENDING_SIGN) {
                 finalData.approvalDate = undefined;
-                finalData.completedDate = undefined;
-                finalData.resultReturnedDate = undefined;
-            }
-            // 4. Nếu quay về SIGNED (Đã ký) -> Xóa bước Hoàn thành/Trả
-            else if (finalData.status === RecordStatus.SIGNED) {
                 finalData.completedDate = undefined;
                 finalData.resultReturnedDate = undefined;
             }
@@ -369,6 +359,33 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
             note: initialData ? 'Cập nhật từ biểu mẫu hồ sơ' : 'Tạo mới hồ sơ'
         };
         finalData.statusLogs = [newLog, ...existingLogs];
+    }
+
+    if (explicitCleared.assignedDate) finalData.assignedDate = null;
+    if (explicitCleared.completedWorkDate) finalData.completedWorkDate = null;
+    if (explicitCleared.pendingCheckDate) finalData.pendingCheckDate = null;
+    if (explicitCleared.checkedDate) { finalData.checkedDate = null; finalData.pendingCheckDate = null; }
+    if (explicitCleared.submissionDate) finalData.submissionDate = null;
+    if (explicitCleared.approvalDate) finalData.approvalDate = null;
+    if (explicitCleared.completedDate) finalData.completedDate = null;
+
+    // Khi xóa các bước / ngày tháng thì tự động đưa về đúng bộ lọc trạng thái của bước đó
+    if (finalData.status) {
+        if (explicitCleared.submissionDate || (!finalData.submissionDate && initialData?.submissionDate)) {
+            if ([RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER].includes(finalData.status)) {
+                finalData.status = finalData.checkedDate ? RecordStatus.CHECKED : (finalData.assignedDate ? RecordStatus.ASSIGNED : RecordStatus.RECEIVED);
+            }
+        }
+        if (explicitCleared.checkedDate || (!finalData.checkedDate && initialData?.checkedDate)) {
+            if ([RecordStatus.CHECKED, RecordStatus.PENDING_CHECK, RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER].includes(finalData.status)) {
+                finalData.status = finalData.assignedDate ? RecordStatus.ASSIGNED : RecordStatus.RECEIVED;
+            }
+        }
+        if (explicitCleared.assignedDate || (!finalData.assignedDate && initialData?.assignedDate)) {
+            if (finalData.status !== RecordStatus.RECEIVED) {
+                finalData.status = RecordStatus.RECEIVED;
+            }
+        }
     }
 
     // Để đảm bảo gửi null thay vì undefined cho API nếu cần xóa
@@ -490,7 +507,6 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                                 <div><label className="block text-xs font-bold text-gray-700 mb-1">Ngày giao NV</label><input type="date" className="w-full border border-gray-300 rounded-md px-3 py-2" value={dateVal(formData.assignedDate)} onChange={(e) => handleChange('assignedDate', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} /></div>
                                 <div><label className="block text-xs font-bold text-teal-700 mb-1">Ngày kiểm tra</label><input type="date" className="w-full border border-teal-300 rounded-md px-3 py-2 bg-teal-50 text-teal-900 font-medium" value={dateVal(formData.checkedDate || formData.pendingCheckDate)} onChange={(e) => { const iso = e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : ''; handleChange('checkedDate', iso); handleChange('pendingCheckDate', iso); }} /></div>
                                 <div><label className="block text-xs font-bold text-purple-700 mb-1">Ngày trình ký</label><input type="date" className="w-full border border-purple-300 rounded-md px-3 py-2 bg-purple-50 text-purple-900 font-medium" value={dateVal(formData.submissionDate)} onChange={(e) => handleChange('submissionDate', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} /></div>
-                                <div><label className="block text-xs font-bold text-indigo-700 mb-1">Ngày ký duyệt</label><input type="date" className="w-full border border-indigo-300 rounded-md px-3 py-2 bg-indigo-50 text-indigo-900 font-medium" value={dateVal(formData.approvalDate)} onChange={(e) => handleChange('approvalDate', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} /></div>
                                 <div><label className="block text-xs font-bold text-green-700 mb-1">Ngày hoàn thành</label><input type="date" className="w-full border border-green-300 rounded-md px-3 py-2 bg-green-50 font-semibold text-green-900" value={dateVal(formData.completedDate)} onChange={(e) => handleChange('completedDate', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} /></div>
                             </>
                         )}
@@ -747,11 +763,17 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-indigo-50/80 p-3.5 rounded-lg border border-indigo-200/80">
                                 <div>
                                     <label className="block text-[10px] font-bold text-indigo-800 uppercase mb-1">Đợt xuất (Batch)</label>
-                                    <input type="text" className="w-full border border-indigo-200 rounded-md px-2.5 py-1.5 text-sm bg-white font-medium" value={val(formData.exportBatch)} onChange={(e) => handleChange('exportBatch', e.target.value)} placeholder="VD: CG - Đợt 01 - 29/07/26..." />
+                                    <div className="flex gap-1">
+                                        <input type="text" className="w-full border border-indigo-200 rounded-md px-2.5 py-1.5 text-sm bg-white font-medium" value={val(formData.exportBatch)} onChange={(e) => handleChange('exportBatch', e.target.value)} placeholder="VD: CG - Đợt 01 - 29/07/26..." />
+                                        {formData.exportBatch && <button type="button" onClick={() => handleChange('exportBatch', '')} className="px-2 bg-red-100 text-red-600 rounded text-xs font-bold hover:bg-red-200" title="Xóa đợt xuất">Xóa</button>}
+                                    </div>
                                 </div>
                                 <div>
                                     <label className="block text-[10px] font-bold text-indigo-800 uppercase mb-1">Ngày xuất</label>
-                                    <input type="date" className="w-full border border-indigo-200 rounded-md px-2.5 py-1.5 text-sm bg-white" value={val(formData.exportDate ? formData.exportDate.split('T')[0] : '')} onChange={(e) => handleChange('exportDate', new Date(e.target.value).toISOString())} />
+                                    <div className="flex gap-1">
+                                        <input type="date" className="w-full border border-indigo-200 rounded-md px-2.5 py-1.5 text-sm bg-white" value={val(formData.exportDate ? formData.exportDate.split('T')[0] : '')} onChange={(e) => handleChange('exportDate', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} />
+                                        {formData.exportDate && <button type="button" onClick={() => handleChange('exportDate', '')} className="px-2 bg-red-100 text-red-600 rounded text-xs font-bold hover:bg-red-200" title="Xóa ngày xuất">Xóa</button>}
+                                    </div>
                                 </div>
                                 <div>
                                     <label className="block text-[10px] font-bold text-purple-900 uppercase mb-1">Phi địa giới</label>

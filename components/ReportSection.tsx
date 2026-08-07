@@ -309,8 +309,8 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
 
     // --- LOGIC TÍNH TOÁN DỮ LIỆU CHUNG (Theo ngày & xã) ---
     const filteredData = useMemo(() => {
-        const start = parseSafeDate(fromDate) || new Date(fromDate); start.setHours(0,0,0,0);
-        const end = parseSafeDate(toDate) || new Date(toDate); end.setHours(23,59,59,999);
+        const start = parseSafeDate(fromDate) || new Date(); start.setHours(0,0,0,0);
+        const end = parseSafeDate(toDate) || new Date(); end.setHours(23,59,59,999);
 
         return activeRecords.filter(r => {
             const rDate = getRecordReceivedDate(r);

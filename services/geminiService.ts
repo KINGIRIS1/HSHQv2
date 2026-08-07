@@ -2,6 +2,7 @@
 import { GoogleGenAI } from "@google/genai";
 import { RecordFile, RecordStatus } from "../types";
 import { STATUS_LABELS, getNormalizedWard, getShortRecordType } from "../constants";
+import { parseSafeDate } from "../utils/appHelpers";
 
 interface OverdueRecord {
   date: string;
@@ -86,22 +87,26 @@ export const generateReport = async (
         
         // Logic tính trễ hạn mới
         if (r.deadline) {
-            const deadlineDate = new Date(r.deadline);
-            deadlineDate.setHours(0,0,0,0);
+            const deadlineDate = parseSafeDate(r.deadline);
+            if (deadlineDate && !isNaN(deadlineDate.getTime())) {
+                deadlineDate.setHours(0,0,0,0);
 
-            if (isCompleted) {
-                // Nếu đã xong, so sánh ngày hoàn thành với ngày hẹn
-                if (r.completedDate) {
-                    const finishedDate = new Date(r.completedDate);
-                    finishedDate.setHours(0,0,0,0);
-                    if (finishedDate > deadlineDate) {
-                        overdueCompletedCount++;
+                if (isCompleted) {
+                    // Nếu đã xong, so sánh ngày hoàn thành với ngày hẹn
+                    if (r.completedDate) {
+                        const finishedDate = parseSafeDate(r.completedDate);
+                        if (finishedDate && !isNaN(finishedDate.getTime())) {
+                            finishedDate.setHours(0,0,0,0);
+                            if (finishedDate > deadlineDate) {
+                                overdueCompletedCount++;
+                            }
+                        }
                     }
-                }
-            } else if (r.status !== RecordStatus.WITHDRAWN && r.status !== RecordStatus.REJECTED) {
-                // Nếu chưa xong, chưa rút, và chưa trả, so sánh hôm nay với ngày hẹn
-                if (today > deadlineDate) {
-                    overduePendingCount++;
+                } else if (r.status !== RecordStatus.WITHDRAWN && r.status !== RecordStatus.REJECTED) {
+                    // Nếu chưa xong, chưa rút, và chưa trả, so sánh hôm nay với ngày hẹn
+                    if (today > deadlineDate) {
+                        overduePendingCount++;
+                    }
                 }
             }
         }

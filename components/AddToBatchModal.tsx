@@ -231,13 +231,13 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
                 />
                 <div className="flex-1">
                     <div className="flex items-center gap-2 font-bold text-gray-800">
-                        <Plus size={16} className="text-blue-600" /> Tạo đợt mới trong ngày
+                        <Plus size={16} className="text-blue-600" /> Tạo đợt mới (Hôm nay)
                     </div>
-                    <div className="mt-1.5 bg-white p-2.5 rounded border border-blue-200">
-                        <div className="text-xs text-gray-500 mb-1">Tên đợt giao tự động:</div>
-                        <div className="font-mono font-bold text-sm text-blue-800 break-all">
-                            {nextBatchInfo.batchName}
-                        </div>
+                    <div className="mt-1 text-xs text-gray-600">
+                        Đợt tiếp theo: <span className="font-bold text-blue-700">Đợt {nextBatchInfo.batchNum}</span>
+                    </div>
+                    <div className="text-xs text-gray-600 mt-0.5">
+                        Ngày: {formatDateDDMMYYYY(todayStr)}
                     </div>
                 </div>
             </label>

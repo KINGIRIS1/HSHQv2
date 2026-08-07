@@ -1,6 +1,7 @@
 import { Document, Packer, Paragraph, Table, TableCell, TableRow, TextRun, WidthType, AlignmentType, BorderStyle, VerticalAlign } from "docx";
 import { saveAs } from "file-saver";
 import { ArchiveRecord } from "../services/apiArchive";
+import { parseSafeDate } from "./appHelpers";
 
 export const generateSoDiaChinhBlob = async (records: ArchiveRecord[], quyenSo: string = "", exportTocOnly: boolean = false): Promise<Blob> => {
     if (!records || records.length === 0) throw new Error("No records");
@@ -24,8 +25,8 @@ export const generateSoDiaChinhBlob = async (records: ArchiveRecord[], quyenSo: 
     // Parse date
     const formatDate = (dateStr: string) => {
         if (!dateStr) return "";
-        const date = new Date(dateStr);
-        if (isNaN(date.getTime())) return dateStr;
+        const date = parseSafeDate(dateStr);
+        if (!date || isNaN(date.getTime())) return dateStr;
         return `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getFullYear()}`;
     };
 
