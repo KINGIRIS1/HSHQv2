@@ -763,8 +763,6 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                 ...currentArchive.data,
                 history: newHistory,
                 submitted_to: directorId,
-                assigned_to: directorId,
-                assigned_date: nowIso,
               },
             });
           }
@@ -778,8 +776,6 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
             checkedDate: record.checkedDate || nowIso,
             submittedTo: directorId,
             submissionDate: nowIso,
-            assignedTo: directorId,
-            assignedDate: nowIso,
           };
 
           if (onUpdateRecord) {
@@ -1716,8 +1712,6 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                       ...currentArchive.data,
                       history: newHistory,
                       checked_by: checkerId,
-                      assigned_to: checkerId,
-                      assigned_date: nowIso,
                     },
                   });
                 }
@@ -1730,8 +1724,6 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                   completedWorkDate: record.completedWorkDate || nowIso,
                   pendingCheckDate: nowIso,
                   checkedBy: checkerId,
-                  assignedTo: checkerId,
-                  assignedDate: nowIso,
                 });
               }
             }

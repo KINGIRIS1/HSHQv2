@@ -1456,9 +1456,7 @@ function App() {
                         completedWorkDate: r.completedWorkDate || nowIso,
                         checkedDate: r.checkedDate || nowIso,
                         submissionDate: nowIso,
-                        submittedTo: directorId,
-                        assignedTo: directorId,
-                        assignedDate: nowIso
+                        submittedTo: directorId
                     }));
                     await updateRecordsBatchById(updates);
                     setToast({ type: 'success', message: `Đã trình ký ${updates.length} hồ sơ thành công!` });
@@ -1488,9 +1486,7 @@ function App() {
                         status: RecordStatus.PENDING_CHECK,
                         completedWorkDate: r.completedWorkDate || nowIso,
                         pendingCheckDate: nowIso,
-                        checkedBy: checkerId,
-                        assignedTo: checkerId,
-                        assignedDate: nowIso
+                        checkedBy: checkerId
                     }));
                     await updateRecordsBatchById(updates);
                     setToast({ type: 'success', message: `Đã trình kiểm tra ${updates.length} hồ sơ thành công!` });
