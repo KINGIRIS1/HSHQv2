@@ -12,10 +12,11 @@ interface BulkUpdateModalProps {
   employees: Employee[];
   wards: string[];
   onConfirm: (field: keyof RecordFile, value: any, customDate?: string, targetRecordIds?: string[], assignedTo?: string) => Promise<void>;
+  currentView?: string;
 }
 
 const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({ 
-  isOpen, onClose, selectedRecords, allRecords, employees, wards, onConfirm 
+  isOpen, onClose, selectedRecords, allRecords, employees, wards, onConfirm, currentView 
 }) => {
   const [targetField, setTargetField] = useState<string>('status');
   const [targetValue, setTargetValue] = useState<string>('');
@@ -57,6 +58,11 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
 
   // Xác định tổ chuyên môn / phòng ban của hồ sơ đang chọn
   const recordDept = useMemo(() => {
+      if (currentView) {
+          if (currentView.startsWith('archive_')) return 'Tổ Lưu trữ';
+          if (currentView.startsWith('other_') || currentView === 'registration_records') return 'Tổ Cấp giấy';
+          if (['all_records', 'assign_tasks', 'completed_list', 'pending_check_list', 'check_list', 'handover_list', 'director_completed', 'survey_list'].includes(currentView)) return 'Tổ Đo đạc';
+      }
       if (!selectedRecords || selectedRecords.length === 0) return 'Tổ Cấp giấy';
       const record = selectedRecords[0];
       const type = (record.recordType || '').toLowerCase();
@@ -71,7 +77,7 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
           return 'Tổ Đo đạc';
       }
       return 'Tổ Cấp giấy';
-  }, [selectedRecords]);
+  }, [currentView, selectedRecords]);
 
   // Lọc danh sách nhân viên theo yêu cầu:
   // - Nếu đang tổ đo đạc: chỉ nhân viên tổ đo đạc và ban giám đốc
