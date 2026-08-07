@@ -326,7 +326,6 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
 
                 if (emp) {
                     matchedEmpId = emp.id;
-                    record.assignedTo = emp.id;
                     if (mode === 'create' && !record.assignedDate) {
                         record.assignedDate = record.receivedDate || new Date().toISOString();
                     }
@@ -390,31 +389,33 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
                 const targetDate = parsedGeneralDate || nowStr;
 
                 if (matchedEmpId) {
-                    if (explicitStatus === RecordStatus.PENDING_SIGN) {
+                    if (explicitStatus === RecordStatus.PENDING_SIGN || explicitStatus === RecordStatus.SIGNED) {
                         record.submittedTo = matchedEmpId;
-                    } else if (explicitStatus === RecordStatus.CHECKED) {
+                    } else if (explicitStatus === RecordStatus.CHECKED || explicitStatus === RecordStatus.PENDING_CHECK) {
                         record.checkedBy = matchedEmpId;
-                    } else if (explicitStatus === RecordStatus.ASSIGNED || explicitStatus === RecordStatus.IN_PROGRESS) {
+                    } else if (explicitStatus === RecordStatus.ASSIGNED || explicitStatus === RecordStatus.IN_PROGRESS || explicitStatus === RecordStatus.RECEIVED) {
+                        record.assignedTo = matchedEmpId;
+                    } else if (mode === 'create') {
                         record.assignedTo = matchedEmpId;
                     }
                 }
 
                 if (explicitStatus === RecordStatus.HANDOVER) {
-                    if (!record.completedDate) record.completedDate = targetDate;
+                    record.completedDate = parsedGeneralDate || record.completedDate || targetDate;
                 } else if (explicitStatus === RecordStatus.RETURNED) {
-                    if (!record.resultReturnedDate) record.resultReturnedDate = targetDate;
+                    record.resultReturnedDate = parsedGeneralDate || record.resultReturnedDate || targetDate;
                 } else if (explicitStatus === RecordStatus.SIGNED) {
-                    if (!record.approvalDate) record.approvalDate = targetDate;
+                    record.approvalDate = parsedGeneralDate || record.approvalDate || targetDate;
                 } else if (explicitStatus === RecordStatus.PENDING_SIGN) {
-                    if (!record.submissionDate) record.submissionDate = targetDate;
+                    record.submissionDate = parsedGeneralDate || record.submissionDate || targetDate;
                 } else if (explicitStatus === RecordStatus.CHECKED) {
-                    if (!record.checkedDate) record.checkedDate = targetDate;
+                    record.checkedDate = parsedGeneralDate || record.checkedDate || targetDate;
                 } else if (explicitStatus === RecordStatus.PENDING_CHECK) {
-                    if (!record.pendingCheckDate) record.pendingCheckDate = targetDate;
+                    record.pendingCheckDate = parsedGeneralDate || record.pendingCheckDate || targetDate;
                 } else if (explicitStatus === RecordStatus.COMPLETED_WORK) {
-                    if (!record.completedWorkDate) record.completedWorkDate = targetDate;
+                    record.completedWorkDate = parsedGeneralDate || record.completedWorkDate || targetDate;
                 } else if (explicitStatus === RecordStatus.ASSIGNED || explicitStatus === RecordStatus.IN_PROGRESS) {
-                    if (!record.assignedDate) record.assignedDate = targetDate;
+                    record.assignedDate = parsedGeneralDate || record.assignedDate || targetDate;
                 }
             } else {
                 // Nếu KHÔNG có cột TRẠNG THÁI cụ thể, dùng LOGIC SUY DIỄN DỰA TRÊN NGÀY THÁNG VÀ PHÂN CÔNG
@@ -423,20 +424,28 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
                     if (!record.completedDate && record.exportDate) {
                         record.completedDate = record.exportDate;
                     }
+                    if (matchedEmpId) record.assignedTo = matchedEmpId;
                 } else if (record.resultReturnedDate) {
                     record.status = RecordStatus.RETURNED;
+                    if (matchedEmpId) record.assignedTo = matchedEmpId;
                 } else if (record.approvalDate) {
                     record.status = RecordStatus.SIGNED;
+                    if (matchedEmpId) record.submittedTo = matchedEmpId;
                 } else if (record.submissionDate) {
                     record.status = RecordStatus.PENDING_SIGN;
+                    if (matchedEmpId) record.submittedTo = matchedEmpId;
                 } else if (record.checkedDate) {
                     record.status = RecordStatus.CHECKED;
+                    if (matchedEmpId) record.checkedBy = matchedEmpId;
                 } else if (record.pendingCheckDate) {
                     record.status = RecordStatus.PENDING_CHECK;
+                    if (matchedEmpId) record.checkedBy = matchedEmpId;
                 } else if (record.completedWorkDate) {
                     record.status = RecordStatus.COMPLETED_WORK;
-                } else if (record.assignedTo || record.assignedDate) {
+                    if (matchedEmpId) record.assignedTo = matchedEmpId;
+                } else if (matchedEmpId || assignedDateRaw) {
                     record.status = RecordStatus.ASSIGNED;
+                    if (matchedEmpId) record.assignedTo = matchedEmpId;
                 } else if (mode === 'create') {
                     record.status = RecordStatus.RECEIVED;
                 }
