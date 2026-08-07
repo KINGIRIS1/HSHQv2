@@ -2,7 +2,7 @@
 import * as XLSX from 'xlsx-js-style';
 import { RecordFile, RecordStatus, Employee } from '../types';
 import { getNormalizedWard, getShortRecordType, STATUS_LABELS } from '../constants';
-import { isRecordOverdue, removeVietnameseTones, parseSafeDate, getRecordReceivedDate, cleanNoteText } from './appHelpers';
+import { isRecordOverdue, removeVietnameseTones, parseSafeDate, getRecordReceivedDate } from './appHelpers';
 import { fetchContracts } from '../services/api';
 
 export const exportReportToExcel = async (
@@ -138,6 +138,13 @@ export const exportReportToExcel = async (
     const dataRows = dataForExport.map((r, i) => {
         const contractInfo = getContractInfo(r.code);
         
+        // Tổng hợp ghi chú cho Excel
+        const notesParts: string[] = [];
+        if (r.notes) notesParts.push(r.notes);
+        if (r.content && r.content !== r.notes) notesParts.push(r.content);
+        
+        const fullNotesText = notesParts.join('; ') || '';
+
         return [
             i + 1,
             r.code,
@@ -155,8 +162,8 @@ export const exportReportToExcel = async (
             formatDate(r.deadline),
             formatDate(r.completedDate),      
             formatDate(r.resultReturnedDate),
-            STATUS_LABELS[r.status] || r.status,
-            cleanNoteText(r.notes)
+            STATUS_LABELS[r.status],
+            ""
         ];
     });
 
@@ -466,7 +473,7 @@ export const exportReturnedListToExcel = (records: RecordFile[], fromDateStr?: s
         formatDate(r.deadline),
         formatDate(r.resultReturnedDate),
         r.receiverName || '',
-        cleanNoteText(r.notes)
+        r.notes || ''
     ]);
 
     let displayDate = "";

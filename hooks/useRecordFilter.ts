@@ -130,15 +130,15 @@ export const useRecordFilter = (
         if (currentView === 'check_list' || currentView === 'other_check_list' || currentView === 'archive_check_list') {
             if (isDirector) {
                 // Giám đốc chỉ thấy hồ sơ trình cho mình
-                result = result.filter(r => r.status === RecordStatus.PENDING_SIGN && r.submittedTo === currentUser?.employeeId && !r.exportBatch && !r.exportDate);
+                result = result.filter(r => r.status === RecordStatus.PENDING_SIGN && r.submittedTo === currentUser?.employeeId);
             } else {
-                result = result.filter(r => r.status === RecordStatus.PENDING_SIGN && !r.exportBatch && !r.exportDate);
+                result = result.filter(r => r.status === RecordStatus.PENDING_SIGN);
             }
         } else if (currentView === 'pending_check_list' || currentView === 'archive_pending_check_list') {
-            // Tab Kiểm tra: Hiển thị hồ sơ Chờ kiểm tra và Đã kiểm tra (chưa bàn giao 1 cửa)
-            result = result.filter(r => (r.status === RecordStatus.PENDING_CHECK || r.status === RecordStatus.CHECKED) && !r.exportBatch && !r.exportDate);
+            // Tab Kiểm tra: Hiển thị hồ sơ Chờ kiểm tra và Đã kiểm tra
+            result = result.filter(r => r.status === RecordStatus.PENDING_CHECK || r.status === RecordStatus.CHECKED);
         } else if (currentView === 'completed_list' || currentView === 'archive_completed_list') {
-            result = result.filter(r => (r.status === RecordStatus.ASSIGNED || r.status === RecordStatus.IN_PROGRESS || r.status === RecordStatus.COMPLETED_WORK) && !r.exportBatch && !r.exportDate);
+            result = result.filter(r => r.status === RecordStatus.ASSIGNED || r.status === RecordStatus.IN_PROGRESS || r.status === RecordStatus.COMPLETED_WORK);
         } else if (currentView === 'director_completed' || currentView === 'other_director_completed' || currentView === 'archive_director_completed') {
             result = result.filter(r => r.submittedTo === currentUser?.employeeId && r.status !== RecordStatus.PENDING_SIGN && r.status !== RecordStatus.RECEIVED && r.status !== RecordStatus.ASSIGNED && r.status !== RecordStatus.IN_PROGRESS && r.status !== RecordStatus.COMPLETED_WORK);
         } else if (currentView === 'handover_list' || currentView === 'other_handover_list' || currentView === 'archive_handover_list') {

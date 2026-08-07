@@ -2,9 +2,8 @@
 import React, { useState, useMemo } from 'react';
 import { RecordFile, Employee, RecordStatus } from '../../types';
 import { generateEmployeeEvaluation } from '../../services/geminiService';
-import { User as UserIcon, AlertOctagon, Sparkles, Loader2, ListFilter, CheckCircle2, Clock, AlertTriangle, Briefcase, Info } from 'lucide-react';
+import { User as UserIcon, AlertOctagon, Sparkles, Loader2, ListFilter, CheckCircle2, Clock, AlertTriangle, Briefcase } from 'lucide-react';
 import { parseSafeDate, getRecordReceivedDate } from '../../utils/appHelpers';
-import { getRecordPlotCount } from '../../constants';
 
 interface EmployeeStatsViewProps {
     records: RecordFile[];
@@ -70,25 +69,8 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
             selectedEmp.position?.toLowerCase().includes('trưởng') ||
             selectedEmp.position?.toLowerCase().includes('phó')
         );
-
         const targetRecords = selectedEmpId 
-            ? recordsInTimeRange.filter(r => {
-                const isCurrentlyAssigned = r.assignedTo === selectedEmpId || r.assignedTo === selectedEmp?.name;
-                const isLeaderChecker = isSelectedLeader && (r.checkedBy === selectedEmpId || r.checkedBy === selectedEmp?.name);
-                const isSubmittedTo = r.submittedTo === selectedEmpId || r.submittedTo === selectedEmp?.name;
-                const wasPreviouslyAssigned = (
-                    r.initialAssignedTo === selectedEmpId || r.initialAssignedTo === selectedEmp?.name ||
-                    r.lastAssignedTo === selectedEmpId || r.lastAssignedTo === selectedEmp?.name
-                );
-                const inLogs = Array.isArray(r.statusLogs) && r.statusLogs.some(log =>
-                    (log.note && (log.note.includes(`[${selectedEmp?.name}]`) || log.note.includes(selectedEmpId))) ||
-                    log.changedBy === selectedEmp?.name || log.changedBy === selectedEmpId
-                );
-                const inStepAssignments = Array.isArray(r.stepAssignments) && r.stepAssignments.some(s =>
-                    s.employeeId === selectedEmpId || s.employeeId === selectedEmp?.name || s.employeeName === selectedEmp?.name
-                );
-                return isCurrentlyAssigned || isLeaderChecker || isSubmittedTo || wasPreviouslyAssigned || inLogs || inStepAssignments;
-            })
+            ? recordsInTimeRange.filter(r => r.assignedTo === selectedEmpId || r.submittedTo === selectedEmpId || (isSelectedLeader && r.checkedBy === selectedEmpId))
             : recordsInTimeRange;
 
         const total = targetRecords.length;
@@ -101,31 +83,19 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
         const overdueRecords: { record: RecordFile, daysOver: number }[] = [];
 
         targetRecords.forEach(r => {
-            const isCurrentlyAssigned = selectedEmpId ? (r.assignedTo === selectedEmpId || r.assignedTo === selectedEmp?.name) : true;
+            // Xác định đã xong hay chưa
             const isFinished = [
                 RecordStatus.HANDOVER, 
                 RecordStatus.RETURNED, 
                 RecordStatus.WITHDRAWN, 
-                RecordStatus.SIGNED,
-                RecordStatus.COMPLETED_WORK,
-                RecordStatus.CHECKED,
-                RecordStatus.PENDING_SIGN,
-                RecordStatus.PENDING_CHECK
+                RecordStatus.SIGNED
             ].includes(r.status) || !!r.exportBatch || !!r.exportDate;
 
-            // Nếu không phải đang phân công hiện tại (đã chuyển bước khác) -> Cán bộ cũ đã hoàn thành bước đảm nhận
-            if (selectedEmpId && !isCurrentlyAssigned) {
+            if (isFinished) {
                 completedCount++;
-                if (r.deadline && (r.completedDate || r.completedWorkDate)) {
+                if (r.deadline && r.completedDate) {
                     const d = new Date(r.deadline); d.setHours(0,0,0,0);
-                    const c = new Date(r.completedDate || r.completedWorkDate!); c.setHours(0,0,0,0);
-                    if (c > d) overdueCompletedCount++;
-                }
-            } else if (isFinished) {
-                completedCount++;
-                if (r.deadline && (r.completedDate || r.completedWorkDate)) {
-                    const d = new Date(r.deadline); d.setHours(0,0,0,0);
-                    const c = new Date(r.completedDate || r.completedWorkDate!); c.setHours(0,0,0,0);
+                    const c = new Date(r.completedDate); c.setHours(0,0,0,0);
                     if (c > d) overdueCompletedCount++;
                 }
             } else {
@@ -157,7 +127,7 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
             longOverdueList,
             totalOverdue: overduePendingCount + overdueCompletedCount
         };
-    }, [recordsInTimeRange, selectedEmpId, employees]);
+    }, [recordsInTimeRange, selectedEmpId]);
 
     // Summary table for all employees when no specific employee is selected
     const employeeSummaryList = useMemo(() => {
@@ -170,75 +140,34 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
                 emp.position?.toLowerCase().includes('trưởng') ||
                 emp.position?.toLowerCase().includes('phó')
             );
-
-            const empRecords = recordsInTimeRange.filter(r => {
-                const isCurrentlyAssigned = r.assignedTo === emp.id || r.assignedTo === emp.name;
-                const isLeaderChecker = isLeader && (r.checkedBy === emp.id || r.checkedBy === emp.name);
-                const isSubmittedTo = r.submittedTo === emp.id || r.submittedTo === emp.name;
-                const wasPreviouslyAssigned = (
-                    r.initialAssignedTo === emp.id || r.initialAssignedTo === emp.name ||
-                    r.lastAssignedTo === emp.id || r.lastAssignedTo === emp.name
-                );
-                const inLogs = Array.isArray(r.statusLogs) && r.statusLogs.some(log =>
-                    (log.note && (log.note.includes(`[${emp.name}]`) || log.note.includes(emp.id))) ||
-                    log.changedBy === emp.name || log.changedBy === emp.id
-                );
-                const inStepAssignments = Array.isArray(r.stepAssignments) && r.stepAssignments.some(s =>
-                    s.employeeId === emp.id || s.employeeId === emp.name || s.employeeName === emp.name
-                );
-
-                return isCurrentlyAssigned || isLeaderChecker || isSubmittedTo || wasPreviouslyAssigned || inLogs || inStepAssignments;
-            });
-
+            const empRecords = recordsInTimeRange.filter(r => r.assignedTo === emp.id || r.submittedTo === emp.id || (isLeader && r.checkedBy === emp.id));
             const totalAssigned = empRecords.length;
-            const totalPlotCount = empRecords.reduce((sum, r) => sum + getRecordPlotCount(r), 0);
 
             let completed = 0;
             let processing = 0;
-            let processingPlotCount = 0;
             let overdueCompleted = 0;
             let overduePending = 0;
 
             empRecords.forEach(r => {
-                const isCurrentlyAssigned = r.assignedTo === emp.id || r.assignedTo === emp.name;
-                const isFinishedOverall = [
+                const isFinished = [
                     RecordStatus.HANDOVER, 
                     RecordStatus.RETURNED, 
                     RecordStatus.WITHDRAWN, 
-                    RecordStatus.SIGNED,
-                    RecordStatus.COMPLETED_WORK,
-                    RecordStatus.CHECKED,
-                    RecordStatus.PENDING_SIGN,
-                    RecordStatus.PENDING_CHECK
+                    RecordStatus.SIGNED
                 ].includes(r.status) || !!r.exportBatch || !!r.exportDate;
 
-                // TH1: Hồ sơ đã chuyển bước cho cán bộ khác (r.assignedTo !== emp.id)
-                // -> Cán bộ này đã hoàn thành bước đảm nhận của mình! Tính 1 hồ sơ đã hoàn thành.
-                if (!isCurrentlyAssigned) {
+                if (isFinished) {
                     completed++;
-                    if (r.deadline && (r.completedDate || r.completedWorkDate)) {
+                    if (r.deadline && r.completedDate) {
                         const d = new Date(r.deadline); d.setHours(0,0,0,0);
-                        const c = new Date(r.completedDate || r.completedWorkDate!); c.setHours(0,0,0,0);
+                        const c = new Date(r.completedDate); c.setHours(0,0,0,0);
                         if (c > d) overdueCompleted++;
                     }
-                } 
-                // TH2: Hồ sơ đang thuộc phân công hiện tại của cán bộ này
-                else {
-                    if (isFinishedOverall) {
-                        completed++;
-                        if (r.deadline && (r.completedDate || r.completedWorkDate)) {
-                            const d = new Date(r.deadline); d.setHours(0,0,0,0);
-                            const c = new Date(r.completedDate || r.completedWorkDate!); c.setHours(0,0,0,0);
-                            if (c > d) overdueCompleted++;
-                        }
-                    } else {
-                        // Hồ sơ 1 bước trong quy trình đang thực hiện -> Tính theo số thửa
-                        processing++;
-                        processingPlotCount += getRecordPlotCount(r);
-                        if (r.deadline) {
-                            const d = new Date(r.deadline); d.setHours(0,0,0,0);
-                            if (today > d) overduePending++;
-                        }
+                } else {
+                    processing++;
+                    if (r.deadline) {
+                        const d = new Date(r.deadline); d.setHours(0,0,0,0);
+                        if (today > d) overduePending++;
                     }
                 }
             });
@@ -246,10 +175,8 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
             return {
                 employee: emp,
                 totalAssigned,
-                totalPlotCount,
                 completed,
                 processing,
-                processingPlotCount,
                 overdueCompleted,
                 overduePending
             };
@@ -428,11 +355,11 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
             ) : (
                 <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col flex-1 animate-fade-in min-h-[400px]">
                     {/* Header bar */}
-                    <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between bg-slate-50/50 gap-3">
+                    <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
                         <div className="flex items-center gap-2">
                             <UserIcon size={18} className="text-slate-600" />
                             <h3 className="font-bold text-slate-800 text-sm sm:text-base uppercase tracking-wide">
-                                BẢNG THỐNG KÊ CHI TIẾT THEO CÁN BỘ
+                                BẢNG THỐNG KÊ NHÂN VIÊN
                             </h3>
                         </div>
                         <div className="flex items-center gap-3">
@@ -442,14 +369,6 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
                         </div>
                     </div>
 
-                    {/* Banner quy tắc tính chỉ tiêu */}
-                    <div className="px-4 py-2.5 bg-sky-50/80 border-b border-sky-100 text-xs text-sky-900 font-semibold flex items-center gap-2">
-                        <Info size={16} className="text-sky-600 shrink-0" />
-                        <span>
-                            <strong className="font-bold text-sky-950">Quy tắc tính khối lượng:</strong> (1) Hồ sơ giao 1 bước trong quy trình: Tính chỉ tiêu theo <span className="underline font-bold">Số thửa đất</span> trên hồ sơ. (2) Hồ sơ chuyển bước khác: Tính là <span className="underline font-bold">1 hồ sơ đã hoàn thành</span>.
-                        </span>
-                    </div>
-
                     {/* Table */}
                     <div className="flex-1 overflow-x-auto overflow-y-auto custom-scrollbar">
                         <table className="w-full text-left text-xs sm:text-sm border-collapse">
@@ -457,13 +376,9 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
                                 <tr>
                                     <th className="py-3.5 px-4 text-center w-12">STT</th>
                                     <th className="py-3.5 px-4 text-left">TÊN CÁN BỘ</th>
-                                    <th className="py-3.5 px-4 text-center">TỔNG HS GIAO</th>
-                                    <th className="py-3.5 px-4 text-center" title="Khi hồ sơ chuyển bước khác -> Tính 1 hồ sơ đã hoàn thành">
-                                        ĐÃ XONG / CHUYỂN BƯỚC
-                                    </th>
-                                    <th className="py-3.5 px-4 text-center" title="Khi hồ sơ được giao 1 bước trong quy trình -> Tính theo số thửa trên hồ sơ">
-                                        ĐANG XỬ LÝ (SỐ THỬA)
-                                    </th>
+                                    <th className="py-3.5 px-4 text-center">HỒ SƠ GIAO</th>
+                                    <th className="py-3.5 px-4 text-center">ĐÃ XONG</th>
+                                    <th className="py-3.5 px-4 text-center">ĐANG XỬ LÝ</th>
                                     <th className="py-3.5 px-4 text-center">TRỄ ĐÃ XONG</th>
                                     <th className="py-3.5 px-4 text-center">TRỄ CHƯA XONG</th>
                                 </tr>
@@ -487,36 +402,30 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
                                             </div>
                                         </td>
                                         <td className="py-3.5 px-4 text-center">
-                                            <span className={`inline-flex flex-col items-center justify-center px-3 py-1 rounded-xl text-xs font-bold min-w-[56px] ${
+                                            <span className={`inline-flex items-center justify-center px-3 py-1 rounded-full text-xs font-bold min-w-[48px] ${
                                                 item.totalAssigned > 0 
-                                                    ? 'bg-blue-50 text-blue-700 border border-blue-100/80' 
+                                                    ? 'bg-blue-50 text-blue-600 border border-blue-100/50' 
                                                     : 'bg-slate-100 text-slate-400'
                                             }`}>
-                                                <span>{item.totalAssigned} HS</span>
-                                                {item.totalPlotCount > 0 && (
-                                                    <span className="text-[10px] font-semibold text-blue-600">({item.totalPlotCount} thửa)</span>
-                                                )}
+                                                {item.totalAssigned}
                                             </span>
                                         </td>
                                         <td className="py-3.5 px-4 text-center">
-                                            <span className={`inline-flex flex-col items-center justify-center px-3 py-1 rounded-xl text-xs font-bold min-w-[56px] ${
+                                            <span className={`inline-flex items-center justify-center px-3 py-1 rounded-full text-xs font-bold min-w-[48px] ${
                                                 item.completed > 0 
-                                                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-100/80' 
+                                                    ? 'bg-emerald-50 text-emerald-600 border border-emerald-100/50' 
                                                     : 'bg-slate-100 text-slate-400'
-                                            }`} title="Chuyển bước khác -> Tính 1 hồ sơ hoàn thành">
-                                                <span>{item.completed} HS</span>
+                                            }`}>
+                                                {item.completed}
                                             </span>
                                         </td>
                                         <td className="py-3.5 px-4 text-center">
-                                            <span className={`inline-flex flex-col items-center justify-center px-3 py-1 rounded-xl text-xs font-bold min-w-[56px] ${
+                                            <span className={`inline-flex items-center justify-center px-3 py-1 rounded-full text-xs font-bold min-w-[48px] ${
                                                 item.processing > 0 
-                                                    ? 'bg-amber-50 text-amber-800 border border-amber-200/80' 
+                                                    ? 'bg-amber-50 text-amber-600 border border-amber-100/50' 
                                                     : 'bg-slate-100 text-slate-400'
-                                            }`} title="Giao 1 bước -> Tính theo số thửa trên hồ sơ">
-                                                <span>{item.processing} HS</span>
-                                                {item.processingPlotCount > 0 && (
-                                                    <span className="text-[10px] font-extrabold text-amber-700">({item.processingPlotCount} thửa)</span>
-                                                )}
+                                            }`}>
+                                                {item.processing}
                                             </span>
                                         </td>
                                         <td className="py-3.5 px-4 text-center">

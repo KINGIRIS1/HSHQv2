@@ -51,16 +51,6 @@ ALTER TABLE land_records ADD COLUMN IF NOT EXISTS "price" numeric;
 ALTER TABLE land_records ADD COLUMN IF NOT EXISTS "advancePayment" numeric;
 ALTER TABLE land_records ADD COLUMN IF NOT EXISTS "isHandedOver" boolean;
 ALTER TABLE land_records ADD COLUMN IF NOT EXISTS "statusLogs" jsonb;
-ALTER TABLE land_records ADD COLUMN IF NOT EXISTS "stepAssignments" jsonb;
-ALTER TABLE land_records ADD COLUMN IF NOT EXISTS "capGiaySubStep" text;
-ALTER TABLE land_records ADD COLUMN IF NOT EXISTS "thamDinhDate" date;
-ALTER TABLE land_records ADD COLUMN IF NOT EXISTS "thamDinhBy" text;
-ALTER TABLE land_records ADD COLUMN IF NOT EXISTS "chuyenThueDate" date;
-ALTER TABLE land_records ADD COLUMN IF NOT EXISTS "chuyenThueBy" text;
-ALTER TABLE land_records ADD COLUMN IF NOT EXISTS "hoanThienDate" date;
-ALTER TABLE land_records ADD COLUMN IF NOT EXISTS "hoanThienBy" text;
-ALTER TABLE land_records ADD COLUMN IF NOT EXISTS "initialAssignedTo" text;
-ALTER TABLE land_records ADD COLUMN IF NOT EXISTS "lastAssignedTo" text;
 ALTER TABLE land_records ADD COLUMN IF NOT EXISTS "archiveHandoverDate" date;
 ALTER TABLE land_records ADD COLUMN IF NOT EXISTS "archiveHandoverBatch" text;
 

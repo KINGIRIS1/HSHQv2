@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { BarChart3, FileSpreadsheet, Loader2, Sparkles, Download, CalendarDays, Printer, Layout, FileText, ListFilter, CheckCircle2, Clock, AlertTriangle, Settings, Key, X, Save, MapPin, UserCheck, ChevronLeft, ChevronRight, PieChart, CheckCircle, Ruler, FolderArchive, CalendarRange, DollarSign, FileCheck } from 'lucide-react';
 import { RecordFile, RecordStatus, Employee, User, UserRole, RolePermissions, DepartmentPermissions } from '../types';
 import { getNormalizedWard, STATUS_LABELS, getShortRecordType, isArchiveRecordType } from '../constants';
-import { isRecordOverdue, removeVietnameseTones, isRecordApproaching, parseSafeDate, getRecordReceivedDate, cleanNoteText } from '../utils/appHelpers';
+import { isRecordOverdue, removeVietnameseTones, isRecordApproaching, parseSafeDate, getRecordReceivedDate } from '../utils/appHelpers';
 import { saveGeminiKey, getGeminiKey } from '../services/geminiService';
 import { fetchArchiveRecords } from '../services/apiArchive';
 import { hasUserPermission } from '../config/roleConfig';
@@ -30,12 +30,8 @@ interface ReportSectionProps {
 
 const getFormattedNotesAndDocs = (r: RecordFile): string => {
     const notesParts: string[] = [];
-    const cleanedNotes = cleanNoteText(r.notes);
-    if (cleanedNotes) notesParts.push(cleanedNotes);
-    if (r.content && r.content !== r.notes && !r.content.startsWith('{') && !r.content.startsWith('[Đồng bộ')) {
-        const cleanedContent = cleanNoteText(r.content);
-        if (cleanedContent) notesParts.push(cleanedContent);
-    }
+    if (r.notes) notesParts.push(r.notes);
+    if (r.content && r.content !== r.notes) notesParts.push(r.content);
     return notesParts.join('; ') || '-';
 };
 

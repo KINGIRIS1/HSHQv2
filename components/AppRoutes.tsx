@@ -1500,7 +1500,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                     onAdvanceStatus={props.advanceStatus}
                     onQuickUpdate={props.handleQuickUpdate}
                     onReturnResult={props.handleOpenReturnModal}
-                    onMapCorrection={(currentView === "other_records" || currentView === "other_completed_list" || isArchiveMeasurementView) ? undefined : props.handleMapCorrectionRequest}
+                    onMapCorrection={props.handleMapCorrectionRequest}
                     onExtendDeadline={props.onExtendDeadline || ((rec) => {
                       if (props.setExtendTargetRecord && props.setIsExtendModalOpen) {
                         props.setExtendTargetRecord(rec);

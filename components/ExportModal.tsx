@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import * as XLSX from 'xlsx-js-style';
 import { RecordFile, RecordStatus } from '../types';
 import { isArchiveRecordType, getShortRecordType } from '../constants';
-import { formatBatchName, cleanNoteText } from '../utils/appHelpers';
+import { formatBatchName } from '../utils/appHelpers';
 import { X, FileDown, Calendar, Layers, MapPin, Printer, Eye, Filter } from 'lucide-react';
 
 interface ExportModalProps {
@@ -240,7 +240,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
 
     // 2. Data Mapping
     const dataRows = recordsToExport.map((r, index) => {
-        let noteText = cleanNoteText(r.notes);
+        let noteText = r.notes || '';
         if (r.status === RecordStatus.WITHDRAWN) {
             noteText = noteText ? `${noteText} (CSD rút hồ sơ)` : 'CSD rút hồ sơ';
         }

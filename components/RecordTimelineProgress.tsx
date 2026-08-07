@@ -191,32 +191,27 @@ export const RecordTimelineProgress: React.FC<RecordTimelineProgressProps> = ({
       {
         id: 'tham_dinh',
         label: 'THẨM ĐỊNH / THẨM TRA',
-        date: record.thamDinhDate || (['tham_dinh', 'phieu_chuyen_thue', 'cho_nop_thue', 'cho_giay_nop_tien', 'hoan_thien_trinh_duyet', 'vo_so_gcn', 'cho_ban_giao', 'da_ban_giao'].includes(record.capGiaySubStep || '') ? record.assignedDate : null),
-        forceActive: record.capGiaySubStep === 'tham_dinh' || !!record.thamDinhDate || (['phieu_chuyen_thue', 'cho_nop_thue', 'cho_giay_nop_tien', 'hoan_thien_trinh_duyet', 'vo_so_gcn', 'cho_ban_giao', 'da_ban_giao'].includes(record.capGiaySubStep || '') && !!record.initialAssignedTo && record.initialAssignedTo !== record.assignedTo),
+        date: ['tham_dinh', 'phieu_chuyen_thue', 'cho_nop_thue', 'cho_giay_nop_tien', 'hoan_thien_trinh_duyet', 'vo_so_gcn', 'cho_ban_giao', 'da_ban_giao'].includes(record.capGiaySubStep || '') ? record.assignedDate : null,
+        forceActive: ['tham_dinh', 'phieu_chuyen_thue', 'cho_nop_thue', 'cho_giay_nop_tien', 'hoan_thien_trinh_duyet', 'vo_so_gcn', 'cho_ban_giao', 'da_ban_giao'].includes(record.capGiaySubStep || '') || !!record.assignedDate,
         icon: ClipboardList,
         colorClass: { text: 'text-blue-700', border: 'border-blue-600', bg: 'bg-blue-600' },
-        subText: (() => {
-          const stepAssign = record.stepAssignments?.find(s => s.step === 'tham_dinh' || s.step === 'tham_tra');
-          const empId = record.thamDinhBy || stepAssign?.employeeId || (record.capGiaySubStep === 'tham_dinh' ? record.assignedTo : (record.initialAssignedTo || record.assignedTo));
-          if (!empId) return undefined;
+        subText: (record.initialAssignedTo || record.assignedTo) ? (() => {
+          const empId = record.initialAssignedTo || record.assignedTo;
           const emp = employees.find(e => e.id === empId);
           return emp ? `${emp.name} (${emp.department})` : undefined;
-        })(),
+        })() : undefined,
         durationLabel: null
       },
       {
         id: 'phieu_chuyen_thue',
         label: 'PHIẾU CHUYỂN THUẾ',
-        date: record.chuyenThueDate || (['phieu_chuyen_thue', 'cho_nop_thue', 'cho_giay_nop_tien', 'hoan_thien_trinh_duyet', 'vo_so_gcn', 'cho_ban_giao', 'da_ban_giao'].includes(record.capGiaySubStep || '') ? (record.capGiaySubStep === 'phieu_chuyen_thue' ? record.assignedDate : null) : null),
-        forceActive: ['phieu_chuyen_thue', 'cho_nop_thue', 'cho_giay_nop_tien', 'hoan_thien_trinh_duyet', 'vo_so_gcn', 'cho_ban_giao', 'da_ban_giao'].includes(record.capGiaySubStep || '') || !!record.chuyenThueDate,
+        date: ['phieu_chuyen_thue', 'cho_nop_thue', 'cho_giay_nop_tien', 'hoan_thien_trinh_duyet', 'vo_so_gcn', 'cho_ban_giao', 'da_ban_giao'].includes(record.capGiaySubStep || '') ? (record.pendingCheckDate || record.assignedDate) : null,
+        forceActive: ['phieu_chuyen_thue', 'cho_nop_thue', 'cho_giay_nop_tien', 'hoan_thien_trinh_duyet', 'vo_so_gcn', 'cho_ban_giao', 'da_ban_giao'].includes(record.capGiaySubStep || ''),
         icon: FileText,
         colorClass: { text: 'text-purple-700', border: 'border-purple-600', bg: 'bg-purple-600' },
-        subText: (['phieu_chuyen_thue', 'cho_nop_thue', 'cho_giay_nop_tien', 'hoan_thien_trinh_duyet', 'vo_so_gcn', 'cho_ban_giao', 'da_ban_giao'].includes(record.capGiaySubStep || '') || !!record.chuyenThueDate)
+        subText: (record.capGiaySubStep === 'phieu_chuyen_thue' && record.assignedTo && record.assignedTo !== record.initialAssignedTo)
           ? (() => {
-              const stepAssign = record.stepAssignments?.find(s => s.step === 'phieu_chuyen_thue');
-              const empId = record.chuyenThueBy || stepAssign?.employeeId || (record.capGiaySubStep === 'phieu_chuyen_thue' ? record.assignedTo : (record.initialAssignedTo || record.assignedTo));
-              if (!empId) return undefined;
-              const emp = employees.find(e => e.id === empId);
+              const emp = employees.find(e => e.id === record.assignedTo);
               return emp ? `${emp.name} (${emp.department})` : undefined;
             })()
           : undefined,
@@ -225,28 +220,23 @@ export const RecordTimelineProgress: React.FC<RecordTimelineProgressProps> = ({
       {
         id: 'cho_nop_thue',
         label: 'CHỜ GIẤY NỘP TIỀN',
-        date: ['cho_nop_thue', 'cho_giay_nop_tien', 'hoan_thien_trinh_duyet', 'vo_so_gcn', 'cho_ban_giao', 'da_ban_giao'].includes(record.capGiaySubStep || '') ? (record.capGiaySubStep === 'cho_nop_thue' || record.capGiaySubStep === 'cho_giay_nop_tien' ? record.assignedDate : null) : null,
+        date: ['cho_nop_thue', 'cho_giay_nop_tien', 'hoan_thien_trinh_duyet', 'vo_so_gcn', 'cho_ban_giao', 'da_ban_giao'].includes(record.capGiaySubStep || '') ? (record.pendingCheckDate || record.assignedDate) : null,
         forceActive: ['cho_nop_thue', 'cho_giay_nop_tien', 'hoan_thien_trinh_duyet', 'vo_so_gcn', 'cho_ban_giao', 'da_ban_giao'].includes(record.capGiaySubStep || ''),
         icon: Clock,
         colorClass: { text: 'text-emerald-700', border: 'border-emerald-600', bg: 'bg-emerald-600' },
-        subText: (record.capGiaySubStep === 'cho_nop_thue' || record.capGiaySubStep === 'cho_giay_nop_tien')
-          ? 'Chờ người dân nộp thuế/tiền'
-          : (['hoan_thien_trinh_duyet', 'vo_so_gcn', 'cho_ban_giao', 'da_ban_giao'].includes(record.capGiaySubStep || '') ? 'Đã hoàn tất nộp thuế' : undefined),
+        subText: (record.capGiaySubStep === 'cho_nop_thue' || record.capGiaySubStep === 'cho_giay_nop_tien') ? 'Chờ người dân nộp thuế/tiền' : undefined,
         durationLabel: null
       },
       {
         id: 'hoan_thien_trinh_duyet',
         label: 'IN & HOÀN THIỆN HỒ SƠ',
-        date: record.hoanThienDate || (['hoan_thien_trinh_duyet', 'vo_so_gcn', 'cho_ban_giao', 'da_ban_giao'].includes(record.capGiaySubStep || '') ? (record.submissionDate || (record.capGiaySubStep === 'hoan_thien_trinh_duyet' ? record.assignedDate : null)) : null),
-        forceActive: ['hoan_thien_trinh_duyet', 'vo_so_gcn', 'cho_ban_giao', 'da_ban_giao'].includes(record.capGiaySubStep || '') || !!record.hoanThienDate,
+        date: ['hoan_thien_trinh_duyet', 'vo_so_gcn', 'cho_ban_giao', 'da_ban_giao'].includes(record.capGiaySubStep || '') ? record.submissionDate : null,
+        forceActive: ['hoan_thien_trinh_duyet', 'vo_so_gcn', 'cho_ban_giao', 'da_ban_giao'].includes(record.capGiaySubStep || ''),
         icon: FileCheck,
         colorClass: { text: 'text-amber-700', border: 'border-amber-600', bg: 'bg-amber-600' },
-        subText: (['hoan_thien_trinh_duyet', 'vo_so_gcn', 'cho_ban_giao', 'da_ban_giao'].includes(record.capGiaySubStep || '') || !!record.hoanThienDate)
+        subText: (record.capGiaySubStep === 'hoan_thien_trinh_duyet' && record.assignedTo && record.assignedTo !== record.initialAssignedTo)
           ? (() => {
-              const stepAssign = record.stepAssignments?.find(s => s.step === 'hoan_thien_trinh_duyet' || s.step === 'in_hoan_thien');
-              const empId = record.hoanThienBy || stepAssign?.employeeId || (record.capGiaySubStep === 'hoan_thien_trinh_duyet' || record.capGiaySubStep === 'in_hoan_thien' ? record.assignedTo : undefined);
-              if (!empId) return undefined;
-              const emp = employees.find(e => e.id === empId);
+              const emp = employees.find(e => e.id === record.assignedTo);
               return emp ? `${emp.name} (${emp.department})` : undefined;
             })()
           : undefined,
@@ -397,7 +387,7 @@ export const RecordTimelineProgress: React.FC<RecordTimelineProgressProps> = ({
                 <div className="flex items-center gap-2 mt-0.5">
                   <Icon size={14} className={isActive ? 'text-slate-500' : 'text-slate-300'} />
                   <span className={`text-xs font-semibold ${isActive ? 'text-slate-800' : 'text-slate-400 italic'}`}>
-                    {step.date ? formatDate(step.date) : (isActive ? 'Đang thực hiện' : 'Chưa thực hiện')}
+                    {step.date ? formatDate(step.date) : (step.forceActive ? 'Đã hoàn tất' : 'Chưa thực hiện')}
                   </span>
                 </div>
 
