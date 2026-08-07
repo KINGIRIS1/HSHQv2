@@ -84,18 +84,19 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
   // - Nếu tổ lưu trữ: toàn bộ nhân viên tổ lưu trữ và ban giám đốc
   // - Không gồm nhân viên bộ phận khác
   const filteredEmployeesForAssignment = useMemo(() => {
-      const isDoDac = recordDept.toLowerCase().includes('đo đạc');
-      const isLuuTru = recordDept.toLowerCase().includes('lưu trữ');
+      const deptLower = recordDept.toLowerCase();
+      const isDoDac = deptLower.includes('đo đạc');
+      const isLuuTru = deptLower.includes('lưu trữ');
+      const isHanhChinh = deptLower.includes('hành chính');
 
       return employees.filter(emp => {
           const dept = (emp.department || '').toLowerCase();
-          const isBgd = dept.includes('ban giám đốc') || dept.includes('giám đốc');
-          if (isBgd) return true;
-
           if (isDoDac) {
               return dept.includes('đo đạc') || dept.includes('kỹ thuật');
           } else if (isLuuTru) {
               return dept.includes('lưu trữ') || dept.includes('thông tin');
+          } else if (isHanhChinh) {
+              return dept.includes('hành chính') || dept.includes('một cửa');
           }
           return dept.includes('cấp giấy') || dept.includes('đăng ký');
       });

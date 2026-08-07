@@ -8,6 +8,7 @@ export enum RecordStatus {
   PENDING_SIGN = 'PENDING_SIGN', // Chờ ký duyệt (Đã trình)
   SIGNED = 'SIGNED',             // Chờ bàn giao
   HANDOVER = 'HANDOVER',         // Giao 1 cửa (Hoàn thành nội bộ)
+  PENDING_SUPPLEMENT = 'PENDING_SUPPLEMENT', // Chờ bổ sung (Chờ người dân bổ sung)
   RETURNED = 'RETURNED',         // Đã trả kết quả (Hoàn thành trả dân)
   WITHDRAWN = 'WITHDRAWN',       // CSD rút hồ sơ (Kết thúc)
   REJECTED = 'REJECTED'          // Hồ sơ trả (Trả về OneDoor)

@@ -535,6 +535,7 @@ function App() {
           RecordStatus.IN_PROGRESS,
           RecordStatus.PENDING_CHECK,
           RecordStatus.PENDING_SIGN,
+          RecordStatus.PENDING_SUPPLEMENT,
           RecordStatus.SIGNED,
           RecordStatus.HANDOVER,
           RecordStatus.RETURNED,
@@ -682,6 +683,7 @@ function App() {
               RecordStatus.IN_PROGRESS,
               RecordStatus.PENDING_CHECK,
               RecordStatus.PENDING_SIGN,
+              RecordStatus.PENDING_SUPPLEMENT,
               RecordStatus.SIGNED,
               RecordStatus.HANDOVER,
               RecordStatus.RETURNED,
@@ -1021,46 +1023,74 @@ function App() {
       setIsRejectReturnStepModalOpen(true);
   }, []);
 
-  const handleConfirmRejectReturnStep = useCallback(async (reason: string, returnDateStr: string, returnOption: 'REJECT' | 'PAUSE' | 'PREVIOUS_STEP' = 'PAUSE') => {
+  const handleConfirmRejectReturnStep = useCallback(async (reason: string, returnDateStr: string, returnOption: 'REJECT' | 'PAUSE' | 'PREVIOUS_STEP' = 'PREVIOUS_STEP') => {
       if (rejectReturnTargetRecords.length === 0) return;
       const targetDateISO = returnDateStr ? new Date(returnDateStr).toISOString() : new Date().toISOString();
       const nowStr = targetDateISO;
 
       const updatedTargets = rejectReturnTargetRecords.map(r => {
           const oldAssigned = r.assignedTo || r.lastAssignedTo || null;
-          const internalLogNote = `[TRẢ HỒ SƠ - ${new Date(targetDateISO).toLocaleDateString('vi-VN')}] Lý do: ${reason}`;
-          const existingNotes = r.privateNotes || '';
-          const updatedPrivateNotes = existingNotes ? `${existingNotes}\n${internalLogNote}` : internalLogNote;
 
           if (returnOption === 'REJECT') {
+              const internalLogNote = `[TRẢ HỦY - ${new Date(targetDateISO).toLocaleDateString('vi-VN')}] Lý do: ${reason}`;
+              const existingNotes = r.privateNotes || '';
+              const updatedPrivateNotes = existingNotes ? `${existingNotes}\n${internalLogNote}` : internalLogNote;
               return {
                   ...r,
                   status: RecordStatus.REJECTED,
                   completedDate: r.completedDate || nowStr,
                   lastAssignedTo: oldAssigned,
-                  assignedTo: null,
-                  assignedDate: null,
+                  assignedTo: oldAssigned,
                   privateNotes: updatedPrivateNotes
               };
           } else if (returnOption === 'PAUSE') {
+              const internalLogNote = `[TẠM DỪNG / CHỜ BỔ SUNG - ${new Date(targetDateISO).toLocaleDateString('vi-VN')}] Lý do: ${reason}`;
+              const existingNotes = r.privateNotes || '';
+              const updatedPrivateNotes = existingNotes ? `${existingNotes}\n${internalLogNote}` : internalLogNote;
               return {
                   ...r,
-                  status: RecordStatus.RETURNED,
+                  status: RecordStatus.PENDING_SUPPLEMENT, // Trạng thái Chờ bổ sung
                   lastAssignedTo: oldAssigned,
-                  assignedTo: null,
-                  assignedDate: null,
+                  assignedTo: oldAssigned,
                   privateNotes: updatedPrivateNotes
               };
           } else {
-              // PREVIOUS_STEP
+              // PREVIOUS_STEP (Trả về / Sửa)
+              const dateHistoryLines: string[] = [];
+              if (r.pendingCheckDate) {
+                  const pDate = new Date(r.pendingCheckDate);
+                  if (!isNaN(pDate.getTime())) {
+                      dateHistoryLines.push(`${pDate.toLocaleDateString('vi-VN')} trình kiểm tra`);
+                  }
+              }
+              if (r.submissionDate) {
+                  const sDate = new Date(r.submissionDate);
+                  if (!isNaN(sDate.getTime())) {
+                      dateHistoryLines.push(`${sDate.toLocaleDateString('vi-VN')} trình ký`);
+                  }
+              }
+
+              let internalLogNote = `[TRẢ VỀ / SỬA - ${new Date(targetDateISO).toLocaleDateString('vi-VN')}]`;
+              if (dateHistoryLines.length > 0) {
+                  internalLogNote += `\n` + dateHistoryLines.join('\n');
+              }
+              internalLogNote += `\nlý do trả: ${reason}`;
+
+              const existingNotes = r.privateNotes || '';
+              const updatedPrivateNotes = existingNotes ? `${existingNotes}\n${internalLogNote}` : internalLogNote;
+
               return {
                   ...r,
-                  status: RecordStatus.IN_PROGRESS,
-                  assignedTo: oldAssigned,
+                  status: RecordStatus.IN_PROGRESS, // Chuyển về Đang thực hiện
+                  assignedTo: oldAssigned,         // Giữ cán bộ thụ lý
+                  lastAssignedTo: oldAssigned,
+                  // Reset ngày tháng các bước để làm lại từ đầu
                   pendingCheckDate: null,
                   submissionDate: null,
                   checkedDate: null,
                   approvalDate: null,
+                  completedDate: null,
+                  completedWorkDate: null,
                   privateNotes: updatedPrivateNotes
               };
           }
@@ -1078,8 +1108,8 @@ function App() {
       const msg = returnOption === 'REJECT' 
           ? `Đã trả hủy ${updatedTargets.length} hồ sơ thành công!` 
           : returnOption === 'PAUSE' 
-          ? `Đã tạm dừng quy trình ${updatedTargets.length} hồ sơ chờ người dân bổ sung!` 
-          : `Đã trả ${updatedTargets.length} hồ sơ về bước Đang thực hiện cho cán bộ xử lý!`;
+          ? `Đã chuyển ${updatedTargets.length} hồ sơ sang trạng thái Chờ bổ sung!` 
+          : `Đã trả ${updatedTargets.length} hồ sơ về cho cán bộ thụ lý sửa chữa hoàn thiện!`;
       setToast({ type: 'success', message: msg });
   }, [rejectReturnTargetRecords]);
 

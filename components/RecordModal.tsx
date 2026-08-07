@@ -145,21 +145,46 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
     allowedRecordTypes = EXTENDED_RECORD_TYPES;
   }
 
+  const targetDept = useMemo(() => {
+    const rType = String(formData.recordType || '').toLowerCase();
+    const rCode = String(formData.code || '').toLowerCase();
+    if (rType.includes('1.1') || rType.includes('1.2') || rType.includes('công văn') || rType.includes('sao lục') || rCode.startsWith('1.')) {
+      return 'Tổ Lưu trữ';
+    }
+    if (rType.includes('2.2') || rType.includes('2.3') || rType.includes('2.4') || rType.includes('2.5') || rType.includes('2.6') || rType.includes('số thửa') || rType.includes('trích đo') || rType.includes('đo đạc')) {
+      return 'Tổ Đo đạc';
+    }
+    if (rType.includes('2.1') || rType.includes('trích lục') || rType.includes('cấp giấy') || rType.includes('đăng ký')) {
+      return 'Tổ Cấp giấy';
+    }
+    return 'Tổ Cấp giấy';
+  }, [formData.recordType, formData.code]);
+
   const filteredEmployees = useMemo(() => {
     if (!employees || employees.length === 0) return [];
-    const userEmp = employees.find(e => (currentUser?.employeeId && e.id === currentUser.employeeId) || e.name.toLowerCase() === currentUser?.name?.toLowerCase() || e.id === currentUser?.username);
-    const userDept = userEmp?.department || '';
-    if (!userDept || currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.SUBADMIN || userDept.toLowerCase().includes('giám đốc') || userDept.toLowerCase().includes('lãnh đạo')) {
-      return employees;
-    }
-    const sameDept = employees.filter(e => e.department && e.department.trim().toLowerCase() === userDept.trim().toLowerCase());
-    if (sameDept.length === 0) return employees;
-    if (formData.assignedTo && !sameDept.some(e => e.id === formData.assignedTo)) {
+    const deptLower = targetDept.toLowerCase();
+    const isDoDac = deptLower.includes('đo đạc');
+    const isLuuTru = deptLower.includes('lưu trữ');
+    const isHanhChinh = deptLower.includes('hành chính');
+
+    const matched = employees.filter(emp => {
+      const empDept = (emp.department || '').toLowerCase();
+      if (isDoDac) {
+        return empDept.includes('đo đạc') || empDept.includes('kỹ thuật');
+      } else if (isLuuTru) {
+        return empDept.includes('lưu trữ') || empDept.includes('thông tin');
+      } else if (isHanhChinh) {
+        return empDept.includes('hành chính') || empDept.includes('một cửa');
+      }
+      return empDept.includes('cấp giấy') || empDept.includes('đăng ký');
+    });
+
+    if (formData.assignedTo && !matched.some(e => e.id === formData.assignedTo)) {
       const assignedEmp = employees.find(e => e.id === formData.assignedTo);
-      if (assignedEmp) sameDept.push(assignedEmp);
+      if (assignedEmp) matched.push(assignedEmp);
     }
-    return sameDept;
-  }, [employees, currentUser, formData.assignedTo]);
+    return matched;
+  }, [employees, targetDept, formData.assignedTo]);
 
   useEffect(() => {
     if (isOpen) {

@@ -141,7 +141,7 @@ export const useRecordFilter = (
             // Tab Kiểm tra: Hiển thị hồ sơ Chờ kiểm tra
             result = result.filter(r => r.status === RecordStatus.PENDING_CHECK);
         } else if (currentView === 'completed_list' || currentView === 'archive_completed_list' || currentView === 'other_completed_list') {
-            result = result.filter(r => r.status === RecordStatus.ASSIGNED || r.status === RecordStatus.IN_PROGRESS);
+            result = result.filter(r => r.status === RecordStatus.ASSIGNED || r.status === RecordStatus.IN_PROGRESS || r.status === RecordStatus.PENDING_SUPPLEMENT);
         } else if (currentView === 'director_completed' || currentView === 'other_director_completed' || currentView === 'archive_director_completed') {
             result = result.filter(r => r.submittedTo === currentUser?.employeeId && r.status !== RecordStatus.PENDING_SIGN && r.status !== RecordStatus.RECEIVED && r.status !== RecordStatus.ASSIGNED && r.status !== RecordStatus.IN_PROGRESS);
         } else if (currentView === 'handover_list' || currentView === 'other_handover_list' || currentView === 'archive_handover_list') {
