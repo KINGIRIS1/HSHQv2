@@ -1346,15 +1346,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                 </button>
               )}
 
-            {(isAdmin || isSubadmin) && props.selectedRecordIds.size > 0 && (
-              <button
-                onClick={() => props.setIsBulkUpdateModalOpen(true)}
-                className="ml-2 flex items-center gap-1 bg-orange-600 text-white px-3 py-1.5 rounded-md hover:bg-orange-700 shadow-sm text-sm font-bold animate-pulse"
-              >
-                <Layers size={16} /> Admin: Xử lý hàng loạt (
-                {props.selectedRecordIds.size})
-              </button>
-            )}
+
 
             {(currentView === "all_records" ||
               currentView === "other_records" ||

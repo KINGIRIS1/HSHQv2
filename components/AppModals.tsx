@@ -11,7 +11,7 @@ import ExportModal from './ExportModal';
 import AddToBatchModal from './AddToBatchModal';
 import ReturnBatchHandoverModal from './ReturnBatchHandoverModal';
 import ExcelPreviewModal from './ExcelPreviewModal';
-import BulkUpdateModal from './BulkUpdateModal';
+
 import ReturnResultModal from './ReturnResultModal';
 import BatchErrorDiagnosticModal from './BatchErrorDiagnosticModal';
 import RejectReturnStepModal from './RejectReturnStepModal';
@@ -232,16 +232,7 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
                 fileName={props.previewExcelName} 
             />
 
-            <BulkUpdateModal 
-                isOpen={props.isBulkUpdateModalOpen}
-                onClose={() => props.setIsBulkUpdateModalOpen(false)}
-                selectedRecords={props.selectedRecordsForBulk}
-                allRecords={props.records}
-                employees={props.employees}
-                wards={props.wards}
-                onConfirm={props.handleBulkUpdate}
-                currentView={props.currentView}
-            />
+
 
             <ReturnResultModal
                 isOpen={props.isReturnModalOpen}
