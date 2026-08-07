@@ -308,7 +308,8 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
             }
 
             // Parse NGƯỜI XỬ LÝ & NGÀY GIAO trước để hỗ trợ suy diễn trạng thái Đã Giao Việc
-            const assigneeRaw = getVal(['NGƯỜI XỬ LÝ', 'NHÂN VIÊN', 'CÁN BỘ', 'assignedto', 'assigned_to', 'assignedTo']);
+            const assigneeRaw = getVal(['NGƯỜI XỬ LÝ', 'NHÂN VIÊN', 'CÁN BỘ', 'assignedto', 'assigned_to', 'assignedType', 'assignedTo']);
+            let matchedEmpId: string | undefined = undefined;
             if (assigneeRaw !== undefined && String(assigneeRaw).trim() !== '') {
                 const rawStr = String(assigneeRaw).trim();
                 const normalizeName = (str: string) => str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().replace(/\s+/g, ' ');
@@ -324,6 +325,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
                 });
 
                 if (emp) {
+                    matchedEmpId = emp.id;
                     record.assignedTo = emp.id;
                     if (mode === 'create' && !record.assignedDate) {
                         record.assignedDate = record.receivedDate || new Date().toISOString();
@@ -333,10 +335,11 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
                 }
             }
 
-            const assignedDateRaw = getVal(['NGÀY GIAO', 'NGÀY GIAO VIỆC', 'assigneddate', 'assigned_date', 'assignedDate']);
+            const assignedDateRaw = getVal(['NGÀY GIAO', 'NGÀY GIAO VIỆC', 'NGÀY XỬ LÝ', 'ngay_xu_ly', 'ngayXuLy', 'assigneddate', 'assigned_date', 'assignedDate']);
+            let parsedGeneralDate: string | undefined = undefined;
             if (assignedDateRaw !== undefined) {
-                const parsedDate = parseExcelDate(assignedDateRaw);
-                if (parsedDate) record.assignedDate = parsedDate;
+                parsedGeneralDate = parseExcelDate(assignedDateRaw) || undefined;
+                if (parsedGeneralDate) record.assignedDate = parsedGeneralDate;
             }
 
             // 5. TRẠNG THÁI & NGƯỜI XỬ LÝ
@@ -381,24 +384,37 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
             if (explicitStatus !== undefined) {
                 record.status = explicitStatus;
                 
-                // Điền tự động các trường ngày tương ứng với trạng thái đã chọn nếu trường ngày đó chưa có giá trị
+                // Định tuyến thông tin người xử lý và ngày tháng chính xác cho từng trạng thái cụ thể
+                // Tránh ghi đè toàn bộ các mốc tiến độ không liên quan
                 const nowStr = new Date().toISOString();
+                const targetDate = parsedGeneralDate || nowStr;
+
+                if (matchedEmpId) {
+                    if (explicitStatus === RecordStatus.PENDING_SIGN) {
+                        record.submittedTo = matchedEmpId;
+                    } else if (explicitStatus === RecordStatus.CHECKED) {
+                        record.checkedBy = matchedEmpId;
+                    } else if (explicitStatus === RecordStatus.ASSIGNED || explicitStatus === RecordStatus.IN_PROGRESS) {
+                        record.assignedTo = matchedEmpId;
+                    }
+                }
+
                 if (explicitStatus === RecordStatus.HANDOVER) {
-                    if (!record.completedDate) record.completedDate = nowStr;
+                    if (!record.completedDate) record.completedDate = targetDate;
                 } else if (explicitStatus === RecordStatus.RETURNED) {
-                    if (!record.resultReturnedDate) record.resultReturnedDate = nowStr;
+                    if (!record.resultReturnedDate) record.resultReturnedDate = targetDate;
                 } else if (explicitStatus === RecordStatus.SIGNED) {
-                    if (!record.approvalDate) record.approvalDate = nowStr;
+                    if (!record.approvalDate) record.approvalDate = targetDate;
                 } else if (explicitStatus === RecordStatus.PENDING_SIGN) {
-                    if (!record.submissionDate) record.submissionDate = nowStr;
+                    if (!record.submissionDate) record.submissionDate = targetDate;
                 } else if (explicitStatus === RecordStatus.CHECKED) {
-                    if (!record.checkedDate) record.checkedDate = nowStr;
+                    if (!record.checkedDate) record.checkedDate = targetDate;
                 } else if (explicitStatus === RecordStatus.PENDING_CHECK) {
-                    if (!record.pendingCheckDate) record.pendingCheckDate = nowStr;
+                    if (!record.pendingCheckDate) record.pendingCheckDate = targetDate;
                 } else if (explicitStatus === RecordStatus.COMPLETED_WORK) {
-                    if (!record.completedWorkDate) record.completedWorkDate = nowStr;
+                    if (!record.completedWorkDate) record.completedWorkDate = targetDate;
                 } else if (explicitStatus === RecordStatus.ASSIGNED || explicitStatus === RecordStatus.IN_PROGRESS) {
-                    if (!record.assignedDate) record.assignedDate = nowStr;
+                    if (!record.assignedDate) record.assignedDate = targetDate;
                 }
             } else {
                 // Nếu KHÔNG có cột TRẠNG THÁI cụ thể, dùng LOGIC SUY DIỄN DỰA TRÊN NGÀY THÁNG VÀ PHÂN CÔNG

@@ -233,7 +233,7 @@ const RecordRow: React.FC<RecordRowProps> = ({
         return (
           <td key="type" className={`${cellClass} text-center text-gray-700`}>
               <div className="break-words leading-normal text-sm" title={record.recordType || ''}> 
-                  {getShortRecordType(record.recordType)}
+                  {getShortRecordType(record)}
               </div>
           </td>
         );

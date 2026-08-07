@@ -145,7 +145,7 @@ const DailyList: React.FC<DailyListProps> = ({ records, wards, currentUser, empl
           i + 1, r.code, r.customerName, 
           getNormalizedWard(r.ward), 
           r.mapSheet || '', r.landPlot || '', 
-          getShortRecordType(r.recordType), 
+          getShortRecordType(r), 
           formatDateStr(r.deadline),
           formatDateStr(r.resultReturnedDate),
           r.receiptNumber || '',
@@ -309,7 +309,7 @@ const DailyList: React.FC<DailyListProps> = ({ records, wards, currentUser, empl
                                     </td>
                                     <td className="p-3 text-center font-mono align-middle">{r.mapSheet || '-'}</td>
                                     <td className="p-3 text-center font-mono align-middle">{r.landPlot || '-'}</td>
-                                    <td className="p-3 text-gray-600 truncate align-middle" title={r.recordType || ''}>{getShortRecordType(r.recordType)}</td> 
+                                    <td className="p-3 text-gray-600 truncate align-middle" title={r.recordType || ''}>{getShortRecordType(r)}</td> 
                                     <td className="p-3 text-center text-blue-700 font-medium align-middle">{r.deadline ? new Date(r.deadline).toLocaleDateString('vi-VN') : '-'}</td> 
                                     <td className="p-3 text-gray-500 italic truncate align-middle" title={r.content || ''}>{r.content}</td>
                                     <td className="p-2 align-middle text-center sticky right-0 bg-white group-hover:bg-blue-50/50 shadow-l">
