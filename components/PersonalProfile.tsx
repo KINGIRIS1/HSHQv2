@@ -212,7 +212,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
         // Map status
         let status = RecordStatus.RECEIVED;
         if (r.status === "assigned") status = RecordStatus.ASSIGNED;
-        else if (r.status === "executed") status = RecordStatus.COMPLETED_WORK;
+        else if (r.status === "executed") status = RecordStatus.IN_PROGRESS;
         else if (r.status === "pending_sign")
           status = RecordStatus.PENDING_SIGN;
         else if (r.status === "signed") status = RecordStatus.SIGNED;
@@ -383,8 +383,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
       (r) =>
         r.assignedTo === user.employeeId &&
         (r.status === RecordStatus.ASSIGNED ||
-          r.status === RecordStatus.IN_PROGRESS ||
-          r.status === RecordStatus.COMPLETED_WORK),
+          r.status === RecordStatus.IN_PROGRESS),
     );
     return filterAndSort(list, searchTerm, sortConfig);
   }, [myRecords, user.employeeId, searchTerm, sortConfig]);
@@ -393,8 +392,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
   const pendingCheckRecords = useMemo(() => {
     let list = myRecords.filter(
       (r) =>
-        r.status === RecordStatus.PENDING_CHECK ||
-        r.status === RecordStatus.CHECKED,
+        r.status === RecordStatus.PENDING_CHECK,
     );
     return filterAndSort(list, searchTerm, sortConfig);
   }, [myRecords, searchTerm, sortConfig]);
@@ -592,11 +590,10 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
         // Cập nhật các mốc thời gian chuyển trạng thái tương ứng
         if (newStatus === RecordStatus.REJECTED) {
           updatedRecord.completedDate = nowIso;
-        } else if (newStatus === RecordStatus.COMPLETED_WORK) {
+        } else if (newStatus === RecordStatus.IN_PROGRESS) {
           updatedRecord.completedWorkDate = nowIso;
         } else if (newStatus === RecordStatus.PENDING_CHECK) {
           updatedRecord.pendingCheckDate = nowIso;
-        } else if (newStatus === RecordStatus.CHECKED) {
           updatedRecord.checkedDate = nowIso;
         } else if (newStatus === RecordStatus.PENDING_SIGN) {
           updatedRecord.submissionDate = nowIso;
@@ -711,7 +708,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
         }
       } else {
         // Normal Record
-        onUpdateStatus(record, RecordStatus.COMPLETED_WORK);
+        onUpdateStatus(record, RecordStatus.IN_PROGRESS);
       }
     }
   };
@@ -722,7 +719,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
         `Xác nhận đã kiểm tra hồ sơ ${record.code}?\nHồ sơ sẽ chuyển sang trạng thái "Đã kiểm tra".`,
       )
     ) {
-      onUpdateStatus(record, RecordStatus.CHECKED);
+      onUpdateStatus(record, RecordStatus.PENDING_CHECK);
     }
   };
 
@@ -1432,8 +1429,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
 
 
                               {activeTab === "pending_check" &&
-                                (r.status === RecordStatus.PENDING_CHECK ||
-                                  r.status === RecordStatus.CHECKED) &&
+                                (r.status === RecordStatus.PENDING_CHECK) &&
                                 isChecker && (
                                   <button
                                     onClick={() => handleForwardToSign(r)}
@@ -1596,8 +1592,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                             ))}
 
                           {activeTab === "pending_check" &&
-                            (r.status === RecordStatus.PENDING_CHECK ||
-                              r.status === RecordStatus.CHECKED) &&
+                            (r.status === RecordStatus.PENDING_CHECK) &&
                             isChecker && (
                               <button
                                 onClick={() => handleForwardToSign(r)}

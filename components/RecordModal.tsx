@@ -259,17 +259,16 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
         // được chốt lại để không bị mất màu trên Timeline do thiếu Date.
         if (initialData?.status && finalData.status !== initialData?.status) {
             const flow = [
-                RecordStatus.RECEIVED, RecordStatus.ASSIGNED, RecordStatus.IN_PROGRESS, 
-                RecordStatus.COMPLETED_WORK, RecordStatus.PENDING_CHECK, RecordStatus.CHECKED, 
+                RecordStatus.RECEIVED, RecordStatus.ASSIGNED, RecordStatus.IN_PROGRESS, RecordStatus.PENDING_CHECK, 
                 RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER
             ];
             // Tạm dùng initialData.status để lấp ngày (để đóng băng tiến độ cũ)
             const prevIdx = flow.indexOf(initialData.status);
             if (prevIdx >= 0) {
                 if (prevIdx >= flow.indexOf(RecordStatus.ASSIGNED) && !finalData.assignedDate && !explicitCleared.assignedDate) finalData.assignedDate = now;
-                if (prevIdx >= flow.indexOf(RecordStatus.COMPLETED_WORK) && !finalData.completedWorkDate && !explicitCleared.completedWorkDate) finalData.completedWorkDate = now;
+                if (prevIdx >= flow.indexOf(RecordStatus.IN_PROGRESS) && !finalData.completedWorkDate && !explicitCleared.completedWorkDate) finalData.completedWorkDate = now;
                 if (prevIdx >= flow.indexOf(RecordStatus.PENDING_CHECK) && !finalData.pendingCheckDate && !explicitCleared.pendingCheckDate) finalData.pendingCheckDate = now;
-                if (prevIdx >= flow.indexOf(RecordStatus.CHECKED) && !finalData.checkedDate && !explicitCleared.checkedDate) finalData.checkedDate = now;
+                if (prevIdx >= flow.indexOf(RecordStatus.PENDING_CHECK) && !finalData.checkedDate && !explicitCleared.checkedDate) finalData.checkedDate = now;
                 if (prevIdx >= flow.indexOf(RecordStatus.PENDING_SIGN) && !finalData.submissionDate && !explicitCleared.submissionDate) finalData.submissionDate = now;
                 if (prevIdx >= flow.indexOf(RecordStatus.SIGNED) && !finalData.approvalDate && !explicitCleared.approvalDate) finalData.approvalDate = now;
             }
@@ -277,9 +276,9 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
             const newIdx = flow.indexOf(finalData.status);
             if (newIdx >= 0) {
                 if (newIdx >= flow.indexOf(RecordStatus.ASSIGNED) && !finalData.assignedDate && !explicitCleared.assignedDate) finalData.assignedDate = now;
-                if (newIdx >= flow.indexOf(RecordStatus.COMPLETED_WORK) && !finalData.completedWorkDate && !explicitCleared.completedWorkDate) finalData.completedWorkDate = now;
+                if (newIdx >= flow.indexOf(RecordStatus.IN_PROGRESS) && !finalData.completedWorkDate && !explicitCleared.completedWorkDate) finalData.completedWorkDate = now;
                 if (newIdx >= flow.indexOf(RecordStatus.PENDING_CHECK) && !finalData.pendingCheckDate && !explicitCleared.pendingCheckDate) finalData.pendingCheckDate = now;
-                if (newIdx >= flow.indexOf(RecordStatus.CHECKED) && !finalData.checkedDate && !explicitCleared.checkedDate) finalData.checkedDate = now;
+                if (newIdx >= flow.indexOf(RecordStatus.PENDING_CHECK) && !finalData.checkedDate && !explicitCleared.checkedDate) finalData.checkedDate = now;
                 if (newIdx >= flow.indexOf(RecordStatus.PENDING_SIGN) && !finalData.submissionDate && !explicitCleared.submissionDate) finalData.submissionDate = now;
                 if (newIdx >= flow.indexOf(RecordStatus.SIGNED) && !finalData.approvalDate && !explicitCleared.approvalDate) finalData.approvalDate = now;
             }
@@ -373,11 +372,11 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
     if (finalData.status) {
         if (explicitCleared.submissionDate || (!finalData.submissionDate && initialData?.submissionDate)) {
             if ([RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER].includes(finalData.status)) {
-                finalData.status = finalData.checkedDate ? RecordStatus.CHECKED : (finalData.assignedDate ? RecordStatus.ASSIGNED : RecordStatus.RECEIVED);
+                finalData.status = finalData.checkedDate ? RecordStatus.PENDING_CHECK : (finalData.assignedDate ? RecordStatus.ASSIGNED : RecordStatus.RECEIVED);
             }
         }
         if (explicitCleared.checkedDate || (!finalData.checkedDate && initialData?.checkedDate)) {
-            if ([RecordStatus.CHECKED, RecordStatus.PENDING_CHECK, RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER].includes(finalData.status)) {
+            if ([RecordStatus.PENDING_CHECK, RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER].includes(finalData.status)) {
                 finalData.status = finalData.assignedDate ? RecordStatus.ASSIGNED : RecordStatus.RECEIVED;
             }
         }

@@ -112,7 +112,10 @@ export const useRecordFilter = (
         // Filter for TEAM_LEADER by managed wards in professional/measurement tab
         const isMeasurementViewTab = [
             'all_records', 'assign_tasks', 'completed_list', 
-            'pending_check_list', 'check_list', 'handover_list', 'director_completed'
+            'pending_check_list', 'check_list', 'handover_list', 'director_completed',
+            'other_records', 'other_assign_tasks', 'other_completed_list', 
+            'other_pending_check_list', 'other_check_list', 'other_handover_list', 'other_director_completed',
+            'registration_records'
         ].includes(currentView);
 
         if (currentUser && currentUser.role === UserRole.TEAM_LEADER && isMeasurementViewTab) {
@@ -134,10 +137,10 @@ export const useRecordFilter = (
             } else {
                 result = result.filter(r => r.status === RecordStatus.PENDING_SIGN);
             }
-        } else if (currentView === 'pending_check_list' || currentView === 'archive_pending_check_list') {
+        } else if (currentView === 'pending_check_list' || currentView === 'archive_pending_check_list' || currentView === 'other_pending_check_list') {
             // Tab Kiểm tra: Hiển thị hồ sơ Chờ kiểm tra
             result = result.filter(r => r.status === RecordStatus.PENDING_CHECK);
-        } else if (currentView === 'completed_list' || currentView === 'archive_completed_list') {
+        } else if (currentView === 'completed_list' || currentView === 'archive_completed_list' || currentView === 'other_completed_list') {
             result = result.filter(r => r.status === RecordStatus.ASSIGNED || r.status === RecordStatus.IN_PROGRESS);
         } else if (currentView === 'director_completed' || currentView === 'other_director_completed' || currentView === 'archive_director_completed') {
             result = result.filter(r => r.submittedTo === currentUser?.employeeId && r.status !== RecordStatus.PENDING_SIGN && r.status !== RecordStatus.RECEIVED && r.status !== RecordStatus.ASSIGNED && r.status !== RecordStatus.IN_PROGRESS);
@@ -182,7 +185,7 @@ export const useRecordFilter = (
         }
 
         // Filter by recordType based on view group
-        const isOtherView = ['other_records', 'other_assign_tasks', 'other_completed_list', 'other_pending_check_list', 'other_check_list', 'other_handover_list', 'registration_records'].includes(currentView);
+        const isOtherView = ['other_records', 'other_assign_tasks', 'other_completed_list', 'other_pending_check_list', 'other_check_list', 'other_handover_list', 'other_director_completed', 'registration_records'].includes(currentView);
         const isArchiveMeasurementView = ['archive_records', 'archive_assign_tasks', 'archive_completed_list', 'archive_pending_check_list', 'archive_check_list', 'archive_handover_list', 'archive_director_completed'].includes(currentView);
         const isMeasurementView = ['all_records', 'assign_tasks', 'completed_list', 'pending_check_list', 'check_list', 'handover_list', 'director_completed'].includes(currentView);
         
@@ -192,12 +195,10 @@ export const useRecordFilter = (
                 result = result.filter(r => getShortRecordType(r.recordType) === filterRecordType);
             }
         } else if (isOtherView) {
-            result = result.filter(r => {
-                const shortType = getShortRecordType(r.recordType);
-                if (isArchiveRecordType(r.recordType)) return false;
-                if (shortType.startsWith('2.')) return false;
-                return true;
-            });
+            result = result.filter(r => isCapGiayRecord(r));
+            if (filterRecordType !== 'all') {
+                result = result.filter(r => getShortRecordType(r.recordType) === filterRecordType || r.recordType === filterRecordType);
+            }
         } else if (isMeasurementView) {
             result = result.filter(r => {
                 if (isArchiveRecordType(r.recordType)) return false;
@@ -333,9 +334,7 @@ export const useRecordFilter = (
                 if (isArchiveMeasurementView) {
                     if (!isArchiveRecordType(r.recordType)) return;
                 } else if (isOtherView) {
-                    const shortType = getShortRecordType(r.recordType);
-                    if (isArchiveRecordType(r.recordType)) return;
-                    if (shortType.startsWith('2.')) return;
+                    if (!isCapGiayRecord(r)) return;
                 } else if (isMeasurementView) {
                     if (isArchiveRecordType(r.recordType)) return;
                     if (isCapGiayRecord(r)) return;

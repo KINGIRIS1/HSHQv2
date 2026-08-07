@@ -356,12 +356,12 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
                     explicitStatus = RecordStatus.ASSIGNED;
                 } else if (sStr.includes('ĐANG') || sStr.includes('PROGRESS')) {
                     explicitStatus = RecordStatus.IN_PROGRESS;
-                } else if (sStr.includes('ĐÃ THỰC HIỆN') || sStr.includes('THỰC HIỆN XONG') || sStr.includes('COMPLETED_WORK') || sStr.includes('ĐO ĐẠC XONG')) {
-                    explicitStatus = RecordStatus.COMPLETED_WORK;
+                } else if (sStr.includes('ĐÃ THỰC HIỆN') || sStr.includes('THỰC HIỆN XONG') || sStr.includes('IN_PROGRESS') || sStr.includes('ĐO ĐẠC XONG')) {
+                    explicitStatus = RecordStatus.IN_PROGRESS;
                 } else if (sStr.includes('CHỜ KIỂM TRA') || sStr.includes('PENDING_CHECK') || sStr.includes('TRÌNH KIỂM TRA')) {
                     explicitStatus = RecordStatus.PENDING_CHECK;
-                } else if (sStr.includes('ĐÃ KIỂM TRA') || sStr.includes('CHECKED') || sStr.includes('ĐÃ KT')) {
-                    explicitStatus = RecordStatus.CHECKED;
+                } else if (sStr.includes('ĐÃ KIỂM TRA') || sStr.includes('PENDING_CHECK') || sStr.includes('ĐÃ KT')) {
+                    explicitStatus = RecordStatus.PENDING_CHECK;
                 } else if (sStr.includes('CHỜ KÝ') || sStr.includes('PENDING_SIGN') || sStr.includes('TRÌNH KÝ')) {
                     explicitStatus = RecordStatus.PENDING_SIGN;
                 } else if (sStr.includes('ĐÃ KÝ') || sStr.includes('SIGNED') || sStr.includes('KÝ DUYỆT')) {
@@ -391,7 +391,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
                 if (matchedEmpId) {
                     if (explicitStatus === RecordStatus.PENDING_SIGN || explicitStatus === RecordStatus.SIGNED) {
                         record.submittedTo = matchedEmpId;
-                    } else if (explicitStatus === RecordStatus.CHECKED || explicitStatus === RecordStatus.PENDING_CHECK) {
+                    } else if (explicitStatus === RecordStatus.PENDING_CHECK) {
                         record.checkedBy = matchedEmpId;
                     } else if (explicitStatus === RecordStatus.ASSIGNED || explicitStatus === RecordStatus.IN_PROGRESS || explicitStatus === RecordStatus.RECEIVED) {
                         record.assignedTo = matchedEmpId;
@@ -408,13 +408,12 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
                     record.approvalDate = parsedGeneralDate || record.approvalDate || targetDate;
                 } else if (explicitStatus === RecordStatus.PENDING_SIGN) {
                     record.submissionDate = parsedGeneralDate || record.submissionDate || targetDate;
-                } else if (explicitStatus === RecordStatus.CHECKED) {
-                    record.checkedDate = parsedGeneralDate || record.checkedDate || targetDate;
                 } else if (explicitStatus === RecordStatus.PENDING_CHECK) {
+                    record.checkedDate = parsedGeneralDate || record.checkedDate || targetDate;
                     record.pendingCheckDate = parsedGeneralDate || record.pendingCheckDate || targetDate;
-                } else if (explicitStatus === RecordStatus.COMPLETED_WORK) {
+                } else if (explicitStatus === RecordStatus.IN_PROGRESS) {
                     record.completedWorkDate = parsedGeneralDate || record.completedWorkDate || targetDate;
-                } else if (explicitStatus === RecordStatus.ASSIGNED || explicitStatus === RecordStatus.IN_PROGRESS) {
+                } else if (explicitStatus === RecordStatus.ASSIGNED) {
                     record.assignedDate = parsedGeneralDate || record.assignedDate || targetDate;
                 }
             } else {
@@ -435,13 +434,13 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
                     record.status = RecordStatus.PENDING_SIGN;
                     if (matchedEmpId) record.submittedTo = matchedEmpId;
                 } else if (record.checkedDate) {
-                    record.status = RecordStatus.CHECKED;
+                    record.status = RecordStatus.PENDING_CHECK;
                     if (matchedEmpId) record.checkedBy = matchedEmpId;
                 } else if (record.pendingCheckDate) {
                     record.status = RecordStatus.PENDING_CHECK;
                     if (matchedEmpId) record.checkedBy = matchedEmpId;
                 } else if (record.completedWorkDate) {
-                    record.status = RecordStatus.COMPLETED_WORK;
+                    record.status = RecordStatus.IN_PROGRESS;
                     if (matchedEmpId) record.assignedTo = matchedEmpId;
                 } else if (matchedEmpId || assignedDateRaw) {
                     record.status = RecordStatus.ASSIGNED;

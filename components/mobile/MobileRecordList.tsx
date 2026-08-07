@@ -71,7 +71,7 @@ const MobileRecordList: React.FC<MobileRecordListProps> = ({
       case RecordStatus.RECEIVED: return 'bg-blue-100 text-blue-700 border-blue-200';
       case RecordStatus.ASSIGNED: return 'bg-orange-100 text-orange-700 border-orange-200';
       case RecordStatus.IN_PROGRESS: return 'bg-yellow-100 text-yellow-700 border-yellow-200';
-      case RecordStatus.COMPLETED_WORK: return 'bg-purple-100 text-purple-700 border-purple-200';
+      case RecordStatus.IN_PROGRESS: return 'bg-purple-100 text-purple-700 border-purple-200';
       case RecordStatus.PENDING_SIGN: return 'bg-pink-100 text-pink-700 border-pink-200';
       case RecordStatus.SIGNED: return 'bg-indigo-100 text-indigo-700 border-indigo-200';
       case RecordStatus.HANDOVER: return 'bg-green-100 text-green-700 border-green-200';

@@ -52,9 +52,9 @@ export const migrateCungCapTaiLieu = async () => {
             // Đồng bộ chuyển đổi trạng thái bản ghi tương thích
             let status = 'RECEIVED';
             if (r.status === 'assigned') status = 'ASSIGNED';
-            else if (r.status === 'executed') status = 'COMPLETED_WORK';
+            else if (r.status === 'executed') status = 'IN_PROGRESS';
             else if (r.status === 'pending_check') status = 'PENDING_CHECK';
-            else if (r.status === 'checked') status = 'CHECKED';
+            else if (r.status === 'checked') status = 'PENDING_CHECK';
             else if (r.status === 'pending_sign') status = 'PENDING_SIGN';
             else if (r.status === 'signed') status = 'SIGNED';
             else if (r.status === 'completed') status = 'RETURNED';

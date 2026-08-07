@@ -367,6 +367,9 @@ export const mapRecordFromDb = (item: any): any => {
     r.archiveHandoverDate = keepOnlyDate(val(r.archiveHandoverDate, r.archivehandoverdate, r.archive_handover_date));
     r.archiveHandoverBatch = val(r.archiveHandoverBatch, r.archivehandoverbatch, r.archive_handover_batch);
 
+    if (r.status === 'IN_PROGRESS' || r.status === 'completed_work') r.status = 'IN_PROGRESS';
+    if (r.status === 'PENDING_CHECK' || r.status === 'checked') r.status = 'PENDING_CHECK';
+
     return r;
 };
 

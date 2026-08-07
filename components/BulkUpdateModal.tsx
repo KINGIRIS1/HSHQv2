@@ -187,7 +187,7 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
                         >
                             <option value="">-- Chọn trạng thái mới --</option>
                             {Object.entries(STATUS_LABELS)
-                                .filter(([key]) => key !== RecordStatus.COMPLETED_WORK)
+                                .filter(([key]) => key !== RecordStatus.IN_PROGRESS)
                                 .map(([key, label]) => (
                                     <option key={key} value={key}>{label}</option>
                                 ))}

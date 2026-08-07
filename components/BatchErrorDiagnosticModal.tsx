@@ -128,7 +128,7 @@ export const BatchErrorDiagnosticModal: React.FC<BatchErrorDiagnosticModalProps>
 
       // MẢNG 3: Kiểm tra & Trình ký
       if (
-        (r.status === RecordStatus.CHECKED ||
+        (r.status === RecordStatus.PENDING_CHECK ||
           r.status === RecordStatus.PENDING_SIGN ||
           r.status === RecordStatus.SIGNED) &&
         (!r.checkedBy || !r.checkedBy.trim())
@@ -146,7 +146,7 @@ export const BatchErrorDiagnosticModal: React.FC<BatchErrorDiagnosticModalProps>
       }
 
       if (
-        (r.status === RecordStatus.CHECKED ||
+        (r.status === RecordStatus.PENDING_CHECK ||
           r.status === RecordStatus.PENDING_SIGN) &&
         !r.pendingCheckDate &&
         !r.checkedDate
@@ -164,7 +164,7 @@ export const BatchErrorDiagnosticModal: React.FC<BatchErrorDiagnosticModalProps>
       }
 
       if (
-        (r.status === RecordStatus.COMPLETED_WORK ||
+        (r.status === RecordStatus.IN_PROGRESS ||
           r.status === RecordStatus.PENDING_CHECK) &&
         !r.completedWorkDate
       ) {
@@ -198,8 +198,7 @@ export const BatchErrorDiagnosticModal: React.FC<BatchErrorDiagnosticModalProps>
       // MẢNG 4: Phân công & Nhân sự
       if (
         (r.status === RecordStatus.ASSIGNED ||
-          r.status === RecordStatus.IN_PROGRESS ||
-          r.status === RecordStatus.COMPLETED_WORK) &&
+          r.status === RecordStatus.IN_PROGRESS) &&
         (!r.assignedTo || !r.assignedTo.trim())
       ) {
         errors.push({

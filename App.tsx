@@ -465,7 +465,7 @@ function App() {
               updates.exportDate = null;
               break;
           // MỚI: Trạng thái Đã thực hiện
-          case RecordStatus.COMPLETED_WORK:
+          case RecordStatus.IN_PROGRESS:
               // Giữ nguyên assignedDate
               updates.completedWorkDate = targetDateStr;
               updates.pendingCheckDate = null;
@@ -482,7 +482,7 @@ function App() {
               updates.completedDate = null;
               updates.resultReturnedDate = null;
               break;
-          case RecordStatus.CHECKED:
+          case RecordStatus.PENDING_CHECK:
               updates.checkedDate = targetDateStr;
               updates.submissionDate = null;
               updates.approvalDate = null;
@@ -534,7 +534,6 @@ function App() {
           RecordStatus.ASSIGNED,
           RecordStatus.IN_PROGRESS,
           RecordStatus.PENDING_CHECK,
-          RecordStatus.CHECKED,
           RecordStatus.PENDING_SIGN,
           RecordStatus.SIGNED,
           RecordStatus.HANDOVER,
@@ -556,18 +555,18 @@ function App() {
                   recordUpdates = { ...getUpdatesForStatusChange(value as RecordStatus, targetDateStr) };
                   recordUpdates.statusLogs = createStatusLog(r, value, 'Cập nhật trạng thái hàng loạt');
 
-                  if (value === RecordStatus.PENDING_CHECK || value === RecordStatus.CHECKED) {
+                  if (value === RecordStatus.PENDING_CHECK || value === RecordStatus.PENDING_CHECK) {
                       if (!r.checkedBy && currentUser?.employeeId) recordUpdates.checkedBy = currentUser.employeeId;
                   } else if (value === RecordStatus.PENDING_SIGN || value === RecordStatus.SIGNED) {
                       if (!r.submittedTo && currentUser?.employeeId) recordUpdates.submittedTo = currentUser.employeeId;
                   }
 
-                  if (value === RecordStatus.COMPLETED_WORK) {
+                  if (value === RecordStatus.IN_PROGRESS) {
                       if (!r.assignedDate) recordUpdates.assignedDate = targetDateStr;
                   } else if (value === RecordStatus.PENDING_CHECK) {
                       if (!r.assignedDate) recordUpdates.assignedDate = targetDateStr;
                       if (!r.completedWorkDate) recordUpdates.completedWorkDate = targetDateStr;
-                  } else if (value === RecordStatus.CHECKED) {
+                  } else if (value === RecordStatus.PENDING_CHECK) {
                       if (!r.assignedDate) recordUpdates.assignedDate = targetDateStr;
                       if (!r.completedWorkDate) recordUpdates.completedWorkDate = targetDateStr;
                       if (!r.pendingCheckDate) recordUpdates.pendingCheckDate = targetDateStr;
@@ -682,7 +681,6 @@ function App() {
               RecordStatus.ASSIGNED,
               RecordStatus.IN_PROGRESS,
               RecordStatus.PENDING_CHECK,
-              RecordStatus.CHECKED,
               RecordStatus.PENDING_SIGN,
               RecordStatus.SIGNED,
               RecordStatus.HANDOVER,
@@ -698,7 +696,7 @@ function App() {
           updates = getUpdatesForStatusChange(value as RecordStatus);
           updates.statusLogs = createStatusLog(record, value, 'Cập nhật trạng thái nhanh');
 
-          if (value === RecordStatus.PENDING_CHECK || value === RecordStatus.CHECKED) {
+          if (value === RecordStatus.PENDING_CHECK || value === RecordStatus.PENDING_CHECK) {
               if (!record.checkedBy && currentUser?.employeeId) updates.checkedBy = currentUser.employeeId;
           } else if (value === RecordStatus.PENDING_SIGN || value === RecordStatus.SIGNED) {
               if (!record.submittedTo && currentUser?.employeeId) updates.submittedTo = currentUser.employeeId;
@@ -713,13 +711,13 @@ function App() {
           
           if (value === RecordStatus.REJECTED || value === RecordStatus.WITHDRAWN) {
               updates.completedDate = record.completedDate || nowStr;
-              const flow = [RecordStatus.RECEIVED, RecordStatus.ASSIGNED, RecordStatus.IN_PROGRESS, RecordStatus.COMPLETED_WORK, RecordStatus.PENDING_CHECK, RecordStatus.CHECKED, RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER];
+              const flow = [RecordStatus.RECEIVED, RecordStatus.ASSIGNED, RecordStatus.IN_PROGRESS, RecordStatus.PENDING_CHECK, RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER];
               const prevIdx = flow.indexOf(record.status);
               if (prevIdx >= 0) {
                   if (prevIdx >= flow.indexOf(RecordStatus.ASSIGNED) && !record.assignedDate) updates.assignedDate = nowStr;
-                  if (prevIdx >= flow.indexOf(RecordStatus.COMPLETED_WORK) && !record.completedWorkDate) updates.completedWorkDate = nowStr;
+                  if (prevIdx >= flow.indexOf(RecordStatus.IN_PROGRESS) && !record.completedWorkDate) updates.completedWorkDate = nowStr;
                   if (prevIdx >= flow.indexOf(RecordStatus.PENDING_CHECK) && !record.pendingCheckDate) updates.pendingCheckDate = nowStr;
-                  if (prevIdx >= flow.indexOf(RecordStatus.CHECKED) && !record.checkedDate) updates.checkedDate = nowStr;
+                  if (prevIdx >= flow.indexOf(RecordStatus.PENDING_CHECK) && !record.checkedDate) updates.checkedDate = nowStr;
                   if (prevIdx >= flow.indexOf(RecordStatus.PENDING_SIGN) && !record.submissionDate) updates.submissionDate = nowStr;
                   if (prevIdx >= flow.indexOf(RecordStatus.SIGNED) && !record.approvalDate) updates.approvalDate = nowStr;
               }
@@ -870,13 +868,13 @@ function App() {
           setIsSubmitCheckModalOpen(true);
           return;
       }
-      if (record.status === RecordStatus.PENDING_CHECK || record.status === RecordStatus.CHECKED || record.status === RecordStatus.COMPLETED_WORK) {
+      if (record.status === RecordStatus.PENDING_CHECK || (record.status as any) === RecordStatus.IN_PROGRESS) {
           // Đi thẳng sang trình ký (bỏ qua bước trung gian là đã kiểm tra)
           setSubmitTargetRecords([record]);
           setIsSubmitModalOpen(true);
           return;
       }
-      const flow = [RecordStatus.RECEIVED, RecordStatus.ASSIGNED, RecordStatus.IN_PROGRESS, RecordStatus.COMPLETED_WORK, RecordStatus.PENDING_CHECK, RecordStatus.CHECKED, RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER];
+      const flow = [RecordStatus.RECEIVED, RecordStatus.ASSIGNED, RecordStatus.IN_PROGRESS, RecordStatus.PENDING_CHECK, RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER];
       const idx = flow.indexOf(record.status);
       if (idx < flow.length - 1) {
           const nextStatus = flow[idx + 1];
@@ -982,16 +980,16 @@ function App() {
           const nowStr = new Date().toISOString();
           const targets = records.filter(r => selectedRecordIds.has(r.id));
           
-          const flow = [RecordStatus.RECEIVED, RecordStatus.ASSIGNED, RecordStatus.IN_PROGRESS, RecordStatus.COMPLETED_WORK, RecordStatus.PENDING_CHECK, RecordStatus.CHECKED, RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER];
+          const flow = [RecordStatus.RECEIVED, RecordStatus.ASSIGNED, RecordStatus.IN_PROGRESS, RecordStatus.PENDING_CHECK, RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER];
 
           const updatesToApply = targets.map(r => {
              const updates: any = { status: RecordStatus.REJECTED, completedDate: r.completedDate || nowStr };
              const prevIdx = flow.indexOf(r.status);
              if (prevIdx >= 0) {
                  if (prevIdx >= flow.indexOf(RecordStatus.ASSIGNED) && !r.assignedDate) updates.assignedDate = nowStr;
-                 if (prevIdx >= flow.indexOf(RecordStatus.COMPLETED_WORK) && !r.completedWorkDate) updates.completedWorkDate = nowStr;
+                 if (prevIdx >= flow.indexOf(RecordStatus.IN_PROGRESS) && !r.completedWorkDate) updates.completedWorkDate = nowStr;
                  if (prevIdx >= flow.indexOf(RecordStatus.PENDING_CHECK) && !r.pendingCheckDate) updates.pendingCheckDate = nowStr;
-                 if (prevIdx >= flow.indexOf(RecordStatus.CHECKED) && !r.checkedDate) updates.checkedDate = nowStr;
+                 if (prevIdx >= flow.indexOf(RecordStatus.PENDING_CHECK) && !r.checkedDate) updates.checkedDate = nowStr;
                  if (prevIdx >= flow.indexOf(RecordStatus.PENDING_SIGN) && !r.submissionDate) updates.submissionDate = nowStr;
                  if (prevIdx >= flow.indexOf(RecordStatus.SIGNED) && !r.approvalDate) updates.approvalDate = nowStr;
              }

@@ -485,7 +485,7 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
         switch(s) {
             case 'draft': return RecordStatus.RECEIVED;
             case 'assigned': return RecordStatus.ASSIGNED;
-            case 'executed': return RecordStatus.COMPLETED_WORK;
+            case 'executed': return RecordStatus.IN_PROGRESS;
             case 'pending_sign': return RecordStatus.PENDING_SIGN;
             case 'signed': return RecordStatus.SIGNED;
             case 'completed': return RecordStatus.RETURNED;
