@@ -739,27 +739,7 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                 formatDate={formatDate}
               />
 
-              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex items-center gap-4 mt-2">
-                <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-slate-500 shadow-2xs">
-                  <UserIcon size={20} />
-                </div>
-                <div>
-                  <p className="text-[10px] text-slate-400 font-bold uppercase">Nhân viên xử lý</p>
-                  <p className="text-xs font-bold text-slate-800">{getEmployeeName(record.assignedTo)}</p>
-                </div>
-              </div>
 
-              {(record.status === RecordStatus.PENDING_CHECK || record.status === RecordStatus.CHECKED) && (
-                <div className="bg-orange-50/60 p-4 rounded-2xl border border-orange-100 flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-orange-500 shadow-2xs">
-                    <UserIcon size={20} />
-                  </div>
-                  <div>
-                    <p className="text-[10px] text-orange-500 font-bold uppercase">Người kiểm tra</p>
-                    <p className="text-xs font-bold text-orange-800">{getEmployeeName(record.checkedBy)}</p>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         )}

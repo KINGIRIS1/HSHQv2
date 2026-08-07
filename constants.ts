@@ -17,7 +17,7 @@ export const STATUS_LABELS: Record<RecordStatus, string> = {
   [RecordStatus.PENDING_CHECK]: 'Chờ kiểm tra',
   [RecordStatus.CHECKED]: 'Chờ kiểm tra',
   [RecordStatus.PENDING_SIGN]: 'Chờ ký duyệt',
-  [RecordStatus.SIGNED]: 'Chờ ký duyệt',
+  [RecordStatus.SIGNED]: 'Chờ bàn giao',
   [RecordStatus.HANDOVER]: 'Đã giao 1 cửa',
   [RecordStatus.RETURNED]: 'Đã trả kết quả',
   [RecordStatus.WITHDRAWN]: 'CSD rút hồ sơ',

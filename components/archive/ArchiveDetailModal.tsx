@@ -110,18 +110,7 @@ const ArchiveDetailModal: React.FC<ArchiveDetailModalProps> = ({ isOpen, onClose
                                 </div>
                             )}
 
-                            {/* NGƯỜI XỬ LÝ */}
-                            <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
-                                <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Người xử lý hồ sơ</label>
-                                <div className="flex items-center gap-3 bg-gray-50 p-3 rounded-lg border border-gray-100">
-                                    <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-500">
-                                        <UserIcon size={16}/>
-                                    </div>
-                                    <span className="font-bold text-sm text-gray-700">
-                                        {record.data?.assigned_to ? getEmployeeName(record.data.assigned_to) : 'Chưa giao'}
-                                    </span>
-                                </div>
-                            </div>
+
                         </div>
 
                         {/* COLUMN 2: CHI TIẾT */}

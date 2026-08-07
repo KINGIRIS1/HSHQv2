@@ -775,28 +775,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                         )}
                     </div>
 
-                    {/* NGƯỜI XỬ LÝ */}
-                    <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
-                        <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Người xử lý hồ sơ</label>
-                        <div className="flex items-center gap-3 bg-gray-50 p-3 rounded-lg border border-gray-100">
-                            <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-500">
-                                <UserIcon size={16}/>
-                            </div>
-                            <span className="font-bold text-sm text-gray-700">{getEmployeeName(record.assignedTo)}</span>
-                        </div>
 
-                        {record.status === RecordStatus.PENDING_CHECK || record.status === RecordStatus.CHECKED ? (
-                            <div className="mt-4">
-                                <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Người kiểm tra</label>
-                                <div className="flex items-center gap-3 bg-orange-50 p-3 rounded-lg border border-orange-100">
-                                    <div className="w-8 h-8 rounded-full bg-orange-200 flex items-center justify-center text-orange-600">
-                                        <UserIcon size={16}/>
-                                    </div>
-                                    <span className="font-bold text-sm text-orange-800">{getEmployeeName(record.checkedBy)}</span>
-                                </div>
-                            </div>
-                        ) : null}
-                    </div>
 
                     {/* REMINDER */}
                     <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
