@@ -126,10 +126,10 @@ export const RejectReturnStepModal: React.FC<RejectReturnStepModalProps> = ({
                 <div className="flex-1">
                   <div className="flex items-center gap-1.5 font-bold text-sm text-amber-900">
                     <PauseCircle size={16} className="text-amber-600 shrink-0" />
-                    <span>1. Trả bổ sung (Dừng quy trình chờ dân bổ sung)</span>
+                    <span>1. Trả dừng quy trình (Chờ người dân bổ sung)</span>
                   </div>
                   <p className="text-xs text-amber-800/80 mt-0.5 leading-relaxed">
-                    Tạm dừng xử lý quy trình. Lưu lý do vào ghi chú nội bộ để theo dõi lỗi và dễ dàng tiếp nhận xử lý tiếp khi bổ sung xong.
+                    Tạm dừng xử lý quy trình. Hệ thống tự động ghi nhớ người thụ lý cũ để gợi ý phân công lại ngay khi nhận thông tin bổ sung.
                   </p>
                 </div>
               </label>
@@ -153,10 +153,10 @@ export const RejectReturnStepModal: React.FC<RejectReturnStepModalProps> = ({
                 <div className="flex-1">
                   <div className="flex items-center gap-1.5 font-bold text-sm text-rose-900">
                     <Ban size={16} className="text-rose-600 shrink-0" />
-                    <span>2. Trả hủy hồ sơ (Chuyển Bộ phận Một cửa)</span>
+                    <span>2. Trả hủy hồ sơ (Tạm dừng / Từ chối hoàn trả 1 cửa)</span>
                   </div>
                   <p className="text-xs text-rose-800/80 mt-0.5 leading-relaxed">
-                    Hủy hồ sơ/Từ chối thụ lý. Chấm dứt xử lý chuyên môn, lưu lý do vào ghi chú nội bộ để theo dõi và chuyển thông báo về 1 Cửa.
+                    Chuyển sang trạng thái Hồ sơ trả (REJECTED). Chấm dứt xử lý chuyên môn và thông báo kết quả trả về Bộ phận Một cửa.
                   </p>
                 </div>
               </label>

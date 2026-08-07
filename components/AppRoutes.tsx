@@ -998,6 +998,37 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                 </div>
               )}
 
+            {/* CẤP GIẤY SUB-STEP TABS (ĐẶT NGAY CẠNH NÚT MỞ/ĐÓNG LỌC - CHỈ HIỂN THỊ TRONG TAB CẤP GIẤY) */}
+            {(currentView === "other_completed_list" || currentView === "other_records") && (
+              <div className="flex items-center gap-1.5 overflow-x-auto border-l border-gray-300 pl-2">
+                <button
+                  onClick={() => props.setCapGiaySubStepFilter && props.setCapGiaySubStepFilter('all')}
+                  className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all whitespace-nowrap border cursor-pointer ${
+                    (!props.capGiaySubStepFilter || props.capGiaySubStepFilter === 'all')
+                      ? 'bg-slate-700 text-white border-slate-700 shadow-xs'
+                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  Tất cả bước
+                </button>
+                {CAP_GIAY_SUB_STEPS.map((step) => {
+                  const isActive = props.capGiaySubStepFilter === step.id;
+                  return (
+                    <button
+                      key={step.id}
+                      onClick={() => props.setCapGiaySubStepFilter && props.setCapGiaySubStepFilter(step.id)}
+                      className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all whitespace-nowrap border cursor-pointer ${
+                        isActive
+                          ? 'bg-teal-700 text-white border-teal-700 shadow-xs'
+                          : 'bg-white text-slate-700 border-slate-200 hover:bg-teal-50 hover:border-teal-300'
+                      }`}
+                    >
+                      {step.label}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
 
             {(currentView === "all_records" ||
               currentView === "other_records" ||

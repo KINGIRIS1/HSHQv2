@@ -802,7 +802,7 @@ function App() {
           return;
       }
 
-      if (record.status === RecordStatus.RECEIVED || !record.assignedTo) { 
+      if (record.status === RecordStatus.RECEIVED) { 
           setAssignTargetRecords([record]); 
           setIsAssignModalOpen(true); 
           return; 
@@ -810,30 +810,15 @@ function App() {
       if (record.status === RecordStatus.ASSIGNED || record.status === RecordStatus.IN_PROGRESS) {
           if (isCapGiayRecord(record)) {
               const currentSubStep = record.capGiaySubStep || 'tham_dinh';
+              let nextSubStep = '';
               if (currentSubStep === 'tham_dinh' || currentSubStep === 'tham_tra') {
-                  const targetSubStep = isTaxDefaultRecordType(record.recordType) ? 'phieu_chuyen_thue' : 'hoan_thien_trinh_duyet';
-                  setAssignTargetRecords([{ ...record, capGiaySubStep: targetSubStep }]);
-                  setIsAssignModalOpen(true);
-                  return;
+                  nextSubStep = isTaxDefaultRecordType(record.recordType) ? 'phieu_chuyen_thue' : 'hoan_thien_trinh_duyet';
               } else if (currentSubStep === 'phieu_chuyen_thue') {
-                  // Chuyển sang Chờ giấy nộp tiền: KHÔNG CẦN CHỌN NGƯỜI GIAO VIỆC (chuyển trạng thái tự động)
-                  const nextSubStep = 'cho_nop_thue';
-                  const subStepLabel = getCapGiaySubStepLabel(nextSubStep);
-                  const updates: Partial<RecordFile> = {
-                      capGiaySubStep: nextSubStep,
-                      statusLogs: createStatusLog(record, record.status, `Chuyển bước: ${subStepLabel}`)
-                  };
-                  setRecords(prev => prev.map(r => r.id === record.id ? { ...r, ...updates } : r));
-                  await updateRecordApi({ ...record, ...updates });
-                  setToast({ type: 'success', message: `Hồ sơ ${record.code} đã chuyển sang trạng thái ${subStepLabel}!` });
-                  return;
+                  nextSubStep = 'cho_nop_thue';
               } else if (currentSubStep === 'cho_nop_thue' || currentSubStep === 'cho_giay_nop_tien') {
-                  // Mở Modal giao việc cho bước In & Hoàn thiện
-                  setAssignTargetRecords([{ ...record, capGiaySubStep: 'hoan_thien_trinh_duyet' }]);
-                  setIsAssignModalOpen(true);
-                  return;
+                  nextSubStep = 'hoan_thien_trinh_duyet';
               } else if (currentSubStep === 'hoan_thien_trinh_duyet' || currentSubStep === 'in_hoan_thien') {
-                  // Đã hoàn thành In & Hoàn thiện -> Trình kiểm tra
+                  // Đã hoàn thành các bước nhỏ trong Đang thực hiện -> Trình kiểm tra
                   setSubmitTargetRecords([record]);
                   setIsSubmitCheckModalOpen(true);
                   return;
@@ -841,6 +826,29 @@ function App() {
                   // Fallback
                   setSubmitTargetRecords([record]);
                   setIsSubmitCheckModalOpen(true);
+                  return;
+              }
+
+              if (nextSubStep) {
+                  const subStepLabel = getCapGiaySubStepLabel(nextSubStep);
+                  const updates: Partial<RecordFile> = {
+                      capGiaySubStep: nextSubStep,
+                      statusLogs: createStatusLog(record, record.status, `Chuyển bước nhỏ: ${subStepLabel}`)
+                  };
+
+                  if (nextSubStep === 'hoan_thien_trinh_duyet' && (currentSubStep === 'cho_nop_thue' || currentSubStep === 'cho_giay_nop_tien')) {
+                      const nowStr = new Date().toISOString();
+                      const todayStr = nowStr.split('T')[0];
+                      const newDeadline = calculateDeadlineHelperByDays(5, todayStr, holidays || []);
+                      updates.status = RecordStatus.RECEIVED;
+                      updates.assignedTo = "";
+                      updates.deadline = newDeadline;
+                      updates.statusLogs = createStatusLog(record, record.status, 'Xác nhận đã nộp tiền thuế → Trả về bước giao việc (chờ phân công in & hoàn thiện, SLA 5 ngày)');
+                  }
+
+                  setRecords(prev => prev.map(r => r.id === record.id ? { ...r, ...updates } : r));
+                  await updateRecordApi({ ...record, ...updates });
+                  setToast({ type: 'success', message: `Hồ sơ ${record.code} đã xác nhận nộp thuế, đã trả về bước giao việc cho người in!` });
                   return;
               }
           }

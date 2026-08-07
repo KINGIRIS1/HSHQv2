@@ -178,11 +178,11 @@ export const calculateDeadlineHelper = (type: string, receivedDateStr: string, h
     let daysToAdd = 30; 
     const lowerType = (type || '').toLowerCase();
 
-    if (lowerType.includes('2.5') || lowerType.includes('tách-hợp') || lowerType.includes('tách - hợp') || lowerType.includes('2.2') || (lowerType.includes('trích đo') && !lowerType.includes('trích đo chỉnh lý'))) {
+    if (lowerType.includes('2.5') || lowerType.includes('tách-hợp') || lowerType.includes('tách - hợp')) {
         daysToAdd = 30;
     } else if (lowerType.includes('1.1') || lowerType.includes('1.2') || lowerType.includes('công văn') || lowerType.includes('cong van') || lowerType.includes('cung cấp tài liệu đất đai') || lowerType.includes('cung cấp dữ liệu') ||
-        lowerType.includes('quy hoạch') || 
-        lowerType.includes('2.6') || 
+        lowerType.includes('2.2') || lowerType.includes('quy hoạch') || 
+        lowerType.includes('2.6') || lowerType.includes('số thửa') || 
         lowerType.includes('2.1') || lowerType.includes('trích lục')) {
         daysToAdd = 10;
     } else if (lowerType.includes('3.2.1') || lowerType.includes('3.2.2') || lowerType.includes('3.5.1') || lowerType.includes('gia hạn') || (lowerType.includes('cấp đổi') && !lowerType.includes('trích đo'))) {
@@ -497,18 +497,15 @@ export function processAssignmentTimelineCheck(
     return `${day}/${month}/${year}`;
   };
 
-  const oldEmpId = record.assignedTo || record.lastAssignedTo;
-  const oldEmp = employees.find(e => e.id === oldEmpId);
+  const oldEmp = employees.find(e => e.id === record.assignedTo);
   const newEmp = employees.find(e => e.id === newEmployeeId);
 
-  const oldEmpName = oldEmp ? oldEmp.name : (oldEmpId || 'Chưa phân công');
+  const oldEmpName = oldEmp ? oldEmp.name : (record.assignedTo || 'Chưa phân công');
   const newEmpName = newEmp ? newEmp.name : newEmployeeId;
-
-  const isEmployeeChanged = !!(record.assignedTo && record.assignedTo !== newEmployeeId);
 
   // List previous milestones
   const historyParts: string[] = [];
-  if (record.assignedDate && record.assignedTo) {
+  if (record.assignedDate) {
     historyParts.push(`Giao NV ${oldEmpName} ngày ${formatDateVN(record.assignedDate)}`);
   }
   if (record.completedWorkDate) {
@@ -554,13 +551,9 @@ export function processAssignmentTimelineCheck(
     if (oldCheckDate && newDate > oldCheckDate) isLaterDate = true;
   }
 
-  const firstProcessor = record.initialAssignedTo || record.assignedTo || newEmployeeId;
-
   const updates: Partial<RecordFile> = {
-    initialAssignedTo: firstProcessor,
     assignedTo: newEmployeeId,
-    assignedDate: (record.status === RecordStatus.RECEIVED || isEmployeeChanged) ? newAssignedDateStr : (record.assignedDate || newAssignedDateStr),
-    lastAssignedTo: record.assignedTo || record.lastAssignedTo || newEmployeeId
+    assignedDate: record.assignedDate || newAssignedDateStr,
   };
   if (record.status === RecordStatus.RECEIVED) {
     updates.status = RecordStatus.IN_PROGRESS;
@@ -572,16 +565,21 @@ export function processAssignmentTimelineCheck(
     updates.handoverWard = firstWard;
   }
 
-  // Preserve history logs in statusLogs without polluting privateNotes or erasing previous step fields
-  if (historyParts.length > 0 || isEmployeeChanged) {
+  if (hasSubsequentSteps || isLaterDate || historyParts.length > 0) {
+    const logNote = `Giao NV ${oldEmpName} ngày ${formatDateVN(record.assignedDate) || 'trước đó'}${record.submissionDate ? `, Trình ký ngày ${formatDateVN(record.submissionDate)}` : ''}`;
+    const fullInternalNote = `Cập nhật lại đã giao việc ngày ${formatDateVN(newAssignedDateStr)} (${newEmpName}). Đưa về bước Đang thực hiện. Ghi chú nội bộ: ${logNote} để biết và truy vết.`;
+
+    const existingPrivate = record.privateNotes || '';
+    updates.privateNotes = existingPrivate ? `${existingPrivate}\n${fullInternalNote}` : fullInternalNote;
+
     const newLog = {
       id: `${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
       recordId: record.id,
       previousStatus: record.status,
-      newStatus: record.status === RecordStatus.RECEIVED ? RecordStatus.IN_PROGRESS : record.status,
+      newStatus: RecordStatus.IN_PROGRESS,
       changedBy: currentUser?.name || 'Hệ thống',
       changedAt: new Date().toISOString(),
-      note: `Giao việc cho NV [${newEmpName}] ngày ${formatDateVN(newAssignedDateStr)}`
+      note: fullInternalNote
     };
     updates.statusLogs = [...(record.statusLogs || []), newLog];
   }
@@ -590,7 +588,8 @@ export function processAssignmentTimelineCheck(
     updates.data = {
       ...record.data,
       assigned_to: newEmployeeId,
-      ngay_giao: updates.assignedDate || newAssignedDateStr
+      ngay_giao: newAssignedDateStr,
+      ghi_chu_noi_bo: updates.privateNotes || record.data.ghi_chu_noi_bo
     };
   }
 

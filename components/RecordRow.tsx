@@ -296,12 +296,44 @@ const RecordRow: React.FC<RecordRowProps> = ({
               <div className="transform origin-top pt-1 flex flex-col items-center">
                   <StatusBadge status={displayStatus} />
                   
-                  {/* HIỂN THỊ TRẠNG THÁI BƯỚC DÀNH RIÊNG CHO HỒ SƠ CẤP GIẤY */}
+                  {/* HIỂN THỊ / CHỌN BƯỚC NHỎ DÀNH RIÊNG CHO HỒ SƠ CẤP GIẤY */}
                   {isCapGiayRecord(record) && (
                     <div className="mt-1 flex flex-col items-center gap-1">
-                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${getCapGiaySubStepBadgeColor(record.capGiaySubStep)}`}>
-                        {getCapGiaySubStepLabel(record.capGiaySubStep)}
-                      </span>
+                      {canPerformAction ? (
+                        <select
+                          value={record.capGiaySubStep || 'tham_dinh'}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            onQuickUpdate(record.id, 'capGiaySubStep', e.target.value);
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          className={`text-[11px] font-bold px-1.5 py-0.5 rounded border outline-none cursor-pointer transition-colors shadow-2xs ${getCapGiaySubStepBadgeColor(record.capGiaySubStep)}`}
+                          title="Chuyển bước nhỏ Cấp giấy"
+                        >
+                          <option value="tham_dinh">Thẩm tra</option>
+                          <option value="phieu_chuyen_thue">Chuyển thuế</option>
+                          <option value="cho_nop_thue">Chờ nộp thuế</option>
+                          <option value="hoan_thien_trinh_duyet">In & Hoàn thiện</option>
+                        </select>
+                      ) : (
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${getCapGiaySubStepBadgeColor(record.capGiaySubStep)}`}>
+                          {getCapGiaySubStepLabel(record.capGiaySubStep)}
+                        </span>
+                      )}
+
+                      {(record.capGiaySubStep === 'cho_nop_thue' || record.capGiaySubStep === 'cho_giay_nop_tien') && canPerformAction && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onQuickUpdate(record.id, 'capGiaySubStep', 'hoan_thien_trinh_duyet');
+                          }}
+                          className="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10px] font-black shadow-xs transition-all flex items-center gap-1 active:scale-95 cursor-pointer"
+                          title="Xác nhận người dân đã nộp tiền thuế -> Chuyển In & Hoàn thiện"
+                        >
+                          <Check size={12} className="stroke-[3]" />
+                          <span>Đã nộp thuế</span>
+                        </button>
+                      )}
                     </div>
                   )}
               </div>
@@ -364,12 +396,6 @@ const RecordRow: React.FC<RecordRowProps> = ({
                 const isCG = isCapGiayRecord(record);
                 const isReturnedOrRejected = record.status === RecordStatus.REJECTED || record.status === RecordStatus.RETURNED || displayStatus === RecordStatus.REJECTED || displayStatus === RecordStatus.RETURNED || record.capGiaySubStep === 'cho_bo_sung';
                 const isTaxWaiting = isCG && (record.capGiaySubStep === 'cho_nop_thue' || record.capGiaySubStep === 'cho_giay_nop_tien');
-                const isOneDoorUser = currentUser?.role === UserRole.ONEDOOR || currentUser?.role === 'ONEDOOR';
-
-                // Đối với tài khoản Một Cửa (ONEDOOR): Chỉ cho phép bấm chuyển bước khi hồ sơ thuộc trạng thái Bổ sung hoặc Chờ nộp thuế
-                if (isOneDoorUser && !isReturnedOrRejected && !isTaxWaiting) {
-                  return null;
-                }
                 
                 if (isReturnedOrRejected) {
                   return (
