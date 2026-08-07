@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { RecordFile, RecordStatus, Employee, UserRole } from '../types';
-import { getNormalizedWard, getShortRecordType, getWardLabel, isCapGiayRecord, getCapGiaySubStepLabel, getCapGiaySubStepBadgeColor } from '../constants';
+import { getNormalizedWard, getShortRecordType, getWardLabel, isCapGiayRecord, getCapGiaySubStepLabel, getCapGiaySubStepBadgeColor, isArchiveRecordType } from '../constants';
 import { isRecordOverdue, isRecordApproaching, toTitleCase, formatBatchName, getBatchDisplayParts } from '../utils/appHelpers';
 import { hasUserPermission } from '../config/roleConfig';
 import StatusBadge from './StatusBadge';
@@ -73,7 +73,10 @@ const RecordRow: React.FC<RecordRowProps> = ({
   React.useEffect(() => { setLocalMsr(record.measurementNumber || ""); }, [record.measurementNumber]);
   React.useEffect(() => { setLocalExc(record.excerptNumber || ""); }, [record.excerptNumber]);
   React.useEffect(() => { setLocalRec(record.receiptNumber || ""); }, [record.receiptNumber]);
-  const normalizeName = (str: string) => str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+  const normalizeName = (str: any) => {
+    if (!str) return "";
+    return String(str).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+  };
   
   const getCurrentHandlerInfo = (r: RecordFile) => {
       let handlerId = r.assignedTo;
@@ -87,12 +90,12 @@ const RecordRow: React.FC<RecordRowProps> = ({
           handlerDate = r.pendingCheckDate || r.assignedDate;
       }
       
-      const emp = employees.find(e => 
+      const emp = Array.isArray(employees) ? employees.find(e => 
           e.id === handlerId || 
           (e as any).employeeId === handlerId || 
           e.name === handlerId ||
           (handlerId && normalizeName(e.name) === normalizeName(handlerId))
-      );
+      ) : undefined;
       const name = emp ? emp.name : handlerId;
       return { name, date: handlerDate };
   };
