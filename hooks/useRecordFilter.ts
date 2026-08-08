@@ -129,31 +129,46 @@ export const useRecordFilter = (
             }
         }
 
+        // View-based filtering helper to get effective display status
+        const getEffectiveStatus = (r: RecordFile): RecordStatus => {
+            if (r.resultReturnedDate) return RecordStatus.RETURNED;
+            if ((r.exportBatch || r.exportDate) && r.status !== RecordStatus.WITHDRAWN && r.status !== RecordStatus.RETURNED && r.status !== RecordStatus.REJECTED) {
+                return RecordStatus.HANDOVER;
+            }
+            return r.status;
+        };
+
         // View-based filtering
         if (currentView === 'check_list' || currentView === 'other_check_list' || currentView === 'archive_check_list') {
             if (isDirector) {
                 // Giám đốc chỉ thấy hồ sơ trình cho mình
-                result = result.filter(r => r.status === RecordStatus.PENDING_SIGN && r.submittedTo === currentUser?.employeeId);
+                result = result.filter(r => getEffectiveStatus(r) === RecordStatus.PENDING_SIGN && r.submittedTo === currentUser?.employeeId);
             } else {
-                result = result.filter(r => r.status === RecordStatus.PENDING_SIGN);
+                result = result.filter(r => getEffectiveStatus(r) === RecordStatus.PENDING_SIGN);
             }
         } else if (currentView === 'pending_check_list' || currentView === 'archive_pending_check_list' || currentView === 'other_pending_check_list') {
             // Tab Kiểm tra: Hiển thị hồ sơ Chờ kiểm tra
-            result = result.filter(r => r.status === RecordStatus.PENDING_CHECK);
+            result = result.filter(r => getEffectiveStatus(r) === RecordStatus.PENDING_CHECK);
         } else if (currentView === 'completed_list' || currentView === 'archive_completed_list' || currentView === 'other_completed_list') {
-            result = result.filter(r => r.status === RecordStatus.ASSIGNED || r.status === RecordStatus.IN_PROGRESS || r.status === RecordStatus.PENDING_SUPPLEMENT);
+            result = result.filter(r => {
+                const s = getEffectiveStatus(r);
+                return s === RecordStatus.ASSIGNED || s === RecordStatus.IN_PROGRESS || s === RecordStatus.PENDING_SUPPLEMENT;
+            });
         } else if (currentView === 'director_completed' || currentView === 'other_director_completed' || currentView === 'archive_director_completed') {
-            result = result.filter(r => r.submittedTo === currentUser?.employeeId && r.status !== RecordStatus.PENDING_SIGN && r.status !== RecordStatus.RECEIVED && r.status !== RecordStatus.ASSIGNED && r.status !== RecordStatus.IN_PROGRESS);
+            result = result.filter(r => {
+                const s = getEffectiveStatus(r);
+                return r.submittedTo === currentUser?.employeeId && s !== RecordStatus.PENDING_SIGN && s !== RecordStatus.RECEIVED && s !== RecordStatus.ASSIGNED && s !== RecordStatus.IN_PROGRESS;
+            });
         } else if (currentView === 'handover_list' || currentView === 'other_handover_list' || currentView === 'archive_handover_list') {
             if (handoverTab === 'today') {
                 // Tab chờ bàn giao: Chỉ hồ sơ đã ký sẵn sàng bàn giao (SIGNED) hoặc (Đã rút/Hồ sơ trả chưa có đợt xuất)
-                result = result.filter(r => 
-                    r.status === RecordStatus.SIGNED || 
-                    ((r.status === RecordStatus.REJECTED || r.status === RecordStatus.WITHDRAWN) && !r.exportBatch)
-                );
+                result = result.filter(r => {
+                    const s = getEffectiveStatus(r);
+                    return (s === RecordStatus.SIGNED || ((s === RecordStatus.REJECTED || s === RecordStatus.WITHDRAWN) && !r.exportBatch)) && !r.exportBatch && !r.exportDate;
+                });
             } else if (handoverTab === 'returned') {
                 // Tab Đã trả kết quả: Status = RETURNED
-                result = result.filter(r => r.status === RecordStatus.RETURNED);
+                result = result.filter(r => getEffectiveStatus(r) === RecordStatus.RETURNED);
                 
                 // CẬP NHẬT: Lọc theo khoảng thời gian (Từ ngày - Đến ngày) thay vì 1 ngày
                 if (filterFromDate || filterToDate) {
@@ -167,11 +182,10 @@ export const useRecordFilter = (
                 }
             } else {
                 // Tab Chờ trả kết quả (history): Hồ sơ đã bàn giao 1 cửa (HANDOVER hoặc đã xuất đợt) và chưa trả kết quả dân
-                result = result.filter(r => 
-                    (r.status === RecordStatus.HANDOVER || 
-                    ((r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED) && r.exportBatch)) &&
-                    !r.resultReturnedDate
-                );
+                result = result.filter(r => {
+                    const s = getEffectiveStatus(r);
+                    return (s === RecordStatus.HANDOVER || ((r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED) && r.exportBatch)) && !r.resultReturnedDate;
+                });
                 // Giữ nguyên logic lọc ngày đơn cho Chờ trả kết quả (theo đợt)
                 if (filterDate) {
                     result = result.filter(r => {
@@ -181,7 +195,7 @@ export const useRecordFilter = (
                 }
             }
         } else if (currentView === 'assign_tasks' || currentView === 'other_assign_tasks' || currentView === 'archive_assign_tasks') {
-            result = result.filter(r => r.status === RecordStatus.RECEIVED);
+            result = result.filter(r => getEffectiveStatus(r) === RecordStatus.RECEIVED);
         }
 
         // Filter by recordType based on view group
@@ -232,9 +246,12 @@ export const useRecordFilter = (
         }
         if (filterStatus !== 'all' && currentView !== 'handover_list' && currentView !== 'other_handover_list' && currentView !== 'archive_handover_list') {
             if (filterStatus === RecordStatus.IN_PROGRESS || filterStatus === RecordStatus.ASSIGNED) {
-                result = result.filter(r => r.status === RecordStatus.IN_PROGRESS || r.status === RecordStatus.ASSIGNED);
+                result = result.filter(r => {
+                    const s = getEffectiveStatus(r);
+                    return s === RecordStatus.IN_PROGRESS || s === RecordStatus.ASSIGNED;
+                });
             } else {
-                result = result.filter(r => r.status === filterStatus);
+                result = result.filter(r => getEffectiveStatus(r) === filterStatus);
             }
         }
         if (filterEmployee !== 'all') {
@@ -332,7 +349,7 @@ export const useRecordFilter = (
             const isMeasurementView = ['all_records', 'assign_tasks', 'completed_list', 'pending_check_list', 'check_list', 'handover_list', 'director_completed'].includes(currentView);
 
             records.forEach(r => {
-                if (r.status === RecordStatus.HANDOVER || r.status === RecordStatus.WITHDRAWN) return; 
+                if (r.status === RecordStatus.HANDOVER || r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.RETURNED || r.exportBatch || r.exportDate || r.resultReturnedDate) return; 
                 if (!checkWarningPermission(r)) return; 
                 
                 // Filter by recordType based on view group

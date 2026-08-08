@@ -370,6 +370,12 @@ export const mapRecordFromDb = (item: any): any => {
     if (r.status === 'ASSIGNED' || r.status === 'assigned' || r.status === 'IN_PROGRESS' || r.status === 'completed_work' || r.status === 'executed') r.status = 'IN_PROGRESS';
     if (r.status === 'PENDING_CHECK' || r.status === 'checked') r.status = 'PENDING_CHECK';
 
+    if (r.resultReturnedDate && r.status !== 'RETURNED') {
+        r.status = 'RETURNED';
+    } else if ((r.exportBatch || r.exportDate) && r.status !== 'WITHDRAWN' && r.status !== 'RETURNED' && r.status !== 'REJECTED') {
+        r.status = 'HANDOVER';
+    }
+
     return r;
 };
 
