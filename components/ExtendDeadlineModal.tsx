@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { RecordFile, User, UserRole } from '../types';
-import { updateRecordApi } from '../services/api';
-import { CalendarClock, X, Loader2, Save } from 'lucide-react';
+import { RecordFile, User } from '../types';
+import { CalendarClock, X, Loader2, Save, AlertCircle } from 'lucide-react';
 
 interface ExtendDeadlineModalProps {
   isOpen: boolean;
   onClose: () => void;
-  record: RecordFile | null;
+  record?: RecordFile | null;
+  records?: RecordFile[];
   currentUser?: User | null;
+  onConfirm?: (extendDate: string, reason: string) => Promise<void>;
   onRefreshData?: () => void;
 }
 
@@ -15,21 +16,27 @@ export const ExtendDeadlineModal: React.FC<ExtendDeadlineModalProps> = ({
   isOpen,
   onClose,
   record,
+  records = [],
   currentUser,
-  onRefreshData
+  onConfirm
 }) => {
   const [extendDate, setExtendDate] = useState('');
   const [extendReason, setExtendReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+
+  const targetRecords = records.length > 0 ? records : (record ? [record] : []);
 
   useEffect(() => {
-    if (record) {
-      setExtendDate(record.deadline ? record.deadline.split('T')[0] : '');
+    if (isOpen && targetRecords.length > 0) {
+      const firstRec = targetRecords[0];
+      setExtendDate(firstRec.deadline ? firstRec.deadline.split('T')[0] : new Date().toISOString().split('T')[0]);
       setExtendReason('');
+      setErrorMsg('');
     }
-  }, [record, isOpen]);
+  }, [isOpen]);
 
-  if (!isOpen || !record) return null;
+  if (!isOpen || targetRecords.length === 0) return null;
 
   const formatDate = (dateStr?: string | null) => {
     if (!dateStr) return 'Chưa có';
@@ -40,43 +47,24 @@ export const ExtendDeadlineModal: React.FC<ExtendDeadlineModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!extendDate) {
-      alert('Vui lòng chọn ngày hẹn mới.');
+      setErrorMsg('Vui lòng chọn ngày hẹn trả mới.');
       return;
     }
     if (!extendReason.trim()) {
-      alert('Vui lòng nhập lý do gia hạn.');
+      setErrorMsg('Vui lòng nhập lý do gia hạn.');
       return;
     }
 
+    setErrorMsg('');
     setIsSubmitting(true);
     try {
-      const nowStr = new Date().toLocaleString('vi-VN');
-      const userLabel = currentUser
-        ? `${currentUser.name} (${currentUser.role === UserRole.ONEDOOR ? 'Một cửa' : 'Quản trị'})`
-        : 'Hệ thống';
-      const extensionNote = `[Gia hạn ngày hẹn] Hạn cũ: ${formatDate(record.deadline)} -> Hạn mới: ${formatDate(extendDate)}. Lý do: ${extendReason.trim()} (Bởi: ${userLabel} lúc ${nowStr})`;
-
-      const newPrivateNotes = record.privateNotes
-        ? `${record.privateNotes}\n${extensionNote}`
-        : extensionNote;
-
-      const updatedRecord: RecordFile = {
-        ...record,
-        deadline: extendDate,
-        privateNotes: newPrivateNotes
-      };
-
-      const result = await updateRecordApi(updatedRecord);
-      if (result) {
-        alert('Đã gia hạn ngày hẹn thành công!');
-        if (onRefreshData) onRefreshData();
-        onClose();
-      } else {
-        alert('Lỗi khi cập nhật ngày gia hạn.');
+      if (onConfirm) {
+        await onConfirm(extendDate, extendReason.trim());
       }
+      onClose();
     } catch (err) {
       console.error('Lỗi gia hạn:', err);
-      alert('Có lỗi xảy ra khi thực hiện gia hạn.');
+      setErrorMsg('Có lỗi xảy ra khi thực hiện gia hạn.');
     } finally {
       setIsSubmitting(false);
     }
@@ -84,31 +72,50 @@ export const ExtendDeadlineModal: React.FC<ExtendDeadlineModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-fade-in">
-      <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3.5 bg-gradient-to-r from-purple-700 to-indigo-700 text-white">
-          <div className="flex items-center gap-2">
-            <CalendarClock size={20} />
-            <h3 className="font-bold text-sm uppercase tracking-wide">Gia hạn hồ sơ</h3>
+        <div className="bg-purple-700 px-5 py-4 text-white flex justify-between items-center shadow-sm">
+          <div className="flex items-center gap-2 font-bold text-lg">
+            <CalendarClock size={22} />
+            <span>Thao Tác Gia Hạn Ngày Hẹn Hồ Sơ</span>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1 hover:bg-white/20 rounded-lg transition-colors text-white cursor-pointer"
-          >
-            <X size={18} />
+          <button onClick={onClose} className="text-purple-100 hover:text-white p-1 rounded-lg transition-colors cursor-pointer">
+            <X size={20} />
           </button>
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
-          <div className="bg-purple-50/60 p-3 rounded-lg border border-purple-100 text-xs text-purple-900 space-y-1">
-            <p className="font-bold text-sm text-purple-950 font-mono">{record.code}</p>
-            <p><strong>Chủ sử dụng:</strong> {record.customerName}</p>
-            <p><strong>Hạn trả hiện tại:</strong> {formatDate(record.deadline)}</p>
+        <form onSubmit={handleSubmit} className="p-5 space-y-4 overflow-y-auto">
+          {errorMsg && (
+            <div className="bg-rose-50 border border-rose-200 text-rose-700 px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-2">
+              <AlertCircle size={16} className="shrink-0" />
+              <span>{errorMsg}</span>
+            </div>
+          )}
+
+          {/* List of target records summary */}
+          <div className="bg-purple-50/70 border border-purple-100 p-3 rounded-xl">
+            <p className="text-xs font-bold text-purple-900 mb-1 flex items-center justify-between">
+              <span>Hồ sơ thực hiện gia hạn ({targetRecords.length}):</span>
+              <span className="bg-purple-200 text-purple-800 text-[10px] px-2 py-0.5 rounded-full font-mono font-bold">
+                {targetRecords.length} hồ sơ
+              </span>
+            </p>
+            <div className="max-h-28 overflow-y-auto space-y-1 text-xs font-medium text-slate-700 divide-y divide-purple-100/60 pr-1">
+              {targetRecords.map((r) => (
+                <div key={r.id} className="pt-1 first:pt-0 flex items-center justify-between">
+                  <span className="font-mono font-bold text-purple-950">{r.code}</span>
+                  <span className="truncate max-w-[180px] text-slate-600">{r.customerName}</span>
+                  <span className="text-[11px] text-purple-800 font-semibold bg-purple-100/80 px-1.5 py-0.5 rounded">
+                    Hạn cũ: {formatDate(r.deadline)}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
 
           <div>
-            <label className="text-xs font-bold text-slate-700 block mb-1">
+            <label className="text-xs font-bold text-slate-800 block mb-1.5">
               Ngày hẹn trả mới <span className="text-red-500">*</span>
             </label>
             <input
@@ -116,12 +123,12 @@ export const ExtendDeadlineModal: React.FC<ExtendDeadlineModalProps> = ({
               required
               value={extendDate}
               onChange={(e) => setExtendDate(e.target.value)}
-              className="w-full text-xs font-semibold px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none"
+              className="w-full text-xs font-semibold px-3 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none"
             />
           </div>
 
           <div>
-            <label className="text-xs font-bold text-slate-700 block mb-1">
+            <label className="text-xs font-bold text-slate-800 block mb-1.5">
               Lý do gia hạn <span className="text-red-500">*</span>
             </label>
             <textarea
@@ -130,24 +137,24 @@ export const ExtendDeadlineModal: React.FC<ExtendDeadlineModalProps> = ({
               value={extendReason}
               onChange={(e) => setExtendReason(e.target.value)}
               placeholder="Nhập chi tiết lý do gia hạn ngày hẹn trả..."
-              className="w-full text-xs p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none resize-none"
+              className="w-full text-xs p-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none resize-none font-medium text-slate-800"
             />
           </div>
 
-          <div className="flex gap-2 justify-end pt-2 border-t border-slate-100">
+          <div className="flex gap-2 justify-end pt-3 border-t border-slate-100">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg text-xs font-bold transition-colors cursor-pointer"
+              className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl text-xs font-bold transition-colors cursor-pointer"
             >
               Hủy
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-4 py-2 bg-purple-700 hover:bg-purple-800 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer disabled:opacity-50"
+              className="px-5 py-2.5 bg-purple-700 hover:bg-purple-800 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md transition-all cursor-pointer disabled:opacity-50"
             >
-              {isSubmitting ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+              {isSubmitting ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
               Lưu gia hạn
             </button>
           </div>
@@ -156,3 +163,6 @@ export const ExtendDeadlineModal: React.FC<ExtendDeadlineModalProps> = ({
     </div>
   );
 };
+
+export default ExtendDeadlineModal;
+

@@ -66,6 +66,10 @@ const RecordRow: React.FC<RecordRowProps> = ({
     'BTN_EXTEND_DEADLINE',
     rolePermissions,
     departmentPermissions
+  ) && (
+    record.status !== RecordStatus.HANDOVER && 
+    record.status !== RecordStatus.RETURNED && 
+    record.status !== RecordStatus.WITHDRAWN
   );
   const [localMsr, setLocalMsr] = React.useState(record.measurementNumber || "");
   const [localExc, setLocalExc] = React.useState(record.excerptNumber || "");

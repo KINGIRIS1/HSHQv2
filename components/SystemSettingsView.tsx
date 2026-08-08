@@ -142,10 +142,45 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
   onHolidaysChanged,
   employees
 }) => {
-  const [activeTab, setActiveTab] = useState<'general' | 'holidays' | 'permissions' | 'data'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'holidays' | 'permissions' | 'workflow' | 'data'>('general');
   const [isDeletingData, setIsDeletingData] = useState(false);
   const [dbTestStatus, setDbTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [dbTestMsg, setDbTestMsg] = useState('');
+  
+  // Workflow & SLA States
+  const DEFAULT_WORKFLOW_STEPS: Record<string, Array<{ id: string; label: string; shortLabel: string; slaDays: number; color?: string }>> = {
+    'Tổ Cấp giấy': [
+      { id: 'tham_dinh', label: '1. Thẩm định', shortLabel: 'Thẩm định', slaDays: 1, color: 'bg-blue-50 text-blue-700 border-blue-200' },
+      { id: 'phieu_chuyen_thue', label: '2. Phiếu chuyển thuế', shortLabel: 'Phiếu chuyển thuế', slaDays: 2, color: 'bg-purple-50 text-purple-700 border-purple-200' },
+      { id: 'cho_tbt', label: '3. Chờ TBT (5 ngày)', shortLabel: 'Chờ TBT', slaDays: 5, color: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
+      { id: 'cho_nop_thue', label: '4. Chờ nộp thuế (GNT)', shortLabel: 'Chờ nộp thuế', slaDays: 0, color: 'bg-amber-50 text-amber-700 border-amber-200' },
+      { id: 'hoan_thien_trinh_duyet', label: '5. In & Hoàn thiện', shortLabel: 'In & Hoàn thiện', slaDays: 3, color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+      { id: 'kiem_tra', label: '6. Kiểm tra', shortLabel: 'Kiểm tra', slaDays: 1, color: 'bg-cyan-50 text-cyan-700 border-cyan-200' },
+      { id: 'trinh_ky', label: '7. Trình ký', shortLabel: 'Trình ký', slaDays: 1, color: 'bg-violet-50 text-violet-700 border-violet-200' },
+      { id: 'vo_so_gcn', label: '8. Vô số GCN', shortLabel: 'Vô số GCN', slaDays: 1, color: 'bg-teal-50 text-teal-700 border-teal-200' },
+      { id: 'cho_ban_giao', label: '9. Giao 1 cửa', shortLabel: 'Giao 1 cửa', slaDays: 1, color: 'bg-rose-50 text-rose-700 border-rose-200' },
+    ],
+    'Tổ Đo đạc': [
+      { id: 'tiep_nhan_dodac', label: '1. Tiếp nhận đo đạc', shortLabel: 'Tiếp nhận', slaDays: 1, color: 'bg-blue-50 text-blue-700 border-blue-200' },
+      { id: 'khao_sat', label: '2. Khảo sát thực tế', shortLabel: 'Khảo sát', slaDays: 5, color: 'bg-purple-50 text-purple-700 border-purple-200' },
+      { id: 'bien_tap', label: '3. Biên tập bản đồ', shortLabel: 'Biên tập', slaDays: 3, color: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
+      { id: 'kiem_tra_kt', label: '4. Kiểm tra kỹ thuật', shortLabel: 'Kiểm tra', slaDays: 1, color: 'bg-cyan-50 text-cyan-700 border-cyan-200' },
+      { id: 'ban_giao_1_cua', label: '5. Bàn giao 1 cửa', shortLabel: 'Bàn giao', slaDays: 1, color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+    ],
+    'Tổ Lưu trữ': [
+      { id: 'tiep_nhan_yeu_cau', label: '1. Tiếp nhận yêu cầu', shortLabel: 'Tiếp nhận', slaDays: 1, color: 'bg-blue-50 text-blue-700 border-blue-200' },
+      { id: 'tra_cuu_ho_so', label: '2. Tra cứu kho lưu trữ', shortLabel: 'Tra cứu', slaDays: 2, color: 'bg-amber-50 text-amber-700 border-amber-200' },
+      { id: 'sao_luc_tai_lieu', label: '3. Sao lục / Trích lục', shortLabel: 'Sao lục', slaDays: 1, color: 'bg-teal-50 text-teal-700 border-teal-200' },
+      { id: 'tra_ket_qua', label: '4. Trả kết quả', shortLabel: 'Trả KQ', slaDays: 1, color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+    ]
+  };
+
+  const [workflowDept, setWorkflowDept] = useState<string>('Tổ Cấp giấy');
+  const [workflowConfigs, setWorkflowConfigs] = useState<Record<string, Array<{ id: string; label: string; shortLabel: string; slaDays: number; color?: string }>>>(DEFAULT_WORKFLOW_STEPS);
+  const [isSavingWorkflow, setIsSavingWorkflow] = useState(false);
+  const [newStepId, setNewStepId] = useState('');
+  const [newStepLabel, setNewStepLabel] = useState('');
+  const [newStepSla, setNewStepSla] = useState<number>(1);
   
   // Update State (Manual Config)
   const [manualVersion, setManualVersion] = useState('');
@@ -389,6 +424,32 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
           setContractNextSeq(savedSeq);
       } else {
           setContractNextSeq('1');
+      }
+      
+      const savedWorkflow = await getSystemSetting('workflow_sla_configs');
+      if (savedWorkflow) {
+          try {
+              setWorkflowConfigs(JSON.parse(savedWorkflow));
+          } catch (e) {}
+      }
+  };
+
+  const handleSaveWorkflowConfigs = async () => {
+      setIsSavingWorkflow(true);
+      const success = await saveSystemSetting('workflow_sla_configs', JSON.stringify(workflowConfigs));
+      setIsSavingWorkflow(false);
+      if (success) {
+          alert("Đã lưu cấu hình quy trình và phân bổ số ngày SLA thành công!");
+          if (onHolidaysChanged) onHolidaysChanged();
+      } else {
+          alert("Lỗi khi lưu cấu hình quy trình.");
+      }
+  };
+
+  const handleResetWorkflow = () => {
+      if (window.confirm("Bạn có chắc chắn muốn đặt lại tất cả các bước và số ngày SLA về mặc định của hệ thống không?")) {
+          setWorkflowConfigs(DEFAULT_WORKFLOW_STEPS);
+          alert("Đã khôi phục các bước quy trình về mặc định. Nhấn 'Lưu cấu hình quy trình & SLA' để hoàn tất.");
       }
   };
 
@@ -714,6 +775,12 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                 <Key size={16} /> Phân quyền
             </button>
             <button 
+                onClick={() => setActiveTab('workflow')}
+                className={`px-4 py-3 text-xs md:text-sm font-black uppercase tracking-widest flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'workflow' ? 'border-indigo-600 text-indigo-700 bg-white' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
+            >
+                <SlidersHorizontal size={16} /> Lập quy trình & SLA
+            </button>
+            <button 
                 onClick={() => setActiveTab('data')}
                 className={`px-4 py-3 text-xs md:text-sm font-black uppercase tracking-widest flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'data' ? 'border-red-600 text-red-700 bg-white' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
             >
@@ -722,6 +789,251 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
         </div>
 
         <div className={`overflow-y-auto flex-1 bg-slate-50/30 ${activeTab === 'permissions' ? '' : 'p-4 md:p-6'}`}>
+            {activeTab === 'workflow' && (
+                <div className="max-w-5xl mx-auto space-y-6">
+                    <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+                        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 pb-5 border-b border-slate-200">
+                            <div>
+                                <h3 className="text-lg font-black text-slate-800 flex items-center gap-2">
+                                    <SlidersHorizontal className="text-indigo-600" size={22} />
+                                    Lập quy trình & phân bổ số ngày SLA theo bộ phận
+                                </h3>
+                                <p className="text-xs text-slate-500 font-medium mt-1">
+                                    Tùy chỉnh các bước xử lý nghiệp vụ, chỉnh sửa số ngày SLA quy định cho từng bước, thêm bước mới hoặc đặt lại mặc định.
+                                </p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <button
+                                    type="button"
+                                    onClick={handleResetWorkflow}
+                                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl border border-slate-300 transition-all flex items-center gap-2 cursor-pointer"
+                                >
+                                    <RotateCcw size={14} /> Đặt lại mặc định
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleSaveWorkflowConfigs}
+                                    disabled={isSavingWorkflow}
+                                    className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-md transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                                >
+                                    {isSavingWorkflow ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                                    Lưu cấu hình quy trình
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Department selector tabs */}
+                        <div className="flex items-center gap-2 pt-6 overflow-x-auto no-scrollbar pb-2">
+                            {Object.keys(workflowConfigs).map(dept => {
+                                const isSelected = workflowDept === dept;
+                                return (
+                                    <button
+                                        key={dept}
+                                        type="button"
+                                        onClick={() => setWorkflowDept(dept)}
+                                        className={`px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all border flex items-center gap-2 cursor-pointer ${
+                                            isSelected
+                                                ? 'bg-indigo-600 text-white border-indigo-700 shadow-sm'
+                                                : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                                        }`}
+                                    >
+                                        <span>{dept}</span>
+                                        <span className={`text-[10px] px-2 py-0.5 rounded-full ${isSelected ? 'bg-indigo-500 text-white' : 'bg-slate-200 text-slate-700'}`}>
+                                            {(workflowConfigs[dept] || []).length} bước
+                                        </span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+
+                        {/* Steps Table for selected department */}
+                        <div className="mt-6 space-y-4">
+                            <div className="flex items-center justify-between">
+                                <h4 className="text-sm font-black text-slate-800 uppercase tracking-wider">
+                                    Quy trình xử lý của: <span className="text-indigo-600">{workflowDept}</span>
+                                </h4>
+                                <span className="text-xs font-semibold text-slate-500">
+                                    Tổng thời gian SLA: {(workflowConfigs[workflowDept] || []).reduce((acc, s) => acc + (Number(s.slaDays) || 0), 0)} ngày làm việc
+                                </span>
+                            </div>
+
+                            <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-2xs">
+                                <table className="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr className="bg-slate-100 text-[11px] font-black uppercase tracking-wider text-slate-600 border-b border-slate-200">
+                                            <th className="py-3 px-4 w-16 text-center">STT</th>
+                                            <th className="py-3 px-4">Mã bước (ID)</th>
+                                            <th className="py-3 px-4">Tên bước quy trình</th>
+                                            <th className="py-3 px-4 w-32 text-center">Số ngày SLA</th>
+                                            <th className="py-3 px-4 w-32 text-center">Thứ tự</th>
+                                            <th className="py-3 px-4 w-20 text-center">Xóa</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100 text-xs">
+                                        {(workflowConfigs[workflowDept] || []).map((step, idx) => (
+                                            <tr key={step.id} className="hover:bg-slate-50/80 transition-colors">
+                                                <td className="py-3 px-4 text-center font-black text-slate-400">
+                                                    #{idx + 1}
+                                                </td>
+                                                <td className="py-3 px-4 font-mono font-bold text-indigo-700">
+                                                    {step.id}
+                                                </td>
+                                                <td className="py-3 px-4">
+                                                    <input
+                                                        type="text"
+                                                        value={step.label}
+                                                        onChange={(e) => {
+                                                            const val = e.target.value;
+                                                            setWorkflowConfigs(prev => {
+                                                                const list = [...(prev[workflowDept] || [])];
+                                                                list[idx] = { ...list[idx], label: val };
+                                                                return { ...prev, [workflowDept]: list };
+                                                            });
+                                                        }}
+                                                        className="w-full border border-slate-200 rounded-lg px-3 py-1.5 font-bold text-slate-800 bg-white focus:border-indigo-500 outline-none"
+                                                    />
+                                                </td>
+                                                <td className="py-3 px-4 text-center">
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        max="99"
+                                                        value={step.slaDays}
+                                                        onChange={(e) => {
+                                                            const val = parseInt(e.target.value) || 0;
+                                                            setWorkflowConfigs(prev => {
+                                                                const list = [...(prev[workflowDept] || [])];
+                                                                list[idx] = { ...list[idx], slaDays: val };
+                                                                return { ...prev, [workflowDept]: list };
+                                                            });
+                                                        }}
+                                                        className="w-20 text-center border border-slate-200 rounded-lg px-2 py-1.5 font-black text-indigo-600 bg-white focus:border-indigo-500 outline-none"
+                                                    />
+                                                </td>
+                                                <td className="py-3 px-4 text-center">
+                                                    <div className="flex items-center justify-center gap-1">
+                                                        <button
+                                                            type="button"
+                                                            disabled={idx === 0}
+                                                            onClick={() => {
+                                                                if (idx === 0) return;
+                                                                setWorkflowConfigs(prev => {
+                                                                    const list = [...(prev[workflowDept] || [])];
+                                                                    const temp = list[idx];
+                                                                    list[idx] = list[idx - 1];
+                                                                    list[idx - 1] = temp;
+                                                                    return { ...prev, [workflowDept]: list };
+                                                                });
+                                                            }}
+                                                            className="p-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-600 disabled:opacity-30 cursor-pointer"
+                                                            title="Đẩy lên"
+                                                        >
+                                                            <ChevronUp size={14} />
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            disabled={idx === (workflowConfigs[workflowDept] || []).length - 1}
+                                                            onClick={() => {
+                                                                const list = workflowConfigs[workflowDept] || [];
+                                                                if (idx === list.length - 1) return;
+                                                                setWorkflowConfigs(prev => {
+                                                                    const l = [...(prev[workflowDept] || [])];
+                                                                    const temp = l[idx];
+                                                                    l[idx] = l[idx + 1];
+                                                                    l[idx + 1] = temp;
+                                                                    return { ...prev, [workflowDept]: l };
+                                                                });
+                                                            }}
+                                                            className="p-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-600 disabled:opacity-30 cursor-pointer"
+                                                            title="Đẩy xuống"
+                                                        >
+                                                            <ChevronDown size={14} />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                                <td className="py-3 px-4 text-center">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setWorkflowConfigs(prev => {
+                                                                const list = (prev[workflowDept] || []).filter((_, i) => i !== idx);
+                                                                return { ...prev, [workflowDept]: list };
+                                                            });
+                                                        }}
+                                                        className="p-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 transition-colors cursor-pointer"
+                                                        title="Xóa bước này"
+                                                    >
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            {/* Add New Step Form */}
+                            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 mt-4 flex flex-col md:flex-row items-center gap-3">
+                                <span className="text-xs font-black text-slate-700 uppercase tracking-wider shrink-0">
+                                    Thêm bước mới:
+                                </span>
+                                <input
+                                    type="text"
+                                    placeholder="Mã ID (VD: buoc_moi)"
+                                    value={newStepId}
+                                    onChange={(e) => setNewStepId(e.target.value)}
+                                    className="w-full md:w-44 border border-slate-200 rounded-xl px-3 py-2 text-xs bg-white font-mono outline-none focus:border-indigo-500"
+                                />
+                                <input
+                                    type="text"
+                                    placeholder="Tên bước quy trình..."
+                                    value={newStepLabel}
+                                    onChange={(e) => setNewStepLabel(e.target.value)}
+                                    className="flex-1 w-full border border-slate-200 rounded-xl px-3 py-2 text-xs bg-white font-bold outline-none focus:border-indigo-500"
+                                />
+                                <div className="flex items-center gap-2 w-full md:w-auto">
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        placeholder="Số ngày SLA"
+                                        value={newStepSla}
+                                        onChange={(e) => setNewStepSla(parseInt(e.target.value) || 0)}
+                                        className="w-24 border border-slate-200 rounded-xl px-3 py-2 text-xs bg-white font-bold text-center outline-none focus:border-indigo-500"
+                                        title="Số ngày SLA"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            if (!newStepId.trim() || !newStepLabel.trim()) {
+                                                alert("Vui lòng nhập đầy đủ Mã ID và Tên bước!");
+                                                return;
+                                            }
+                                            const stepToAdd = {
+                                                id: newStepId.trim().toLowerCase().replace(/\s+/g, '_'),
+                                                label: newStepLabel.trim(),
+                                                shortLabel: newStepLabel.trim().split(' ').slice(1).join(' ') || newStepLabel.trim(),
+                                                slaDays: newStepSla,
+                                                color: 'bg-slate-50 text-slate-700 border-slate-200'
+                                            };
+                                            setWorkflowConfigs(prev => {
+                                                const list = [...(prev[workflowDept] || []), stepToAdd];
+                                                return { ...prev, [workflowDept]: list };
+                                            });
+                                            setNewStepId('');
+                                            setNewStepLabel('');
+                                            setNewStepSla(1);
+                                        }}
+                                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+                                    >
+                                        <Plus size={14} /> Thêm bước
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {activeTab === 'general' && (
                 <div className="space-y-6 max-w-4xl mx-auto">
                     {/* Cloud Database Info */}

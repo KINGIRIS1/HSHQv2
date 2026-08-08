@@ -176,23 +176,46 @@ export const calculateDeadlineHelper = (type: string, receivedDateStr: string, h
     let daysToAdd = 30; 
     const lowerType = (type || '').toLowerCase();
 
-    if (lowerType.includes('2.5') || lowerType.includes('tách-hợp') || lowerType.includes('tách - hợp')) {
-        daysToAdd = 30;
-    } else if (lowerType.includes('1.1') || lowerType.includes('1.2') || lowerType.includes('công văn') || lowerType.includes('cong van') || lowerType.includes('cung cấp tài liệu đất đai') || lowerType.includes('cung cấp dữ liệu') ||
-        lowerType.includes('2.2') || lowerType.includes('quy hoạch') || 
-        lowerType.includes('2.6') || lowerType.includes('số thửa') || 
-        lowerType.includes('2.1') || lowerType.includes('trích lục')) {
-        daysToAdd = 10;
-    } else if (lowerType.includes('3.2.1') || lowerType.includes('3.2.2') || lowerType.includes('3.5.1') || lowerType.includes('gia hạn') || (lowerType.includes('cấp đổi') && !lowerType.includes('trích đo'))) {
-        daysToAdd = 7;
-    } else if (lowerType.includes('3.1.1') || lowerType.includes('3.1.2') || lowerType.includes('3.1.3') || lowerType.includes('3.1.4') || lowerType.includes('3.3.1') || lowerType.includes('3.3.2') || lowerType.includes('3.6.1') || lowerType.includes('3.7.1') || lowerType.includes('37.1') || lowerType.includes('chuyển nhượng') || lowerType.includes('tặng cho') || lowerType.includes('thừa kế') || lowerType.includes('thỏa thuận') || lowerType.includes('chuyển mục đích') || lowerType.includes('đính chính')) {
-        daysToAdd = 10;
-    } else if (lowerType.includes('3.4.1') || lowerType.includes('trích đo chỉnh lý') || lowerType.includes('chỉnh lý bản đồ')) {
-        daysToAdd = 15;
-    } else if (lowerType.includes('2.3') || lowerType.includes('trích đo') || 
-               lowerType.includes('2.4') || lowerType.includes('cắm mốc') || 
-               lowerType.includes('đo đạc') || lowerType.includes('tách thửa')) {
-        daysToAdd = 30;
+    // Check dynamic workflow SLA config from localStorage if available
+    let dynamicDays: number | null = null;
+    try {
+        const savedWorkflow = localStorage.getItem('workflow_sla_configs');
+        if (savedWorkflow) {
+            const parsed = JSON.parse(savedWorkflow);
+            let deptKey = 'Tổ Cấp giấy';
+            if (lowerType.includes('đo đạc') || lowerType.includes('trích đo') || lowerType.includes('bản đồ')) {
+                deptKey = 'Tổ Đo đạc';
+            } else if (lowerType.includes('lưu trữ') || lowerType.includes('tra cứu') || lowerType.includes('sao lục')) {
+                deptKey = 'Tổ Lưu trữ';
+            }
+            const steps = parsed[deptKey];
+            if (steps && Array.isArray(steps) && steps.length > 0) {
+                dynamicDays = steps.reduce((acc: number, s: any) => acc + (Number(s.slaDays) || 0), 0);
+            }
+        }
+    } catch (e) {}
+
+    if (dynamicDays !== null && dynamicDays > 0) {
+        daysToAdd = dynamicDays;
+    } else {
+        if (lowerType.includes('2.5') || lowerType.includes('tách-hợp') || lowerType.includes('tách - hợp')) {
+            daysToAdd = 30;
+        } else if (lowerType.includes('1.1') || lowerType.includes('1.2') || lowerType.includes('công văn') || lowerType.includes('cong van') || lowerType.includes('cung cấp tài liệu đất đai') || lowerType.includes('cung cấp dữ liệu') ||
+            lowerType.includes('2.2') || lowerType.includes('quy hoạch') || 
+            lowerType.includes('2.6') || lowerType.includes('số thửa') || 
+            lowerType.includes('2.1') || lowerType.includes('trích lục')) {
+            daysToAdd = 10;
+        } else if (lowerType.includes('3.2.1') || lowerType.includes('3.2.2') || lowerType.includes('3.5.1') || lowerType.includes('gia hạn') || (lowerType.includes('cấp đổi') && !lowerType.includes('trích đo'))) {
+            daysToAdd = 7;
+        } else if (lowerType.includes('3.1.1') || lowerType.includes('3.1.2') || lowerType.includes('3.1.3') || lowerType.includes('3.1.4') || lowerType.includes('3.3.1') || lowerType.includes('3.3.2') || lowerType.includes('3.6.1') || lowerType.includes('3.7.1') || lowerType.includes('37.1') || lowerType.includes('chuyển nhượng') || lowerType.includes('tặng cho') || lowerType.includes('thừa kế') || lowerType.includes('thỏa thuận') || lowerType.includes('chuyển mục đích') || lowerType.includes('đính chính')) {
+            daysToAdd = 10;
+        } else if (lowerType.includes('3.4.1') || lowerType.includes('trích đo chỉnh lý') || lowerType.includes('chỉnh lý bản đồ')) {
+            daysToAdd = 15;
+        } else if (lowerType.includes('2.3') || lowerType.includes('trích đo') || 
+                   lowerType.includes('2.4') || lowerType.includes('cắm mốc') || 
+                   lowerType.includes('đo đạc') || lowerType.includes('tách thửa')) {
+            daysToAdd = 30;
+        }
     }
     
     // Áp dụng quy ước thời gian: nếu nhận sau 15h dời ngày trả qua sáng hôm sau (tức là cộng thêm 1 ngày làm việc)
@@ -847,6 +870,30 @@ export function migrateUnbatchedRecords(records: RecordFile[]): { migratedRecord
 
     return { migratedRecords, hasChanges };
 }
+
+export const formatCheckOrSignDate = (dateVal: string | undefined | null, record: RecordFile, type: 'check' | 'sign'): string => {
+    if (dateVal) {
+        const d = parseSafeDate(dateVal);
+        if (d && !isNaN(d.getTime())) {
+            return `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}`;
+        }
+        return String(dateVal).split('T')[0];
+    }
+
+    const isSignedOrCompleted = [
+        RecordStatus.SIGNED, 
+        RecordStatus.HANDOVER, 
+        RecordStatus.RETURNED
+    ].includes(record.status) || !!record.completedDate || !!record.exportBatch;
+
+    if (type === 'check') {
+        const isCheckedOrPassed = isSignedOrCompleted || record.status === RecordStatus.PENDING_SIGN || !!record.checkedDate || !!record.pendingCheckDate;
+        return isCheckedOrPassed ? "Đã hoàn thành" : "Đang thực hiện";
+    } else {
+        const isSigned = isSignedOrCompleted || record.status === RecordStatus.SIGNED;
+        return isSigned ? "Đã hoàn thành" : "Đang thực hiện";
+    }
+};
 
 
 

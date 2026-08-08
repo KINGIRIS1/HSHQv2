@@ -2,7 +2,7 @@
 import * as XLSX from 'xlsx-js-style';
 import { RecordFile, RecordStatus, Employee } from '../types';
 import { getNormalizedWard, getShortRecordType, STATUS_LABELS } from '../constants';
-import { isRecordOverdue, removeVietnameseTones, parseSafeDate, getRecordReceivedDate } from './appHelpers';
+import { isRecordOverdue, removeVietnameseTones, parseSafeDate, getRecordReceivedDate, formatCheckOrSignDate } from './appHelpers';
 import { fetchContracts } from '../services/api';
 
 export const exportReportToExcel = async (
@@ -129,6 +129,8 @@ export const exportReportToExcel = async (
         "Giá trị TL", // Yêu cầu 1: Thêm cột Giá trị thanh lý
         "Ngày Nhận", 
         "Hẹn Trả", 
+        "Ngày kiểm tra",
+        "Ngày trình ký",
         "Ngày hoàn thành",
         "Ngày trả kết quả",
         "Trạng Thái", 
@@ -160,6 +162,8 @@ export const exportReportToExcel = async (
             contractInfo.liquidation, // Giá trị TL
             formatDate(r.receivedDate),
             formatDate(r.deadline),
+            formatCheckOrSignDate(r.checkedDate || r.pendingCheckDate, r, 'check'),
+            formatCheckOrSignDate(r.submissionDate, r, 'sign'),
             formatDate(r.completedDate),      
             formatDate(r.resultReturnedDate),
             STATUS_LABELS[r.status],

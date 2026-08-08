@@ -184,9 +184,10 @@ export interface RecordFile {
   
   measurementNumber?: string | null; 
   excerptNumber?: string | null;
+  soPhieuChuyenThue?: string | null; // Số phiếu chuyển thuế
   
   // Bước nhỏ xử lý quy trình Cấp Giấy (Chỉ dành riêng cho Hồ sơ Cấp Giấy)
-  capGiaySubStep?: 'tham_dinh' | 'phieu_chuyen_thue' | 'cho_nop_thue' | 'hoan_thien_trinh_duyet' | string | null;
+  capGiaySubStep?: 'tham_dinh' | 'phieu_chuyen_thue' | 'cho_tbt' | 'cho_nop_thue' | 'hoan_thien_trinh_duyet' | 'kiem_tra' | 'trinh_ky' | 'vo_so_gcn' | 'cho_ban_giao' | 'da_ban_giao' | string | null;
   
   // Tính năng nhắc nhở
   reminderDate?: string | null;      // Thời gian đặt lịch nhắc

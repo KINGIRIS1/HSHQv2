@@ -114,6 +114,9 @@ function App() {
   const [rejectReturnTargetRecords, setRejectReturnTargetRecords] = useState<RecordFile[]>([]);
   const [isExtendModalOpen, setIsExtendModalOpen] = useState(false);
   const [extendTargetRecord, setExtendTargetRecord] = useState<RecordFile | null>(null);
+  const [extendTargetRecords, setExtendTargetRecords] = useState<RecordFile[]>([]);
+  const [isSupplementModalOpen, setIsSupplementModalOpen] = useState(false);
+  const [supplementTargetRecords, setSupplementTargetRecords] = useState<RecordFile[]>([]);
 
   // Report States
   const [globalReportContent, setGlobalReportContent] = useState('');
@@ -976,39 +979,109 @@ function App() {
       exportReturnedListToExcel(recordFilterProps.filteredRecords, recordFilterProps.filterFromDate, recordFilterProps.filterToDate, recordFilterProps.filterWard);
   };
 
-  const handleMarkAsRejected = async () => {
-      if (selectedRecordIds.size === 0) return;
-      if (await confirmAction(`Xác nhận đánh dấu ${selectedRecordIds.size} hồ sơ đang chọn thành "Hồ sơ trả"?\n\nHồ sơ sẽ được chuyển vào danh sách Chờ giao của bộ phận 1 cửa.`)) {
-          const nowStr = new Date().toISOString();
-          const targets = records.filter(r => selectedRecordIds.has(r.id));
-          
-          const flow = [RecordStatus.RECEIVED, RecordStatus.ASSIGNED, RecordStatus.IN_PROGRESS, RecordStatus.PENDING_CHECK, RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER];
+  const handleOpenRejectReturnModal = useCallback((targets: RecordFile[]) => {
+      setRejectReturnTargetRecords(targets);
+      setIsRejectReturnStepModalOpen(true);
+  }, []);
 
-          const updatesToApply = targets.map(r => {
-             const updates: any = { status: RecordStatus.REJECTED, completedDate: r.completedDate || nowStr };
-             const prevIdx = flow.indexOf(r.status);
-             if (prevIdx >= 0) {
-                 if (prevIdx >= flow.indexOf(RecordStatus.ASSIGNED) && !r.assignedDate) updates.assignedDate = nowStr;
-                 if (prevIdx >= flow.indexOf(RecordStatus.IN_PROGRESS) && !r.completedWorkDate) updates.completedWorkDate = nowStr;
-                 if (prevIdx >= flow.indexOf(RecordStatus.PENDING_CHECK) && !r.pendingCheckDate) updates.pendingCheckDate = nowStr;
-                 if (prevIdx >= flow.indexOf(RecordStatus.PENDING_CHECK) && !r.checkedDate) updates.checkedDate = nowStr;
-                 if (prevIdx >= flow.indexOf(RecordStatus.PENDING_SIGN) && !r.submissionDate) updates.submissionDate = nowStr;
-                 if (prevIdx >= flow.indexOf(RecordStatus.SIGNED) && !r.approvalDate) updates.approvalDate = nowStr;
-             }
-             updates.statusLogs = createStatusLog(r, RecordStatus.REJECTED, 'Đánh dấu hồ sơ trả');
-             return { ...r, ...updates };
-          });
-          
-          setRecords(prev => prev.map(r => {
-              const updated = updatesToApply.find(u => u.id === r.id);
-              return updated ? updated : r;
-          }));
-          await Promise.all(updatesToApply.map(r => updateRecordApi(r)));
-          
-          setSelectedRecordIds(new Set());
-          setToast({ type: 'success', message: `Đã đánh dấu ${targets.length} hồ sơ thành "Hồ sơ trả".` });
+  const handleOpenExtendModal = useCallback((targets: RecordFile[]) => {
+      setExtendTargetRecords(targets);
+      setIsExtendModalOpen(true);
+  }, []);
+
+  const handleOpenSupplementModal = useCallback((targets: RecordFile | RecordFile[]) => {
+      const list = Array.isArray(targets) ? targets : [targets];
+      setSupplementTargetRecords(list);
+      setIsSupplementModalOpen(true);
+  }, []);
+
+  const handleConfirmSupplement = useCallback(async (note: string) => {
+      if (supplementTargetRecords.length === 0) return;
+      const nowStr = new Date().toLocaleString('vi-VN');
+      const userLabel = currentUser
+        ? `${currentUser.name} (${currentUser.role === UserRole.ONEDOOR ? 'Một cửa' : 'Quản trị'})`
+        : 'Hệ thống';
+
+      const updatedTargets = supplementTargetRecords.map(r => {
+        const supplementNote = `[Tiếp nhận bổ sung] Ghi chú: ${note.trim()} (Bởi: ${userLabel} lúc ${nowStr})`;
+        const existingNotes = r.privateNotes || '';
+        const updatedPrivateNotes = existingNotes ? `${existingNotes}\n${supplementNote}` : supplementNote;
+
+        const targetStatus = r.assignedTo ? RecordStatus.IN_PROGRESS : RecordStatus.RECEIVED;
+
+        return {
+          ...r,
+          status: targetStatus,
+          privateNotes: updatedPrivateNotes,
+          statusLogs: createStatusLog(r, targetStatus, `Tiếp nhận bổ sung: ${note.trim()}`)
+        };
+      });
+
+      setRecords(prev => prev.map(r => {
+          const found = updatedTargets.find(u => u.id === r.id);
+          return found ? found : r;
+      }));
+
+      await Promise.all(updatedTargets.map(r => updateRecordApi(r)));
+
+      setToast({ 
+        type: 'success', 
+        message: `Đã tiếp nhận bổ sung cho ${updatedTargets.length} hồ sơ thành công!` 
+      });
+  }, [supplementTargetRecords, currentUser]);
+
+  const handleConfirmExtendDeadline = useCallback(async (extendDate: string, reason: string) => {
+      if (extendTargetRecords.length === 0) return;
+      const nowStr = new Date().toLocaleString('vi-VN');
+      const userLabel = currentUser
+        ? `${currentUser.name} (${currentUser.role === UserRole.ONEDOOR ? 'Một cửa' : 'Quản trị'})`
+        : 'Hệ thống';
+
+      const formatDate = (dateStr?: string | null) => {
+        if (!dateStr) return 'Chưa có';
+        const d = new Date(dateStr);
+        return isNaN(d.getTime()) ? 'Chưa có' : d.toLocaleDateString('vi-VN');
+      };
+
+      const updatedTargets = extendTargetRecords.map(r => {
+        const extensionNote = `[Gia hạn ngày hẹn] Hạn cũ: ${formatDate(r.deadline)} -> Hạn mới: ${formatDate(extendDate)}. Lý do: ${reason.trim()} (Bởi: ${userLabel} lúc ${nowStr})`;
+        const existingNotes = r.privateNotes || '';
+        const updatedPrivateNotes = existingNotes ? `${existingNotes}\n${extensionNote}` : extensionNote;
+
+        return {
+          ...r,
+          deadline: extendDate,
+          privateNotes: updatedPrivateNotes
+        };
+      });
+
+      setRecords(prev => prev.map(r => {
+          const found = updatedTargets.find(u => u.id === r.id);
+          return found ? found : r;
+      }));
+
+      await Promise.all(updatedTargets.map(r => updateRecordApi(r)));
+
+      setToast({ 
+        type: 'success', 
+        message: `Đã gia hạn ngày hẹn cho ${updatedTargets.length} hồ sơ thành công!` 
+      });
+  }, [extendTargetRecords, currentUser]);
+
+  const handleMarkAsRejected = useCallback(() => {
+      if (selectedRecordIds.size === 0) return;
+      const validTargets = records.filter(r => 
+          selectedRecordIds.has(r.id) && 
+          r.status !== RecordStatus.HANDOVER && 
+          r.status !== RecordStatus.RETURNED && 
+          r.status !== RecordStatus.WITHDRAWN
+      );
+      if (validTargets.length === 0) {
+          setToast({ type: 'error', message: 'Không có hồ sơ hợp lệ (ở các bước trước Giao 1 cửa) để thực hiện thao tác trả!' });
+          return;
       }
-  };
+      handleOpenRejectReturnModal(validTargets);
+  }, [selectedRecordIds, records, handleOpenRejectReturnModal]);
 
   const handleHandOverRecords = useCallback(async (recordIds: string[]) => {
       if (recordIds.length === 0) return;
@@ -1017,11 +1090,6 @@ function App() {
       await updateRecordsBatchById(updates);
       setToast({ type: 'success', message: `Đã tự động bàn giao ${recordIds.length} hồ sơ và đồng bộ dữ liệu!` });
   }, [setRecords]);
-
-  const handleOpenRejectReturnModal = useCallback((targets: RecordFile[]) => {
-      setRejectReturnTargetRecords(targets);
-      setIsRejectReturnStepModalOpen(true);
-  }, []);
 
   const handleConfirmRejectReturnStep = useCallback(async (reason: string, returnDateStr: string, returnOption: 'REJECT' | 'PAUSE' | 'PREVIOUS_STEP' = 'PREVIOUS_STEP') => {
       if (rejectReturnTargetRecords.length === 0) return;
@@ -1405,9 +1473,11 @@ function App() {
             setIsDiagnosticModalOpen={setIsDiagnosticModalOpen}
             setIsExtendModalOpen={setIsExtendModalOpen}
             setExtendTargetRecord={setExtendTargetRecord}
+            handleOpenExtendModal={handleOpenExtendModal}
             advanceStatus={advanceStatus}
             handleOpenReturnModal={handleOpenReturnModal}
             handleOpenRejectReturnModal={handleOpenRejectReturnModal}
+            handleOpenSupplementModal={handleOpenSupplementModal}
         />
 
         <AppModals 
@@ -1426,12 +1496,15 @@ function App() {
             isDiagnosticModalOpen={isDiagnosticModalOpen} setIsDiagnosticModalOpen={setIsDiagnosticModalOpen}
             isRejectReturnStepModalOpen={isRejectReturnStepModalOpen} setIsRejectReturnStepModalOpen={setIsRejectReturnStepModalOpen}
             isExtendModalOpen={isExtendModalOpen} setIsExtendModalOpen={setIsExtendModalOpen}
+            isSupplementModalOpen={isSupplementModalOpen} setIsSupplementModalOpen={setIsSupplementModalOpen}
             
             editingRecord={editingRecord} setEditingRecord={setEditingRecord}
             viewingRecord={viewingRecord} setViewingRecord={setViewingRecord}
             deletingRecord={deletingRecord} setDeletingRecord={setDeletingRecord}
             returnRecord={returnRecord} setReturnRecord={setReturnRecord}
             extendTargetRecord={extendTargetRecord} setExtendTargetRecord={setExtendTargetRecord}
+            extendTargetRecords={extendTargetRecords}
+            supplementTargetRecords={supplementTargetRecords}
             assignTargetRecords={assignTargetRecords}
             rejectReturnTargetRecords={rejectReturnTargetRecords}
             exportModalType={exportModalType}
@@ -1456,7 +1529,11 @@ function App() {
             handleBatchUpdateRecords={handleBatchUpdateRecords}
             confirmReturnResult={handleConfirmReturnResult}
             onConfirmRejectReturnStep={handleConfirmRejectReturnStep}
+            onConfirmExtendDeadline={handleConfirmExtendDeadline}
+            onConfirmSupplement={handleConfirmSupplement}
             onOpenRejectReturnModal={(r) => handleOpenRejectReturnModal([r])}
+            onOpenExtendModal={(r) => handleOpenExtendModal([r])}
+            onOpenSupplementModal={(r) => handleOpenSupplementModal([r])}
 
             employees={employees}
             users={users}

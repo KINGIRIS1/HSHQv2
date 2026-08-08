@@ -28,7 +28,7 @@ import {
 } from "lucide-react";
 import * as XLSX from "xlsx-js-style";
 import { getShortRecordType, isArchiveRecordType, isCapGiayRecord } from "../constants";
-import { confirmAction, calculateDeadlineHelperByDays } from "../utils/appHelpers";
+import { confirmAction, calculateDeadlineHelperByDays, formatCheckOrSignDate } from "../utils/appHelpers";
 import { updateRecordApi, fetchContracts } from "../services/api";
 import {
   fetchArchiveRecords,
@@ -515,7 +515,8 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
       "Địa chỉ": r.address || "",
       "Nội dung": r.content || "",
       "Ngày giao việc": r.assignedDate ? r.assignedDate.split("T")[0] : "",
-      "Ngày trình ký": r.submissionDate ? r.submissionDate.split("T")[0] : "",
+      "Ngày kiểm tra": formatCheckOrSignDate(r.checkedDate || r.pendingCheckDate, r, 'check'),
+      "Ngày trình ký": formatCheckOrSignDate(r.submissionDate, r, 'sign'),
       "Ngày duyệt": r.approvalDate ? r.approvalDate.split("T")[0] : "",
       "Ngày hoàn thành": r.completedDate ? r.completedDate.split("T")[0] : "",
       "Ngày trả kết quả": r.resultReturnedDate

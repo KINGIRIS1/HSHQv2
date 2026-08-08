@@ -16,6 +16,7 @@ import ReturnResultModal from './ReturnResultModal';
 import BatchErrorDiagnosticModal from './BatchErrorDiagnosticModal';
 import RejectReturnStepModal from './RejectReturnStepModal';
 import { ExtendDeadlineModal } from './ExtendDeadlineModal';
+import SupplementModal from './SupplementModal';
 import * as XLSX from 'xlsx-js-style';
 
 interface AppModalsProps {
@@ -35,6 +36,7 @@ interface AppModalsProps {
     isDiagnosticModalOpen?: boolean;
     isRejectReturnStepModalOpen?: boolean;
     isExtendModalOpen?: boolean;
+    isSupplementModalOpen?: boolean;
     
     // Data States
     editingRecord: RecordFile | null;
@@ -42,8 +44,10 @@ interface AppModalsProps {
     deletingRecord: RecordFile | null;
     returnRecord: RecordFile | null;
     extendTargetRecord?: RecordFile | null;
+    extendTargetRecords?: RecordFile[];
     assignTargetRecords: RecordFile[];
     rejectReturnTargetRecords?: RecordFile[];
+    supplementTargetRecords?: RecordFile[];
     exportModalType: 'handover' | 'check_list';
     
     // Preview Data
@@ -65,6 +69,7 @@ interface AppModalsProps {
     setIsDiagnosticModalOpen?: (v: boolean) => void;
     setIsRejectReturnStepModalOpen?: (v: boolean) => void;
     setIsExtendModalOpen?: (v: boolean) => void;
+    setIsSupplementModalOpen?: (v: boolean) => void;
     
     setEditingRecord: (r: RecordFile | null) => void;
     setViewingRecord: (r: RecordFile | null) => void;
@@ -91,7 +96,11 @@ interface AppModalsProps {
     handleBatchUpdateRecords?: (updates: Partial<RecordFile>[]) => Promise<void>;
     confirmReturnResult: (receiptNumber: string, receiverName: string, returnedPrice: number, receiptType?: 'Biên Lai' | 'Hóa Đơn') => void;
     onConfirmRejectReturnStep?: (reason: string, returnDateStr: string) => Promise<void>;
+    onConfirmExtendDeadline?: (extendDate: string, reason: string) => Promise<void>;
+    onConfirmSupplement?: (note: string) => Promise<void>;
     onOpenRejectReturnModal?: (record: RecordFile) => void;
+    onOpenExtendModal?: (record: RecordFile) => void;
+    onOpenSupplementModal?: (record: RecordFile) => void;
 
     // Shared Data
     employees: Employee[];
@@ -183,6 +192,8 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
                     onCreateContract={props.onCreateContract}
                     onRefreshData={props.onRefreshData}
                     onOpenRejectReturnModal={props.onOpenRejectReturnModal}
+                    onOpenExtendModal={props.onOpenExtendModal}
+                    onOpenSupplementModal={props.onOpenSupplementModal}
                 />
             )}
             
@@ -269,8 +280,20 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
                     if (props.setExtendTargetRecord) props.setExtendTargetRecord(null);
                 }}
                 record={props.extendTargetRecord || null}
+                records={props.extendTargetRecords || []}
                 currentUser={props.currentUser}
+                onConfirm={props.onConfirmExtendDeadline}
                 onRefreshData={props.onRefreshData}
+            />
+
+            <SupplementModal
+                isOpen={!!props.isSupplementModalOpen}
+                onClose={() => props.setIsSupplementModalOpen && props.setIsSupplementModalOpen(false)}
+                records={props.supplementTargetRecords || []}
+                currentUser={props.currentUser}
+                employees={props.employees}
+                users={props.users}
+                onConfirm={props.onConfirmSupplement || (async () => {})}
             />
         </>
     );

@@ -17,6 +17,7 @@ const StatusBadge: React.FC<StatusBadgeProps> = ({ status }) => {
     [RecordStatus.PENDING_SIGN]: 'bg-purple-500',
     [RecordStatus.SIGNED]: 'bg-purple-500',
     [RecordStatus.HANDOVER]: 'bg-green-500 animate-pulse',
+    [RecordStatus.PENDING_SUPPLEMENT]: 'bg-amber-500 animate-pulse',
     [RecordStatus.RETURNED]: 'bg-emerald-500',
     [RecordStatus.WITHDRAWN]: 'bg-slate-400',
     [RecordStatus.REJECTED]: 'bg-rose-500',

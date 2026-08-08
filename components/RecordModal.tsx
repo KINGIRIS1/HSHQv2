@@ -163,20 +163,32 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
   const filteredEmployees = useMemo(() => {
     if (!employees || employees.length === 0) return [];
     const deptLower = targetDept.toLowerCase();
-    const isDoDac = deptLower.includes('đo đạc');
-    const isLuuTru = deptLower.includes('lưu trữ');
-    const isHanhChinh = deptLower.includes('hành chính');
+    
+    const DEPT_KEYS: Record<string, string[]> = {
+      'tổ cấp giấy': ['tổ cấp giấy', 'tổ đăng ký cấp giấy', 'đăng ký cấp giấy', 'tổ đăng ký', 'cấp giấy', 'đăng ký'],
+      'tổ đo đạc': ['tổ đo đạc', 'đo đạc', 'kỹ thuật', 'bản đồ'],
+      'tổ lưu trữ': ['tổ thông tin lưu trữ', 'tổ lưu trữ', 'thông tin lưu trữ', 'lưu trữ'],
+      'tổ hành chính': ['tổ hành chính', 'một cửa', 'quản trị hệ thống', 'hành chính'],
+      'ban giám đốc': ['ban giám đốc', 'giám đốc', 'ban lãnh đạo']
+    };
+
+    let targetKey = 'tổ cấp giấy';
+    if (deptLower.includes('đo đạc') || deptLower.includes('kỹ thuật')) {
+      targetKey = 'tổ đo đạc';
+    } else if (deptLower.includes('lưu trữ') || deptLower.includes('thông tin')) {
+      targetKey = 'tổ lưu trữ';
+    } else if (deptLower.includes('hành chính') || deptLower.includes('một cửa')) {
+      targetKey = 'tổ hành chính';
+    }
+
+    const validKeys = DEPT_KEYS[targetKey] || DEPT_KEYS['tổ cấp giấy'];
+    const leaderKeys = DEPT_KEYS['ban giám đốc'];
 
     const matched = employees.filter(emp => {
       const empDept = (emp.department || '').toLowerCase();
-      if (isDoDac) {
-        return empDept.includes('đo đạc') || empDept.includes('kỹ thuật');
-      } else if (isLuuTru) {
-        return empDept.includes('lưu trữ') || empDept.includes('thông tin');
-      } else if (isHanhChinh) {
-        return empDept.includes('hành chính') || empDept.includes('một cửa');
-      }
-      return empDept.includes('cấp giấy') || empDept.includes('đăng ký');
+      const isMatchDept = validKeys.some(k => empDept.includes(k));
+      const isLeader = leaderKeys.some(k => empDept.includes(k));
+      return isMatchDept || isLeader;
     });
 
     if (formData.assignedTo && !matched.some(e => e.id === formData.assignedTo)) {

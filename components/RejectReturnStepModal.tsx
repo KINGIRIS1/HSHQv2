@@ -21,7 +21,7 @@ export const RejectReturnStepModal: React.FC<RejectReturnStepModalProps> = ({
   users = [],
   onConfirm
 }) => {
-  const [returnOption, setReturnOption] = useState<'REJECT' | 'PAUSE' | 'PREVIOUS_STEP'>('PREVIOUS_STEP');
+  const [returnOption, setReturnOption] = useState<'REJECT' | 'PAUSE' | 'PREVIOUS_STEP'>('PAUSE');
   const [reason, setReason] = useState('');
   const [returnDate, setReturnDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -32,7 +32,7 @@ export const RejectReturnStepModal: React.FC<RejectReturnStepModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!reason.trim()) {
-      setErrorMsg('Vui lòng nhập rõ lý do trả về / yêu cầu sửa!');
+      setErrorMsg('Vui lòng nhập rõ lý do trả hồ sơ / bổ sung / sửa chữa!');
       return;
     }
     setErrorMsg('');
@@ -64,7 +64,7 @@ export const RejectReturnStepModal: React.FC<RejectReturnStepModalProps> = ({
         <div className="bg-rose-600 px-5 py-4 text-white flex justify-between items-center shadow-sm">
           <div className="flex items-center gap-2 font-bold text-lg">
             <Undo2 size={22} />
-            <span>Thao Tác Trả Về / Sửa Hồ Sơ</span>
+            <span>Thao Tác Trả Hồ Sơ</span>
           </div>
           <button onClick={onClose} className="text-rose-100 hover:text-white p-1 rounded-lg transition-colors">
             <X size={20} />
@@ -83,7 +83,7 @@ export const RejectReturnStepModal: React.FC<RejectReturnStepModalProps> = ({
           {/* List of target records summary */}
           <div className="bg-rose-50/70 border border-rose-100 p-3 rounded-xl">
             <p className="text-xs font-bold text-rose-900 mb-1 flex items-center justify-between">
-              <span>Hồ sơ thực hiện trả về sửa ({records.length}):</span>
+              <span>Hồ sơ thực hiện thao tác ({records.length}):</span>
               <span className="bg-rose-200 text-rose-800 text-[10px] px-2 py-0.5 rounded-full font-mono font-bold">
                 {records.length} hồ sơ
               </span>
@@ -101,27 +101,77 @@ export const RejectReturnStepModal: React.FC<RejectReturnStepModalProps> = ({
             </div>
           </div>
 
-          {/* THÔNG TIN MỤC 3: TRẢ VỀ CÁN BỘ THỤ LÝ ĐỂ SỬA CHỮA */}
-          <div className="bg-blue-50/80 border-2 border-blue-400 p-3.5 rounded-xl text-blue-950 space-y-2">
-            <div className="flex items-center gap-2 font-bold text-sm text-blue-900 border-b border-blue-200 pb-1.5">
-              <ArrowLeftRight size={18} className="text-blue-600 shrink-0" />
-              <span>Mục 3: Trả về cán bộ thụ lý (Yêu cầu sửa chữa / hoàn thiện)</span>
-            </div>
-            <p className="text-xs text-blue-900/90 leading-relaxed font-medium">
-              Chuyển hồ sơ về trạng thái <strong>Đang thực hiện</strong> cho cán bộ chuyên môn thụ lý chỉnh sửa.
-            </p>
-            <div className="grid grid-cols-2 gap-2 pt-1 text-[11px]">
-              <div className="bg-white p-2 rounded-lg border border-blue-200 text-blue-900 font-medium">
-                <span className="font-bold text-emerald-700 block mb-0.5">📝 LƯU LỊCH SỬ NỘI BỘ:</span>
-                • Ngày trình kiểm tra cũ (nếu có)<br/>
-                • Ngày trình ký cũ (nếu có)<br/>
-                • Lý do trả hồ sơ
-              </div>
-              <div className="bg-white p-2 rounded-lg border border-blue-200 text-blue-900 font-medium">
-                <span className="font-bold text-rose-700 block mb-0.5">✕ RESET NGÀY THÁNG:</span>
-                • Xóa ngày trình / đã kiểm tra / ký<br/>
-                • Chuyển về trạng thái Đang thực hiện
-              </div>
+          {/* CHỌN PHƯƠNG ÁN TRẢ HỒ SƠ */}
+          <div>
+            <label className="block text-sm font-bold text-slate-800 mb-2">
+              Chọn phương án trả hồ sơ:
+            </label>
+            <div className="grid grid-cols-1 gap-2.5">
+              {/* Option 1: Trả dừng quy trình chờ bổ sung */}
+              <label 
+                className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${
+                  returnOption === 'PAUSE' 
+                    ? 'border-amber-500 bg-amber-50/80 shadow-sm' 
+                    : 'border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                <input 
+                  type="radio" 
+                  name="returnOption" 
+                  value="PAUSE"
+                  checked={returnOption === 'PAUSE'}
+                  onChange={() => setReturnOption('PAUSE')}
+                  className="text-amber-600 focus:ring-amber-500"
+                />
+                <div className="flex-1 flex items-center gap-1.5 font-bold text-sm text-amber-900">
+                  <PauseCircle size={16} className="text-amber-600 shrink-0" />
+                  <span>1. Trả dừng quy trình (Chờ người dân bổ sung)</span>
+                </div>
+              </label>
+
+              {/* Option 2: Trả hủy hồ sơ */}
+              <label 
+                className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${
+                  returnOption === 'REJECT' 
+                    ? 'border-rose-500 bg-rose-50/80 shadow-sm' 
+                    : 'border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                <input 
+                  type="radio" 
+                  name="returnOption" 
+                  value="REJECT"
+                  checked={returnOption === 'REJECT'}
+                  onChange={() => setReturnOption('REJECT')}
+                  className="text-rose-600 focus:ring-rose-500"
+                />
+                <div className="flex-1 flex items-center gap-1.5 font-bold text-sm text-rose-900">
+                  <Ban size={16} className="text-rose-600 shrink-0" />
+                  <span>2. Trả hủy hồ sơ (Tạm dừng / Từ chối hoàn trả 1 cửa)</span>
+                </div>
+              </label>
+
+              {/* Option 3: Trả về cán bộ thụ lý sửa */}
+              <label 
+                className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${
+                  returnOption === 'PREVIOUS_STEP' 
+                    ? 'border-blue-500 bg-blue-50/80 shadow-sm' 
+                    : 'border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                <input 
+                  type="radio" 
+                  name="returnOption" 
+                  value="PREVIOUS_STEP"
+                  checked={returnOption === 'PREVIOUS_STEP'}
+                  onChange={() => setReturnOption('PREVIOUS_STEP')}
+                  className="text-blue-600 focus:ring-blue-500"
+                />
+                <div className="flex-1 flex items-center gap-1.5 font-bold text-sm text-blue-900">
+                  <ArrowLeftRight size={16} className="text-blue-600 shrink-0" />
+                  <span>3. Trả về cán bộ thụ lý (Yêu cầu sửa chữa / hoàn thiện)</span>
+                </div>
+              </label>
             </div>
           </div>
 
@@ -129,14 +179,14 @@ export const RejectReturnStepModal: React.FC<RejectReturnStepModalProps> = ({
           <div>
             <label className="block text-sm font-bold text-slate-800 mb-1.5 flex items-center gap-2">
               <MessageSquare size={16} className="text-rose-600" />
-              <span>Lý do thực hiện (Lưu vào Ghi chú nội bộ)</span>
+              <span>Ghi chú lý do trả hồ sơ</span>
               <span className="text-red-500">*</span>
             </label>
             <textarea
               rows={2.5}
               required
               className="w-full border border-gray-300 rounded-xl p-3 text-sm focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none font-medium text-slate-800 placeholder:text-gray-400"
-              placeholder="Nhập chi tiết nội dung yêu cầu cán bộ thụ lý sửa chữa hoàn thiện hồ sơ..."
+              placeholder="Nhập chi tiết ghi chú lý do..."
               value={reason}
               onChange={(e) => setReason(e.target.value)}
             />

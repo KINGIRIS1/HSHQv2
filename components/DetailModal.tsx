@@ -25,9 +25,11 @@ interface DetailModalProps {
   onCreateContract?: (record: Partial<RecordFile>) => void;
   onRefreshData?: () => void;
   onOpenRejectReturnModal?: (record: RecordFile) => void;
+  onOpenExtendModal?: (record: RecordFile) => void;
+  onOpenSupplementModal?: (record: RecordFile) => void;
 }
 
-export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, employees, users, currentUser, onEdit, onDelete, onCreateLiquidation, onCreateContract, onRefreshData, onOpenRejectReturnModal }) => {
+export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, employees, users, currentUser, onEdit, onDelete, onCreateLiquidation, onCreateContract, onRefreshData, onOpenRejectReturnModal, onOpenExtendModal, onOpenSupplementModal }) => {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [previewBlob, setPreviewBlob] = useState<Blob | null>(null);
   const [previewFileName, setPreviewFileName] = useState('');
@@ -601,13 +603,33 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
             </div>
             
             <div className="flex items-center gap-2">
-                {onOpenRejectReturnModal && record && (record.status === RecordStatus.PENDING_CHECK || record.status === RecordStatus.PENDING_SIGN || record.status === RecordStatus.SIGNED) && (
+                {onOpenExtendModal && record && (record.status !== RecordStatus.HANDOVER && record.status !== RecordStatus.RETURNED && record.status !== RecordStatus.WITHDRAWN) && (
+                    <button
+                        onClick={() => { onClose(); onOpenExtendModal(record); }}
+                        className="flex items-center gap-2 px-3 py-1.5 bg-purple-50 border border-purple-200 text-purple-700 rounded hover:bg-purple-100 transition-colors text-sm font-bold shadow-sm"
+                        title="Gia hạn ngày hẹn trả kết quả"
+                    >
+                        <CalendarClock size={16} /> Gia hạn ngày hẹn
+                    </button>
+                )}
+
+                {onOpenSupplementModal && record && record.status === RecordStatus.PENDING_SUPPLEMENT && (
+    <button
+        onClick={() => { onClose(); onOpenSupplementModal(record); }}
+        className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 border border-amber-200 text-amber-700 rounded hover:bg-amber-100 transition-colors text-sm font-bold shadow-sm"
+        title="Tiếp nhận bổ sung hồ sơ và chuyển tiếp tục xử lý"
+    >
+        <FileCheck size={16} /> Bổ sung hồ sơ
+    </button>
+)}
+
+                {onOpenRejectReturnModal && record && (record.status !== RecordStatus.HANDOVER && record.status !== RecordStatus.RETURNED && record.status !== RecordStatus.WITHDRAWN) && (
                     <button
                         onClick={() => { onClose(); onOpenRejectReturnModal(record); }}
                         className="flex items-center gap-2 px-3 py-1.5 bg-rose-50 border border-rose-200 text-rose-700 rounded hover:bg-rose-100 transition-colors text-sm font-bold shadow-sm"
-                        title="Trả hồ sơ về bước trước (Yêu cầu sửa)"
+                        title="Trả hồ sơ"
                     >
-                        <Undo2 size={16} /> Trả lại / Yêu cầu sửa
+                        <Undo2 size={16} /> Trả hồ sơ
                     </button>
                 )}
 

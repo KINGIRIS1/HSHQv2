@@ -253,11 +253,10 @@ export const useRecordFilter = (
         }
 
         // Cap Giay Sub-step Filter (Chỉ áp dụng trong tab Đang thực hiện)
-        if (currentView === 'other_completed_list') {
-            const activeSubStep = (capGiaySubStepFilter === 'all' || !capGiaySubStepFilter) ? 'tham_dinh' : capGiaySubStepFilter;
+        if (currentView === 'other_completed_list' && capGiaySubStepFilter && capGiaySubStepFilter !== 'all') {
             result = result.filter(r => {
                 const currentSubStep = r.capGiaySubStep || 'tham_dinh';
-                return currentSubStep === activeSubStep;
+                return currentSubStep === capGiaySubStepFilter;
             });
         }
 

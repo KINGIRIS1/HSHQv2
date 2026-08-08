@@ -9,6 +9,7 @@ import {
   RolePermissions,
   DepartmentPermissions,
   DEFAULT_ROLE_PERMISSIONS,
+  RecordStatus,
 } from "../types";
 import { STATUS_LABELS, CAP_GIAY_SUB_STEPS } from "../constants";
 import { COLUMN_DEFS, removeVietnameseTones, matchDepartmentKey } from "../utils/appHelpers";
@@ -224,6 +225,7 @@ interface AppRoutesProps {
   setIsDiagnosticModalOpen?: (b: boolean) => void;
   setIsExtendModalOpen?: (b: boolean) => void;
   setExtendTargetRecord?: (r: RecordFile | null) => void;
+  handleOpenExtendModal?: (records: RecordFile[]) => void;
   onExtendDeadline?: (record: RecordFile) => void;
   advanceStatus: (r: RecordFile) => void;
   handleOpenReturnModal: (r: RecordFile) => void;
@@ -231,6 +233,7 @@ interface AppRoutesProps {
   setColumnOrder: React.Dispatch<React.SetStateAction<string[]>>;
   onBulkUpdate?: (field: keyof RecordFile, value: any, customDate?: string, targetRecordIds?: string[]) => Promise<void>;
   handleOpenRejectReturnModal?: (records: RecordFile[]) => void;
+  handleOpenSupplementModal?: (records: RecordFile[]) => void;
 }
 
 const AppRoutes: React.FC<AppRoutesProps> = (props) => {
@@ -998,37 +1001,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                 </div>
               )}
 
-            {/* CẤP GIẤY SUB-STEP TABS (ĐẶT NGAY CẠNH NÚT MỞ/ĐÓNG LỌC - CHỈ HIỂN THỊ TRONG TAB CẤP GIẤY) */}
-            {(currentView === "other_completed_list" || currentView === "other_records") && (
-              <div className="flex items-center gap-1.5 overflow-x-auto border-l border-gray-300 pl-2">
-                <button
-                  onClick={() => props.setCapGiaySubStepFilter && props.setCapGiaySubStepFilter('all')}
-                  className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all whitespace-nowrap border cursor-pointer ${
-                    (!props.capGiaySubStepFilter || props.capGiaySubStepFilter === 'all')
-                      ? 'bg-slate-700 text-white border-slate-700 shadow-xs'
-                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
-                  }`}
-                >
-                  Tất cả bước
-                </button>
-                {CAP_GIAY_SUB_STEPS.map((step) => {
-                  const isActive = props.capGiaySubStepFilter === step.id;
-                  return (
-                    <button
-                      key={step.id}
-                      onClick={() => props.setCapGiaySubStepFilter && props.setCapGiaySubStepFilter(step.id)}
-                      className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all whitespace-nowrap border cursor-pointer ${
-                        isActive
-                          ? 'bg-teal-700 text-white border-teal-700 shadow-xs'
-                          : 'bg-white text-slate-700 border-slate-200 hover:bg-teal-50 hover:border-teal-300'
-                      }`}
-                    >
-                      {step.label}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+
 
             {(currentView === "all_records" ||
               currentView === "other_records" ||
@@ -1132,13 +1105,24 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                     <button
                       onClick={() => {
                         const targets = records.filter((r) => props.selectedRecordIds.has(r.id));
-                        if (targets.length > 0 && props.setExtendTargetRecord && props.setIsExtendModalOpen) {
-                          props.setExtendTargetRecord(targets[0]);
-                          props.setIsExtendModalOpen(true);
+                        const validTargets = targets.filter((r) => 
+                            r.status !== RecordStatus.HANDOVER && 
+                            r.status !== RecordStatus.RETURNED && 
+                            r.status !== RecordStatus.WITHDRAWN
+                        );
+                        if (validTargets.length === 0) {
+                            console.warn('Không có hồ sơ hợp lệ (ở các bước trước Giao 1 cửa) để thực hiện gia hạn!');
+                            return;
+                        }
+                        if (props.handleOpenExtendModal) {
+                            props.handleOpenExtendModal(validTargets);
+                        } else if (props.setExtendTargetRecord && props.setIsExtendModalOpen) {
+                            props.setExtendTargetRecord(validTargets[0]);
+                            props.setIsExtendModalOpen(true);
                         }
                       }}
-                      className="flex items-center gap-1.5 bg-purple-600 text-white px-3 py-1.5 rounded-md hover:bg-purple-700 text-sm font-bold shadow-sm transition-all"
-                      title="Gia hạn ngày hẹn trả kết quả cho hồ sơ đang chọn"
+                      className="flex items-center gap-1.5 bg-purple-600 text-white px-3 py-1.5 rounded-md hover:bg-purple-700 text-sm font-bold shadow-sm transition-all cursor-pointer"
+                      title="Gia hạn ngày hẹn trả kết quả cho các hồ sơ đang chọn"
                     >
                       <CalendarClock size={16} /> Gia hạn ({props.selectedRecordIds.size})
                     </button>
@@ -1196,9 +1180,9 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                         props.handleOpenRejectReturnModal!(targets);
                       }}
                       className="flex items-center gap-1.5 bg-rose-600 text-white px-3 py-1.5 rounded-md hover:bg-rose-700 text-sm font-bold shadow-sm transition-all"
-                      title="Trả hồ sơ không đạt về bước Đang thực hiện"
+                      title="Trả hồ sơ"
                     >
-                      <Undo2 size={16} /> Trả Về / Sửa ({props.selectedRecordIds.size})
+                      <Undo2 size={16} /> Trả hồ sơ ({props.selectedRecordIds.size})
                     </button>
                   )}
 
@@ -1298,13 +1282,33 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                   isOtherView) &&
                   props.selectedRecordIds.size > 0 && (
                     <>
+                      {currentView === "all_records" && (() => {
+                        const supplementTargets = records.filter((r) =>
+                          props.selectedRecordIds.has(r.id) &&
+                          r.status === RecordStatus.PENDING_SUPPLEMENT
+                        );
+                        if (supplementTargets.length === 0) return null;
+                        return (
+                          <button
+                            onClick={() => {
+                              if (props.handleOpenSupplementModal) {
+                                props.handleOpenSupplementModal(supplementTargets);
+                              }
+                            }}
+                            className="flex items-center gap-1.5 bg-amber-600 text-white px-3 py-1.5 rounded-md hover:bg-amber-700 text-sm font-bold shadow-sm transition-all cursor-pointer"
+                            title="Tiếp nhận bổ sung cho các hồ sơ đang ở trạng thái Chờ bổ sung"
+                          >
+                            <FileCheck size={16} /> Bổ sung ({supplementTargets.length})
+                          </button>
+                        );
+                      })()}
                       {hasPermission('BTN_REJECT_RECORD') && (
                         <button
                           onClick={props.handleMarkAsRejected}
                           className="flex items-center gap-1.5 bg-red-600 text-white px-3 py-1.5 rounded-md hover:bg-red-700 text-sm font-bold shadow-sm transition-all"
-                          title="Trả hồ sơ về Bộ phận 1 cửa"
+                          title="Trả hồ sơ"
                         >
-                          <ClipboardList size={16} /> Hồ sơ trả ({props.selectedRecordIds.size})
+                          <Undo2 size={16} /> Trả hồ sơ ({props.selectedRecordIds.size})
                         </button>
                       )}
                       {(hasPermission('BTN_ASSIGN_STAFF') || hasPermission('ASSIGN_RECORDS')) && (() => {
