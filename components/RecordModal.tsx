@@ -148,15 +148,54 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
   const targetDept = useMemo(() => {
     const rType = String(formData.recordType || '').toLowerCase();
     const rCode = String(formData.code || '').toLowerCase();
-    if (rType.includes('1.1') || rType.includes('1.2') || rType.includes('công văn') || rType.includes('sao lục') || rCode.startsWith('1.')) {
+    const shortType = getShortRecordType(formData.recordType).toLowerCase();
+
+    // 1. Tổ Lưu trữ / Cung cấp thông tin (nhóm 1.*, công văn, sao lục)
+    if (
+      rType.includes('1.1') || 
+      rType.includes('1.2') || 
+      rType.includes('công văn') || 
+      rType.includes('sao lục') || 
+      rCode.startsWith('1.') ||
+      shortType.startsWith('1.')
+    ) {
       return 'Tổ Lưu trữ';
     }
-    if (rType.includes('2.2') || rType.includes('2.3') || rType.includes('2.4') || rType.includes('2.5') || rType.includes('2.6') || rType.includes('số thửa') || rType.includes('trích đo') || rType.includes('đo đạc')) {
-      return 'Tổ Đo đạc';
-    }
-    if (rType.includes('2.1') || rType.includes('trích lục') || rType.includes('cấp giấy') || rType.includes('đăng ký')) {
+
+    // 2. Tổ Cấp giấy (Chính xác là các thủ tục nhóm 3.*, cấp giấy, GCN, biến động...)
+    const isCapGiayGroup = 
+      rType.startsWith('3.') || 
+      rCode.startsWith('3.') || 
+      shortType.startsWith('3.') || 
+      rType.includes('3.4.1') ||
+      rType.includes('cấp giấy') ||
+      rType.includes('gcn') ||
+      rType.includes('đăng ký') ||
+      rType.includes('cấp đổi') ||
+      rType.includes('cấp lại') ||
+      rType.includes('biến động');
+
+    if (isCapGiayGroup && !rType.includes('2.5') && !rType.includes('đo đạc') && !rType.includes('trích đo')) {
       return 'Tổ Cấp giấy';
     }
+
+    // 3. Tổ Đo đạc (nhóm 2.*, trích đo, đo đạc, cắm mốc, số thửa, chỉnh lý, tách thửa đo đạc...)
+    if (
+      rType.startsWith('2.') || 
+      rCode.startsWith('2.') || 
+      shortType.startsWith('2.') || 
+      rType.includes('2.1') || rType.includes('2.2') || rType.includes('2.3') || rType.includes('2.4') || rType.includes('2.5') || rType.includes('2.6') || 
+      rType.includes('đo đạc') || 
+      rType.includes('trích đo') || 
+      rType.includes('cắm mốc') || 
+      rType.includes('chỉnh lý') || 
+      rType.includes('số thửa') ||
+      rType.includes('tách thửa') ||
+      rType.includes('tách-hợp thửa')
+    ) {
+      return 'Tổ Đo đạc';
+    }
+
     return 'Tổ Cấp giấy';
   }, [formData.recordType, formData.code]);
 
@@ -169,7 +208,6 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
       'tổ đo đạc': ['tổ đo đạc', 'đo đạc', 'kỹ thuật', 'bản đồ'],
       'tổ lưu trữ': ['tổ thông tin lưu trữ', 'tổ lưu trữ', 'thông tin lưu trữ', 'lưu trữ'],
       'tổ hành chính': ['tổ hành chính', 'một cửa', 'quản trị hệ thống', 'hành chính'],
-      'ban giám đốc': ['ban giám đốc', 'giám đốc', 'ban lãnh đạo']
     };
 
     let targetKey = 'tổ cấp giấy';
@@ -182,13 +220,13 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
     }
 
     const validKeys = DEPT_KEYS[targetKey] || DEPT_KEYS['tổ cấp giấy'];
-    const leaderKeys = DEPT_KEYS['ban giám đốc'];
 
     const matched = employees.filter(emp => {
       const empDept = (emp.department || '').toLowerCase();
-      const isMatchDept = validKeys.some(k => empDept.includes(k));
-      const isLeader = leaderKeys.some(k => empDept.includes(k));
-      return isMatchDept || isLeader;
+      // Bỏ Ban Giám Đốc khỏi danh sách chọn người xử lý
+      const isBgd = empDept.includes('ban giám đốc') || empDept.includes('giám đốc') || empDept.includes('ban lãnh đạo');
+      if (isBgd) return false;
+      return validKeys.some(k => empDept.includes(k));
     });
 
     if (formData.assignedTo && !matched.some(e => e.id === formData.assignedTo)) {

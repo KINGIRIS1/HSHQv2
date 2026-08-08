@@ -318,11 +318,12 @@ export const calculateDeadlineHelperByDays = (daysToAdd: number, startDateStr: s
 
 // Lấy SLA theo từng bước quy trình Cấp Giấy (tính bằng số ngày làm việc)
 export const getCapGiayStepSLA = (subStep?: string | null, hasThamdinh?: boolean): number => {
+    if (subStep === 'tiep_nhan') return 1;
     if (!subStep || subStep === 'tham_dinh') return 1; // Bước 1: Thẩm định (1 ngày)
     if (subStep === 'phieu_chuyen_thue') return hasThamdinh ? 2 : 3; // Bước 2: 2 ngày nếu qua thẩm định, 3 ngày nếu không qua
-    if (subStep === 'cho_nop_thue') return 0; // Chờ người dân nộp thuế (Một cửa)
-    if (subStep === 'hoan_thien_trinh_duyet') return 5; // Bước 4: Hoàn thiện in GCN (5 ngày)
-    if (subStep === 'trinh_kiem_tra') return 1; // Trình kiểm tra (1 ngày)
+    if (subStep === 'cho_nop_thue' || subStep === 'cho_giay_nop_tien') return 0; // Chờ người dân nộp thuế (Một cửa)
+    if (subStep === 'hoan_thien_trinh_duyet' || subStep === 'in_hoan_thien') return 5; // Hoàn thiện in GCN (5 ngày)
+    if (subStep === 'kiem_tra') return 1; // Kiểm tra (1 ngày)
     if (subStep === 'trinh_ky') return 1; // Trình ký (1 ngày)
     if (subStep === 'vo_so_gcn') return 1; // Vô số GCN (1 ngày)
     return 1;

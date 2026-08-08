@@ -340,15 +340,16 @@ export const MOCK_RECORDS: RecordFile[] = [
 ];
 
 export const CAP_GIAY_SUB_STEPS = [
-  { id: 'tham_dinh', label: '1. Thẩm định', shortLabel: 'Thẩm định', slaDays: 1, color: 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100' },
-  { id: 'phieu_chuyen_thue', label: '2. Phiếu chuyển thuế', shortLabel: 'Phiếu chuyển thuế', slaDays: 2, color: 'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100' },
-  { id: 'cho_tbt', label: '3. Chờ TBT (5 ngày)', shortLabel: 'Chờ TBT', slaDays: 5, color: 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100' },
-  { id: 'cho_nop_thue', label: '4. Chờ nộp thuế (GNT)', shortLabel: 'Chờ nộp thuế', slaDays: 0, color: 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100' },
-  { id: 'hoan_thien_trinh_duyet', label: '5. In & Hoàn thiện', shortLabel: 'In & Hoàn thiện', slaDays: 3, color: 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' },
-  { id: 'kiem_tra', label: '6. Kiểm tra', shortLabel: 'Kiểm tra', slaDays: 1, color: 'bg-cyan-50 text-cyan-700 border-cyan-200 hover:bg-cyan-100' },
-  { id: 'trinh_ky', label: '7. Trình ký', shortLabel: 'Trình ký', slaDays: 1, color: 'bg-violet-50 text-violet-700 border-violet-200 hover:bg-violet-100' },
-  { id: 'vo_so_gcn', label: '8. Vô số GCN', shortLabel: 'Vô số GCN', slaDays: 1, color: 'bg-teal-50 text-teal-700 border-teal-200 hover:bg-teal-100' },
-  { id: 'cho_ban_giao', label: '9. Giao 1 cửa', shortLabel: 'Giao 1 cửa', slaDays: 1, color: 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100' },
+  { id: 'tiep_nhan', label: '1. Tiếp nhận', shortLabel: 'Tiếp nhận', slaDays: 1, color: 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100' },
+  { id: 'tham_dinh', label: '2. Thẩm định', shortLabel: 'Thẩm định', slaDays: 1, color: 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100' },
+  { id: 'phieu_chuyen_thue', label: '3. Phiếu chuyển thuế', shortLabel: 'Phiếu chuyển thuế', slaDays: 2, color: 'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100' },
+  { id: 'cho_tbt', label: '4. Chờ TBT (5 ngày)', shortLabel: 'Chờ TBT', slaDays: 5, color: 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100' },
+  { id: 'cho_nop_thue', label: '5. Chờ nộp thuế (GNT)', shortLabel: 'Chờ nộp thuế', slaDays: 0, color: 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100' },
+  { id: 'hoan_thien_trinh_duyet', label: '6. In & Hoàn thiện', shortLabel: 'In & Hoàn thiện', slaDays: 3, color: 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' },
+  { id: 'kiem_tra', label: '7. Kiểm tra', shortLabel: 'Kiểm tra', slaDays: 1, color: 'bg-cyan-50 text-cyan-700 border-cyan-200 hover:bg-cyan-100' },
+  { id: 'trinh_ky', label: '8. Trình ký', shortLabel: 'Trình ký', slaDays: 1, color: 'bg-violet-50 text-violet-700 border-violet-200 hover:bg-violet-100' },
+  { id: 'vo_so_gcn', label: '9. Vô số GCN', shortLabel: 'Vô số GCN', slaDays: 1, color: 'bg-teal-50 text-teal-700 border-teal-200 hover:bg-teal-100' },
+  { id: 'cho_ban_giao', label: '10. Giao 1 cửa', shortLabel: 'Giao 1 cửa', slaDays: 1, color: 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100' },
 ] as const;
 
 export const isCapGiayRecord = (record: RecordFile | Partial<RecordFile> | null | undefined): boolean => {
@@ -409,23 +410,7 @@ export const isTaxDefaultRecordType = (type: string | null | undefined): boolean
 // - Hồ sơ Cấp lại GCN (3.3.1 - không thuế nhưng cần thẩm định): Thẩm định (tham_dinh)
 // - Các hồ sơ không thuế còn lại (Cấp đổi 3.2.1, Tách - hợp thửa 3.4.1, Gia hạn 3.5.1, Đính chính 37.1...): Hoàn thiện in GCN (hoan_thien_trinh_duyet)
 export const getDefaultCapGiaySubStep = (type?: string | null): string => {
-  if (!type) return 'tham_dinh';
-  const t = type.toLowerCase().trim();
-  const short = getShortRecordType(type);
-
-  // 1. Nếu là thủ tục Cấp lại (3.3.1 - không thuế) -> Mặc định cần Thẩm định (Bước 1)
-  if (short.startsWith('3.3.1') || (t.includes('cấp lại') && !t.includes('thuế'))) {
-    return 'tham_dinh';
-  }
-
-  // 2. Nếu là thủ tục Có thuế -> Mặc định Phiếu chuyển thuế (Bước 2)
-  if (isTaxDefaultRecordType(type)) {
-    return 'phieu_chuyen_thue';
-  }
-
-  // 3. Với các hồ sơ không thuế còn lại (3.2.1 Cấp đổi, 3.4.1 Tách - hợp thửa, 3.5.1 Gia hạn, 37.1 Đính chính...)
-  // Mặc định giao việc tại In và Hoàn thiện GCN (hoan_thien_trinh_duyet)
-  return 'hoan_thien_trinh_duyet';
+  return 'tiep_nhan';
 };
 
 export const getRecordPlotCount = (record: RecordFile | Partial<RecordFile> | null | undefined): number => {
@@ -439,6 +424,7 @@ export const getRecordPlotCount = (record: RecordFile | Partial<RecordFile> | nu
 };
 
 export const getCapGiaySubStepLabel = (subStep?: string | null): string => {
+  if (subStep === 'tiep_nhan') return 'Tiếp nhận';
   if (!subStep || subStep === 'tham_dinh' || subStep === 'tham_tra') return 'Thẩm định';
   if (subStep === 'phieu_chuyen_thue') return 'Phiếu chuyển thuế';
   if (subStep === 'cho_tbt') return 'Chờ TBT';
@@ -452,19 +438,21 @@ export const getCapGiaySubStepLabel = (subStep?: string | null): string => {
 };
 
 export const getCapGiaySubStepFullLabel = (subStep?: string | null): string => {
-  if (!subStep || subStep === 'tham_dinh' || subStep === 'tham_tra') return '1. Thẩm định';
-  if (subStep === 'phieu_chuyen_thue') return '2. Phiếu chuyển thuế';
-  if (subStep === 'cho_tbt') return '3. Chờ TBT (5 ngày)';
-  if (subStep === 'cho_nop_thue' || subStep === 'cho_giay_nop_tien') return '4. Chờ nộp thuế (GNT)';
-  if (subStep === 'hoan_thien_trinh_duyet' || subStep === 'in_hoan_thien') return '5. In & Hoàn thiện';
-  if (subStep === 'kiem_tra') return '6. Kiểm tra';
-  if (subStep === 'trinh_ky') return '7. Trình ký';
-  if (subStep === 'vo_so_gcn') return '8. Vô số GCN & Ngày ký';
-  if (subStep === 'cho_ban_giao') return '9. Giao 1 cửa';
+  if (subStep === 'tiep_nhan') return '1. Tiếp nhận';
+  if (!subStep || subStep === 'tham_dinh' || subStep === 'tham_tra') return '2. Thẩm định';
+  if (subStep === 'phieu_chuyen_thue') return '3. Phiếu chuyển thuế';
+  if (subStep === 'cho_tbt') return '4. Chờ TBT (5 ngày)';
+  if (subStep === 'cho_nop_thue' || subStep === 'cho_giay_nop_tien') return '5. Chờ nộp thuế (GNT)';
+  if (subStep === 'hoan_thien_trinh_duyet' || subStep === 'in_hoan_thien') return '6. In & Hoàn thiện';
+  if (subStep === 'kiem_tra') return '7. Kiểm tra';
+  if (subStep === 'trinh_ky') return '8. Trình ký';
+  if (subStep === 'vo_so_gcn') return '9. Vô số GCN & Ngày ký';
+  if (subStep === 'cho_ban_giao') return '10. Giao 1 cửa';
   return subStep;
 };
 
 export const getCapGiaySubStepBadgeColor = (subStep?: string | null): string => {
+  if (subStep === 'tiep_nhan') return 'bg-slate-50 text-slate-700 border-slate-200';
   if (!subStep || subStep === 'tham_dinh') return 'bg-blue-50 text-blue-700 border-blue-200';
   if (subStep === 'phieu_chuyen_thue') return 'bg-purple-50 text-purple-700 border-purple-200';
   if (subStep === 'cho_tbt') return 'bg-indigo-50 text-indigo-700 border-indigo-200';

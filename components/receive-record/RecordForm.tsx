@@ -124,16 +124,9 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
   }, [notification]);
 
   useEffect(() => {
-    if (!initialData) {
-        const isCapGiay = isCapGiayRecord(formData);
+    if (!initialData && !formData.code) {
         const newCode = generateCode(processingWard, formData.receivedDate || '', [], formData.recordType || undefined);
-        setFormData(prev => {
-            if (isCapGiay && prev.code && prev.code.trim() !== '' && prev.code !== newCode && !prev.code.startsWith('CV-')) {
-                return prev;
-            }
-            if (prev.code === newCode) return prev;
-            return { ...prev, code: newCode };
-        });
+        setFormData(prev => ({ ...prev, code: newCode }));
     }
   }, [processingWard, formData.receivedDate, formData.recordType, records, initialData]);
 
@@ -364,22 +357,16 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
 
                 <div>
                     <label className={labelClass}>
-                        Mã hồ sơ
-                        {isCapGiayRecord(formData) && (
-                            <span className="text-[11px] font-normal text-teal-600 ml-1 font-sans">(Nhập mã từ PM khác)</span>
-                        )}
+                        Mã hồ sơ / Số iGate <span className="text-red-500">*</span>
+                        <span className="text-[11px] font-normal text-teal-600 ml-1 font-sans">(Cán bộ tự nhập hoặc tự động)</span>
                     </label>
                     <input 
                         type="text" 
-                        readOnly={!isCapGiayRecord(formData) && !initialData} 
-                        className={`${inputClass} font-mono ${
-                            isCapGiayRecord(formData) || initialData 
-                                ? 'bg-white font-bold text-blue-700 border-teal-400 focus:border-teal-500' 
-                                : 'bg-slate-100 text-slate-500 cursor-not-allowed'
-                        }`} 
+                        required
+                        className={`${inputClass} font-mono bg-white font-bold text-blue-700 border-teal-400 focus:border-teal-500`}
                         value={formData.code || ''} 
-                        onChange={(e) => (isCapGiayRecord(formData) || initialData) && handleChange('code', e.target.value)} 
-                        placeholder={isCapGiayRecord(formData) ? "Nhập mã hồ sơ..." : "Mã tự động"}
+                        onChange={(e) => handleChange('code', e.target.value)} 
+                        placeholder="Nhập số hồ sơ iGate..."
                     />
                 </div>
 
