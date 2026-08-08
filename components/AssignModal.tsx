@@ -16,31 +16,31 @@ const DEPARTMENTS_CONFIG: DeptConfig[] = [
         id: 'Tổ Cấp giấy',
         label: 'Tổ Cấp giấy',
         subtitle: 'Đăng ký, biến động, cấp ...',
-        matchKeys: ['tổ cấp giấy', 'tổ đăng ký cấp giấy', 'đăng ký cấp giấy', 'tổ đăng ký', 'cấp giấy']
+        matchKeys: ['tổ cấp giấy', 'tổ đăng ký cấp giấy', 'đăng ký cấp giấy', 'tổ đăng ký', 'cấp giấy', 'đăng ký', 'biến động']
     },
     {
         id: 'Tổ Lưu trữ',
         label: 'Tổ Lưu trữ',
         subtitle: 'Khai thác hồ sơ & dữ liệu l...',
-        matchKeys: ['tổ thông tin lưu trữ', 'tổ lưu trữ', 'thông tin lưu trữ', 'lưu trữ']
+        matchKeys: ['tổ thông tin lưu trữ', 'tổ lưu trữ', 'thông tin lưu trữ', 'lưu trữ', 'thông tin', 'sao lục', 'công văn']
     },
     {
         id: 'Tổ Đo đạc',
         label: 'Tổ Đo đạc',
         subtitle: 'Đo vẽ bản đồ, trích đo th...',
-        matchKeys: ['tổ đo đạc', 'đo đạc']
+        matchKeys: ['tổ đo đạc', 'đo đạc', 'đo dạc', 'kỹ thuật', 'bản đồ', 'tổ đo', 'nội nghiệp', 'ngoại nghiệp', 'địa chính']
     },
     {
         id: 'Tổ Hành chính',
         label: 'Tổ Hành chính',
         subtitle: 'Một cửa, tổng hợp, hành ...',
-        matchKeys: ['tổ hành chính', 'một cửa', 'quản trị hệ thống', 'hành chính']
+        matchKeys: ['tổ hành chính', 'một cửa', 'quản trị hệ thống', 'hành chính', 'tổng hợp']
     },
     {
         id: 'Ban Giám đốc',
         label: 'Ban Giám đốc',
         subtitle: 'Ban Giám đốc & Phối hợp ...',
-        matchKeys: ['ban giám đốc', 'giám đốc']
+        matchKeys: ['ban giám đốc', 'giám đốc', 'ban lãnh đạo', 'phó giám đốc']
     }
 ];
 

@@ -201,27 +201,36 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
 
   const filteredEmployees = useMemo(() => {
     if (!employees || employees.length === 0) return [];
-    const deptLower = targetDept.toLowerCase();
+    
+    // X определяем bộ phận theo currentView hoặc recordType
+    let targetKey = 'tổ cấp giấy';
+    if (isMeasurementView) {
+      targetKey = 'tổ đo đạc';
+    } else if (isArchiveView) {
+      targetKey = 'tổ lưu trữ';
+    } else if (isOtherView || isCapGiayView) {
+      targetKey = 'tổ cấp giấy';
+    } else {
+      const deptLower = targetDept.toLowerCase();
+      if (deptLower.includes('đo đạc') || deptLower.includes('đo dạc') || deptLower.includes('kỹ thuật') || deptLower.includes('nội nghiệp') || deptLower.includes('ngoại nghiệp')) {
+        targetKey = 'tổ đo đạc';
+      } else if (deptLower.includes('lưu trữ') || deptLower.includes('thông tin') || deptLower.includes('sao lục') || deptLower.includes('công văn')) {
+        targetKey = 'tổ lưu trữ';
+      } else if (deptLower.includes('hành chính') || deptLower.includes('một cửa')) {
+        targetKey = 'tổ hành chính';
+      }
+    }
     
     const DEPT_KEYS: Record<string, string[]> = {
-      'tổ cấp giấy': ['tổ cấp giấy', 'tổ đăng ký cấp giấy', 'đăng ký cấp giấy', 'tổ đăng ký', 'cấp giấy', 'đăng ký'],
-      'tổ đo đạc': ['tổ đo đạc', 'đo đạc', 'kỹ thuật', 'bản đồ'],
-      'tổ lưu trữ': ['tổ thông tin lưu trữ', 'tổ lưu trữ', 'thông tin lưu trữ', 'lưu trữ'],
-      'tổ hành chính': ['tổ hành chính', 'một cửa', 'quản trị hệ thống', 'hành chính'],
+      'tổ cấp giấy': ['tổ cấp giấy', 'tổ đăng ký cấp giấy', 'đăng ký cấp giấy', 'tổ đăng ký', 'cấp giấy', 'đăng ký', 'biến động', 'cấp gcn', 'gcn', 'đăng ký & cấp giấy', 'bộ phận cấp giấy'],
+      'tổ đo đạc': ['tổ đo đạc', 'đo đạc', 'đo dạc', 'kỹ thuật', 'bản đồ', 'tổ đo', 'nội nghiệp', 'ngoại nghiệp', 'địa chính', 'bản đồ địa chính'],
+      'tổ lưu trữ': ['tổ thông tin lưu trữ', 'tổ lưu trữ', 'thông tin lưu trữ', 'lưu trữ', 'thông tin', 'sao lục', 'công văn', 'tổ ttltr', 'ttltr'],
+      'tổ hành chính': ['tổ hành chính', 'một cửa', 'quản trị hệ thống', 'hành chính', 'tổng hợp', 'bộ phận tiếp nhận'],
     };
-
-    let targetKey = 'tổ cấp giấy';
-    if (deptLower.includes('đo đạc') || deptLower.includes('kỹ thuật')) {
-      targetKey = 'tổ đo đạc';
-    } else if (deptLower.includes('lưu trữ') || deptLower.includes('thông tin')) {
-      targetKey = 'tổ lưu trữ';
-    } else if (deptLower.includes('hành chính') || deptLower.includes('một cửa')) {
-      targetKey = 'tổ hành chính';
-    }
 
     const validKeys = DEPT_KEYS[targetKey] || DEPT_KEYS['tổ cấp giấy'];
 
-    const matched = employees.filter(emp => {
+    let matched = employees.filter(emp => {
       const empDept = (emp.department || '').toLowerCase();
       // Bỏ Ban Giám Đốc khỏi danh sách chọn người xử lý
       const isBgd = empDept.includes('ban giám đốc') || empDept.includes('giám đốc') || empDept.includes('ban lãnh đạo');
@@ -229,12 +238,20 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
       return validKeys.some(k => empDept.includes(k));
     });
 
+    // Dự phòng: nếu lọc quá hẹp dẫn tới rỗng, lấy tất cả nhân viên không phải Giám đốc
+    if (matched.length === 0) {
+      matched = employees.filter(emp => {
+        const empDept = (emp.department || '').toLowerCase();
+        return !empDept.includes('ban giám đốc') && !empDept.includes('giám đốc') && !empDept.includes('ban lãnh đạo');
+      });
+    }
+
     if (formData.assignedTo && !matched.some(e => e.id === formData.assignedTo)) {
       const assignedEmp = employees.find(e => e.id === formData.assignedTo);
       if (assignedEmp) matched.push(assignedEmp);
     }
     return matched;
-  }, [employees, targetDept, formData.assignedTo]);
+  }, [employees, targetDept, formData.assignedTo, currentView, isMeasurementView, isArchiveView, isOtherView, isCapGiayView]);
 
   useEffect(() => {
     if (isOpen) {
@@ -334,13 +351,13 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
         // được chốt lại để không bị mất màu trên Timeline do thiếu Date.
         if (initialData?.status && finalData.status !== initialData?.status) {
             const flow = [
-                RecordStatus.RECEIVED, RecordStatus.ASSIGNED, RecordStatus.IN_PROGRESS, RecordStatus.PENDING_CHECK, 
+                RecordStatus.RECEIVED, RecordStatus.IN_PROGRESS, RecordStatus.PENDING_CHECK, 
                 RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER
             ];
             // Tạm dùng initialData.status để lấp ngày (để đóng băng tiến độ cũ)
             const prevIdx = flow.indexOf(initialData.status);
             if (prevIdx >= 0) {
-                if (prevIdx >= flow.indexOf(RecordStatus.ASSIGNED) && !finalData.assignedDate && !explicitCleared.assignedDate) finalData.assignedDate = now;
+                if (prevIdx >= flow.indexOf(RecordStatus.IN_PROGRESS) && !finalData.assignedDate && !explicitCleared.assignedDate) finalData.assignedDate = now;
                 if (prevIdx >= flow.indexOf(RecordStatus.IN_PROGRESS) && !finalData.completedWorkDate && !explicitCleared.completedWorkDate) finalData.completedWorkDate = now;
                 if (prevIdx >= flow.indexOf(RecordStatus.PENDING_CHECK) && !finalData.pendingCheckDate && !explicitCleared.pendingCheckDate) finalData.pendingCheckDate = now;
                 if (prevIdx >= flow.indexOf(RecordStatus.PENDING_CHECK) && !finalData.checkedDate && !explicitCleared.checkedDate) finalData.checkedDate = now;
@@ -350,7 +367,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
             // Auto fill current forward progress as well if going forward
             const newIdx = flow.indexOf(finalData.status);
             if (newIdx >= 0) {
-                if (newIdx >= flow.indexOf(RecordStatus.ASSIGNED) && !finalData.assignedDate && !explicitCleared.assignedDate) finalData.assignedDate = now;
+                if (newIdx >= flow.indexOf(RecordStatus.IN_PROGRESS) && !finalData.assignedDate && !explicitCleared.assignedDate) finalData.assignedDate = now;
                 if (newIdx >= flow.indexOf(RecordStatus.IN_PROGRESS) && !finalData.completedWorkDate && !explicitCleared.completedWorkDate) finalData.completedWorkDate = now;
                 if (newIdx >= flow.indexOf(RecordStatus.PENDING_CHECK) && !finalData.pendingCheckDate && !explicitCleared.pendingCheckDate) finalData.pendingCheckDate = now;
                 if (newIdx >= flow.indexOf(RecordStatus.PENDING_CHECK) && !finalData.checkedDate && !explicitCleared.checkedDate) finalData.checkedDate = now;
@@ -447,12 +464,12 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
     if (finalData.status) {
         if (explicitCleared.submissionDate || (!finalData.submissionDate && initialData?.submissionDate)) {
             if ([RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER].includes(finalData.status)) {
-                finalData.status = finalData.checkedDate ? RecordStatus.PENDING_CHECK : (finalData.assignedDate ? RecordStatus.ASSIGNED : RecordStatus.RECEIVED);
+                finalData.status = finalData.checkedDate ? RecordStatus.PENDING_CHECK : (finalData.assignedDate ? RecordStatus.IN_PROGRESS : RecordStatus.RECEIVED);
             }
         }
         if (explicitCleared.checkedDate || (!finalData.checkedDate && initialData?.checkedDate)) {
             if ([RecordStatus.PENDING_CHECK, RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER].includes(finalData.status)) {
-                finalData.status = finalData.assignedDate ? RecordStatus.ASSIGNED : RecordStatus.RECEIVED;
+                finalData.status = finalData.assignedDate ? RecordStatus.IN_PROGRESS : RecordStatus.RECEIVED;
             }
         }
         if (explicitCleared.assignedDate || (!finalData.assignedDate && initialData?.assignedDate)) {
@@ -472,7 +489,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
         cleanData.resultReturnedDate = null;
         cleanData.exportBatch = null;
         cleanData.exportDate = null;
-    } else if (finalData.status === RecordStatus.ASSIGNED) {
+    } else if (finalData.status === RecordStatus.ASSIGNED || finalData.status === RecordStatus.IN_PROGRESS) {
         cleanData.submissionDate = null;
         cleanData.approvalDate = null;
         cleanData.completedDate = null;
@@ -573,7 +590,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                         )}
                         {hasAdminRights && (
                             <>
-                                <div><label className="block text-xs font-bold text-gray-700 mb-1">Trạng thái</label><select className="w-full border border-gray-300 rounded-md px-3 py-2 bg-yellow-50 font-medium" value={val(formData.status)} onChange={(e) => handleChange('status', e.target.value)}>{Object.values(RecordStatus).map(s => <option key={s} value={s}>{STATUS_LABELS[s] || s}</option>)}</select></div>
+                                <div><label className="block text-xs font-bold text-gray-700 mb-1">Trạng thái</label><select className="w-full border border-gray-300 rounded-md px-3 py-2 bg-yellow-50 font-medium" value={val(formData.status)} onChange={(e) => handleChange('status', e.target.value)}>{Object.values(RecordStatus).filter(s => s !== RecordStatus.ASSIGNED).map(s => <option key={s} value={s}>{STATUS_LABELS[s] || s}</option>)}</select></div>
                                 <div><label className="block text-xs font-bold text-gray-700 mb-1">Ngày nhận</label><input type="date" required className="w-full border border-gray-300 rounded-md px-3 py-2" value={dateVal(formData.receivedDate)} onChange={(e) => handleChange('receivedDate', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} /></div>
                                 {!isCongVan && (
                                     <div><label className="block text-xs font-bold text-gray-700 mb-1">Hẹn trả <span className="text-red-500">*</span></label><input type="date" required className="w-full border border-gray-300 rounded-md px-3 py-2 font-semibold text-red-600 bg-red-50" value={dateVal(formData.deadline)} onChange={(e) => handleChange('deadline', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} /></div>

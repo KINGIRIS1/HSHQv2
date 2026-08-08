@@ -67,13 +67,10 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
       const record = selectedRecords[0];
       const type = (record.recordType || '').toLowerCase();
       
-      if (type.includes('1.1') || type.includes('1.2') || type.includes('công văn') || type.includes('lưu trữ')) {
+      if (type.includes('1.1') || type.includes('1.2') || type.includes('công văn') || type.includes('lưu trữ') || type.includes('sao lục')) {
           return 'Tổ Lưu trữ';
       }
-      if (type.includes('2.1') || type.includes('trích lục')) {
-          return 'Tổ Cấp giấy';
-      }
-      if (type.includes('2.2') || type.includes('2.3') || type.includes('2.4') || type.includes('2.5') || type.includes('2.6') || type.includes('số thửa') || type.includes('trích đo') || type.includes('đo đạc')) {
+      if (type.includes('2.1') || type.includes('2.2') || type.includes('2.3') || type.includes('2.4') || type.includes('2.5') || type.includes('2.6') || type.includes('số thửa') || type.includes('trích đo') || type.includes('trích lục') || type.includes('đo đạc')) {
           return 'Tổ Đo đạc';
       }
       return 'Tổ Cấp giấy';
@@ -85,20 +82,20 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
   // - Không gồm nhân viên bộ phận khác
   const filteredEmployeesForAssignment = useMemo(() => {
       const deptLower = recordDept.toLowerCase();
-      const isDoDac = deptLower.includes('đo đạc');
-      const isLuuTru = deptLower.includes('lưu trữ');
-      const isHanhChinh = deptLower.includes('hành chính');
+      const isDoDac = deptLower.includes('đo đạc') || deptLower.includes('đo dạc');
+      const isLuuTru = deptLower.includes('lưu trữ') || deptLower.includes('thông tin');
+      const isHanhChinh = deptLower.includes('hành chính') || deptLower.includes('một cửa');
 
       return employees.filter(emp => {
           const dept = (emp.department || '').toLowerCase();
           if (isDoDac) {
-              return dept.includes('đo đạc') || dept.includes('kỹ thuật');
+              return dept.includes('đo đạc') || dept.includes('đo dạc') || dept.includes('kỹ thuật') || dept.includes('nội nghiệp') || dept.includes('ngoại nghiệp') || dept.includes('địa chính');
           } else if (isLuuTru) {
-              return dept.includes('lưu trữ') || dept.includes('thông tin');
+              return dept.includes('lưu trữ') || dept.includes('thông tin') || dept.includes('sao lục') || dept.includes('công văn');
           } else if (isHanhChinh) {
-              return dept.includes('hành chính') || dept.includes('một cửa');
+              return dept.includes('hành chính') || dept.includes('một cửa') || dept.includes('tổng hợp');
           }
-          return dept.includes('cấp giấy') || dept.includes('đăng ký');
+          return dept.includes('cấp giấy') || dept.includes('đăng ký') || dept.includes('biến động');
       });
   }, [employees, recordDept]);
 
@@ -188,7 +185,7 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
                         >
                             <option value="">-- Chọn trạng thái mới --</option>
                             {Object.entries(STATUS_LABELS)
-                                .filter(([key]) => key !== RecordStatus.IN_PROGRESS)
+                                .filter(([key]) => key !== RecordStatus.ASSIGNED)
                                 .map(([key, label]) => (
                                     <option key={key} value={key}>{label}</option>
                                 ))}

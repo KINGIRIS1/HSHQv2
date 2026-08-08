@@ -929,54 +929,56 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                               className="w-full text-xs border border-gray-200 rounded-md p-1.5 outline-none focus:border-blue-500 bg-gray-50 font-medium text-gray-800 cursor-pointer"
                             >
                               <option value="all">Mọi trạng thái</option>
-                              {Object.entries(STATUS_LABELS).map(([key, label]) => (
-                                <option key={key} value={key}>
-                                  {label}
-                                </option>
-                              ))}
+                              {Object.entries(STATUS_LABELS)
+                                .filter(([key]) => key !== RecordStatus.ASSIGNED)
+                                .map(([key, label]) => (
+                                  <option key={key} value={key}>
+                                    {label}
+                                  </option>
+                                ))}
                             </select>
                           </div>
                         )}
 
                         {/* 6. Lọc Cán bộ / Nhân viên */}
-                        {canPerformAction &&
-                          (currentView === "all_records" ||
-                            currentView === "other_records" ||
-                            currentView === "archive_records") && (
-                            <div>
-                              <label className="block text-[11px] font-bold text-gray-500 mb-1 flex items-center gap-1">
-                                <UserIcon size={13} /> Cán bộ xử lý:
-                              </label>
-                              <select
-                                value={props.filterEmployee}
-                                onChange={(e) => props.setFilterEmployee(e.target.value)}
-                                className="w-full text-xs border border-gray-200 rounded-md p-1.5 outline-none focus:border-blue-500 bg-gray-50 font-medium text-gray-800 cursor-pointer"
-                              >
-                                <option value="all">Tất cả cán bộ</option>
-                                <option value="unassigned">Chưa giao</option>
-                                {employees
-                                  .filter((emp) => {
-                                    const d = removeVietnameseTones((emp.department || '').toLowerCase());
-                                    if (isArchiveMeasurementView) return d.includes('luu tru');
-                                    if (isMeasurementView)
-                                      return (
-                                        d.includes('do dac') ||
-                                        d.includes('ky thuat') ||
-                                        d.includes('to do') ||
-                                        d.includes('dia chinh') ||
-                                        d.includes('noi nghiep') ||
-                                        d.includes('ngoai nghiep')
-                                      );
-                                    return true;
-                                  })
-                                  .map((emp) => (
-                                    <option key={emp.id} value={emp.id}>
-                                      {emp.name}
-                                    </option>
-                                  ))}
-                              </select>
-                            </div>
-                          )}
+                        <div>
+                          <label className="block text-[11px] font-bold text-gray-500 mb-1 flex items-center gap-1">
+                            <UserIcon size={13} /> Cán bộ xử lý:
+                          </label>
+                          <select
+                            value={props.filterEmployee}
+                            onChange={(e) => props.setFilterEmployee(e.target.value)}
+                            className="w-full text-xs border border-gray-200 rounded-md p-1.5 outline-none focus:border-blue-500 bg-gray-50 font-medium text-gray-800 cursor-pointer"
+                          >
+                            <option value="all">Tất cả cán bộ</option>
+                            <option value="unassigned">Chưa giao</option>
+                            {employees
+                              .filter((emp) => {
+                                const d = removeVietnameseTones((emp.department || '').toLowerCase());
+                                if (isArchiveMeasurementView) return d.includes('luu tru') || d.includes('thong tin');
+                                if (isMeasurementView)
+                                  return (
+                                    d.includes('do dac') ||
+                                    d.includes('ky thuat') ||
+                                    d.includes('to do') ||
+                                    d.includes('dia chinh') ||
+                                    d.includes('noi nghiep') ||
+                                    d.includes('ngoai nghiep')
+                                  );
+                                if (isOtherView)
+                                  return (
+                                    d.includes('cap giay') ||
+                                    d.includes('dang ky')
+                                  );
+                                return true;
+                              })
+                              .map((emp) => (
+                                <option key={emp.id} value={emp.id}>
+                                  {emp.name} ({emp.department})
+                                </option>
+                              ))}
+                          </select>
+                        </div>
 
                         {/* Nút Xóa tất cả bộ lọc */}
                         <button

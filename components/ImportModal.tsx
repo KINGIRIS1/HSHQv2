@@ -353,7 +353,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
                 if (sStr.includes('1 CỬA') || sStr.includes('1 CUA') || sStr.includes('MỘT CỬA') || sStr.includes('MOT CUA') || sStr.includes('HANDOVER') || sStr.includes('GIAO 1 CỬA') || sStr.includes('ĐÃ GIAO 1 CỬA') || sStr.includes('BÀN GIAO') || sStr.includes('ĐÃ XUẤT') || sStr.includes('XUẤT 1 CỬA')) {
                     explicitStatus = RecordStatus.HANDOVER;
                 } else if (sStr.includes('GIAO NHÂN VIÊN') || sStr.includes('PASSED_TO') || sStr.includes('ASSIGNED') || sStr.includes('GIAO VIỆC') || sStr.includes('ĐÃ GIAO VIỆC') || sStr.includes('PHÂN CÔNG') || (sStr.includes('ĐÃ GIAO') && !sStr.includes('1 CỬA'))) {
-                    explicitStatus = RecordStatus.ASSIGNED;
+                    explicitStatus = RecordStatus.IN_PROGRESS;
                 } else if (sStr.includes('ĐANG') || sStr.includes('PROGRESS')) {
                     explicitStatus = RecordStatus.IN_PROGRESS;
                 } else if (sStr.includes('ĐÃ THỰC HIỆN') || sStr.includes('THỰC HIỆN XONG') || sStr.includes('IN_PROGRESS') || sStr.includes('ĐO ĐẠC XONG')) {
@@ -393,7 +393,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
                         record.submittedTo = matchedEmpId;
                     } else if (explicitStatus === RecordStatus.PENDING_CHECK) {
                         record.checkedBy = matchedEmpId;
-                    } else if (explicitStatus === RecordStatus.ASSIGNED || explicitStatus === RecordStatus.IN_PROGRESS || explicitStatus === RecordStatus.RECEIVED) {
+                    } else if (explicitStatus === RecordStatus.IN_PROGRESS || explicitStatus === RecordStatus.RECEIVED) {
                         record.assignedTo = matchedEmpId;
                     } else if (mode === 'create') {
                         record.assignedTo = matchedEmpId;
@@ -413,7 +413,6 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
                     record.pendingCheckDate = parsedGeneralDate || record.pendingCheckDate || targetDate;
                 } else if (explicitStatus === RecordStatus.IN_PROGRESS) {
                     record.completedWorkDate = parsedGeneralDate || record.completedWorkDate || targetDate;
-                } else if (explicitStatus === RecordStatus.ASSIGNED) {
                     record.assignedDate = parsedGeneralDate || record.assignedDate || targetDate;
                 }
             } else {

@@ -109,28 +109,8 @@ const MainLayout: React.FC<MainLayoutProps> = ({
                     </div>
                 </div>
 
-                {/* RIGHT: USER INFO & THEME TOGGLE */}
+                {/* RIGHT: USER INFO */}
                 <div className="relative flex items-center gap-2 md:gap-3">
-                    {/* Theme Toggle Button in Header */}
-                    <button
-                        onClick={toggleTheme}
-                        className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-all flex items-center gap-1.5 text-xs font-bold shadow-xs active:scale-95"
-                        title={theme === 'dark' ? 'Chuyển sang giao diện Sáng' : 'Chuyển sang giao diện Tối'}
-                        aria-label="Chế độ giao diện"
-                    >
-                        {theme === 'dark' ? (
-                            <>
-                                <Sun size={18} className="text-amber-300 animate-spin-slow" />
-                                <span className="hidden sm:inline text-amber-200 text-[11px]">Sáng</span>
-                            </>
-                        ) : (
-                            <>
-                                <Moon size={18} className="text-blue-200" />
-                                <span className="hidden sm:inline text-blue-100 text-[11px]">Tối</span>
-                            </>
-                        )}
-                    </button>
-
                     <button 
                         onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
                         className="flex items-center gap-3 group cursor-pointer hover:bg-white/10 p-1.5 rounded-lg transition-colors outline-none focus:ring-2 focus:ring-blue-400/50"
@@ -151,29 +131,15 @@ const MainLayout: React.FC<MainLayoutProps> = ({
                     {isUserMenuOpen && (
                         <>
                             <div className="fixed inset-0 z-40" onClick={() => setIsUserMenuOpen(false)}></div>
-                            <div className="absolute top-full right-0 mt-2 w-64 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-gray-100 dark:border-slate-700 overflow-hidden z-50 animate-in fade-in zoom-in-95 duration-200 origin-top-right">
-                                <div className="p-4 border-b border-gray-100 dark:border-slate-700 bg-gray-50/50 dark:bg-slate-900/50">
-                                    <p className="text-sm font-bold text-gray-800 dark:text-slate-100 truncate">{currentUser.name}</p>
-                                    <p className="text-xs text-gray-500 dark:text-slate-400 truncate mt-0.5">@{currentUser.username}</p>
-                                    <div className="mt-2 text-[10px] font-bold uppercase tracking-wider text-blue-600 bg-blue-50 dark:bg-blue-900/40 dark:text-blue-300 px-2 py-1 rounded inline-block border border-blue-100 dark:border-blue-800">
+                            <div className="absolute top-full right-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden z-50 animate-in fade-in zoom-in-95 duration-200 origin-top-right">
+                                <div className="p-4 border-b border-gray-100 bg-gray-50/50">
+                                    <p className="text-sm font-bold text-gray-800 truncate">{currentUser.name}</p>
+                                    <p className="text-xs text-gray-500 truncate mt-0.5">@{currentUser.username}</p>
+                                    <div className="mt-2 text-[10px] font-bold uppercase tracking-wider text-blue-600 bg-blue-50 px-2 py-1 rounded inline-block border border-blue-100">
                                         {currentUser.role === UserRole.ADMIN ? 'Administrator' : currentUser.role === UserRole.SUBADMIN ? 'Phó quản trị' : currentUser.role === UserRole.TEAM_LEADER ? 'Nhóm trưởng' : currentUser.role === UserRole.ONEDOOR ? 'Một cửa' : 'Nhân viên'}
                                     </div>
                                 </div>
                                 <div className="p-2 space-y-1">
-                                    <button 
-                                        onClick={toggleTheme}
-                                        className="w-full text-left px-3 py-2.5 text-sm font-medium text-gray-700 dark:text-slate-200 hover:bg-blue-50 dark:hover:bg-slate-700 hover:text-blue-700 rounded-lg flex items-center justify-between transition-colors group"
-                                    >
-                                        <div className="flex items-center gap-3">
-                                            <div className="bg-amber-50 dark:bg-slate-700 p-1.5 rounded-md text-amber-600 dark:text-amber-300">
-                                                {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
-                                            </div>
-                                            <span>Giao diện: {theme === 'dark' ? 'Tối' : 'Sáng'}</span>
-                                        </div>
-                                        <span className="text-[11px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-slate-700 px-2 py-0.5 rounded-full">
-                                            {theme === 'dark' ? 'Đang bật Tối' : 'Đang bật Sáng'}
-                                        </span>
-                                    </button>
                                     <button 
                                         onClick={() => {
                                             setShowHelpModal(true);

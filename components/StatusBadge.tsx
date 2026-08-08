@@ -12,7 +12,7 @@ const StatusBadge: React.FC<StatusBadgeProps> = ({ status }) => {
   const dotColors: Record<RecordStatus, string> = {
     [RecordStatus.RECEIVED]: 'bg-gray-400',
     [RecordStatus.ASSIGNED]: 'bg-blue-500',
-    [RecordStatus.IN_PROGRESS]: 'bg-amber-500 animate-pulse',
+    [RecordStatus.IN_PROGRESS]: 'bg-blue-500',
     [RecordStatus.PENDING_CHECK]: 'bg-orange-500',
     [RecordStatus.PENDING_SIGN]: 'bg-purple-500',
     [RecordStatus.SIGNED]: 'bg-purple-500',

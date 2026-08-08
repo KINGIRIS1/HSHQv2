@@ -188,9 +188,10 @@ export const calculateDeadlineHelper = (type: string, receivedDateStr: string, h
             } else if (lowerType.includes('lưu trữ') || lowerType.includes('tra cứu') || lowerType.includes('sao lục')) {
                 deptKey = 'Tổ Lưu trữ';
             }
-            const steps = parsed[deptKey];
+            const procKey = `${deptKey}__${type}`;
+            const steps = parsed[procKey] || parsed[deptKey];
             if (steps && Array.isArray(steps) && steps.length > 0) {
-                dynamicDays = steps.reduce((acc: number, s: any) => acc + (Number(s.slaDays) || 0), 0);
+                dynamicDays = steps.reduce((acc: number, s: any) => acc + (Number(s.slaDays) || ((Number(s.slaHours) || 0) / 8)), 0);
             }
         }
     } catch (e) {}

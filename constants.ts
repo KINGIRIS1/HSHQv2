@@ -11,7 +11,7 @@ export const APP_VERSION = '2.1.1';
 
 export const STATUS_LABELS: Record<RecordStatus, string> = {
   [RecordStatus.RECEIVED]: 'Tiếp nhận mới',
-  [RecordStatus.ASSIGNED]: 'Đã giao việc',
+  [RecordStatus.ASSIGNED]: 'Đang thực hiện',
   [RecordStatus.IN_PROGRESS]: 'Đang thực hiện',
   [RecordStatus.PENDING_CHECK]: 'Chờ kiểm tra',
   [RecordStatus.PENDING_SIGN]: 'Chờ ký duyệt',
@@ -24,9 +24,9 @@ export const STATUS_LABELS: Record<RecordStatus, string> = {
 };
 
 export const STATUS_COLORS: Record<RecordStatus, string> = {
-  [RecordStatus.RECEIVED]: 'bg-gray-100 text-gray-800',
-  [RecordStatus.ASSIGNED]: 'bg-blue-100 text-blue-800',
-  [RecordStatus.IN_PROGRESS]: 'bg-yellow-100 text-yellow-800',
+  [RecordStatus.RECEIVED]: 'bg-gray-100 text-gray-800 border border-gray-200',
+  [RecordStatus.ASSIGNED]: 'bg-blue-100 text-blue-800 border border-blue-200 font-bold',
+  [RecordStatus.IN_PROGRESS]: 'bg-blue-100 text-blue-800 border border-blue-200 font-bold',
   [RecordStatus.PENDING_CHECK]: 'bg-orange-100 text-orange-800',
   [RecordStatus.PENDING_SIGN]: 'bg-purple-100 text-purple-800',
   [RecordStatus.SIGNED]: 'bg-purple-100 text-purple-800',

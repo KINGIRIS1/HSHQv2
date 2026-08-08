@@ -231,24 +231,30 @@ export const useRecordFilter = (
             });
         }
         if (filterStatus !== 'all' && currentView !== 'handover_list' && currentView !== 'other_handover_list' && currentView !== 'archive_handover_list') {
-            result = result.filter(r => r.status === filterStatus);
+            if (filterStatus === RecordStatus.IN_PROGRESS || filterStatus === RecordStatus.ASSIGNED) {
+                result = result.filter(r => r.status === RecordStatus.IN_PROGRESS || r.status === RecordStatus.ASSIGNED);
+            } else {
+                result = result.filter(r => r.status === filterStatus);
+            }
         }
-        if (filterEmployee !== 'all' && currentView !== 'assign_tasks') {
+        if (filterEmployee !== 'all') {
             if (filterEmployee === 'unassigned') {
                 result = result.filter(r => !r.assignedTo && !r.checkedBy);
             } else {
-                const emp = employees.find(e => e.id === filterEmployee);
+                const emp = employees.find(e => e.id === filterEmployee || e.name === filterEmployee);
+                const empName = emp ? emp.name : filterEmployee;
                 const isLeader = emp && (
                     emp.position?.toLowerCase().includes('tổ') ||
                     emp.position?.toLowerCase().includes('nhóm') ||
                     emp.position?.toLowerCase().includes('trưởng') ||
                     emp.position?.toLowerCase().includes('phó')
                 );
-                if (isLeader) {
-                    result = result.filter(r => r.assignedTo === filterEmployee || r.checkedBy === filterEmployee);
-                } else {
-                    result = result.filter(r => r.assignedTo === filterEmployee);
-                }
+                result = result.filter(r => {
+                    const assigned = r.assignedTo === filterEmployee || r.assignedTo === empName;
+                    const submitted = r.submittedTo === filterEmployee || r.submittedTo === empName;
+                    const checked = isLeader && (r.checkedBy === filterEmployee || r.checkedBy === empName);
+                    return assigned || submitted || checked;
+                });
             }
         }
 

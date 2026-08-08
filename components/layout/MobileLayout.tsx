@@ -77,15 +77,6 @@ const MobileLayout: React.FC<MobileLayoutProps> = ({
             <h1 className="font-bold text-base sm:text-lg tracking-tight truncate">QLHS Mobile</h1>
           </div>
           <div className="flex items-center gap-1.5 sm:gap-3">
-            {/* Theme Toggle Button Mobile Header */}
-            <button
-              onClick={toggleTheme}
-              className="min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-white/10 rounded-full transition-colors cursor-pointer text-white"
-              title={theme === 'dark' ? 'Giao diện Sáng' : 'Giao diện Tối'}
-            >
-              {theme === 'dark' ? <Sun size={20} className="text-amber-300" /> : <Moon size={20} className="text-blue-100" />}
-            </button>
-
             <button className="relative min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-white/10 rounded-full transition-colors cursor-pointer">
               <Bell size={20} />
               {activeRemindersCount > 0 && (
@@ -109,28 +100,14 @@ const MobileLayout: React.FC<MobileLayoutProps> = ({
               {isUserMenuOpen && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setIsUserMenuOpen(false)}></div>
-                  <div className="absolute right-0 mt-2 w-60 bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-100 dark:border-slate-700 overflow-hidden z-50 animate-in fade-in zoom-in-95 duration-200 origin-top-right text-slate-800 dark:text-slate-100">
-                    <div className="p-3.5 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
-                      <p className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate">{currentUser.name}</p>
-                      <div className="mt-1 text-[9px] font-bold uppercase tracking-wider text-blue-600 bg-blue-50 dark:bg-blue-900/40 dark:text-blue-300 px-2 py-0.5 rounded inline-block border border-blue-100 dark:border-blue-800">
+                  <div className="absolute right-0 mt-2 w-60 bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden z-50 animate-in fade-in zoom-in-95 duration-200 origin-top-right text-slate-800">
+                    <div className="p-3.5 border-b border-slate-100 bg-slate-50/50">
+                      <p className="text-xs font-bold text-slate-800 truncate">{currentUser.name}</p>
+                      <div className="mt-1 text-[9px] font-bold uppercase tracking-wider text-blue-600 bg-blue-50 px-2 py-0.5 rounded inline-block border border-blue-100">
                         {currentUser.role === UserRole.ADMIN ? 'Admin' : currentUser.role === UserRole.SUBADMIN ? 'Phó quản trị' : currentUser.role === UserRole.TEAM_LEADER ? 'Nhóm trưởng' : currentUser.role === UserRole.ONEDOOR ? 'Một cửa' : 'Nhân viên'}
                       </div>
                     </div>
                     <div className="p-1.5 space-y-1">
-                      <button 
-                        onClick={toggleTheme}
-                        className="w-full min-h-[44px] text-left px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-blue-50 dark:hover:bg-slate-700 rounded-xl flex items-center justify-between transition-colors group cursor-pointer"
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <div className="bg-amber-50 dark:bg-slate-700 p-1.5 rounded-lg text-amber-600 dark:text-amber-300">
-                            {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
-                          </div>
-                          <span>Giao diện: {theme === 'dark' ? 'Tối' : 'Sáng'}</span>
-                        </div>
-                        <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-slate-700 px-2 py-0.5 rounded-full">
-                          {theme === 'dark' ? 'Tối' : 'Sáng'}
-                        </span>
-                      </button>
                       <button 
                         onClick={() => {
                           setShowHelpModal(true);
