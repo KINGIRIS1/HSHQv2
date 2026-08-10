@@ -202,7 +202,7 @@ export const calculateDeadlineHelper = (type: string, receivedDateStr: string, h
         if (lowerType.includes('2.5') || lowerType.includes('tách-hợp') || lowerType.includes('tách - hợp')) {
             daysToAdd = 30;
         } else if (lowerType.includes('1.1') || lowerType.includes('1.2') || lowerType.includes('công văn') || lowerType.includes('cong van') || lowerType.includes('cung cấp tài liệu đất đai') || lowerType.includes('cung cấp dữ liệu') ||
-            lowerType.includes('2.2') || lowerType.includes('quy hoạch') || 
+            lowerType.includes('quy hoạch') || 
             lowerType.includes('2.6') || lowerType.includes('số thửa') || 
             lowerType.includes('2.1') || lowerType.includes('trích lục')) {
             daysToAdd = 10;
@@ -212,7 +212,7 @@ export const calculateDeadlineHelper = (type: string, receivedDateStr: string, h
             daysToAdd = 10;
         } else if (lowerType.includes('3.4.1') || lowerType.includes('trích đo chỉnh lý') || lowerType.includes('chỉnh lý bản đồ')) {
             daysToAdd = 15;
-        } else if (lowerType.includes('2.3') || lowerType.includes('trích đo') || 
+        } else if (lowerType.includes('2.2') || lowerType.includes('2.3') || lowerType.includes('trích đo') || 
                    lowerType.includes('2.4') || lowerType.includes('cắm mốc') || 
                    lowerType.includes('đo đạc') || lowerType.includes('tách thửa')) {
             daysToAdd = 30;
