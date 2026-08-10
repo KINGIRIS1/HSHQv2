@@ -612,7 +612,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                         className="flex items-center gap-2 px-3 py-1.5 bg-purple-50 border border-purple-200 text-purple-700 rounded hover:bg-purple-100 transition-colors text-sm font-bold shadow-sm"
                         title="Gia hạn ngày hẹn trả kết quả"
                     >
-                        <CalendarClock size={16} /> Gia hạn ngày hẹn
+                        <CalendarClock size={16} /> Gia hạn
                     </button>
                 )}
 

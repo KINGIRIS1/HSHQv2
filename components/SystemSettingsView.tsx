@@ -41,7 +41,7 @@ const PERMISSION_GROUPS = [
       { id: 'VIEW_RECORDS', label: 'Xem danh sách hồ sơ' },
       { id: 'ADD_RECORDS', label: 'Thêm / Nhập mới hồ sơ' },
       { id: 'EXPORT_RECORDS', label: 'Xuất danh sách hồ sơ (Excel)' },
-      { id: 'BTN_EXTEND_DEADLINE', label: '⏱️ Thao tác: Gia hạn ngày hẹn (Hồ sơ)' },
+      { id: 'BTN_EXTEND_DEADLINE', label: '⏱️ Thao tác: Gia hạn (Hồ sơ)' },
     ]
   },
   {
@@ -77,7 +77,7 @@ const PERMISSION_GROUPS = [
       { id: 'DODAC_BTN_REJECT_RECORD', label: '↩️ Thao tác: Trả hồ sơ / Từ chối (Yêu cầu sửa) (Đo đạc)' },
       { id: 'DODAC_BTN_RETURN_RESULT', label: '🎁 Thao tác: Trả kết quả hồ sơ (Đo đạc)' },
       { id: 'DODAC_BTN_CLOSE_BATCH', label: '📦 Thao tác: Tạo đợt bàn giao / Chốt đợt (Đo đạc)' },
-      { id: 'DODAC_BTN_EXTEND_DEADLINE', label: '⏱️ Thao tác: Gia hạn ngày hẹn (Đo đạc)' },
+      { id: 'DODAC_BTN_EXTEND_DEADLINE', label: '⏱️ Thao tác: Gia hạn (Đo đạc)' },
     ]
   },
 
@@ -99,7 +99,7 @@ const PERMISSION_GROUPS = [
       { id: 'ARCHIVE_BTN_REJECT_RECORD', label: '↩️ Thao tác: Trả hồ sơ / Từ chối (Yêu cầu sửa) (Lưu trữ)' },
       { id: 'ARCHIVE_BTN_RETURN_RESULT', label: '🎁 Thao tác: Trả kết quả hồ sơ (Lưu trữ)' },
       { id: 'ARCHIVE_BTN_CLOSE_BATCH', label: '📦 Thao tác: Tạo đợt bàn giao / Chốt đợt (Lưu trữ)' },
-      { id: 'ARCHIVE_BTN_EXTEND_DEADLINE', label: '⏱️ Thao tác: Gia hạn ngày hẹn (Lưu trữ)' },
+      { id: 'ARCHIVE_BTN_EXTEND_DEADLINE', label: '⏱️ Thao tác: Gia hạn (Lưu trữ)' },
     ]
   },
   {
@@ -118,7 +118,7 @@ const PERMISSION_GROUPS = [
       { id: 'CAPGIAY_BTN_REJECT_RECORD', label: '↩️ Thao tác: Trả hồ sơ / Từ chối (Yêu cầu sửa) (Cấp giấy)' },
       { id: 'CAPGIAY_BTN_RETURN_RESULT', label: '🎁 Thao tác: Trả kết quả hồ sơ (Cấp giấy)' },
       { id: 'CAPGIAY_BTN_CLOSE_BATCH', label: '📦 Thao tác: Tạo đợt bàn giao / Chốt đợt (Cấp giấy)' },
-      { id: 'CAPGIAY_BTN_EXTEND_DEADLINE', label: '⏱️ Thao tác: Gia hạn ngày hẹn (Cấp giấy)' },
+      { id: 'CAPGIAY_BTN_EXTEND_DEADLINE', label: '⏱️ Thao tác: Gia hạn (Cấp giấy)' },
     ]
   },
   {

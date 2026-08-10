@@ -145,6 +145,17 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
   }
 
   const targetDept = useMemo(() => {
+    if (
+      isCapGiayRecord(formData) || 
+      isCapGiayView || 
+      currentView?.startsWith('capgiay_') || 
+      formData.group === 'cap_giay' || 
+      formData.group === 'Cấp giấy' ||
+      (initialData && (isCapGiayRecord(initialData) || initialData.group === 'cap_giay' || initialData.group === 'Cấp giấy'))
+    ) {
+      return 'Tổ Cấp giấy';
+    }
+
     const rType = String(formData.recordType || '').toLowerCase();
     const rCode = String(formData.code || '').toLowerCase();
     const shortType = getShortRecordType(formData.recordType).toLowerCase();
@@ -203,7 +214,9 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
     
     // X определяем bộ phận theo currentView hoặc recordType
     let targetKey = 'tổ cấp giấy';
-    if (isMeasurementView) {
+    if (isCapGiayRecord(formData) || targetDept === 'Tổ Cấp giấy') {
+      targetKey = 'tổ cấp giấy';
+    } else if (isMeasurementView) {
       targetKey = 'tổ đo đạc';
     } else if (isArchiveView) {
       targetKey = 'tổ lưu trữ';
@@ -576,29 +589,68 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                                 {allowedRecordTypes.map(t => <option key={t} value={t}>{t}</option>)}
                             </select>
                         </div>
-                        {hasAdminRights && (
+                        <>
                             <>
                                 <div><label className="block text-xs font-bold text-gray-700 mb-1">Trạng thái</label><select className="w-full border border-gray-300 rounded-md px-3 py-2 bg-yellow-50 font-medium" value={val(formData.status)} onChange={(e) => handleChange('status', e.target.value)}>{Object.values(RecordStatus).filter(s => s !== RecordStatus.ASSIGNED).map(s => <option key={s} value={s}>{STATUS_LABELS[s] || s}</option>)}</select></div>
+                                
+                                {targetDept === 'Tổ Cấp giấy' && (
+                                    <div>
+                                        <label className="block text-xs font-bold text-teal-800 mb-1">Trạng thái Cấp Giấy (Bước quy trình)</label>
+                                        <select 
+                                            className="w-full border border-teal-300 rounded-md px-3 py-2 bg-teal-50 font-bold text-teal-900 text-xs" 
+                                            value={val(formData.capGiaySubStep || 'tham_dinh')} 
+                                            onChange={(e) => handleChange('capGiaySubStep', e.target.value)}
+                                        >
+                                            <option value="tiep_nhan">1. Tiếp nhận mới</option>
+                                            <option value="tham_dinh">2. Chờ thẩm định</option>
+                                            <option value="phieu_chuyen_thue">3. Chờ chuyển thuế</option>
+                                            <option value="cho_tbt">4. Chờ Thuế KV7</option>
+                                            <option value="cho_nop_thue">5. Chờ Giấy nộp tiền</option>
+                                            <option value="hoan_thien_trinh_duyet">6. Chờ In & hoàn thiện</option>
+                                            <option value="trinh_kiem_tra">7. Chờ kiểm tra</option>
+                                            <option value="trinh_ky">8. Chờ ký duyệt</option>
+                                            <option value="cho_ban_giao">9. Chờ bàn giao</option>
+                                            <option value="cho_bo_sung">10. Chờ bổ sung</option>
+                                            <option value="giao_mot_cua">11. Đã giao kết quả</option>
+                                            <option value="da_tra_ket_qua">12. Đã trả kết quả</option>
+                                        </select>
+                                    </div>
+                                )}
                                 <div><label className="block text-xs font-bold text-gray-700 mb-1">Ngày nhận</label><input type="date" required className="w-full border border-gray-300 rounded-md px-3 py-2" value={dateVal(formData.receivedDate)} onChange={(e) => handleChange('receivedDate', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} /></div>
                                 {!isCongVan && (
                                     <div><label className="block text-xs font-bold text-gray-700 mb-1">Hẹn trả <span className="text-red-500">*</span></label><input type="date" required className="w-full border border-gray-300 rounded-md px-3 py-2 font-semibold text-red-600 bg-red-50" value={dateVal(formData.deadline)} onChange={(e) => handleChange('deadline', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} /></div>
                                 )}
-                                <div><label className="block text-xs font-bold text-gray-700 mb-1">Ngày giao NV</label><input type="date" className="w-full border border-gray-300 rounded-md px-3 py-2" value={dateVal(formData.assignedDate)} onChange={(e) => handleChange('assignedDate', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} /></div>
-                                <div><label className="block text-xs font-bold text-indigo-700 mb-1">Ngày thẩm định</label><input type="date" className="w-full border border-indigo-300 rounded-md px-3 py-2 bg-indigo-50 text-indigo-900 font-medium" value={dateVal(formData.completedWorkDate)} onChange={(e) => handleChange('completedWorkDate', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} /></div>
+                                {targetDept !== 'Tổ Cấp giấy' && (
+                                    <div><label className="block text-xs font-bold text-gray-700 mb-1">Ngày giao NV</label><input type="date" className="w-full border border-gray-300 rounded-md px-3 py-2" value={dateVal(formData.assignedDate)} onChange={(e) => handleChange('assignedDate', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} /></div>
+                                )}
                                 
-                                <div><label className="block text-xs font-bold text-amber-700 mb-1">Ngày chuyển thuế</label><input type="date" className="w-full border border-amber-300 rounded-md px-3 py-2 bg-amber-50 text-amber-900 font-medium" value={dateVal(formData.taxTransferDate)} onChange={(e) => handleChange('taxTransferDate', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} /></div>
-                                <div><label className="block text-xs font-bold text-orange-700 mb-1">Ngày nhận TB Thuế KV7</label><input type="date" className="w-full border border-orange-300 rounded-md px-3 py-2 bg-orange-50 text-orange-900 font-medium" value={dateVal(formData.taxNoticeDate)} onChange={(e) => handleChange('taxNoticeDate', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} /></div>
-                                <div><label className="block text-xs font-bold text-yellow-700 mb-1">Ngày nộp thuế / GNT</label><input type="date" className="w-full border border-yellow-300 rounded-md px-3 py-2 bg-yellow-50 text-yellow-900 font-medium" value={dateVal(formData.taxPaidDate)} onChange={(e) => handleChange('taxPaidDate', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} /></div>
-                                <div><label className="block text-xs font-bold text-emerald-700 mb-1">Ngày in & hoàn thiện</label><input type="date" className="w-full border border-emerald-300 rounded-md px-3 py-2 bg-emerald-50 text-emerald-900 font-medium" value={dateVal(formData.printedDate)} onChange={(e) => handleChange('printedDate', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} /></div>
+                                {targetDept === 'Tổ Cấp giấy' && (
+                                    <div><label className="block text-xs font-bold text-indigo-700 mb-1">Ngày thẩm định</label><input type="date" className="w-full border border-indigo-300 rounded-md px-3 py-2 bg-indigo-50 text-indigo-900 font-medium" value={dateVal(formData.completedWorkDate)} onChange={(e) => handleChange('completedWorkDate', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} /></div>
+                                )}
+                                
+                                {targetDept === 'Tổ Cấp giấy' && (
+                                    <>
+                                        <div><label className="block text-xs font-bold text-amber-700 mb-1">Ngày chuyển thuế</label><input type="date" className="w-full border border-amber-300 rounded-md px-3 py-2 bg-amber-50 text-amber-900 font-medium" value={dateVal(formData.taxTransferDate)} onChange={(e) => handleChange('taxTransferDate', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} /></div>
+                                        <div><label className="block text-xs font-bold text-orange-700 mb-1">Ngày nhận TB Thuế KV7</label><input type="date" className="w-full border border-orange-300 rounded-md px-3 py-2 bg-orange-50 text-orange-900 font-medium" value={dateVal(formData.taxNoticeDate)} onChange={(e) => handleChange('taxNoticeDate', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} /></div>
+                                        <div><label className="block text-xs font-bold text-yellow-700 mb-1">Ngày nộp thuế / GNT</label><input type="date" className="w-full border border-yellow-300 rounded-md px-3 py-2 bg-yellow-50 text-yellow-900 font-medium" value={dateVal(formData.taxPaidDate)} onChange={(e) => handleChange('taxPaidDate', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} /></div>
+                                        <div><label className="block text-xs font-bold text-emerald-700 mb-1">Ngày in & hoàn thiện</label><input type="date" className="w-full border border-emerald-300 rounded-md px-3 py-2 bg-emerald-50 text-emerald-900 font-medium" value={dateVal(formData.printedDate)} onChange={(e) => handleChange('printedDate', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} /></div>
+                                    </>
+                                )}
 
-                                <div><label className="block text-xs font-bold text-teal-700 mb-1">Ngày kiểm tra</label><input type="date" className="w-full border border-teal-300 rounded-md px-3 py-2 bg-teal-50 text-teal-900 font-medium" value={dateVal(formData.checkedDate || formData.pendingCheckDate)} onChange={(e) => { const iso = e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : ''; handleChange('checkedDate', iso); handleChange('pendingCheckDate', iso); }} /></div>
+                                {targetDept !== 'Tổ Lưu trữ' && (
+                                    <div><label className="block text-xs font-bold text-teal-700 mb-1">Ngày kiểm tra</label><input type="date" className="w-full border border-teal-300 rounded-md px-3 py-2 bg-teal-50 text-teal-900 font-medium" value={dateVal(formData.checkedDate || formData.pendingCheckDate)} onChange={(e) => { const iso = e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : ''; handleChange('checkedDate', iso); handleChange('pendingCheckDate', iso); }} /></div>
+                                )}
+
                                 <div><label className="block text-xs font-bold text-purple-700 mb-1">Ngày trình ký</label><input type="date" className="w-full border border-purple-300 rounded-md px-3 py-2 bg-purple-50 text-purple-900 font-medium" value={dateVal(formData.submissionDate)} onChange={(e) => handleChange('submissionDate', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} /></div>
-                                <div><label className="block text-xs font-bold text-blue-700 mb-1">Ngày ký duyệt</label><input type="date" className="w-full border border-blue-300 rounded-md px-3 py-2 bg-blue-50 text-blue-900 font-medium" value={dateVal(formData.approvalDate)} onChange={(e) => handleChange('approvalDate', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} /></div>
+
+                                {targetDept === 'Tổ Cấp giấy' && (
+                                    <div><label className="block text-xs font-bold text-blue-700 mb-1">Ngày ký duyệt</label><input type="date" className="w-full border border-blue-300 rounded-md px-3 py-2 bg-blue-50 text-blue-900 font-medium" value={dateVal(formData.approvalDate)} onChange={(e) => handleChange('approvalDate', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} /></div>
+                                )}
+
                                 <div><label className="block text-xs font-bold text-green-700 mb-1">Ngày hoàn thành</label><input type="date" className="w-full border border-green-300 rounded-md px-3 py-2 bg-green-50 font-semibold text-green-900" value={dateVal(formData.completedDate)} onChange={(e) => handleChange('completedDate', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} /></div>
                                 <div><label className="block text-xs font-bold text-emerald-700 mb-1">Ngày trả KQ</label><input type="date" className="w-full border border-emerald-300 rounded-md px-3 py-2 bg-emerald-50 text-emerald-900 font-medium" value={dateVal(formData.resultReturnedDate)} onChange={(e) => handleChange('resultReturnedDate', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} /></div>
                             </>
-                        )}
-                        {!hasAdminRights && <div className="col-span-full p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700 italic text-center">* Ngày tháng và trạng thái chỉ Admin/Subadmin được chỉnh sửa.</div>}
+                        </>
                     </div>
                 </div>
 
@@ -656,6 +708,13 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                                     {wards.map(w => <option key={w} value={w}>{getWardLabel(w)}</option>)}
                                 </select>
                             </div>
+                            {isCGModal && (
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:col-span-2 bg-teal-50/60 p-3 rounded-lg border border-teal-200">
+                                    <div><label className="block text-xs font-bold text-teal-800 mb-1">Số phát hành GCN</label><input type="text" className="w-full border border-teal-300 rounded-md px-2.5 py-1.5 bg-white text-teal-900 font-bold text-xs" placeholder="VD: CD 123456" value={val(formData.issueNumber)} onChange={(e) => handleChange('issueNumber', e.target.value)} /></div>
+                                    <div><label className="block text-xs font-bold text-teal-800 mb-1">Số vào sổ GCN</label><input type="text" className="w-full border border-teal-300 rounded-md px-2.5 py-1.5 bg-white text-teal-900 font-bold text-xs" placeholder="VD: CH 01234" value={val(formData.entryNumber)} onChange={(e) => handleChange('entryNumber', e.target.value)} /></div>
+                                    <div><label className="block text-xs font-bold text-teal-800 mb-1">Ngày cấp GCN</label><input type="date" className="w-full border border-teal-300 rounded-md px-2.5 py-1.5 bg-white text-teal-900 font-medium text-xs" value={dateVal(formData.issueDate)} onChange={(e) => handleChange('issueDate', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} /></div>
+                                </div>
+                            )}
                             <div className="grid grid-cols-3 gap-2 md:col-span-2">
                                 <div><label className="block text-xs font-bold text-gray-700 mb-1">Tờ bản đồ</label><input type="text" className="w-full border border-gray-300 rounded-md px-3 py-2 text-center font-mono" value={val(formData.mapSheet)} onChange={(e) => handleChange('mapSheet', e.target.value)} /></div>
                                 <div><label className="block text-xs font-bold text-gray-700 mb-1">Thửa đất</label><input type="text" className="w-full border border-gray-300 rounded-md px-3 py-2 text-center font-mono" value={val(formData.landPlot)} onChange={(e) => handleChange('landPlot', e.target.value)} /></div>

@@ -600,14 +600,6 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
             {/* MAIN TAB SWITCHER */}
             <div className="bg-white border-b border-gray-200 flex items-center justify-between px-4 pt-2 shrink-0">
                 <div className="flex items-center gap-1 overflow-x-auto">
-                    {(isHanhChinhOrAdmin || canSeeRegistrationTab || (userDept && (userDept.toLowerCase().includes('cấp giấy') || userDept.toLowerCase().includes('đăng ký')))) && (
-                        <button 
-                            onClick={() => setMainTab('registration')}
-                            className={`px-5 py-2.5 text-sm font-bold rounded-t-lg border-t border-l border-r transition-all flex items-center gap-2 shrink-0 ${mainTab === 'registration' ? 'bg-purple-50 border-gray-200 text-purple-700 border-b-transparent relative top-[1px]' : 'bg-gray-50 border-transparent text-gray-500 hover:bg-gray-100'}`}
-                        >
-                            <FileCheck size={18} /> Báo cáo Cấp giấy
-                        </button>
-                    )}
                     {(isHanhChinhOrAdmin || canSeeMeasurementTab || (userDept && (userDept.toLowerCase().includes('đo đạc') || userDept.toLowerCase().includes('kỹ thuật')))) && (
                         <button 
                             onClick={() => setMainTab('measurement')}

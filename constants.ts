@@ -429,32 +429,34 @@ export const getRecordPlotCount = (record: RecordFile | Partial<RecordFile> | nu
 };
 
 export const getCapGiaySubStepLabel = (subStep?: string | null): string => {
-  if (subStep === 'tiep_nhan' || subStep === 'tiep_nhan_giao_viec') return 'Chưa giao';
-  if (!subStep || subStep === 'tham_dinh' || subStep === 'tham_tra') return 'Thẩm định';
-  if (subStep === 'phieu_chuyen_thue') return 'Chuyển thuế';
-  if (subStep === 'cho_tbt') return 'Thuế KV7';
-  if (subStep === 'cho_gnt' || subStep === 'cho_nop_thue' || subStep === 'cho_giay_nop_tien') return 'Giấy nộp tiền';
-  if (subStep === 'in_hoan_thien' || subStep === 'hoan_thien_trinh_duyet') return 'In & Hoàn thiện';
-  if (subStep === 'trinh_kiem_tra' || subStep === 'kiem_tra') return 'Kiểm tra';
-  if (subStep === 'trinh_ky') return 'Ký duyệt';
-  if (subStep === 'cho_ban_giao') return 'Bàn giao';
-  if (subStep === 'cho_giao_1cua_tra_kq' || subStep === 'giao_mot_cua') return 'Giao kết quả';
+  if (subStep === 'tiep_nhan' || subStep === 'tiep_nhan_giao_viec') return 'Tiếp nhận mới';
+  if (!subStep || subStep === 'tham_dinh' || subStep === 'tham_tra') return 'Chờ thẩm định';
+  if (subStep === 'phieu_chuyen_thue') return 'Chờ chuyển thuế';
+  if (subStep === 'cho_tbt') return 'Chờ Thuế KV7';
+  if (subStep === 'cho_gnt' || subStep === 'cho_nop_thue' || subStep === 'cho_giay_nop_tien') return 'Chờ Giấy nộp tiền';
+  if (subStep === 'in_hoan_thien' || subStep === 'hoan_thien_trinh_duyet') return 'Chờ In & hoàn thiện';
+  if (subStep === 'trinh_kiem_tra' || subStep === 'kiem_tra') return 'Chờ kiểm tra';
+  if (subStep === 'trinh_ky') return 'Chờ ký duyệt';
+  if (subStep === 'cho_ban_giao') return 'Chờ bàn giao';
+  if (subStep === 'cho_bo_sung') return 'Chờ bổ sung';
+  if (subStep === 'cho_giao_1cua_tra_kq' || subStep === 'giao_mot_cua') return 'Đã giao kết quả';
   if (subStep === 'da_tra_ket_qua' || subStep === 'chinh_ly_luu_tru' || subStep === 'da_ban_giao') return 'Đã trả kết quả';
   return subStep || '';
 };
 
 export const getCapGiaySubStepFullLabel = (subStep?: string | null): string => {
-  if (subStep === 'tiep_nhan' || subStep === 'tiep_nhan_giao_viec') return '1. Chưa giao';
-  if (!subStep || subStep === 'tham_dinh' || subStep === 'tham_tra') return '2. Thẩm định';
-  if (subStep === 'phieu_chuyen_thue') return '3. Chuyển thuế';
-  if (subStep === 'cho_tbt') return '4. Thuế KV7';
-  if (subStep === 'cho_gnt' || subStep === 'cho_nop_thue' || subStep === 'cho_giay_nop_tien') return '5. Giấy nộp tiền';
-  if (subStep === 'in_hoan_thien' || subStep === 'hoan_thien_trinh_duyet') return '6. In & Hoàn thiện';
-  if (subStep === 'trinh_kiem_tra' || subStep === 'kiem_tra') return '7. Kiểm tra';
-  if (subStep === 'trinh_ky') return '8. Ký duyệt';
-  if (subStep === 'cho_ban_giao') return '9. Bàn giao';
-  if (subStep === 'cho_giao_1cua_tra_kq' || subStep === 'giao_mot_cua') return '10. Giao kết quả';
-  if (subStep === 'da_tra_ket_qua' || subStep === 'chinh_ly_luu_tru' || subStep === 'da_ban_giao') return '11. Đã trả kết quả';
+  if (subStep === 'tiep_nhan' || subStep === 'tiep_nhan_giao_viec') return '1. Tiếp nhận mới';
+  if (!subStep || subStep === 'tham_dinh' || subStep === 'tham_tra') return '2. Chờ thẩm định';
+  if (subStep === 'phieu_chuyen_thue') return '3. Chờ chuyển thuế';
+  if (subStep === 'cho_tbt') return '4. Chờ Thuế KV7';
+  if (subStep === 'cho_gnt' || subStep === 'cho_nop_thue' || subStep === 'cho_giay_nop_tien') return '5. Chờ Giấy nộp tiền';
+  if (subStep === 'in_hoan_thien' || subStep === 'hoan_thien_trinh_duyet') return '6. Chờ In & hoàn thiện';
+  if (subStep === 'trinh_kiem_tra' || subStep === 'kiem_tra') return '7. Chờ kiểm tra';
+  if (subStep === 'trinh_ky') return '8. Chờ ký duyệt';
+  if (subStep === 'cho_ban_giao') return '9. Chờ bàn giao';
+  if (subStep === 'cho_bo_sung') return '10. Chờ bổ sung';
+  if (subStep === 'cho_giao_1cua_tra_kq' || subStep === 'giao_mot_cua') return '11. Đã giao kết quả';
+  if (subStep === 'da_tra_ket_qua' || subStep === 'chinh_ly_luu_tru' || subStep === 'da_ban_giao') return '12. Đã trả kết quả';
   return subStep || '';
 };
 
