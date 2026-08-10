@@ -1250,7 +1250,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                     onClick={props.handleExportReturnedList}
                     className="hidden md:flex items-center gap-1.5 bg-emerald-600 text-white px-3 py-1.5 rounded-md hover:bg-emerald-700 text-sm font-bold shadow-sm transition-all"
                   >
-                    <FileSpreadsheet size={16} /> Xuất DS TK
+                    <FileSpreadsheet size={16} /> Xuất DS TKQ
                   </button>
                 </div>
               )}
