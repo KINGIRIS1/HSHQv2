@@ -1147,7 +1147,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
 
             {canPerformAction && (
               <>
-                {currentView === "all_records" && (
+                {(currentView === "all_records" || currentView === "archive_records" || currentView.startsWith("archive_")) && (
                   <div className="flex items-center gap-2">
                     <div className="h-6 w-px bg-gray-300 mx-1"></div>
                     <div className="relative inline-block text-left" ref={addMenuRef}>
@@ -1382,7 +1382,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                       <Layers size={16} /> Xử lý hàng loạt ({props.selectedRecordIds.size})
                     </button>
                   )}
-                  {currentView === "all_records" && (() => {
+                  {(currentView === "all_records" || currentView === "archive_records" || currentView.startsWith("archive_")) && (() => {
                     const supplementTargets = records.filter((r) =>
                       props.selectedRecordIds.has(r.id) &&
                       r.status === RecordStatus.PENDING_SUPPLEMENT

@@ -24,7 +24,6 @@ export const RejectReturnStepModal: React.FC<RejectReturnStepModalProps> = ({
   const [returnOption, setReturnOption] = useState<'REJECT' | 'PAUSE' | 'PREVIOUS_STEP'>('PAUSE');
   const [reason, setReason] = useState('');
   const [returnDate, setReturnDate] = useState(() => new Date().toISOString().split('T')[0]);
-  const [agreed, setAgreed] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -207,20 +206,6 @@ export const RejectReturnStepModal: React.FC<RejectReturnStepModalProps> = ({
             />
           </div>
 
-          {/* Đồng ý giải trình */}
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-start gap-2.5">
-            <input 
-              type="checkbox" 
-              id="agreeCheck" 
-              checked={agreed} 
-              onChange={(e) => setAgreed(e.target.checked)}
-              className="mt-0.5 w-4 h-4 text-rose-600 rounded border-gray-300 focus:ring-rose-500 cursor-pointer"
-            />
-            <label htmlFor="agreeCheck" className="text-xs font-bold text-amber-900 cursor-pointer leading-relaxed">
-              Tôi đã giải trình đầy đủ lý do trên và <span className="text-rose-700 underline font-extrabold">ĐỒNG Ý</span> thực hiện thao tác này.
-            </label>
-          </div>
-
           {/* Submit Actions */}
           <div className="flex justify-end gap-3 pt-3 border-t border-gray-100">
             <button
@@ -233,11 +218,11 @@ export const RejectReturnStepModal: React.FC<RejectReturnStepModalProps> = ({
             </button>
             <button
               type="submit"
-              disabled={isSubmitting || !reason.trim() || !agreed}
+              disabled={isSubmitting || !reason.trim()}
               className="flex items-center gap-2 px-5 py-2 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white rounded-xl font-bold text-sm shadow-md transition-all active:scale-95"
             >
               <Undo2 size={16} />
-              {isSubmitting ? 'Đang xử lý...' : 'Đồng Ý & Thực Hiện'}
+              {isSubmitting ? 'Đang xử lý...' : 'Xác Nhận Thực Hiện'}
             </button>
           </div>
         </form>
