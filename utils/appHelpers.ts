@@ -189,7 +189,13 @@ export const calculateDeadlineHelper = (type: string, receivedDateStr: string, h
                 deptKey = 'Tổ Lưu trữ';
             }
             const procKey = `${deptKey}__${type}`;
-            const steps = parsed[procKey] || parsed[deptKey];
+            let steps = parsed[procKey];
+            if (!steps && lowerType) {
+                const matchedKey = Object.keys(parsed).find(k => k.includes('__') && k.toLowerCase().includes(lowerType));
+                if (matchedKey) {
+                    steps = parsed[matchedKey];
+                }
+            }
             if (steps && Array.isArray(steps) && steps.length > 0) {
                 dynamicDays = steps.reduce((acc: number, s: any) => acc + (Number(s.slaDays) || ((Number(s.slaHours) || 0) / 8)), 0);
             }
@@ -199,7 +205,8 @@ export const calculateDeadlineHelper = (type: string, receivedDateStr: string, h
     if (dynamicDays !== null && dynamicDays > 0) {
         daysToAdd = dynamicDays;
     } else {
-        if (lowerType.includes('2.5') || lowerType.includes('tách-hợp') || lowerType.includes('tách - hợp')) {
+        if (lowerType.includes('2.2') || lowerType.includes('2.3') || lowerType.includes('2.4') || lowerType.includes('2.5') || 
+            lowerType.includes('trích đo') || lowerType.includes('cắm mốc') || lowerType.includes('đo đạc') || lowerType.includes('tách thửa') || lowerType.includes('tách - hợp')) {
             daysToAdd = 30;
         } else if (lowerType.includes('1.1') || lowerType.includes('1.2') || lowerType.includes('công văn') || lowerType.includes('cong van') || lowerType.includes('cung cấp tài liệu đất đai') || lowerType.includes('cung cấp dữ liệu') ||
             lowerType.includes('quy hoạch') || 
@@ -212,9 +219,7 @@ export const calculateDeadlineHelper = (type: string, receivedDateStr: string, h
             daysToAdd = 10;
         } else if (lowerType.includes('3.4.1') || lowerType.includes('trích đo chỉnh lý') || lowerType.includes('chỉnh lý bản đồ')) {
             daysToAdd = 15;
-        } else if (lowerType.includes('2.2') || lowerType.includes('2.3') || lowerType.includes('trích đo') || 
-                   lowerType.includes('2.4') || lowerType.includes('cắm mốc') || 
-                   lowerType.includes('đo đạc') || lowerType.includes('tách thửa')) {
+        } else {
             daysToAdd = 30;
         }
     }
