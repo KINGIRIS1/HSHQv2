@@ -199,7 +199,8 @@ export const useRecordFilter = (
         }
 
         // Filter by recordType based on view group
-        const isOtherView = ['other_records', 'other_assign_tasks', 'other_completed_list', 'other_pending_check_list', 'other_check_list', 'other_handover_list', 'other_director_completed', 'registration_records'].includes(currentView);
+        const isDangkySubView = currentView.startsWith('dangky_') && currentView !== 'dangky_records';
+        const isOtherView = ['other_records', 'other_assign_tasks', 'other_completed_list', 'other_pending_check_list', 'other_check_list', 'other_handover_list', 'other_director_completed', 'registration_records', 'dangky_records'].includes(currentView) || currentView.startsWith('dangky_');
         const isArchiveMeasurementView = ['archive_records', 'archive_assign_tasks', 'archive_completed_list', 'archive_pending_check_list', 'archive_check_list', 'archive_handover_list', 'archive_director_completed'].includes(currentView);
         const isMeasurementView = ['all_records', 'assign_tasks', 'completed_list', 'pending_check_list', 'check_list', 'handover_list', 'director_completed'].includes(currentView);
         
@@ -210,6 +211,27 @@ export const useRecordFilter = (
             }
         } else if (isOtherView) {
             result = result.filter(r => isCapGiayRecord(r));
+            
+            if (isDangkySubView) {
+                const targetStepId = currentView.replace('dangky_', '');
+                result = result.filter(r => {
+                    const step = r.capGiaySubStep || 'tiep_nhan_giao_viec';
+                    if (targetStepId === 'tiep_nhan_giao_viec') {
+                        return step === 'tiep_nhan_giao_viec' || step === 'tiep_nhan' || r.status === RecordStatus.RECEIVED;
+                    }
+                    if (targetStepId === 'tham_dinh') {
+                        return step === 'tham_dinh' || step === 'tham_tra' || step === 'cho_tham_dinh';
+                    }
+                    if (targetStepId === 'in_hoan_thien') {
+                        return step === 'in_hoan_thien' || step === 'hoan_thien_trinh_duyet' || step === 'cho_in_hoan_thien' || step === 'cho_in';
+                    }
+                    if (targetStepId === 'cho_ban_giao') {
+                        return step === 'cho_ban_giao' || step === 'ban_giao' || step === 'giao_mot_cua';
+                    }
+                    return step === targetStepId;
+                });
+            }
+
             if (filterRecordType !== 'all') {
                 result = result.filter(r => getShortRecordType(r.recordType) === filterRecordType || r.recordType === filterRecordType);
             }
@@ -250,6 +272,22 @@ export const useRecordFilter = (
                     const s = getEffectiveStatus(r);
                     return s === RecordStatus.IN_PROGRESS || s === RecordStatus.ASSIGNED;
                 });
+            } else if (filterStatus === 'cho_tham_dinh' || filterStatus === 'tham_dinh') {
+                result = result.filter(r => {
+                    const step = r.capGiaySubStep || 'tham_dinh';
+                    return step === 'tham_dinh' || step === 'tham_tra' || step === 'cho_tham_dinh';
+                });
+            } else if (filterStatus === 'phieu_chuyen_thue') {
+                result = result.filter(r => r.capGiaySubStep === 'phieu_chuyen_thue');
+            } else if (filterStatus === 'cho_tbt') {
+                result = result.filter(r => r.capGiaySubStep === 'cho_tbt');
+            } else if (filterStatus === 'cho_gnt' || filterStatus === 'cho_nop_thue' || filterStatus === 'cho_giay_nop_tien') {
+                result = result.filter(r => r.capGiaySubStep === 'cho_gnt' || r.capGiaySubStep === 'cho_nop_thue' || r.capGiaySubStep === 'cho_giay_nop_tien');
+            } else if (filterStatus === 'in_hoan_thien') {
+                result = result.filter(r => {
+                    const step = r.capGiaySubStep || '';
+                    return step === 'in_hoan_thien' || step === 'hoan_thien_trinh_duyet' || step === 'cho_in_hoan_thien' || step === 'cho_in';
+                });
             } else {
                 result = result.filter(r => getEffectiveStatus(r) === filterStatus);
             }
@@ -275,10 +313,37 @@ export const useRecordFilter = (
             }
         }
 
-        // Cap Giay Sub-step Filter (Chỉ áp dụng trong tab Đang thực hiện)
-        if (currentView === 'other_completed_list' && capGiaySubStepFilter && capGiaySubStepFilter !== 'all') {
+        // Cap Giay / Registration Sub-step Filter
+        if ((currentView === 'other_completed_list' || currentView === 'registration_records' || currentView === 'other_records') && capGiaySubStepFilter && capGiaySubStepFilter !== 'all') {
             result = result.filter(r => {
                 const currentSubStep = r.capGiaySubStep || 'tham_dinh';
+                if (capGiaySubStepFilter === 'tiep_nhan_giao_viec') {
+                    return currentSubStep === 'tiep_nhan_giao_viec' || currentSubStep === 'tiep_nhan' || r.status === RecordStatus.RECEIVED;
+                }
+                if (capGiaySubStepFilter === 'tham_dinh') {
+                    return currentSubStep === 'tham_dinh' || currentSubStep === 'tham_tra' || currentSubStep === 'cho_tham_dinh';
+                }
+                if (capGiaySubStepFilter === 'cho_gnt') {
+                    return currentSubStep === 'cho_gnt' || currentSubStep === 'cho_nop_thue' || currentSubStep === 'cho_giay_nop_tien';
+                }
+                if (capGiaySubStepFilter === 'in_hoan_thien') {
+                    return currentSubStep === 'in_hoan_thien' || currentSubStep === 'hoan_thien_trinh_duyet' || currentSubStep === 'cho_in_hoan_thien' || currentSubStep === 'cho_in';
+                }
+                if (capGiaySubStepFilter === 'trinh_kiem_tra') {
+                    return currentSubStep === 'trinh_kiem_tra' || currentSubStep === 'kiem_tra' || r.status === RecordStatus.PENDING_CHECK;
+                }
+                if (capGiaySubStepFilter === 'trinh_ky') {
+                    return currentSubStep === 'trinh_ky' || r.status === RecordStatus.PENDING_SIGN;
+                }
+                if (capGiaySubStepFilter === 'vo_so_gcn') {
+                    return currentSubStep === 'vo_so_gcn' || currentSubStep === 'cho_vo_so' || r.status === RecordStatus.SIGNED;
+                }
+                if (capGiaySubStepFilter === 'giao_mot_cua' || capGiaySubStepFilter === 'cho_ban_giao') {
+                    return currentSubStep === 'giao_mot_cua' || currentSubStep === 'cho_ban_giao' || currentSubStep === 'ban_giao' || r.status === RecordStatus.HANDOVER;
+                }
+                if (capGiaySubStepFilter === 'chinh_ly_luu_tru') {
+                    return currentSubStep === 'chinh_ly_luu_tru' || currentSubStep === 'da_ban_giao';
+                }
                 return currentSubStep === capGiaySubStepFilter;
             });
         }

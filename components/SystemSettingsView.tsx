@@ -80,15 +80,7 @@ const PERMISSION_GROUPS = [
       { id: 'DODAC_BTN_EXTEND_DEADLINE', label: '⏱️ Thao tác: Gia hạn ngày hẹn (Đo đạc)' },
     ]
   },
-  {
-    id: 'capgiay',
-    title: '3.1 Cấp giấy & Vô số GCN',
-    desc: 'Quy trình xử lý hồ sơ Cấp giấy và Quản lý Vô số GCN',
-    items: [
-      { id: 'other_records', label: 'Quy trình xử lý hồ sơ (Tab Cấp giấy)' },
-      { id: 'registration_records', label: 'Quản lý Vô số GCN (Tab Vô số GCN)' },
-    ]
-  },
+
   {
     id: 'luutru',
     title: '4. Lưu trữ',
@@ -111,8 +103,27 @@ const PERMISSION_GROUPS = [
     ]
   },
   {
+    id: 'capgiay',
+    title: '5. Cấp giấy',
+    desc: 'Quy trình, danh mục và các nút bấm thao tác tại Tab Đăng ký cấp giấy',
+    items: [
+      { id: 'registration_records', label: 'Quy trình xử lý hồ sơ Cấp giấy (Tab Cấp giấy)' },
+      { id: 'CAPGIAY_VIEW_DETAILS', label: '👁️ Thao tác: Xem chi tiết hồ sơ (Cấp giấy)' },
+      { id: 'CAPGIAY_EDIT_RECORDS', label: '✏️ Thao tác: Sửa thông tin hồ sơ (Cấp giấy)' },
+      { id: 'CAPGIAY_DELETE_RECORDS', label: '🗑️ Thao tác: Xóa hồ sơ (Cấp giấy)' },
+      { id: 'CAPGIAY_CHECK_RECORDS', label: '✅ Thao tác: Kiểm tra & Ký kiểm tra (Cấp giấy)' },
+      { id: 'CAPGIAY_HANDOVER_RECORDS', label: '📤 Thao tác: Bàn giao hồ sơ sang 1 cửa (Cấp giấy)' },
+      { id: 'CAPGIAY_BTN_ASSIGN_STAFF', label: '👤 Thao tác: Giao việc / Phân công cán bộ (Cấp giấy)' },
+      { id: 'CAPGIAY_BTN_SUBMIT_SIGN', label: '✍️ Thao tác: Trình ký / Phê duyệt / Ký duyệt (Cấp giấy)' },
+      { id: 'CAPGIAY_BTN_REJECT_RECORD', label: '↩️ Thao tác: Trả hồ sơ / Từ chối (Yêu cầu sửa) (Cấp giấy)' },
+      { id: 'CAPGIAY_BTN_RETURN_RESULT', label: '🎁 Thao tác: Trả kết quả hồ sơ (Cấp giấy)' },
+      { id: 'CAPGIAY_BTN_CLOSE_BATCH', label: '📦 Thao tác: Tạo đợt bàn giao / Chốt đợt (Cấp giấy)' },
+      { id: 'CAPGIAY_BTN_EXTEND_DEADLINE', label: '⏱️ Thao tác: Gia hạn ngày hẹn (Cấp giấy)' },
+    ]
+  },
+  {
     id: 'tienich',
-    title: '5. Tiện ích & Báo cáo',
+    title: '6. Tiện ích & Báo cáo',
     desc: 'Các chức năng Lịch công tác, Báo cáo thống kê, Chat nội bộ, Quản lý nhân sự & Hệ thống',
     items: [
       { id: 'VIEW_SCHEDULE', label: 'Xem lịch công tác tuần' },
@@ -150,25 +161,25 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
   // Workflow & SLA States
   const DEFAULT_WORKFLOW_STEPS: Record<string, Array<{ id: string; label: string; shortLabel: string; slaDays: number; slaHours?: number; isExternalWait?: boolean; color?: string }>> = {
     'Tổ Cấp giấy': [
-      { id: 'tiep_nhan', label: '1. Tiếp nhận', shortLabel: 'Tiếp nhận', slaDays: 1, slaHours: 8, color: 'bg-slate-50 text-slate-700 border-slate-200' },
-      { id: 'tham_dinh', label: '2. Thẩm định', shortLabel: 'Thẩm định', slaDays: 1, slaHours: 8, color: 'bg-blue-50 text-blue-700 border-blue-200' },
+      { id: 'tiep_nhan', label: '1. Chưa giao', shortLabel: 'Chưa giao', slaDays: 1, slaHours: 8, color: 'bg-slate-50 text-slate-700 border-slate-200' },
+      { id: 'tham_dinh', label: '2. Thẩm định hồ sơ', shortLabel: 'Thẩm định hồ sơ', slaDays: 1, slaHours: 8, color: 'bg-blue-50 text-blue-700 border-blue-200' },
       { id: 'phieu_chuyen_thue', label: '3. Phiếu chuyển thuế', shortLabel: 'Phiếu chuyển thuế', slaDays: 2.5, slaHours: 20, color: 'bg-purple-50 text-purple-700 border-purple-200' },
-      { id: 'cho_tbt', label: '4. Chờ TBT (5 ngày)', shortLabel: 'Chờ TBT', slaDays: 5, slaHours: 40, isExternalWait: true, color: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
-      { id: 'cho_nop_thue', label: '5. Chờ nộp thuế (GNT)', shortLabel: 'Chờ nộp thuế', slaDays: 0, slaHours: 0, isExternalWait: true, color: 'bg-amber-50 text-amber-700 border-amber-200' },
+      { id: 'cho_tbt', label: '4. Chờ Thông báo thuế (5 ngày)', shortLabel: 'Chờ Thông báo thuế', slaDays: 5, slaHours: 40, isExternalWait: true, color: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
+      { id: 'cho_nop_thue', label: '5. Chờ Giấy nộp tiền (GNT)', shortLabel: 'Chờ Giấy nộp tiền', slaDays: 0, slaHours: 0, isExternalWait: true, color: 'bg-amber-50 text-amber-700 border-amber-200' },
       { id: 'hoan_thien_trinh_duyet', label: '6. In & Hoàn thiện', shortLabel: 'In & Hoàn thiện', slaDays: 5, slaHours: 40, color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-      { id: 'kiem_tra', label: '7. Kiểm tra', shortLabel: 'Kiểm tra', slaDays: 1, slaHours: 8, color: 'bg-cyan-50 text-cyan-700 border-cyan-200' },
+      { id: 'kiem_tra', label: '7. Trình kiểm tra', shortLabel: 'Trình kiểm tra', slaDays: 1, slaHours: 8, color: 'bg-cyan-50 text-cyan-700 border-cyan-200' },
       { id: 'trinh_ky', label: '8. Trình ký', shortLabel: 'Trình ký', slaDays: 1, slaHours: 8, color: 'bg-violet-50 text-violet-700 border-violet-200' },
       { id: 'vo_so_gcn', label: '9. Vô số GCN', shortLabel: 'Vô số GCN', slaDays: 1, slaHours: 8, color: 'bg-teal-50 text-teal-700 border-teal-200' },
       { id: 'cho_ban_giao', label: '10. Giao 1 cửa', shortLabel: 'Giao 1 cửa', slaDays: 0.5, slaHours: 4, color: 'bg-rose-50 text-rose-700 border-rose-200' },
     ],
     'Tổ Cấp giấy__3.1.1 Chuyển nhượng': [
-      { id: 'tiep_nhan', label: '1. Tiếp nhận', shortLabel: 'Tiếp nhận', slaDays: 1, slaHours: 8, color: 'bg-slate-50 text-slate-700 border-slate-200' },
-      { id: 'tham_dinh', label: '2. Thẩm định', shortLabel: 'Thẩm định', slaDays: 1, slaHours: 8, color: 'bg-blue-50 text-blue-700 border-blue-200' },
+      { id: 'tiep_nhan', label: '1. Chưa giao', shortLabel: 'Chưa giao', slaDays: 1, slaHours: 8, color: 'bg-slate-50 text-slate-700 border-slate-200' },
+      { id: 'tham_dinh', label: '2. Thẩm định hồ sơ', shortLabel: 'Thẩm định hồ sơ', slaDays: 1, slaHours: 8, color: 'bg-blue-50 text-blue-700 border-blue-200' },
       { id: 'phieu_chuyen_thue', label: '3. Phiếu chuyển thuế', shortLabel: 'Phiếu chuyển thuế', slaDays: 2.5, slaHours: 20, color: 'bg-purple-50 text-purple-700 border-purple-200' },
-      { id: 'cho_tbt', label: '4. Chờ TBT (5 ngày)', shortLabel: 'Chờ TBT', slaDays: 5, slaHours: 40, isExternalWait: true, color: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
-      { id: 'cho_nop_thue', label: '5. Chờ nộp thuế (GNT)', shortLabel: 'Chờ nộp thuế', slaDays: 0, slaHours: 0, isExternalWait: true, color: 'bg-amber-50 text-amber-700 border-amber-200' },
+      { id: 'cho_tbt', label: '4. Chờ Thông báo thuế (5 ngày)', shortLabel: 'Chờ Thông báo thuế', slaDays: 5, slaHours: 40, isExternalWait: true, color: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
+      { id: 'cho_nop_thue', label: '5. Chờ Giấy nộp tiền (GNT)', shortLabel: 'Chờ Giấy nộp tiền', slaDays: 0, slaHours: 0, isExternalWait: true, color: 'bg-amber-50 text-amber-700 border-amber-200' },
       { id: 'hoan_thien_trinh_duyet', label: '6. In & Hoàn thiện', shortLabel: 'In & Hoàn thiện', slaDays: 5, slaHours: 40, color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-      { id: 'kiem_tra', label: '7. Kiểm tra', shortLabel: 'Kiểm tra', slaDays: 1, slaHours: 8, color: 'bg-cyan-50 text-cyan-700 border-cyan-200' },
+      { id: 'kiem_tra', label: '7. Trình kiểm tra', shortLabel: 'Trình kiểm tra', slaDays: 1, slaHours: 8, color: 'bg-cyan-50 text-cyan-700 border-cyan-200' },
       { id: 'trinh_ky', label: '8. Trình ký', shortLabel: 'Trình ký', slaDays: 1, slaHours: 8, color: 'bg-violet-50 text-violet-700 border-violet-200' },
       { id: 'vo_so_gcn', label: '9. Vô số GCN', shortLabel: 'Vô số GCN', slaDays: 1, slaHours: 8, color: 'bg-teal-50 text-teal-700 border-teal-200' },
       { id: 'cho_ban_giao', label: '10. Giao 1 cửa', shortLabel: 'Giao 1 cửa', slaDays: 0.5, slaHours: 4, color: 'bg-rose-50 text-rose-700 border-rose-200' },
@@ -274,7 +285,7 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
     ]
   };
 
-  const [workflowDept, setWorkflowDept] = useState<string>('Tổ Cấp giấy');
+  const [workflowDept, setWorkflowDept] = useState<string>('Tổ Đo đạc');
   const [selectedProcedureKey, setSelectedProcedureKey] = useState<string>('all');
   const [workflowConfigs, setWorkflowConfigs] = useState<Record<string, Array<{ id: string; label: string; shortLabel: string; slaDays: number; slaHours?: number; isExternalWait?: boolean; color?: string }>>>(DEFAULT_WORKFLOW_STEPS);
   const [savedWorkflowConfigs, setSavedWorkflowConfigs] = useState<Record<string, any>>({});
@@ -987,7 +998,7 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                             <div className="flex flex-wrap items-center justify-between gap-3">
                                 {/* Department selector tabs */}
                                 <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
-                                    {['Tổ Cấp giấy', 'Tổ Đo đạc', 'Tổ Lưu trữ'].map(dept => {
+                                    {['Tổ Đo đạc', 'Tổ Lưu trữ'].map(dept => {
                                         const isSelected = workflowDept === dept;
                                         const deptStepsCount = (workflowConfigs[dept] || DEFAULT_WORKFLOW_STEPS[dept] || []).length;
                                         return (

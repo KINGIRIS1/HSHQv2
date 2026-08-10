@@ -11,6 +11,7 @@ import SystemReceiptTemplate from './receive-record/SystemReceiptTemplate';
 import SystemAnnexTemplate from './receive-record/SystemAnnexTemplate';
 import { getBatchDisplayParts, calculateDeadlineHelperByDays } from '../utils/appHelpers';
 import { RecordTimelineProgress } from './RecordTimelineProgress';
+import { hasUserPermission } from '../config/roleConfig';
 
 interface DetailModalProps {
   isOpen: boolean;
@@ -19,6 +20,8 @@ interface DetailModalProps {
   employees: Employee[];
   users: User[];
   currentUser: User | null;
+  rolePermissions?: Record<string, string[]>;
+  departmentPermissions?: Record<string, string[]>;
   onEdit?: (record: RecordFile) => void;
   onDelete?: (record: RecordFile) => void;
   onCreateLiquidation?: (record: RecordFile) => void; 
@@ -29,7 +32,7 @@ interface DetailModalProps {
   onOpenSupplementModal?: (record: RecordFile) => void;
 }
 
-export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, employees, users, currentUser, onEdit, onDelete, onCreateLiquidation, onCreateContract, onRefreshData, onOpenRejectReturnModal, onOpenExtendModal, onOpenSupplementModal }) => {
+export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, employees, users, currentUser, rolePermissions, departmentPermissions, onEdit, onDelete, onCreateLiquidation, onCreateContract, onRefreshData, onOpenRejectReturnModal, onOpenExtendModal, onOpenSupplementModal }) => {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [previewBlob, setPreviewBlob] = useState<Blob | null>(null);
   const [previewFileName, setPreviewFileName] = useState('');
@@ -603,7 +606,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
             </div>
             
             <div className="flex items-center gap-2">
-                {onOpenExtendModal && record && (record.status !== RecordStatus.HANDOVER && record.status !== RecordStatus.RETURNED && record.status !== RecordStatus.WITHDRAWN) && (
+                {hasUserPermission(currentUser, employees, 'BTN_EXTEND_DEADLINE', rolePermissions, departmentPermissions) && onOpenExtendModal && record && (record.status !== RecordStatus.HANDOVER && record.status !== RecordStatus.RETURNED && record.status !== RecordStatus.WITHDRAWN) && (
                     <button
                         onClick={() => { onClose(); onOpenExtendModal(record); }}
                         className="flex items-center gap-2 px-3 py-1.5 bg-purple-50 border border-purple-200 text-purple-700 rounded hover:bg-purple-100 transition-colors text-sm font-bold shadow-sm"
@@ -623,7 +626,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
     </button>
 )}
 
-                {onOpenRejectReturnModal && record && (record.status !== RecordStatus.HANDOVER && record.status !== RecordStatus.RETURNED && record.status !== RecordStatus.WITHDRAWN) && (
+                {hasUserPermission(currentUser, employees, 'BTN_REJECT_RECORD', rolePermissions, departmentPermissions) && onOpenRejectReturnModal && record && (record.status !== RecordStatus.HANDOVER && record.status !== RecordStatus.RETURNED && record.status !== RecordStatus.WITHDRAWN) && (
                     <button
                         onClick={() => { onClose(); onOpenRejectReturnModal(record); }}
                         className="flex items-center gap-2 px-3 py-1.5 bg-rose-50 border border-rose-200 text-rose-700 rounded hover:bg-rose-100 transition-colors text-sm font-bold shadow-sm"

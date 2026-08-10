@@ -11,6 +11,7 @@ import ExportModal from './ExportModal';
 import AddToBatchModal from './AddToBatchModal';
 import ReturnBatchHandoverModal from './ReturnBatchHandoverModal';
 import ExcelPreviewModal from './ExcelPreviewModal';
+import BulkUpdateModal from './BulkUpdateModal';
 
 import ReturnResultModal from './ReturnResultModal';
 import BatchErrorDiagnosticModal from './BatchErrorDiagnosticModal';
@@ -108,6 +109,8 @@ interface AppModalsProps {
     currentUser: User;
     wards: string[];
     holidays?: any[];
+    rolePermissions?: Record<string, string[]>;
+    departmentPermissions?: Record<string, string[]>;
     filteredRecords: RecordFile[];
     records: RecordFile[];
     selectedCount: number;
@@ -186,6 +189,8 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
                     employees={props.employees} 
                     users={props.users}
                     currentUser={props.currentUser} 
+                    rolePermissions={props.rolePermissions}
+                    departmentPermissions={props.departmentPermissions}
                     onEdit={props.canPerformAction ? (r) => { props.setEditingRecord(r); props.setIsModalOpen(true); } : undefined}
                     onDelete={props.canPerformAction ? props.confirmDelete : undefined}
                     onCreateLiquidation={props.onCreateLiquidation}
@@ -241,6 +246,17 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
                 onClose={() => props.setIsExcelPreviewOpen(false)} 
                 workbook={props.previewWorkbook} 
                 fileName={props.previewExcelName} 
+            />
+
+            <BulkUpdateModal
+                isOpen={props.isBulkUpdateModalOpen}
+                onClose={() => props.setIsBulkUpdateModalOpen(false)}
+                selectedRecords={props.selectedRecordsForBulk}
+                allRecords={props.records}
+                employees={props.employees}
+                wards={props.wards}
+                onConfirm={props.handleBulkUpdate}
+                currentView={props.currentView}
             />
 
 

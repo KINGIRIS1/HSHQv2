@@ -76,26 +76,25 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
       return 'Tổ Cấp giấy';
   }, [currentView, selectedRecords]);
 
-  // Lọc danh sách nhân viên theo yêu cầu:
-  // - Nếu đang tổ đo đạc: chỉ nhân viên tổ đo đạc và ban giám đốc
-  // - Nếu tổ lưu trữ: toàn bộ nhân viên tổ lưu trữ và ban giám đốc
-  // - Không gồm nhân viên bộ phận khác
+  // Lọc danh sách nhân viên theo yêu cầu: chỉ nhân viên của tổ chuyên môn đó và ban giám đốc
   const filteredEmployeesForAssignment = useMemo(() => {
-      const deptLower = recordDept.toLowerCase();
-      const isDoDac = deptLower.includes('đo đạc') || deptLower.includes('đo dạc');
-      const isLuuTru = deptLower.includes('lưu trữ') || deptLower.includes('thông tin');
-      const isHanhChinh = deptLower.includes('hành chính') || deptLower.includes('một cửa');
-
+      const DEPARTMENTS_CONFIG = [
+          { id: 'Tổ Cấp giấy', matchKeys: ['tổ cấp giấy', 'tổ đăng ký cấp giấy', 'đăng ký cấp giấy', 'tổ đăng ký', 'cấp giấy', 'đăng ký', 'biến động'] },
+          { id: 'Tổ Lưu trữ', matchKeys: ['tổ thông tin lưu trữ', 'tổ lưu trữ', 'thông tin lưu trữ', 'lưu trữ', 'thông tin', 'sao lục', 'công văn'] },
+          { id: 'Tổ Đo đạc', matchKeys: ['tổ đo đạc', 'đo đạc', 'đo dạc', 'kỹ thuật', 'bản đồ', 'tổ đo', 'nội nghiệp', 'ngoại nghiệp', 'địa chính'] },
+          { id: 'Tổ Hành chính', matchKeys: ['tổ hành chính', 'một cửa', 'quản trị hệ thống', 'hành chính', 'tổng hợp'] },
+          { id: 'Ban Giám đốc', matchKeys: ['ban giám đốc', 'giám đốc', 'ban lãnh đạo', 'phó giám đốc'] }
+      ];
+      const targetDeptConfig = DEPARTMENTS_CONFIG.find(c => c.id === recordDept);
       return employees.filter(emp => {
           const dept = (emp.department || '').toLowerCase();
-          if (isDoDac) {
-              return dept.includes('đo đạc') || dept.includes('đo dạc') || dept.includes('kỹ thuật') || dept.includes('nội nghiệp') || dept.includes('ngoại nghiệp') || dept.includes('địa chính');
-          } else if (isLuuTru) {
-              return dept.includes('lưu trữ') || dept.includes('thông tin') || dept.includes('sao lục') || dept.includes('công văn');
-          } else if (isHanhChinh) {
-              return dept.includes('hành chính') || dept.includes('một cửa') || dept.includes('tổng hợp');
+          const pos = (emp.position || '').toLowerCase();
+          const isDirectorate = pos.includes('giám đốc') || pos.includes('lãnh đạo') || dept.includes('ban giám đốc') || dept.includes('ban lãnh đạo');
+          if (isDirectorate) return true;
+          if (targetDeptConfig) {
+              return targetDeptConfig.matchKeys.some(key => dept.includes(key));
           }
-          return dept.includes('cấp giấy') || dept.includes('đăng ký') || dept.includes('biến động');
+          return dept.includes(recordDept.toLowerCase());
       });
   }, [employees, recordDept]);
 
@@ -161,7 +160,6 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
                         }}
                     >
                         <option value="status">Trạng thái hồ sơ (Quy trình)</option>
-                        <option value="capGiaySubStep">Bước xử lý Cấp giấy (Chỉ Cấp giấy)</option>
                         <option value="exportBatch">Đợt xuất (Bàn giao)</option>
                         <option value="receiptNumber">Số BL/HĐ</option>
                         <option value="returnedPrice">Số tiền</option>
@@ -189,20 +187,6 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
                                 .map(([key, label]) => (
                                     <option key={key} value={key}>{label}</option>
                                 ))}
-                        </select>
-                    )}
-
-                    {targetField === 'capGiaySubStep' && (
-                        <select 
-                            className="w-full border border-teal-300 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-teal-500 outline-none bg-teal-50 font-bold text-teal-900"
-                            value={targetValue}
-                            onChange={(e) => setTargetValue(e.target.value)}
-                        >
-                            <option value="">-- Chọn bước nhỏ Cấp giấy --</option>
-                            <option value="tham_dinh">1. Thẩm tra</option>
-                            <option value="phieu_chuyen_thue">2. Phiếu chuyển thuế</option>
-                            <option value="cho_nop_thue">3. Chờ giấy nộp tiền</option>
-                            <option value="hoan_thien_trinh_duyet">4. In & Hoàn thiện</option>
                         </select>
                     )}
 
@@ -305,7 +289,7 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
             </button>
             <button 
                 onClick={handleConfirm} 
-                disabled={isProcessing || !targetValue || (useCustomDate && !customDate) || activeRecordsToUpdate.length === 0}
+                disabled={isProcessing || (!targetValue && !selectedAssignee) || (useCustomDate && !customDate) || activeRecordsToUpdate.length === 0}
                 className="flex items-center gap-2 px-6 py-2.5 bg-orange-600 text-white rounded-lg hover:bg-orange-700 font-bold text-sm shadow-md transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
             >
                 {isProcessing ? 'Đang xử lý...' : <><CheckCircle2 size={18} /> Cập nhật ngay ({activeRecordsToUpdate.length})</>}

@@ -49,14 +49,15 @@ export const useAppData = (currentUser: User | null) => {
                 }
             };
 
-            const [recData, empData, userData, updateInfo, holidayData, permsData, deptPermsData] = await Promise.all([
+            const [recData, empData, userData, updateInfo, holidayData, permsData, deptPermsData, workflowSlaData] = await Promise.all([
                 safeFetch(() => fetchRecords(), 12000, getFromCache(CACHE_KEYS.RECORDS, [])),
                 safeFetch(() => fetchEmployees(), 10000, getFromCache(CACHE_KEYS.EMPLOYEES, MOCK_EMPLOYEES)),
                 safeFetch(() => fetchUsers(), 10000, getFromCache(CACHE_KEYS.USERS, MOCK_USERS)),
                 safeFetch(() => fetchUpdateInfo(), 5000, null),
                 safeFetch(() => fetchHolidays(), 5000, getFromCache(CACHE_KEYS.HOLIDAYS, [])),
                 safeFetch(() => getSystemSetting('role_permissions'), 5000, null),
-                safeFetch(() => getSystemSetting('department_permissions'), 5000, null)
+                safeFetch(() => getSystemSetting('department_permissions'), 5000, null),
+                safeFetch(() => getSystemSetting('workflow_sla_configs'), 5000, null)
             ]);
 
             const rawList = Array.isArray(recData) ? recData : [];
@@ -66,12 +67,17 @@ export const useAppData = (currentUser: User | null) => {
             setUsers(userData && userData.length > 0 ? userData : getFromCache(CACHE_KEYS.USERS, MOCK_USERS));
             setHolidays(holidayData || []);
 
+            if (workflowSlaData) {
+                try {
+                    localStorage.setItem('workflow_sla_configs', workflowSlaData);
+                } catch (e) {
+                    console.warn("Failed to sync workflow_sla_configs to localStorage", e);
+                }
+            }
+
             if (permsData) {
                 try {
                     const parsed = JSON.parse(permsData);
-                    const defaultOneDoor = DEFAULT_ROLE_PERMISSIONS[UserRole.ONEDOOR] || [];
-                    const existingOneDoor = parsed[UserRole.ONEDOOR] || [];
-                    parsed[UserRole.ONEDOOR] = Array.from(new Set([...existingOneDoor, ...defaultOneDoor]));
                     setRolePermissions(parsed);
                 } catch (e) {
                     console.warn("Failed to parse role_permissions", e);
@@ -80,12 +86,6 @@ export const useAppData = (currentUser: User | null) => {
             if (deptPermsData) {
                 try {
                     const parsedDept = JSON.parse(deptPermsData);
-                    Object.keys(parsedDept).forEach(key => {
-                        if (key.endsWith(`_${UserRole.ONEDOOR}`)) {
-                            const defaultOneDoor = DEFAULT_ROLE_PERMISSIONS[UserRole.ONEDOOR] || [];
-                            parsedDept[key] = Array.from(new Set([...(parsedDept[key] || []), ...defaultOneDoor]));
-                        }
-                    });
                     setDepartmentPermissions(parsedDept);
                 } catch (e) {
                     console.warn("Failed to parse department_permissions", e);
@@ -114,39 +114,42 @@ export const useAppData = (currentUser: User | null) => {
         loadData();
     }, [loadData]);
 
-    // Lắng nghe thay đổi Realtime từ bảng land_records
+    // Lắng nghe thay đổi Realtime từ 3 bảng: land_records, dangky_records, luutru_records
     useEffect(() => {
         if (!supabase) return;
 
-        const landRecordsChannel = supabase.channel('land_records_changes')
-            .on(
-                'postgres_changes',
-                { event: 'INSERT', schema: 'public', table: 'land_records' },
-                (payload) => {
-                    setRecords(prev => {
-                        if (prev.some(r => r.id === payload.new.id)) return prev;
-                        return [mapRecordFromDb(payload.new) as RecordFile, ...prev];
-                    });
-                }
-            )
-            .on(
-                'postgres_changes',
-                { event: 'UPDATE', schema: 'public', table: 'land_records' },
-                (payload) => {
-                    setRecords(prev => prev.map(r => r.id === payload.new.id ? { ...r, ...mapRecordFromDb(payload.new) } as RecordFile : r));
-                }
-            )
-            .on(
-                'postgres_changes',
-                { event: 'DELETE', schema: 'public', table: 'land_records' },
-                (payload) => {
-                    setRecords(prev => prev.filter(r => r.id !== payload.old.id));
-                }
-            )
-            .subscribe();
+        const tables = ['land_records', 'dangky_records', 'luutru_records'];
+        const channels = tables.map(table => {
+            return supabase.channel(`${table}_changes`)
+                .on(
+                    'postgres_changes',
+                    { event: 'INSERT', schema: 'public', table },
+                    (payload) => {
+                        setRecords(prev => {
+                            if (prev.some(r => r.id === payload.new.id)) return prev;
+                            return [mapRecordFromDb(payload.new) as RecordFile, ...prev];
+                        });
+                    }
+                )
+                .on(
+                    'postgres_changes',
+                    { event: 'UPDATE', schema: 'public', table },
+                    (payload) => {
+                        setRecords(prev => prev.map(r => r.id === payload.new.id ? { ...r, ...mapRecordFromDb(payload.new) } as RecordFile : r));
+                    }
+                )
+                .on(
+                    'postgres_changes',
+                    { event: 'DELETE', schema: 'public', table },
+                    (payload) => {
+                        setRecords(prev => prev.filter(r => r.id !== payload.old.id));
+                    }
+                )
+                .subscribe();
+        });
 
         return () => {
-            supabase.removeChannel(landRecordsChannel);
+            channels.forEach(ch => supabase.removeChannel(ch));
         };
     }, []);
 

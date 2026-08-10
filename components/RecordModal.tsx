@@ -124,15 +124,13 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
   ].includes(currentView || "");
 
   let allowedRecordTypes: string[] = [];
-  if (isOtherView || isCapGiayView) {
+  if (isOtherView || isCapGiayView || isCapGiayRecord(formData) || isCapGiayRecord(initialData) || currentView === 'dangky_records' || currentView?.startsWith('dangky_')) {
     allowedRecordTypes = CAP_GIAY_RECORD_TYPES;
   } else if (isArchiveView) {
     allowedRecordTypes = [
       '1.1 Sao lục',
       '1.2 Công văn'
     ];
-  } else if (isCapGiayView) {
-    allowedRecordTypes = CAP_GIAY_RECORD_TYPES;
   } else if (isMeasurementView) {
     allowedRecordTypes = [
       '2.1 Trích lục',
@@ -577,17 +575,6 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                                 {allowedRecordTypes.map(t => <option key={t} value={t}>{t}</option>)}
                             </select>
                         </div>
-                        {isCapGiayRecord(formData) && (
-                            <div>
-                                <label className="block text-xs font-bold text-teal-700 mb-1">Bước xử lý Cấp giấy</label>
-                                <select className="w-full border border-teal-300 rounded-md px-3 py-2 bg-teal-50 font-bold text-teal-900" value={formData.capGiaySubStep || 'tham_dinh'} onChange={(e) => handleChange('capGiaySubStep', e.target.value)}>
-                                    <option value="tham_dinh">1. Thẩm tra</option>
-                                    <option value="phieu_chuyen_thue">2. Phiếu chuyển thuế</option>
-                                    <option value="cho_nop_thue">3. Chờ giấy nộp tiền</option>
-                                    <option value="hoan_thien_trinh_duyet">4. In & Hoàn thiện</option>
-                                </select>
-                            </div>
-                        )}
                         {hasAdminRights && (
                             <>
                                 <div><label className="block text-xs font-bold text-gray-700 mb-1">Trạng thái</label><select className="w-full border border-gray-300 rounded-md px-3 py-2 bg-yellow-50 font-medium" value={val(formData.status)} onChange={(e) => handleChange('status', e.target.value)}>{Object.values(RecordStatus).filter(s => s !== RecordStatus.ASSIGNED).map(s => <option key={s} value={s}>{STATUS_LABELS[s] || s}</option>)}</select></div>
@@ -596,9 +583,12 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                                     <div><label className="block text-xs font-bold text-gray-700 mb-1">Hẹn trả <span className="text-red-500">*</span></label><input type="date" required className="w-full border border-gray-300 rounded-md px-3 py-2 font-semibold text-red-600 bg-red-50" value={dateVal(formData.deadline)} onChange={(e) => handleChange('deadline', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} /></div>
                                 )}
                                 <div><label className="block text-xs font-bold text-gray-700 mb-1">Ngày giao NV</label><input type="date" className="w-full border border-gray-300 rounded-md px-3 py-2" value={dateVal(formData.assignedDate)} onChange={(e) => handleChange('assignedDate', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} /></div>
+                                <div><label className="block text-xs font-bold text-indigo-700 mb-1">Ngày thẩm định</label><input type="date" className="w-full border border-indigo-300 rounded-md px-3 py-2 bg-indigo-50 text-indigo-900 font-medium" value={dateVal(formData.completedWorkDate)} onChange={(e) => handleChange('completedWorkDate', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} /></div>
                                 <div><label className="block text-xs font-bold text-teal-700 mb-1">Ngày kiểm tra</label><input type="date" className="w-full border border-teal-300 rounded-md px-3 py-2 bg-teal-50 text-teal-900 font-medium" value={dateVal(formData.checkedDate || formData.pendingCheckDate)} onChange={(e) => { const iso = e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : ''; handleChange('checkedDate', iso); handleChange('pendingCheckDate', iso); }} /></div>
                                 <div><label className="block text-xs font-bold text-purple-700 mb-1">Ngày trình ký</label><input type="date" className="w-full border border-purple-300 rounded-md px-3 py-2 bg-purple-50 text-purple-900 font-medium" value={dateVal(formData.submissionDate)} onChange={(e) => handleChange('submissionDate', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} /></div>
+                                <div><label className="block text-xs font-bold text-blue-700 mb-1">Ngày ký duyệt</label><input type="date" className="w-full border border-blue-300 rounded-md px-3 py-2 bg-blue-50 text-blue-900 font-medium" value={dateVal(formData.approvalDate)} onChange={(e) => handleChange('approvalDate', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} /></div>
                                 <div><label className="block text-xs font-bold text-green-700 mb-1">Ngày hoàn thành</label><input type="date" className="w-full border border-green-300 rounded-md px-3 py-2 bg-green-50 font-semibold text-green-900" value={dateVal(formData.completedDate)} onChange={(e) => handleChange('completedDate', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} /></div>
+                                <div><label className="block text-xs font-bold text-emerald-700 mb-1">Ngày trả KQ</label><input type="date" className="w-full border border-emerald-300 rounded-md px-3 py-2 bg-emerald-50 text-emerald-900 font-medium" value={dateVal(formData.resultReturnedDate)} onChange={(e) => handleChange('resultReturnedDate', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} /></div>
                             </>
                         )}
                         {!hasAdminRights && <div className="col-span-full p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700 italic text-center">* Ngày tháng và trạng thái chỉ Admin/Subadmin được chỉnh sửa.</div>}

@@ -101,9 +101,9 @@ export const migrateCungCapTaiLieu = async () => {
             return safeData;
         });
 
-        // Insert into land_records using upsert to avoid conflicts on duplicate IDs
+        // Insert into luutru_records using upsert to avoid conflicts on duplicate IDs
         const { error: insertError } = await supabase
-            .from('land_records')
+            .from('luutru_records')
             .upsert(landRecordsToInsert);
             
         if (insertError) throw insertError;

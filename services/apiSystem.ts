@@ -165,6 +165,12 @@ export const deleteAllDataApi = async (): Promise<boolean> => {
         const { error: err1 } = await supabase.from('land_records').delete().neq('id', '0'); 
         if (err1) throw err1;
 
+        const { error: err1_dk } = await supabase.from('dangky_records').delete().neq('id', '0');
+        if (err1_dk) console.warn("Error deleting dangky_records:", err1_dk);
+
+        const { error: err1_lt } = await supabase.from('luutru_records').delete().neq('id', '0');
+        if (err1_lt) console.warn("Error deleting luutru_records:", err1_lt);
+
         const { error: err2 } = await supabase.from('contracts').delete().neq('id', '0');
         if (err2) throw err2;
 

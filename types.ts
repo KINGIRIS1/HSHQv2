@@ -45,6 +45,8 @@ export const DEFAULT_ROLE_PERMISSIONS: RolePermissions = {
     'DODAC_BTN_ASSIGN_STAFF', 'DODAC_BTN_SUBMIT_SIGN', 'DODAC_BTN_REJECT_RECORD', 'DODAC_BTN_RETURN_RESULT', 'DODAC_BTN_CLOSE_BATCH', 'DODAC_BTN_EXTEND_DEADLINE',
     'ARCHIVE_VIEW_DETAILS', 'ARCHIVE_EDIT_RECORDS', 'ARCHIVE_DELETE_RECORDS', 'ARCHIVE_CHECK_RECORDS', 'ARCHIVE_HANDOVER_RECORDS',
     'ARCHIVE_BTN_ASSIGN_STAFF', 'ARCHIVE_BTN_SUBMIT_SIGN', 'ARCHIVE_BTN_REJECT_RECORD', 'ARCHIVE_BTN_RETURN_RESULT', 'ARCHIVE_BTN_CLOSE_BATCH', 'ARCHIVE_BTN_EXTEND_DEADLINE',
+    'CAPGIAY_VIEW_DETAILS', 'CAPGIAY_EDIT_RECORDS', 'CAPGIAY_DELETE_RECORDS', 'CAPGIAY_CHECK_RECORDS', 'CAPGIAY_HANDOVER_RECORDS',
+    'CAPGIAY_BTN_ASSIGN_STAFF', 'CAPGIAY_BTN_SUBMIT_SIGN', 'CAPGIAY_BTN_REJECT_RECORD', 'CAPGIAY_BTN_RETURN_RESULT', 'CAPGIAY_BTN_CLOSE_BATCH', 'CAPGIAY_BTN_EXTEND_DEADLINE',
     'ASSIGN_RECORDS', 'REJECT_RECORDS', 'SIGN_RECORDS', 'EXPORT_RECORDS'
   ],
   [UserRole.ONEDOOR]: [
@@ -120,6 +122,7 @@ export interface User {
   name: string;
   role: UserRole;
   employeeId?: string;
+  permissions?: string[];
 }
 
 export interface Employee {
@@ -186,8 +189,8 @@ export interface RecordFile {
   excerptNumber?: string | null;
   soPhieuChuyenThue?: string | null; // Số phiếu chuyển thuế
   
-  // Bước nhỏ xử lý quy trình Cấp Giấy (Chỉ dành riêng cho Hồ sơ Cấp Giấy)
-  capGiaySubStep?: 'tham_dinh' | 'phieu_chuyen_thue' | 'cho_tbt' | 'cho_nop_thue' | 'hoan_thien_trinh_duyet' | 'kiem_tra' | 'trinh_ky' | 'vo_so_gcn' | 'cho_ban_giao' | 'da_ban_giao' | string | null;
+  // Bước nhỏ xử lý quy trình 11 bước Tab Đăng ký
+  capGiaySubStep?: 'tiep_nhan_giao_viec' | 'tham_dinh' | 'phieu_chuyen_thue' | 'cho_tbt' | 'cho_gnt' | 'cho_nop_thue' | 'in_hoan_thien' | 'hoan_thien_trinh_duyet' | 'trinh_kiem_tra' | 'kiem_tra' | 'trinh_ky' | 'vo_so_gcn' | 'cho_vo_so' | 'giao_mot_cua' | 'cho_ban_giao' | 'chinh_ly_luu_tru' | 'da_ban_giao' | string | null;
   
   // Tính năng nhắc nhở
   reminderDate?: string | null;      // Thời gian đặt lịch nhắc
@@ -233,6 +236,10 @@ export interface RecordStatusLog {
   changedBy: string;
   changedAt: string;
   note?: string | null;
+  status?: string;
+  subStep?: string;
+  updatedAt?: string;
+  updatedBy?: string;
 }
 
 // Interface cho Item tách thửa

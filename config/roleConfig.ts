@@ -80,13 +80,18 @@ function removeDiacritics(str: string): string {
  * Lấy danh sách các ID quyền hạn (permissions) thực tế của người dùng
  */
 export function getUserPermissions(
-  user: { role: UserRole; employeeId?: string } | null | undefined,
+  user: { role: UserRole; employeeId?: string; permissions?: string[] } | null | undefined,
   employees: { id: string; department: string }[] | null | undefined,
   rolePermissions?: Record<string, string[]>,
   departmentPermissions?: Record<string, string[]>
 ): string[] {
   if (!user) return [];
   if (user.role === UserRole.ADMIN) return ['*'];
+
+  // Nếu tài khoản cá nhân có danh sách quyền riêng tùy chỉnh -> Ưu tiên áp dụng
+  if (user.permissions && Array.isArray(user.permissions)) {
+    return user.permissions;
+  }
 
   let activePerms: string[] | null = null;
 
@@ -123,12 +128,6 @@ export function getUserPermissions(
     }
   }
 
-  // Luôn đảm bảo vai trò ONEDOOR kế thừa toàn bộ danh sách quyền mặc định của Một cửa
-  if (user.role === UserRole.ONEDOOR) {
-    const defaultOneDoor = DEFAULT_ROLE_PERMISSIONS[UserRole.ONEDOOR] || [];
-    activePerms = Array.from(new Set([...(activePerms || []), ...defaultOneDoor]));
-  }
-
   return activePerms || [];
 }
 
@@ -136,7 +135,7 @@ export function getUserPermissions(
  * Kiểm tra người dùng có một quyền hạn cụ thể hay không
  */
 export function hasUserPermission(
-  user: { role: UserRole; employeeId?: string } | null | undefined,
+  user: { role: UserRole; employeeId?: string; permissions?: string[] } | null | undefined,
   employees: { id: string; department: string }[] | null | undefined,
   permissionId: string,
   rolePermissions?: Record<string, string[]>,
@@ -146,14 +145,10 @@ export function hasUserPermission(
   if (user.role === UserRole.ADMIN) return true;
 
   const perms = getUserPermissions(user, employees, rolePermissions, departmentPermissions);
-  if (perms.includes('*') || perms.includes(permissionId)) return true;
+  if (perms.includes('*')) return true;
+  if (perms.includes(permissionId)) return true;
 
-  // Trường hợp kiểm tra quyền nút bấm theo tab hoặc ngược lại
-  if (perms.includes(`DODAC_${permissionId}`) || perms.includes(`ARCHIVE_${permissionId}`)) {
-    return true;
-  }
-
-  // Nếu tham số truyền vào có tiền tố DODAC_ hoặc ARCHIVE_, hỗ trợ kiểm tra dự phòng đối với mã gốc
+  // Nếu là kiểm tra mã tab chuyên môn (DODAC_ / ARCHIVE_)
   if (permissionId.startsWith('DODAC_') || permissionId.startsWith('ARCHIVE_')) {
     const legacyId = permissionId.replace(/^(DODAC_|ARCHIVE_)/, '');
     if (perms.includes(legacyId)) return true;

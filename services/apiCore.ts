@@ -178,7 +178,7 @@ export const keepOnlyDate = (val: any): string | null => {
     return val;
 };
 
-export const sanitizeData = (data: any, allowedColumns: string[]) => {
+export const sanitizeData = (data: any, allowedColumns?: string[]) => {
     const clean: any = { ...data };
     const numberFields = [
         'area', 'unitPrice', 'vatRate', 'vatAmount', 'totalAmount', 
@@ -194,12 +194,12 @@ export const sanitizeData = (data: any, allowedColumns: string[]) => {
         }
     });
     
-    // DateTime fields: Giữ nguyên ngày và giờ (những trường thực sự cần lưu đầy đủ timestamp)
+    // DateTime fields: Giữ nguyên ngày và giờ
     const dateTimeFields = [
         'lastRemindedAt', 'createdDate'
     ];
 
-    // Date-only fields: Chỉ lấy phần ngày YYYY-MM-DD, loại bỏ hoàn toàn phần giờ
+    // Date-only fields: Chỉ lấy phần ngày YYYY-MM-DD
     const dateOnlyFields = [
         'receivedDate', 'resultReturnedDate',
         'deadline', 'assignedDate', 
@@ -228,6 +228,8 @@ export const sanitizeData = (data: any, allowedColumns: string[]) => {
             }
         }
     });
+
+    if (!allowedColumns) return clean;
     
     const sanitized: any = {};
     allowedColumns.forEach(col => {
@@ -358,6 +360,8 @@ export const mapRecordFromDb = (item: any): any => {
     r.personalNotes = val(r.personalNotes, r.personalnotes, r.personal_notes);
     r.isHandedOver = val(r.isHandedOver, r.ishandedover, r.is_handed_over);
     r.deadline = keepOnlyDate(val(r.deadline, r.deadline, r.dead_line));
+    
+    r.capGiaySubStep = val(r.capGiaySubStep, r.capgiaysubstep, r.cap_giay_sub_step);
     
     let rawLogs = val(r.statusLogs, r.statuslogs, r.status_logs);
     if (typeof rawLogs === 'string') {

@@ -9,7 +9,8 @@ import {
     saveSystemSetting,
     fetchWorkSchedules,
     fetchExcerptHistory,
-    fetchExcerptCounters
+    fetchExcerptCounters,
+    getTargetTableForRecord
 } from './api';
 import { RecordFile, Contract, Employee, User, Holiday } from '../types';
 import { 
@@ -149,16 +150,37 @@ export const restoreFullBackupToSupabase = async (backupData: FullBackupData): P
             return chunked;
         };
 
-        // 1. Khôi phục land_records
+        // 1. Khôi phục records (land_records, dangky_records, luutru_records)
         if (bData.records) {
-            const { error } = await supabase.from('land_records').delete().neq('id', '0');
-            if (error) console.warn("Lỗi xóa land_records:", error);
+            await Promise.all([
+                supabase.from('land_records').delete().neq('id', '0'),
+                supabase.from('dangky_records').delete().neq('id', '0'),
+                supabase.from('luutru_records').delete().neq('id', '0')
+            ]);
             if (bData.records.length > 0) {
-                const chunks = chunkArray(bData.records, 200);
-                for (const chunk of chunks) {
-                    const { error: insErr } = await supabase.from('land_records').insert(chunk);
-                    if (insErr) throw insErr;
-                }
+                const landRecs: any[] = [];
+                const dangkyRecs: any[] = [];
+                const luutruRecs: any[] = [];
+
+                bData.records.forEach((r: any) => {
+                    const target = getTargetTableForRecord(r);
+                    if (target === 'dangky_records') dangkyRecs.push(r);
+                    else if (target === 'luutru_records') luutruRecs.push(r);
+                    else landRecs.push(r);
+                });
+
+                const restoreTable = async (table: string, recs: any[]) => {
+                    if (recs.length === 0) return;
+                    const chunks = chunkArray(recs, 200);
+                    for (const chunk of chunks) {
+                        const { error: insErr } = await supabase.from(table).insert(chunk);
+                        if (insErr) throw insErr;
+                    }
+                };
+
+                await restoreTable('land_records', landRecs);
+                await restoreTable('dangky_records', dangkyRecs);
+                await restoreTable('luutru_records', luutruRecs);
             }
         }
 

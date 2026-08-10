@@ -826,19 +826,21 @@ function App() {
           if (isCapGiayRecord(record)) {
               const currentSubStep = record.capGiaySubStep || 'tham_dinh';
               let nextSubStep = '';
-              if (currentSubStep === 'tham_dinh' || currentSubStep === 'tham_tra') {
-                  nextSubStep = isTaxDefaultRecordType(record.recordType) ? 'phieu_chuyen_thue' : 'hoan_thien_trinh_duyet';
+              if (currentSubStep === 'tiep_nhan' || currentSubStep === 'tiep_nhan_giao_viec') {
+                  nextSubStep = 'tham_dinh';
+              } else if (currentSubStep === 'tham_dinh' || currentSubStep === 'tham_tra') {
+                  nextSubStep = isTaxDefaultRecordType(record.recordType) ? 'phieu_chuyen_thue' : 'in_hoan_thien';
               } else if (currentSubStep === 'phieu_chuyen_thue') {
-                  nextSubStep = 'cho_nop_thue';
-              } else if (currentSubStep === 'cho_nop_thue' || currentSubStep === 'cho_giay_nop_tien') {
-                  nextSubStep = 'hoan_thien_trinh_duyet';
-              } else if (currentSubStep === 'hoan_thien_trinh_duyet' || currentSubStep === 'in_hoan_thien') {
-                  // Đã hoàn thành các bước nhỏ trong Đang thực hiện -> Trình kiểm tra
+                  nextSubStep = 'cho_tbt';
+              } else if (currentSubStep === 'cho_tbt') {
+                  nextSubStep = 'cho_gnt';
+              } else if (currentSubStep === 'cho_gnt' || currentSubStep === 'cho_nop_thue' || currentSubStep === 'cho_giay_nop_tien') {
+                  nextSubStep = 'in_hoan_thien';
+              } else if (currentSubStep === 'in_hoan_thien' || currentSubStep === 'hoan_thien_trinh_duyet') {
                   setSubmitTargetRecords([record]);
                   setIsSubmitCheckModalOpen(true);
                   return;
               } else {
-                  // Fallback
                   setSubmitTargetRecords([record]);
                   setIsSubmitCheckModalOpen(true);
                   return;
@@ -851,7 +853,7 @@ function App() {
                       statusLogs: createStatusLog(record, record.status, `Chuyển bước nhỏ: ${subStepLabel}`)
                   };
 
-                  if (nextSubStep === 'hoan_thien_trinh_duyet' && (currentSubStep === 'cho_nop_thue' || currentSubStep === 'cho_giay_nop_tien')) {
+                  if (nextSubStep === 'in_hoan_thien' && (currentSubStep === 'cho_gnt' || currentSubStep === 'cho_nop_thue' || currentSubStep === 'cho_giay_nop_tien')) {
                       const nowStr = new Date().toISOString();
                       const todayStr = nowStr.split('T')[0];
                       const newDeadline = calculateDeadlineHelperByDays(5, todayStr, holidays || []);
@@ -863,7 +865,7 @@ function App() {
 
                   setRecords(prev => prev.map(r => r.id === record.id ? { ...r, ...updates } : r));
                   await updateRecordApi({ ...record, ...updates });
-                  setToast({ type: 'success', message: `Hồ sơ ${record.code} đã xác nhận nộp thuế, đã trả về bước giao việc cho người in!` });
+                  setToast({ type: 'success', message: `Hồ sơ ${record.code} đã cập nhật sang bước: ${subStepLabel}` });
                   return;
               }
           }
@@ -1306,6 +1308,8 @@ function App() {
             users={users}
             currentUser={currentUser}
             wards={wards}
+            rolePermissions={rolePermissions}
+            departmentPermissions={departmentPermissions}
             filteredRecords={recordFilterProps.filteredRecords}
             records={records}
             selectedCount={selectedRecordIds.size}
@@ -1540,6 +1544,8 @@ function App() {
             currentUser={currentUser}
             wards={wards}
             holidays={holidays}
+            rolePermissions={rolePermissions}
+            departmentPermissions={departmentPermissions}
             filteredRecords={recordFilterProps.filteredRecords}
             records={records}
             selectedCount={selectedRecordIds.size}

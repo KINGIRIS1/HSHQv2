@@ -1,7 +1,8 @@
 
 import React, { useMemo, useState, useEffect } from 'react';
 import { RecordFile, RecordStatus } from '../types';
-import { getNormalizedWard, getShortRecordType } from '../constants';
+import { getNormalizedWard, getShortRecordType, isCapGiayRecord } from '../constants';
+import { DANGKY_11_STEPS } from '../services/apiDangkyRecords';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { FileText, RotateCcw, CheckCircle, ArchiveX, MapPin, Layers, CalendarRange, Filter, CalendarDays, Calendar, SlidersHorizontal, ArrowLeft, ArrowRight, Eye, EyeOff, RefreshCw, HelpCircle, Shield, Headphones, X, CheckCircle2, Phone, Mail, Clock, MessageSquare, UserCheck, FolderInput, BarChart3, User } from 'lucide-react';
 
@@ -23,6 +24,9 @@ const DashboardView: React.FC<DashboardViewProps> = ({ records, currentUser, emp
 
     // Modal Trợ giúp & Phân quyền
     const [showHelpModal, setShowHelpModal] = useState(false);
+
+    // Tab Dashboard: General (Chuyên môn) vs Dangky (Thủ tục Đăng ký 11 bước)
+    const [dashboardTab, setDashboardTab] = useState<'general' | 'dangky'>('general');
 
     // State chọn chế độ xem: Năm, Tháng, Tuần
     const [viewMode, setViewMode] = useState<'year' | 'month' | 'week'>('year');
@@ -83,6 +87,30 @@ const DashboardView: React.FC<DashboardViewProps> = ({ records, currentUser, emp
     const completed = filteredRecords.filter(r => r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED || r.status === RecordStatus.REJECTED).length;
     const withdrawn = filteredRecords.filter(r => r.status === RecordStatus.WITHDRAWN).length;
     const processing = total - completed - withdrawn;
+
+    // 3.1. Thống kê theo 11 bước quy trình Đăng ký
+    const dangkyStepStats = useMemo(() => {
+        const dangkyRecords = filteredRecords.filter(r => isCapGiayRecord(r));
+        const totalDangky = dangkyRecords.length;
+        
+        return DANGKY_11_STEPS.map((step, index) => {
+            const count = dangkyRecords.filter(r => {
+                const currentSubStep = r.capGiaySubStep || 'tiep_nhan_giao_viec';
+                if (step.id === 'tiep_nhan_giao_viec') {
+                    return currentSubStep === 'tiep_nhan_giao_viec' || currentSubStep === 'tiep_nhan' || r.status === RecordStatus.RECEIVED;
+                }
+                return currentSubStep === step.id;
+            }).length;
+
+            const percent = totalDangky > 0 ? Math.round((count / totalDangky) * 100) : 0;
+            return {
+                ...step,
+                stepNumber: index + 1,
+                count,
+                percent
+            };
+        });
+    }, [filteredRecords]);
 
     // --- Cấu hình Custom Dashboard (Thứ tự & Hiển thị thẻ) ---
     const [cardOrder, setCardOrder] = useState<string[]>(() => {
@@ -512,6 +540,75 @@ const DashboardView: React.FC<DashboardViewProps> = ({ records, currentUser, emp
                 </div>
             )}
 
+            {/* TAB SELECTOR: CHUYÊN MÔN VS ĐĂNG KÝ (11 BƯỚC) */}
+            <div className="flex bg-slate-200/70 p-1 rounded-xl border border-slate-200/80 shrink-0 gap-1">
+                <button
+                    onClick={() => setDashboardTab('general')}
+                    className={`flex-1 py-2 px-3 rounded-lg text-xs font-extrabold transition-all flex items-center justify-center gap-2 ${dashboardTab === 'general' ? 'bg-white text-blue-700 shadow-sm border border-slate-200/60' : 'text-slate-600 hover:text-slate-900'}`}
+                >
+                    <BarChart3 size={16} /> Thống kê Chuyên môn & Đo đạc
+                </button>
+                <button
+                    onClick={() => setDashboardTab('dangky')}
+                    className={`flex-1 py-2 px-3 rounded-lg text-xs font-extrabold transition-all flex items-center justify-center gap-2 ${dashboardTab === 'dangky' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+                >
+                    <FolderInput size={16} /> Thống kê Quy trình Đăng ký (11 Bước)
+                </button>
+            </div>
+
+            {/* IF DANGKY TAB IS SELECTED */}
+            {dashboardTab === 'dangky' ? (
+                <div className="space-y-4 flex-1 overflow-y-auto pr-1 custom-scrollbar">
+                    {/* TOP SUMMARY FOR DANGKY */}
+                    <div className="bg-gradient-to-r from-indigo-700 to-purple-700 rounded-xl p-5 text-white shadow-md flex flex-col md:flex-row justify-between items-center gap-4">
+                        <div>
+                            <h3 className="text-lg font-black tracking-tight">Tiến độ 11 bước Quy trình Đăng ký</h3>
+                            <p className="text-xs text-indigo-100 mt-0.5">Theo dõi chi tiết số lượng hồ sơ đang lưu tại từng bước trong quy trình xử lý 11 giai đoạn.</p>
+                        </div>
+                        <div className="flex items-center gap-2 bg-white/10 px-4 py-2 rounded-lg border border-white/20">
+                            <span className="text-xs text-indigo-100 font-bold">Tổng số hồ sơ Đăng ký:</span>
+                            <span className="text-xl font-black text-white">{filteredRecords.filter(r => isCapGiayRecord(r)).length}</span>
+                        </div>
+                    </div>
+
+                    {/* 11 STEPS GRID */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                        {dangkyStepStats.map((step) => (
+                            <div 
+                                key={step.id}
+                                onClick={() => setCurrentView?.(`dangky_${step.id}`)}
+                                className="bg-white p-4 rounded-xl border border-indigo-100 hover:border-indigo-300 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer group flex flex-col justify-between"
+                            >
+                                <div>
+                                    <div className="flex justify-between items-center mb-2">
+                                        <span className="w-6 h-6 rounded-full bg-indigo-600 text-white text-xs font-black flex items-center justify-center shadow-sm">
+                                            {step.stepNumber}
+                                        </span>
+                                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100">
+                                            {step.percent}% tổng số
+                                        </span>
+                                    </div>
+                                    <h4 className="font-bold text-slate-800 text-sm tracking-tight group-hover:text-indigo-600 transition-colors">
+                                        {step.label}
+                                    </h4>
+                                </div>
+
+                                <div className="mt-4 pt-3 border-t border-slate-100 flex justify-between items-end">
+                                    <div>
+                                        <span className="text-[10px] uppercase font-bold text-slate-400 block">Đang ở bước này</span>
+                                        <span className="text-2xl font-black text-indigo-700">{step.count}</span>
+                                        <span className="text-xs text-slate-500 font-medium ml-1">hồ sơ</span>
+                                    </div>
+                                    <div className="flex items-center gap-1 text-xs font-bold text-indigo-600 group-hover:translate-x-1 transition-transform">
+                                        Chi tiết <ArrowRight size={14} />
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            ) : (
+                <>
             {/* CARDS: THỐNG KÊ CHI TIẾT */}
             <div className={`grid gap-4 shrink-0 ${getGridColsClass(orderedVisibleCards.length)}`}>
                 {orderedVisibleCards.map((card) => {
@@ -610,6 +707,8 @@ const DashboardView: React.FC<DashboardViewProps> = ({ records, currentUser, emp
                     </div>
                 </div>
             </div>
+            </>
+            )}
 
             {/* MODAL TRỢ GIÚP - CHÍNH SÁCH PHÂN QUYỀN & HỖ TRỢ KỸ THUẬT */}
             {showHelpModal && (
