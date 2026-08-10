@@ -1024,11 +1024,11 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                 {/* COLUMN 3: TIẾN ĐỘ & NHẮC VIỆC */}
                 <div className="space-y-6">
                     {/* KHU VỰC NHẬP THÔNG TIN VÔ SỔ GCN KHI KÝ XONG */}
-                    {isCapGiayRecord(record) && (record.capGiaySubStep === 'vo_so_gcn' || record.status === RecordStatus.SIGNED) && (
+                    {isCapGiayRecord(record) && [RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER].includes(record.status) && (
                         <div className="bg-white rounded-xl border border-teal-200 shadow-sm overflow-hidden p-3 bg-gradient-to-br from-teal-50/50 to-white flex flex-col gap-3 animate-fade-in">
                             <div className="text-xs font-bold text-teal-900 flex items-center justify-between">
-                                <span className="flex items-center gap-1.5"><FileCheck size={16} className="text-teal-600" /> Nhập thông tin Vô sổ GCN & Chuyển Chờ bàn giao</span>
-                                <span className="text-[10px] bg-teal-100 text-teal-800 px-2 py-0.5 rounded font-bold">Vô sổ GCN</span>
+                                <span className="flex items-center gap-1.5"><FileCheck size={16} className="text-teal-600" /> Nhập thông tin số phát hành & số vào sổ GCN</span>
+                                <span className="text-[10px] bg-teal-100 text-teal-800 px-2 py-0.5 rounded font-bold">Thông tin GCN</span>
                             </div>
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                                 <div>

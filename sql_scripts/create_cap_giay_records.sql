@@ -27,6 +27,10 @@ CREATE TABLE IF NOT EXISTS cap_giay_records (
     deadline DATE,                       -- Hạn giải quyết
     assigned_to TEXT,                    -- Nhân viên thụ lý
     assigned_date DATE,                  -- Ngày phân công
+    tax_transfer_date DATE,              -- Ngày chuyển thuế
+    tax_notice_date DATE,                -- Ngày nhận TB Thuế KV7
+    tax_paid_date DATE,                  -- Ngày nộp thuế / Giấy nộp tiền
+    printed_date DATE,                   -- Ngày in & hoàn thiện
     submission_date DATE,                -- Ngày trình ký
     submitted_to TEXT,                   -- Người trình ký (Lãnh đạo)
     pending_check_date DATE,             -- Ngày trình kiểm tra

@@ -9,7 +9,7 @@ export const DANGKY_11_STEPS = [
   { id: 'tiep_nhan_giao_viec', label: 'Chưa giao', code: 'STEP_1', color: 'bg-blue-50 text-blue-700 border-blue-200' },
   { id: 'tham_dinh', label: 'Chờ thẩm định', code: 'STEP_2', color: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
   { id: 'phieu_chuyen_thue', label: 'Chờ chuyển thuế', code: 'STEP_3', color: 'bg-amber-50 text-amber-700 border-amber-200' },
-  { id: 'cho_tbt', label: 'Chờ thông báo thuế', code: 'STEP_4', color: 'bg-orange-50 text-orange-700 border-orange-200' },
+  { id: 'cho_tbt', label: 'Chờ Thuế KV7', code: 'STEP_4', color: 'bg-orange-50 text-orange-700 border-orange-200' },
   { id: 'cho_gnt', label: 'Chờ GNT', code: 'STEP_5', color: 'bg-yellow-50 text-yellow-700 border-yellow-200' },
   { id: 'in_hoan_thien', label: 'Chờ In & Hoàn thiện', code: 'STEP_6', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
   { id: 'trinh_kiem_tra', label: 'Kiểm tra', code: 'STEP_7', color: 'bg-purple-50 text-purple-700 border-purple-200' },

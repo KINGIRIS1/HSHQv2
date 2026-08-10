@@ -348,14 +348,13 @@ export const CAP_GIAY_SUB_STEPS = [
   { id: 'tiep_nhan_giao_viec', label: '1. Tiếp nhận / Giao việc', shortLabel: 'Tiếp nhận/Giao việc', slaDays: 1, color: 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100' },
   { id: 'tham_dinh', label: '2. Thẩm định', shortLabel: 'Thẩm định', slaDays: 1, color: 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100' },
   { id: 'phieu_chuyen_thue', label: '3. Phiếu chuyển thuế', shortLabel: 'Phiếu chuyển thuế', slaDays: 2, color: 'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100' },
-  { id: 'cho_tbt', label: '4. Chờ TBT - Thông báo thuế', shortLabel: 'Chờ TBT', slaDays: 5, color: 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100' },
+  { id: 'cho_tbt', label: '4. Chờ Thuế KV7', shortLabel: 'Chờ Thuế KV7', slaDays: 5, color: 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100' },
   { id: 'cho_gnt', label: '5. Chờ GNT - Giấy nộp tiền', shortLabel: 'Chờ GNT', slaDays: 3, color: 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100' },
   { id: 'in_hoan_thien', label: '6. In & Hoàn thiện', shortLabel: 'In & Hoàn thiện', slaDays: 3, color: 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' },
   { id: 'trinh_kiem_tra', label: '7. Trình kiểm tra', shortLabel: 'Trình kiểm tra', slaDays: 1, color: 'bg-cyan-50 text-cyan-700 border-cyan-200 hover:bg-cyan-100' },
   { id: 'trinh_ky', label: '8. Trình ký', shortLabel: 'Trình ký', slaDays: 1, color: 'bg-violet-50 text-violet-700 border-violet-200 hover:bg-violet-100' },
-  { id: 'vo_so_gcn', label: '9. Chờ vô số GCN', shortLabel: 'Chờ vô số', slaDays: 1, color: 'bg-teal-50 text-teal-700 border-teal-200 hover:bg-teal-100' },
-  { id: 'giao_mot_cua', label: '10. Chờ giao 1 cửa / Trả KQL', shortLabel: 'Giao 1 cửa', slaDays: 1, color: 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100' },
-  { id: 'chinh_ly_luu_tru', label: '11. Chỉnh lý / Lưu trữ', shortLabel: 'Chỉnh lý/Lưu trữ', slaDays: 1, color: 'bg-stone-50 text-stone-700 border-stone-200 hover:bg-stone-100' },
+  { id: 'giao_mot_cua', label: '9. Chờ giao 1 cửa / Trả KQL', shortLabel: 'Giao 1 cửa', slaDays: 1, color: 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100' },
+  { id: 'chinh_ly_luu_tru', label: '10. Chỉnh lý / Lưu trữ', shortLabel: 'Chỉnh lý/Lưu trữ', slaDays: 1, color: 'bg-stone-50 text-stone-700 border-stone-200 hover:bg-stone-100' },
 ] as const;
 
 export const isCapGiayRecord = (record: RecordFile | Partial<RecordFile> | null | undefined): boolean => {
@@ -433,7 +432,7 @@ export const getCapGiaySubStepLabel = (subStep?: string | null): string => {
   if (subStep === 'tiep_nhan' || subStep === 'tiep_nhan_giao_viec') return 'Chưa giao';
   if (!subStep || subStep === 'tham_dinh' || subStep === 'tham_tra') return 'Thẩm định';
   if (subStep === 'phieu_chuyen_thue') return 'Chuyển thuế';
-  if (subStep === 'cho_tbt') return 'Thông báo thuế';
+  if (subStep === 'cho_tbt') return 'Thuế KV7';
   if (subStep === 'cho_gnt' || subStep === 'cho_nop_thue' || subStep === 'cho_giay_nop_tien') return 'Giấy nộp tiền';
   if (subStep === 'in_hoan_thien' || subStep === 'hoan_thien_trinh_duyet') return 'In & Hoàn thiện';
   if (subStep === 'trinh_kiem_tra' || subStep === 'kiem_tra') return 'Kiểm tra';
@@ -448,7 +447,7 @@ export const getCapGiaySubStepFullLabel = (subStep?: string | null): string => {
   if (subStep === 'tiep_nhan' || subStep === 'tiep_nhan_giao_viec') return '1. Chưa giao';
   if (!subStep || subStep === 'tham_dinh' || subStep === 'tham_tra') return '2. Thẩm định';
   if (subStep === 'phieu_chuyen_thue') return '3. Chuyển thuế';
-  if (subStep === 'cho_tbt') return '4. Thông báo thuế';
+  if (subStep === 'cho_tbt') return '4. Thuế KV7';
   if (subStep === 'cho_gnt' || subStep === 'cho_nop_thue' || subStep === 'cho_giay_nop_tien') return '5. Giấy nộp tiền';
   if (subStep === 'in_hoan_thien' || subStep === 'hoan_thien_trinh_duyet') return '6. In & Hoàn thiện';
   if (subStep === 'trinh_kiem_tra' || subStep === 'kiem_tra') return '7. Kiểm tra';

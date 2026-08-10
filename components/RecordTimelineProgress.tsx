@@ -137,14 +137,6 @@ export const RecordTimelineProgress: React.FC<RecordTimelineProgressProps> = ({
 
   const isCG = isCapGiayRecord(record);
 
-  const isVoSoGcnActive = isCG && (
-    record.capGiaySubStep === 'vo_so_gcn' || 
-    record.capGiaySubStep === 'cho_ban_giao' || 
-    record.capGiaySubStep === 'da_ban_giao' || 
-    [RecordStatus.HANDOVER, RecordStatus.RETURNED].includes(record.status) ||
-    !!record.completedDate || !!record.exportDate
-  );
-
   // Build timeline steps array
   const steps = [
     {
@@ -181,8 +173,8 @@ export const RecordTimelineProgress: React.FC<RecordTimelineProgressProps> = ({
     ...(isCG ? [
       {
         id: 'tham_dinh',
-        label: 'CHỜ THẨM ĐỊNH',
-        date: ['tham_dinh', 'phieu_chuyen_thue', 'cho_tbt', 'cho_gnt', 'in_hoan_thien', 'hoan_thien_trinh_duyet', 'trinh_kiem_tra', 'trinh_ky', 'vo_so_gcn', 'cho_ban_giao', 'da_ban_giao'].includes(record.capGiaySubStep || '') ? record.receivedDate : null,
+        label: 'THẨM ĐỊNH',
+        date: ['tham_dinh', 'phieu_chuyen_thue', 'cho_tbt', 'cho_gnt', 'in_hoan_thien', 'hoan_thien_trinh_duyet', 'trinh_kiem_tra', 'trinh_ky', 'cho_ban_giao', 'da_ban_giao'].includes(record.capGiaySubStep || '') ? record.receivedDate : null,
         forceActive: true,
         icon: ClipboardList,
         colorClass: { text: 'text-indigo-700', border: 'border-indigo-600', bg: 'bg-indigo-600' },
@@ -194,42 +186,54 @@ export const RecordTimelineProgress: React.FC<RecordTimelineProgressProps> = ({
       },
       {
         id: 'phieu_chuyen_thue',
-        label: 'CHỜ CHUYỂN THUẾ',
-        date: ['phieu_chuyen_thue', 'cho_tbt', 'cho_gnt', 'in_hoan_thien', 'hoan_thien_trinh_duyet', 'trinh_kiem_tra', 'trinh_ky', 'vo_so_gcn', 'cho_ban_giao', 'da_ban_giao'].includes(record.capGiaySubStep || '') ? record.assignedDate : null,
-        forceActive: ['phieu_chuyen_thue', 'cho_tbt', 'cho_gnt', 'in_hoan_thien', 'hoan_thien_trinh_duyet', 'trinh_kiem_tra', 'trinh_ky', 'vo_so_gcn', 'cho_ban_giao', 'da_ban_giao'].includes(record.capGiaySubStep || ''),
+        label: 'CHUYỂN THUẾ',
+        date: record.taxTransferDate || (['phieu_chuyen_thue', 'cho_tbt', 'cho_gnt', 'in_hoan_thien', 'hoan_thien_trinh_duyet', 'trinh_kiem_tra', 'trinh_ky', 'cho_ban_giao', 'da_ban_giao'].includes(record.capGiaySubStep || '') ? record.assignedDate : null),
+        forceActive: ['phieu_chuyen_thue', 'cho_tbt', 'cho_gnt', 'in_hoan_thien', 'hoan_thien_trinh_duyet', 'trinh_kiem_tra', 'trinh_ky', 'cho_ban_giao', 'da_ban_giao'].includes(record.capGiaySubStep || ''),
         icon: FileText,
         colorClass: { text: 'text-amber-700', border: 'border-amber-600', bg: 'bg-amber-600' },
-        subText: undefined,
+        subText: record.assignedTo ? (() => {
+          const emp = employees.find(e => e.id === record.assignedTo);
+          return emp ? `${emp.name} (${emp.department})` : undefined;
+        })() : undefined,
         durationLabel: null
       },
       {
         id: 'cho_tbt',
-        label: 'CHỜ THÔNG BÁO THUẾ',
-        date: ['cho_tbt', 'cho_gnt', 'in_hoan_thien', 'hoan_thien_trinh_duyet', 'trinh_kiem_tra', 'trinh_ky', 'vo_so_gcn', 'cho_ban_giao', 'da_ban_giao'].includes(record.capGiaySubStep || '') ? record.assignedDate : null,
-        forceActive: ['cho_tbt', 'cho_gnt', 'in_hoan_thien', 'hoan_thien_trinh_duyet', 'trinh_kiem_tra', 'trinh_ky', 'vo_so_gcn', 'cho_ban_giao', 'da_ban_giao'].includes(record.capGiaySubStep || ''),
+        label: 'THUẾ KV7',
+        date: record.taxNoticeDate || (['cho_tbt', 'cho_gnt', 'in_hoan_thien', 'hoan_thien_trinh_duyet', 'trinh_kiem_tra', 'trinh_ky', 'cho_ban_giao', 'da_ban_giao'].includes(record.capGiaySubStep || '') ? record.assignedDate : null),
+        forceActive: ['cho_tbt', 'cho_gnt', 'in_hoan_thien', 'hoan_thien_trinh_duyet', 'trinh_kiem_tra', 'trinh_ky', 'cho_ban_giao', 'da_ban_giao'].includes(record.capGiaySubStep || ''),
         icon: FileText,
         colorClass: { text: 'text-orange-700', border: 'border-orange-600', bg: 'bg-orange-600' },
-        subText: undefined,
+        subText: record.assignedTo ? (() => {
+          const emp = employees.find(e => e.id === record.assignedTo);
+          return emp ? `${emp.name} (${emp.department})` : undefined;
+        })() : undefined,
         durationLabel: null
       },
       {
         id: 'cho_gnt',
-        label: 'CHỜ GNT',
-        date: ['cho_gnt', 'in_hoan_thien', 'hoan_thien_trinh_duyet', 'trinh_kiem_tra', 'trinh_ky', 'vo_so_gcn', 'cho_ban_giao', 'da_ban_giao'].includes(record.capGiaySubStep || '') ? record.assignedDate : null,
-        forceActive: ['cho_gnt', 'in_hoan_thien', 'hoan_thien_trinh_duyet', 'trinh_kiem_tra', 'trinh_ky', 'vo_so_gcn', 'cho_ban_giao', 'da_ban_giao'].includes(record.capGiaySubStep || ''),
+        label: 'GIẤY NỘP TIỀN',
+        date: record.taxPaidDate || (['cho_gnt', 'in_hoan_thien', 'hoan_thien_trinh_duyet', 'trinh_kiem_tra', 'trinh_ky', 'cho_ban_giao', 'da_ban_giao'].includes(record.capGiaySubStep || '') ? record.assignedDate : null),
+        forceActive: ['cho_gnt', 'in_hoan_thien', 'hoan_thien_trinh_duyet', 'trinh_kiem_tra', 'trinh_ky', 'cho_ban_giao', 'da_ban_giao'].includes(record.capGiaySubStep || ''),
         icon: FileText,
         colorClass: { text: 'text-yellow-700', border: 'border-yellow-600', bg: 'bg-yellow-600' },
-        subText: undefined,
+        subText: record.assignedTo ? (() => {
+          const emp = employees.find(e => e.id === record.assignedTo);
+          return emp ? `${emp.name} (${emp.department})` : undefined;
+        })() : undefined,
         durationLabel: null
       },
       {
         id: 'in_hoan_thien',
-        label: 'CHỜ IN & HOÀN THIỆN',
-        date: ['in_hoan_thien', 'hoan_thien_trinh_duyet', 'trinh_kiem_tra', 'trinh_ky', 'vo_so_gcn', 'cho_ban_giao', 'da_ban_giao'].includes(record.capGiaySubStep || '') ? record.submissionDate : null,
-        forceActive: ['in_hoan_thien', 'hoan_thien_trinh_duyet', 'trinh_kiem_tra', 'trinh_ky', 'vo_so_gcn', 'cho_ban_giao', 'da_ban_giao'].includes(record.capGiaySubStep || ''),
+        label: 'IN & HOÀN THIỆN',
+        date: record.printedDate || (['in_hoan_thien', 'hoan_thien_trinh_duyet', 'trinh_kiem_tra', 'trinh_ky', 'cho_ban_giao', 'da_ban_giao'].includes(record.capGiaySubStep || '') ? record.submissionDate : null),
+        forceActive: ['in_hoan_thien', 'hoan_thien_trinh_duyet', 'trinh_kiem_tra', 'trinh_ky', 'cho_ban_giao', 'da_ban_giao'].includes(record.capGiaySubStep || ''),
         icon: FileCheck,
         colorClass: { text: 'text-emerald-700', border: 'border-emerald-600', bg: 'bg-emerald-600' },
-        subText: undefined,
+        subText: record.assignedTo ? (() => {
+          const emp = employees.find(e => e.id === record.assignedTo);
+          return emp ? `${emp.name} (${emp.department})` : undefined;
+        })() : undefined,
         durationLabel: null
       }
     ] : []),
@@ -264,18 +268,7 @@ export const RecordTimelineProgress: React.FC<RecordTimelineProgressProps> = ({
       })() : undefined,
       durationLabel: record.submissionDate ? getStepDurationText(record.submissionDate, isCG ? (record.completedDate || record.exportDate) : (record.approvalDate || record.completedDate)) : null
     },
-    ...(isCG ? [
-      {
-        id: 'vo_so_gcn',
-        label: 'VÔ SỔ GCN',
-        date: isVoSoGcnActive ? (record.completedDate || record.exportDate) : null,
-        forceActive: isVoSoGcnActive,
-        icon: Hash,
-        colorClass: { text: 'text-teal-700', border: 'border-teal-600', bg: 'bg-teal-600' },
-        subText: record.issueNumber ? `Số GCN: ${record.issueNumber}` : undefined,
-        durationLabel: null
-      }
-    ] : []),
+
     {
       id: 'completion',
       label: record.status === RecordStatus.REJECTED ? "HỒ SƠ TRẢ" : record.status === RecordStatus.WITHDRAWN ? "RÚT HỒ SƠ" : "HOÀN THÀNH",

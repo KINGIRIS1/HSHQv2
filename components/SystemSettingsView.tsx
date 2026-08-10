@@ -164,13 +164,12 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
       { id: 'tiep_nhan', label: '1. Chưa giao', shortLabel: 'Chưa giao', slaDays: 1, slaHours: 8, color: 'bg-slate-50 text-slate-700 border-slate-200' },
       { id: 'tham_dinh', label: '2. Thẩm định hồ sơ', shortLabel: 'Thẩm định hồ sơ', slaDays: 1, slaHours: 8, color: 'bg-blue-50 text-blue-700 border-blue-200' },
       { id: 'phieu_chuyen_thue', label: '3. Phiếu chuyển thuế', shortLabel: 'Phiếu chuyển thuế', slaDays: 2.5, slaHours: 20, color: 'bg-purple-50 text-purple-700 border-purple-200' },
-      { id: 'cho_tbt', label: '4. Chờ Thông báo thuế (5 ngày)', shortLabel: 'Chờ Thông báo thuế', slaDays: 5, slaHours: 40, isExternalWait: true, color: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
+      { id: 'cho_tbt', label: '4. Chờ Thuế KV7 (5 ngày)', shortLabel: 'Chờ Thuế KV7', slaDays: 5, slaHours: 40, isExternalWait: true, color: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
       { id: 'cho_nop_thue', label: '5. Chờ Giấy nộp tiền (GNT)', shortLabel: 'Chờ Giấy nộp tiền', slaDays: 0, slaHours: 0, isExternalWait: true, color: 'bg-amber-50 text-amber-700 border-amber-200' },
       { id: 'hoan_thien_trinh_duyet', label: '6. In & Hoàn thiện', shortLabel: 'In & Hoàn thiện', slaDays: 5, slaHours: 40, color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
       { id: 'kiem_tra', label: '7. Trình kiểm tra', shortLabel: 'Trình kiểm tra', slaDays: 1, slaHours: 8, color: 'bg-cyan-50 text-cyan-700 border-cyan-200' },
       { id: 'trinh_ky', label: '8. Trình ký', shortLabel: 'Trình ký', slaDays: 1, slaHours: 8, color: 'bg-violet-50 text-violet-700 border-violet-200' },
-      { id: 'vo_so_gcn', label: '9. Vô số GCN', shortLabel: 'Vô số GCN', slaDays: 1, slaHours: 8, color: 'bg-teal-50 text-teal-700 border-teal-200' },
-      { id: 'cho_ban_giao', label: '10. Giao 1 cửa', shortLabel: 'Giao 1 cửa', slaDays: 0.5, slaHours: 4, color: 'bg-rose-50 text-rose-700 border-rose-200' },
+      { id: 'cho_ban_giao', label: '9. Giao 1 cửa', shortLabel: 'Giao 1 cửa', slaDays: 0.5, slaHours: 4, color: 'bg-rose-50 text-rose-700 border-rose-200' },
     ],
     'Tổ Cấp giấy__3.1.1 Chuyển nhượng': [
       { id: 'tiep_nhan', label: '1. Chưa giao', shortLabel: 'Chưa giao', slaDays: 1, slaHours: 8, color: 'bg-slate-50 text-slate-700 border-slate-200' },
@@ -181,8 +180,7 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
       { id: 'hoan_thien_trinh_duyet', label: '6. In & Hoàn thiện', shortLabel: 'In & Hoàn thiện', slaDays: 5, slaHours: 40, color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
       { id: 'kiem_tra', label: '7. Trình kiểm tra', shortLabel: 'Trình kiểm tra', slaDays: 1, slaHours: 8, color: 'bg-cyan-50 text-cyan-700 border-cyan-200' },
       { id: 'trinh_ky', label: '8. Trình ký', shortLabel: 'Trình ký', slaDays: 1, slaHours: 8, color: 'bg-violet-50 text-violet-700 border-violet-200' },
-      { id: 'vo_so_gcn', label: '9. Vô số GCN', shortLabel: 'Vô số GCN', slaDays: 1, slaHours: 8, color: 'bg-teal-50 text-teal-700 border-teal-200' },
-      { id: 'cho_ban_giao', label: '10. Giao 1 cửa', shortLabel: 'Giao 1 cửa', slaDays: 0.5, slaHours: 4, color: 'bg-rose-50 text-rose-700 border-rose-200' },
+      { id: 'cho_ban_giao', label: '9. Giao 1 cửa', shortLabel: 'Giao 1 cửa', slaDays: 0.5, slaHours: 4, color: 'bg-rose-50 text-rose-700 border-rose-200' },
     ],
     'Tổ Cấp giấy__3.1.2 Tặng cho': [
       { id: 'tiep_nhan', label: '1. Tiếp nhận', shortLabel: 'Tiếp nhận', slaDays: 1, slaHours: 8, color: 'bg-slate-50 text-slate-700 border-slate-200' },
@@ -193,8 +191,7 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
       { id: 'hoan_thien_trinh_duyet', label: '6. In & Hoàn thiện', shortLabel: 'In & Hoàn thiện', slaDays: 5, slaHours: 40, color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
       { id: 'kiem_tra', label: '7. Kiểm tra', shortLabel: 'Kiểm tra', slaDays: 1, slaHours: 8, color: 'bg-cyan-50 text-cyan-700 border-cyan-200' },
       { id: 'trinh_ky', label: '8. Trình ký', shortLabel: 'Trình ký', slaDays: 1, slaHours: 8, color: 'bg-violet-50 text-violet-700 border-violet-200' },
-      { id: 'vo_so_gcn', label: '9. Vô số GCN', shortLabel: 'Vô số GCN', slaDays: 1, slaHours: 8, color: 'bg-teal-50 text-teal-700 border-teal-200' },
-      { id: 'cho_ban_giao', label: '10. Giao 1 cửa', shortLabel: 'Giao 1 cửa', slaDays: 0.5, slaHours: 4, color: 'bg-rose-50 text-rose-700 border-rose-200' },
+      { id: 'cho_ban_giao', label: '9. Giao 1 cửa', shortLabel: 'Giao 1 cửa', slaDays: 0.5, slaHours: 4, color: 'bg-rose-50 text-rose-700 border-rose-200' },
     ],
     'Tổ Cấp giấy__3.1.3 Thừa kế': [
       { id: 'tiep_nhan', label: '1. Tiếp nhận', shortLabel: 'Tiếp nhận', slaDays: 1, slaHours: 8, color: 'bg-slate-50 text-slate-700 border-slate-200' },
@@ -205,8 +202,7 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
       { id: 'hoan_thien_trinh_duyet', label: '6. In & Hoàn thiện', shortLabel: 'In & Hoàn thiện', slaDays: 5, slaHours: 40, color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
       { id: 'kiem_tra', label: '7. Kiểm tra', shortLabel: 'Kiểm tra', slaDays: 1, slaHours: 8, color: 'bg-cyan-50 text-cyan-700 border-cyan-200' },
       { id: 'trinh_ky', label: '8. Trình ký', shortLabel: 'Trình ký', slaDays: 1, slaHours: 8, color: 'bg-violet-50 text-violet-700 border-violet-200' },
-      { id: 'vo_so_gcn', label: '9. Vô số GCN', shortLabel: 'Vô số GCN', slaDays: 1, slaHours: 8, color: 'bg-teal-50 text-teal-700 border-teal-200' },
-      { id: 'cho_ban_giao', label: '10. Giao 1 cửa', shortLabel: 'Giao 1 cửa', slaDays: 0.5, slaHours: 4, color: 'bg-rose-50 text-rose-700 border-rose-200' },
+      { id: 'cho_ban_giao', label: '9. Giao 1 cửa', shortLabel: 'Giao 1 cửa', slaDays: 0.5, slaHours: 4, color: 'bg-rose-50 text-rose-700 border-rose-200' },
     ],
     'Tổ Cấp giấy__3.1.4 Thỏa thuận': [
       { id: 'tiep_nhan', label: '1. Tiếp nhận', shortLabel: 'Tiếp nhận', slaDays: 1, slaHours: 8, color: 'bg-slate-50 text-slate-700 border-slate-200' },
@@ -217,8 +213,7 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
       { id: 'hoan_thien_trinh_duyet', label: '6. In & Hoàn thiện', shortLabel: 'In & Hoàn thiện', slaDays: 5, slaHours: 40, color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
       { id: 'kiem_tra', label: '7. Kiểm tra', shortLabel: 'Kiểm tra', slaDays: 1, slaHours: 8, color: 'bg-cyan-50 text-cyan-700 border-cyan-200' },
       { id: 'trinh_ky', label: '8. Trình ký', shortLabel: 'Trình ký', slaDays: 1, slaHours: 8, color: 'bg-violet-50 text-violet-700 border-violet-200' },
-      { id: 'vo_so_gcn', label: '9. Vô số GCN', shortLabel: 'Vô số GCN', slaDays: 1, slaHours: 8, color: 'bg-teal-50 text-teal-700 border-teal-200' },
-      { id: 'cho_ban_giao', label: '10. Giao 1 cửa', shortLabel: 'Giao 1 cửa', slaDays: 0.5, slaHours: 4, color: 'bg-rose-50 text-rose-700 border-rose-200' },
+      { id: 'cho_ban_giao', label: '9. Giao 1 cửa', shortLabel: 'Giao 1 cửa', slaDays: 0.5, slaHours: 4, color: 'bg-rose-50 text-rose-700 border-rose-200' },
     ],
     'Tổ Cấp giấy__3.2.2 Cấp đổi (có thuế)': [
       { id: 'tiep_nhan', label: '1. Tiếp nhận', shortLabel: 'Tiếp nhận', slaDays: 1, slaHours: 8, color: 'bg-slate-50 text-slate-700 border-slate-200' },
@@ -229,24 +224,21 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
       { id: 'hoan_thien_trinh_duyet', label: '6. In & Hoàn thiện', shortLabel: 'In & Hoàn thiện', slaDays: 5, slaHours: 40, color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
       { id: 'kiem_tra', label: '7. Kiểm tra', shortLabel: 'Kiểm tra', slaDays: 1, slaHours: 8, color: 'bg-cyan-50 text-cyan-700 border-cyan-200' },
       { id: 'trinh_ky', label: '8. Trình ký', shortLabel: 'Trình ký', slaDays: 1, slaHours: 8, color: 'bg-violet-50 text-violet-700 border-violet-200' },
-      { id: 'vo_so_gcn', label: '9. Vô số GCN', shortLabel: 'Vô số GCN', slaDays: 1, slaHours: 8, color: 'bg-teal-50 text-teal-700 border-teal-200' },
-      { id: 'cho_ban_giao', label: '10. Giao 1 cửa', shortLabel: 'Giao 1 cửa', slaDays: 0.5, slaHours: 4, color: 'bg-rose-50 text-rose-700 border-rose-200' },
+      { id: 'cho_ban_giao', label: '9. Giao 1 cửa', shortLabel: 'Giao 1 cửa', slaDays: 0.5, slaHours: 4, color: 'bg-rose-50 text-rose-700 border-rose-200' },
     ],
     'Tổ Cấp giấy__3.2.1 Cấp đổi': [
       { id: 'tiep_nhan', label: '1. Tiếp nhận', shortLabel: 'Tiếp nhận', slaDays: 0.5, slaHours: 4, color: 'bg-slate-50 text-slate-700 border-slate-200' },
       { id: 'hoan_thien_trinh_duyet', label: '2. In & Hoàn thiện', shortLabel: 'In & Hoàn thiện', slaDays: 5, slaHours: 40, color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
       { id: 'kiem_tra', label: '3. Kiểm tra', shortLabel: 'Kiểm tra', slaDays: 1, slaHours: 8, color: 'bg-cyan-50 text-cyan-700 border-cyan-200' },
       { id: 'trinh_ky', label: '4. Trình ký', shortLabel: 'Trình ký', slaDays: 1, slaHours: 8, color: 'bg-violet-50 text-violet-700 border-violet-200' },
-      { id: 'vo_so_gcn', label: '5. Vô số GCN', shortLabel: 'Vô số GCN', slaDays: 1.5, slaHours: 12, color: 'bg-teal-50 text-teal-700 border-teal-200' },
-      { id: 'cho_ban_giao', label: '6. Giao 1 cửa', shortLabel: 'Giao 1 cửa', slaDays: 0.5, slaHours: 4, color: 'bg-rose-50 text-rose-700 border-rose-200' },
+      { id: 'cho_ban_giao', label: '5. Giao 1 cửa', shortLabel: 'Giao 1 cửa', slaDays: 0.5, slaHours: 4, color: 'bg-rose-50 text-rose-700 border-rose-200' },
     ],
     'Tổ Cấp giấy__3.5.1 Gia hạn': [
       { id: 'tiep_nhan', label: '1. Tiếp nhận', shortLabel: 'Tiếp nhận', slaDays: 0.5, slaHours: 4, color: 'bg-slate-50 text-slate-700 border-slate-200' },
       { id: 'hoan_thien_trinh_duyet', label: '2. In & Hoàn thiện', shortLabel: 'In & Hoàn thiện', slaDays: 5, slaHours: 40, color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
       { id: 'kiem_tra', label: '3. Kiểm tra', shortLabel: 'Kiểm tra', slaDays: 1, slaHours: 8, color: 'bg-cyan-50 text-cyan-700 border-cyan-200' },
       { id: 'trinh_ky', label: '4. Trình ký', shortLabel: 'Trình ký', slaDays: 1, slaHours: 8, color: 'bg-violet-50 text-violet-700 border-violet-200' },
-      { id: 'vo_so_gcn', label: '5. Vô số GCN', shortLabel: 'Vô số GCN', slaDays: 1.5, slaHours: 12, color: 'bg-teal-50 text-teal-700 border-teal-200' },
-      { id: 'cho_ban_giao', label: '6. Giao 1 cửa', shortLabel: 'Giao 1 cửa', slaDays: 0.5, slaHours: 4, color: 'bg-rose-50 text-rose-700 border-rose-200' },
+      { id: 'cho_ban_giao', label: '5. Giao 1 cửa', shortLabel: 'Giao 1 cửa', slaDays: 0.5, slaHours: 4, color: 'bg-rose-50 text-rose-700 border-rose-200' },
     ],
     'Tổ Đo đạc': [
       { id: 'tiep_nhan_dodac', label: '1. Tiếp nhận', shortLabel: 'Tiếp nhận', slaDays: 1, slaHours: 8, color: 'bg-blue-50 text-blue-700 border-blue-200' },
@@ -286,7 +278,21 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
   };
 
   const [workflowDept, setWorkflowDept] = useState<string>('Tổ Đo đạc');
-  const [selectedProcedureKey, setSelectedProcedureKey] = useState<string>('all');
+  const availableProcedures = React.useMemo(() => {
+    if (workflowDept === 'Tổ Cấp giấy') return CAP_GIAY_RECORD_TYPES;
+    if (workflowDept === 'Tổ Đo đạc') return MEASUREMENT_RECORD_TYPES;
+    if (workflowDept === 'Tổ Lưu trữ') return ARCHIVE_RECORD_TYPES;
+    return [];
+  }, [workflowDept]);
+
+  const [selectedProcedureKey, setSelectedProcedureKey] = useState<string>(MEASUREMENT_RECORD_TYPES[0] || '');
+
+  useEffect(() => {
+    if (availableProcedures.length > 0 && !availableProcedures.includes(selectedProcedureKey)) {
+      setSelectedProcedureKey(availableProcedures[0]);
+    }
+  }, [workflowDept, availableProcedures]);
+
   const [workflowConfigs, setWorkflowConfigs] = useState<Record<string, Array<{ id: string; label: string; shortLabel: string; slaDays: number; slaHours?: number; isExternalWait?: boolean; color?: string }>>>(DEFAULT_WORKFLOW_STEPS);
   const [savedWorkflowConfigs, setSavedWorkflowConfigs] = useState<Record<string, any>>({});
   const [isSavingWorkflow, setIsSavingWorkflow] = useState(false);
@@ -295,17 +301,8 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
   const [newStepSla, setNewStepSla] = useState<number>(1);
   const [targetTotalDays, setTargetTotalDays] = useState<number>(15);
 
-  const availableProcedures = React.useMemo(() => {
-    if (workflowDept === 'Tổ Cấp giấy') return CAP_GIAY_RECORD_TYPES;
-    if (workflowDept === 'Tổ Đo đạc') return MEASUREMENT_RECORD_TYPES;
-    if (workflowDept === 'Tổ Lưu trữ') return ARCHIVE_RECORD_TYPES;
-    return [];
-  }, [workflowDept]);
-
   const activeConfigKey = React.useMemo(() => {
-    return selectedProcedureKey === 'all' 
-      ? workflowDept 
-      : `${workflowDept}__${selectedProcedureKey}`;
+    return `${workflowDept}__${selectedProcedureKey}`;
   }, [workflowDept, selectedProcedureKey]);
 
   const activeSteps = React.useMemo(() => {
@@ -598,58 +595,29 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
   };
 
   const handleResetWorkflow = async () => {
-      const confirmMsg = selectedProcedureKey !== 'all'
-          ? `Bạn có chắc chắn muốn khôi phục các bước quy trình SLA của thủ tục '${selectedProcedureKey}' về mặc định ban đầu không?\n\nNếu đồng ý, các thay đổi sẽ được xóa và khôi phục về giá trị mặc định ban đầu.`
-          : `Bạn có chắc chắn muốn khôi phục tất cả các bước quy trình SLA thuộc '${workflowDept}' về mặc định ban đầu không?\n\nNếu đồng ý, tất cả tùy chỉnh sẽ được khôi phục về mặc định ban đầu.`;
+      const confirmMsg = `Bạn có chắc chắn muốn khôi phục các bước quy trình SLA của thủ tục '${selectedProcedureKey}' về mặc định ban đầu không?\n\nNếu đồng ý, các thay đổi sẽ được xóa và khôi phục về giá trị mặc định ban đầu.`;
 
       if (window.confirm(confirmMsg)) {
           const copy = { ...workflowConfigs };
           const savedCopy = { ...savedWorkflowConfigs };
 
-          if (selectedProcedureKey !== 'all') {
-              const customKey = `${workflowDept}__${selectedProcedureKey}`;
-              if (DEFAULT_WORKFLOW_STEPS[customKey]) {
-                  copy[customKey] = JSON.parse(JSON.stringify(DEFAULT_WORKFLOW_STEPS[customKey]));
-              } else {
-                  delete copy[customKey];
-              }
-              delete savedCopy[customKey];
-
-              setWorkflowConfigs(copy);
-              setSavedWorkflowConfigs(savedCopy);
-
-              await saveSystemSetting('workflow_sla_configs', JSON.stringify(copy));
-              try {
-                  localStorage.setItem('workflow_sla_configs', JSON.stringify(copy));
-              } catch (e) {}
-
-              alert(`Đã khôi phục quy trình thủ tục '${selectedProcedureKey}' về mặc định ban đầu và bỏ ký hiệu ★.`);
+          const customKey = `${workflowDept}__${selectedProcedureKey}`;
+          if (DEFAULT_WORKFLOW_STEPS[customKey]) {
+              copy[customKey] = JSON.parse(JSON.stringify(DEFAULT_WORKFLOW_STEPS[customKey]));
           } else {
-              Object.keys(copy).forEach(k => {
-                  if (k.startsWith(`${workflowDept}__`) || k === workflowDept) {
-                      if (DEFAULT_WORKFLOW_STEPS[k]) {
-                          copy[k] = JSON.parse(JSON.stringify(DEFAULT_WORKFLOW_STEPS[k]));
-                      } else {
-                          delete copy[k];
-                      }
-                  }
-              });
-              Object.keys(savedCopy).forEach(k => {
-                  if (k.startsWith(`${workflowDept}__`) || k === workflowDept) {
-                      delete savedCopy[k];
-                  }
-              });
-
-              setWorkflowConfigs(copy);
-              setSavedWorkflowConfigs(savedCopy);
-
-              await saveSystemSetting('workflow_sla_configs', JSON.stringify(copy));
-              try {
-                  localStorage.setItem('workflow_sla_configs', JSON.stringify(copy));
-              } catch (e) {}
-
-              alert(`Đã khôi phục tất cả quy trình thuộc '${workflowDept}' về mặc định ban đầu và bỏ ký hiệu ★.`);
+              delete copy[customKey];
           }
+          delete savedCopy[customKey];
+
+          setWorkflowConfigs(copy);
+          setSavedWorkflowConfigs(savedCopy);
+
+          await saveSystemSetting('workflow_sla_configs', JSON.stringify(copy));
+          try {
+              localStorage.setItem('workflow_sla_configs', JSON.stringify(copy));
+          } catch (e) {}
+
+          alert(`Đã khôi phục quy trình thủ tục '${selectedProcedureKey}' về mặc định ban đầu và bỏ ký hiệu ★.`);
           if (onHolidaysChanged) onHolidaysChanged();
       }
   };
@@ -1063,7 +1031,6 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                                         onChange={(e) => setSelectedProcedureKey(e.target.value)}
                                         className="w-full bg-white border border-indigo-300 font-bold text-xs text-indigo-950 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500 shadow-2xs cursor-pointer"
                                     >
-                                        <option value="all">-- Cấu hình mặc định cho toàn bộ {workflowDept} --</option>
                                         {availableProcedures.map(proc => {
                                             const procKey = `${workflowDept}__${proc}`;
                                             const defaultConfig = DEFAULT_WORKFLOW_STEPS[procKey] || DEFAULT_WORKFLOW_STEPS[workflowDept];
@@ -1078,16 +1045,6 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                                             );
                                         })}
                                     </select>
-                                    {selectedProcedureKey !== 'all' && (
-                                        <button
-                                            type="button"
-                                            onClick={() => setSelectedProcedureKey('all')}
-                                            className="px-2.5 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs rounded-xl transition-colors whitespace-nowrap cursor-pointer"
-                                            title="Chuyển về cấu hình chung"
-                                        >
-                                            Chung
-                                        </button>
-                                    )}
                                 </div>
                             </div>
 
@@ -1095,7 +1052,7 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-0.5">
                                 <h4 className="text-sm font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
                                     <span className="w-2 h-2 rounded-full bg-indigo-600 inline-block"></span>
-                                    Các bước quy trình: <span className="text-indigo-600">{selectedProcedureKey === 'all' ? workflowDept : selectedProcedureKey}</span>
+                                    Các bước quy trình: <span className="text-indigo-600">{selectedProcedureKey}</span>
                                 </h4>
                                 <div className="flex flex-wrap items-center gap-2 shrink-0">
                                     <div className="flex items-center bg-white border border-indigo-300 rounded-xl px-2.5 py-1.5 shadow-2xs text-xs">

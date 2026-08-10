@@ -189,8 +189,14 @@ export interface RecordFile {
   excerptNumber?: string | null;
   soPhieuChuyenThue?: string | null; // Số phiếu chuyển thuế
   
+  // Các mốc ngày xử lý chuyên biệt cho Tab Cấp Giấy
+  taxTransferDate?: string | null;  // Ngày chuyển thuế
+  taxNoticeDate?: string | null;    // Ngày nhận TB Thuế KV7
+  taxPaidDate?: string | null;      // Ngày nộp thuế / Giấy nộp tiền
+  printedDate?: string | null;      // Ngày in & hoàn thiện
+
   // Bước nhỏ xử lý quy trình 11 bước Tab Đăng ký
-  capGiaySubStep?: 'tiep_nhan_giao_viec' | 'tham_dinh' | 'phieu_chuyen_thue' | 'cho_tbt' | 'cho_gnt' | 'cho_nop_thue' | 'in_hoan_thien' | 'hoan_thien_trinh_duyet' | 'trinh_kiem_tra' | 'kiem_tra' | 'trinh_ky' | 'vo_so_gcn' | 'cho_vo_so' | 'giao_mot_cua' | 'cho_ban_giao' | 'chinh_ly_luu_tru' | 'da_ban_giao' | string | null;
+  capGiaySubStep?: 'tiep_nhan_giao_viec' | 'tham_dinh' | 'phieu_chuyen_thue' | 'cho_tbt' | 'cho_gnt' | 'cho_nop_thue' | 'in_hoan_thien' | 'hoan_thien_trinh_duyet' | 'trinh_kiem_tra' | 'kiem_tra' | 'trinh_ky' | 'cho_vo_so' | 'giao_mot_cua' | 'cho_ban_giao' | 'chinh_ly_luu_tru' | 'da_ban_giao' | string | null;
   
   // Tính năng nhắc nhở
   reminderDate?: string | null;      // Thời gian đặt lịch nhắc

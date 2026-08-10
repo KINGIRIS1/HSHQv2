@@ -335,9 +335,7 @@ export const useRecordFilter = (
                 if (capGiaySubStepFilter === 'trinh_ky') {
                     return currentSubStep === 'trinh_ky' || r.status === RecordStatus.PENDING_SIGN;
                 }
-                if (capGiaySubStepFilter === 'vo_so_gcn') {
-                    return currentSubStep === 'vo_so_gcn' || currentSubStep === 'cho_vo_so' || r.status === RecordStatus.SIGNED;
-                }
+
                 if (capGiaySubStepFilter === 'giao_mot_cua' || capGiaySubStepFilter === 'cho_ban_giao') {
                     return currentSubStep === 'giao_mot_cua' || currentSubStep === 'cho_ban_giao' || currentSubStep === 'ban_giao' || r.status === RecordStatus.HANDOVER;
                 }

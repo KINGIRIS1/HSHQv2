@@ -205,12 +205,12 @@ export const calculateDeadlineHelper = (type: string, receivedDateStr: string, h
     if (dynamicDays !== null && dynamicDays > 0) {
         daysToAdd = dynamicDays;
     } else {
-        if (lowerType.includes('2.2') || lowerType.includes('2.3') || lowerType.includes('2.4') || lowerType.includes('2.5') || 
+        if (lowerType.includes('2.2') || lowerType.includes('2.4') || lowerType.includes('2.5') || 
             lowerType.includes('trích đo') || lowerType.includes('cắm mốc') || lowerType.includes('đo đạc') || lowerType.includes('tách thửa') || lowerType.includes('tách - hợp')) {
             daysToAdd = 30;
         } else if (lowerType.includes('1.1') || lowerType.includes('1.2') || lowerType.includes('công văn') || lowerType.includes('cong van') || lowerType.includes('cung cấp tài liệu đất đai') || lowerType.includes('cung cấp dữ liệu') ||
             lowerType.includes('quy hoạch') || 
-            lowerType.includes('2.6') || lowerType.includes('số thửa') || 
+            lowerType.includes('2.3') || lowerType.includes('2.6') || lowerType.includes('số thửa') || 
             lowerType.includes('2.1') || lowerType.includes('trích lục')) {
             daysToAdd = 10;
         } else if (lowerType.includes('3.2.1') || lowerType.includes('3.2.2') || lowerType.includes('3.5.1') || lowerType.includes('gia hạn') || (lowerType.includes('cấp đổi') && !lowerType.includes('trích đo'))) {
@@ -331,7 +331,6 @@ export const getCapGiayStepSLA = (subStep?: string | null, hasThamdinh?: boolean
     if (subStep === 'hoan_thien_trinh_duyet' || subStep === 'in_hoan_thien') return 5; // Hoàn thiện in GCN (5 ngày)
     if (subStep === 'kiem_tra') return 1; // Kiểm tra (1 ngày)
     if (subStep === 'trinh_ky') return 1; // Trình ký (1 ngày)
-    if (subStep === 'vo_so_gcn') return 1; // Vô số GCN (1 ngày)
     return 1;
 };
 
@@ -586,25 +585,6 @@ export function processAssignmentTimelineCheck(
   if (firstWard) {
     updates.ward = firstWard;
     updates.handoverWard = firstWard;
-  }
-
-  if (hasSubsequentSteps || isLaterDate || historyParts.length > 0) {
-    const logNote = `Giao NV ${oldEmpName} ngày ${formatDateVN(record.assignedDate) || 'trước đó'}${record.submissionDate ? `, Trình ký ngày ${formatDateVN(record.submissionDate)}` : ''}`;
-    const fullInternalNote = `Cập nhật lại đã giao việc ngày ${formatDateVN(newAssignedDateStr)} (${newEmpName}). Đưa về bước Đang thực hiện. Ghi chú nội bộ: ${logNote} để biết và truy vết.`;
-
-    const existingPrivate = record.privateNotes || '';
-    updates.privateNotes = existingPrivate ? `${existingPrivate}\n${fullInternalNote}` : fullInternalNote;
-
-    const newLog = {
-      id: `${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-      recordId: record.id,
-      previousStatus: record.status,
-      newStatus: RecordStatus.IN_PROGRESS,
-      changedBy: currentUser?.name || 'Hệ thống',
-      changedAt: new Date().toISOString(),
-      note: fullInternalNote
-    };
-    updates.statusLogs = [...(record.statusLogs || []), newLog];
   }
 
   if (record.data) {

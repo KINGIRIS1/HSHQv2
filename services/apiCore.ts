@@ -363,6 +363,11 @@ export const mapRecordFromDb = (item: any): any => {
     
     r.capGiaySubStep = val(r.capGiaySubStep, r.capgiaysubstep, r.cap_giay_sub_step);
     
+    r.taxTransferDate = keepOnlyDate(val(r.taxTransferDate, r.taxtransferdate, r.tax_transfer_date));
+    r.taxNoticeDate = keepOnlyDate(val(r.taxNoticeDate, r.taxnoticedate, r.tax_notice_date));
+    r.taxPaidDate = keepOnlyDate(val(r.taxPaidDate, r.taxpaiddate, r.tax_paid_date));
+    r.printedDate = keepOnlyDate(val(r.printedDate, r.printeddate, r.printed_date));
+    
     let rawLogs = val(r.statusLogs, r.statuslogs, r.status_logs);
     if (typeof rawLogs === 'string') {
         try { rawLogs = JSON.parse(rawLogs); } catch (e) { rawLogs = []; }

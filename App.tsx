@@ -586,7 +586,7 @@ function App() {
                       if (!r.checkedDate) recordUpdates.checkedDate = targetDateStr;
                       if (!r.submissionDate) recordUpdates.submissionDate = targetDateStr;
                       if (isCapGiayRecord(r)) {
-                          recordUpdates.capGiaySubStep = 'vo_so_gcn';
+                          recordUpdates.capGiaySubStep = 'giao_mot_cua';
                       }
                   } else if (value === RecordStatus.HANDOVER) {
                       if (!r.assignedDate) recordUpdates.assignedDate = targetDateStr;
@@ -963,7 +963,7 @@ function App() {
               status: RecordStatus.SIGNED,
               approvalDate: nowStr,
               completedDate: null,
-              ...(isCapGiayRecord(r) ? { capGiaySubStep: 'vo_so_gcn' } : {}),
+              ...(isCapGiayRecord(r) ? { capGiaySubStep: 'giao_mot_cua' } : {}),
               statusLogs: createStatusLog(r, RecordStatus.SIGNED, 'Ký duyệt đợt')
           }));
           setRecords(prev => prev.map(r => {

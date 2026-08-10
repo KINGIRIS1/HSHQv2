@@ -755,7 +755,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                   className={`px-2.5 py-1 rounded-md text-xs font-bold flex items-center gap-1 transition-all whitespace-nowrap cursor-pointer ${currentView === "dangky_cho_tbt" ? "bg-amber-600 text-white shadow-xs" : "bg-white/80 text-amber-900 hover:bg-white"}`}
                 >
                   <FileText size={13} />
-                  <span>Chờ thông báo thuế</span>
+                  <span>Chờ Thuế KV7</span>
                 </button>
                 <button
                   onClick={() => props.setCurrentView("dangky_cho_gnt")}
@@ -1033,19 +1033,19 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                             >
                               <option value="all">Mọi trạng thái</option>
                               {Object.entries(STATUS_LABELS)
-                                .filter(([key]) => key !== RecordStatus.ASSIGNED && (!isDangkyView || key !== RecordStatus.IN_PROGRESS))
+                                .filter(([key]) => key !== RecordStatus.ASSIGNED && (!isDangkyView && !isOtherView || key !== RecordStatus.IN_PROGRESS))
                                 .map(([key, label]) => (
                                   <option key={key} value={key}>
                                     {label}
                                   </option>
                                 ))}
-                              {isDangkyView && (
+                              {(isDangkyView || isOtherView) && (
                                 <>
-                                  <option value="cho_tham_dinh">Chờ thẩm định</option>
-                                  <option value="phieu_chuyen_thue">Chờ chuyển thuế</option>
-                                  <option value="cho_tbt">Chờ Thuế KV7</option>
-                                  <option value="cho_gnt">Chờ Giấy nộp tiền</option>
-                                  <option value="in_hoan_thien">Chờ In & hoàn thiện</option>
+                                  <option value="cho_tham_dinh">🟢 Chờ Thẩm định</option>
+                                  <option value="phieu_chuyen_thue">🟧 Chờ chuyển thuế</option>
+                                  <option value="cho_tbt">📙 Chờ Thuế KV7</option>
+                                  <option value="cho_gnt">💳 Chờ Giấy nộp tiền</option>
+                                  <option value="in_hoan_thien">🖨️ Chờ In & hoàn thiện</option>
                                 </>
                               )}
                             </select>

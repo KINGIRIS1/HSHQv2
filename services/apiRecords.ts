@@ -19,7 +19,7 @@ export const RECORD_DB_COLUMNS = [
     'issueNumber', 'entryNumber', 'issueDate', 'residentialArea',
     'price', 'advancePayment', 'isHandedOver',
     'statusLogs', 'archiveHandoverDate', 'archiveHandoverBatch',
-    'capGiaySubStep'
+    'capGiaySubStep', 'taxTransferDate', 'taxNoticeDate', 'taxPaidDate', 'printedDate'
 ];
 
 const OPTIONAL_NEW_COLUMNS = [
@@ -30,7 +30,7 @@ const OPTIONAL_NEW_COLUMNS = [
     'privateNotes', 'personalNotes', 'checkedBy', 'pendingCheckDate', 'checkedDate', 'completedWorkDate',
     'price', 'advancePayment', 'isHandedOver',
     'statusLogs', 'archiveHandoverDate', 'archiveHandoverBatch',
-    'capGiaySubStep'
+    'capGiaySubStep', 'taxTransferDate', 'taxNoticeDate', 'taxPaidDate', 'printedDate'
 ];
 
 export const getTargetTableForRecord = (record: Partial<RecordFile> | null | undefined): string => {
