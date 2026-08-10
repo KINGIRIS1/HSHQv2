@@ -94,7 +94,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
   });
 
   const [attachedDocs, setAttachedDocs] = useState<AttachedDocItem[]>([]);
-  const [recordTypeGroup, setRecordTypeGroup] = useState<'all' | 'cap_giay' | 'do_dac' | 'luu_tru'>('all');
+  const [recordTypeGroup, setRecordTypeGroup] = useState<'all' | 'do_dac' | 'luu_tru'>('all');
   const [authCccd, setAuthCccd] = useState('');
   const [authAddress, setAuthAddress] = useState('');
   const [isAuthOpen, setIsAuthOpen] = useState(false);
@@ -304,13 +304,6 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
                         <div className="inline-flex rounded-lg p-0.5 bg-slate-100 border border-slate-200 text-[10px] font-bold">
                             <button
                                 type="button"
-                                onClick={() => setRecordTypeGroup('cap_giay')}
-                                className={`px-2 py-0.5 rounded transition-all ${recordTypeGroup === 'cap_giay' ? 'bg-teal-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
-                            >
-                                Cấp giấy
-                            </button>
-                            <button
-                                type="button"
                                 onClick={() => setRecordTypeGroup('do_dac')}
                                 className={`px-2 py-0.5 rounded transition-all ${recordTypeGroup === 'do_dac' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
                             >
@@ -334,9 +327,8 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
                     </div>
                     <select className={`${inputClass} font-semibold`} value={formData.recordType || ''} onChange={(e) => handleChange('recordType', e.target.value)}>
                         <option value="">
-                            {recordTypeGroup === 'cap_giay' ? '-- Chọn thủ tục Cấp giấy --' : recordTypeGroup === 'do_dac' ? '-- Chọn thủ tục Đo đạc --' : recordTypeGroup === 'luu_tru' ? '-- Chọn thủ tục Lưu trữ --' : '-- Chọn loại hồ sơ --'}
+                            {recordTypeGroup === 'do_dac' ? '-- Chọn thủ tục Đo đạc --' : recordTypeGroup === 'luu_tru' ? '-- Chọn thủ tục Lưu trữ --' : '-- Chọn loại hồ sơ --'}
                         </option>
-                        {recordTypeGroup === 'cap_giay' && CAP_GIAY_RECORD_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                         {recordTypeGroup === 'do_dac' && MEASUREMENT_RECORD_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                         {recordTypeGroup === 'luu_tru' && ARCHIVE_RECORD_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                         {recordTypeGroup === 'all' && (
@@ -346,9 +338,6 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
                                 </optgroup>
                                 <optgroup label="2. Tổ Đo đạc">
                                     {MEASUREMENT_RECORD_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                                </optgroup>
-                                <optgroup label="3. Cấp giấy / Đăng ký biến động">
-                                    {CAP_GIAY_RECORD_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                                 </optgroup>
                             </>
                         )}

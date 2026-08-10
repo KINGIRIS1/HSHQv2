@@ -1147,14 +1147,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
 
             {canPerformAction && (
               <>
-                {(currentView === "all_records" ||
-                  currentView === "assign_tasks" ||
-                  currentView === "archive_records" ||
-                  currentView === "archive_assign_tasks" ||
-                  currentView === "other_records" ||
-                  currentView === "dangky_records" ||
-                  currentView === "dangky_tiep_nhan_giao_viec" ||
-                  currentView === "other_assign_tasks") && (
+                {currentView === "all_records" && (
                   <div className="flex items-center gap-2">
                     <div className="h-6 w-px bg-gray-300 mx-1"></div>
                     <div className="relative inline-block text-left" ref={addMenuRef}>
@@ -1257,7 +1250,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                     onClick={props.handleExportReturnedList}
                     className="hidden md:flex items-center gap-1.5 bg-emerald-600 text-white px-3 py-1.5 rounded-md hover:bg-emerald-700 text-sm font-bold shadow-sm transition-all"
                   >
-                    <FileSpreadsheet size={16} /> Xuất Excel (Đã trả KQ)
+                    <FileSpreadsheet size={16} /> Xuất DS TK
                   </button>
                 </div>
               )}
@@ -1636,7 +1629,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                     onAdvanceStatus={props.advanceStatus}
                     onQuickUpdate={props.handleQuickUpdate}
                     onReturnResult={props.handleOpenReturnModal}
-                    onMapCorrection={props.handleMapCorrectionRequest}
+                    onMapCorrection={currentView.startsWith('archive_') || currentView === 'archive_records' ? undefined : props.handleMapCorrectionRequest}
                     onExtendDeadline={props.onExtendDeadline || ((rec) => {
                       if (props.setExtendTargetRecord && props.setIsExtendModalOpen) {
                         props.setExtendTargetRecord(rec);
