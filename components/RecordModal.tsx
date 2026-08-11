@@ -114,6 +114,22 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
     "director_completed",
   ].includes(currentView || "");
 
+  const isProfessionalReceptionTab = [
+    'receive_record',
+    'dangky_tiep_nhan_giao_viec',
+    'assign_tasks',
+    'archive_assign_tasks',
+    'other_assign_tasks',
+    'capgiay_assign_tasks'
+  ].includes(currentView || '') || formData.capGiaySubStep === 'tiep_nhan' || (!initialData && [
+    'receive_record',
+    'dangky_tiep_nhan_giao_viec',
+    'assign_tasks',
+    'archive_assign_tasks',
+    'other_assign_tasks',
+    'capgiay_assign_tasks'
+  ].includes(currentView || ''));
+
   const isCapGiayView = [
     "capgiay_records",
     "capgiay_assign_tasks",
@@ -280,13 +296,12 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
             setAuthAddress(parsed.address);
             setIsAuthOpen(!!(initialData.authorizedBy || parsed.cccd || parsed.address));
         } else {
-            const defaultRecType = allowedRecordTypes[0] || EXTENDED_RECORD_TYPES[0];
+            const defaultRecType = '';
             const recDate = new Date().toISOString();
-            const initDeadline = calculateDeadlineHelper(defaultRecType, recDate.split('T')[0], holidays || []);
+            const initDeadline = '';
             let initPrice: number | undefined = undefined;
-            if (defaultRecType.includes('1.1') || defaultRecType.includes('1.2') || defaultRecType.includes('sao lục') || defaultRecType.includes('công văn')) {
-              initPrice = 310000;
-            }
+
+            const currentEmp = employees.find(e => e.id === currentUser.employeeId || e.name?.toLowerCase() === currentUser.name?.toLowerCase());
 
             setFormData({
               ...defaultState,
@@ -294,7 +309,10 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
               receivedDate: recDate,
               deadline: initDeadline,
               price: initPrice,
-              code: `HS-${new Date().getFullYear()}-${Math.floor(Math.random() * 1000)}`
+              code: `HS-${new Date().getFullYear()}-${Math.floor(Math.random() * 1000)}`,
+              status: RecordStatus.RECEIVED,
+              capGiaySubStep: 'tiep_nhan',
+              assignedTo: currentEmp ? currentEmp.id : (currentUser.employeeId || '')
             });
             setAttachedDocs([]);
             setAuthCccd('');
@@ -577,81 +595,103 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                 {/* 1. THÔNG TIN CHUNG */}
                 <div className="bg-white p-4 md:p-5 rounded-lg border border-gray-200 shadow-sm">
                     <h3 className="text-sm font-bold text-blue-800 uppercase mb-4 flex items-center gap-2 border-b pb-2"><Calendar size={16} /> Thông tin chung</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        <div className="md:col-span-1">
-                            <label className="block text-xs font-bold text-gray-700 mb-1">Mã hồ sơ <span className="text-red-500">*</span></label>
-                            <input type="text" required className="w-full border border-gray-300 rounded-md px-3 py-2 bg-gray-50 font-bold text-blue-700" value={val(formData.code)} onChange={(e) => handleChange('code', e.target.value)} />
+                    {isProfessionalReceptionTab ? (
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <div>
+                                <label className="block text-xs font-bold text-gray-700 mb-1">Mã hồ sơ <span className="text-red-500">*</span></label>
+                                <input type="text" required className="w-full border border-gray-300 rounded-md px-3 py-2 bg-gray-50 font-bold text-blue-700" value={val(formData.code)} onChange={(e) => handleChange('code', e.target.value)} />
+                            </div>
+                            <div className={isCongVan ? "md:col-span-2" : "md:col-span-1"}>
+                                <label className="block text-xs font-bold text-gray-700 mb-1">Loại hồ sơ</label>
+                                <select className="w-full border border-gray-300 rounded-md px-3 py-2 bg-white" value={formData.recordType ? getShortRecordType(formData.recordType) : ''} onChange={(e) => handleChange('recordType', e.target.value)}>
+                                    <option value="">-- Chọn loại hồ sơ --</option>
+                                    {allowedRecordTypes.map(t => <option key={t} value={t}>{t}</option>)}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-gray-700 mb-1">Ngày nhận</label>
+                                <input type="date" required className="w-full border border-gray-300 rounded-md px-3 py-2" value={dateVal(formData.receivedDate)} onChange={(e) => handleChange('receivedDate', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} />
+                            </div>
+                            {!isCongVan && (
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-700 mb-1">Hẹn trả <span className="text-red-500">*</span></label>
+                                    <input type="date" required className="w-full border border-gray-300 rounded-md px-3 py-2 font-semibold text-red-600 bg-red-50" value={dateVal(formData.deadline)} onChange={(e) => handleChange('deadline', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} />
+                                </div>
+                            )}
                         </div>
-                        <div className="md:col-span-3">
-                            <label className="block text-xs font-bold text-gray-700 mb-1">Loại hồ sơ</label>
-                            <select className="w-full border border-gray-300 rounded-md px-3 py-2 bg-white" value={formData.recordType ? getShortRecordType(formData.recordType) : ''} onChange={(e) => handleChange('recordType', e.target.value)}>
-                                <option value="">-- Chọn loại hồ sơ --</option>
-                                {allowedRecordTypes.map(t => <option key={t} value={t}>{t}</option>)}
-                            </select>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <div className="md:col-span-1">
+                                <label className="block text-xs font-bold text-gray-700 mb-1">Mã hồ sơ <span className="text-red-500">*</span></label>
+                                <input type="text" required className="w-full border border-gray-300 rounded-md px-3 py-2 bg-gray-50 font-bold text-blue-700" value={val(formData.code)} onChange={(e) => handleChange('code', e.target.value)} />
+                            </div>
+                            <div className="md:col-span-3">
+                                <label className="block text-xs font-bold text-gray-700 mb-1">Loại hồ sơ</label>
+                                <select className="w-full border border-gray-300 rounded-md px-3 py-2 bg-white" value={formData.recordType ? getShortRecordType(formData.recordType) : ''} onChange={(e) => handleChange('recordType', e.target.value)}>
+                                    <option value="">-- Chọn loại hồ sơ --</option>
+                                    {allowedRecordTypes.map(t => <option key={t} value={t}>{t}</option>)}
+                                </select>
+                            </div>
+                            <div><label className="block text-xs font-bold text-gray-700 mb-1">Trạng thái</label><select className="w-full border border-gray-300 rounded-md px-3 py-2 bg-yellow-50 font-medium" value={val(formData.status)} onChange={(e) => handleChange('status', e.target.value)}>{Object.values(RecordStatus).filter(s => s !== RecordStatus.ASSIGNED).map(s => <option key={s} value={s}>{STATUS_LABELS[s] || s}</option>)}</select></div>
+                            
+                            {targetDept === 'Tổ Cấp giấy' && (
+                                <div>
+                                    <label className="block text-xs font-bold text-teal-800 mb-1">Trạng thái Cấp Giấy (Bước quy trình)</label>
+                                    <select 
+                                        className="w-full border border-teal-300 rounded-md px-3 py-2 bg-teal-50 font-bold text-teal-900 text-xs" 
+                                        value={val(formData.capGiaySubStep || 'tham_dinh')} 
+                                        onChange={(e) => handleChange('capGiaySubStep', e.target.value)}
+                                    >
+                                        <option value="tiep_nhan">1. Tiếp nhận mới</option>
+                                        <option value="tham_dinh">2. Chờ thẩm định</option>
+                                        <option value="phieu_chuyen_thue">3. Chờ chuyển thuế</option>
+                                        <option value="cho_tbt">4. Chờ Thuế KV7</option>
+                                        <option value="cho_nop_thue">5. Chờ Giấy nộp tiền</option>
+                                        <option value="hoan_thien_trinh_duyet">6. Chờ In & hoàn thiện</option>
+                                        <option value="trinh_kiem_tra">7. Chờ kiểm tra</option>
+                                        <option value="trinh_ky">8. Chờ ký duyệt</option>
+                                        <option value="cho_ban_giao">9. Chờ bàn giao</option>
+                                        <option value="cho_bo_sung">10. Chờ bổ sung</option>
+                                        <option value="giao_mot_cua">11. Đã giao kết quả</option>
+                                        <option value="da_tra_ket_qua">12. Đã trả kết quả</option>
+                                    </select>
+                                </div>
+                            )}
+                            <div><label className="block text-xs font-bold text-gray-700 mb-1">Ngày nhận</label><input type="date" required className="w-full border border-gray-300 rounded-md px-3 py-2" value={dateVal(formData.receivedDate)} onChange={(e) => handleChange('receivedDate', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} /></div>
+                            {!isCongVan && (
+                                <div><label className="block text-xs font-bold text-gray-700 mb-1">Hẹn trả <span className="text-red-500">*</span></label><input type="date" required className="w-full border border-gray-300 rounded-md px-3 py-2 font-semibold text-red-600 bg-red-50" value={dateVal(formData.deadline)} onChange={(e) => handleChange('deadline', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} /></div>
+                            )}
+                            {targetDept !== 'Tổ Cấp giấy' && (
+                                <div><label className="block text-xs font-bold text-gray-700 mb-1">Ngày giao NV</label><input type="date" className="w-full border border-gray-300 rounded-md px-3 py-2" value={dateVal(formData.assignedDate)} onChange={(e) => handleChange('assignedDate', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} /></div>
+                            )}
+                            
+                            {targetDept === 'Tổ Cấp giấy' && (
+                                <div><label className="block text-xs font-bold text-indigo-700 mb-1">Ngày thẩm định</label><input type="date" className="w-full border border-indigo-300 rounded-md px-3 py-2 bg-indigo-50 text-indigo-900 font-medium" value={dateVal(formData.completedWorkDate)} onChange={(e) => handleChange('completedWorkDate', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} /></div>
+                            )}
+                            
+                            {targetDept === 'Tổ Cấp giấy' && (
+                                <>
+                                    <div><label className="block text-xs font-bold text-amber-700 mb-1">Ngày chuyển thuế</label><input type="date" className="w-full border border-amber-300 rounded-md px-3 py-2 bg-amber-50 text-amber-900 font-medium" value={dateVal(formData.taxTransferDate)} onChange={(e) => handleChange('taxTransferDate', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} /></div>
+                                    <div><label className="block text-xs font-bold text-orange-700 mb-1">Ngày nhận TB Thuế KV7</label><input type="date" className="w-full border border-orange-300 rounded-md px-3 py-2 bg-orange-50 text-orange-900 font-medium" value={dateVal(formData.taxNoticeDate)} onChange={(e) => handleChange('taxNoticeDate', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} /></div>
+                                    <div><label className="block text-xs font-bold text-yellow-700 mb-1">Ngày nộp thuế / GNT</label><input type="date" className="w-full border border-yellow-300 rounded-md px-3 py-2 bg-yellow-50 text-yellow-900 font-medium" value={dateVal(formData.taxPaidDate)} onChange={(e) => handleChange('taxPaidDate', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} /></div>
+                                    <div><label className="block text-xs font-bold text-emerald-700 mb-1">Ngày in & hoàn thiện</label><input type="date" className="w-full border border-emerald-300 rounded-md px-3 py-2 bg-emerald-50 text-emerald-900 font-medium" value={dateVal(formData.printedDate)} onChange={(e) => handleChange('printedDate', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} /></div>
+                                </>
+                            )}
+
+                            {targetDept !== 'Tổ Lưu trữ' && (
+                                <div><label className="block text-xs font-bold text-teal-700 mb-1">Ngày kiểm tra</label><input type="date" className="w-full border border-teal-300 rounded-md px-3 py-2 bg-teal-50 text-teal-900 font-medium" value={dateVal(formData.checkedDate || formData.pendingCheckDate)} onChange={(e) => { const iso = e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : ''; handleChange('checkedDate', iso); handleChange('pendingCheckDate', iso); }} /></div>
+                            )}
+
+                            <div><label className="block text-xs font-bold text-purple-700 mb-1">Ngày trình ký</label><input type="date" className="w-full border border-purple-300 rounded-md px-3 py-2 bg-purple-50 text-purple-900 font-medium" value={dateVal(formData.submissionDate)} onChange={(e) => handleChange('submissionDate', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} /></div>
+
+                            {targetDept === 'Tổ Cấp giấy' && (
+                                <div><label className="block text-xs font-bold text-blue-700 mb-1">Ngày ký duyệt</label><input type="date" className="w-full border border-blue-300 rounded-md px-3 py-2 bg-blue-50 text-blue-900 font-medium" value={dateVal(formData.approvalDate)} onChange={(e) => handleChange('approvalDate', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} /></div>
+                            )}
+
+                            <div><label className="block text-xs font-bold text-green-700 mb-1">Ngày hoàn thành</label><input type="date" className="w-full border border-green-300 rounded-md px-3 py-2 bg-green-50 font-semibold text-green-900" value={dateVal(formData.completedDate)} onChange={(e) => handleChange('completedDate', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} /></div>
+                            <div><label className="block text-xs font-bold text-emerald-700 mb-1">Ngày trả KQ</label><input type="date" className="w-full border border-emerald-300 rounded-md px-3 py-2 bg-emerald-50 text-emerald-900 font-medium" value={dateVal(formData.resultReturnedDate)} onChange={(e) => handleChange('resultReturnedDate', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} /></div>
                         </div>
-                        <>
-                            <>
-                                <div><label className="block text-xs font-bold text-gray-700 mb-1">Trạng thái</label><select className="w-full border border-gray-300 rounded-md px-3 py-2 bg-yellow-50 font-medium" value={val(formData.status)} onChange={(e) => handleChange('status', e.target.value)}>{Object.values(RecordStatus).filter(s => s !== RecordStatus.ASSIGNED).map(s => <option key={s} value={s}>{STATUS_LABELS[s] || s}</option>)}</select></div>
-                                
-                                {targetDept === 'Tổ Cấp giấy' && (
-                                    <div>
-                                        <label className="block text-xs font-bold text-teal-800 mb-1">Trạng thái Cấp Giấy (Bước quy trình)</label>
-                                        <select 
-                                            className="w-full border border-teal-300 rounded-md px-3 py-2 bg-teal-50 font-bold text-teal-900 text-xs" 
-                                            value={val(formData.capGiaySubStep || 'tham_dinh')} 
-                                            onChange={(e) => handleChange('capGiaySubStep', e.target.value)}
-                                        >
-                                            <option value="tiep_nhan">1. Tiếp nhận mới</option>
-                                            <option value="tham_dinh">2. Chờ thẩm định</option>
-                                            <option value="phieu_chuyen_thue">3. Chờ chuyển thuế</option>
-                                            <option value="cho_tbt">4. Chờ Thuế KV7</option>
-                                            <option value="cho_nop_thue">5. Chờ Giấy nộp tiền</option>
-                                            <option value="hoan_thien_trinh_duyet">6. Chờ In & hoàn thiện</option>
-                                            <option value="trinh_kiem_tra">7. Chờ kiểm tra</option>
-                                            <option value="trinh_ky">8. Chờ ký duyệt</option>
-                                            <option value="cho_ban_giao">9. Chờ bàn giao</option>
-                                            <option value="cho_bo_sung">10. Chờ bổ sung</option>
-                                            <option value="giao_mot_cua">11. Đã giao kết quả</option>
-                                            <option value="da_tra_ket_qua">12. Đã trả kết quả</option>
-                                        </select>
-                                    </div>
-                                )}
-                                <div><label className="block text-xs font-bold text-gray-700 mb-1">Ngày nhận</label><input type="date" required className="w-full border border-gray-300 rounded-md px-3 py-2" value={dateVal(formData.receivedDate)} onChange={(e) => handleChange('receivedDate', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} /></div>
-                                {!isCongVan && (
-                                    <div><label className="block text-xs font-bold text-gray-700 mb-1">Hẹn trả <span className="text-red-500">*</span></label><input type="date" required className="w-full border border-gray-300 rounded-md px-3 py-2 font-semibold text-red-600 bg-red-50" value={dateVal(formData.deadline)} onChange={(e) => handleChange('deadline', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} /></div>
-                                )}
-                                {targetDept !== 'Tổ Cấp giấy' && (
-                                    <div><label className="block text-xs font-bold text-gray-700 mb-1">Ngày giao NV</label><input type="date" className="w-full border border-gray-300 rounded-md px-3 py-2" value={dateVal(formData.assignedDate)} onChange={(e) => handleChange('assignedDate', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} /></div>
-                                )}
-                                
-                                {targetDept === 'Tổ Cấp giấy' && (
-                                    <div><label className="block text-xs font-bold text-indigo-700 mb-1">Ngày thẩm định</label><input type="date" className="w-full border border-indigo-300 rounded-md px-3 py-2 bg-indigo-50 text-indigo-900 font-medium" value={dateVal(formData.completedWorkDate)} onChange={(e) => handleChange('completedWorkDate', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} /></div>
-                                )}
-                                
-                                {targetDept === 'Tổ Cấp giấy' && (
-                                    <>
-                                        <div><label className="block text-xs font-bold text-amber-700 mb-1">Ngày chuyển thuế</label><input type="date" className="w-full border border-amber-300 rounded-md px-3 py-2 bg-amber-50 text-amber-900 font-medium" value={dateVal(formData.taxTransferDate)} onChange={(e) => handleChange('taxTransferDate', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} /></div>
-                                        <div><label className="block text-xs font-bold text-orange-700 mb-1">Ngày nhận TB Thuế KV7</label><input type="date" className="w-full border border-orange-300 rounded-md px-3 py-2 bg-orange-50 text-orange-900 font-medium" value={dateVal(formData.taxNoticeDate)} onChange={(e) => handleChange('taxNoticeDate', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} /></div>
-                                        <div><label className="block text-xs font-bold text-yellow-700 mb-1">Ngày nộp thuế / GNT</label><input type="date" className="w-full border border-yellow-300 rounded-md px-3 py-2 bg-yellow-50 text-yellow-900 font-medium" value={dateVal(formData.taxPaidDate)} onChange={(e) => handleChange('taxPaidDate', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} /></div>
-                                        <div><label className="block text-xs font-bold text-emerald-700 mb-1">Ngày in & hoàn thiện</label><input type="date" className="w-full border border-emerald-300 rounded-md px-3 py-2 bg-emerald-50 text-emerald-900 font-medium" value={dateVal(formData.printedDate)} onChange={(e) => handleChange('printedDate', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} /></div>
-                                    </>
-                                )}
-
-                                {targetDept !== 'Tổ Lưu trữ' && (
-                                    <div><label className="block text-xs font-bold text-teal-700 mb-1">Ngày kiểm tra</label><input type="date" className="w-full border border-teal-300 rounded-md px-3 py-2 bg-teal-50 text-teal-900 font-medium" value={dateVal(formData.checkedDate || formData.pendingCheckDate)} onChange={(e) => { const iso = e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : ''; handleChange('checkedDate', iso); handleChange('pendingCheckDate', iso); }} /></div>
-                                )}
-
-                                <div><label className="block text-xs font-bold text-purple-700 mb-1">Ngày trình ký</label><input type="date" className="w-full border border-purple-300 rounded-md px-3 py-2 bg-purple-50 text-purple-900 font-medium" value={dateVal(formData.submissionDate)} onChange={(e) => handleChange('submissionDate', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} /></div>
-
-                                {targetDept === 'Tổ Cấp giấy' && (
-                                    <div><label className="block text-xs font-bold text-blue-700 mb-1">Ngày ký duyệt</label><input type="date" className="w-full border border-blue-300 rounded-md px-3 py-2 bg-blue-50 text-blue-900 font-medium" value={dateVal(formData.approvalDate)} onChange={(e) => handleChange('approvalDate', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} /></div>
-                                )}
-
-                                <div><label className="block text-xs font-bold text-green-700 mb-1">Ngày hoàn thành</label><input type="date" className="w-full border border-green-300 rounded-md px-3 py-2 bg-green-50 font-semibold text-green-900" value={dateVal(formData.completedDate)} onChange={(e) => handleChange('completedDate', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} /></div>
-                                <div><label className="block text-xs font-bold text-emerald-700 mb-1">Ngày trả KQ</label><input type="date" className="w-full border border-emerald-300 rounded-md px-3 py-2 bg-emerald-50 text-emerald-900 font-medium" value={dateVal(formData.resultReturnedDate)} onChange={(e) => handleChange('resultReturnedDate', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} /></div>
-                            </>
-                        </>
-                    </div>
+                    )}
                 </div>
 
                 {/* 2. CHỦ SỬ DỤNG HOẶC THÔNG TIN GỬI NHẬN */}
@@ -878,94 +918,98 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                             </div>
                         </div>
 
-                        <div className={`grid gap-4 bg-gray-50 p-3.5 rounded-lg border border-gray-200 ${(!isCongVan && (showMsr || showExc)) ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
-                            {!isCongVan && (
-                                <>
-                                    {showMsr && (
-                                        <div><label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Số Trích đo</label><input type="text" className="w-full border border-gray-300 rounded-md px-2.5 py-1.5 text-sm bg-white" value={val(formData.measurementNumber)} onChange={(e) => handleChange('measurementNumber', e.target.value)} placeholder="Nhập số trích đo..." /></div>
+                                                {!isProfessionalReceptionTab && (
+                            <>
+                                <div className={`grid gap-4 bg-gray-50 p-3.5 rounded-lg border border-gray-200 ${(!isCongVan && (showMsr || showExc)) ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
+                                    {!isCongVan && (
+                                        <>
+                                            {showMsr && (
+                                                <div><label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Số Trích đo</label><input type="text" className="w-full border border-gray-300 rounded-md px-2.5 py-1.5 text-sm bg-white" value={val(formData.measurementNumber)} onChange={(e) => handleChange('measurementNumber', e.target.value)} placeholder="Nhập số trích đo..." /></div>
+                                            )}
+                                            {showExc && (
+                                                <div><label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Số Trích lục</label><input type="text" className="w-full border border-gray-300 rounded-md px-2.5 py-1.5 text-sm bg-white" value={val(formData.excerptNumber)} onChange={(e) => handleChange('excerptNumber', e.target.value)} placeholder="Nhập số trích lục..." /></div>
+                                            )}
+                                        </>
                                     )}
-                                    {showExc && (
-                                        <div><label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Số Trích lục</label><input type="text" className="w-full border border-gray-300 rounded-md px-2.5 py-1.5 text-sm bg-white" value={val(formData.excerptNumber)} onChange={(e) => handleChange('excerptNumber', e.target.value)} placeholder="Nhập số trích lục..." /></div>
-                                    )}
-                                </>
-                            )}
-                            <div className="w-full">
-                                <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Giao nhân viên xử lý</label>
-                                <select className="w-full border border-gray-300 rounded-md px-2.5 py-1.5 text-sm bg-white" value={val(formData.assignedTo)} onChange={(e) => handleChange('assignedTo', e.target.value)}>
-                                    <option value="">-- Chưa giao --</option>
-                                    {filteredEmployees.map(emp => <option key={emp.id} value={emp.id}>{emp.name} - {emp.department}</option>)}
-                                </select>
-                            </div>
-                        </div>
-
-                        {hasAdminRights && (
-                            <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
-                                <div className="flex items-center gap-2 mb-1"><Lock size={14} className="text-yellow-600" /><label className="text-xs font-bold text-yellow-800 uppercase">Ghi chú nội bộ</label></div>
-                                <textarea rows={2} className="w-full border border-yellow-300 rounded-md px-3 py-2 bg-white text-sm" value={val(formData.privateNotes)} onChange={(e) => handleChange('privateNotes', e.target.value)} placeholder="Nhập ghi chú nội bộ..." />
-                            </div>
-                        )}
-
-                        {/* HIỂN THỊ ĐỢT XUẤT, NGÀY XUẤT VÀ PHI ĐỊA GIỚI */}
-                        {hasAdminRights && (
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-indigo-50/80 p-3.5 rounded-lg border border-indigo-200/80">
-                                <div>
-                                    <label className="block text-[10px] font-bold text-indigo-800 uppercase mb-1">Đợt xuất (Batch)</label>
-                                    <div className="flex gap-1">
-                                        <input type="text" className="w-full border border-indigo-200 rounded-md px-2.5 py-1.5 text-sm bg-white font-medium" value={val(formData.exportBatch)} onChange={(e) => handleChange('exportBatch', e.target.value)} placeholder="VD: CG - Đợt 01 - 29/07/26..." />
-                                        {formData.exportBatch && <button type="button" onClick={() => handleChange('exportBatch', '')} className="px-2 bg-red-100 text-red-600 rounded text-xs font-bold hover:bg-red-200" title="Xóa đợt xuất">Xóa</button>}
+                                    <div className="w-full">
+                                        <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Giao nhân viên xử lý</label>
+                                        <select className="w-full border border-gray-300 rounded-md px-2.5 py-1.5 text-sm bg-white" value={val(formData.assignedTo)} onChange={(e) => handleChange('assignedTo', e.target.value)}>
+                                            <option value="">-- Chưa giao --</option>
+                                            {filteredEmployees.map(emp => <option key={emp.id} value={emp.id}>{emp.name} - {emp.department}</option>)}
+                                        </select>
                                     </div>
                                 </div>
-                                <div>
-                                    <label className="block text-[10px] font-bold text-indigo-800 uppercase mb-1">Ngày xuất</label>
-                                    <div className="flex gap-1">
-                                        <input type="date" className="w-full border border-indigo-200 rounded-md px-2.5 py-1.5 text-sm bg-white" value={val(formData.exportDate ? formData.exportDate.split('T')[0] : '')} onChange={(e) => handleChange('exportDate', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} />
-                                        {formData.exportDate && <button type="button" onClick={() => handleChange('exportDate', '')} className="px-2 bg-red-100 text-red-600 rounded text-xs font-bold hover:bg-red-200" title="Xóa ngày xuất">Xóa</button>}
-                                    </div>
-                                </div>
-                                <div>
-                                    <label className="block text-[10px] font-bold text-purple-900 uppercase mb-1">Phi địa giới</label>
-                                    <select 
-                                        className="w-full border border-indigo-200 rounded-md px-2.5 py-1.5 text-sm bg-white font-semibold text-purple-900"
-                                        value={val(formData.handoverWard)} 
-                                        onChange={(e) => handleChange('handoverWard', e.target.value || null)}
-                                    >
-                                        <option value="">-- Không (Theo địa chỉ thửa đất) --</option>
-                                        {wards.map(w => <option key={w} value={w}>{getWardLabel(w)}</option>)}
-                                    </select>
-                                </div>
-                            </div>
-                        )}
 
-                        {canEditResult && (
-                            <div className="bg-emerald-50 p-4 rounded-lg border border-emerald-200">
-                                <h4 className="text-sm font-bold text-emerald-800 flex items-center gap-2 mb-3"><FileCheck size={16} /> TRẢ KẾT QUẢ CHO DÂN</h4>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    <div>
-                                        <label className="block text-xs font-bold text-emerald-700 mb-1">Ngày trả kết quả</label>
-                                        <input type="date" className="w-full border border-emerald-300 rounded-md px-3 py-2 bg-white font-bold text-emerald-800" value={dateVal(formData.resultReturnedDate)} onChange={(e) => handleChange('resultReturnedDate', e.target.value)} />
+                                {hasAdminRights && (
+                                    <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
+                                        <div className="flex items-center gap-2 mb-1"><Lock size={14} className="text-yellow-600" /><label className="text-xs font-bold text-yellow-800 uppercase">Ghi chú nội bộ</label></div>
+                                        <textarea rows={2} className="w-full border border-yellow-300 rounded-md px-3 py-2 bg-white text-sm" value={val(formData.privateNotes)} onChange={(e) => handleChange('privateNotes', e.target.value)} placeholder="Nhập ghi chú nội bộ..." />
                                     </div>
-                                    <div>
-                                        <div className="flex items-center justify-between mb-1">
-                                            <label className="block text-xs font-bold text-emerald-700">
-                                                {formData.receiptType === 'Biên Lai' ? 'Số Biên lai' : formData.receiptType === 'Hóa Đơn' ? 'Số Hóa đơn' : 'Số Chứng từ'}
-                                            </label>
+                                )}
+
+                                {/* HIỂN THỊ ĐỢT XUẤT, NGÀY XUẤT VÀ PHI ĐỊA GIỚI */}
+                                {hasAdminRights && (
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-indigo-50/80 p-3.5 rounded-lg border border-indigo-200/80">
+                                        <div>
+                                            <label className="block text-[10px] font-bold text-indigo-800 uppercase mb-1">Đợt xuất (Batch)</label>
+                                            <div className="flex gap-1">
+                                                <input type="text" className="w-full border border-indigo-200 rounded-md px-2.5 py-1.5 text-sm bg-white font-medium" value={val(formData.exportBatch)} onChange={(e) => handleChange('exportBatch', e.target.value)} placeholder="VD: CG - Đợt 01 - 29/07/26..." />
+                                                {formData.exportBatch && <button type="button" onClick={() => handleChange('exportBatch', '')} className="px-2 bg-red-100 text-red-600 rounded text-xs font-bold hover:bg-red-200" title="Xóa đợt xuất">Xóa</button>}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-bold text-indigo-800 uppercase mb-1">Ngày xuất</label>
+                                            <div className="flex gap-1">
+                                                <input type="date" className="w-full border border-indigo-200 rounded-md px-2.5 py-1.5 text-sm bg-white" value={val(formData.exportDate ? formData.exportDate.split('T')[0] : '')} onChange={(e) => handleChange('exportDate', e.target.value ? new Date(e.target.value + 'T12:00:00').toISOString() : '')} />
+                                                {formData.exportDate && <button type="button" onClick={() => handleChange('exportDate', '')} className="px-2 bg-red-100 text-red-600 rounded text-xs font-bold hover:bg-red-200" title="Xóa ngày xuất">Xóa</button>}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-bold text-purple-900 uppercase mb-1">Phi địa giới</label>
                                             <select 
-                                                className="text-[10px] font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 rounded px-1 py-0.5 outline-none cursor-pointer"
-                                                value={formData.receiptType || 'Biên Lai'}
-                                                onChange={(e) => handleChange('receiptType', e.target.value)}
+                                                className="w-full border border-indigo-200 rounded-md px-2.5 py-1.5 text-sm bg-white font-semibold text-purple-900"
+                                                value={val(formData.handoverWard)} 
+                                                onChange={(e) => handleChange('handoverWard', e.target.value || null)}
                                             >
-                                                <option value="Biên Lai">Biên Lai</option>
-                                                <option value="Hóa Đơn">Hóa Đơn</option>
+                                                <option value="">-- Không (Theo địa chỉ thửa đất) --</option>
+                                                {wards.map(w => <option key={w} value={w}>{getWardLabel(w)}</option>)}
                                             </select>
                                         </div>
-                                        <input type="text" className="w-full border border-emerald-300 rounded-md px-3 py-2 font-mono text-center font-bold bg-white" value={val(formData.receiptNumber)} onChange={(e) => handleChange('receiptNumber', e.target.value)} placeholder={`Nhập số ${formData.receiptType === 'Hóa Đơn' ? 'hóa đơn' : 'biên lai'}...`} />
                                     </div>
-                                    <div>
-                                        <label className="block text-xs font-bold text-emerald-700 mb-1">Số tiền</label>
-                                        <input type="number" className="w-full border border-emerald-300 rounded-md px-3 py-2 font-bold text-center text-emerald-900 bg-white" value={formData.returnedPrice !== undefined && formData.returnedPrice !== null ? formData.returnedPrice : ''} onChange={(e) => handleChange('returnedPrice', parseFloat(e.target.value) || 0)} placeholder="Nhập số tiền..." />
+                                )}
+
+                                {canEditResult && (
+                                    <div className="bg-emerald-50 p-4 rounded-lg border border-emerald-200">
+                                        <h4 className="text-sm font-bold text-emerald-800 flex items-center gap-2 mb-3"><FileCheck size={16} /> TRẢ KẾT QUẢ CHO DÂN</h4>
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                            <div>
+                                                <label className="block text-xs font-bold text-emerald-700 mb-1">Ngày trả kết quả</label>
+                                                <input type="date" className="w-full border border-emerald-300 rounded-md px-3 py-2 bg-white font-bold text-emerald-800" value={dateVal(formData.resultReturnedDate)} onChange={(e) => handleChange('resultReturnedDate', e.target.value)} />
+                                            </div>
+                                            <div>
+                                                <div className="flex items-center justify-between mb-1">
+                                                    <label className="block text-xs font-bold text-emerald-700">
+                                                        {formData.receiptType === 'Biên Lai' ? 'Số Biên lai' : formData.receiptType === 'Hóa Đơn' ? 'Số Hóa đơn' : 'Số Chứng từ'}
+                                                    </label>
+                                                    <select 
+                                                        className="text-[10px] font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 rounded px-1 py-0.5 outline-none cursor-pointer"
+                                                        value={formData.receiptType || 'Biên Lai'}
+                                                        onChange={(e) => handleChange('receiptType', e.target.value)}
+                                                    >
+                                                        <option value="Biên Lai">Biên Lai</option>
+                                                        <option value="Hóa Đơn">Hóa Đơn</option>
+                                                    </select>
+                                                </div>
+                                                <input type="text" className="w-full border border-emerald-300 rounded-md px-3 py-2 font-mono text-center font-bold bg-white" value={val(formData.receiptNumber)} onChange={(e) => handleChange('receiptNumber', e.target.value)} placeholder={`Nhập số ${formData.receiptType === 'Hóa Đơn' ? 'hóa đơn' : 'biên lai'}...`} />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-bold text-emerald-700 mb-1">Số tiền</label>
+                                                <input type="number" className="w-full border border-emerald-300 rounded-md px-3 py-2 font-bold text-center text-emerald-900 bg-white" value={formData.returnedPrice !== undefined && formData.returnedPrice !== null ? formData.returnedPrice : ''} onChange={(e) => handleChange('returnedPrice', parseFloat(e.target.value) || 0)} placeholder="Nhập số tiền..." />
+                                            </div>
+                                        </div>
                                     </div>
-                                </div>
-                            </div>
+                                )}
+                            </>
                         )}
 
                         {/* 5. LỊCH SỬ THAY ĐỔI TRẠNG THÁI (LOG) */}
