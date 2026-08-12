@@ -112,9 +112,9 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
               let targetContractType = existingContract.contractType;
               if (recType.includes('2.4') || recType.includes('cắm mốc')) {
                   targetContractType = 'Cắm mốc';
-              } else if (recType.includes('2.3') || recType.includes('đo đạc') || recType.includes('trích đo')) {
+              } else if (recType.includes('2.2') || recType.includes('đo đạc') || recType.includes('trích đo')) {
                   targetContractType = 'Đo đạc';
-              } else if (recType.includes('2.1') || recType.includes('2.2') || recType.includes('trích lục')) {
+              } else if (recType.includes('2.1') || recType.includes('trích lục')) {
                   targetContractType = 'Trích lục';
               } else if (recType.includes('2.5') || recType.includes('tách thửa')) {
                   targetContractType = 'Tách thửa';
@@ -152,7 +152,7 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
                       // Cố gắng map chính xác tên dịch vụ trong bảng giá
                       const match = priceList.find(p => p.serviceName.toLowerCase().includes('cắm mốc'));
                       serviceType = match ? match.serviceName : 'Cắm mốc ranh giới';
-                  } else if (recType.includes('2.1') || recType.includes('2.2') || recType.includes('trích lục')) {
+                  } else if (recType.includes('2.1') || recType.includes('trích lục')) {
                       contractType = 'Trích lục';
                       const match = priceList.find(p => p.serviceName.toLowerCase().includes('trích lục'));
                       serviceType = match ? match.serviceName : 'Trích lục bản đồ địa chính';

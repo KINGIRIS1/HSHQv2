@@ -382,28 +382,30 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
                     if (!record.assignedDate) record.assignedDate = nowStr;
                 }
             } else {
-                // Nếu KHÔNG có cột TRẠNG THÁI cụ thể, dùng LOGIC SUY DIỄN DỰA TRÊN NGÀY THÁNG VÀ PHÂN CÔNG
-                if (record.exportBatch || record.exportDate || record.completedDate) {
-                    record.status = RecordStatus.HANDOVER;
-                    if (!record.completedDate && record.exportDate) {
-                        record.completedDate = record.exportDate;
+                // Nếu KHÔNG có cột TRẠNG THÁI cụ thể, dùng LOGIC SUY DIỄN DỰA TRÊN NGÀY THÁNG VÀ PHÂN CÔNG (chỉ áp dụng cho tạo mới, tránh ghi đè status khi update)
+                if (mode === 'create') {
+                    if (record.exportBatch || record.exportDate || record.completedDate) {
+                        record.status = RecordStatus.HANDOVER;
+                        if (!record.completedDate && record.exportDate) {
+                            record.completedDate = record.exportDate;
+                        }
+                    } else if (record.resultReturnedDate) {
+                        record.status = RecordStatus.RETURNED;
+                    } else if (record.approvalDate) {
+                        record.status = RecordStatus.SIGNED;
+                    } else if (record.submissionDate) {
+                        record.status = RecordStatus.PENDING_SIGN;
+                    } else if (record.checkedDate) {
+                        record.status = RecordStatus.CHECKED;
+                    } else if (record.pendingCheckDate) {
+                        record.status = RecordStatus.PENDING_CHECK;
+                    } else if (record.completedWorkDate) {
+                        record.status = RecordStatus.COMPLETED_WORK;
+                    } else if (record.assignedTo || record.assignedDate) {
+                        record.status = RecordStatus.ASSIGNED;
+                    } else {
+                        record.status = RecordStatus.RECEIVED;
                     }
-                } else if (record.resultReturnedDate) {
-                    record.status = RecordStatus.RETURNED;
-                } else if (record.approvalDate) {
-                    record.status = RecordStatus.SIGNED;
-                } else if (record.submissionDate) {
-                    record.status = RecordStatus.PENDING_SIGN;
-                } else if (record.checkedDate) {
-                    record.status = RecordStatus.CHECKED;
-                } else if (record.pendingCheckDate) {
-                    record.status = RecordStatus.PENDING_CHECK;
-                } else if (record.completedWorkDate) {
-                    record.status = RecordStatus.COMPLETED_WORK;
-                } else if (record.assignedTo || record.assignedDate) {
-                    record.status = RecordStatus.ASSIGNED;
-                } else if (mode === 'create') {
-                    record.status = RecordStatus.RECEIVED;
                 }
             }
 

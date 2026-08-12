@@ -1,7 +1,7 @@
 
 import { supabase, isConfigured } from './supabaseClient';
 import { RecordFile } from '../types';
-import { MOCK_RECORDS, API_BASE_URL } from '../constants';
+import { MOCK_RECORDS, API_BASE_URL, isArchiveRecordType } from '../constants';
 import { logError, getFromCache, saveToCache, CACHE_KEYS, sanitizeData, sanitizePayloadFor22P02, normalizeCode, mapRecordFromDb } from './apiCore';
 
 const RECORD_DB_COLUMNS = [
@@ -19,6 +19,20 @@ const RECORD_DB_COLUMNS = [
     'price', 'advancePayment', 'isHandedOver',
     'statusLogs', 'archiveHandoverDate', 'archiveHandoverBatch'
 ];
+
+const getTargetTable = (record: Partial<RecordFile>): 'land_records' | 'luutru_records' => {
+    if (record.recordType && isArchiveRecordType(record.recordType)) {
+        return 'luutru_records';
+    }
+    if (record.id) {
+        const cached: RecordFile[] = getFromCache(CACHE_KEYS.RECORDS, []);
+        const found = cached.find(r => r.id === record.id);
+        if (found && isArchiveRecordType(found.recordType)) {
+            return 'luutru_records';
+        }
+    }
+    return 'land_records';
+};
 
 const OPTIONAL_NEW_COLUMNS = [
     'customerAddress', 'issueNumber', 'entryNumber', 'issueDate', 'residentialArea',
@@ -44,6 +58,7 @@ export const fetchRecords = async (): Promise<RecordFile[]> => {
     let retryCount = 0;
     const maxRetries = 1;
 
+    // 1. Fetch from land_records
     while (hasMore) {
         try {
             const { data, error } = await supabase
@@ -71,6 +86,37 @@ export const fetchRecords = async (): Promise<RecordFile[]> => {
             }
             throw fetchError;
         }
+    }
+
+    // 2. Fetch from luutru_records
+    try {
+        let fromLt = 0;
+        let hasMoreLt = true;
+        while (hasMoreLt) {
+            const { data, error } = await supabase
+                .from('luutru_records')
+                .select('*')
+                .order('receivedDate', { ascending: false })
+                .order('id', { ascending: true }) 
+                .range(fromLt, fromLt + step - 1);
+
+            if (error) {
+                if (error.code === 'PGRST205' || error.code === '42P01' || error.message?.includes('does not exist')) {
+                    console.info('Bảng luutru_records không tồn tại, bỏ qua.');
+                } else {
+                    console.warn('Lỗi khi fetch luutru_records:', error);
+                }
+                hasMoreLt = false;
+            } else if (data && data.length > 0) {
+                allRecords = [...allRecords, ...data];
+                fromLt += step;
+                if (data.length < step) hasMoreLt = false;
+            } else {
+                hasMoreLt = false;
+            }
+        }
+    } catch (ltError) {
+        console.warn('Lỗi fetch luutru_records:', ltError);
     }
     
     const uniqueMap = new Map();
@@ -252,25 +298,26 @@ export const createRecordApi = async (record: RecordFile): Promise<RecordFile | 
         }
         
         const payload = sanitizeData(recordToSave, RECORD_DB_COLUMNS);
-        let { data, error } = await supabase.from('land_records').insert([payload]).select();
+        const targetTable = isArchiveRecordType(recordToSave.recordType) ? 'luutru_records' : 'land_records';
+        let { data, error } = await supabase.from(targetTable).insert([payload]).select();
         
         if (error && (error.code === '22P02' || String(error.message || '').includes('22P02') || String(error.message || '').includes('invalid input syntax'))) {
-            console.warn("⚠️ [22P02 Fallback] Retrying insert with 22P02 sanitized payload...");
+            console.warn(`⚠️ [22P02 Fallback] Retrying insert into ${targetTable} with 22P02 sanitized payload...`);
             const fallback22P02Payload = sanitizePayloadFor22P02(payload);
-            const res = await supabase.from('land_records').insert([fallback22P02Payload]).select();
+            const res = await supabase.from(targetTable).insert([fallback22P02Payload]).select();
             data = res.data;
             error = res.error;
         }
 
         if (error && (error.code === 'PGRST204' || String(error.code) === '42703' || (error.message && String(error.message).includes('does not exist')))) {
-            console.warn("⚠️ [Fallback] Database is missing columns. Retrying without new columns...");
+            console.warn(`⚠️ [Fallback] Database is missing columns. Retrying insert into ${targetTable} without new columns...`);
             if (!(window as any).fallbackAlertShown) {
                 logError("createRecordApi", error, true);
                 (window as any).fallbackAlertShown = true;
             }
             const fallbackPayload = sanitizePayloadFor22P02({ ...payload });
             OPTIONAL_NEW_COLUMNS.forEach(col => delete fallbackPayload[col]);
-            const { data: fallbackData, error: fallbackError } = await supabase.from('land_records').insert([fallbackPayload]).select();
+            const { data: fallbackData, error: fallbackError } = await supabase.from(targetTable).insert([fallbackPayload]).select();
             if (fallbackError) throw fallbackError;
             const result = mapRecordFromDb({ ...recordToSave, ...(fallbackData?.[0] || {}) }) as RecordFile;
             if (result) syncCacheOnCreate(result);
@@ -291,25 +338,26 @@ export const updateRecordApi = async (record: RecordFile): Promise<RecordFile | 
     if (!isConfigured) return record;
     try {
         const payload = sanitizeData(record, RECORD_DB_COLUMNS);
-        let { data, error } = await supabase.from('land_records').update(payload).eq('id', record.id).select();
+        const targetTable = isArchiveRecordType(record.recordType) ? 'luutru_records' : 'land_records';
+        let { data, error } = await supabase.from(targetTable).update(payload).eq('id', record.id).select();
         
         if (error && (error.code === '22P02' || String(error.message || '').includes('22P02') || String(error.message || '').includes('invalid input syntax'))) {
-            console.warn("⚠️ [22P02 Fallback] Retrying update with 22P02 sanitized payload...");
+            console.warn(`⚠️ [22P02 Fallback] Retrying update on ${targetTable} with 22P02 sanitized payload...`);
             const fallback22P02Payload = sanitizePayloadFor22P02(payload);
-            const res = await supabase.from('land_records').update(fallback22P02Payload).eq('id', record.id).select();
+            const res = await supabase.from(targetTable).update(fallback22P02Payload).eq('id', record.id).select();
             data = res.data;
             error = res.error;
         }
 
         if (error && (error.code === 'PGRST204' || String(error.code) === '42703' || (error.message && String(error.message).includes('does not exist')))) {
-            console.warn("⚠️ [Fallback] Database is missing columns. Retrying without new columns...");
+            console.warn(`⚠️ [Fallback] Database is missing columns. Retrying update on ${targetTable} without new columns...`);
             if (!(window as any).fallbackAlertShown) {
                 logError("updateRecordApi", error, true);
                 (window as any).fallbackAlertShown = true;
             }
             const fallbackPayload = sanitizePayloadFor22P02({ ...payload });
             OPTIONAL_NEW_COLUMNS.forEach(col => delete fallbackPayload[col]);
-            const { data: fallbackData, error: fallbackError } = await supabase.from('land_records').update(fallbackPayload).eq('id', record.id).select();
+            const { data: fallbackData, error: fallbackError } = await supabase.from(targetTable).update(fallbackPayload).eq('id', record.id).select();
             if (fallbackError) throw fallbackError;
             const result = mapRecordFromDb({ ...record, ...(fallbackData?.[0] || {}) }) as RecordFile;
             if (result) syncCacheOnUpdate(result);
@@ -331,21 +379,22 @@ export const updateRecordFieldsApi = async (id: string, fields: Partial<RecordFi
     try {
         const payload = sanitizeData({ id, ...fields } as any, RECORD_DB_COLUMNS);
         delete payload.id;
-        let { data, error } = await supabase.from('land_records').update(payload).eq('id', id).select();
+        const targetTable = getTargetTable({ id, ...fields });
+        let { data, error } = await supabase.from(targetTable).update(payload).eq('id', id).select();
         
         if (error && (error.code === '22P02' || String(error.message || '').includes('22P02') || String(error.message || '').includes('invalid input syntax'))) {
-            console.warn("⚠️ [22P02 Fallback] Retrying updateRecordFieldsApi with 22P02 sanitized payload...");
+            console.warn(`⚠️ [22P02 Fallback] Retrying updateRecordFieldsApi on ${targetTable} with 22P02 sanitized payload...`);
             const fallback22P02Payload = sanitizePayloadFor22P02(payload);
-            const res = await supabase.from('land_records').update(fallback22P02Payload).eq('id', id).select();
+            const res = await supabase.from(targetTable).update(fallback22P02Payload).eq('id', id).select();
             data = res.data;
             error = res.error;
         }
 
         if (error && (error.code === 'PGRST204' || String(error.code) === '42703' || (error.message && String(error.message).includes('does not exist')))) {
-            console.warn("⚠️ [Fallback] Database is missing columns. Retrying without new columns...");
+            console.warn(`⚠️ [Fallback] Database is missing columns on ${targetTable}. Retrying without new columns...`);
             const fallbackPayload = sanitizePayloadFor22P02({ ...payload });
             OPTIONAL_NEW_COLUMNS.forEach(col => delete fallbackPayload[col]);
-            const { data: fallbackData, error: fallbackError } = await supabase.from('land_records').update(fallbackPayload).eq('id', id).select();
+            const { data: fallbackData, error: fallbackError } = await supabase.from(targetTable).update(fallbackPayload).eq('id', id).select();
             if (fallbackError) throw fallbackError;
             const result = mapRecordFromDb({ id, ...fields, ...(fallbackData?.[0] || {}) }) as RecordFile;
             if (result) syncCacheOnUpdate(result);
@@ -365,8 +414,9 @@ export const updateRecordFieldsApi = async (id: string, fields: Partial<RecordFi
 export const deleteRecordApi = async (id: string): Promise<boolean> => {
     if (!isConfigured) return true;
     try {
-        const { error } = await supabase.from('land_records').delete().eq('id', id);
-        if (error) throw error;
+        const { error: error1 } = await supabase.from('land_records').delete().eq('id', id);
+        const { error: error2 } = await supabase.from('luutru_records').delete().eq('id', id);
+        if (error1 && error2) throw error1;
         syncCacheOnDelete(id);
         return true;
     } catch (error) {
@@ -378,12 +428,11 @@ export const deleteRecordApi = async (id: string): Promise<boolean> => {
 export const createRecordsBatchApi = async (records: RecordFile[], onProgress?: (processed: number, total: number) => void): Promise<boolean> => {
     if (!isConfigured) return true;
     try {
-        const payload = [];
+        const landPayload: any[] = [];
+        const archivePayload: any[] = [];
+        
         for (const r of records) {
             let finalCode = r.code;
-            
-            // Chỉ tạo mới code tự động nếu như mã bị thiếu hoặc có chứa dấu '?' (mã nháp)
-            // KHÔNG GHI ĐÈ các mã có định dạng chuẩn (isGeneratedFormat) vì đây là data từ Excel đưa vào
             if (!finalCode || finalCode.includes('?')) {
                 finalCode = await getNextGlobalRecordCode(r.receivedDate || new Date().toISOString());
             }
@@ -393,47 +442,58 @@ export const createRecordsBatchApi = async (records: RecordFile[], onProgress?: 
                 recordPayload.id = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substr(2, 9);
             }
             
-            payload.push(sanitizeData(recordPayload, RECORD_DB_COLUMNS));
+            const sanitized = sanitizeData(recordPayload, RECORD_DB_COLUMNS);
+            if (isArchiveRecordType(r.recordType)) {
+                archivePayload.push(sanitized);
+            } else {
+                landPayload.push(sanitized);
+            }
         }
 
-        const CHUNK_SIZE = 500;
-        for (let i = 0; i < payload.length; i += CHUNK_SIZE) {
-            const chunk = payload.slice(i, i + CHUNK_SIZE);
-            let { error } = await supabase.from('land_records').insert(chunk);
-            
-            if (error && (error.code === '22P02' || String(error.message || '').includes('22P02') || String(error.message || '').includes('invalid input syntax'))) {
-                console.warn(`⚠️ [22P02 Fallback] Retrying batch insert chunk ${i} with 22P02 sanitized payload...`);
-                const fallback22P02 = sanitizePayloadFor22P02(chunk);
-                const res = await supabase.from('land_records').insert(fallback22P02);
-                error = res.error;
-            }
-
-            if (error && (error.code === 'PGRST204' || String(error.code) === '42703' || (error.message && String(error.message).includes('does not exist')))) {
-                console.warn(`⚠️ [Fallback] Database is missing columns. Retrying batch insert chunk ${i} without new columns...`);
-                if (!(window as any).fallbackAlertShown) {
-                    logError("createRecordsBatchApi", error);
-                    (window as any).fallbackAlertShown = true;
+        const insertIntoTableInChunks = async (table: 'land_records' | 'luutru_records', payload: any[]) => {
+            const CHUNK_SIZE = 500;
+            for (let i = 0; i < payload.length; i += CHUNK_SIZE) {
+                const chunk = payload.slice(i, i + CHUNK_SIZE);
+                let { error } = await supabase.from(table).insert(chunk);
+                
+                if (error && (error.code === '22P02' || String(error.message || '').includes('22P02') || String(error.message || '').includes('invalid input syntax'))) {
+                    console.warn(`⚠️ [22P02 Fallback] Retrying batch insert into ${table} chunk ${i} with 22P02 sanitized payload...`);
+                    const fallback22P02 = sanitizePayloadFor22P02(chunk);
+                    const res = await supabase.from(table).insert(fallback22P02);
+                    error = res.error;
                 }
-                const fallbackPayload = chunk.map(p => {
-                    const fp = sanitizePayloadFor22P02({ ...p });
-                    OPTIONAL_NEW_COLUMNS.forEach(col => delete fp[col]);
-                    return fp;
-                });
-                const { error: fallbackError } = await supabase.from('land_records').insert(fallbackPayload);
-                if (fallbackError) throw fallbackError;
-            } else if (error) {
-                throw error;
+
+                if (error && (error.code === 'PGRST204' || String(error.code) === '42703' || (error.message && String(error.message).includes('does not exist')))) {
+                    console.warn(`⚠️ [Fallback] Database is missing columns on ${table}. Retrying batch insert chunk ${i} without new columns...`);
+                    const fallbackPayload = chunk.map(p => {
+                        const fp = sanitizePayloadFor22P02({ ...p });
+                        OPTIONAL_NEW_COLUMNS.forEach(col => delete fp[col]);
+                        return fp;
+                    });
+                    const { error: fallbackError } = await supabase.from(table).insert(fallbackPayload);
+                    if (fallbackError) throw fallbackError;
+                } else if (error) {
+                    throw error;
+                }
             }
-            
-            if (onProgress) {
-                onProgress(Math.min(i + CHUNK_SIZE, payload.length), payload.length);
-            }
+        };
+
+        if (landPayload.length > 0) {
+            await insertIntoTableInChunks('land_records', landPayload);
+        }
+        if (archivePayload.length > 0) {
+            await insertIntoTableInChunks('luutru_records', archivePayload);
+        }
+
+        if (onProgress) {
+            onProgress(records.length, records.length);
         }
         
         // Synchronize local cache with the batch of new records
         try {
             const cached: RecordFile[] = getFromCache(CACHE_KEYS.RECORDS, []);
-            payload.forEach(p => {
+            const allPayloads = [...landPayload, ...archivePayload];
+            allPayloads.forEach(p => {
                 const mapped = mapRecordFromDb(p);
                 if (!cached.some(r => r.id === mapped.id)) {
                     cached.unshift(mapped);
@@ -539,30 +599,35 @@ export const forceUpdateRecordsBatchApi = async (records: RecordFile[], onProgre
                 continue;
             }
 
-            const { data: existingData, error: fetchError } = await supabase
-                .from('land_records')
-                .select('*')
-                .in('code', searchCodes);
+            // Fetch existing from both tables
+            const [{ data: existingLand, error: landError }, { data: existingLuutru, error: luutruError }] = await Promise.all([
+                supabase.from('land_records').select('*').in('code', searchCodes),
+                supabase.from('luutru_records').select('*').in('code', searchCodes)
+            ]);
 
-            if (fetchError) throw fetchError;
+            if (landError) throw landError;
 
-            const dbMap = new Map<string, any>();
-            if (existingData) {
-                existingData.forEach((r: any) => {
-                    if (r.code) {
-                        dbMap.set(normalizeCode(r.code), r);
-                    }
+            const dbMap = new Map<string, { record: any; table: 'land_records' | 'luutru_records' }>();
+            if (existingLand) {
+                existingLand.forEach((r: any) => {
+                    if (r.code) dbMap.set(normalizeCode(r.code), { record: r, table: 'land_records' });
+                });
+            }
+            if (existingLuutru) {
+                existingLuutru.forEach((r: any) => {
+                    if (r.code) dbMap.set(normalizeCode(r.code), { record: r, table: 'luutru_records' });
                 });
             }
 
-            const updatesToPush: any[] = [];
+            const landUpdates: any[] = [];
+            const luutruUpdates: any[] = [];
 
             chunkRecords.forEach((excelRecord) => {
                 const normCode = normalizeCode(excelRecord.code);
-                const dbRecord = dbMap.get(normCode);
+                const dbEntry = dbMap.get(normCode);
                 
-                if (dbRecord) {
-                    const merged = { ...dbRecord };
+                if (dbEntry) {
+                    const merged = { ...dbEntry.record };
                     let hasChange = false;
 
                     Object.keys(excelRecord).forEach(key => {
@@ -578,39 +643,46 @@ export const forceUpdateRecordsBatchApi = async (records: RecordFile[], onProgre
                     });
 
                     if (hasChange) {
-                        updatesToPush.push(sanitizeData(merged, RECORD_DB_COLUMNS));
+                        const sanitized = sanitizeData(merged, RECORD_DB_COLUMNS);
+                        if (dbEntry.table === 'luutru_records') {
+                            luutruUpdates.push(sanitized);
+                        } else {
+                            landUpdates.push(sanitized);
+                        }
                         updateCount++;
                     }
                 }
             });
 
-            if (updatesToPush.length > 0) {
-                let { error: upsertError } = await supabase.from('land_records').upsert(updatesToPush);
+            const upsertIntoTable = async (table: 'land_records' | 'luutru_records', updates: any[]) => {
+                if (updates.length === 0) return;
+                let { error: upsertError } = await supabase.from(table).upsert(updates);
                 
                 if (upsertError && (upsertError.code === '22P02' || String(upsertError.message || '').includes('22P02') || String(upsertError.message || '').includes('invalid input syntax'))) {
-                    console.warn(`⚠️ [22P02 Fallback] Retrying chunk target upsert with 22P02 sanitized payload...`);
-                    const fallback22P02 = sanitizePayloadFor22P02(updatesToPush);
-                    const res = await supabase.from('land_records').upsert(fallback22P02);
+                    console.warn(`⚠️ [22P02 Fallback] Retrying chunk target upsert into ${table} with 22P02 sanitized payload...`);
+                    const fallback22P02 = sanitizePayloadFor22P02(updates);
+                    const res = await supabase.from(table).upsert(fallback22P02);
                     upsertError = res.error;
                 }
 
                 if (upsertError && (upsertError.code === 'PGRST204' || String(upsertError.code) === '42703' || (upsertError.message && String(upsertError.message).includes('does not exist')))) {
-                    console.warn(`⚠️ [Fallback] Retrying chunk target upsert without new columns...`);
-                    if (!(window as any).fallbackAlertShown) {
-                        logError("forceUpdateRecordsBatchApi", upsertError);
-                        (window as any).fallbackAlertShown = true;
-                    }
-                    const fallbackPayload = updatesToPush.map(p => {
+                    console.warn(`⚠️ [Fallback] Retrying chunk target upsert into ${table} without new columns...`);
+                    const fallbackPayload = updates.map(p => {
                         const fp = sanitizePayloadFor22P02({ ...p });
                         OPTIONAL_NEW_COLUMNS.forEach(col => delete fp[col]);
                         return fp;
                     });
-                    const { error: fallbackError } = await supabase.from('land_records').upsert(fallbackPayload);
+                    const { error: fallbackError } = await supabase.from(table).upsert(fallbackPayload);
                     if (fallbackError) throw fallbackError;
                 } else if (upsertError) {
                     throw upsertError;
                 }
-            }
+            };
+
+            await Promise.all([
+                upsertIntoTable('land_records', landUpdates),
+                upsertIntoTable('luutru_records', luutruUpdates)
+            ]);
             
             if (onProgress) {
                 onProgress(Math.min(i + CHUNK_SIZE, records.length), records.length);
@@ -643,39 +715,47 @@ export const updateRecordsBatchById = async (updates: Partial<RecordFile>[], onP
 
     try {
         const rows = updates.map(u => sanitizeData(u, RECORD_DB_COLUMNS));
-        let { error } = await supabase
-            .from('land_records')
-            .upsert(rows);
+        const landRows: any[] = [];
+        const luutruRows: any[] = [];
 
-        if (error && (error.code === '22P02' || String(error.message || '').includes('22P02') || String(error.message || '').includes('invalid input syntax'))) {
-            console.warn("⚠️ [22P02 Fallback] Retrying updateRecordsBatchById with 22P02 sanitized payload...");
-            const fallback22P02Rows = sanitizePayloadFor22P02(rows);
-            const res = await supabase.from('land_records').upsert(fallback22P02Rows);
-            error = res.error;
-        }
-
-        if (error && (error.code === 'PGRST204' || String(error.code) === '42703' || (error.message && String(error.message).includes('does not exist')))) {
-            console.warn("⚠️ [Fallback] Database is missing columns inside updateRecordsBatchById. Retrying without new columns...");
-            if (!(window as any).fallbackAlertShown) {
-                logError("updateRecordsBatchById", error, true);
-                (window as any).fallbackAlertShown = true;
+        rows.forEach((row, idx) => {
+            const table = getTargetTable(updates[idx]);
+            if (table === 'luutru_records') {
+                luutruRows.push(row);
+            } else {
+                landRows.push(row);
             }
-            const fallbackPayload = rows.map(r => {
-                const fp = sanitizePayloadFor22P02({ ...r });
-                OPTIONAL_NEW_COLUMNS.forEach(col => delete fp[col]);
-                return fp;
-            });
-            const { error: fallbackError } = await supabase
-                .from('land_records')
-                .upsert(fallbackPayload);
-            if (fallbackError) throw fallbackError;
-            
-            syncCacheOnBatchUpdate(updates);
-            if (onProgress) onProgress(updates.length, updates.length);
-            return { success: true, count: updates.length };
-        }
+        });
 
-        if (error) throw error;
+        const upsertIntoTable = async (table: 'land_records' | 'luutru_records', payload: any[]) => {
+            if (payload.length === 0) return;
+            let { error } = await supabase.from(table).upsert(payload);
+
+            if (error && (error.code === '22P02' || String(error.message || '').includes('22P02') || String(error.message || '').includes('invalid input syntax'))) {
+                console.warn(`⚠️ [22P02 Fallback] Retrying updateRecordsBatchById on ${table} with 22P02 sanitized payload...`);
+                const fallback22P02Rows = sanitizePayloadFor22P02(payload);
+                const res = await supabase.from(table).upsert(fallback22P02Rows);
+                error = res.error;
+            }
+
+            if (error && (error.code === 'PGRST204' || String(error.code) === '42703' || (error.message && String(error.message).includes('does not exist')))) {
+                console.warn(`⚠️ [Fallback] Database is missing columns inside updateRecordsBatchById on ${table}. Retrying without new columns...`);
+                const fallbackPayload = payload.map(r => {
+                    const fp = sanitizePayloadFor22P02({ ...r });
+                    OPTIONAL_NEW_COLUMNS.forEach(col => delete fp[col]);
+                    return fp;
+                });
+                const { error: fallbackError } = await supabase.from(table).upsert(fallbackPayload);
+                if (fallbackError) throw fallbackError;
+            } else if (error) {
+                throw error;
+            }
+        };
+
+        await Promise.all([
+            upsertIntoTable('land_records', landRows),
+            upsertIntoTable('luutru_records', luutruRows)
+        ]);
         
         syncCacheOnBatchUpdate(updates);
         if (onProgress) onProgress(updates.length, updates.length);

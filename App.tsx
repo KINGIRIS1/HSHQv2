@@ -516,13 +516,24 @@ function App() {
               recordUpdates.statusLogs = createStatusLog(r, value, 'Cập nhật trạng thái hàng loạt');
               
               if (extraData?.assignedTo) {
-                  recordUpdates.assignedTo = extraData.assignedTo;
-                  if (value === RecordStatus.PENDING_CHECK || value === RecordStatus.CHECKED) {
+                  if (value === RecordStatus.RECEIVED) {
+                      recordUpdates.receivedBy = extraData.assignedTo;
+                  } else if (value === RecordStatus.IN_PROGRESS || value === RecordStatus.ASSIGNED) {
+                      recordUpdates.assignedTo = extraData.assignedTo;
+                  } else if (value === RecordStatus.PENDING_CHECK || value === RecordStatus.CHECKED) {
                       recordUpdates.checkedBy = extraData.assignedTo;
+                  } else if (value === RecordStatus.PENDING_SIGN || value === RecordStatus.SIGNED) {
+                      recordUpdates.submittedTo = extraData.assignedTo;
+                  } else {
+                      recordUpdates.assignedTo = extraData.assignedTo;
                   }
               }
 
-              if (value === RecordStatus.COMPLETED_WORK) {
+              if (value === RecordStatus.RECEIVED) {
+                  if (extraData?.customDate) recordUpdates.receivedDate = extraData.customDate;
+              } else if (value === RecordStatus.IN_PROGRESS || value === RecordStatus.ASSIGNED) {
+                  if (extraData?.customDate) recordUpdates.assignedDate = extraData.customDate;
+              } else if (value === RecordStatus.COMPLETED_WORK) {
                   if (!r.assignedDate) recordUpdates.assignedDate = targetDateStr;
                   if (extraData?.customDate) recordUpdates.completedWorkDate = extraData.customDate;
               } else if (value === RecordStatus.PENDING_CHECK) {

@@ -125,7 +125,17 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 bg-gray-50 p-3 rounded-lg border border-gray-200">
                                 <div>
-                                    <label className="block text-xs font-bold text-gray-700 mb-1">Người xử lý / Phụ trách</label>
+                                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                                        {targetValue === RecordStatus.RECEIVED
+                                            ? "Cán bộ tiếp nhận"
+                                            : targetValue === RecordStatus.IN_PROGRESS || targetValue === RecordStatus.ASSIGNED
+                                            ? "Cán bộ thực hiện / Người đo đạc"
+                                            : targetValue === RecordStatus.PENDING_CHECK
+                                            ? "Cán bộ kiểm tra / Người kiểm tra"
+                                            : targetValue === RecordStatus.PENDING_SIGN
+                                            ? "Người được trình ký"
+                                            : "Người xử lý / Phụ trách"}
+                                    </label>
                                     <select 
                                         className="w-full border border-gray-300 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-orange-500 outline-none bg-white"
                                         value={statusEmployee}
@@ -138,7 +148,23 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-bold text-gray-700 mb-1">Ngày thực hiện / Ngày giao</label>
+                                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                                        {targetValue === RecordStatus.RECEIVED
+                                            ? "Ngày tiếp nhận"
+                                            : targetValue === RecordStatus.IN_PROGRESS || targetValue === RecordStatus.ASSIGNED
+                                            ? "Ngày giao thực hiện"
+                                            : targetValue === RecordStatus.COMPLETED_WORK
+                                            ? "Ngày hoàn thành thực hiện"
+                                            : targetValue === RecordStatus.PENDING_CHECK
+                                            ? "Ngày trình kiểm tra"
+                                            : targetValue === RecordStatus.PENDING_SIGN
+                                            ? "Ngày trình ký"
+                                            : targetValue === RecordStatus.HANDOVER
+                                            ? "Ngày xuất giao"
+                                            : targetValue === RecordStatus.RETURNED
+                                            ? "Ngày trả kết quả"
+                                            : "Ngày áp dụng"}
+                                    </label>
                                     <input 
                                         type="date"
                                         className="w-full border border-gray-300 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-orange-500 outline-none bg-white"
