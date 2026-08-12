@@ -86,22 +86,31 @@ const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calc
               '1.2 CÔNG VĂN': '1.2 Công văn',
               'CÔNG VĂN': '1.2 Công văn',
               'CONG VAN': '1.2 Công văn',
-              'TL': 'Trích lục bản đồ địa chính',
-              'TRÍCH LỤC': 'Trích lục bản đồ địa chính',
-              'TĐ': '2.3 Trích đo',
-              'TD': '2.3 Trích đo',
-              'TRÍCH ĐO': '2.3 Trích đo',
-              'ĐĐ': 'Đo đạc',
-              'DD': 'Đo đạc',
-              'ĐO ĐẠC': 'Đo đạc',
-              'CM': 'Cắm mốc',
-              'CẮM MỐC': 'Cắm mốc',
+              'TL': '2.1 Trích lục',
+              'TRÍCH LỤC': '2.1 Trích lục',
+              '2.1': '2.1 Trích lục',
+              'TĐ': '2.2 Trích đo',
+              'TD': '2.2 Trích đo',
+              'TRÍCH ĐO': '2.2 Trích đo',
+              '2.2': '2.2 Trích đo',
+              'CN SỐ THỬA': '2.3 Cập nhật số thửa',
+              'CẬP NHẬT SỐ THỬA': '2.3 Cập nhật số thửa',
+              'CẬP NHẬP SỐ THỬA': '2.3 Cập nhật số thửa',
+              '2.3': '2.3 Cập nhật số thửa',
+              '2.6': '2.3 Cập nhật số thửa',
+              'ĐĐ': '2.4 Trích đo Cắm mốc',
+              'DD': '2.4 Trích đo Cắm mốc',
+              'ĐO ĐẠC': '2.4 Trích đo Cắm mốc',
+              'CM': '2.4 Trích đo Cắm mốc',
+              'CẮM MỐC': '2.4 Trích đo Cắm mốc',
+              '2.4': '2.4 Trích đo Cắm mốc',
               'CL': 'Trích đo chỉnh lý bản đồ địa chính',
               'CHỈNH LÝ': 'Trích đo chỉnh lý bản đồ địa chính',
               'HIẾN ĐƯỜNG': 'Trích đo chỉnh lý bản đồ địa chính',
-              'TÁCH THỬA': 'Tách thửa',
-              'HỢP THỬA': '2.3 Trích đo',
-              'CẤP ĐỔI': '2.3 Trích đo'
+              'TÁCH THỬA': '2.5 Trích đo Tách - Hợp thửa',
+              'HỢP THỬA': '2.2 Trích đo',
+              'CẤP ĐỔI': '2.2 Trích đo',
+              '2.5': '2.5 Trích đo Tách - Hợp thửa'
           };
 
           for (let i = headerRowIndex + 1; i < data.length; i++) {
@@ -124,12 +133,12 @@ const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calc
               if (!recordType) {
                   const lower = rawType.toLowerCase();
                   if (lower.includes('1.2') || lower.includes('công văn') || lower.includes('cong van') || lower.includes('cung cấp tài liệu')) recordType = '1.2 Công văn';
-                  else if (lower.includes('trích lục')) recordType = 'Trích lục bản đồ địa chính';
+                  else if (lower.includes('trích lục')) recordType = '2.1 Trích lục';
                   else if (lower.includes('chỉnh lý') || lower.includes('hiến đường')) recordType = 'Trích đo chỉnh lý bản đồ địa chính';
-                  else if (lower.includes('tách thửa')) recordType = 'Tách thửa';
-                  else if (lower.includes('trích đo') || lower.includes('hợp thửa')) recordType = 'Trích đo bản đồ địa chính';
-                  else if (lower.includes('đo đạc')) recordType = 'Đo đạc';
-                  else if (lower.includes('cắm mốc')) recordType = 'Cắm mốc';
+                  else if (lower.includes('số thửa') || lower.includes('cập nhật') || lower.includes('cập nhập') || lower.includes('2.6')) recordType = '2.3 Cập nhật số thửa';
+                  else if (lower.includes('tách thửa')) recordType = '2.5 Trích đo Tách - Hợp thửa';
+                  else if (lower.includes('trích đo') || lower.includes('hợp thửa')) recordType = '2.2 Trích đo';
+                  else if (lower.includes('đo đạc') || lower.includes('cắm mốc')) recordType = '2.4 Trích đo Cắm mốc';
                   else if (rawType) recordType = rawType;
                   else recordType = RECORD_TYPES[0];
               }

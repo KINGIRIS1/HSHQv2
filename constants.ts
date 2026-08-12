@@ -70,10 +70,10 @@ export const RECORD_TYPES = [
   '1.1 Sao lục hồ sơ',
   '1.2 Công văn',
   '2.1 Trích lục',
-  '2.3 Trích đo',
+  '2.2 Trích đo',
+  '2.3 Cập nhật số thửa',
   '2.4 Trích đo Cắm mốc',
-  '2.5 Trích đo Tách - Hợp thửa',
-  '2.6 CN số thửa'
+  '2.5 Trích đo Tách - Hợp thửa'
 ];
 
 // Danh sách loại hồ sơ MỞ RỘNG (Dùng cho form Thêm mới trong "Tất cả hồ sơ" - Admin/Nội bộ)
@@ -128,19 +128,19 @@ export const getShortRecordType = (type: string | null | undefined): string => {
   
   if (t.startsWith('1.1') || t === 'cung cấp tài liệu đất đai' || t === 'cung cấp dữ liệu đất đai' || t === 'sao lục' || t === 'sao luc' || t === 'sao lục hồ sơ' || t === '1.1 cc dl đđ' || t === '1.1 sao lục') return '1.1 Sao lục';
   if (t.startsWith('1.2') || t === 'công văn') return '1.2 Công văn';
-  if (t.startsWith('2.1') || t.startsWith('2.2') || t === 'trích lục' || t === 'trích lục quy hoạch' || t === 'trích lục qh') return '2.1 Trích lục';
-  if (t.startsWith('2.3') || t === 'trích đo') return '2.3 Trích đo';
+  if (t.startsWith('2.1') || t === 'trích lục' || t === 'trích lục quy hoạch' || t === 'trích lục qh') return '2.1 Trích lục';
+  if (t.startsWith('2.2') || t === '2.3 trích đo' || t === 'trích đo') return '2.2 Trích đo';
+  if (t.startsWith('2.3') || t.startsWith('2.6') || t === 'cung cấp số thửa đất' || t === 'cung cấp số thửa' || t === 'cc số thửa' || t === 'cập nhập số thửa' || t === 'cập nhật số thửa' || t === 'cn số thửa') return '2.3 Cập nhật số thửa';
   if (t.startsWith('2.4') || t === 'cắm mốc' || t === 'trích đo cắm mốc') return '2.4 Cắm mốc';
   if (t.startsWith('2.5') || t === 'tách thửa' || t === 'tách-hợp thửa' || t === 'trích đo tách - hợp thửa') return '2.5 Tách-Hợp thửa';
-  if (t.startsWith('2.6') || t === 'cung cấp số thửa đất' || t === 'cung cấp số thửa' || t === 'cc số thửa' || t === 'cập nhập số thửa' || t === 'cập nhật số thửa' || t === 'cn số thửa') return '2.6 CN Số Thửa';
 
   // Fallbacks for legacy other categories
   if (t.includes('cung cấp tài liệu đất đai') || t.includes('cung cấp dữ liệu') || t.includes('sao lục') || t.includes('sao luc') || t.includes('cc dl đđ')) return '1.1 Sao lục';
   if (t.includes('trích lục quy hoạch')) return '2.1 Trích lục';
-  if (t.includes('cung cấp số thửa đất') || t.includes('số thửa') || t.includes('cập nhập số thửa') || t.includes('cập nhật số thửa')) return '2.6 CN Số Thửa';
+  if (t.includes('cung cấp số thửa đất') || t.includes('số thửa') || t.includes('cập nhập số thửa') || t.includes('cập nhật số thửa') || t.includes('2.6')) return '2.3 Cập nhật số thửa';
   if (t.includes('trích đo') && t.includes('cắm mốc')) return '2.4 Cắm mốc';
   if (t.includes('trích đo') && (t.includes('tách') || t.includes('hợp'))) return '2.5 Tách-Hợp thửa';
-  if (t.includes('trích đo')) return '2.3 Trích đo';
+  if (t.includes('trích đo') || t.includes('2.2')) return '2.2 Trích đo';
   if (t.includes('cắm mốc')) return '2.4 Cắm mốc';
   if (t.includes('trích lục')) return '2.1 Trích lục';
   if (t.includes('tách thửa')) return '2.5 Tách-Hợp thửa';

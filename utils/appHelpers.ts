@@ -179,13 +179,14 @@ export const calculateDeadlineHelper = (type: string, receivedDateStr: string, h
     const lowerType = (type || '').toLowerCase();
 
     if (lowerType.includes('1.1') || lowerType.includes('cung cấp tài liệu đất đai') || lowerType.includes('cung cấp dữ liệu') ||
-        lowerType.includes('2.2') || lowerType.includes('quy hoạch') || 
-        lowerType.includes('2.6') || lowerType.includes('số thửa') || 
-        lowerType.includes('2.1') || lowerType.includes('trích lục')) {
+        lowerType.includes('2.1') || lowerType.includes('trích lục') || 
+        lowerType.includes('2.3 cập nhật') || lowerType.includes('2.3 cập nhập') || lowerType.includes('2.3 số thửa') ||
+        lowerType.includes('2.6') || lowerType.includes('số thửa') || lowerType.includes('cập nhật số thửa') || lowerType.includes('cập nhập số thửa') ||
+        lowerType.includes('quy hoạch')) {
         daysToAdd = 10;
     } else if (lowerType.includes('trích đo chỉnh lý') || lowerType.includes('chỉnh lý bản đồ')) {
         daysToAdd = 15;
-    } else if (lowerType.includes('2.3') || lowerType.includes('trích đo') || 
+    } else if (lowerType.includes('2.2') || lowerType.includes('2.3') || lowerType.includes('trích đo') || 
                lowerType.includes('2.4') || lowerType.includes('cắm mốc') || 
                lowerType.includes('2.5') || lowerType.includes('tách') || lowerType.includes('hợp') ||
                lowerType.includes('đo đạc') || lowerType.includes('tách thửa')) {

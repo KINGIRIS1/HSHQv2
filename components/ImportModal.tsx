@@ -138,13 +138,13 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
         const mappedRecords: any[] = []; // Dùng any để linh hoạt cho Update object
 
         const typeMapping: Record<string, string> = {
-            'TL': 'Trích lục bản đồ địa chính', 'TRÍCH LỤC': 'Trích lục bản đồ địa chính',
-            'TĐ': '2.3 Trích đo', 'TD': '2.3 Trích đo', 'TRÍCH ĐO': '2.3 Trích đo',
-            'ĐĐ': 'Đo đạc', 'DD': 'Đo đạc', 'ĐO ĐẠC': 'Đo đạc',
-            'CM': 'Cắm mốc', 'CẮM MỐC': 'Cắm mốc',
+            'TL': '2.1 Trích lục', 'TRÍCH LỤC': '2.1 Trích lục', '2.1': '2.1 Trích lục',
+            'TĐ': '2.2 Trích đo', 'TD': '2.2 Trích đo', 'TRÍCH ĐO': '2.2 Trích đo', '2.2': '2.2 Trích đo',
+            'CN SỐ THỬA': '2.3 Cập nhật số thửa', 'CẬP NHẬT SỐ THỬA': '2.3 Cập nhật số thửa', 'CẬP NHẬP SỐ THỬA': '2.3 Cập nhật số thửa', '2.3': '2.3 Cập nhật số thửa', '2.6': '2.3 Cập nhật số thửa',
+            'ĐĐ': '2.4 Trích đo Cắm mốc', 'DD': '2.4 Trích đo Cắm mốc', 'ĐO ĐẠC': '2.4 Trích đo Cắm mốc', 'CM': '2.4 Trích đo Cắm mốc', 'CẮM MỐC': '2.4 Trích đo Cắm mốc', '2.4': '2.4 Trích đo Cắm mốc',
             'CL': 'Trích đo chỉnh lý bản đồ địa chính', 'CHỈNH LÝ': 'Trích đo chỉnh lý bản đồ địa chính',
             'HIẾN ĐƯỜNG': 'Trích đo chỉnh lý bản đồ địa chính',
-            'TÁCH THỬA': 'Tách thửa', 'HỢP THỬA': '2.3 Trích đo', 'CẤP ĐỔI': '2.3 Trích đo'
+            'TÁCH THỬA': '2.5 Trích đo Tách - Hợp thửa', 'HỢP THỬA': '2.2 Trích đo', 'CẤP ĐỔI': '2.2 Trích đo', '2.5': '2.5 Trích đo Tách - Hợp thửa'
         };
 
         for (let i = headerRowIndex + 1; i < data.length; i++) {

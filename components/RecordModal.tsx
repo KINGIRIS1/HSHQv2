@@ -125,20 +125,20 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
   } else if (isMeasurementView) {
     allowedRecordTypes = [
       '2.1 Trích lục',
-      '2.3 Trích đo',
-      '2.4 Cắm mốc',
-      '2.5 Tách-Hợp thửa',
-      '2.6 CN số thửa'
+      '2.2 Trích đo',
+      '2.3 Cập nhật số thửa',
+      '2.4 Trích đo Cắm mốc',
+      '2.5 Trích đo Tách - Hợp thửa'
     ];
   } else {
     allowedRecordTypes = [
-      '1.1 Sao lục',
+      '1.1 Sao lục hồ sơ',
       '1.2 Công văn',
       '2.1 Trích lục',
-      '2.3 Trích đo',
-      '2.4 Cắm mốc',
-      '2.5 Tách-Hợp thửa',
-      '2.6 CN số thửa',
+      '2.2 Trích đo',
+      '2.3 Cập nhật số thửa',
+      '2.4 Trích đo Cắm mốc',
+      '2.5 Trích đo Tách - Hợp thửa',
       'CMD',
       'Thi hành án',
       'Tòa án'
