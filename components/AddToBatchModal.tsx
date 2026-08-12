@@ -113,7 +113,7 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
       const batches: Record<string, { label: string, date: string, count: number, fullDate: string }> = {};
       
       records.forEach(r => {
-          if ((r.status === RecordStatus.HANDOVER || r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED || r.exportBatch) && r.exportBatch && r.exportDate) {
+          if ((r.status === RecordStatus.HANDOVER || r.status === RecordStatus.SIGNED || r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED || r.exportBatch) && r.exportBatch && r.exportDate) {
               const datePart = r.exportDate.split('T')[0];
               const label = formatBatchName(r.exportBatch, '', datePart);
               

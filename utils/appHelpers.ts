@@ -92,7 +92,8 @@ export const isRecordOverdue = (record: RecordFile): boolean => {
       RecordStatus.HANDOVER,
       RecordStatus.RETURNED,
       RecordStatus.WITHDRAWN,
-      RecordStatus.REJECTED
+      RecordStatus.REJECTED,
+      RecordStatus.SIGNED
   ];
 
   if (completedStatuses.includes(record.status)) return false;
@@ -116,7 +117,8 @@ export const isRecordApproaching = (record: RecordFile): boolean => {
       RecordStatus.HANDOVER,
       RecordStatus.RETURNED,
       RecordStatus.WITHDRAWN,
-      RecordStatus.REJECTED
+      RecordStatus.REJECTED,
+      RecordStatus.SIGNED
   ];
 
   if (completedStatuses.includes(record.status)) return false;
@@ -177,13 +179,16 @@ export const calculateDeadlineHelper = (type: string, receivedDateStr: string, h
     const lowerType = (type || '').toLowerCase();
 
     if (lowerType.includes('1.1') || lowerType.includes('cung cấp tài liệu đất đai') || lowerType.includes('cung cấp dữ liệu') ||
-        lowerType.includes('2.1') || lowerType.includes('trích lục') ||
-        lowerType.includes('2.3') || lowerType.includes('số thửa') || lowerType.includes('cập nhật số thửa') || lowerType.includes('cập nhập số thửa') ||
-        lowerType.includes('quy hoạch')) {
+        lowerType.includes('2.2') || lowerType.includes('quy hoạch') || 
+        lowerType.includes('2.6') || lowerType.includes('số thửa') || 
+        lowerType.includes('2.1') || lowerType.includes('trích lục')) {
         daysToAdd = 10;
     } else if (lowerType.includes('trích đo chỉnh lý') || lowerType.includes('chỉnh lý bản đồ')) {
         daysToAdd = 15;
-    } else {
+    } else if (lowerType.includes('2.3') || lowerType.includes('trích đo') || 
+               lowerType.includes('2.4') || lowerType.includes('cắm mốc') || 
+               lowerType.includes('2.5') || lowerType.includes('tách') || lowerType.includes('hợp') ||
+               lowerType.includes('đo đạc') || lowerType.includes('tách thửa')) {
         daysToAdd = 30;
     }
     
@@ -350,7 +355,12 @@ export function processAssignmentTimelineCheck(
     record.pendingCheckDate ||
     record.checkedDate ||
     record.approvalDate ||
-    record.completedWorkDate
+    record.completedWorkDate ||
+    record.status === RecordStatus.PENDING_CHECK ||
+    record.status === RecordStatus.CHECKED ||
+    record.status === RecordStatus.PENDING_SIGN ||
+    record.status === RecordStatus.SIGNED ||
+    record.status === RecordStatus.COMPLETED_WORK
   );
 
   let isLaterDate = false;
@@ -587,24 +597,6 @@ export function migrateUnbatchedRecords(records: RecordFile[]): { migratedRecord
 
     const migratedRecords = records.map(r => {
         let currentBatch = r.exportBatch;
-        let recType = r.recordType;
-        let isTypeChanged = false;
-
-        if (recType) {
-            const tLower = recType.toLowerCase();
-            if ((tLower.includes('2.3') && tLower.includes('trích đo')) || tLower === '2.3 trích đo') {
-                recType = '2.2 Trích đo';
-                isTypeChanged = true;
-            } else if (tLower.includes('2.6') || tLower.includes('cập số thửa') || tLower.includes('cập nhật số thửa') || tLower.includes('cn số thửa')) {
-                recType = '2.3 Cập nhật số thửa';
-                isTypeChanged = true;
-            }
-        }
-
-        if (isTypeChanged) {
-            hasChanges = true;
-            r = { ...r, recordType: recType };
-        }
 
         // Tự động làm sạch các tên đợt cũ bị lặp chữ "Đợt"
         if (typeof currentBatch === 'string' && /^Đợt\s+Đợt/i.test(currentBatch)) {

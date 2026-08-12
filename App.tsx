@@ -426,17 +426,58 @@ function App() {
       switch (newStatus) {
           case RecordStatus.RECEIVED:
               updates.assignedDate = null;
+              updates.submissionDate = null;
+              updates.approvalDate = null;
               updates.completedDate = null;
               updates.resultReturnedDate = null;
               updates.exportBatch = null;
               updates.exportDate = null;
               break;
+          case RecordStatus.ASSIGNED:
           case RecordStatus.IN_PROGRESS:
               updates.assignedDate = targetDateStr;
+              updates.submissionDate = null;
+              updates.approvalDate = null;
               updates.completedDate = null;
               updates.resultReturnedDate = null;
               updates.exportBatch = null;
               updates.exportDate = null;
+              break;
+          // MỚI: Trạng thái Đã thực hiện
+          case RecordStatus.COMPLETED_WORK:
+              // Giữ nguyên assignedDate
+              updates.completedWorkDate = targetDateStr;
+              updates.pendingCheckDate = null;
+              updates.checkedDate = null;
+              updates.submissionDate = null; 
+              updates.approvalDate = null;
+              updates.completedDate = null;
+              break;
+          case RecordStatus.PENDING_CHECK:
+              updates.pendingCheckDate = targetDateStr;
+              updates.checkedDate = null;
+              updates.submissionDate = null;
+              updates.approvalDate = null;
+              updates.completedDate = null;
+              updates.resultReturnedDate = null;
+              break;
+          case RecordStatus.CHECKED:
+              updates.checkedDate = targetDateStr;
+              updates.submissionDate = null;
+              updates.approvalDate = null;
+              updates.completedDate = null;
+              updates.resultReturnedDate = null;
+              break;
+          case RecordStatus.PENDING_SIGN:
+              updates.submissionDate = targetDateStr; 
+              updates.approvalDate = null;
+              updates.completedDate = null;
+              updates.resultReturnedDate = null;
+              break;
+          case RecordStatus.SIGNED:
+              updates.approvalDate = targetDateStr; 
+              updates.completedDate = null;
+              updates.resultReturnedDate = null;
               break;
           case RecordStatus.HANDOVER:
               updates.completedDate = targetDateStr; 

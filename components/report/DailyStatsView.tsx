@@ -328,6 +328,8 @@ const DailyStatsView: React.FC<DailyStatsViewProps> = ({
                                             <span className={`px-2.5 py-1 rounded text-[10px] uppercase font-bold tracking-wider border ${
                                                 r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED ? 'bg-green-50 text-green-800 border-green-200' : 
                                                 r.status === RecordStatus.WITHDRAWN ? 'bg-gray-100 text-gray-600 border-gray-200' :
+                                                r.status === RecordStatus.PENDING_SIGN || r.status === RecordStatus.SIGNED ? 'bg-purple-100 text-purple-700 border-purple-200' :
+                                                r.status === RecordStatus.COMPLETED_WORK ? 'bg-teal-100 text-teal-700 border-teal-200' :
                                                 'bg-blue-100 text-blue-700 border-blue-200'
                                             }`}>
                                                 {STATUS_LABELS[r.status] || r.status}

@@ -410,23 +410,24 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
 
   // LOGIC CHECK NẾU ĐÃ THỰC HIỆN XONG (Để hiển thị bước "Đã thực hiện")
   const isWorkDone = [
+    RecordStatus.COMPLETED_WORK, RecordStatus.PENDING_CHECK, RecordStatus.CHECKED, RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, 
     RecordStatus.HANDOVER, RecordStatus.RETURNED
   ].includes(record.status) || !!record.completedWorkDate;
   
   const isPendingCheckActive = [
-      RecordStatus.HANDOVER, RecordStatus.RETURNED
+      RecordStatus.PENDING_CHECK, RecordStatus.CHECKED, RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER, RecordStatus.RETURNED
   ].includes(record.status) || !!record.pendingCheckDate;
 
   const isCheckedActive = [
-      RecordStatus.HANDOVER, RecordStatus.RETURNED
+      RecordStatus.CHECKED, RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER, RecordStatus.RETURNED
   ].includes(record.status) || !!record.checkedDate;
 
   const isPendingSignActive = [
-      RecordStatus.HANDOVER, RecordStatus.RETURNED
+      RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER, RecordStatus.RETURNED
   ].includes(record.status) || !!record.submissionDate;
 
   const isSignedActive = [
-      RecordStatus.HANDOVER, RecordStatus.RETURNED
+      RecordStatus.SIGNED, RecordStatus.HANDOVER, RecordStatus.RETURNED
   ].includes(record.status) || !!record.approvalDate;
 
   const recordTypeLower = (record?.recordType || '').toLowerCase();

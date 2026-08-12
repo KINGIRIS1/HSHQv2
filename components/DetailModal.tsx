@@ -484,23 +484,23 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
 
   // LOGIC CHECK NẾU ĐÃ THỰC HIỆN XONG (Để hiển thị bước "Đã thực hiện")
   const isWorkDone = [
-      RecordStatus.HANDOVER, RecordStatus.RETURNED
+      RecordStatus.COMPLETED_WORK, RecordStatus.PENDING_CHECK, RecordStatus.CHECKED, RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER, RecordStatus.RETURNED
   ].includes(record.status) || !!record.completedWorkDate;
   
   const isPendingCheckActive = [
-      RecordStatus.HANDOVER, RecordStatus.RETURNED
+      RecordStatus.PENDING_CHECK, RecordStatus.CHECKED, RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER, RecordStatus.RETURNED
   ].includes(record.status) || !!record.pendingCheckDate;
 
   const isCheckedActive = [
-      RecordStatus.HANDOVER, RecordStatus.RETURNED
+      RecordStatus.CHECKED, RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER, RecordStatus.RETURNED
   ].includes(record.status) || !!record.checkedDate;
 
   const isPendingSignActive = [
-      RecordStatus.HANDOVER, RecordStatus.RETURNED
+      RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER, RecordStatus.RETURNED
   ].includes(record.status) || !!record.submissionDate;
 
   const isSignedActive = [
-      RecordStatus.HANDOVER, RecordStatus.RETURNED
+      RecordStatus.SIGNED, RecordStatus.HANDOVER, RecordStatus.RETURNED
   ].includes(record.status) || !!record.approvalDate;
 
 
@@ -519,7 +519,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
             </div>
             
             <div className="flex items-center gap-2">
-                {onOpenRejectReturnModal && record && (record.status === RecordStatus.IN_PROGRESS || record.status === RecordStatus.RECEIVED) && (
+                {onOpenRejectReturnModal && record && (record.status === RecordStatus.PENDING_CHECK || record.status === RecordStatus.CHECKED || record.status === RecordStatus.PENDING_SIGN || record.status === RecordStatus.SIGNED) && (
                     <button
                         onClick={() => { onClose(); onOpenRejectReturnModal(record); }}
                         className="flex items-center gap-2 px-3 py-1.5 bg-rose-50 border border-rose-200 text-rose-700 rounded hover:bg-rose-100 transition-colors text-sm font-bold shadow-sm"

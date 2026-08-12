@@ -21,10 +21,10 @@ const ArchiveDetailModal: React.FC<ArchiveDetailModalProps> = ({ isOpen, onClose
     const mapStatus = (s: string): RecordStatus => {
         switch(s) {
             case 'draft': return RecordStatus.RECEIVED;
-            case 'assigned':
-            case 'executed':
-            case 'pending_sign':
-            case 'signed': return RecordStatus.IN_PROGRESS;
+            case 'assigned': return RecordStatus.ASSIGNED;
+            case 'executed': return RecordStatus.COMPLETED_WORK;
+            case 'pending_sign': return RecordStatus.PENDING_SIGN;
+            case 'signed': return RecordStatus.SIGNED;
             case 'completed': return RecordStatus.RETURNED;
             default: return RecordStatus.RECEIVED;
         }

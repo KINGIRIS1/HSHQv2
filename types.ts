@@ -1,19 +1,19 @@
 
 // Định nghĩa trạng thái của hồ sơ theo quy trình
 export enum RecordStatus {
-  RECEIVED = 'RECEIVED',
-  ASSIGNED = 'ASSIGNED',
-  IN_PROGRESS = 'IN_PROGRESS',
-  COMPLETED_WORK = 'COMPLETED_WORK',
-  PENDING_CHECK = 'PENDING_CHECK',
-  CHECKED = 'CHECKED',
-  PENDING_SIGN = 'PENDING_SIGN',
-  SIGNED = 'SIGNED',
-  PENDING_SUPPLEMENT = 'PENDING_SUPPLEMENT',
-  HANDOVER = 'HANDOVER',
-  RETURNED = 'RETURNED',
-  WITHDRAWN = 'WITHDRAWN',
-  REJECTED = 'REJECTED'
+  RECEIVED = 'RECEIVED',         // Tiếp nhận
+  ASSIGNED = 'ASSIGNED',         // Giao nhân viên
+  IN_PROGRESS = 'IN_PROGRESS',   // Đang thực hiện
+  COMPLETED_WORK = 'COMPLETED_WORK', // Đã thực hiện (Mới: Nhân viên làm xong, chưa trình)
+  PENDING_SUPPLEMENT = 'PENDING_SUPPLEMENT', // Chờ bổ sung (Trả dừng quy trình)
+  PENDING_CHECK = 'PENDING_CHECK', // Chờ kiểm tra
+  CHECKED = 'CHECKED',           // Đã kiểm tra
+  PENDING_SIGN = 'PENDING_SIGN', // Chờ ký duyệt (Đã trình)
+  SIGNED = 'SIGNED',             // Đã ký (Lập danh sách ký)
+  HANDOVER = 'HANDOVER',         // Giao 1 cửa (Hoàn thành nội bộ)
+  RETURNED = 'RETURNED',         // Đã trả kết quả (Hoàn thành trả dân)
+  WITHDRAWN = 'WITHDRAWN',       // CSD rút hồ sơ (Kết thúc)
+  REJECTED = 'REJECTED'          // Hồ sơ trả (Trả về OneDoor)
 }
 
 export enum UserRole {

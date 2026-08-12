@@ -71,7 +71,28 @@ export const useReminderSystem = (
                 const newStatus = r.status;
                 const isAssignedEmployee = currentUser && currentUser.employeeId === r.assignedTo;
 
-                // A. 'Hồ sơ trả về' -> RecordStatus.REJECTED
+                // A. 'Đang chờ ký' -> RecordStatus.PENDING_SIGN
+                if (newStatus === RecordStatus.PENDING_SIGN) {
+                    const isRelevantSupervisor = currentUser && (
+                        currentUser.role === UserRole.ADMIN ||
+                        currentUser.role === UserRole.SUBADMIN ||
+                        currentUser.employeeId === r.submittedTo
+                    );
+
+                    if (isRelevantSupervisor) {
+                        triggerSystemNotification(
+                            `Yêu cầu Trình ký mới: ${r.code}`,
+                            `Hồ sơ của khách hàng ${r.customerName} đã được trình ký duyệt. Vui lòng kiểm tra!`
+                        );
+                    } else if (isAssignedEmployee) {
+                        triggerSystemNotification(
+                            `Hồ sơ đã được trình ký: ${r.code}`,
+                            `Hồ sơ của khách hàng ${r.customerName} đã chuyển sang trạng thái chờ ký duyệt.`
+                        );
+                    }
+                }
+
+                // B. 'Đã trả về' -> RecordStatus.REJECTED (trả về nhân viên)
                 if (newStatus === RecordStatus.REJECTED) {
                     const isOneDoor = currentUser && currentUser.role === UserRole.ONEDOOR;
                     if (isAssignedEmployee) {
@@ -83,6 +104,16 @@ export const useReminderSystem = (
                         triggerSystemNotification(
                             `Hồ sơ lỗi trả về một cửa: ${r.code}`,
                             `Hồ sơ ${r.code} (khách hàng ${r.customerName}) đã bị trả về một cửa.`
+                        );
+                    }
+                }
+
+                // C. 'Giao giải quyết' -> RecordStatus.ASSIGNED
+                if (newStatus === RecordStatus.ASSIGNED) {
+                    if (isAssignedEmployee) {
+                        triggerSystemNotification(
+                            `Giao hồ sơ mới: ${r.code}`,
+                            `Bạn đã được phân công xử lý hồ sơ ${r.code} cho khách hàng ${r.customerName}.`
                         );
                     }
                 }

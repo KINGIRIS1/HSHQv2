@@ -79,7 +79,8 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
             const isFinished = [
                 RecordStatus.HANDOVER, 
                 RecordStatus.RETURNED, 
-                RecordStatus.WITHDRAWN
+                RecordStatus.WITHDRAWN, 
+                RecordStatus.SIGNED
             ].includes(r.status) || !!r.exportBatch || !!r.exportDate;
 
             if (isFinished) {
@@ -137,7 +138,8 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
                 const isFinished = [
                     RecordStatus.HANDOVER, 
                     RecordStatus.RETURNED, 
-                    RecordStatus.WITHDRAWN
+                    RecordStatus.WITHDRAWN, 
+                    RecordStatus.SIGNED
                 ].includes(r.status) || !!r.exportBatch || !!r.exportDate;
 
                 if (isFinished) {

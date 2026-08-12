@@ -135,10 +135,10 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                     const mapStatus = (s: string): RecordStatus => {
                         switch(s) {
                             case 'draft': return RecordStatus.RECEIVED;
-                            case 'assigned':
-                            case 'executed':
-                            case 'pending_sign':
-                            case 'signed': return RecordStatus.IN_PROGRESS;
+                            case 'assigned': return RecordStatus.ASSIGNED;
+                            case 'executed': return RecordStatus.COMPLETED_WORK;
+                            case 'pending_sign': return RecordStatus.PENDING_SIGN;
+                            case 'signed': return RecordStatus.SIGNED;
                             case 'completed': return RecordStatus.RETURNED;
                             default: return RecordStatus.RECEIVED;
                         }
@@ -245,20 +245,22 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
             if (cardFilter === 'completed') {
                 return r.status === RecordStatus.HANDOVER || 
                        r.status === RecordStatus.RETURNED || 
+                       r.status === RecordStatus.SIGNED ||
                        !!r.exportBatch || !!r.exportDate;
             }
             if (cardFilter === 'processing') {
                 const isDone = r.status === RecordStatus.HANDOVER || 
                                r.status === RecordStatus.RETURNED || 
+                               r.status === RecordStatus.SIGNED ||
                                !!r.exportBatch || !!r.exportDate;
                 return !isDone && r.status !== RecordStatus.WITHDRAWN && r.status !== RecordStatus.REJECTED;
             }
             if (cardFilter === 'overdue_pending') {
-                if (r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED || r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED || r.exportBatch) return false;
+                if (r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED || r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED || r.status === RecordStatus.SIGNED || r.exportBatch) return false;
                 return isRecordOverdue(r);
             }
             if (cardFilter === 'overdue_completed') {
-                const isDone = r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED || !!r.exportBatch;
+                const isDone = r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED || r.status === RecordStatus.SIGNED || !!r.exportBatch;
                 if (!isDone) return false;
                 const d = parseSafeDate(r.deadline);
                 const c = parseSafeDate(r.completedDate);
@@ -305,6 +307,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
         const completed = sourceData.filter(r => 
             r.status === RecordStatus.HANDOVER || 
             r.status === RecordStatus.RETURNED || 
+            r.status === RecordStatus.SIGNED ||
             !!r.exportBatch || !!r.exportDate // Đã xuất cũng tính là xong
         ).length;
         
@@ -313,13 +316,13 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
         
         // Logic overdue pending: Quá hạn và chưa xong (chưa xuất/chưa trả/chưa rút)
         const overduePending = sourceData.filter(r => {
-            if (r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED || r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED || r.exportBatch) return false;
+            if (r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED || r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED || r.status === RecordStatus.SIGNED || r.exportBatch) return false;
             return isRecordOverdue(r);
         }).length;
         
         // Logic overdue completed: Đã xong nhưng bị trễ
         const overdueCompleted = sourceData.filter(r => {
-            const isDone = r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED || !!r.exportBatch;
+            const isDone = r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED || r.status === RecordStatus.SIGNED || !!r.exportBatch;
             if (!isDone) return false;
             const d = parseSafeDate(r.deadline);
             const c = parseSafeDate(r.completedDate);
@@ -423,7 +426,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
             dataToExport = selectedEmpId ? filteredData.filter(r => r.assignedTo === selectedEmpId) : filteredData;
         } else if (activeTab === 'overdue') {
             dataToExport = filteredData.filter(r => {
-                if (r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED || r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED || r.exportBatch) return false;
+                if (r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED || r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED || r.status === RecordStatus.SIGNED || r.exportBatch) return false;
                 return isRecordOverdue(r);
             });
         }

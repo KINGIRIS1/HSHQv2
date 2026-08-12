@@ -80,6 +80,7 @@ export const generateReport = async (
         const isCompleted = r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED || r.status === RecordStatus.REJECTED;
         
         if (isCompleted) completedCount++;
+        else if (r.status === RecordStatus.PENDING_SIGN) pendingSignCount++;
         else if (r.status === RecordStatus.WITHDRAWN) withdrawnCount++;
         else processingCount++;
         

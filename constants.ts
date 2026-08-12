@@ -9,16 +9,16 @@ export const API_BASE_URL = 'https://dajjhubrhybodggbqapt.supabase.co';
 // PHIÊN BẢN HIỆN TẠI CỦA ỨNG DỤNG
 export const APP_VERSION = '2.1.1';
 
-export const STATUS_LABELS: Partial<Record<RecordStatus, string>> = {
+export const STATUS_LABELS: Record<RecordStatus, string> = {
   [RecordStatus.RECEIVED]: 'Tiếp nhận mới',
-  [RecordStatus.ASSIGNED]: 'Đã giao việc',
+  [RecordStatus.ASSIGNED]: 'Đang thực hiện',
   [RecordStatus.IN_PROGRESS]: 'Đang thực hiện',
-  [RecordStatus.COMPLETED_WORK]: 'Đã thực hiện xong',
-  [RecordStatus.PENDING_CHECK]: 'Chờ kiểm tra',
-  [RecordStatus.CHECKED]: 'Đã kiểm tra',
-  [RecordStatus.PENDING_SIGN]: 'Chờ ký',
-  [RecordStatus.SIGNED]: 'Đã ký',
+  [RecordStatus.COMPLETED_WORK]: 'Đang thực hiện',
   [RecordStatus.PENDING_SUPPLEMENT]: 'Chờ bổ sung',
+  [RecordStatus.PENDING_CHECK]: 'Chờ kiểm tra',
+  [RecordStatus.CHECKED]: 'Chờ kiểm tra',
+  [RecordStatus.PENDING_SIGN]: 'Chờ ký duyệt',
+  [RecordStatus.SIGNED]: 'Chờ bàn giao',
   [RecordStatus.HANDOVER]: 'Đã giao 1 cửa',
   [RecordStatus.RETURNED]: 'Đã trả kết quả',
   [RecordStatus.WITHDRAWN]: 'CSD rút hồ sơ',
@@ -29,22 +29,25 @@ export const SELECTABLE_STATUSES: { key: RecordStatus; label: string }[] = [
   { key: RecordStatus.RECEIVED, label: 'Tiếp nhận mới' },
   { key: RecordStatus.IN_PROGRESS, label: 'Đang thực hiện' },
   { key: RecordStatus.PENDING_SUPPLEMENT, label: 'Chờ bổ sung' },
+  { key: RecordStatus.PENDING_CHECK, label: 'Chờ kiểm tra' },
+  { key: RecordStatus.PENDING_SIGN, label: 'Chờ ký duyệt' },
+  { key: RecordStatus.SIGNED, label: 'Chờ bàn giao' },
   { key: RecordStatus.HANDOVER, label: 'Đã giao 1 cửa' },
   { key: RecordStatus.RETURNED, label: 'Đã trả kết quả' },
   { key: RecordStatus.WITHDRAWN, label: 'CSD rút hồ sơ' },
   { key: RecordStatus.REJECTED, label: 'Trả hồ sơ' },
 ];
 
-export const STATUS_COLORS: Partial<Record<RecordStatus, string>> = {
+export const STATUS_COLORS: Record<RecordStatus, string> = {
   [RecordStatus.RECEIVED]: 'bg-gray-100 text-gray-800',
   [RecordStatus.ASSIGNED]: 'bg-blue-100 text-blue-800',
   [RecordStatus.IN_PROGRESS]: 'bg-yellow-100 text-yellow-800',
-  [RecordStatus.COMPLETED_WORK]: 'bg-teal-100 text-teal-800',
-  [RecordStatus.PENDING_CHECK]: 'bg-purple-100 text-purple-800',
-  [RecordStatus.CHECKED]: 'bg-indigo-100 text-indigo-800',
-  [RecordStatus.PENDING_SIGN]: 'bg-orange-100 text-orange-800',
-  [RecordStatus.SIGNED]: 'bg-emerald-100 text-emerald-800',
+  [RecordStatus.COMPLETED_WORK]: 'bg-cyan-100 text-cyan-800', // MỚI: Đã bổ sung
   [RecordStatus.PENDING_SUPPLEMENT]: 'bg-amber-100 text-amber-900 border border-amber-300 font-bold',
+  [RecordStatus.PENDING_CHECK]: 'bg-orange-100 text-orange-800',
+  [RecordStatus.CHECKED]: 'bg-teal-100 text-teal-800',
+  [RecordStatus.PENDING_SIGN]: 'bg-purple-100 text-purple-800',
+  [RecordStatus.SIGNED]: 'bg-indigo-100 text-indigo-800',
   [RecordStatus.HANDOVER]: 'bg-green-100 text-green-800',
   [RecordStatus.RETURNED]: 'bg-emerald-100 text-emerald-800 border border-emerald-200 font-bold',
   [RecordStatus.WITHDRAWN]: 'bg-slate-600 text-white',
@@ -67,10 +70,10 @@ export const RECORD_TYPES = [
   '1.1 Sao lục hồ sơ',
   '1.2 Công văn',
   '2.1 Trích lục',
-  '2.2 Trích đo',
-  '2.3 Cập nhật số thửa',
+  '2.3 Trích đo',
   '2.4 Trích đo Cắm mốc',
-  '2.5 Trích đo Tách - Hợp thửa'
+  '2.5 Trích đo Tách - Hợp thửa',
+  '2.6 CN số thửa'
 ];
 
 // Danh sách loại hồ sơ MỞ RỘNG (Dùng cho form Thêm mới trong "Tất cả hồ sơ" - Admin/Nội bộ)
@@ -125,19 +128,19 @@ export const getShortRecordType = (type: string | null | undefined): string => {
   
   if (t.startsWith('1.1') || t === 'cung cấp tài liệu đất đai' || t === 'cung cấp dữ liệu đất đai' || t === 'sao lục' || t === 'sao luc' || t === 'sao lục hồ sơ' || t === '1.1 cc dl đđ' || t === '1.1 sao lục') return '1.1 Sao lục';
   if (t.startsWith('1.2') || t === 'công văn') return '1.2 Công văn';
-  if (t.startsWith('2.1') || t === 'trích lục' || t === 'trích lục quy hoạch' || t === 'trích lục qh') return '2.1 Trích lục';
-  if (t.startsWith('2.2') || t === 'trích đo') return '2.2 Trích đo';
-  if (t.startsWith('2.3') || t.startsWith('2.6') || t === 'cung cấp số thửa đất' || t === 'cung cấp số thửa' || t === 'cc số thửa' || t === 'cập nhập số thửa' || t === 'cập nhật số thửa' || t === 'cn số thửa' || t === '2.6 cn số thửa' || t === '2.3 cập nhật số thửa') return '2.3 Cập nhật số thửa';
+  if (t.startsWith('2.1') || t.startsWith('2.2') || t === 'trích lục' || t === 'trích lục quy hoạch' || t === 'trích lục qh') return '2.1 Trích lục';
+  if (t.startsWith('2.3') || t === 'trích đo') return '2.3 Trích đo';
   if (t.startsWith('2.4') || t === 'cắm mốc' || t === 'trích đo cắm mốc') return '2.4 Cắm mốc';
   if (t.startsWith('2.5') || t === 'tách thửa' || t === 'tách-hợp thửa' || t === 'trích đo tách - hợp thửa') return '2.5 Tách-Hợp thửa';
+  if (t.startsWith('2.6') || t === 'cung cấp số thửa đất' || t === 'cung cấp số thửa' || t === 'cc số thửa' || t === 'cập nhập số thửa' || t === 'cập nhật số thửa' || t === 'cn số thửa') return '2.6 CN Số Thửa';
 
   // Fallbacks for legacy other categories
   if (t.includes('cung cấp tài liệu đất đai') || t.includes('cung cấp dữ liệu') || t.includes('sao lục') || t.includes('sao luc') || t.includes('cc dl đđ')) return '1.1 Sao lục';
   if (t.includes('trích lục quy hoạch')) return '2.1 Trích lục';
-  if (t.includes('cung cấp số thửa đất') || t.includes('số thửa') || t.includes('cập nhập số thửa') || t.includes('cập nhật số thửa')) return '2.3 Cập nhật số thửa';
+  if (t.includes('cung cấp số thửa đất') || t.includes('số thửa') || t.includes('cập nhập số thửa') || t.includes('cập nhật số thửa')) return '2.6 CN Số Thửa';
   if (t.includes('trích đo') && t.includes('cắm mốc')) return '2.4 Cắm mốc';
   if (t.includes('trích đo') && (t.includes('tách') || t.includes('hợp'))) return '2.5 Tách-Hợp thửa';
-  if (t.includes('trích đo')) return '2.2 Trích đo';
+  if (t.includes('trích đo')) return '2.3 Trích đo';
   if (t.includes('cắm mốc')) return '2.4 Cắm mốc';
   if (t.includes('trích lục')) return '2.1 Trích lục';
   if (t.includes('tách thửa')) return '2.5 Tách-Hợp thửa';

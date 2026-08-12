@@ -318,7 +318,7 @@ const RecordRow: React.FC<RecordRowProps> = ({
             <div className="flex items-center gap-1">
               <button onClick={(e) => { e.stopPropagation(); onView(record); }} className="p-1 text-slate-600 hover:text-green-700 hover:bg-green-100/80 rounded transition-colors border border-slate-200/80 bg-white" title="Xem chi tiết"><Eye size={15} /></button>
               
-              {onReturnResult && displayStatus === RecordStatus.HANDOVER && !record.resultReturnedDate && (
+              {onReturnResult && (displayStatus === RecordStatus.HANDOVER || displayStatus === RecordStatus.SIGNED) && !record.resultReturnedDate && (
                   <button onClick={(e) => { e.stopPropagation(); onReturnResult(record); }} className="p-1 text-emerald-700 hover:bg-emerald-100 rounded transition-colors border border-emerald-200 bg-emerald-50" title="Trả kết quả">
                       <FileCheck size={15} />
                   </button>

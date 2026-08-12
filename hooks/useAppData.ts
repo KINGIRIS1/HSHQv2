@@ -31,53 +31,34 @@ export const useAppData = (currentUser: User | null) => {
     const [updateUrl, setUpdateUrl] = useState<string | null>(null);
 
     const loadData = useCallback(async () => {
-        // 1. Load from cache immediately for instant render
         try {
-            const { getFromCache, CACHE_KEYS } = await import('../services/apiCore');
-            const { MOCK_EMPLOYEES, MOCK_USERS } = await import('../constants');
-            
-            const cachedRecords = getFromCache(CACHE_KEYS.RECORDS, []);
-            if (cachedRecords.length > 0) {
-                const { migratedRecords } = migrateUnbatchedRecords(cachedRecords);
-                setRecords(migratedRecords);
-            }
-            setEmployees(getFromCache(CACHE_KEYS.EMPLOYEES, MOCK_EMPLOYEES));
-            setUsers(getFromCache(CACHE_KEYS.USERS, MOCK_USERS));
-            setHolidays(getFromCache(CACHE_KEYS.HOLIDAYS, []));
-        } catch (e) {
-            console.warn("Error loading initial cache:", e);
-        }
+            // Tạo timeout promise để tránh việc fetch bị treo mãi mãi
+            // Tăng timeout lên 30s để xử lý trường hợp mạng chậm hoặc DB bị sleep
+            const timeoutPromise = new Promise((_, reject) => 
+                setTimeout(() => reject(new Error("Timeout")), 30000)
+            );
 
-        // 2. Fetch fresh data with Promise.allSettled resilience
-        try {
-            const results = await Promise.allSettled([
+            const dataPromise = Promise.all([
                 fetchRecords(),
                 fetchEmployees(),
                 fetchUsers(),
                 fetchUpdateInfo(),
-                fetchHolidays(),
+                fetchHolidays(), // Tải thêm danh sách ngày nghỉ
                 getSystemSetting('role_permissions'),
                 getSystemSetting('department_permissions')
             ]);
 
-            const [recRes, empRes, userRes, updateRes, holidayRes, permsRes, deptPermsRes] = results;
+            // Race giữa fetch data và timeout
+            const [recData, empData, userData, updateInfo, holidayData, permsData, deptPermsData] = await Promise.race([dataPromise, timeoutPromise]) as any;
 
-            if (recRes.status === 'fulfilled' && Array.isArray(recRes.value)) {
-                const { migratedRecords } = migrateUnbatchedRecords(recRes.value);
-                setRecords(migratedRecords);
-            }
-            if (empRes.status === 'fulfilled' && Array.isArray(empRes.value)) {
-                setEmployees(empRes.value);
-            }
-            if (userRes.status === 'fulfilled' && Array.isArray(userRes.value)) {
-                setUsers(userRes.value);
-            }
-            if (holidayRes.status === 'fulfilled' && Array.isArray(holidayRes.value)) {
-                setHolidays(holidayRes.value);
-            }
-            if (permsRes.status === 'fulfilled' && permsRes.value) {
+            const { migratedRecords } = migrateUnbatchedRecords(Array.isArray(recData) ? recData : []);
+            setRecords(migratedRecords);
+            setEmployees(empData);
+            setUsers(userData);
+            setHolidays(holidayData); // Cập nhật state holidays
+            if (permsData) {
                 try {
-                    const parsed = JSON.parse(permsRes.value);
+                    const parsed = JSON.parse(permsData);
                     const defaultOneDoor = DEFAULT_ROLE_PERMISSIONS[UserRole.ONEDOOR] || [];
                     const existingOneDoor = parsed[UserRole.ONEDOOR] || [];
                     parsed[UserRole.ONEDOOR] = Array.from(new Set([...existingOneDoor, ...defaultOneDoor]));
@@ -86,9 +67,9 @@ export const useAppData = (currentUser: User | null) => {
                     console.error("Failed to parse role_permissions", e);
                 }
             }
-            if (deptPermsRes.status === 'fulfilled' && deptPermsRes.value) {
+            if (deptPermsData) {
                 try {
-                    const parsedDept = JSON.parse(deptPermsRes.value);
+                    const parsedDept = JSON.parse(deptPermsData);
                     Object.keys(parsedDept).forEach(key => {
                         if (key.endsWith(`_${UserRole.ONEDOOR}`)) {
                             const defaultOneDoor = DEFAULT_ROLE_PERMISSIONS[UserRole.ONEDOOR] || [];
@@ -100,19 +81,28 @@ export const useAppData = (currentUser: User | null) => {
                     console.error("Failed to parse department_permissions", e);
                 }
             }
-
-            if (updateRes.status === 'fulfilled' && updateRes.value && updateRes.value.version) {
-                if (updateRes.value.version !== APP_VERSION) {
-                    setIsUpdateAvailable(true);
-                    setLatestVersion(updateRes.value.version);
-                    setUpdateUrl(updateRes.value.url);
-                }
-            }
-
             setConnectionStatus('connected');
+
+            if (updateInfo && updateInfo.version && updateInfo.version !== APP_VERSION) {
+                setIsUpdateAvailable(true);
+                setLatestVersion(updateInfo.version);
+                setUpdateUrl(updateInfo.url);
+            }
         } catch (error) {
-            console.warn("Network fetch warning (using cached/offline data):", error);
+            console.error("Lỗi tải dữ liệu hoặc Timeout:", error);
+            // Quan trọng: Khi lỗi, chuyển sang OFFLINE nhưng vẫn cho phép App hoạt động
             setConnectionStatus('offline');
+            
+            // Nếu cache cũng rỗng (lần đầu chạy) hoặc bị timeout nên không nhận được data, 
+            // ta sẽ chủ động đọc lại từ Cache để người dùng có thể Đăng nhập và làm việc.
+            import('../services/apiCore').then(({ getFromCache, CACHE_KEYS }) => {
+                import('../constants').then(({ MOCK_EMPLOYEES, MOCK_USERS }) => {
+                    setRecords((prev) => prev.length > 0 ? prev : getFromCache(CACHE_KEYS.RECORDS, []));
+                    setEmployees((prev) => prev.length > 0 ? prev : getFromCache(CACHE_KEYS.EMPLOYEES, MOCK_EMPLOYEES));
+                    setUsers((prev) => prev.length > 0 ? prev : getFromCache(CACHE_KEYS.USERS, MOCK_USERS));
+                    setHolidays((prev) => prev.length > 0 ? prev : getFromCache(CACHE_KEYS.HOLIDAYS, []));
+                });
+            });
         }
     }, []);
 

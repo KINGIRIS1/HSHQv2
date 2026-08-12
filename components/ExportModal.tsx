@@ -52,7 +52,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
     categoryRecords.forEach(r => {
       if (type === 'handover') {
           // Logic cho Giao 1 cửa
-          if (r.status === RecordStatus.HANDOVER || r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED || r.exportBatch) {
+          if (r.status === RecordStatus.HANDOVER || r.status === RecordStatus.SIGNED || r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED || r.exportBatch) {
               if (r.exportBatch && r.exportDate) {
                   const dateStr = r.exportDate.split('T')[0];
                   const key = `${dateStr}_${r.exportBatch}`;
@@ -72,7 +72,8 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
           }
       } else if (type === 'check_list') {
           // Logic cho Trình Ký: Dựa vào ngày tiếp nhận (receivedDate) để gom nhóm
-          if (r.status === RecordStatus.IN_PROGRESS || r.status === RecordStatus.RECEIVED) {
+          // Lấy các hồ sơ đang Chờ ký hoặc Đã ký (nhưng chưa giao)
+          if (r.status === RecordStatus.PENDING_SIGN || r.status === RecordStatus.SIGNED) {
              const dateStr = r.receivedDate ? r.receivedDate.split('T')[0] : null;
              if (!dateStr) return;
              const key = `date_${dateStr}`;
@@ -184,7 +185,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
         recordsToExport = records.filter(r => {
             const rDateStr = r.receivedDate ? r.receivedDate.split('T')[0] : null;
             const matchDate = rDateStr === dateStr;
-            const matchStatus = r.status === RecordStatus.IN_PROGRESS || r.status === RecordStatus.RECEIVED;
+            const matchStatus = r.status === RecordStatus.PENDING_SIGN || r.status === RecordStatus.SIGNED;
             const matchWard = selectedWard === 'all' || r.ward === selectedWard;
             return matchDate && matchStatus && matchWard;
         });

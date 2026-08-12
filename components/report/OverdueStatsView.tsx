@@ -32,7 +32,7 @@ const OverdueStatsView: React.FC<OverdueStatsViewProps> = ({ records, employees 
             }
 
             // Check pending overdue
-            const isDone = r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED || !!r.exportBatch;
+            const isDone = r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED || r.status === RecordStatus.SIGNED || !!r.exportBatch;
             const isWithdrawnOrRejected = r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED;
             
             if (!isDone && !isWithdrawnOrRejected) {
