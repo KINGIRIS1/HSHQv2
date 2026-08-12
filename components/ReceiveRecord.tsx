@@ -146,45 +146,20 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
       return 'CT';
   };
 
-  const calculateNextCode = (wardName: string, dateStr: string, existingCodes: string[] = [], recordType?: string) => {
-    let dateObj = dateStr ? new Date(dateStr) : new Date();
-    if (isNaN(dateObj.getTime())) dateObj = new Date();
+  const calculateNextCode = (wardName: string, dateStr: string, existingCodes: string[] = []) => {
+    if (!dateStr) return '';
 
-    const year = dateObj.getFullYear().toString();
-
-    // Check for 1.2 Công văn
-    if (recordType && (recordType.startsWith('1.2') || recordType.includes('Công văn'))) {
-      const prefix = `CV-${year}-`;
-      let maxSeq = 0;
-
-      const checkCvSeq = (code: string | undefined | null) => {
-        if (!code) return;
-        if (code.startsWith(prefix)) {
-          const numPart = code.substring(prefix.length);
-          const seqNum = parseInt(numPart, 10);
-          if (!isNaN(seqNum) && seqNum > maxSeq) {
-            maxSeq = seqNum;
-          }
-        }
-      };
-
-      combinedRecords.forEach((r: RecordFile) => checkCvSeq(r.code));
-      existingCodes.forEach(checkCvSeq);
-
-      const nextSeq = (maxSeq + 1).toString().padStart(4, '0');
-      return `${prefix}${nextSeq}`;
-    }
-
+    const d = new Date(dateStr);
+    const year = d.getFullYear().toString();
     const yy = year.slice(-2);
-    const mm = ('0' + (dateObj.getMonth() + 1)).slice(-2);
-    const dd = ('0' + dateObj.getDate()).slice(-2);
+    const mm = ('0' + (d.getMonth() + 1)).slice(-2);
+    const dd = ('0' + d.getDate()).slice(-2);
     const datePrefix = `${yy}${mm}${dd}`;
     
     let maxSeq = 0;
     
     const checkSeq = (code: string | undefined | null) => {
         if (!code) return;
-        if (code.startsWith('CV-')) return;
         const parts = code.split('-');
         if (parts.length === 2 || parts.length === 3) {
             const rDate = parts.length === 2 ? parts[0] : parts[1];
@@ -371,7 +346,7 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col h-full animate-fade-in-up overflow-hidden">
-      <div className="px-3 py-1 md:px-4 md:py-1 border-b border-gray-100 flex justify-between items-center bg-blue-50/50 shrink-0 z-10">
+      <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-blue-50/50 shrink-0 z-10">
         <div className="flex bg-white p-1 rounded-lg border border-gray-200">
             {canCreate && (
               <button 
@@ -407,7 +382,7 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto px-2.5 pt-1.5 pb-0 md:px-3.5 md:pt-2 min-h-0">
+      <div className="flex-1 overflow-y-auto p-3.5 md:p-4 min-h-0">
         {viewMode === 'create' && (
             <RecordForm 
                 initialData={editingRecord}

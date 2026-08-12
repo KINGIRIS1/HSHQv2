@@ -1,8 +1,7 @@
 
 import React, { useMemo, useState, useEffect } from 'react';
 import { RecordFile, RecordStatus } from '../types';
-import { getNormalizedWard, getShortRecordType, isCapGiayRecord } from '../constants';
-import { DANGKY_11_STEPS } from '../services/apiDangkyRecords';
+import { getNormalizedWard, getShortRecordType } from '../constants';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { FileText, RotateCcw, CheckCircle, ArchiveX, MapPin, Layers, CalendarRange, Filter, CalendarDays, Calendar, SlidersHorizontal, ArrowLeft, ArrowRight, Eye, EyeOff, RefreshCw, HelpCircle, Shield, Headphones, X, CheckCircle2, Phone, Mail, Clock, MessageSquare, UserCheck, FolderInput, BarChart3, User } from 'lucide-react';
 
@@ -24,7 +23,6 @@ const DashboardView: React.FC<DashboardViewProps> = ({ records, currentUser, emp
 
     // Modal Trợ giúp & Phân quyền
     const [showHelpModal, setShowHelpModal] = useState(false);
-
 
     // State chọn chế độ xem: Năm, Tháng, Tuần
     const [viewMode, setViewMode] = useState<'year' | 'month' | 'week'>('year');
@@ -85,7 +83,6 @@ const DashboardView: React.FC<DashboardViewProps> = ({ records, currentUser, emp
     const completed = filteredRecords.filter(r => r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED || r.status === RecordStatus.REJECTED).length;
     const withdrawn = filteredRecords.filter(r => r.status === RecordStatus.WITHDRAWN).length;
     const processing = total - completed - withdrawn;
-
 
     // --- Cấu hình Custom Dashboard (Thứ tự & Hiển thị thẻ) ---
     const [cardOrder, setCardOrder] = useState<string[]>(() => {
@@ -244,7 +241,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ records, currentUser, emp
                 });
             } else if (dept.includes('đăng ký') || dept.includes('cap giay')) {
                 modules.push({
-                    id: 'other_records',
+                    id: 'registration_records',
                     label: 'Quản lý Hồ sơ Đăng ký',
                     description: 'Kiểm tra, xét duyệt hồ sơ đăng ký biến động, cấp giấy chứng nhận quyền sử dụng đất, đăng ký thế chấp.',
                     icon: FileText,
@@ -514,7 +511,6 @@ const DashboardView: React.FC<DashboardViewProps> = ({ records, currentUser, emp
                     </div>
                 </div>
             )}
-
 
             {/* CARDS: THỐNG KÊ CHI TIẾT */}
             <div className={`grid gap-4 shrink-0 ${getGridColsClass(orderedVisibleCards.length)}`}>

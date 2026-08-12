@@ -2,8 +2,10 @@
 import React, { useState, useMemo } from 'react';
 import { RecordFile, Employee, RecordStatus } from '../../types';
 import { generateEmployeeEvaluation } from '../../services/geminiService';
-import { User as UserIcon, AlertOctagon, Sparkles, Loader2, ListFilter, CheckCircle2, Clock, AlertTriangle, Briefcase } from 'lucide-react';
-import { parseSafeDate, getRecordReceivedDate } from '../../utils/appHelpers';
+import { User as UserIcon, AlertOctagon, Sparkles, Loader2, ListFilter, CheckCircle2, Clock, AlertTriangle, Briefcase, FileSpreadsheet } from 'lucide-react';
+import * as XLSX from 'xlsx-js-style';
+import { STATUS_LABELS } from '../../constants';
+import { cleanSyncNotes } from '../../utils/appHelpers';
 
 interface EmployeeStatsViewProps {
     records: RecordFile[];
@@ -12,7 +14,7 @@ interface EmployeeStatsViewProps {
     toDate: string;
     selectedEmpId: string;
     setSelectedEmpId: (id: string) => void;
-    defaultDeptFilter?: 'all' | 'archive' | 'onedoor' | 'measurement' | 'registration';
+    defaultDeptFilter?: 'all' | 'archive' | 'onedoor' | 'measurement';
 }
 
 const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({ 
@@ -20,7 +22,7 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
 }) => {
     const [aiEvaluation, setAiEvaluation] = useState<string>('');
     const [isGenerating, setIsGenerating] = useState(false);
-    const [deptFilter, setDeptFilter] = useState<'all' | 'archive' | 'onedoor' | 'measurement' | 'registration'>(defaultDeptFilter);
+    const [deptFilter, setDeptFilter] = useState<'all' | 'archive' | 'onedoor' | 'measurement'>(defaultDeptFilter);
 
     // Synchronize deptFilter if defaultDeptFilter changes
     React.useEffect(() => {
@@ -42,35 +44,25 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
             if (deptFilter === 'measurement') {
                 return d.includes('đo đạc') || d.includes('kỹ thuật');
             }
-            if (deptFilter === 'registration') {
-                return d.includes('cấp giấy') || d.includes('đăng ký');
-            }
             return true;
         });
     }, [employees, deptFilter]);
 
     // Filter records by date range first
     const recordsInTimeRange = useMemo(() => {
-        const start = parseSafeDate(fromDate) || new Date(); start.setHours(0,0,0,0);
-        const end = parseSafeDate(toDate) || new Date(); end.setHours(23,59,59,999);
+        const start = new Date(fromDate); start.setHours(0,0,0,0);
+        const end = new Date(toDate); end.setHours(23,59,59,999);
         return records.filter(r => {
-            const rDate = getRecordReceivedDate(r);
-            if (!rDate) return false;
+            if (!r.receivedDate) return false;
+            const rDate = new Date(r.receivedDate);
             return rDate >= start && rDate <= end;
         });
     }, [records, fromDate, toDate]);
 
     // Calculate Stats (Used for AI and Lists, visual cards are handled by parent ReportSection)
     const stats = useMemo(() => {
-        const selectedEmp = employees.find(e => e.id === selectedEmpId);
-        const isSelectedLeader = selectedEmp && (
-            selectedEmp.position?.toLowerCase().includes('tổ') ||
-            selectedEmp.position?.toLowerCase().includes('nhóm') ||
-            selectedEmp.position?.toLowerCase().includes('trưởng') ||
-            selectedEmp.position?.toLowerCase().includes('phó')
-        );
         const targetRecords = selectedEmpId 
-            ? recordsInTimeRange.filter(r => r.assignedTo === selectedEmpId || r.submittedTo === selectedEmpId || (isSelectedLeader && r.checkedBy === selectedEmpId))
+            ? recordsInTimeRange.filter(r => r.assignedTo === selectedEmpId)
             : recordsInTimeRange;
 
         const total = targetRecords.length;
@@ -87,8 +79,7 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
             const isFinished = [
                 RecordStatus.HANDOVER, 
                 RecordStatus.RETURNED, 
-                RecordStatus.WITHDRAWN, 
-                RecordStatus.SIGNED
+                RecordStatus.WITHDRAWN
             ].includes(r.status) || !!r.exportBatch || !!r.exportDate;
 
             if (isFinished) {
@@ -134,13 +125,7 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
         const today = new Date(); today.setHours(0,0,0,0);
 
         return filteredEmployeesByDept.map(emp => {
-            const isLeader = emp && (
-                emp.position?.toLowerCase().includes('tổ') ||
-                emp.position?.toLowerCase().includes('nhóm') ||
-                emp.position?.toLowerCase().includes('trưởng') ||
-                emp.position?.toLowerCase().includes('phó')
-            );
-            const empRecords = recordsInTimeRange.filter(r => r.assignedTo === emp.id || r.submittedTo === emp.id || (isLeader && r.checkedBy === emp.id));
+            const empRecords = recordsInTimeRange.filter(r => r.assignedTo === emp.id);
             const totalAssigned = empRecords.length;
 
             let completed = 0;
@@ -152,8 +137,7 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
                 const isFinished = [
                     RecordStatus.HANDOVER, 
                     RecordStatus.RETURNED, 
-                    RecordStatus.WITHDRAWN, 
-                    RecordStatus.SIGNED
+                    RecordStatus.WITHDRAWN
                 ].includes(r.status) || !!r.exportBatch || !!r.exportDate;
 
                 if (isFinished) {
@@ -182,6 +166,35 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
             };
         }).sort((a, b) => b.totalAssigned - a.totalAssigned);
     }, [filteredEmployeesByDept, recordsInTimeRange]);
+
+    const handleExportSummaryExcel = () => {
+        const dataToExport = employeeSummaryList.map((item, idx) => ({
+            'STT': idx + 1,
+            'Tên cán bộ': item.employee.name,
+            'Phòng / Tổ': item.employee.department || 'Tổ chuyên môn',
+            'Hồ sơ giao': item.totalAssigned,
+            'Đã xong': item.completed,
+            'Đang xử lý': item.processing,
+            'Trễ đã xong': item.overdueCompleted,
+            'Trễ chưa xong': item.overduePending
+        }));
+
+        const ws = XLSX.utils.json_to_sheet(dataToExport);
+        ws['!cols'] = [
+            { wch: 5 },
+            { wch: 25 },
+            { wch: 20 },
+            { wch: 12 },
+            { wch: 12 },
+            { wch: 12 },
+            { wch: 12 },
+            { wch: 12 }
+        ];
+
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "ThongKeNhanVien");
+        XLSX.writeFile(wb, `Bao_Cao_Thong_Ke_Nhan_Vien_${fromDate}_${toDate}.xlsx`);
+    };
 
     const handleGenerateReview = async () => {
         if (!stats || !selectedEmpId) return;
@@ -214,6 +227,56 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
         setIsGenerating(false);
     };
 
+    const handleExportEmployeeRecords = () => {
+        if (!selectedEmpId) return;
+        
+        const emp = employees.find(e => e.id === selectedEmpId);
+        const empName = emp ? emp.name : "NhanVien";
+        
+        const targetRecords = recordsInTimeRange.filter(r => r.assignedTo === selectedEmpId);
+        
+        if (targetRecords.length === 0) {
+            alert("Không có hồ sơ nào trong khoảng thời gian này.");
+            return;
+        }
+
+        const dataToExport = targetRecords.map((r, idx) => ({
+            'STT': idx + 1,
+            'Mã hồ sơ': r.code,
+            'Tên khách hàng': r.customerName,
+            'Địa chỉ': r.address,
+            'Xã/Phường': r.ward,
+            'Ngày nhận': r.receivedDate ? new Date(r.receivedDate).toLocaleDateString('vi-VN') : '',
+            'Hẹn trả': r.deadline ? new Date(r.deadline).toLocaleDateString('vi-VN') : '',
+            'Ngày xong': r.completedDate ? new Date(r.completedDate).toLocaleDateString('vi-VN') : '',
+            'Trạng thái': STATUS_LABELS[r.status] || r.status,
+            'Ghi chú': cleanSyncNotes(r.notes || r.content) || ''
+        }));
+
+        const ws = XLSX.utils.json_to_sheet(dataToExport);
+        
+        // Auto-width columns
+        const wscols = [
+            { wch: 5 }, // STT
+            { wch: 15 }, // Ma HS
+            { wch: 25 }, // Ten KH
+            { wch: 30 }, // Dia chi
+            { wch: 15 }, // Xa
+            { wch: 12 }, // Ngay nhan
+            { wch: 12 }, // Hen tra
+            { wch: 12 }, // Ngay xong
+            { wch: 15 }, // Trang thai
+            { wch: 30 }  // Ghi chu
+        ];
+        ws['!cols'] = wscols;
+
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "DanhSachHoSo");
+        
+        const fileName = `DS_HoSo_${empName}_${fromDate}_${toDate}.xlsx`;
+        XLSX.writeFile(wb, fileName);
+    };
+
     return (
         <div className="flex flex-col h-full bg-slate-100 p-6 overflow-y-auto">
             
@@ -243,6 +306,7 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
                             ))}
                         </select>
                     </div>
+                    {/* Single shared Excel button is on top toolbar */}
                 </div>
             </div>
 

@@ -1,17 +1,19 @@
 
 // Định nghĩa trạng thái của hồ sơ theo quy trình
 export enum RecordStatus {
-  RECEIVED = 'RECEIVED',         // Tiếp nhận
-  ASSIGNED = 'ASSIGNED',         // Giao nhân viên
-  IN_PROGRESS = 'IN_PROGRESS',   // Đang thực hiện
-  PENDING_CHECK = 'PENDING_CHECK', // Chờ kiểm tra
-  PENDING_SIGN = 'PENDING_SIGN', // Chờ ký duyệt (Đã trình)
-  SIGNED = 'SIGNED',             // Chờ bàn giao
-  HANDOVER = 'HANDOVER',         // Giao 1 cửa (Hoàn thành nội bộ)
-  PENDING_SUPPLEMENT = 'PENDING_SUPPLEMENT', // Chờ bổ sung (Chờ người dân bổ sung)
-  RETURNED = 'RETURNED',         // Đã trả kết quả (Hoàn thành trả dân)
-  WITHDRAWN = 'WITHDRAWN',       // CSD rút hồ sơ (Kết thúc)
-  REJECTED = 'REJECTED'          // Hồ sơ trả (Trả về OneDoor)
+  RECEIVED = 'RECEIVED',
+  ASSIGNED = 'ASSIGNED',
+  IN_PROGRESS = 'IN_PROGRESS',
+  COMPLETED_WORK = 'COMPLETED_WORK',
+  PENDING_CHECK = 'PENDING_CHECK',
+  CHECKED = 'CHECKED',
+  PENDING_SIGN = 'PENDING_SIGN',
+  SIGNED = 'SIGNED',
+  PENDING_SUPPLEMENT = 'PENDING_SUPPLEMENT',
+  HANDOVER = 'HANDOVER',
+  RETURNED = 'RETURNED',
+  WITHDRAWN = 'WITHDRAWN',
+  REJECTED = 'REJECTED'
 }
 
 export enum UserRole {
@@ -30,24 +32,16 @@ export const DEFAULT_ROLE_PERMISSIONS: RolePermissions = {
   [UserRole.SUBADMIN]: ['*'],
   [UserRole.TEAM_LEADER]: [
     'receive_record', 'receive_sub_create', 'receive_sub_bulk', 'receive_sub_list', 'receive_sub_vphc',
-    'receive_contract', 'VIEW_CONTRACTS', 'ADD_CONTRACTS', 'EDIT_CONTRACTS', 'LIQUIDATE_CONTRACTS', 'DELETE_CONTRACTS', 'EXPORT_CONTRACTS',
-    'all_records', 'all_sub_all', 'assign_tasks', 'completed_list', 'pending_check_list', 'check_list', 'handover_list', 'director_completed', 'survey_list',
-    'archive_records', 'archive_sub_all', 'archive_assign_tasks', 'archive_completed_list', 'archive_pending_check_list', 'archive_check_list', 'archive_handover_list', 'archive_director_completed', 'VIEW_ARCHIVE', 'MANAGE_ARCHIVE',
+    'receive_contract', 'VIEW_CONTRACTS', 'ADD_CONTRACTS', 'EDIT_CONTRACTS', 'LIQUIDATE_CONTRACTS', 'EXPORT_CONTRACTS',
+    'all_records', 'all_sub_all', 'assign_tasks', 'completed_list', 'pending_check_list', 'check_list', 'handover_list', 'director_completed',
+    'archive_records', 'archive_sub_all', 'archive_assign_tasks', 'archive_completed_list', 'archive_pending_check_list', 'archive_check_list', 'archive_handover_list', 'archive_director_completed',
     'registration_records',
     'other_records', 'other_sub_all', 'other_assign_tasks', 'other_check_list', 'other_handover_list', 'other_director_completed',
     'excerpt_management', 'MANAGE_EXCERPTS', 'VIEW_EXCERPTS',
-    'reports', 'VIEW_REPORTS', 'REPORT_TAB_REGISTRATION', 'REPORT_TAB_MEASUREMENT', 'REPORT_TAB_ARCHIVE', 'REPORT_TAB_REVENUE',
+    'reports', 'VIEW_REPORTS',
     'work_schedule', 'VIEW_SCHEDULE',
-    'utilities', 'VIEW_CHAT', 'VIEW_PERSONAL_PROFILE',
-    'VIEW_RECORDS', 'VIEW_DETAILS', 'ADD_RECORDS', 'EDIT_RECORDS', 'DELETE_RECORDS', 'CHECK_RECORDS', 'HANDOVER_RECORDS',
-    'BTN_ASSIGN_STAFF', 'BTN_SUBMIT_SIGN', 'BTN_REJECT_RECORD', 'BTN_RETURN_RESULT', 'BTN_CLOSE_BATCH', 'BTN_EXTEND_DEADLINE',
-    'DODAC_VIEW_DETAILS', 'DODAC_EDIT_RECORDS', 'DODAC_DELETE_RECORDS', 'DODAC_CHECK_RECORDS', 'DODAC_HANDOVER_RECORDS',
-    'DODAC_BTN_ASSIGN_STAFF', 'DODAC_BTN_SUBMIT_SIGN', 'DODAC_BTN_REJECT_RECORD', 'DODAC_BTN_RETURN_RESULT', 'DODAC_BTN_CLOSE_BATCH', 'DODAC_BTN_EXTEND_DEADLINE',
-    'ARCHIVE_VIEW_DETAILS', 'ARCHIVE_EDIT_RECORDS', 'ARCHIVE_DELETE_RECORDS', 'ARCHIVE_CHECK_RECORDS', 'ARCHIVE_HANDOVER_RECORDS',
-    'ARCHIVE_BTN_ASSIGN_STAFF', 'ARCHIVE_BTN_SUBMIT_SIGN', 'ARCHIVE_BTN_REJECT_RECORD', 'ARCHIVE_BTN_RETURN_RESULT', 'ARCHIVE_BTN_CLOSE_BATCH', 'ARCHIVE_BTN_EXTEND_DEADLINE',
-    'CAPGIAY_VIEW_DETAILS', 'CAPGIAY_EDIT_RECORDS', 'CAPGIAY_DELETE_RECORDS', 'CAPGIAY_CHECK_RECORDS', 'CAPGIAY_HANDOVER_RECORDS',
-    'CAPGIAY_BTN_ASSIGN_STAFF', 'CAPGIAY_BTN_SUBMIT_SIGN', 'CAPGIAY_BTN_REJECT_RECORD', 'CAPGIAY_BTN_RETURN_RESULT', 'CAPGIAY_BTN_CLOSE_BATCH', 'CAPGIAY_BTN_EXTEND_DEADLINE',
-    'ASSIGN_RECORDS', 'REJECT_RECORDS', 'SIGN_RECORDS', 'EXPORT_RECORDS'
+    'utilities',
+    'BTN_SUBMIT_SIGN', 'BTN_REJECT_RECORD', 'BTN_CLOSE_BATCH', 'BTN_EXTEND_DEADLINE'
   ],
   [UserRole.ONEDOOR]: [
     'receive_record', 'receive_sub_create', 'receive_sub_bulk', 'receive_sub_list', 'receive_sub_vphc', 'ADD_RECORDS',
@@ -57,12 +51,10 @@ export const DEFAULT_ROLE_PERMISSIONS: RolePermissions = {
     'registration_records',
     'other_records', 'other_sub_all', 'other_handover_list',
     'excerpt_management', 'VIEW_EXCERPTS',
-    'reports', 'VIEW_REPORTS', 'REPORT_TAB_REGISTRATION', 'REPORT_TAB_MEASUREMENT', 'REPORT_TAB_ARCHIVE', 'REPORT_TAB_REVENUE',
+    'reports', 'VIEW_REPORTS',
     'work_schedule', 'VIEW_SCHEDULE',
     'utilities', 'VIEW_CHAT', 'VIEW_PERSONAL_PROFILE',
-    'BTN_CLOSE_BATCH', 'BTN_EXTEND_DEADLINE',
-    'DODAC_BTN_CLOSE_BATCH', 'DODAC_BTN_EXTEND_DEADLINE',
-    'ARCHIVE_BTN_CLOSE_BATCH', 'ARCHIVE_BTN_EXTEND_DEADLINE'
+    'BTN_CLOSE_BATCH', 'BTN_EXTEND_DEADLINE'
   ],
   [UserRole.EMPLOYEE]: [
     'receive_contract', 'VIEW_CONTRACTS', 'LIQUIDATE_CONTRACTS',
@@ -71,10 +63,9 @@ export const DEFAULT_ROLE_PERMISSIONS: RolePermissions = {
     'registration_records',
     'other_records', 'other_sub_all',
     'excerpt_management', 'VIEW_EXCERPTS',
-    'reports', 'VIEW_REPORTS', 'REPORT_TAB_REGISTRATION', 'REPORT_TAB_MEASUREMENT', 'REPORT_TAB_ARCHIVE', 'REPORT_TAB_REVENUE',
     'work_schedule', 'VIEW_SCHEDULE',
     'utilities',
-    'BTN_SUBMIT_SIGN', 'DODAC_BTN_SUBMIT_SIGN', 'ARCHIVE_BTN_SUBMIT_SIGN'
+    'BTN_SUBMIT_SIGN'
   ]
 };
 
@@ -122,7 +113,6 @@ export interface User {
   name: string;
   role: UserRole;
   employeeId?: string;
-  permissions?: string[];
 }
 
 export interface Employee {
@@ -172,7 +162,6 @@ export interface RecordFile {
   
   status: RecordStatus;   
   assignedTo?: string | null;    
-  lastAssignedTo?: string | null; // Ghi nhớ người thụ lý cũ để gợi ý phân công khi giao lại
   notes?: string | null;         
   privateNotes?: string | null;  
   personalNotes?: string | null; // Ghi chú cá nhân của nhân viên
@@ -187,16 +176,6 @@ export interface RecordFile {
   
   measurementNumber?: string | null; 
   excerptNumber?: string | null;
-  soPhieuChuyenThue?: string | null; // Số phiếu chuyển thuế
-  
-  // Các mốc ngày xử lý chuyên biệt cho Tab Cấp Giấy
-  taxTransferDate?: string | null;  // Ngày chuyển thuế
-  taxNoticeDate?: string | null;    // Ngày nhận TB Thuế KV7
-  taxPaidDate?: string | null;      // Ngày nộp thuế / Giấy nộp tiền
-  printedDate?: string | null;      // Ngày in & hoàn thiện
-
-  // Bước nhỏ xử lý quy trình 11 bước Tab Đăng ký
-  capGiaySubStep?: 'tiep_nhan_giao_viec' | 'tham_dinh' | 'phieu_chuyen_thue' | 'cho_tbt' | 'cho_gnt' | 'cho_nop_thue' | 'in_hoan_thien' | 'hoan_thien_trinh_duyet' | 'trinh_kiem_tra' | 'kiem_tra' | 'trinh_ky' | 'cho_vo_so' | 'giao_mot_cua' | 'cho_ban_giao' | 'chinh_ly_luu_tru' | 'da_ban_giao' | string | null;
   
   // Tính năng nhắc nhở
   reminderDate?: string | null;      // Thời gian đặt lịch nhắc
@@ -242,10 +221,6 @@ export interface RecordStatusLog {
   changedBy: string;
   changedAt: string;
   note?: string | null;
-  status?: string;
-  subStep?: string;
-  updatedAt?: string;
-  updatedBy?: string;
 }
 
 // Interface cho Item tách thửa

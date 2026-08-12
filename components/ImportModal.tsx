@@ -139,12 +139,12 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
 
         const typeMapping: Record<string, string> = {
             'TL': 'Trích lục bản đồ địa chính', 'TRÍCH LỤC': 'Trích lục bản đồ địa chính',
-            'TĐ': 'Trích đo bản đồ địa chính', 'TD': 'Trích đo bản đồ địa chính', 'TRÍCH ĐO': 'Trích đo bản đồ địa chính',
+            'TĐ': '2.3 Trích đo', 'TD': '2.3 Trích đo', 'TRÍCH ĐO': '2.3 Trích đo',
             'ĐĐ': 'Đo đạc', 'DD': 'Đo đạc', 'ĐO ĐẠC': 'Đo đạc',
             'CM': 'Cắm mốc', 'CẮM MỐC': 'Cắm mốc',
             'CL': 'Trích đo chỉnh lý bản đồ địa chính', 'CHỈNH LÝ': 'Trích đo chỉnh lý bản đồ địa chính',
             'HIẾN ĐƯỜNG': 'Trích đo chỉnh lý bản đồ địa chính',
-            'TÁCH THỬA': 'Tách thửa', 'HỢP THỬA': 'Trích đo bản đồ địa chính', 'CẤP ĐỔI': 'Trích đo bản đồ địa chính'
+            'TÁCH THỬA': 'Tách thửa', 'HỢP THỬA': '2.3 Trích đo', 'CẤP ĐỔI': '2.3 Trích đo'
         };
 
         for (let i = headerRowIndex + 1; i < data.length; i++) {
@@ -152,18 +152,16 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
             if (!row || row.length === 0) continue;
 
             // Hàm helper: Trả về undefined nếu cột không tồn tại, trả về giá trị nếu có
-            const getVal = (possibleHeaders: string[], excludeSub?: string) => {
+            const getVal = (possibleHeaders: string[]) => {
                 // Ưu tiên khớp chính xác (exact match)
                 let idx = headers.findIndex(h => {
                     const hUpper = h.trim().toUpperCase();
-                    if (excludeSub && hUpper.includes(excludeSub.toUpperCase())) return false;
                     return possibleHeaders.some(ph => hUpper === ph.toUpperCase());
                 });
                 // Nếu không có khớp chính xác, tìm khớp chứa chuỗi (contains)
                 if (idx === -1) {
                     idx = headers.findIndex(h => {
                         const hUpper = h.trim().toUpperCase();
-                        if (excludeSub && hUpper.includes(excludeSub.toUpperCase())) return false;
                         return possibleHeaders.some(ph => hUpper.includes(ph.toUpperCase()));
                     });
                 }
@@ -212,7 +210,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
 
             const errors: string[] = [];
 
-            const rawArea = getVal(['DIỆN TÍCH', 'AREA', 'area'], 'ĐẤT Ở');
+            const rawArea = getVal(['DIỆN TÍCH', 'AREA', 'area']);
             if (rawArea !== undefined && rawArea !== null && rawArea !== '') {
                 const parsedArea = parseFloat(String(rawArea));
                 record.area = isNaN(parsedArea) ? 0 : parsedArea;
@@ -308,37 +306,18 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
             }
 
             // Parse NGƯỜI XỬ LÝ & NGÀY GIAO trước để hỗ trợ suy diễn trạng thái Đã Giao Việc
-            const assigneeRaw = getVal(['NGƯỜI XỬ LÝ', 'NHÂN VIÊN', 'CÁN BỘ', 'assignedto', 'assigned_to', 'assignedType', 'assignedTo']);
-            let matchedEmpId: string | undefined = undefined;
+            const assigneeRaw = getVal(['NGƯỜI XỬ LÝ', 'NHÂN VIÊN', 'assignedto', 'assigned_to', 'assignedTo']);
             if (assigneeRaw !== undefined && String(assigneeRaw).trim() !== '') {
-                const rawStr = String(assigneeRaw).trim();
-                const normalizeName = (str: string) => str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().replace(/\s+/g, ' ');
-                const rawNorm = normalizeName(rawStr);
-
-                const emp = employees.find(e => {
-                    const empNameNorm = normalizeName(e.name);
-                    return empNameNorm === rawNorm || 
-                           (rawNorm.length >= 3 && empNameNorm.includes(rawNorm)) || 
-                           (empNameNorm.length >= 3 && rawNorm.includes(empNameNorm)) || 
-                           e.id === rawStr || 
-                           (e as any).employeeId === rawStr;
-                });
-
+                const emp = employees.find(e => e.name.toLowerCase().includes(String(assigneeRaw).toLowerCase().trim()));
                 if (emp) {
-                    matchedEmpId = emp.id;
-                    if (mode === 'create' && !record.assignedDate) {
-                        record.assignedDate = record.receivedDate || new Date().toISOString();
-                    }
-                } else {
-                    errors.push(`Cán bộ xử lý "${rawStr}" không khớp với bất kỳ nhân sự nào trong hệ thống!`);
+                    record.assignedTo = emp.id;
+                    if (mode === 'create') record.assignedDate = record.receivedDate;
                 }
             }
 
-            const assignedDateRaw = getVal(['NGÀY GIAO', 'NGÀY GIAO VIỆC', 'NGÀY XỬ LÝ', 'ngay_xu_ly', 'ngayXuLy', 'assigneddate', 'assigned_date', 'assignedDate']);
-            let parsedGeneralDate: string | undefined = undefined;
+            const assignedDateRaw = getVal(['NGÀY GIAO', 'NGÀY GIAO VIỆC', 'assigneddate', 'assigned_date', 'assignedDate']);
             if (assignedDateRaw !== undefined) {
-                parsedGeneralDate = parseExcelDate(assignedDateRaw) || undefined;
-                if (parsedGeneralDate) record.assignedDate = parsedGeneralDate;
+                record.assignedDate = parseExcelDate(assignedDateRaw);
             }
 
             // 5. TRẠNG THÁI & NGƯỜI XỬ LÝ
@@ -353,15 +332,15 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
                 if (sStr.includes('1 CỬA') || sStr.includes('1 CUA') || sStr.includes('MỘT CỬA') || sStr.includes('MOT CUA') || sStr.includes('HANDOVER') || sStr.includes('GIAO 1 CỬA') || sStr.includes('ĐÃ GIAO 1 CỬA') || sStr.includes('BÀN GIAO') || sStr.includes('ĐÃ XUẤT') || sStr.includes('XUẤT 1 CỬA')) {
                     explicitStatus = RecordStatus.HANDOVER;
                 } else if (sStr.includes('GIAO NHÂN VIÊN') || sStr.includes('PASSED_TO') || sStr.includes('ASSIGNED') || sStr.includes('GIAO VIỆC') || sStr.includes('ĐÃ GIAO VIỆC') || sStr.includes('PHÂN CÔNG') || (sStr.includes('ĐÃ GIAO') && !sStr.includes('1 CỬA'))) {
-                    explicitStatus = RecordStatus.IN_PROGRESS;
+                    explicitStatus = RecordStatus.ASSIGNED;
                 } else if (sStr.includes('ĐANG') || sStr.includes('PROGRESS')) {
                     explicitStatus = RecordStatus.IN_PROGRESS;
-                } else if (sStr.includes('ĐÃ THỰC HIỆN') || sStr.includes('THỰC HIỆN XONG') || sStr.includes('IN_PROGRESS') || sStr.includes('ĐO ĐẠC XONG')) {
-                    explicitStatus = RecordStatus.IN_PROGRESS;
+                } else if (sStr.includes('ĐÃ THỰC HIỆN') || sStr.includes('THỰC HIỆN XONG') || sStr.includes('COMPLETED_WORK') || sStr.includes('ĐO ĐẠC XONG')) {
+                    explicitStatus = RecordStatus.COMPLETED_WORK;
                 } else if (sStr.includes('CHỜ KIỂM TRA') || sStr.includes('PENDING_CHECK') || sStr.includes('TRÌNH KIỂM TRA')) {
                     explicitStatus = RecordStatus.PENDING_CHECK;
-                } else if (sStr.includes('ĐÃ KIỂM TRA') || sStr.includes('PENDING_CHECK') || sStr.includes('ĐÃ KT')) {
-                    explicitStatus = RecordStatus.PENDING_CHECK;
+                } else if (sStr.includes('ĐÃ KIỂM TRA') || sStr.includes('CHECKED') || sStr.includes('ĐÃ KT')) {
+                    explicitStatus = RecordStatus.CHECKED;
                 } else if (sStr.includes('CHỜ KÝ') || sStr.includes('PENDING_SIGN') || sStr.includes('TRÌNH KÝ')) {
                     explicitStatus = RecordStatus.PENDING_SIGN;
                 } else if (sStr.includes('ĐÃ KÝ') || sStr.includes('SIGNED') || sStr.includes('KÝ DUYỆT')) {
@@ -383,37 +362,24 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
             if (explicitStatus !== undefined) {
                 record.status = explicitStatus;
                 
-                // Định tuyến thông tin người xử lý và ngày tháng chính xác cho từng trạng thái cụ thể
-                // Tránh ghi đè toàn bộ các mốc tiến độ không liên quan
+                // Điền tự động các trường ngày tương ứng với trạng thái đã chọn nếu trường ngày đó chưa có giá trị
                 const nowStr = new Date().toISOString();
-                const targetDate = parsedGeneralDate || nowStr;
-
-                if (matchedEmpId) {
-                    if (explicitStatus === RecordStatus.PENDING_SIGN || explicitStatus === RecordStatus.SIGNED) {
-                        record.submittedTo = matchedEmpId;
-                    } else if (explicitStatus === RecordStatus.PENDING_CHECK) {
-                        record.checkedBy = matchedEmpId;
-                    } else if (explicitStatus === RecordStatus.IN_PROGRESS || explicitStatus === RecordStatus.RECEIVED) {
-                        record.assignedTo = matchedEmpId;
-                    } else if (mode === 'create') {
-                        record.assignedTo = matchedEmpId;
-                    }
-                }
-
                 if (explicitStatus === RecordStatus.HANDOVER) {
-                    record.completedDate = parsedGeneralDate || record.completedDate || targetDate;
+                    if (!record.completedDate) record.completedDate = nowStr;
                 } else if (explicitStatus === RecordStatus.RETURNED) {
-                    record.resultReturnedDate = parsedGeneralDate || record.resultReturnedDate || targetDate;
+                    if (!record.resultReturnedDate) record.resultReturnedDate = nowStr;
                 } else if (explicitStatus === RecordStatus.SIGNED) {
-                    record.approvalDate = parsedGeneralDate || record.approvalDate || targetDate;
+                    if (!record.approvalDate) record.approvalDate = nowStr;
                 } else if (explicitStatus === RecordStatus.PENDING_SIGN) {
-                    record.submissionDate = parsedGeneralDate || record.submissionDate || targetDate;
+                    if (!record.submissionDate) record.submissionDate = nowStr;
+                } else if (explicitStatus === RecordStatus.CHECKED) {
+                    if (!record.checkedDate) record.checkedDate = nowStr;
                 } else if (explicitStatus === RecordStatus.PENDING_CHECK) {
-                    record.checkedDate = parsedGeneralDate || record.checkedDate || targetDate;
-                    record.pendingCheckDate = parsedGeneralDate || record.pendingCheckDate || targetDate;
-                } else if (explicitStatus === RecordStatus.IN_PROGRESS) {
-                    record.completedWorkDate = parsedGeneralDate || record.completedWorkDate || targetDate;
-                    record.assignedDate = parsedGeneralDate || record.assignedDate || targetDate;
+                    if (!record.pendingCheckDate) record.pendingCheckDate = nowStr;
+                } else if (explicitStatus === RecordStatus.COMPLETED_WORK) {
+                    if (!record.completedWorkDate) record.completedWorkDate = nowStr;
+                } else if (explicitStatus === RecordStatus.ASSIGNED || explicitStatus === RecordStatus.IN_PROGRESS) {
+                    if (!record.assignedDate) record.assignedDate = nowStr;
                 }
             } else {
                 // Nếu KHÔNG có cột TRẠNG THÁI cụ thể, dùng LOGIC SUY DIỄN DỰA TRÊN NGÀY THÁNG VÀ PHÂN CÔNG
@@ -422,28 +388,20 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
                     if (!record.completedDate && record.exportDate) {
                         record.completedDate = record.exportDate;
                     }
-                    if (matchedEmpId) record.assignedTo = matchedEmpId;
                 } else if (record.resultReturnedDate) {
                     record.status = RecordStatus.RETURNED;
-                    if (matchedEmpId) record.assignedTo = matchedEmpId;
                 } else if (record.approvalDate) {
                     record.status = RecordStatus.SIGNED;
-                    if (matchedEmpId) record.submittedTo = matchedEmpId;
                 } else if (record.submissionDate) {
                     record.status = RecordStatus.PENDING_SIGN;
-                    if (matchedEmpId) record.submittedTo = matchedEmpId;
                 } else if (record.checkedDate) {
-                    record.status = RecordStatus.PENDING_CHECK;
-                    if (matchedEmpId) record.checkedBy = matchedEmpId;
+                    record.status = RecordStatus.CHECKED;
                 } else if (record.pendingCheckDate) {
                     record.status = RecordStatus.PENDING_CHECK;
-                    if (matchedEmpId) record.checkedBy = matchedEmpId;
                 } else if (record.completedWorkDate) {
-                    record.status = RecordStatus.IN_PROGRESS;
-                    if (matchedEmpId) record.assignedTo = matchedEmpId;
-                } else if (matchedEmpId || assignedDateRaw) {
+                    record.status = RecordStatus.COMPLETED_WORK;
+                } else if (record.assignedTo || record.assignedDate) {
                     record.status = RecordStatus.ASSIGNED;
-                    if (matchedEmpId) record.assignedTo = matchedEmpId;
                 } else if (mode === 'create') {
                     record.status = RecordStatus.RECEIVED;
                 }
@@ -532,8 +490,8 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100] p-2 sm:p-4 backdrop-blur-sm">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-5xl xl:max-w-6xl 2xl:max-w-7xl h-[88vh] flex flex-col animate-fade-in-up">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100] p-4 backdrop-blur-sm">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-5xl h-[85vh] flex flex-col animate-fade-in-up">
         {/* HEADER */}
         <div className="flex justify-between items-center p-5 border-b shrink-0">
           <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">

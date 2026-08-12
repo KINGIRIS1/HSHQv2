@@ -1,11 +1,10 @@
 
 import React, { useState } from 'react';
 import TopNavigation from '../TopNavigation';
-import { Menu, WifiOff, ShieldCheck, UserCircle, LogOut, UserCog, ChevronDown, Settings, HelpCircle, Shield, Headphones, X, UserCheck, Phone, Mail, Clock, CheckCircle2, Sun, Moon } from 'lucide-react';
+import { Menu, WifiOff, ShieldCheck, UserCircle, LogOut, UserCog, ChevronDown, Settings, HelpCircle, Shield, Headphones, X, UserCheck, Phone, Mail, Clock, CheckCircle2 } from 'lucide-react';
 import { User, UserRole, RolePermissions, DepartmentPermissions, Employee } from '../../types';
 import { isViewAllowedForUser } from '../../config/roleConfig';
 import UpdateRequiredModal from '../UpdateRequiredModal';
-import { useTheme } from '../../hooks/useTheme';
 
 interface MainLayoutProps {
     children: React.ReactNode;
@@ -73,14 +72,13 @@ const MainLayout: React.FC<MainLayoutProps> = ({
 }) => {
     const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
     const [showHelpModal, setShowHelpModal] = useState(false);
-    const { theme, toggleTheme } = useTheme();
 
     if (!currentUser) return <>{children}</>;
 
     const linkedEmployee = currentUser.employeeId ? employees.find(e => e.id === currentUser.employeeId) : null;
 
     return (
-        <div className="flex flex-col h-screen bg-slate-50 dark:bg-slate-900 overflow-hidden font-sans transition-colors duration-200">
+        <div className="flex flex-col h-screen bg-slate-50 overflow-hidden font-sans">
             {/* Modal Cập nhật Bắt buộc */}
             <UpdateRequiredModal 
                 visible={showUpdateModal}
@@ -110,7 +108,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({
                 </div>
 
                 {/* RIGHT: USER INFO */}
-                <div className="relative flex items-center gap-2 md:gap-3">
+                <div className="relative flex items-center gap-3">
                     <button 
                         onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
                         className="flex items-center gap-3 group cursor-pointer hover:bg-white/10 p-1.5 rounded-lg transition-colors outline-none focus:ring-2 focus:ring-blue-400/50"
@@ -145,9 +143,9 @@ const MainLayout: React.FC<MainLayoutProps> = ({
                                             setShowHelpModal(true);
                                             setIsUserMenuOpen(false);
                                         }}
-                                        className="w-full text-left px-3 py-2.5 text-sm font-medium text-gray-700 dark:text-slate-200 hover:bg-blue-50 dark:hover:bg-slate-700 hover:text-blue-700 rounded-lg flex items-center gap-3 transition-colors group"
+                                        className="w-full text-left px-3 py-2.5 text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700 rounded-lg flex items-center gap-3 transition-colors group"
                                     >
-                                        <div className="bg-blue-50 dark:bg-slate-700 p-1.5 rounded-md group-hover:bg-blue-100 transition-colors text-blue-600 dark:text-blue-300">
+                                        <div className="bg-blue-50 p-1.5 rounded-md group-hover:bg-blue-100 transition-colors text-blue-600">
                                             <HelpCircle size={16} />
                                         </div>
                                         Trợ giúp & Phân quyền
@@ -157,22 +155,36 @@ const MainLayout: React.FC<MainLayoutProps> = ({
                                             setCurrentView('account_settings');
                                             setIsUserMenuOpen(false);
                                         }}
-                                        className="w-full text-left px-3 py-2.5 text-sm font-medium text-gray-700 dark:text-slate-200 hover:bg-blue-50 dark:hover:bg-slate-700 hover:text-blue-700 rounded-lg flex items-center gap-3 transition-colors group"
+                                        className="w-full text-left px-3 py-2.5 text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700 rounded-lg flex items-center gap-3 transition-colors group"
                                     >
-                                        <div className="bg-gray-100 dark:bg-slate-700 p-1.5 rounded-md group-hover:bg-blue-100 transition-colors text-gray-500 dark:text-slate-300 group-hover:text-blue-600">
+                                        <div className="bg-gray-100 p-1.5 rounded-md group-hover:bg-blue-100 transition-colors text-gray-500 group-hover:text-blue-600">
                                             <UserCog size={16} />
                                         </div>
                                         Cài đặt tài khoản
                                     </button>
-                                    <div className="h-px bg-gray-100 dark:bg-slate-700 my-1 mx-2"></div>
+                                    {(currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.SUBADMIN || isViewAllowedForUser(currentUser, employees, 'system_dashboard')) && (
+                                        <button 
+                                            onClick={() => {
+                                                setCurrentView('system_dashboard');
+                                                setIsUserMenuOpen(false);
+                                            }}
+                                            className="w-full text-left px-3 py-2.5 text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700 rounded-lg flex items-center gap-3 transition-colors group"
+                                        >
+                                            <div className="bg-gray-100 p-1.5 rounded-md group-hover:bg-blue-100 transition-colors text-gray-500 group-hover:text-blue-600">
+                                                <Settings size={16} />
+                                            </div>
+                                            Cài đặt hệ thống
+                                        </button>
+                                    )}
+                                    <div className="h-px bg-gray-100 my-1 mx-2"></div>
                                     <button 
                                         onClick={() => {
                                             onLogout();
                                             setIsUserMenuOpen(false);
                                         }}
-                                        className="w-full text-left px-3 py-2.5 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg flex items-center gap-3 transition-colors group"
+                                        className="w-full text-left px-3 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg flex items-center gap-3 transition-colors group"
                                     >
-                                        <div className="bg-red-50 dark:bg-red-900/40 p-1.5 rounded-md group-hover:bg-red-100 transition-colors text-red-500 group-hover:text-red-600">
+                                        <div className="bg-red-50 p-1.5 rounded-md group-hover:bg-red-100 transition-colors text-red-500 group-hover:text-red-600">
                                             <LogOut size={16} />
                                         </div>
                                         Đăng xuất

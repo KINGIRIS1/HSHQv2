@@ -1,16 +1,16 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState } from 'react';
 import { RecordFile, RecordStatus, Employee } from '../../types';
 import { getNormalizedWard, STATUS_LABELS } from '../../constants';
 import { isRecordOverdue } from '../../utils/appHelpers';
-import { AlertTriangle, CheckCircle2, Clock, MapPin, ChevronLeft, ChevronRight } from 'lucide-react';
+import { exportOverdueStatsToExcel } from '../../utils/excelExport';
+import { AlertTriangle, CheckCircle2, Clock, MapPin, ChevronLeft, ChevronRight, Download } from 'lucide-react';
 
 interface OverdueStatsViewProps {
     records: RecordFile[];
     employees: Employee[];
-    onFilteredRecordsChange?: (records: RecordFile[]) => void;
 }
 
-const OverdueStatsView: React.FC<OverdueStatsViewProps> = ({ records, employees, onFilteredRecordsChange }) => {
+const OverdueStatsView: React.FC<OverdueStatsViewProps> = ({ records, employees }) => {
     const [filterType, setFilterType] = useState<'all' | 'completed' | 'pending'>('all');
     const [selectedEmployee, setSelectedEmployee] = useState<string>('all');
     const [currentPage, setCurrentPage] = useState(1);
@@ -25,22 +25,14 @@ const OverdueStatsView: React.FC<OverdueStatsViewProps> = ({ records, employees,
             // Apply selectedEmployee filter
             if (selectedEmployee !== 'all') {
                 if (selectedEmployee === 'unassigned') {
-                    if (r.assignedTo || r.checkedBy) return;
+                    if (r.assignedTo) return;
                 } else {
-                    const emp = employees.find(e => e.id === selectedEmployee);
-                    const isLeader = emp && (
-                        emp.position?.toLowerCase().includes('tổ') ||
-                        emp.position?.toLowerCase().includes('nhóm') ||
-                        emp.position?.toLowerCase().includes('trưởng') ||
-                        emp.position?.toLowerCase().includes('phó')
-                    );
-                    const isMatch = r.assignedTo === selectedEmployee || (isLeader && r.checkedBy === selectedEmployee);
-                    if (!isMatch) return;
+                    if (r.assignedTo !== selectedEmployee) return;
                 }
             }
 
             // Check pending overdue
-            const isDone = r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED || r.status === RecordStatus.SIGNED || !!r.exportBatch;
+            const isDone = r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED || !!r.exportBatch;
             const isWithdrawnOrRejected = r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED;
             
             if (!isDone && !isWithdrawnOrRejected) {
@@ -96,12 +88,6 @@ const OverdueStatsView: React.FC<OverdueStatsViewProps> = ({ records, employees,
         setCurrentPage(1);
         setMobileVisibleCount(20);
     }, [filterType, selectedEmployee]);
-
-    useEffect(() => {
-        if (onFilteredRecordsChange) {
-            onFilteredRecordsChange(overdueData.filteredRecords);
-        }
-    }, [overdueData.filteredRecords, onFilteredRecordsChange]);
 
     const formatDate = (d?: string | null) => {
         if (!d) return '-';
@@ -171,6 +157,8 @@ const OverdueStatsView: React.FC<OverdueStatsViewProps> = ({ records, employees,
                                 ))}
                             </select>
                         </div>
+
+                        {/* Single shared Excel button is on top toolbar */}
                     </div>
                 </div>
                 <div className="hidden md:block flex-1 overflow-auto">

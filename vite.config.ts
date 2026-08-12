@@ -29,31 +29,22 @@ export default defineConfig({
     },
   },
   define: {
-    'global': 'globalThis',
+    'global': 'window',
+    'process.env': {}
   },
   build: {
     outDir: 'dist',
     emptyOutDir: true,
-    target: 'es2020',
+    target: 'es2020', // Đảm bảo tương thích tốt hơn
     rollupOptions: {
-      output: {
-        manualChunks(id) {
-          if (id.includes('node_modules')) {
-            if (id.includes('lucide-react')) {
-              return 'icons';
+        output: {
+            // Tách nhỏ file vendor để tránh lỗi load file quá lớn
+            manualChunks: {
+                vendor: ['react', 'react-dom'],
+                utils: ['xlsx-js-style', 'docxtemplater', 'pizzip', 'file-saver'],
+                icons: ['lucide-react']
             }
-            if (id.includes('recharts') || id.includes('d3')) {
-              return 'charts';
-            }
-            if (id.includes('docx') || id.includes('docxtemplater') || id.includes('pizzip') || id.includes('jszip')) {
-              return 'docx-utils';
-            }
-            if (id.includes('xlsx-js-style') || id.includes('file-saver')) {
-              return 'excel-utils';
-            }
-          }
         }
-      }
     }
   },
   server: {

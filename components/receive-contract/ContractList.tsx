@@ -188,7 +188,7 @@ const ContractList: React.FC<ContractListProps> = ({ contracts: propContracts, o
                                             </>
                                         )}
                                         
-                                        {(currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.SUBADMIN || currentUser?.role === UserRole.TEAM_LEADER) && (
+                                        {(currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.SUBADMIN) && (
                                             <button onClick={() => onDelete(c.id)} className="p-1.5 text-red-500 hover:bg-red-100 rounded transition-colors" title="Xóa"><Trash2 size={16} /></button>
                                         )}
                                     </div>

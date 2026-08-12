@@ -1,7 +1,5 @@
 -- ====================================================================
--- SCRIPT CẬP NHẬT HOÀN CHỈNH CHO SUPABASE (DÙNG CHO SQL EDITOR)
--- Sao chép toàn bộ nội dung file này và dán vào SQL Editor trên Supabase,
--- sau đó bấm "Run" để cập nhật đầy đủ các cột và kiểu dữ liệu.
+-- SCRIPT CẬP NHẬT HOÀN CHỈNH CHO 3 BẢNG (DANGKY, LAND, LUUTRU) TRÊN SUPABASE
 -- ====================================================================
 
 -- 1. Cập nhật kiểu dữ liệu bảng EMPLOYEES (Nếu cột id đang là UUID làm lỗi NVxxx)
@@ -12,7 +10,44 @@ BEGIN
     END IF;
 END $$;
 
--- 2. Đảm bảo bảng LAND_RECORDS có đầy đủ tất cả các cột mới nhất
+-- 2. Đảm bảo bảng LAND_RECORDS (Tổ Đo đạc) có đầy đủ tất cả các cột
+CREATE TABLE IF NOT EXISTS land_records (
+    id TEXT PRIMARY KEY,
+    code TEXT NOT NULL UNIQUE,
+    "customerName" TEXT NOT NULL,
+    "phoneNumber" TEXT,
+    cccd TEXT,
+    "customerAddress" TEXT,
+    ward TEXT,
+    "landPlot" TEXT,
+    "mapSheet" TEXT,
+    area NUMERIC,
+    address TEXT,
+    "group" TEXT,
+    status TEXT DEFAULT 'RECEIVED',
+    "measurementNumber" TEXT,
+    "excerptNumber" TEXT,
+    "needsMapCorrection" BOOLEAN,
+    "checkedBy" TEXT,
+    "checkedDate" DATE,
+    "completedWorkDate" DATE,
+    "receivedBy" TEXT,
+    "assignedTo" TEXT,
+    "submissionDate" DATE,
+    "approvalDate" DATE,
+    "completedDate" DATE,
+    price NUMERIC,
+    "advancePayment" NUMERIC,
+    "isHandedOver" BOOLEAN DEFAULT FALSE,
+    "statusLogs" JSONB DEFAULT '[]'::jsonb,
+    "archiveHandoverDate" DATE,
+    "archiveHandoverBatch" TEXT,
+    "exportBatch" TEXT,
+    "exportDate" DATE,
+    "createdAt" TIMESTAMPTZ DEFAULT NOW(),
+    "updatedAt" TIMESTAMPTZ DEFAULT NOW()
+);
+
 ALTER TABLE land_records ADD COLUMN IF NOT EXISTS "customerAddress" text;
 ALTER TABLE land_records ADD COLUMN IF NOT EXISTS "issueNumber" text;
 ALTER TABLE land_records ADD COLUMN IF NOT EXISTS "entryNumber" text;
@@ -54,17 +89,75 @@ ALTER TABLE land_records ADD COLUMN IF NOT EXISTS "statusLogs" jsonb;
 ALTER TABLE land_records ADD COLUMN IF NOT EXISTS "archiveHandoverDate" date;
 ALTER TABLE land_records ADD COLUMN IF NOT EXISTS "archiveHandoverBatch" text;
 
--- 3. Đổi kiểu dữ liệu các cột trong LAND_RECORDS về kiểu CHUỖI (text) tránh lỗi kiểu dữ liệu 22P02
+-- 3. Đảm bảo bảng DANGKY_RECORDS (Tổ Cấp giấy) được tạo và cập nhật đầy đủ
+CREATE TABLE IF NOT EXISTS dangky_records (
+    id TEXT PRIMARY KEY,
+    code TEXT NOT NULL UNIQUE,
+    "customerName" TEXT NOT NULL,
+    "phoneNumber" TEXT,
+    cccd TEXT,
+    "customerAddress" TEXT,
+    ward TEXT,
+    "landPlot" TEXT,
+    "mapSheet" TEXT,
+    area NUMERIC,
+    address TEXT,
+    "group" TEXT,
+    "issueNumber" TEXT,
+    "entryNumber" TEXT,
+    "issueDate" DATE,
+    "residentialArea" NUMERIC,
+    status TEXT DEFAULT 'RECEIVED',
+    "receivedBy" TEXT,
+    "assignedTo" TEXT,
+    "checkedBy" TEXT,
+    "submissionDate" DATE,
+    "approvalDate" DATE,
+    "completedDate" DATE,
+    price NUMERIC,
+    "advancePayment" NUMERIC,
+    "statusLogs" JSONB DEFAULT '[]'::jsonb,
+    "isHandedOver" BOOLEAN DEFAULT FALSE,
+    "archiveHandoverDate" DATE,
+    "archiveHandoverBatch" TEXT,
+    "createdAt" TIMESTAMPTZ DEFAULT NOW(),
+    "updatedAt" TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 4. Đảm bảo bảng LUUTRU_RECORDS và ARCHIVE_RECORDS (Tổ Lưu trữ)
+CREATE TABLE IF NOT EXISTS luutru_records (
+    id TEXT PRIMARY KEY,
+    type TEXT NOT NULL,
+    status TEXT DEFAULT 'draft',
+    so_hieu TEXT,
+    trich_yeu TEXT,
+    ngay_thang DATE,
+    noi_nhan_gui TEXT,
+    "created_by" TEXT,
+    data JSONB DEFAULT '{}'::jsonb,
+    "exportBatch" TEXT,
+    "createdAt" TIMESTAMPTZ DEFAULT NOW(),
+    "updatedAt" TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS archive_records (
+    id TEXT PRIMARY KEY,
+    type TEXT NOT NULL,
+    status TEXT DEFAULT 'draft',
+    so_hieu TEXT,
+    trich_yeu TEXT,
+    ngay_thang DATE,
+    noi_nhan_gui TEXT,
+    "created_by" TEXT,
+    data JSONB DEFAULT '{}'::jsonb,
+    "exportBatch" TEXT,
+    "createdAt" TIMESTAMPTZ DEFAULT NOW(),
+    "updatedAt" TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 5. Đồng bộ kiểu dữ liệu text
 ALTER TABLE land_records ALTER COLUMN "exportBatch" TYPE text USING "exportBatch"::text;
 ALTER TABLE land_records ALTER COLUMN "archiveHandoverBatch" TYPE text USING "archiveHandoverBatch"::text;
 ALTER TABLE land_records ALTER COLUMN "excerptNumber" TYPE text USING "excerptNumber"::text;
 ALTER TABLE land_records ALTER COLUMN "measurementNumber" TYPE text USING "measurementNumber"::text;
 
--- 4. Nếu bảng ARCHIVE_RECORDS tồn tại, đảm bảo cột exportBatch là kiểu CHUỖI (text)
-DO $$ 
-BEGIN
-    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'archive_records') THEN
-        ALTER TABLE archive_records ADD COLUMN IF NOT EXISTS "exportBatch" text;
-        ALTER TABLE archive_records ALTER COLUMN "exportBatch" TYPE text USING "exportBatch"::text;
-    END IF;
-END $$;

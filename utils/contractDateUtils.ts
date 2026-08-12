@@ -27,6 +27,17 @@ export function checkContractDateErrors(
   contract: Partial<Contract>,
   mode: 'contract' | 'liquidation' = 'contract'
 ): ContractDateCheckResult {
+  if (mode === 'liquidation') {
+    return {
+      hasError: false,
+      hasWarning: false,
+      isFutureDate: false,
+      isPastDate: false,
+      isLogicError: false,
+      messages: []
+    };
+  }
+
   const messages: string[] = [];
   let isFutureDate = false;
   let isPastDate = false;
@@ -73,11 +84,8 @@ export function checkContractDateErrors(
       : contract.liquidationDate
     : null;
 
-  if (mode === 'liquidation' || contract.status === 'COMPLETED' || liqDateClean) {
-    if (!liqDateClean && mode === 'liquidation') {
-      messages.push('Chưa nhập ngày thanh lý hợp đồng.');
-      isLogicError = true;
-    } else if (liqDateClean) {
+  if (contract.status === 'COMPLETED' || liqDateClean) {
+    if (liqDateClean) {
       if (liqDateClean > todayStr) {
         isFutureDate = true;
         messages.push(

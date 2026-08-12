@@ -113,7 +113,7 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
       const batches: Record<string, { label: string, date: string, count: number, fullDate: string }> = {};
       
       records.forEach(r => {
-          if ((r.status === RecordStatus.HANDOVER || r.status === RecordStatus.SIGNED || r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED || r.exportBatch) && r.exportBatch && r.exportDate) {
+          if ((r.status === RecordStatus.HANDOVER || r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED || r.exportBatch) && r.exportBatch && r.exportDate) {
               const datePart = r.exportDate.split('T')[0];
               const label = formatBatchName(r.exportBatch, '', datePart);
               
@@ -180,8 +180,8 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-2 sm:p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg lg:max-w-xl xl:max-w-2xl 2xl:max-w-3xl animate-fade-in-up flex flex-col overflow-hidden">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg animate-fade-in-up flex flex-col overflow-hidden">
         <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
             <h3 className="font-bold text-gray-800 text-lg">Chốt Danh Sách Giao 1 Cửa</h3>
             <button onClick={onClose} className="text-gray-400 hover:text-red-500"><X size={20}/></button>
@@ -231,13 +231,13 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
                 />
                 <div className="flex-1">
                     <div className="flex items-center gap-2 font-bold text-gray-800">
-                        <Plus size={16} className="text-blue-600" /> Tạo đợt mới (Hôm nay)
+                        <Plus size={16} className="text-blue-600" /> Tạo đợt mới trong ngày
                     </div>
-                    <div className="mt-1 text-xs text-gray-600">
-                        Đợt tiếp theo: <span className="font-bold text-blue-700">Đợt {nextBatchInfo.batchNum}</span>
-                    </div>
-                    <div className="text-xs text-gray-600 mt-0.5">
-                        Ngày: {formatDateDDMMYYYY(todayStr)}
+                    <div className="mt-1.5 bg-white p-2.5 rounded border border-blue-200">
+                        <div className="text-xs text-gray-500 mb-1">Tên đợt giao tự động:</div>
+                        <div className="font-mono font-bold text-sm text-blue-800 break-all">
+                            {nextBatchInfo.batchName}
+                        </div>
                     </div>
                 </div>
             </label>

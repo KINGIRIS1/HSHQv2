@@ -1,17 +1,16 @@
 
 import React, { useState, useEffect } from 'react';
 import { RecordFile, Employee, User, UserRole, SplitItem, RecordStatus } from '../types';
-import { getNormalizedWard, getShortRecordType, isCapGiayRecord, CAP_GIAY_SUB_STEPS, getCapGiaySubStepLabel, getCapGiaySubStepBadgeColor } from '../constants';
+import { getNormalizedWard, getShortRecordType } from '../constants';
 import StatusBadge from './StatusBadge';
-import { X, MapPin, FileText, User as UserIcon, Receipt, DollarSign, CheckCircle2, Circle, Send, FileSignature, CheckSquare, CalendarClock, FileCheck, Calculator, Loader2, StickyNote, Save, Bell, Printer, Pencil, Trash2, Info, FileDown, Undo2, Check } from 'lucide-react';
+import { X, MapPin, FileText, User as UserIcon, Receipt, DollarSign, CheckCircle2, Circle, Send, FileSignature, CheckSquare, CalendarClock, FileCheck, Calculator, Loader2, StickyNote, Save, Bell, Printer, Pencil, Trash2, Info, FileDown, Undo2 } from 'lucide-react';
 import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../services/docxService';
 import DocxPreviewModal from './DocxPreviewModal';
-import { updateRecordApi, fetchContracts, fetchExcerptHistory, saveExcerptRecord, fetchExcerptCounters, saveExcerptCounters, fetchTrichDoHistory, saveTrichDoRecord, fetchTrichDoCounters, saveTrichDoCounters } from '../services/api';
+import { updateRecordApi, fetchContracts } from '../services/api';
 import SystemReceiptTemplate from './receive-record/SystemReceiptTemplate';
 import SystemAnnexTemplate from './receive-record/SystemAnnexTemplate';
-import { getBatchDisplayParts, calculateDeadlineHelperByDays } from '../utils/appHelpers';
-import { RecordTimelineProgress } from './RecordTimelineProgress';
-import { hasUserPermission } from '../config/roleConfig';
+import { getEmployeeName as getEmpNameHelper } from '../utils/appHelpers';
+
 
 interface DetailModalProps {
   isOpen: boolean;
@@ -20,8 +19,6 @@ interface DetailModalProps {
   employees: Employee[];
   users: User[];
   currentUser: User | null;
-  rolePermissions?: Record<string, string[]>;
-  departmentPermissions?: Record<string, string[]>;
   onEdit?: (record: RecordFile) => void;
   onDelete?: (record: RecordFile) => void;
   onCreateLiquidation?: (record: RecordFile) => void; 
@@ -29,10 +26,9 @@ interface DetailModalProps {
   onRefreshData?: () => void;
   onOpenRejectReturnModal?: (record: RecordFile) => void;
   onOpenExtendModal?: (record: RecordFile) => void;
-  onOpenSupplementModal?: (record: RecordFile) => void;
 }
 
-export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, employees, users, currentUser, rolePermissions, departmentPermissions, onEdit, onDelete, onCreateLiquidation, onCreateContract, onRefreshData, onOpenRejectReturnModal, onOpenExtendModal, onOpenSupplementModal }) => {
+export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, employees, users, currentUser, onEdit, onDelete, onCreateLiquidation, onCreateContract, onRefreshData, onOpenRejectReturnModal, onOpenExtendModal }) => {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [previewBlob, setPreviewBlob] = useState<Blob | null>(null);
   const [previewFileName, setPreviewFileName] = useState('');
@@ -65,20 +61,9 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
   const [contracts, setContracts] = useState<any[]>([]);
   const [matchedContract, setMatchedContract] = useState<any | null>(null);
 
-  // State cho Vô Số GCN
-  const [voSoIssueNumber, setVoSoIssueNumber] = useState('');
-  const [voSoEntryNumber, setVoSoEntryNumber] = useState('');
-  const [voSoIssueDate, setVoSoIssueDate] = useState('');
-
-  // State cho Tự động lấy số Trích lục / Trích đo
-  const [isGettingAutoNumber, setIsGettingAutoNumber] = useState(false);
-
   useEffect(() => {
       if (record) {
           setPersonalNote(record.personalNotes || '');
-          setVoSoIssueNumber(record.issueNumber || '');
-          setVoSoEntryNumber(record.entryNumber || '');
-          setVoSoIssueDate(record.issueDate ? record.issueDate.split('T')[0] : '');
           // Set reminder date (yyyy-MM-dd)
           if (record.reminderDate) {
               setReminderDate(record.reminderDate.split('T')[0]);
@@ -200,9 +185,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
   };
 
   const getEmployeeName = (id?: string | null) => {
-    if (!id) return 'Chưa giao';
-    const emp = employees.find(e => e.id === id);
-    return emp ? `${emp.name} (${emp.department})` : 'Không xác định';
+    return getEmpNameHelper(id, employees);
   };
 
   const handleSavePersonalNote = async () => {
@@ -291,76 +274,6 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
       } finally {
           setIsExtending(false);
       }
-  };
-
-  const handleAutoGetNumber = async () => {
-    if (!record) return;
-    setIsGettingAutoNumber(true);
-    try {
-        const recordTypeLower = (record.recordType || '').toLowerCase();
-        const isTrichLuc = recordTypeLower.includes('trích lục') || recordTypeLower.includes('tl');
-        const currentYear = new Date().getFullYear();
-        const getCounterKey = (yr: number) => yr <= 2025 ? 'GLOBAL' : `GLOBAL_${yr}`;
-
-        const serverHistory = isTrichLuc ? await fetchExcerptHistory() : await fetchTrichDoHistory();
-        let maxNumberInHistory = 0;
-        serverHistory.forEach((r: any) => {
-            const itemYear = new Date(r.createdAt).getFullYear();
-            const yearMatch = currentYear <= 2025 ? itemYear <= 2025 : itemYear === currentYear;
-            if (yearMatch && r.excerptNumber > maxNumberInHistory) {
-                maxNumberInHistory = r.excerptNumber;
-            }
-        });
-
-        const serverCounters = isTrichLuc ? await fetchExcerptCounters() : await fetchTrichDoCounters();
-        const counterKey = getCounterKey(currentYear);
-        const currentCountOnServer = serverCounters[counterKey] || 0;
-        const nextCount = Math.max(currentCountOnServer, maxNumberInHistory) + 1;
-
-        const newExcerptRecord = {
-            id: Math.random().toString(36).substr(2, 9),
-            ward: record.ward || 'Chưa xác định',
-            mapSheet: record.mapSheet || '---',
-            landPlot: record.landPlot || '---',
-            excerptNumber: nextCount,
-            createdAt: new Date().toISOString(),
-            createdBy: currentUser?.name || 'Hệ thống',
-            linkedRecordCode: record.code,
-            ownerName: (record as any).ownerName || record.customerName,
-            address: (record as any).address || record.customerAddress,
-            assignedTo: record.assignedTo || undefined
-        };
-
-        if (isTrichLuc) {
-            await saveExcerptRecord(newExcerptRecord);
-            await saveExcerptCounters({ ...serverCounters, [counterKey]: nextCount });
-        } else {
-            await saveTrichDoRecord(newExcerptRecord);
-            await saveTrichDoCounters({ ...serverCounters, [counterKey]: nextCount });
-        }
-
-        const numStr = nextCount.toString();
-        const updatedRecord: RecordFile = {
-            ...record,
-            excerptNumber: isTrichLuc ? numStr : (record.excerptNumber || numStr),
-            measurementNumber: !isTrichLuc ? numStr : (record.measurementNumber || numStr)
-        };
-
-        const res = await updateRecordApi(updatedRecord);
-        if (res) {
-            if (isTrichLuc) record.excerptNumber = numStr;
-            else record.measurementNumber = numStr;
-            if (onRefreshData) onRefreshData();
-            alert(`Đã cấp thành công ${isTrichLuc ? 'Số trích lục' : 'Số trích đo'}: ${numStr}`);
-        } else {
-            alert('Không thể lưu số vào hồ sơ. Vui lòng thử lại.');
-        }
-    } catch (error) {
-        console.error('Lỗi lấy số tự động:', error);
-        alert('Không thể lấy số tự động. Vui lòng thử lại!');
-    } finally {
-        setIsGettingAutoNumber(false);
-    }
   };
 
   const handlePrintReceipt = async () => {
@@ -571,29 +484,29 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
 
   // LOGIC CHECK NẾU ĐÃ THỰC HIỆN XONG (Để hiển thị bước "Đã thực hiện")
   const isWorkDone = [
-      RecordStatus.IN_PROGRESS, RecordStatus.PENDING_CHECK, RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER, RecordStatus.RETURNED
+      RecordStatus.HANDOVER, RecordStatus.RETURNED
   ].includes(record.status) || !!record.completedWorkDate;
   
   const isPendingCheckActive = [
-      RecordStatus.PENDING_CHECK, RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER, RecordStatus.RETURNED
+      RecordStatus.HANDOVER, RecordStatus.RETURNED
   ].includes(record.status) || !!record.pendingCheckDate;
 
   const isCheckedActive = [
-      RecordStatus.PENDING_CHECK, RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER, RecordStatus.RETURNED
+      RecordStatus.HANDOVER, RecordStatus.RETURNED
   ].includes(record.status) || !!record.checkedDate;
 
   const isPendingSignActive = [
-      RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER, RecordStatus.RETURNED
+      RecordStatus.HANDOVER, RecordStatus.RETURNED
   ].includes(record.status) || !!record.submissionDate;
 
   const isSignedActive = [
-      RecordStatus.SIGNED, RecordStatus.HANDOVER, RecordStatus.RETURNED
+      RecordStatus.HANDOVER, RecordStatus.RETURNED
   ].includes(record.status) || !!record.approvalDate;
 
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-2 sm:p-4 backdrop-blur-sm">
-      <div className="bg-gray-50 rounded-xl shadow-2xl w-full max-w-7xl 2xl:max-w-[1700px] max-h-[95vh] overflow-hidden flex flex-col animate-fade-in-up">
+    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+      <div className="bg-gray-50 rounded-xl shadow-2xl w-full max-w-7xl max-h-[95vh] overflow-hidden flex flex-col animate-fade-in-up">
         
         {/* HEADER */}
         <div className="bg-white px-6 py-4 border-b border-gray-200 flex justify-between items-center shrink-0">
@@ -606,37 +519,27 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
             </div>
             
             <div className="flex items-center gap-2">
-                {hasUserPermission(currentUser, employees, 'BTN_EXTEND_DEADLINE', rolePermissions, departmentPermissions) && onOpenExtendModal && record && (record.status !== RecordStatus.HANDOVER && record.status !== RecordStatus.RETURNED && record.status !== RecordStatus.WITHDRAWN) && (
-                    <button
-                        onClick={() => { onClose(); onOpenExtendModal(record); }}
-                        className="flex items-center gap-2 px-3 py-1.5 bg-purple-50 border border-purple-200 text-purple-700 rounded hover:bg-purple-100 transition-colors text-sm font-bold shadow-sm"
-                        title="Gia hạn ngày hẹn trả kết quả"
-                    >
-                        <CalendarClock size={16} /> Gia hạn
-                    </button>
-                )}
-
-                {onOpenSupplementModal && record && record.status === RecordStatus.PENDING_SUPPLEMENT && (
-    <button
-        onClick={() => { onClose(); onOpenSupplementModal(record); }}
-        className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 border border-amber-200 text-amber-700 rounded hover:bg-amber-100 transition-colors text-sm font-bold shadow-sm"
-        title="Tiếp nhận bổ sung hồ sơ và chuyển tiếp tục xử lý"
-    >
-        <FileCheck size={16} /> Bổ sung hồ sơ
-    </button>
-)}
-
-                {hasUserPermission(currentUser, employees, 'BTN_REJECT_RECORD', rolePermissions, departmentPermissions) && onOpenRejectReturnModal && record && (record.status !== RecordStatus.HANDOVER && record.status !== RecordStatus.RETURNED && record.status !== RecordStatus.WITHDRAWN) && (
+                {onOpenRejectReturnModal && record && (record.status === RecordStatus.IN_PROGRESS || record.status === RecordStatus.RECEIVED) && (
                     <button
                         onClick={() => { onClose(); onOpenRejectReturnModal(record); }}
                         className="flex items-center gap-2 px-3 py-1.5 bg-rose-50 border border-rose-200 text-rose-700 rounded hover:bg-rose-100 transition-colors text-sm font-bold shadow-sm"
-                        title="Trả hồ sơ"
+                        title="Trả hồ sơ (Yêu cầu sửa / bổ sung / hủy)"
                     >
                         <Undo2 size={16} /> Trả hồ sơ
                     </button>
                 )}
 
-                {onCreateLiquidation && record && record.recordType && (getShortRecordType(record.recordType).startsWith('2.2') || getShortRecordType(record.recordType).startsWith('2.4')) && (
+                {onOpenExtendModal && record && (
+                    <button
+                        onClick={() => { onClose(); onOpenExtendModal(record); }}
+                        className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 border border-amber-200 text-amber-800 rounded hover:bg-amber-100 transition-colors text-sm font-bold shadow-sm"
+                        title="Gia hạn ngày hẹn trả"
+                    >
+                        <CalendarClock size={16} /> Gia hạn
+                    </button>
+                )}
+
+                {onCreateLiquidation && record && record.recordType && (getShortRecordType(record.recordType).startsWith('2.3') || getShortRecordType(record.recordType).startsWith('2.4')) && (
                     <button
                         onClick={() => { onClose(); onCreateLiquidation(record); }}
                         className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-200 text-gray-600 rounded hover:bg-gray-50 transition-colors text-sm font-medium"
@@ -646,7 +549,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                     </button>
                 )}
 
-                {record && record.recordType && (getShortRecordType(record.recordType).startsWith('2.2') || getShortRecordType(record.recordType).startsWith('2.4')) && (
+                {record && record.recordType && (getShortRecordType(record.recordType).startsWith('2.3') || getShortRecordType(record.recordType).startsWith('2.4')) && (
                     <button
                         onClick={() => {
                             const hasAnnexTemplate = hasTemplate(STORAGE_KEYS.CONTRACT_TEMPLATE_ANNEX);
@@ -680,7 +583,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                     </button>
                 )}
                 
-                {canPerformAction && onDelete && (currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.SUBADMIN || currentUser?.role === UserRole.TEAM_LEADER) && (
+                {canPerformAction && onDelete && (currentUser?.role === 'ADMIN' || currentUser?.role === 'SUBADMIN') && (
                     <button onClick={() => { onClose(); onDelete(record); }} className="p-2 text-gray-400 hover:text-red-600 transition-colors">
                         <Trash2 size={20} />
                     </button>
@@ -800,8 +703,6 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                         )}
                     </div>
 
-
-
                     {/* REMINDER */}
                     <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
                         <div className="flex justify-between items-center mb-3">
@@ -856,14 +757,14 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                     <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm h-full flex flex-col">
                         {/* HÀNG BÁO HỢP ĐỒNG (CHỈ ÁP DỤNG CHO 2.3 VÀ 2.4) & SỐ TRÍCH ĐO / TRÍCH LỤC */}
                         {(() => {
-                            const isContractProcedure = !!(record?.recordType && (getShortRecordType(record.recordType).startsWith('2.2') || getShortRecordType(record.recordType).startsWith('2.4')));
-                            const hasExcerptOrMeasurement = !isCapGiayRecord(record) && !!(recordTypeLower.includes('trích đo') || recordTypeLower.includes('trích lục') || record?.measurementNumber || record?.excerptNumber);
+                            const isContractProcedure = !!(record?.recordType && (getShortRecordType(record.recordType).startsWith('2.3') || getShortRecordType(record.recordType).startsWith('2.4')));
+                            const hasExcerptOrMeasurement = !!(recordTypeLower.includes('trích đo') || recordTypeLower.includes('trích lục') || record?.measurementNumber || record?.excerptNumber);
 
                             if (!isContractProcedure && !hasExcerptOrMeasurement) return null;
 
                             return (
                                 <div className={`grid grid-cols-1 ${isContractProcedure && hasExcerptOrMeasurement ? 'sm:grid-cols-2' : ''} gap-3 mb-4`}>
-                                    {/* CỘT HỢP ĐỒNG LIÊN KẾT - CHỈ XUẤT HIỆN CHO THỦ TỤC 2.2 & 2.4 */}
+                                    {/* CỘT HỢP ĐỒNG LIÊN KẾT - CHỈ XUẤT HIỆN CHO THỦ TỤC 2.3 & 2.4 */}
                                     {isContractProcedure && (
                                         <div className="bg-indigo-50/80 border border-indigo-100 rounded-xl p-3 flex items-center justify-between gap-2">
                                             <div className="flex items-center gap-2.5 min-w-0">
@@ -893,43 +794,23 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                                     )}
 
                                     {/* CỘT SỐ TRÍCH ĐO / SỐ TRÍCH LỤC */}
-                                    {hasExcerptOrMeasurement && (() => {
-                                        const isTrichLuc = recordTypeLower.includes('trích lục') || recordTypeLower.includes('tl');
-                                        const existingNum = isTrichLuc 
-                                            ? record.excerptNumber 
-                                            : (record.measurementNumber || record.excerptNumber);
-                                        const hasNumber = !!(existingNum && existingNum !== '---' && existingNum !== '');
-
-                                        return (
-                                            <div className="bg-purple-50/80 border border-purple-100 rounded-xl p-3 flex items-center justify-between gap-2 min-w-0">
-                                                <div className="flex items-center gap-2.5 min-w-0">
-                                                    <div className="bg-purple-200 text-purple-700 p-2 rounded-lg shrink-0">
-                                                        <FileCheck size={16} />
-                                                    </div>
-                                                    <div className="text-left truncate">
-                                                        <span className="text-[10px] text-purple-600 uppercase font-bold block">
-                                                            {isTrichLuc ? 'Số trích lục' : 'Số trích đo'}
-                                                        </span>
-                                                        <p className="text-xs font-bold text-purple-950 truncate">
-                                                            {hasNumber ? existingNum : 'Chưa có số'}
-                                                        </p>
-                                                    </div>
-                                                </div>
-
-                                                {!hasNumber && (
-                                                    <button
-                                                        onClick={handleAutoGetNumber}
-                                                        disabled={isGettingAutoNumber}
-                                                        className="inline-flex items-center gap-1 text-[11px] font-bold bg-purple-600 text-white hover:bg-purple-700 px-2.5 py-1.5 rounded-lg transition-colors shadow-sm whitespace-nowrap shrink-0 disabled:opacity-50"
-                                                        title="Cấp số trích lục/trích đo tự động tiếp theo"
-                                                    >
-                                                        {isGettingAutoNumber ? <Loader2 size={13} className="animate-spin" /> : <Calculator size={13} />}
-                                                        <span>Lấy số tự động</span>
-                                                    </button>
-                                                )}
+                                    {hasExcerptOrMeasurement && (
+                                        <div className="bg-purple-50/80 border border-purple-100 rounded-xl p-3 flex items-center gap-2.5">
+                                            <div className="bg-purple-200 text-purple-700 p-2 rounded-lg shrink-0">
+                                                <FileCheck size={16} />
                                             </div>
-                                        );
-                                    })()}
+                                            <div className="text-left truncate">
+                                                <span className="text-[10px] text-purple-600 uppercase font-bold block">
+                                                    {recordTypeLower.includes('trích lục') ? 'Số trích lục' : 'Số trích đo'}
+                                                </span>
+                                                <p className="text-xs font-bold text-purple-950 truncate">
+                                                    {recordTypeLower.includes('trích lục') 
+                                                        ? (record.excerptNumber || '---') 
+                                                        : (record.measurementNumber || record.excerptNumber || '---')}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             );
                         })()}
@@ -960,25 +841,25 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                             
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 {/* Thẻ Số tiền */}
-                                <div className="bg-emerald-50/80 p-3 rounded-xl border border-emerald-200/80 flex flex-col items-center justify-center text-center min-w-0">
-                                    <label className="text-[10px] text-emerald-700 uppercase font-bold block whitespace-nowrap truncate text-center">
+                                <div className="bg-emerald-50/80 p-3 rounded-xl border border-emerald-200/80 flex flex-col justify-center min-w-0">
+                                    <label className="text-[10px] text-emerald-700 uppercase font-bold block whitespace-nowrap truncate">
                                         Số tiền thu
                                     </label>
-                                    <p className="text-sm font-black text-emerald-800 whitespace-nowrap truncate mt-0.5 text-center">
+                                    <p className="text-sm font-black text-emerald-800 whitespace-nowrap truncate mt-0.5">
                                         {record.returnedPrice !== undefined && record.returnedPrice !== null
-                                            ? record.returnedPrice.toLocaleString('vi-VN')
+                                            ? record.returnedPrice.toLocaleString('vi-VN') + ' đ'
                                             : (record.recordType === 'Cung cấp tài liệu đất đai' 
-                                                ? '310.000' 
-                                                : (contractPrice !== null && contractPrice !== undefined ? contractPrice.toLocaleString('vi-VN') : '---'))}
+                                                ? '310.000 đ' 
+                                                : (contractPrice !== null && contractPrice !== undefined ? contractPrice.toLocaleString('vi-VN') + ' đ' : '---'))}
                                     </p>
                                 </div>
 
                                 {/* Thẻ Số BL/HĐ */}
-                                <div className="bg-blue-50/80 p-3 rounded-xl border border-blue-200/80 flex flex-col items-center justify-center text-center min-w-0">
-                                    <label className="text-[10px] text-blue-700 uppercase font-bold block whitespace-nowrap truncate text-center">
+                                <div className="bg-blue-50/80 p-3 rounded-xl border border-blue-200/80 flex flex-col justify-center min-w-0">
+                                    <label className="text-[10px] text-blue-700 uppercase font-bold block whitespace-nowrap truncate">
                                         {record.receiptType === 'Biên Lai' ? 'SỐ BIÊN LAI' : record.receiptType === 'Hóa Đơn' ? 'SỐ HÓA ĐƠN' : 'SỐ BIÊN LAI / HÓA ĐƠN'}
                                     </label>
-                                    <p className="text-xs font-black text-blue-900 font-mono whitespace-nowrap truncate mt-0.5 text-center">
+                                    <p className="text-xs font-black text-blue-900 font-mono whitespace-nowrap truncate mt-0.5">
                                         {record.receiptNumber || '---'}
                                     </p>
                                 </div>
@@ -1023,83 +904,97 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
 
                 {/* COLUMN 3: TIẾN ĐỘ & NHẮC VIỆC */}
                 <div className="space-y-6">
-                    {/* KHU VỰC NHẬP THÔNG TIN VÔ SỔ GCN KHI KÝ XONG */}
-                    {isCapGiayRecord(record) && [RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER].includes(record.status) && (
-                        <div className="bg-white rounded-xl border border-teal-200 shadow-sm overflow-hidden p-3 bg-gradient-to-br from-teal-50/50 to-white flex flex-col gap-3 animate-fade-in">
-                            <div className="text-xs font-bold text-teal-900 flex items-center justify-between">
-                                <span className="flex items-center gap-1.5"><FileCheck size={16} className="text-teal-600" /> Nhập thông tin số phát hành & số vào sổ GCN</span>
-                                <span className="text-[10px] bg-teal-100 text-teal-800 px-2 py-0.5 rounded font-bold">Thông tin GCN</span>
-                            </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                                <div>
-                                    <label className="text-[10px] font-bold text-teal-800 block mb-1">Số phát hành GCN</label>
-                                    <input 
-                                        type="text" 
-                                        placeholder="VD: CD 123456" 
-                                        className="w-full text-xs font-bold border border-teal-300 rounded px-2.5 py-1.5 bg-white text-gray-800 focus:outline-none focus:ring-1 focus:ring-teal-500"
-                                        value={voSoIssueNumber}
-                                        onChange={(e) => setVoSoIssueNumber(e.target.value)}
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-[10px] font-bold text-teal-800 block mb-1">Số vào sổ GCN</label>
-                                    <input 
-                                                type="text" 
-                                                placeholder="VD: CH 01234" 
-                                                className="w-full text-xs font-bold border border-teal-300 rounded px-2.5 py-1.5 bg-white text-gray-800 focus:outline-none focus:ring-1 focus:ring-teal-500"
-                                                value={voSoEntryNumber}
-                                                onChange={(e) => setVoSoEntryNumber(e.target.value)}
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="text-[10px] font-bold text-teal-800 block mb-1">Ngày ký GCN</label>
-                                            <input 
-                                                type="date" 
-                                                className="w-full text-xs font-bold border border-teal-300 rounded px-2.5 py-1.5 bg-white text-gray-800 focus:outline-none focus:ring-1 focus:ring-teal-500"
-                                                value={voSoIssueDate}
-                                                onChange={(e) => setVoSoIssueDate(e.target.value)}
-                                            />
-                                        </div>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        disabled={!canPerformAction}
-                                        onClick={async () => {
-                                            if (!canPerformAction) return;
-                                            const updated = { 
-                                                ...record, 
-                                                issueNumber: voSoIssueNumber || record.issueNumber,
-                                                entryNumber: voSoEntryNumber || record.entryNumber,
-                                                issueDate: voSoIssueDate || record.issueDate,
-                                                capGiaySubStep: 'cho_ban_giao', 
-                                                status: RecordStatus.HANDOVER
-                                            };
-                                            const res = await updateRecordApi(updated);
-                                            if (res) {
-                                                record.issueNumber = updated.issueNumber;
-                                                record.entryNumber = updated.entryNumber;
-                                                record.issueDate = updated.issueDate;
-                                                record.capGiaySubStep = 'cho_ban_giao';
-                                                record.status = RecordStatus.HANDOVER;
-                                                if (onRefreshData) onRefreshData();
-                                            }
-                                        }}
-                                        className="w-full py-2 bg-teal-600 hover:bg-teal-700 active:scale-98 text-white rounded-lg text-xs font-black shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
-                                    >
-                                        <Check size={16} className="stroke-[3]" />
-                                        <span>Hoàn tất Vô sổ GCN → Chuyển sang Chờ bàn giao (1 cửa)</span>
-                                    </button>
-                                </div>
+                    {/* TIMELINE */}
+                    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                        <div className="bg-indigo-600 px-5 py-3 flex items-center gap-2">
+                            <CalendarClock size={16} className="text-white"/>
+                            <span className="text-xs font-bold text-white uppercase">Tiến độ & Thời gian</span>
+                        </div>
+                        
+                        <div className="p-6 text-center border-b border-gray-100">
+                             <label className="text-[10px] text-gray-400 uppercase font-bold block mb-1">Hạn trả kết quả</label>
+                             <p className="text-2xl font-black text-gray-800">{formatDate(record.deadline)}</p>
+                             <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded mt-2 inline-block">
+                                Ngày nhận: {formatDate(record.receivedDate)}
+                             </span>
+                        </div>
+
+                        <div className="p-6 space-y-0">
+                             <TimelineItem 
+                                date={record.receivedDate} 
+                                label="TIẾP NHẬN MỚI" 
+                                icon={UserIcon}
+                                colorClass={{text: 'text-emerald-700', border: 'border-emerald-600', bg: 'bg-emerald-600'}}
+                                subText={record.receivedBy ? (() => {
+                                    const receiver = users.find(u => u.employeeId === record.receivedBy);
+                                    if (!receiver) return undefined;
+                                    const emp = employees.find(e => e.id === receiver.employeeId);
+                                    return `${receiver.name} (${emp?.position || 'Nhân viên'})`;
+                                })() : undefined}
+                            />
+
+                            <TimelineItem 
+                                date={record.assignedDate || record.completedWorkDate} 
+                                forceActive={isWorkDone || !!record.assignedDate}
+                                label="ĐANG THỰC HIỆN" 
+                                icon={UserIcon}
+                                colorClass={{text: 'text-blue-700', border: 'border-blue-600', bg: 'bg-blue-600'}}
+                                subText={record.assignedTo ? (() => {
+                                    const emp = employees.find(e => e.id === record.assignedTo);
+                                    if (!emp) return undefined;
+                                    return `${emp.name} (${emp.department})`;
+                                })() : undefined}
+                            />
+
+                            {/* Ẩn mốc kiểm tra cho một số loại hồ sơ */}
+                            {!(record.recordType === 'Cung cấp tài liệu đất đai' || record.recordType === 'Sao lục' || record.recordType === 'Công văn') && (
+                                <TimelineItem 
+                                    date={record.pendingCheckDate || record.checkedDate} 
+                                    forceActive={isPendingCheckActive || isCheckedActive}
+                                    label="TRÌNH KIỂM TRA" 
+                                    icon={Send}
+                                    colorClass={{text: 'text-orange-700', border: 'border-orange-600', bg: 'bg-orange-600'}}
+                                    subText={record.checkedBy ? (() => {
+                                        const checker = employees.find(e => e.id === record.checkedBy);
+                                        if (!checker) return undefined;
+                                        return `${checker.name} (${checker?.position || 'Người kiểm tra'})`;
+                                    })() : undefined}
+                                />
                             )}
 
-                    {/* TIMELINE */}
-                    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
-                        <RecordTimelineProgress 
-                            record={record}
-                            employees={employees}
-                            users={users}
-                            formatDate={formatDate}
-                        />
+                            <TimelineItem 
+                                date={record.submissionDate || record.approvalDate} 
+                                forceActive={isPendingSignActive || isSignedActive}
+                                label="TRÌNH KÝ DUYỆT" 
+                                icon={Send}
+                                colorClass={{text: 'text-purple-700', border: 'border-purple-600', bg: 'bg-purple-600'}}
+                                subText={record.submittedTo ? (() => {
+                                    const director = users.find(u => u.employeeId === record.submittedTo);
+                                    if (!director) return undefined;
+                                    const emp = employees.find(e => e.id === director.employeeId);
+                                    return `${director.name} (${emp?.position || (director.role === UserRole.ADMIN ? 'Giám đốc' : 'Phó giám đốc')})`;
+                                })() : undefined}
+                            />
+                            
+                            <TimelineItem 
+                                date={record.completedDate || record.exportDate} 
+                                forceActive={!!record.completedDate || !!record.exportDate || !!record.exportBatch}
+                                label={record.status === RecordStatus.REJECTED ? "TRẢ HỒ SƠ" : record.status === RecordStatus.WITHDRAWN ? "CSD RÚT HỒ SƠ" : "HOÀN THÀNH"} 
+                                icon={CheckSquare}
+                                isLast={false}
+                                colorClass={{text: record.status === RecordStatus.REJECTED ? 'text-red-700' : 'text-green-700', border: record.status === RecordStatus.REJECTED ? 'border-red-600' : 'border-green-600', bg: record.status === RecordStatus.REJECTED ? 'bg-red-600' : 'bg-green-600'}}
+                                subText={record.exportBatch ? `Đợt xuất: ${String(record.exportBatch).padStart(2, '0')}` : undefined}
+                            />
+                            
+                            <TimelineItem 
+                                date={record.resultReturnedDate} 
+                                label="TRẢ KẾT QUẢ" 
+                                icon={FileCheck}
+                                isLast={true}
+                                colorClass={{text: 'text-emerald-700', border: 'border-emerald-600', bg: 'bg-emerald-600'}}
+                                subText={record.resultReturnedDate && record.receiverName ? `Người nhận: ${record.receiverName}` : undefined}
+                            />
+                        </div>
                     </div>
                 </div>
 

@@ -23,8 +23,8 @@ export const ROLE_VIEWS_CONFIG: Record<UserRole, RoleConfig> = {
     role: UserRole.ONEDOOR,
     allowedViews: [
       'dashboard', 'receive_record', 'receive_contract', 
-      'all_records', 'registration_records', 'other_records', 'other_assign_tasks', 'other_completed_list', 'other_pending_check_list', 'other_check_list', 'other_handover_list', 'personal_profile', 
-      'account_settings', 'utilities', 'handover_list', 'archive_handover_list', 'work_schedule', 
+      'all_records', 'registration_records', 'other_records', 'personal_profile', 
+      'account_settings', 'utilities', 'handover_list', 'archive_handover_list', 'other_handover_list', 'work_schedule', 
       'archive_records', 'receive_group', 'records_group', 'management_group',
       'reports', 'tools_group', 'barcode_generator'
     ]
@@ -51,7 +51,7 @@ export const ROLE_VIEWS_CONFIG: Record<UserRole, RoleConfig> = {
       },
       {
         keyword: 'đăng ký',
-        views: ['registration_records', 'other_records', 'other_assign_tasks', 'other_completed_list', 'other_pending_check_list', 'other_check_list', 'other_handover_list']
+        views: ['registration_records']
       },
       {
         keyword: 'lưu trữ',
@@ -74,87 +74,6 @@ function removeDiacritics(str: string): string {
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/đ/g, 'd')
     .replace(/Đ/g, 'D');
-}
-
-/**
- * Lấy danh sách các ID quyền hạn (permissions) thực tế của người dùng
- */
-export function getUserPermissions(
-  user: { role: UserRole; employeeId?: string; permissions?: string[] } | null | undefined,
-  employees: { id: string; department: string }[] | null | undefined,
-  rolePermissions?: Record<string, string[]>,
-  departmentPermissions?: Record<string, string[]>
-): string[] {
-  if (!user) return [];
-  if (user.role === UserRole.ADMIN) return ['*'];
-
-  // Nếu tài khoản cá nhân có danh sách quyền riêng tùy chỉnh -> Ưu tiên áp dụng
-  if (user.permissions && Array.isArray(user.permissions)) {
-    return user.permissions;
-  }
-
-  let activePerms: string[] | null = null;
-
-  if (user.employeeId && employees && departmentPermissions) {
-    const emp = employees.find(e => e.id === user.employeeId);
-    if (emp && emp.department) {
-      const compositeKey = `${emp.department}_${user.role}`;
-      if (departmentPermissions[compositeKey]) {
-        activePerms = departmentPermissions[compositeKey];
-      } else if (departmentPermissions[emp.department]) {
-        activePerms = departmentPermissions[emp.department];
-      } else {
-        const matchingKey = Object.keys(departmentPermissions).find(k => {
-          if (k.endsWith(`_${user.role}`)) {
-            const deptPart = k.replace(`_${user.role}`, '');
-            return matchDepartmentKey(deptPart, emp.department);
-          }
-          return matchDepartmentKey(k, emp.department);
-        });
-        if (matchingKey && departmentPermissions[matchingKey]) {
-          activePerms = departmentPermissions[matchingKey];
-        }
-      }
-    }
-  }
-
-  if (activePerms === null) {
-    if (rolePermissions && rolePermissions[user.role]) {
-      activePerms = rolePermissions[user.role];
-    } else if (DEFAULT_ROLE_PERMISSIONS[user.role]) {
-      activePerms = DEFAULT_ROLE_PERMISSIONS[user.role];
-    } else {
-      activePerms = [];
-    }
-  }
-
-  return activePerms || [];
-}
-
-/**
- * Kiểm tra người dùng có một quyền hạn cụ thể hay không
- */
-export function hasUserPermission(
-  user: { role: UserRole; employeeId?: string; permissions?: string[] } | null | undefined,
-  employees: { id: string; department: string }[] | null | undefined,
-  permissionId: string,
-  rolePermissions?: Record<string, string[]>,
-  departmentPermissions?: Record<string, string[]>
-): boolean {
-  if (!user) return false;
-  if (user.role === UserRole.ADMIN) return true;
-
-  const perms = getUserPermissions(user, employees, rolePermissions, departmentPermissions);
-  if (perms.includes('*')) return true;
-  if (perms.includes(permissionId)) return true;
-
-  // Nếu là kiểm tra mã tab chuyên môn (DODAC_ / ARCHIVE_)
-  if (permissionId.startsWith('DODAC_') || permissionId.startsWith('ARCHIVE_')) {
-    const legacyId = permissionId.replace(/^(DODAC_|ARCHIVE_)/, '');
-    if (perms.includes(legacyId)) return true;
-  }
-
-  return false;
 }
 
 /**
@@ -239,20 +158,6 @@ export function isViewAllowedForUser(
     }
   }
 
-  // Đảm bảo đối với Tổ Lưu trữ có cấu hình tùy chỉnh, nếu không tích survey_list hay all_records thì sẽ không thấy tab Đo đạc
-  if (isCustomDeptPerm && user.employeeId && employees && activePerms) {
-    const emp = employees.find(e => e.id === user.employeeId);
-    if (emp && emp.department && matchDepartmentKey('lưu trữ', emp.department)) {
-      if (!activePerms.includes('survey_list') && !activePerms.includes('all_records')) {
-        const SURVEY_PERMS = [
-          'all_records', 'all_sub_all', 'assign_tasks', 'completed_list',
-          'pending_check_list', 'check_list', 'handover_list', 'director_completed', 'survey_list'
-        ];
-        activePerms = activePerms.filter(p => !SURVEY_PERMS.includes(p));
-      }
-    }
-  }
-
   // Luôn đảm bảo vai trò ONEDOOR kế thừa toàn bộ danh sách quyền mặc định của Một cửa
   if (user.role === UserRole.ONEDOOR) {
     const defaultOneDoor = DEFAULT_ROLE_PERMISSIONS[UserRole.ONEDOOR] || [];
@@ -283,7 +188,7 @@ export function isViewAllowedForUser(
         return activePerms.includes('all_records') || activePerms.includes('all_sub_all') || activePerms.includes('assign_tasks') || activePerms.includes('check_list') || activePerms.includes('handover_list') || activePerms.includes('completed_list') || activePerms.includes('pending_check_list') || activePerms.includes('director_completed') ||
                activePerms.includes('archive_records') || activePerms.includes('registration_records') || activePerms.includes('other_records');
       case 'tools_group':
-        return activePerms.includes('reports') || activePerms.includes('VIEW_REPORTS') || activePerms.includes('excerpt_management') || activePerms.includes('MANAGE_EXCERPTS') || activePerms.includes('utilities') || activePerms.includes('work_schedule') || activePerms.includes('system_dashboard') || activePerms.includes('SYSTEM_SETTINGS');
+        return activePerms.includes('reports') || activePerms.includes('VIEW_REPORTS') || activePerms.includes('excerpt_management') || activePerms.includes('MANAGE_EXCERPTS') || activePerms.includes('utilities') || activePerms.includes('work_schedule');
       case 'management_group':
         return activePerms.includes('work_schedule') || activePerms.includes('VIEW_SCHEDULE') || activePerms.includes('personal_profile');
 
@@ -296,7 +201,6 @@ export function isViewAllowedForUser(
                activePerms.includes('receive_sub_vphc');
       case 'all_records':
         return activePerms.includes('all_records') ||
-               activePerms.includes('survey_list') ||
                activePerms.includes('all_sub_all') ||
                activePerms.includes('assign_tasks') ||
                activePerms.includes('completed_list') ||

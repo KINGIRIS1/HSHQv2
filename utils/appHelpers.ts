@@ -176,52 +176,15 @@ export const calculateDeadlineHelper = (type: string, receivedDateStr: string, h
     let daysToAdd = 30; 
     const lowerType = (type || '').toLowerCase();
 
-    // Check dynamic workflow SLA config from localStorage if available
-    let dynamicDays: number | null = null;
-    try {
-        const savedWorkflow = localStorage.getItem('workflow_sla_configs');
-        if (savedWorkflow) {
-            const parsed = JSON.parse(savedWorkflow);
-            let deptKey = 'Tổ Cấp giấy';
-            if (lowerType.includes('đo đạc') || lowerType.includes('trích đo') || lowerType.includes('bản đồ')) {
-                deptKey = 'Tổ Đo đạc';
-            } else if (lowerType.includes('lưu trữ') || lowerType.includes('tra cứu') || lowerType.includes('sao lục')) {
-                deptKey = 'Tổ Lưu trữ';
-            }
-            const procKey = `${deptKey}__${type}`;
-            let steps = parsed[procKey];
-            if (!steps && lowerType) {
-                const matchedKey = Object.keys(parsed).find(k => k.includes('__') && k.toLowerCase().includes(lowerType));
-                if (matchedKey) {
-                    steps = parsed[matchedKey];
-                }
-            }
-            if (steps && Array.isArray(steps) && steps.length > 0) {
-                dynamicDays = steps.reduce((acc: number, s: any) => acc + (Number(s.slaDays) || ((Number(s.slaHours) || 0) / 8)), 0);
-            }
-        }
-    } catch (e) {}
-
-    if (dynamicDays !== null && dynamicDays > 0) {
-        daysToAdd = dynamicDays;
+    if (lowerType.includes('1.1') || lowerType.includes('cung cấp tài liệu đất đai') || lowerType.includes('cung cấp dữ liệu') ||
+        lowerType.includes('2.1') || lowerType.includes('trích lục') ||
+        lowerType.includes('2.3') || lowerType.includes('số thửa') || lowerType.includes('cập nhật số thửa') || lowerType.includes('cập nhập số thửa') ||
+        lowerType.includes('quy hoạch')) {
+        daysToAdd = 10;
+    } else if (lowerType.includes('trích đo chỉnh lý') || lowerType.includes('chỉnh lý bản đồ')) {
+        daysToAdd = 15;
     } else {
-        if (lowerType.includes('2.2') || lowerType.includes('2.4') || lowerType.includes('2.5') || 
-            lowerType.includes('trích đo') || lowerType.includes('cắm mốc') || lowerType.includes('đo đạc') || lowerType.includes('tách thửa') || lowerType.includes('tách - hợp')) {
-            daysToAdd = 30;
-        } else if (lowerType.includes('1.1') || lowerType.includes('1.2') || lowerType.includes('công văn') || lowerType.includes('cong van') || lowerType.includes('cung cấp tài liệu đất đai') || lowerType.includes('cung cấp dữ liệu') ||
-            lowerType.includes('quy hoạch') || 
-            lowerType.includes('2.3') || lowerType.includes('2.6') || lowerType.includes('số thửa') || 
-            lowerType.includes('2.1') || lowerType.includes('trích lục')) {
-            daysToAdd = 10;
-        } else if (lowerType.includes('3.2.1') || lowerType.includes('3.2.2') || lowerType.includes('3.5.1') || lowerType.includes('gia hạn') || (lowerType.includes('cấp đổi') && !lowerType.includes('trích đo'))) {
-            daysToAdd = 7;
-        } else if (lowerType.includes('3.1.1') || lowerType.includes('3.1.2') || lowerType.includes('3.1.3') || lowerType.includes('3.1.4') || lowerType.includes('3.3.1') || lowerType.includes('3.3.2') || lowerType.includes('3.6.1') || lowerType.includes('3.7.1') || lowerType.includes('37.1') || lowerType.includes('chuyển nhượng') || lowerType.includes('tặng cho') || lowerType.includes('thừa kế') || lowerType.includes('thỏa thuận') || lowerType.includes('chuyển mục đích') || lowerType.includes('đính chính')) {
-            daysToAdd = 10;
-        } else if (lowerType.includes('3.4.1') || lowerType.includes('trích đo chỉnh lý') || lowerType.includes('chỉnh lý bản đồ')) {
-            daysToAdd = 15;
-        } else {
-            daysToAdd = 30;
-        }
+        daysToAdd = 30;
     }
     
     // Áp dụng quy ước thời gian: nếu nhận sau 15h dời ngày trả qua sáng hôm sau (tức là cộng thêm 1 ngày làm việc)
@@ -282,123 +245,6 @@ export const calculateDeadlineHelper = (type: string, receivedDateStr: string, h
     return formatDateKey(currentDate);
 };
 
-// Tính deadline khi biết số ngày làm việc
-export const calculateDeadlineHelperByDays = (daysToAdd: number, startDateStr: string, holidays: any[]): string => {
-    if (!startDateStr || daysToAdd <= 0) return startDateStr || formatDateKey(new Date());
-    const startDate = new Date(startDateStr);
-    let count = 0;
-    let currentDate = new Date(startDate);
-
-    const holidaySet = new Set<string>();
-    const currentYear = startDate.getFullYear();
-    const yearsToCheck = [currentYear, currentYear + 1];
-
-    if (holidays && holidays.length > 0) {
-        holidays.forEach(h => {
-            yearsToCheck.forEach(year => {
-                if (h.isLunar) {
-                    const solarDate = getSolarDateFromLunar(h.day, h.month, year);
-                    if (solarDate) holidaySet.add(formatDateKey(solarDate));
-                } else {
-                    const solarDate = new Date(year, h.month - 1, h.day);
-                    holidaySet.add(formatDateKey(solarDate));
-                }
-            });
-        });
-    }
-
-    while (count < daysToAdd) {
-        currentDate.setDate(currentDate.getDate() + 1);
-        const dayOfWeek = currentDate.getDay();
-        const dateString = formatDateKey(currentDate);
-        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-        const isHoliday = holidaySet.has(dateString);
-
-        if (!isWeekend && !isHoliday) {
-            count++;
-        }
-    }
-
-    return formatDateKey(currentDate);
-};
-
-// Lấy SLA theo từng bước quy trình Cấp Giấy (tính bằng số ngày làm việc)
-export const getCapGiayStepSLA = (subStep?: string | null, hasThamdinh?: boolean): number => {
-    if (subStep === 'tiep_nhan') return 1;
-    if (!subStep || subStep === 'tham_dinh') return 1; // Bước 1: Thẩm định (1 ngày)
-    if (subStep === 'phieu_chuyen_thue') return hasThamdinh ? 2 : 3; // Bước 2: 2 ngày nếu qua thẩm định, 3 ngày nếu không qua
-    if (subStep === 'cho_nop_thue' || subStep === 'cho_giay_nop_tien') return 0; // Chờ người dân nộp thuế (Một cửa)
-    if (subStep === 'hoan_thien_trinh_duyet' || subStep === 'in_hoan_thien') return 5; // Hoàn thiện in GCN (5 ngày)
-    if (subStep === 'kiem_tra') return 1; // Kiểm tra (1 ngày)
-    if (subStep === 'trinh_ky') return 1; // Trình ký (1 ngày)
-    return 1;
-};
-
-// Lấy thông tin SLA và trạng thái hạn dùng cho hồ sơ
-export const getRecordSLADetails = (record: RecordFile, holidays: any[] = []) => {
-    const isFinished = [RecordStatus.HANDOVER, RecordStatus.RETURNED, RecordStatus.WITHDRAWN, RecordStatus.REJECTED].includes(record.status) || !!record.resultReturnedDate;
-    if (isFinished) {
-        return {
-            slaStatus: 'COMPLETED' as const,
-            statusText: 'Đã hoàn thành',
-            badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-            remainingDays: 0,
-            currentStepSLA: 0
-        };
-    }
-
-    const subStep = record.capGiaySubStep || 'tham_dinh';
-    const hasThamdinh = record.capGiaySubStep === 'tham_dinh';
-    const stepSLA = getCapGiayStepSLA(subStep, hasThamdinh);
-
-    const deadline = parseSafeDate(record.deadline);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    if (!deadline) {
-        return {
-            slaStatus: 'ON_TIME' as const,
-            statusText: 'Đang thực hiện',
-            badgeClass: 'bg-blue-50 text-blue-700 border-blue-200',
-            remainingDays: 0,
-            currentStepSLA: stepSLA
-        };
-    }
-
-    const targetDate = new Date(deadline);
-    targetDate.setHours(0, 0, 0, 0);
-
-    const diffTime = targetDate.getTime() - today.getTime();
-    const remainingDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-    if (remainingDays < 0) {
-        const overdueDays = Math.abs(remainingDays);
-        return {
-            slaStatus: 'EXPIRED' as const,
-            statusText: `Quá hạn ${overdueDays} ngày`,
-            badgeClass: 'bg-rose-100 text-rose-800 border-rose-300 font-extrabold animate-pulse',
-            remainingDays,
-            currentStepSLA: stepSLA
-        };
-    } else if (remainingDays <= 1) {
-        return {
-            slaStatus: 'WARNING' as const,
-            statusText: remainingDays === 0 ? 'Hạn chót hôm nay!' : 'Còn 1 ngày SLA',
-            badgeClass: 'bg-amber-100 text-amber-800 border-amber-300 font-extrabold shadow-2xs',
-            remainingDays,
-            currentStepSLA: stepSLA
-        };
-    } else {
-        return {
-            slaStatus: 'ON_TIME' as const,
-            statusText: `Còn ${remainingDays} ngày`,
-            badgeClass: 'bg-teal-50 text-teal-800 border-teal-200 font-bold',
-            remainingDays,
-            currentStepSLA: stepSLA
-        };
-    }
-};
-
 // --- HÀM TIỆN ÍCH SO KHỚP PHÒNG BAN ---
 export function matchDepartmentKey(key: string, empDept: string): boolean {
     if (!key || !empDept) return false;
@@ -454,58 +300,6 @@ export function parseSafeDate(dateStr: any): Date | null {
     return isNaN(d.getTime()) ? null : d;
 }
 
-export function extractDateFromRecordCode(code?: string | null): Date | null {
-    if (!code) return null;
-    const s = String(code).trim();
-    if (!s) return null;
-
-    // Case 1: YYMMDD-xxxx or prefix-YYMMDD-xxxx e.g. 240815-0001 or WARD-240815-0001
-    const yymmddMatch = s.match(/(?:^|[^\d])(\d{2})(\d{2})(\d{2})(?:[^\d]|$)/);
-    if (yymmddMatch) {
-        const yy = parseInt(yymmddMatch[1], 10);
-        const mm = parseInt(yymmddMatch[2], 10);
-        const dd = parseInt(yymmddMatch[3], 10);
-        if (mm >= 1 && mm <= 12 && dd >= 1 && dd <= 31) {
-            const year = yy >= 50 ? 1900 + yy : 2000 + yy;
-            const date = new Date(year, mm - 1, dd);
-            if (!isNaN(date.getTime())) return date;
-        }
-    }
-
-    // Case 2: DD.MM.YYYY or DD/MM/YYYY
-    const dmyMatch = s.match(/(\d{1,2})[\/\.-](\d{1,2})[\/\.-](\d{4})/);
-    if (dmyMatch) {
-        const d = parseInt(dmyMatch[1], 10);
-        const m = parseInt(dmyMatch[2], 10);
-        const y = parseInt(dmyMatch[3], 10);
-        if (m >= 1 && m <= 12 && d >= 1 && d <= 31) {
-            const date = new Date(y, m - 1, d);
-            if (!isNaN(date.getTime())) return date;
-        }
-    }
-
-    // Case 3: YYYY.MM.DD or YYYY/MM/DD
-    const ymdMatch = s.match(/(\d{4})[\/\.-](\d{1,2})[\/\.-](\d{1,2})/);
-    if (ymdMatch) {
-        const y = parseInt(ymdMatch[1], 10);
-        const m = parseInt(ymdMatch[2], 10);
-        const d = parseInt(ymdMatch[3], 10);
-        if (m >= 1 && m <= 12 && d >= 1 && d <= 31) {
-            const date = new Date(y, m - 1, d);
-            if (!isNaN(date.getTime())) return date;
-        }
-    }
-
-    return null;
-}
-
-export function getRecordReceivedDate(r: any): Date | null {
-    if (!r) return null;
-    const parsed = parseSafeDate(r.receivedDate || r.ngay_thang || r.created_at);
-    if (parsed) return parsed;
-    return extractDateFromRecordCode(r.code);
-}
-
 export function processAssignmentTimelineCheck(
   record: RecordFile,
   newEmployeeId: string,
@@ -554,9 +348,9 @@ export function processAssignmentTimelineCheck(
   const hasSubsequentSteps = !!(
     record.submissionDate ||
     record.pendingCheckDate ||
+    record.checkedDate ||
     record.approvalDate ||
-    record.status === RecordStatus.PENDING_CHECK ||
-    record.status === RecordStatus.PENDING_SIGN
+    record.completedWorkDate
   );
 
   let isLaterDate = false;
@@ -587,6 +381,25 @@ export function processAssignmentTimelineCheck(
     updates.handoverWard = firstWard;
   }
 
+  if (hasSubsequentSteps || isLaterDate || historyParts.length > 0) {
+    const logNote = `Giao NV ${oldEmpName} ngày ${formatDateVN(record.assignedDate) || 'trước đó'}${record.submissionDate ? `, Trình ký ngày ${formatDateVN(record.submissionDate)}` : ''}`;
+    const fullInternalNote = `Cập nhật lại đã giao việc ngày ${formatDateVN(newAssignedDateStr)} (${newEmpName}). Đưa về bước Đang thực hiện. Ghi chú nội bộ: ${logNote} để biết và truy vết.`;
+
+    const existingPrivate = record.privateNotes || '';
+    updates.privateNotes = existingPrivate ? `${existingPrivate}\n${fullInternalNote}` : fullInternalNote;
+
+    const newLog = {
+      id: `${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      recordId: record.id,
+      previousStatus: record.status,
+      newStatus: RecordStatus.IN_PROGRESS,
+      changedBy: currentUser?.name || 'Hệ thống',
+      changedAt: new Date().toISOString(),
+      note: fullInternalNote
+    };
+    updates.statusLogs = [...(record.statusLogs || []), newLog];
+  }
+
   if (record.data) {
     updates.data = {
       ...record.data,
@@ -601,7 +414,7 @@ export function processAssignmentTimelineCheck(
 
 // --- HÀM XỬ LÝ VÀ ĐỊNH DẠNG ĐỢT GIAO 1 CỬA ---
 
-export function getDepartmentForRecord(r: RecordFile): 'Tổ Đo đạc' | 'Tổ Lưu trữ' | 'Tổ Cấp giấy' {
+export function getDepartmentForRecord(r: RecordFile): string {
     if (r.returnHandoverDept) {
         const d = r.returnHandoverDept.toLowerCase();
         if (d.includes('lưu trữ') || d.includes('thông tin')) return 'Tổ Lưu trữ';
@@ -614,13 +427,14 @@ export function getDepartmentForRecord(r: RecordFile): 'Tổ Đo đạc' | 'Tổ
     if (type.includes('1.1') || type.includes('1.2') || type.includes('công văn') || type.includes('sao lục') || code.startsWith('1.')) {
         return 'Tổ Lưu trữ';
     }
-    if (type.includes('2.1') || type.includes('2.2') || type.includes('2.3') || type.includes('2.4') || type.includes('2.5') || type.includes('2.6') || type.includes('trích lục') || type.includes('số thửa') || type.includes('trích đo') || type.includes('đo đạc') || code.startsWith('2.')) {
+    if (type.includes('2.1') || type.includes('2.2') || type.includes('trích lục')) {
+        return 'Tổ Cấp giấy';
+    }
+    if (type.includes('2.3') || type.includes('2.4') || type.includes('2.5') || type.includes('2.6') || type.includes('số thửa') || type.includes('trích đo') || type.includes('đo đạc') || code.startsWith('2.')) {
         return 'Tổ Đo đạc';
     }
     return 'Tổ Cấp giấy';
 }
-
-export const getRecordDepartment = getDepartmentForRecord;
 
 export function getDeptAbbr(deptName: string): string {
     if (!deptName) return 'CG';
@@ -632,44 +446,31 @@ export function getDeptAbbr(deptName: string): string {
 }
 
 export function formatDateDDMMYYYY(d?: string | null): string {
-    if (!d) return '';
-    const clean = String(d).trim();
-    if (!clean) return '';
-    
-    const isoPart = clean.split('T')[0];
-    const parts = isoPart.split('-');
-    if (parts.length === 3 && parts[0].length >= 2) {
-        let y = parts[0];
-        if (y.length === 2) y = '20' + y;
-        const m = parts[1].padStart(2, '0');
-        const day = parts[2].padStart(2, '0');
-        return `${day}/${m}/${y}`;
+    if (!d) {
+        const today = new Date();
+        return `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
     }
-    
-    if (clean.includes('/')) {
-        const slashParts = clean.split('/');
-        if (slashParts.length === 3) {
-            const day = slashParts[0].padStart(2, '0');
-            const m = slashParts[1].padStart(2, '0');
-            let y = slashParts[2];
-            if (y.length === 2) y = '20' + y;
-            return `${day}/${m}/${y}`;
-        }
+    const clean = d.split('T')[0];
+    const parts = clean.split('-');
+    if (parts.length === 3) {
+        return `${parts[2]}/${parts[1]}/${parts[0]}`;
     }
-    
-    const parsed = new Date(clean);
-    if (!isNaN(parsed.getTime())) {
-        const day = String(parsed.getDate()).padStart(2, '0');
-        const m = String(parsed.getMonth() + 1).padStart(2, '0');
-        const y = parsed.getFullYear();
-        return `${day}/${m}/${y}`;
-    }
-    
-    return clean;
+    return d;
 }
 
 export function formatDateDDMMYY(d?: string | null): string {
-    return formatDateDDMMYYYY(d);
+    if (!d) {
+        const today = new Date();
+        const yy = String(today.getFullYear()).slice(-2);
+        return `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${yy}`;
+    }
+    const clean = d.split('T')[0];
+    const parts = clean.split('-');
+    if (parts.length === 3) {
+        const yy = parts[0].length === 4 ? parts[0].slice(-2) : parts[0];
+        return `${parts[2]}/${parts[1]}/${yy}`;
+    }
+    return d;
 }
 
 export function formatBatchName(batch: number | string | null | undefined, deptName?: string, dateStr?: string | null): string {
@@ -786,6 +587,24 @@ export function migrateUnbatchedRecords(records: RecordFile[]): { migratedRecord
 
     const migratedRecords = records.map(r => {
         let currentBatch = r.exportBatch;
+        let recType = r.recordType;
+        let isTypeChanged = false;
+
+        if (recType) {
+            const tLower = recType.toLowerCase();
+            if ((tLower.includes('2.3') && tLower.includes('trích đo')) || tLower === '2.3 trích đo') {
+                recType = '2.2 Trích đo';
+                isTypeChanged = true;
+            } else if (tLower.includes('2.6') || tLower.includes('cập số thửa') || tLower.includes('cập nhật số thửa') || tLower.includes('cn số thửa')) {
+                recType = '2.3 Cập nhật số thửa';
+                isTypeChanged = true;
+            }
+        }
+
+        if (isTypeChanged) {
+            hasChanges = true;
+            r = { ...r, recordType: recType };
+        }
 
         // Tự động làm sạch các tên đợt cũ bị lặp chữ "Đợt"
         if (typeof currentBatch === 'string' && /^Đợt\s+Đợt/i.test(currentBatch)) {
@@ -858,29 +677,56 @@ export function migrateUnbatchedRecords(records: RecordFile[]): { migratedRecord
     return { migratedRecords, hasChanges };
 }
 
-export const formatCheckOrSignDate = (dateVal: string | undefined | null, record: RecordFile, type: 'check' | 'sign'): string => {
-    if (dateVal) {
-        const d = parseSafeDate(dateVal);
-        if (d && !isNaN(d.getTime())) {
-            return `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}`;
-        }
-        return String(dateVal).split('T')[0];
-    }
+// --- HÀM CHUẨN HÓA VÀ TRA CỨU NHÂN SỰ (ID VS TÊN) ---
+export function getEmployeeName(idOrName?: string | null, employees: Employee[] = []): string {
+    if (!idOrName) return 'Chưa giao';
+    const trimmed = String(idOrName).trim();
+    if (!trimmed) return 'Chưa giao';
+    
+    // 1. Tìm theo ID (không phân biệt hoa thường)
+    let emp = employees.find(e => e.id && e.id.toLowerCase() === trimmed.toLowerCase());
+    if (emp) return `${emp.name} (${emp.department || 'Nhân sự'})`;
+    
+    // 2. Tìm theo Tên (không phân biệt hoa thường)
+    emp = employees.find(e => e.name && e.name.toLowerCase() === trimmed.toLowerCase());
+    if (emp) return `${emp.name} (${emp.department || 'Nhân sự'})`;
+    
+    // 3. Nếu không tìm thấy trong danh mục, trả về chính chuỗi đang lưu (tránh mất tên nếu nhập tự do)
+    return trimmed;
+}
 
-    const isSignedOrCompleted = [
-        RecordStatus.SIGNED, 
-        RecordStatus.HANDOVER, 
-        RecordStatus.RETURNED
-    ].includes(record.status) || !!record.completedDate || !!record.exportBatch;
+export function resolveEmployeeId(idOrName?: string | null, employees: Employee[] = []): string {
+    if (!idOrName) return '';
+    const trimmed = String(idOrName).trim();
+    if (!trimmed) return '';
+    
+    // Nếu truyền vào trùng ID hoặc Tên trong danh sách, quy đổi về ID chuẩn
+    const emp = employees.find(e => (e.id && e.id.toLowerCase() === trimmed.toLowerCase()) || (e.name && e.name.toLowerCase() === trimmed.toLowerCase()));
+    return emp ? emp.id : trimmed;
+}
 
-    if (type === 'check') {
-        const isCheckedOrPassed = isSignedOrCompleted || record.status === RecordStatus.PENDING_SIGN || !!record.checkedDate || !!record.pendingCheckDate;
-        return isCheckedOrPassed ? "Đã hoàn thành" : "Đang thực hiện";
-    } else {
-        const isSigned = isSignedOrCompleted || record.status === RecordStatus.SIGNED;
-        return isSigned ? "Đã hoàn thành" : "Đang thực hiện";
+export function cleanSyncNotes(text?: string | null): string {
+    if (!text) return '';
+    let str = String(text);
+    const patterns = [
+        /đồng\s*bộ\s*thủ\s*tục\s*cũ/gi,
+        /đồng\s*bộ\s*thủ\s*tục\s*củ/gi,
+        /đồng\s*bộ\s*từ\s*thủ\s*tục\s*cũ/gi,
+        /đồng\s*bộ\s*từ\s*thủ\s*tục\s*củ/gi,
+        /thủ\s*tục\s*cũ/gi,
+        /thủ\s*tục\s*củ/gi,
+        /trích\s*đo\s*bản\s*đồ\s*địa\s*chính/gi,
+        /trích\s*đo\s*địa\s*chính/gi,
+        /trích\s*đo/gi
+    ];
+    for (const p of patterns) {
+        str = str.replace(p, '');
     }
-};
+    str = str.replace(/;\s*;/g, ';').replace(/^\s*;\s*|\s*;\s*$/g, '').trim();
+    return str;
+}
+
+
 
 
 

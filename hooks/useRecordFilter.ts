@@ -2,7 +2,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { RecordFile, User, UserRole, RecordStatus, Employee } from '../types';
 import { removeVietnameseTones, isRecordOverdue, isRecordApproaching } from '../utils/appHelpers';
-import { getShortRecordType, isArchiveRecordType, isCapGiayRecord } from '../constants';
+import { getShortRecordType, isArchiveRecordType } from '../constants';
 
 export const useRecordFilter = (
     records: RecordFile[],
@@ -34,7 +34,6 @@ export const useRecordFilter = (
         setFilterStatus('all');
         setFilterEmployee('all');
         setWarningFilter('none');
-        setCapGiaySubStepFilter('all');
         setFilterSpecificDate('');
         setFilterAssignedDate('');
         setFilterFromDate('');
@@ -56,7 +55,6 @@ export const useRecordFilter = (
     const [filterRecordType, setFilterRecordType] = useState('all');
     const [filterStatus, setFilterStatus] = useState('all');
     const [filterEmployee, setFilterEmployee] = useState('all');
-    const [capGiaySubStepFilter, setCapGiaySubStepFilter] = useState<string>('all');
     const [warningFilter, setWarningFilter] = useState<'none' | 'overdue' | 'approaching'>('none');
     
     // Cập nhật type cho handoverTab để hỗ trợ 'returned'
@@ -87,10 +85,9 @@ export const useRecordFilter = (
         }
         if (currentUser.role === UserRole.TEAM_LEADER) {
             const leaderEmp = employees.find(e => e.id === currentUser.employeeId);
-            if (!leaderEmp) return true; 
-            const isMyTask = r.assignedTo === currentUser.employeeId || r.checkedBy === currentUser.employeeId;
-            const hasManagedWards = leaderEmp.managedWards && leaderEmp.managedWards.length > 0;
-            const isMyWard = hasManagedWards ? leaderEmp.managedWards.some((w: string) => r.ward && r.ward.includes(w)) : true;
+            if (!leaderEmp) return false; 
+            const isMyTask = r.assignedTo === currentUser.employeeId;
+            const isMyWard = leaderEmp.managedWards.some((w: string) => r.ward && r.ward.includes(w));
             return isMyTask || isMyWard;
         }
         return false; 
@@ -112,63 +109,39 @@ export const useRecordFilter = (
         // Filter for TEAM_LEADER by managed wards in professional/measurement tab
         const isMeasurementViewTab = [
             'all_records', 'assign_tasks', 'completed_list', 
-            'pending_check_list', 'check_list', 'handover_list', 'director_completed',
-            'other_records', 'other_assign_tasks', 'other_completed_list', 
-            'other_pending_check_list', 'other_check_list', 'other_handover_list', 'other_director_completed',
-            'registration_records'
+            'pending_check_list', 'check_list', 'handover_list', 'director_completed'
         ].includes(currentView);
 
         if (currentUser && currentUser.role === UserRole.TEAM_LEADER && isMeasurementViewTab) {
             const leaderEmp = employees.find(e => e.id === currentUser.employeeId);
-            if (leaderEmp && leaderEmp.managedWards && leaderEmp.managedWards.length > 0) {
+            if (leaderEmp) {
                 result = result.filter(r => {
                     const isMyTask = r.assignedTo === currentUser.employeeId;
-                    const isMyWard = leaderEmp.managedWards.some((w: string) => r.ward && r.ward.includes(w));
+                    const isMyWard = leaderEmp.managedWards && leaderEmp.managedWards.some((w: string) => r.ward && r.ward.includes(w));
                     return isMyTask || isMyWard;
                 });
             }
         }
 
-        // View-based filtering helper to get effective display status
-        const getEffectiveStatus = (r: RecordFile): RecordStatus => {
-            if (r.resultReturnedDate) return RecordStatus.RETURNED;
-            if ((r.exportBatch || r.exportDate) && r.status !== RecordStatus.WITHDRAWN && r.status !== RecordStatus.RETURNED && r.status !== RecordStatus.REJECTED) {
-                return RecordStatus.HANDOVER;
-            }
-            return r.status;
-        };
-
         // View-based filtering
         if (currentView === 'check_list' || currentView === 'other_check_list' || currentView === 'archive_check_list') {
-            if (isDirector) {
-                // Giám đốc chỉ thấy hồ sơ trình cho mình
-                result = result.filter(r => getEffectiveStatus(r) === RecordStatus.PENDING_SIGN && r.submittedTo === currentUser?.employeeId);
-            } else {
-                result = result.filter(r => getEffectiveStatus(r) === RecordStatus.PENDING_SIGN);
-            }
-        } else if (currentView === 'pending_check_list' || currentView === 'archive_pending_check_list' || currentView === 'other_pending_check_list') {
-            // Tab Kiểm tra: Hiển thị hồ sơ Chờ kiểm tra
-            result = result.filter(r => getEffectiveStatus(r) === RecordStatus.PENDING_CHECK);
-        } else if (currentView === 'completed_list' || currentView === 'archive_completed_list' || currentView === 'other_completed_list') {
-            result = result.filter(r => {
-                const s = getEffectiveStatus(r);
-                return s === RecordStatus.ASSIGNED || s === RecordStatus.IN_PROGRESS || s === RecordStatus.PENDING_SUPPLEMENT;
-            });
+            result = result.filter(r => r.status === RecordStatus.IN_PROGRESS);
+        } else if (currentView === 'pending_check_list' || currentView === 'archive_pending_check_list') {
+            result = result.filter(r => r.status === RecordStatus.IN_PROGRESS);
+        } else if (currentView === 'completed_list' || currentView === 'archive_completed_list') {
+            result = result.filter(r => r.status === RecordStatus.IN_PROGRESS || r.status === RecordStatus.RECEIVED);
         } else if (currentView === 'director_completed' || currentView === 'other_director_completed' || currentView === 'archive_director_completed') {
-            result = result.filter(r => {
-                const s = getEffectiveStatus(r);
-                return r.submittedTo === currentUser?.employeeId && s !== RecordStatus.PENDING_SIGN && s !== RecordStatus.RECEIVED && s !== RecordStatus.ASSIGNED && s !== RecordStatus.IN_PROGRESS;
-            });
+            result = result.filter(r => r.status === RecordStatus.HANDOVER);
         } else if (currentView === 'handover_list' || currentView === 'other_handover_list' || currentView === 'archive_handover_list') {
             if (handoverTab === 'today') {
-                // Tab chờ bàn giao: Chỉ hồ sơ đã ký sẵn sàng bàn giao (SIGNED) hoặc (Đã rút/Hồ sơ trả chưa có đợt xuất)
-                result = result.filter(r => {
-                    const s = getEffectiveStatus(r);
-                    return (s === RecordStatus.SIGNED || ((s === RecordStatus.REJECTED || s === RecordStatus.WITHDRAWN) && !r.exportBatch)) && !r.exportBatch && !r.exportDate;
-                });
+                // Tab chờ giao: Bao gồm Đang thực hiện / Hoàn thành nội bộ HOẶC (Đã rút VÀ chưa có đợt xuất) HOẶC Hồ sơ trả (REJECTED)
+                result = result.filter(r => 
+                    r.status === RecordStatus.IN_PROGRESS || r.status === RecordStatus.RECEIVED ||
+                    ((r.status === RecordStatus.REJECTED || r.status === RecordStatus.WITHDRAWN) && !r.exportBatch)
+                );
             } else if (handoverTab === 'returned') {
                 // Tab Đã trả kết quả: Status = RETURNED
-                result = result.filter(r => getEffectiveStatus(r) === RecordStatus.RETURNED);
+                result = result.filter(r => r.status === RecordStatus.RETURNED);
                 
                 // CẬP NHẬT: Lọc theo khoảng thời gian (Từ ngày - Đến ngày) thay vì 1 ngày
                 if (filterFromDate || filterToDate) {
@@ -181,12 +154,12 @@ export const useRecordFilter = (
                     });
                 }
             } else {
-                // Tab Chờ trả kết quả (history): Hồ sơ đã bàn giao 1 cửa (HANDOVER hoặc đã xuất đợt) và chưa trả kết quả dân
-                result = result.filter(r => {
-                    const s = getEffectiveStatus(r);
-                    return (s === RecordStatus.HANDOVER || ((r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED) && r.exportBatch)) && !r.resultReturnedDate;
-                });
-                // Giữ nguyên logic lọc ngày đơn cho Chờ trả kết quả (theo đợt)
+                // Tab Lịch sử giao: Bao gồm Đã giao HOẶC (Đã rút VÀ đã có đợt xuất)
+                result = result.filter(r => 
+                    r.status === RecordStatus.HANDOVER || 
+                    ((r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED) && r.exportBatch)
+                );
+                // Giữ nguyên logic lọc ngày đơn cho Lịch sử giao (theo đợt)
                 if (filterDate) {
                     result = result.filter(r => {
                         const dateToCheck = r.exportDate || r.completedDate;
@@ -195,12 +168,11 @@ export const useRecordFilter = (
                 }
             }
         } else if (currentView === 'assign_tasks' || currentView === 'other_assign_tasks' || currentView === 'archive_assign_tasks') {
-            result = result.filter(r => getEffectiveStatus(r) === RecordStatus.RECEIVED);
+            result = result.filter(r => r.status === RecordStatus.RECEIVED);
         }
 
         // Filter by recordType based on view group
-        const isDangkySubView = currentView.startsWith('dangky_') && currentView !== 'dangky_records';
-        const isOtherView = ['other_records', 'other_assign_tasks', 'other_completed_list', 'other_pending_check_list', 'other_check_list', 'other_handover_list', 'other_director_completed', 'registration_records', 'dangky_records'].includes(currentView) || currentView.startsWith('dangky_');
+        const isOtherView = ['other_records', 'other_assign_tasks', 'other_check_list', 'other_handover_list', 'other_director_completed'].includes(currentView);
         const isArchiveMeasurementView = ['archive_records', 'archive_assign_tasks', 'archive_completed_list', 'archive_pending_check_list', 'archive_check_list', 'archive_handover_list', 'archive_director_completed'].includes(currentView);
         const isMeasurementView = ['all_records', 'assign_tasks', 'completed_list', 'pending_check_list', 'check_list', 'handover_list', 'director_completed'].includes(currentView);
         
@@ -210,36 +182,17 @@ export const useRecordFilter = (
                 result = result.filter(r => getShortRecordType(r.recordType) === filterRecordType);
             }
         } else if (isOtherView) {
-            result = result.filter(r => isCapGiayRecord(r));
-            
-            if (isDangkySubView) {
-                const targetStepId = currentView.replace('dangky_', '');
-                result = result.filter(r => {
-                    const step = r.capGiaySubStep || 'tiep_nhan_giao_viec';
-                    if (targetStepId === 'tiep_nhan_giao_viec') {
-                        return step === 'tiep_nhan_giao_viec' || step === 'tiep_nhan' || r.status === RecordStatus.RECEIVED;
-                    }
-                    if (targetStepId === 'tham_dinh') {
-                        return step === 'tham_dinh' || step === 'tham_tra' || step === 'cho_tham_dinh';
-                    }
-                    if (targetStepId === 'in_hoan_thien') {
-                        return step === 'in_hoan_thien' || step === 'hoan_thien_trinh_duyet' || step === 'cho_in_hoan_thien' || step === 'cho_in';
-                    }
-                    if (targetStepId === 'cho_ban_giao') {
-                        return step === 'cho_ban_giao' || step === 'ban_giao' || step === 'giao_mot_cua';
-                    }
-                    return step === targetStepId;
-                });
-            }
-
-            if (filterRecordType !== 'all') {
-                result = result.filter(r => getShortRecordType(r.recordType) === filterRecordType || r.recordType === filterRecordType);
-            }
+            result = result.filter(r => {
+                const shortType = getShortRecordType(r.recordType);
+                return ['CMD', 'Tòa án', 'Thi hành án'].includes(shortType);
+            });
         } else if (isMeasurementView) {
             result = result.filter(r => {
-                if (isArchiveRecordType(r.recordType)) return false;
-                if (isCapGiayRecord(r)) return false;
-                return true;
+                const shortType = getShortRecordType(r.recordType);
+                return (
+                    !isArchiveRecordType(r.recordType) &&
+                    !['CMD', 'Tòa án', 'Thi hành án'].includes(shortType)
+                );
             });
             if (filterRecordType !== 'all') {
                 result = result.filter(r => getShortRecordType(r.recordType) === filterRecordType || r.recordType === filterRecordType);
@@ -267,83 +220,11 @@ export const useRecordFilter = (
             });
         }
         if (filterStatus !== 'all' && currentView !== 'handover_list' && currentView !== 'other_handover_list' && currentView !== 'archive_handover_list') {
-            if (filterStatus === RecordStatus.IN_PROGRESS || filterStatus === RecordStatus.ASSIGNED) {
-                result = result.filter(r => {
-                    const s = getEffectiveStatus(r);
-                    return s === RecordStatus.IN_PROGRESS || s === RecordStatus.ASSIGNED;
-                });
-            } else if (filterStatus === 'cho_tham_dinh' || filterStatus === 'tham_dinh') {
-                result = result.filter(r => {
-                    const step = r.capGiaySubStep || 'tham_dinh';
-                    return step === 'tham_dinh' || step === 'tham_tra' || step === 'cho_tham_dinh';
-                });
-            } else if (filterStatus === 'phieu_chuyen_thue') {
-                result = result.filter(r => r.capGiaySubStep === 'phieu_chuyen_thue');
-            } else if (filterStatus === 'cho_tbt') {
-                result = result.filter(r => r.capGiaySubStep === 'cho_tbt');
-            } else if (filterStatus === 'cho_gnt' || filterStatus === 'cho_nop_thue' || filterStatus === 'cho_giay_nop_tien') {
-                result = result.filter(r => r.capGiaySubStep === 'cho_gnt' || r.capGiaySubStep === 'cho_nop_thue' || r.capGiaySubStep === 'cho_giay_nop_tien');
-            } else if (filterStatus === 'in_hoan_thien') {
-                result = result.filter(r => {
-                    const step = r.capGiaySubStep || '';
-                    return step === 'in_hoan_thien' || step === 'hoan_thien_trinh_duyet' || step === 'cho_in_hoan_thien' || step === 'cho_in';
-                });
-            } else {
-                result = result.filter(r => getEffectiveStatus(r) === filterStatus);
-            }
+            result = result.filter(r => r.status === filterStatus);
         }
-        if (filterEmployee !== 'all') {
-            if (filterEmployee === 'unassigned') {
-                result = result.filter(r => !r.assignedTo && !r.checkedBy);
-            } else {
-                const emp = employees.find(e => e.id === filterEmployee || e.name === filterEmployee);
-                const empName = emp ? emp.name : filterEmployee;
-                const isLeader = emp && (
-                    emp.position?.toLowerCase().includes('tổ') ||
-                    emp.position?.toLowerCase().includes('nhóm') ||
-                    emp.position?.toLowerCase().includes('trưởng') ||
-                    emp.position?.toLowerCase().includes('phó')
-                );
-                result = result.filter(r => {
-                    const assigned = r.assignedTo === filterEmployee || r.assignedTo === empName;
-                    const submitted = r.submittedTo === filterEmployee || r.submittedTo === empName;
-                    const checked = isLeader && (r.checkedBy === filterEmployee || r.checkedBy === empName);
-                    return assigned || submitted || checked;
-                });
-            }
-        }
-
-        // Cap Giay / Registration Sub-step Filter
-        if ((currentView === 'other_completed_list' || currentView === 'registration_records' || currentView === 'other_records') && capGiaySubStepFilter && capGiaySubStepFilter !== 'all') {
-            result = result.filter(r => {
-                const currentSubStep = r.capGiaySubStep || 'tham_dinh';
-                if (capGiaySubStepFilter === 'tiep_nhan_giao_viec') {
-                    return currentSubStep === 'tiep_nhan_giao_viec' || currentSubStep === 'tiep_nhan' || r.status === RecordStatus.RECEIVED;
-                }
-                if (capGiaySubStepFilter === 'tham_dinh') {
-                    return currentSubStep === 'tham_dinh' || currentSubStep === 'tham_tra' || currentSubStep === 'cho_tham_dinh';
-                }
-                if (capGiaySubStepFilter === 'cho_gnt') {
-                    return currentSubStep === 'cho_gnt' || currentSubStep === 'cho_nop_thue' || currentSubStep === 'cho_giay_nop_tien';
-                }
-                if (capGiaySubStepFilter === 'in_hoan_thien') {
-                    return currentSubStep === 'in_hoan_thien' || currentSubStep === 'hoan_thien_trinh_duyet' || currentSubStep === 'cho_in_hoan_thien' || currentSubStep === 'cho_in';
-                }
-                if (capGiaySubStepFilter === 'trinh_kiem_tra') {
-                    return currentSubStep === 'trinh_kiem_tra' || currentSubStep === 'kiem_tra' || r.status === RecordStatus.PENDING_CHECK;
-                }
-                if (capGiaySubStepFilter === 'trinh_ky') {
-                    return currentSubStep === 'trinh_ky' || r.status === RecordStatus.PENDING_SIGN;
-                }
-
-                if (capGiaySubStepFilter === 'giao_mot_cua' || capGiaySubStepFilter === 'cho_ban_giao') {
-                    return currentSubStep === 'giao_mot_cua' || currentSubStep === 'cho_ban_giao' || currentSubStep === 'ban_giao' || r.status === RecordStatus.HANDOVER;
-                }
-                if (capGiaySubStepFilter === 'chinh_ly_luu_tru') {
-                    return currentSubStep === 'chinh_ly_luu_tru' || currentSubStep === 'da_ban_giao';
-                }
-                return currentSubStep === capGiaySubStepFilter;
-            });
+        if (filterEmployee !== 'all' && currentView !== 'assign_tasks') {
+            if (filterEmployee === 'unassigned') result = result.filter(r => !r.assignedTo);
+            else result = result.filter(r => r.assignedTo === filterEmployee);
         }
 
         // Date Filters (General for other views)
@@ -393,7 +274,7 @@ export const useRecordFilter = (
         });
 
         return result;
-    }, [records, searchTerm, filterWard, filterRecordType, filterStatus, filterEmployee, capGiaySubStepFilter, filterDate, filterSpecificDate, filterAssignedDate, filterFromDate, filterToDate, showAdvancedDateFilter, warningFilter, currentView, sortConfig, handoverTab, currentUser, employees]);
+    }, [records, searchTerm, filterWard, filterRecordType, filterStatus, filterEmployee, filterDate, filterSpecificDate, filterAssignedDate, filterFromDate, filterToDate, showAdvancedDateFilter, warningFilter, currentView, sortConfig, handoverTab, currentUser, employees]);
 
     const paginatedRecords = useMemo(() => {
         const start = (currentPage - 1) * itemsPerPage;
@@ -407,23 +288,21 @@ export const useRecordFilter = (
         let overdue = 0;
         let approaching = 0;
         if (records.length > 0 && currentUser) {
-            const isOtherView = ['other_records', 'other_assign_tasks', 'other_completed_list', 'other_pending_check_list', 'other_check_list', 'other_handover_list', 'other_director_completed', 'registration_records'].includes(currentView);
+            const isOtherView = ['other_records', 'other_assign_tasks', 'other_check_list', 'other_handover_list', 'other_director_completed'].includes(currentView);
             const isArchiveMeasurementView = ['archive_records', 'archive_assign_tasks', 'archive_completed_list', 'archive_pending_check_list', 'archive_check_list', 'archive_handover_list', 'archive_director_completed'].includes(currentView);
             const isMeasurementView = ['all_records', 'assign_tasks', 'completed_list', 'pending_check_list', 'check_list', 'handover_list', 'director_completed'].includes(currentView);
 
             records.forEach(r => {
-                if (r.status === RecordStatus.HANDOVER || r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.RETURNED || r.exportBatch || r.exportDate || r.resultReturnedDate) return; 
+                if (r.status === RecordStatus.HANDOVER || r.status === RecordStatus.WITHDRAWN) return; 
                 if (!checkWarningPermission(r)) return; 
                 
                 // Filter by recordType based on view group
-                if (isArchiveMeasurementView) {
-                    if (!isArchiveRecordType(r.recordType)) return;
-                } else if (isOtherView) {
-                    if (!isCapGiayRecord(r)) return;
-                } else if (isMeasurementView) {
-                    if (isArchiveRecordType(r.recordType)) return;
-                    if (isCapGiayRecord(r)) return;
-                }
+                if (isArchiveMeasurementView && !isArchiveRecordType(r.recordType)) return;
+                if (isOtherView && !['CMD', 'Tòa án', 'Thi hành án'].includes(getShortRecordType(r.recordType))) return;
+                if (isMeasurementView && (
+                    isArchiveRecordType(r.recordType) ||
+                    ['CMD', 'Tòa án', 'Thi hành án'].includes(getShortRecordType(r.recordType))
+                )) return;
 
                 if (isRecordOverdue(r)) overdue++;
                 else if (isRecordApproaching(r)) approaching++;
@@ -447,7 +326,6 @@ export const useRecordFilter = (
         filterRecordType, setFilterRecordType,
         filterStatus, setFilterStatus,
         filterEmployee, setFilterEmployee,
-        capGiaySubStepFilter, setCapGiaySubStepFilter,
         warningFilter, setWarningFilter,
         handoverTab, setHandoverTab,
         sortConfig, setSortConfig,

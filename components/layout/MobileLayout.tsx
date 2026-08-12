@@ -5,7 +5,6 @@ import {
   FileText, 
   MessageSquare, 
   Settings, 
-  Settings2,
   LogOut, 
   Bell,
   Menu,
@@ -24,11 +23,8 @@ import {
   Mail,
   Clock,
   UserCheck,
-  CheckCircle2,
-  Sun,
-  Moon
+  CheckCircle2
 } from 'lucide-react';
-import { useTheme } from '../../hooks/useTheme';
 
 interface MobileLayoutProps {
   currentUser: User;
@@ -51,7 +47,6 @@ const MobileLayout: React.FC<MobileLayoutProps> = ({
 }) => {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [showHelpModal, setShowHelpModal] = useState(false);
-  const { theme, toggleTheme } = useTheme();
 
   const navItems = [
     { id: 'dashboard', label: 'Tổng quan', icon: LayoutDashboard },
@@ -66,7 +61,7 @@ const MobileLayout: React.FC<MobileLayoutProps> = ({
   navItems.push({ id: 'personal_profile', label: 'Cá nhân', icon: UserIcon });
 
   return (
-    <div className="flex flex-col h-screen bg-slate-50 dark:bg-slate-900 overflow-hidden">
+    <div className="flex flex-col h-screen bg-slate-50 overflow-hidden">
       {/* Top Header */}
       <header className="bg-blue-700 text-white px-3 py-2 sm:px-6 flex justify-between items-center shadow-md shrink-0 z-30 pt-[calc(0.5rem+env(safe-area-inset-top,0px))]">
         <div className="max-w-7xl mx-auto w-full flex justify-between items-center">
@@ -113,9 +108,9 @@ const MobileLayout: React.FC<MobileLayoutProps> = ({
                           setShowHelpModal(true);
                           setIsUserMenuOpen(false);
                         }}
-                        className="w-full min-h-[44px] text-left px-3 py-2 text-xs font-semibold text-blue-700 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-slate-700 rounded-xl flex items-center gap-2.5 transition-colors group cursor-pointer"
+                        className="w-full min-h-[44px] text-left px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-50 rounded-xl flex items-center gap-2.5 transition-colors group cursor-pointer"
                       >
-                        <div className="bg-blue-100 dark:bg-slate-700 p-1.5 rounded-lg text-blue-600 dark:text-blue-300">
+                        <div className="bg-blue-100 p-1.5 rounded-lg text-blue-600">
                           <HelpCircle size={16} />
                         </div>
                         Chính sách & Hỗ trợ kỹ thuật
@@ -132,20 +127,6 @@ const MobileLayout: React.FC<MobileLayoutProps> = ({
                         </div>
                         Cài đặt & Tài khoản
                       </button>
-                      {(currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.SUBADMIN) && (
-                        <button 
-                          onClick={() => {
-                            setCurrentView('system_settings');
-                            setIsUserMenuOpen(false);
-                          }}
-                          className="w-full min-h-[44px] text-left px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-orange-50 hover:text-orange-700 rounded-xl flex items-center gap-2.5 transition-colors group cursor-pointer"
-                        >
-                          <div className="bg-orange-50 p-1.5 rounded-lg text-orange-600">
-                            <Settings2 size={16} />
-                          </div>
-                          Cài đặt hệ thống
-                        </button>
-                      )}
                       <div className="h-px bg-slate-100 my-1 mx-1.5"></div>
                       <button 
                         onClick={() => {

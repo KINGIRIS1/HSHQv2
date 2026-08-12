@@ -6,8 +6,8 @@ import { fetchRecords, fetchEmployees, fetchUsers, fetchUpdateInfo, fetchHoliday
     saveEmployeeApi, deleteEmployeeApi, saveUserApi, deleteUserApi, deleteAllDataApi, getSystemSetting
 } from '../services/api';
 import { supabase } from '../services/supabaseClient';
-import { mapRecordFromDb, getFromCache, CACHE_KEYS } from '../services/apiCore';
-import { DEFAULT_WARDS as STATIC_WARDS, APP_VERSION, MOCK_EMPLOYEES, MOCK_USERS } from '../constants';
+import { mapRecordFromDb } from '../services/apiCore';
+import { DEFAULT_WARDS as STATIC_WARDS, APP_VERSION } from '../constants';
 import { migrateUnbatchedRecords } from '../utils/appHelpers';
 
 export const useAppData = (currentUser: User | null) => {
@@ -31,81 +31,88 @@ export const useAppData = (currentUser: User | null) => {
     const [updateUrl, setUpdateUrl] = useState<string | null>(null);
 
     const loadData = useCallback(async () => {
+        // 1. Load from cache immediately for instant render
         try {
-            const safeFetch = async <T>(fn: () => Promise<T>, timeoutMs: number, fallback: T): Promise<T> => {
-                try {
-                    let timer: any;
-                    const timeoutPromise = new Promise<T>((resolve) => {
-                        timer = setTimeout(() => {
-                            console.warn(`Request timed out after ${timeoutMs}ms, using fallback.`);
-                            resolve(fallback);
-                        }, timeoutMs);
-                    });
-                    const res = await Promise.race([fn(), timeoutPromise]);
-                    clearTimeout(timer);
-                    return res ?? fallback;
-                } catch {
-                    return fallback;
-                }
-            };
+            const { getFromCache, CACHE_KEYS } = await import('../services/apiCore');
+            const { MOCK_EMPLOYEES, MOCK_USERS } = await import('../constants');
+            
+            const cachedRecords = getFromCache(CACHE_KEYS.RECORDS, []);
+            if (cachedRecords.length > 0) {
+                const { migratedRecords } = migrateUnbatchedRecords(cachedRecords);
+                setRecords(migratedRecords);
+            }
+            setEmployees(getFromCache(CACHE_KEYS.EMPLOYEES, MOCK_EMPLOYEES));
+            setUsers(getFromCache(CACHE_KEYS.USERS, MOCK_USERS));
+            setHolidays(getFromCache(CACHE_KEYS.HOLIDAYS, []));
+        } catch (e) {
+            console.warn("Error loading initial cache:", e);
+        }
 
-            const [recData, empData, userData, updateInfo, holidayData, permsData, deptPermsData, workflowSlaData] = await Promise.all([
-                safeFetch(() => fetchRecords(), 12000, getFromCache(CACHE_KEYS.RECORDS, [])),
-                safeFetch(() => fetchEmployees(), 10000, getFromCache(CACHE_KEYS.EMPLOYEES, MOCK_EMPLOYEES)),
-                safeFetch(() => fetchUsers(), 10000, getFromCache(CACHE_KEYS.USERS, MOCK_USERS)),
-                safeFetch(() => fetchUpdateInfo(), 5000, null),
-                safeFetch(() => fetchHolidays(), 5000, getFromCache(CACHE_KEYS.HOLIDAYS, [])),
-                safeFetch(() => getSystemSetting('role_permissions'), 5000, null),
-                safeFetch(() => getSystemSetting('department_permissions'), 5000, null),
-                safeFetch(() => getSystemSetting('workflow_sla_configs'), 5000, null)
+        // 2. Fetch fresh data with Promise.allSettled resilience
+        try {
+            const results = await Promise.allSettled([
+                fetchRecords(),
+                fetchEmployees(),
+                fetchUsers(),
+                fetchUpdateInfo(),
+                fetchHolidays(),
+                getSystemSetting('role_permissions'),
+                getSystemSetting('department_permissions')
             ]);
 
-            const rawList = Array.isArray(recData) ? recData : [];
-            const { migratedRecords } = migrateUnbatchedRecords(rawList);
-            setRecords(migratedRecords.length > 0 ? migratedRecords : getFromCache(CACHE_KEYS.RECORDS, []));
-            setEmployees(empData && empData.length > 0 ? empData : getFromCache(CACHE_KEYS.EMPLOYEES, MOCK_EMPLOYEES));
-            setUsers(userData && userData.length > 0 ? userData : getFromCache(CACHE_KEYS.USERS, MOCK_USERS));
-            setHolidays(holidayData || []);
+            const [recRes, empRes, userRes, updateRes, holidayRes, permsRes, deptPermsRes] = results;
 
-            if (workflowSlaData) {
-                try {
-                    localStorage.setItem('workflow_sla_configs', workflowSlaData);
-                } catch (e) {
-                    console.warn("Failed to sync workflow_sla_configs to localStorage", e);
-                }
+            if (recRes.status === 'fulfilled' && Array.isArray(recRes.value)) {
+                const { migratedRecords } = migrateUnbatchedRecords(recRes.value);
+                setRecords(migratedRecords);
             }
-
-            if (permsData) {
+            if (empRes.status === 'fulfilled' && Array.isArray(empRes.value)) {
+                setEmployees(empRes.value);
+            }
+            if (userRes.status === 'fulfilled' && Array.isArray(userRes.value)) {
+                setUsers(userRes.value);
+            }
+            if (holidayRes.status === 'fulfilled' && Array.isArray(holidayRes.value)) {
+                setHolidays(holidayRes.value);
+            }
+            if (permsRes.status === 'fulfilled' && permsRes.value) {
                 try {
-                    const parsed = JSON.parse(permsData);
+                    const parsed = JSON.parse(permsRes.value);
+                    const defaultOneDoor = DEFAULT_ROLE_PERMISSIONS[UserRole.ONEDOOR] || [];
+                    const existingOneDoor = parsed[UserRole.ONEDOOR] || [];
+                    parsed[UserRole.ONEDOOR] = Array.from(new Set([...existingOneDoor, ...defaultOneDoor]));
                     setRolePermissions(parsed);
                 } catch (e) {
-                    console.warn("Failed to parse role_permissions", e);
+                    console.error("Failed to parse role_permissions", e);
                 }
             }
-            if (deptPermsData) {
+            if (deptPermsRes.status === 'fulfilled' && deptPermsRes.value) {
                 try {
-                    const parsedDept = JSON.parse(deptPermsData);
+                    const parsedDept = JSON.parse(deptPermsRes.value);
+                    Object.keys(parsedDept).forEach(key => {
+                        if (key.endsWith(`_${UserRole.ONEDOOR}`)) {
+                            const defaultOneDoor = DEFAULT_ROLE_PERMISSIONS[UserRole.ONEDOOR] || [];
+                            parsedDept[key] = Array.from(new Set([...(parsedDept[key] || []), ...defaultOneDoor]));
+                        }
+                    });
                     setDepartmentPermissions(parsedDept);
                 } catch (e) {
-                    console.warn("Failed to parse department_permissions", e);
+                    console.error("Failed to parse department_permissions", e);
                 }
             }
-            setConnectionStatus('connected');
 
-            if (updateInfo && updateInfo.version && updateInfo.version !== APP_VERSION) {
-                setIsUpdateAvailable(true);
-                setLatestVersion(updateInfo.version);
-                setUpdateUrl(updateInfo.url);
+            if (updateRes.status === 'fulfilled' && updateRes.value && updateRes.value.version) {
+                if (updateRes.value.version !== APP_VERSION) {
+                    setIsUpdateAvailable(true);
+                    setLatestVersion(updateRes.value.version);
+                    setUpdateUrl(updateRes.value.url);
+                }
             }
+
+            setConnectionStatus('connected');
         } catch (error) {
-            console.warn("Lỗi tải dữ liệu cloud, chuyển sang chế độ cache offline:", error);
+            console.warn("Network fetch warning (using cached/offline data):", error);
             setConnectionStatus('offline');
-            
-            setRecords((prev) => prev.length > 0 ? prev : getFromCache(CACHE_KEYS.RECORDS, []));
-            setEmployees((prev) => prev.length > 0 ? prev : getFromCache(CACHE_KEYS.EMPLOYEES, MOCK_EMPLOYEES));
-            setUsers((prev) => prev.length > 0 ? prev : getFromCache(CACHE_KEYS.USERS, MOCK_USERS));
-            setHolidays((prev) => prev.length > 0 ? prev : getFromCache(CACHE_KEYS.HOLIDAYS, []));
         }
     }, []);
 
@@ -114,42 +121,39 @@ export const useAppData = (currentUser: User | null) => {
         loadData();
     }, [loadData]);
 
-    // Lắng nghe thay đổi Realtime từ 3 bảng: land_records, dangky_records, luutru_records
+    // Lắng nghe thay đổi Realtime từ bảng land_records
     useEffect(() => {
         if (!supabase) return;
 
-        const tables = ['land_records', 'dangky_records', 'luutru_records'];
-        const channels = tables.map(table => {
-            return supabase.channel(`${table}_changes`)
-                .on(
-                    'postgres_changes',
-                    { event: 'INSERT', schema: 'public', table },
-                    (payload) => {
-                        setRecords(prev => {
-                            if (prev.some(r => r.id === payload.new.id)) return prev;
-                            return [mapRecordFromDb(payload.new) as RecordFile, ...prev];
-                        });
-                    }
-                )
-                .on(
-                    'postgres_changes',
-                    { event: 'UPDATE', schema: 'public', table },
-                    (payload) => {
-                        setRecords(prev => prev.map(r => r.id === payload.new.id ? { ...r, ...mapRecordFromDb(payload.new) } as RecordFile : r));
-                    }
-                )
-                .on(
-                    'postgres_changes',
-                    { event: 'DELETE', schema: 'public', table },
-                    (payload) => {
-                        setRecords(prev => prev.filter(r => r.id !== payload.old.id));
-                    }
-                )
-                .subscribe();
-        });
+        const landRecordsChannel = supabase.channel('land_records_changes')
+            .on(
+                'postgres_changes',
+                { event: 'INSERT', schema: 'public', table: 'land_records' },
+                (payload) => {
+                    setRecords(prev => {
+                        if (prev.some(r => r.id === payload.new.id)) return prev;
+                        return [mapRecordFromDb(payload.new) as RecordFile, ...prev];
+                    });
+                }
+            )
+            .on(
+                'postgres_changes',
+                { event: 'UPDATE', schema: 'public', table: 'land_records' },
+                (payload) => {
+                    setRecords(prev => prev.map(r => r.id === payload.new.id ? { ...r, ...mapRecordFromDb(payload.new) } as RecordFile : r));
+                }
+            )
+            .on(
+                'postgres_changes',
+                { event: 'DELETE', schema: 'public', table: 'land_records' },
+                (payload) => {
+                    setRecords(prev => prev.filter(r => r.id !== payload.old.id));
+                }
+            )
+            .subscribe();
 
         return () => {
-            channels.forEach(ch => supabase.removeChannel(ch));
+            supabase.removeChannel(landRecordsChannel);
         };
     }, []);
 

@@ -1,15 +1,23 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { RecordFile, RecordStatus, User, UserRole } from '../types';
 import { updateRecordFieldsApi } from '../services/api';
-import { parseSafeDate } from '../utils/appHelpers';
 
 const REMINDER_INTERVAL = 60000; // Kiểm tra mỗi 1 phút
 const REPEAT_HOURS = 2; // Nhắc lại mỗi 2 giờ
 
-// Helper gửi thông báo hệ thống (Notification API) - Đã tắt hoàn toàn theo yêu cầu của người dùng
-const triggerSystemNotification = (_title: string, _body: string) => {
-    // Đã tắt hoàn toàn tất cả thông báo thời gian thực / hệ thống khi có hồ sơ mới chuyển tới hoặc trễ hạn
-    return;
+// Helper gửi thông báo hệ thống (Notification API)
+const triggerSystemNotification = (title: string, body: string) => {
+    if (window.electronAPI && window.electronAPI.showNotification) {
+        window.electronAPI.showNotification(title, body);
+    } else if (Notification.permission === 'granted') {
+        new Notification(title, { body });
+    } else if (Notification.permission !== 'denied') {
+        Notification.requestPermission().then(permission => {
+            if (permission === 'granted') {
+                new Notification(title, { body });
+            }
+        });
+    }
 };
 
 export const useReminderSystem = (
@@ -63,28 +71,7 @@ export const useReminderSystem = (
                 const newStatus = r.status;
                 const isAssignedEmployee = currentUser && currentUser.employeeId === r.assignedTo;
 
-                // A. 'Đang chờ ký' -> RecordStatus.PENDING_SIGN
-                if (newStatus === RecordStatus.PENDING_SIGN) {
-                    const isRelevantSupervisor = currentUser && (
-                        currentUser.role === UserRole.ADMIN ||
-                        currentUser.role === UserRole.SUBADMIN ||
-                        currentUser.employeeId === r.submittedTo
-                    );
-
-                    if (isRelevantSupervisor) {
-                        triggerSystemNotification(
-                            `Yêu cầu Trình ký mới: ${r.code}`,
-                            `Hồ sơ của khách hàng ${r.customerName} đã được trình ký duyệt. Vui lòng kiểm tra!`
-                        );
-                    } else if (isAssignedEmployee) {
-                        triggerSystemNotification(
-                            `Hồ sơ đã được trình ký: ${r.code}`,
-                            `Hồ sơ của khách hàng ${r.customerName} đã chuyển sang trạng thái chờ ký duyệt.`
-                        );
-                    }
-                }
-
-                // B. 'Đã trả về' -> RecordStatus.REJECTED (trả về nhân viên)
+                // A. 'Hồ sơ trả về' -> RecordStatus.REJECTED
                 if (newStatus === RecordStatus.REJECTED) {
                     const isOneDoor = currentUser && currentUser.role === UserRole.ONEDOOR;
                     if (isAssignedEmployee) {
@@ -96,16 +83,6 @@ export const useReminderSystem = (
                         triggerSystemNotification(
                             `Hồ sơ lỗi trả về một cửa: ${r.code}`,
                             `Hồ sơ ${r.code} (khách hàng ${r.customerName}) đã bị trả về một cửa.`
-                        );
-                    }
-                }
-
-                // C. 'Giao giải quyết' -> RecordStatus.ASSIGNED
-                if (newStatus === RecordStatus.ASSIGNED) {
-                    if (isAssignedEmployee) {
-                        triggerSystemNotification(
-                            `Giao hồ sơ mới: ${r.code}`,
-                            `Bạn đã được phân công xử lý hồ sơ ${r.code} cho khách hàng ${r.customerName}.`
                         );
                     }
                 }
@@ -187,8 +164,8 @@ export const useReminderSystem = (
                     ].includes(r.status);
 
                     if (!isFinishedOrWithdrawn) {
-                        const deadlineDate = parseSafeDate(r.deadline);
-                        const deadlineTime = deadlineDate ? deadlineDate.getTime() : NaN;
+                        const deadlineDate = new Date(r.deadline);
+                        const deadlineTime = deadlineDate.getTime();
                         
                         if (!isNaN(deadlineTime) && now >= deadlineTime) {
                             const isAssignedToCurrentUser = currentUser && currentUser.employeeId === r.assignedTo;

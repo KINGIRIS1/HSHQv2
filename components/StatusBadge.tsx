@@ -9,16 +9,18 @@ interface StatusBadgeProps {
 
 const StatusBadge: React.FC<StatusBadgeProps> = ({ status }) => {
   // Map specific status values to customized bullet colors
-  const dotColors: Record<RecordStatus, string> = {
+  const dotColors: Partial<Record<RecordStatus, string>> = {
     [RecordStatus.RECEIVED]: 'bg-gray-400',
-    [RecordStatus.ASSIGNED]: 'bg-blue-500',
-    [RecordStatus.IN_PROGRESS]: 'bg-blue-500',
-    [RecordStatus.PENDING_CHECK]: 'bg-orange-500',
-    [RecordStatus.PENDING_SIGN]: 'bg-purple-500',
-    [RecordStatus.SIGNED]: 'bg-purple-500',
+    [RecordStatus.ASSIGNED]: 'bg-amber-500 animate-pulse',
+    [RecordStatus.IN_PROGRESS]: 'bg-amber-500 animate-pulse',
+    [RecordStatus.COMPLETED_WORK]: 'bg-amber-500 animate-pulse',
+    [RecordStatus.PENDING_CHECK]: 'bg-amber-500 animate-pulse',
+    [RecordStatus.CHECKED]: 'bg-amber-500 animate-pulse',
+    [RecordStatus.PENDING_SIGN]: 'bg-green-500 animate-pulse',
+    [RecordStatus.SIGNED]: 'bg-green-500 animate-pulse',
     [RecordStatus.HANDOVER]: 'bg-green-500 animate-pulse',
-    [RecordStatus.PENDING_SUPPLEMENT]: 'bg-amber-500 animate-pulse',
     [RecordStatus.RETURNED]: 'bg-emerald-500',
+    [RecordStatus.PENDING_SUPPLEMENT]: 'bg-pink-500',
     [RecordStatus.WITHDRAWN]: 'bg-slate-400',
     [RecordStatus.REJECTED]: 'bg-rose-500',
   };

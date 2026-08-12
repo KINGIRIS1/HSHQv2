@@ -21,10 +21,10 @@ const ArchiveDetailModal: React.FC<ArchiveDetailModalProps> = ({ isOpen, onClose
     const mapStatus = (s: string): RecordStatus => {
         switch(s) {
             case 'draft': return RecordStatus.RECEIVED;
-            case 'assigned': return RecordStatus.ASSIGNED;
-            case 'executed': return RecordStatus.IN_PROGRESS;
-            case 'pending_sign': return RecordStatus.PENDING_SIGN;
-            case 'signed': return RecordStatus.SIGNED;
+            case 'assigned':
+            case 'executed':
+            case 'pending_sign':
+            case 'signed': return RecordStatus.IN_PROGRESS;
             case 'completed': return RecordStatus.RETURNED;
             default: return RecordStatus.RECEIVED;
         }
@@ -42,8 +42,8 @@ const ArchiveDetailModal: React.FC<ArchiveDetailModalProps> = ({ isOpen, onClose
     };
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-2 sm:p-4 backdrop-blur-sm">
-            <div className="bg-gray-50 rounded-xl shadow-2xl w-full max-w-7xl 2xl:max-w-[1700px] max-h-[95vh] overflow-hidden flex flex-col animate-fade-in-up">
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+            <div className="bg-gray-50 rounded-xl shadow-2xl w-full max-w-7xl max-h-[95vh] overflow-hidden flex flex-col animate-fade-in-up">
                 {/* HEADER */}
                 <div className="bg-white px-6 py-4 border-b border-gray-200 flex justify-between items-center shrink-0">
                     <div className="flex items-center gap-4">
@@ -110,7 +110,18 @@ const ArchiveDetailModal: React.FC<ArchiveDetailModalProps> = ({ isOpen, onClose
                                 </div>
                             )}
 
-
+                            {/* NGƯỜI XỬ LÝ */}
+                            <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+                                <label className="text-[10px] text-gray-400 uppercase font-bold block mb-2">Người xử lý hồ sơ</label>
+                                <div className="flex items-center gap-3 bg-gray-50 p-3 rounded-lg border border-gray-100">
+                                    <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-500">
+                                        <UserIcon size={16}/>
+                                    </div>
+                                    <span className="font-bold text-sm text-gray-700">
+                                        {record.data?.assigned_to ? getEmployeeName(record.data.assigned_to) : 'Chưa giao'}
+                                    </span>
+                                </div>
+                            </div>
                         </div>
 
                         {/* COLUMN 2: CHI TIẾT */}

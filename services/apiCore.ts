@@ -106,11 +106,13 @@ export const logError = (context: string, error: any, silent: boolean = false) =
     }
 
     if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('configuration') || msg.includes('Load failed')) {
-        console.warn(`⚠️ [Lỗi kết nối] ${context}: Không thể kết nối tới cơ sở dữ liệu Cloud Supabase. Vui lòng kiểm tra lại mạng.`);
-        return;
-    } else if (code === '42P01') {
-        console.error(`❌ Lỗi tại ${context}: Bảng dữ liệu chưa tồn tại trên Supabase! (Code: 42P01)`);
-        alert(`LỖI BẢNG DỮ LIỆU: Bảng '${context.includes('Contract') ? 'contracts' : 'land_records'}' chưa tồn tại trên Supabase!\n\nVui lòng truy cập SQL Editor trên trang quản trị Supabase và tạo bảng tương ứng.`);
+        console.error(`❌ [Lỗi kết nối] ${context}: Không thể kết nối tới cơ sở dữ liệu Cloud Supabase. Vui lòng kiểm tra lại mạng.`);
+        alert(`LỖI KẾT NỐI: Không thể kết nối tới cơ sở dữ liệu Cloud Supabase. Vui lòng kiểm tra kết nối mạng của bạn.`);
+    } else if (code === '42P01' || code === 'PGRST205' || (typeof msg === 'string' && msg.includes('schema cache'))) {
+        console.error(`❌ Lỗi tại ${context}: Bảng dữ liệu chưa tồn tại trên Supabase! (Code: ${code || 'PGRST205'})`);
+        if (!silent) {
+            alert(`LỖI BẢNG DỮ LIỆU: Bảng '${context.includes('Contract') ? 'contracts' : 'archive_records'}' chưa tồn tại trên Supabase!\n\nVui lòng truy cập SQL Editor trên trang quản trị Supabase và chạy file SQL tạo bảng tương ứng.`);
+        }
     } else if (code === '22P02') {
         console.error(`❌ Lỗi tại ${context}: Định dạng dữ liệu không khớp kiểu cột Supabase (Lỗi 22P02). Hệ thống sẽ tự động xử lý ép kiểu an toàn.`);
     } else if (code === 'PGRST204' || code === '42703' || msg.includes('column') || details.includes('column') || msg.includes('does not exist')) {
@@ -178,7 +180,7 @@ export const keepOnlyDate = (val: any): string | null => {
     return val;
 };
 
-export const sanitizeData = (data: any, allowedColumns?: string[]) => {
+export const sanitizeData = (data: any, allowedColumns: string[]) => {
     const clean: any = { ...data };
     const numberFields = [
         'area', 'unitPrice', 'vatRate', 'vatAmount', 'totalAmount', 
@@ -194,12 +196,12 @@ export const sanitizeData = (data: any, allowedColumns?: string[]) => {
         }
     });
     
-    // DateTime fields: Giữ nguyên ngày và giờ
+    // DateTime fields: Giữ nguyên ngày và giờ (những trường thực sự cần lưu đầy đủ timestamp)
     const dateTimeFields = [
         'lastRemindedAt', 'createdDate'
     ];
 
-    // Date-only fields: Chỉ lấy phần ngày YYYY-MM-DD
+    // Date-only fields: Chỉ lấy phần ngày YYYY-MM-DD, loại bỏ hoàn toàn phần giờ
     const dateOnlyFields = [
         'receivedDate', 'resultReturnedDate',
         'deadline', 'assignedDate', 
@@ -228,8 +230,6 @@ export const sanitizeData = (data: any, allowedColumns?: string[]) => {
             }
         }
     });
-
-    if (!allowedColumns) return clean;
     
     const sanitized: any = {};
     allowedColumns.forEach(col => {
@@ -361,13 +361,6 @@ export const mapRecordFromDb = (item: any): any => {
     r.isHandedOver = val(r.isHandedOver, r.ishandedover, r.is_handed_over);
     r.deadline = keepOnlyDate(val(r.deadline, r.deadline, r.dead_line));
     
-    r.capGiaySubStep = val(r.capGiaySubStep, r.capgiaysubstep, r.cap_giay_sub_step);
-    
-    r.taxTransferDate = keepOnlyDate(val(r.taxTransferDate, r.taxtransferdate, r.tax_transfer_date));
-    r.taxNoticeDate = keepOnlyDate(val(r.taxNoticeDate, r.taxnoticedate, r.tax_notice_date));
-    r.taxPaidDate = keepOnlyDate(val(r.taxPaidDate, r.taxpaiddate, r.tax_paid_date));
-    r.printedDate = keepOnlyDate(val(r.printedDate, r.printeddate, r.printed_date));
-    
     let rawLogs = val(r.statusLogs, r.statuslogs, r.status_logs);
     if (typeof rawLogs === 'string') {
         try { rawLogs = JSON.parse(rawLogs); } catch (e) { rawLogs = []; }
@@ -375,15 +368,6 @@ export const mapRecordFromDb = (item: any): any => {
     r.statusLogs = Array.isArray(rawLogs) ? rawLogs : [];
     r.archiveHandoverDate = keepOnlyDate(val(r.archiveHandoverDate, r.archivehandoverdate, r.archive_handover_date));
     r.archiveHandoverBatch = val(r.archiveHandoverBatch, r.archivehandoverbatch, r.archive_handover_batch);
-
-    if (r.status === 'ASSIGNED' || r.status === 'assigned' || r.status === 'IN_PROGRESS' || r.status === 'completed_work' || r.status === 'executed') r.status = 'IN_PROGRESS';
-    if (r.status === 'PENDING_CHECK' || r.status === 'checked') r.status = 'PENDING_CHECK';
-
-    if (r.resultReturnedDate && r.status !== 'RETURNED') {
-        r.status = 'RETURNED';
-    } else if ((r.exportBatch || r.exportDate) && r.status !== 'WITHDRAWN' && r.status !== 'RETURNED' && r.status !== 'REJECTED') {
-        r.status = 'HANDOVER';
-    }
 
     return r;
 };

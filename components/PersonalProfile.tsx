@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { RecordFile, RecordStatus, User, Employee, Contract, UserRole } from "../types";
+import { RecordFile, RecordStatus, User, Employee, Contract } from "../types";
 import StatusBadge from "./StatusBadge";
 import {
   Briefcase,
@@ -27,8 +27,8 @@ import {
   FileX,
 } from "lucide-react";
 import * as XLSX from "xlsx-js-style";
-import { getShortRecordType, isArchiveRecordType, isCapGiayRecord } from "../constants";
-import { confirmAction, calculateDeadlineHelperByDays, formatCheckOrSignDate } from "../utils/appHelpers";
+import { getShortRecordType, isArchiveRecordType } from "../constants";
+import { confirmAction, cleanSyncNotes } from "../utils/appHelpers";
 import { updateRecordApi, fetchContracts } from "../services/api";
 import {
   fetchArchiveRecords,
@@ -55,7 +55,6 @@ interface PersonalProfileProps {
   onViewRecord: (record: RecordFile) => void;
   onCreateLiquidation?: (record: RecordFile) => void;
   onMapCorrection?: (record: RecordFile) => void; // New Handler Prop
-  onAssignRecord?: (record: RecordFile) => void;
 }
 
 function removeVietnameseTones(str: string): string {
@@ -87,16 +86,13 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
   onCreateLiquidation,
   onMapCorrection,
 }) => {
-  // Thêm tab 'all', 'overdue', 'upcoming'
+  // Thêm tab 'pending_sign'
   const [activeTab, setActiveTab] = useState<
-    | "all"
     | "pending"
     | "pending_check"
     | "pending_sign"
     | "finished"
     | "reminder"
-    | "overdue"
-    | "upcoming"
   >(isDirector ? "pending_sign" : "pending");
   const [currentPage, setCurrentPage] = useState(1);
   const [mobileVisibleCount, setMobileVisibleCount] = useState(20);
@@ -162,28 +158,39 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
   const myRecords = useMemo(() => {
     const mainRecords = records.filter((r) => {
       if (!user.employeeId) return false;
-      // Hồ sơ Cấp giấy đang ở bước Chờ nộp tiền thuế thì KHÔNG xuất hiện ở Tab cá nhân
-      if (isCapGiayRecord(r) && (r.capGiaySubStep === 'cho_nop_thue' || r.capGiaySubStep === 'cho_giay_nop_tien')) {
-        return false;
-      }
       if (isDirector) {
         return (
           r.submittedTo === user.employeeId || r.assignedTo === user.employeeId
         );
       }
-      // Nếu là người kiểm tra (Tổ trưởng / Tổ phó), họ có thể thấy hồ sơ được giao cho họ HOẶC hồ sơ trình cho họ kiểm tra
-      const emp = employees.find((e) => e.id === user.employeeId);
-      const isCheckerUser = (user.role === UserRole.TEAM_LEADER) || (emp && (
-        emp.position?.toLowerCase().includes("tổ") ||
-        emp.position?.toLowerCase().includes("nhóm") ||
-        emp.position?.toLowerCase().includes("trưởng") ||
-        emp.position?.toLowerCase().includes("phó")
-      ));
+      // Nếu là người kiểm tra, họ có thể thấy hồ sơ được giao cho họ HOẶC hồ sơ trình cho họ kiểm tra
+      const isCheckerUser =
+        employees
+          .find((e) => e.id === user.employeeId)
+          ?.position?.toLowerCase()
+          .includes("tổ") &&
+        (employees
+          .find((e) => e.id === user.employeeId)
+          ?.department?.toLowerCase()
+          .includes("đo đạc") ||
+          employees
+            .find((e) => e.id === user.employeeId)
+            ?.department?.toLowerCase()
+            .includes("kỹ thuật"));
       if (isCheckerUser) {
-        if (r.assignedTo === user.employeeId || r.checkedBy === user.employeeId || r.submittedTo === user.employeeId) return true;
+        // Chỉ hiển thị hồ sơ giao xử lý (assignedTo) HOẶC hồ sơ đã tới khâu kiểm tra (status >= PENDING_CHECK) nếu họ là người kiểm tra (checkedBy)
+        if (r.assignedTo === user.employeeId) return true;
+        if (r.checkedBy === user.employeeId) {
+          const reachedCheckStage =
+            r.status !== RecordStatus.RECEIVED &&
+            r.status !== RecordStatus.ASSIGNED &&
+            r.status !== RecordStatus.IN_PROGRESS &&
+            r.status !== RecordStatus.COMPLETED_WORK;
+          return reachedCheckStage;
+        }
         return false;
       }
-      return r.assignedTo === user.employeeId || r.submittedTo === user.employeeId;
+      return r.assignedTo === user.employeeId;
     });
 
     const mappedArchives = archiveRecords
@@ -195,24 +202,45 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
             r.data?.assigned_to === user.employeeId
           );
         }
-        const emp = employees.find((e) => e.id === user.employeeId);
-        const isCheckerUser = (user.role === UserRole.TEAM_LEADER) || (emp && (
-          emp.position?.toLowerCase().includes("tổ") ||
-          emp.position?.toLowerCase().includes("nhóm") ||
-          emp.position?.toLowerCase().includes("trưởng") ||
-          emp.position?.toLowerCase().includes("phó")
-        ));
+        const isCheckerUser =
+          employees
+            .find((e) => e.id === user.employeeId)
+            ?.position?.toLowerCase()
+            .includes("tổ") &&
+          (employees
+            .find((e) => e.id === user.employeeId)
+            ?.department?.toLowerCase()
+            .includes("đo đạc") ||
+            employees
+              .find((e) => e.id === user.employeeId)
+              ?.department?.toLowerCase()
+              .includes("kỹ thuật"));
         if (isCheckerUser) {
-          if (r.data?.assigned_to === user.employeeId || r.data?.checked_by === user.employeeId || r.data?.submitted_to === user.employeeId) return true;
+          if (r.data?.assigned_to === user.employeeId) return true;
+          if (r.data?.checked_by === user.employeeId) {
+            // Map status của archive để kiểm tra xem đã tới khâu kiểm tra chưa
+            let status: RecordStatus = RecordStatus.RECEIVED;
+            if (r.status === "assigned") status = RecordStatus.ASSIGNED;
+            else if (r.status === "executed") status = RecordStatus.COMPLETED_WORK;
+            else if (r.status === "pending_sign") status = RecordStatus.PENDING_SIGN;
+            else if (r.status === "signed") status = RecordStatus.SIGNED;
+            else if (r.status === "completed") status = RecordStatus.RETURNED;
+
+            const reachedCheckStage =
+              status === RecordStatus.PENDING_SIGN ||
+              status === RecordStatus.SIGNED ||
+              status === RecordStatus.RETURNED;
+            return reachedCheckStage;
+          }
           return false;
         }
-        return r.data?.assigned_to === user.employeeId || r.data?.submitted_to === user.employeeId;
+        return r.data?.assigned_to === user.employeeId;
       })
       .map((r) => {
         // Map status
         let status = RecordStatus.RECEIVED;
         if (r.status === "assigned") status = RecordStatus.ASSIGNED;
-        else if (r.status === "executed") status = RecordStatus.IN_PROGRESS;
+        else if (r.status === "executed") status = RecordStatus.COMPLETED_WORK;
         else if (r.status === "pending_sign")
           status = RecordStatus.PENDING_SIGN;
         else if (r.status === "signed") status = RecordStatus.SIGNED;
@@ -295,104 +323,23 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
     }
   }, [isChecker]);
 
-  // Helper tính số ngày còn lại đến hạn
-  function getDaysRemaining(r: RecordFile): number | null {
-    const isFinished =
-      r.status === RecordStatus.HANDOVER ||
-      r.status === RecordStatus.RETURNED ||
-      r.status === RecordStatus.REJECTED ||
-      r.status === RecordStatus.WITHDRAWN ||
-      Boolean(r.completedDate) ||
-      Boolean(r.exportDate) ||
-      Boolean(r.resultReturnedDate);
-
-    if (isFinished || !r.deadline) return null;
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const dl = new Date(r.deadline);
-    dl.setHours(0, 0, 0, 0);
-    return Math.ceil((dl.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-  }
-
-  // Helper filter & sort chung (Sắp xếp thông minh đưa hồ sơ trễ hạn lên đầu tiên, sắp xếp giảm dần theo mức độ trễ)
-  function filterAndSort(list: RecordFile[], term: string, sort: any) {
-    if (term) {
-      const lowerSearch = removeVietnameseTones(term);
-      const rawSearch = term.toLowerCase();
-      list = list.filter((r) => {
-        const nameNorm = removeVietnameseTones(r.customerName || "");
-        const codeRaw = (r.code || "").toLowerCase();
-        const wardNorm = removeVietnameseTones(r.ward || "");
-        return (
-          nameNorm.includes(lowerSearch) ||
-          codeRaw.includes(rawSearch) ||
-          wardNorm.includes(lowerSearch)
-        );
-      });
-    }
-
-    return list.sort((a, b) => {
-      // Nếu người dùng chọn sắp xếp thủ công theo cột khác không phải deadline
-      if (sort.key && sort.key !== "deadline") {
-        const aValue = a[sort.key as keyof RecordFile];
-        const bValue = b[sort.key as keyof RecordFile];
-        if (!aValue) return 1;
-        if (!bValue) return -1;
-        if (aValue < bValue) return sort.direction === "asc" ? -1 : 1;
-        if (aValue > bValue) return sort.direction === "asc" ? 1 : -1;
-        return 0;
-      }
-
-      // SẮP XẾP THÔNG MINH (Default hoặc khi xếp theo hạn xử lý):
-      // 1. Hồ sơ trễ hạn (days < 0): Lên đầu tiên! Sắp xếp trễ nhiều ngày nhất trước (-15 ngày, -10 ngày, -2 ngày, -1 ngày)
-      // 2. Hồ sơ còn hạn/sắp tới hạn (days >= 0): Sắp xếp theo hạn gần nhất trước (0 ngày, 1 ngày, 2 ngày...)
-      // 3. Hồ sơ đã hoàn thành / không có hạn: Đưa xuống cuối
-      const daysA = getDaysRemaining(a);
-      const daysB = getDaysRemaining(b);
-
-      const isOverdueA = daysA !== null && daysA < 0;
-      const isOverdueB = daysB !== null && daysB < 0;
-
-      if (isOverdueA && isOverdueB) {
-        return daysA! - daysB!; // -15 trước -2 (vì -15 < -2 => trễ nhiều hơn lên trước)
-      }
-      if (isOverdueA && !isOverdueB) return -1;
-      if (!isOverdueA && isOverdueB) return 1;
-
-      if (daysA !== null && daysB !== null) {
-        return daysA - daysB; // 0 ngày, 1 ngày, 2 ngày...
-      }
-      if (daysA !== null && daysB === null) return -1;
-      if (daysA === null && daysB !== null) return 1;
-
-      const timeA = a.deadline ? new Date(a.deadline).getTime() : 0;
-      const timeB = b.deadline ? new Date(b.deadline).getTime() : 0;
-      return sort.direction === "desc" ? timeB - timeA : timeA - timeB;
-    });
-  }
-
-  // 0. Tất cả hồ sơ được giao
-  const allRecords = useMemo(() => {
-    return filterAndSort(myRecords, searchTerm, sortConfig);
-  }, [myRecords, searchTerm, sortConfig]);
-
-  // 1. Hồ sơ Đang thực hiện (ASSIGNED, IN_PROGRESS, COMPLETED_WORK do chính mình thực hiện)
+  // 1. Hồ sơ Đang thực hiện (ASSIGNED, IN_PROGRESS, COMPLETED_WORK)
   const pendingRecords = useMemo(() => {
     let list = myRecords.filter(
       (r) =>
-        r.assignedTo === user.employeeId &&
-        (r.status === RecordStatus.ASSIGNED ||
-          r.status === RecordStatus.IN_PROGRESS),
+        r.status === RecordStatus.ASSIGNED ||
+        r.status === RecordStatus.IN_PROGRESS ||
+        r.status === RecordStatus.COMPLETED_WORK,
     );
     return filterAndSort(list, searchTerm, sortConfig);
-  }, [myRecords, user.employeeId, searchTerm, sortConfig]);
+  }, [myRecords, searchTerm, sortConfig]);
 
   // 3. Hồ sơ Chờ kiểm tra (PENDING_CHECK) - Dành cho Tổ trưởng/Tổ phó
   const pendingCheckRecords = useMemo(() => {
     let list = myRecords.filter(
       (r) =>
-        r.status === RecordStatus.PENDING_CHECK,
+        r.status === RecordStatus.PENDING_CHECK ||
+        r.status === RecordStatus.CHECKED,
     );
     return filterAndSort(list, searchTerm, sortConfig);
   }, [myRecords, searchTerm, sortConfig]);
@@ -413,24 +360,6 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
         r.status === RecordStatus.REJECTED ||
         r.status === RecordStatus.WITHDRAWN,
     );
-    return filterAndSort(list, searchTerm, sortConfig);
-  }, [myRecords, searchTerm, sortConfig]);
-
-  // 6. Hồ sơ Trễ hạn (chưa hoàn thành và quá hạn)
-  const overdueRecords = useMemo(() => {
-    let list = myRecords.filter((r) => {
-      const days = getDaysRemaining(r);
-      return days !== null && days < 0;
-    });
-    return filterAndSort(list, searchTerm, sortConfig);
-  }, [myRecords, searchTerm, sortConfig]);
-
-  // 7. Hồ sơ Sắp tới hạn (chưa hoàn thành và còn 0 - 2 ngày)
-  const upcomingRecords = useMemo(() => {
-    let list = myRecords.filter((r) => {
-      const days = getDaysRemaining(r);
-      return days !== null && days >= 0 && days <= 2;
-    });
     return filterAndSort(list, searchTerm, sortConfig);
   }, [myRecords, searchTerm, sortConfig]);
 
@@ -461,26 +390,47 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
     });
   }, [myRecords, searchTerm]);
 
+  // Helper filter & sort chung
+  function filterAndSort(list: RecordFile[], term: string, sort: any) {
+    if (term) {
+      const lowerSearch = removeVietnameseTones(term);
+      const rawSearch = term.toLowerCase();
+      list = list.filter((r) => {
+        const nameNorm = removeVietnameseTones(r.customerName || "");
+        const codeRaw = (r.code || "").toLowerCase();
+        const wardNorm = removeVietnameseTones(r.ward || "");
+        return (
+          nameNorm.includes(lowerSearch) ||
+          codeRaw.includes(rawSearch) ||
+          wardNorm.includes(lowerSearch)
+        );
+      });
+    }
+    return list.sort((a, b) => {
+      const aValue = a[sort.key as keyof RecordFile];
+      const bValue = b[sort.key as keyof RecordFile];
+      if (!aValue) return 1;
+      if (!bValue) return -1;
+      if (aValue < bValue) return sort.direction === "asc" ? -1 : 1;
+      if (aValue > bValue) return sort.direction === "asc" ? 1 : -1;
+      return 0;
+    });
+  }
+
   // Tổng hợp các chỉ số
   const completedTotal = finishedRecords.length;
 
   // Xác định danh sách hiển thị dựa trên Tab đang chọn
   const displayRecords =
-    activeTab === "all"
-      ? allRecords
-      : activeTab === "pending"
-        ? pendingRecords
-        : activeTab === "pending_check"
-          ? pendingCheckRecords
-          : activeTab === "pending_sign"
-            ? reviewRecords
-            : activeTab === "finished"
-              ? finishedRecords
-              : activeTab === "overdue"
-                ? overdueRecords
-                : activeTab === "upcoming"
-                  ? upcomingRecords
-                  : reminderRecords;
+    activeTab === "pending"
+      ? pendingRecords
+      : activeTab === "pending_check"
+        ? pendingCheckRecords
+        : activeTab === "pending_sign"
+          ? reviewRecords
+          : activeTab === "finished"
+            ? finishedRecords
+            : reminderRecords;
 
   const totalPages = Math.ceil(displayRecords.length / itemsPerPage);
 
@@ -513,16 +463,15 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
       "Số thửa": r.landPlot || "",
       "Diện tích": r.area || "",
       "Địa chỉ": r.address || "",
-      "Nội dung": r.content || "",
+      "Nội dung": cleanSyncNotes(r.content) || "",
       "Ngày giao việc": r.assignedDate ? r.assignedDate.split("T")[0] : "",
-      "Ngày kiểm tra": formatCheckOrSignDate(r.checkedDate || r.pendingCheckDate, r, 'check'),
-      "Ngày trình ký": formatCheckOrSignDate(r.submissionDate, r, 'sign'),
+      "Ngày trình ký": r.submissionDate ? r.submissionDate.split("T")[0] : "",
       "Ngày duyệt": r.approvalDate ? r.approvalDate.split("T")[0] : "",
       "Ngày hoàn thành": r.completedDate ? r.completedDate.split("T")[0] : "",
       "Ngày trả kết quả": r.resultReturnedDate
         ? r.resultReturnedDate.split("T")[0]
         : "",
-      "Ghi chú": r.notes || "",
+      "Ghi chú": cleanSyncNotes(r.notes) || "",
       "Ghi chú cá nhân": r.personalNotes || "",
       "Số trích đo": r.measurementNumber || "",
       "Số trích lục": r.excerptNumber || "",
@@ -591,10 +540,11 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
         // Cập nhật các mốc thời gian chuyển trạng thái tương ứng
         if (newStatus === RecordStatus.REJECTED) {
           updatedRecord.completedDate = nowIso;
-        } else if (newStatus === RecordStatus.IN_PROGRESS) {
+        } else if (newStatus === RecordStatus.COMPLETED_WORK) {
           updatedRecord.completedWorkDate = nowIso;
         } else if (newStatus === RecordStatus.PENDING_CHECK) {
           updatedRecord.pendingCheckDate = nowIso;
+        } else if (newStatus === RecordStatus.CHECKED) {
           updatedRecord.checkedDate = nowIso;
         } else if (newStatus === RecordStatus.PENDING_SIGN) {
           updatedRecord.submissionDate = nowIso;
@@ -709,7 +659,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
         }
       } else {
         // Normal Record
-        onUpdateStatus(record, RecordStatus.IN_PROGRESS);
+        onUpdateStatus(record, RecordStatus.COMPLETED_WORK);
       }
     }
   };
@@ -720,7 +670,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
         `Xác nhận đã kiểm tra hồ sơ ${record.code}?\nHồ sơ sẽ chuyển sang trạng thái "Đã kiểm tra".`,
       )
     ) {
-      onUpdateStatus(record, RecordStatus.PENDING_CHECK);
+      onUpdateStatus(record, RecordStatus.CHECKED);
     }
   };
 
@@ -756,7 +706,6 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
               : [];
             const newHistory = [...oldHistory, historyEntry];
 
-            const nowIso = new Date().toISOString();
             await saveArchiveRecord({
               id: record.id,
               status: "pending_sign",
@@ -1010,12 +959,6 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
         return "Chờ kiểm tra";
       case "pending_sign":
         return "Chờ ký";
-      case "finished":
-        return "Hoàn thành";
-      case "overdue":
-        return "Trễ hạn";
-      case "upcoming":
-        return "Sắp tới hạn";
       case "reminder":
         return "Nhắc việc";
       default:
@@ -1053,51 +996,39 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
             Danh sách hồ sơ bạn đang phụ trách.
           </p>
         </div>
-        <div className="flex flex-wrap gap-1.5 md:gap-2.5 w-full md:w-auto justify-center md:justify-end">
-          <div 
-            onClick={() => { setActiveTab("all"); setCurrentPage(1); setSearchTerm(""); }}
-            className={`cursor-pointer active:scale-95 transition-all text-center p-1.5 md:px-3 md:py-2 bg-slate-100 rounded-lg border ${activeTab === "all" ? "ring-2 ring-slate-600 border-slate-500 font-extrabold shadow-sm bg-slate-200" : "border-slate-200 hover:border-slate-300"} min-w-[70px] md:min-w-[85px] flex flex-col justify-center`}
-            title="Xem tất cả hồ sơ được giao"
-          >
-            <div className="text-base md:text-xl font-bold text-slate-800">
-              {myRecords.length}
-            </div>
-            <div className="text-[9px] md:text-xs text-slate-700 uppercase font-bold leading-tight mt-0.5">
-              Tất cả
-            </div>
-          </div>
+        <div className={`grid ${isChecker || isMeasurementTeam ? "grid-cols-4" : "grid-cols-3"} sm:flex gap-1.5 md:gap-4 w-full md:w-auto justify-center`}>
           <div 
             onClick={() => { setActiveTab("pending"); setCurrentPage(1); setSearchTerm(""); }}
-            className={`cursor-pointer active:scale-95 transition-all text-center p-1.5 md:px-3 md:py-2 bg-blue-50 rounded-lg border ${activeTab === "pending" ? "ring-2 ring-blue-500 border-blue-400 font-extrabold shadow-sm bg-blue-100" : "border-blue-100 hover:border-blue-300"} min-w-[70px] md:min-w-[85px] flex flex-col justify-center`}
+            className={`cursor-pointer active:scale-95 transition-all text-center p-1.5 md:px-4 md:py-2 bg-blue-50 rounded-lg border ${activeTab === "pending" ? "ring-2 ring-blue-500 border-blue-400 font-extrabold shadow-sm" : "border-blue-100 hover:border-blue-300"} min-w-0 md:min-w-[100px] flex flex-col justify-center`}
             title="Xem danh sách đang thực hiện"
           >
-            <div className="text-base md:text-xl font-bold text-blue-700">
+            <div className="text-base md:text-2xl font-bold text-blue-700">
               {pendingRecords.length}
             </div>
             <div className="text-[9px] md:text-xs text-blue-600 uppercase font-bold leading-tight mt-0.5">
-              Đang làm
+              Đang thực hiện
             </div>
           </div>
           {(isChecker || isMeasurementTeam) && (
             <div 
               onClick={() => { setActiveTab("pending_check"); setCurrentPage(1); setSearchTerm(""); }}
-              className={`cursor-pointer active:scale-95 transition-all text-center p-1.5 md:px-3 md:py-2 bg-orange-50 rounded-lg border ${activeTab === "pending_check" ? "ring-2 ring-orange-500 border-orange-400 font-extrabold shadow-sm bg-orange-100" : "border-orange-100 hover:border-orange-300"} min-w-[70px] md:min-w-[85px] flex flex-col justify-center`}
+              className={`cursor-pointer active:scale-95 transition-all text-center p-1.5 md:px-4 md:py-2 bg-orange-50 rounded-lg border ${activeTab === "pending_check" ? "ring-2 ring-orange-500 border-orange-400 font-extrabold shadow-sm" : "border-orange-100 hover:border-orange-300"} min-w-0 md:min-w-[100px] flex flex-col justify-center`}
               title="Xem danh sách chờ kiểm tra"
             >
-              <div className="text-base md:text-xl font-bold text-orange-700">
+              <div className="text-base md:text-2xl font-bold text-orange-700">
                 {pendingCheckRecords.length}
               </div>
               <div className="text-[9px] md:text-xs text-orange-600 uppercase font-bold leading-tight mt-0.5">
-                Chờ KT
+                Chờ kiểm tra
               </div>
             </div>
           )}
           <div 
             onClick={() => { setActiveTab("pending_sign"); setCurrentPage(1); setSearchTerm(""); }}
-            className={`cursor-pointer active:scale-95 transition-all text-center p-1.5 md:px-3 md:py-2 bg-purple-50 rounded-lg border ${activeTab === "pending_sign" ? "ring-2 ring-purple-500 border-purple-400 font-extrabold shadow-sm bg-purple-100" : "border-purple-100 hover:border-purple-300"} min-w-[70px] md:min-w-[85px] flex flex-col justify-center`}
+            className={`cursor-pointer active:scale-95 transition-all text-center p-1.5 md:px-4 md:py-2 bg-purple-50 rounded-lg border ${activeTab === "pending_sign" ? "ring-2 ring-purple-500 border-purple-400 font-extrabold shadow-sm" : "border-purple-100 hover:border-purple-300"} min-w-0 md:min-w-[100px] flex flex-col justify-center`}
             title="Xem danh sách chờ ký"
           >
-            <div className="text-base md:text-xl font-bold text-purple-700">
+            <div className="text-base md:text-2xl font-bold text-purple-700">
               {reviewRecords.length}
             </div>
             <div className="text-[9px] md:text-xs text-purple-600 uppercase font-bold leading-tight mt-0.5">
@@ -1106,10 +1037,10 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
           </div>
           <div 
             onClick={() => { setActiveTab("finished"); setCurrentPage(1); setSearchTerm(""); }}
-            className={`cursor-pointer active:scale-95 transition-all text-center p-1.5 md:px-3 md:py-2 bg-green-50 rounded-lg border ${activeTab === "finished" ? "ring-2 ring-green-500 border-green-400 font-extrabold shadow-sm bg-green-100" : "border-green-100 hover:border-green-300"} min-w-[70px] md:min-w-[85px] flex flex-col justify-center`}
+            className={`cursor-pointer active:scale-95 transition-all text-center p-1.5 md:px-4 md:py-2 bg-green-50 rounded-lg border ${activeTab === "finished" ? "ring-2 ring-green-500 border-green-400 font-extrabold shadow-sm" : "border-green-100 hover:border-green-300"} min-w-0 md:min-w-[100px] flex flex-col justify-center`}
             title="Xem danh sách hoàn thành"
           >
-            <div className="text-base md:text-xl font-bold text-green-700">
+            <div className="text-base md:text-2xl font-bold text-green-700">
               {finishedRecords.length}
             </div>
             <div className="text-[9px] md:text-xs text-green-600 uppercase font-bold leading-tight mt-0.5">
@@ -1122,9 +1053,9 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
       {/* MAIN CONTENT */}
       <div className="flex-1 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col min-h-0">
         {/* SEARCH & ACTIONS */}
-        <div className="p-3 md:p-4 border-b border-gray-100 bg-gray-50 flex flex-col md:flex-row justify-between items-center gap-2.5 shrink-0">
-          <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-            <div className="relative flex-1 min-w-[200px] md:w-64">
+        <div className="p-4 border-b border-gray-100 bg-gray-50 flex flex-col md:flex-row justify-between items-center gap-3 shrink-0">
+          <div className="flex items-center gap-2 w-full md:w-auto">
+            <div className="relative flex-1 md:w-72">
               <Search
                 className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
                 size={16}
@@ -1132,7 +1063,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
               <input
                 type="text"
                 placeholder={`Tìm trong ${getTabLabel()}...`}
-                className="w-full pl-9 pr-4 py-1.5 md:py-2 border border-gray-200 rounded-lg text-xs md:text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white shadow-sm"
+                className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white shadow-sm"
                 value={searchTerm}
                 onChange={(e) => {
                   setSearchTerm(e.target.value);
@@ -1141,46 +1072,6 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
               />
             </div>
 
-            {/* Nút lọc nhanh Trễ hạn (Thiết kế chuẩn theo mẫu hình ảnh) */}
-            <button
-              onClick={() => {
-                setActiveTab(activeTab === "overdue" ? "pending" : "overdue");
-                setCurrentPage(1);
-                setSearchTerm("");
-              }}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all cursor-pointer shadow-xs border ${
-                activeTab === "overdue"
-                  ? "bg-red-50 border-red-500 ring-2 ring-red-400"
-                  : "bg-white border-gray-200 hover:border-red-300 hover:bg-red-50/30"
-              }`}
-              title="Chỉ hiển thị hồ sơ trễ hạn"
-            >
-              <AlertTriangle className="text-red-500 shrink-0" size={18} />
-              <span className="text-red-600 font-extrabold text-sm md:text-base leading-none">
-                {overdueRecords.length}
-              </span>
-            </button>
-
-            {/* Nút lọc nhanh Sắp tới hạn (Thiết kế chuẩn theo mẫu hình ảnh) */}
-            <button
-              onClick={() => {
-                setActiveTab(activeTab === "upcoming" ? "pending" : "upcoming");
-                setCurrentPage(1);
-                setSearchTerm("");
-              }}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all cursor-pointer shadow-xs border ${
-                activeTab === "upcoming"
-                  ? "bg-orange-50 border-orange-500 ring-2 ring-orange-400"
-                  : "bg-white border-gray-200 hover:border-orange-300 hover:bg-orange-50/30"
-              }`}
-              title="Chỉ hiển thị hồ sơ sắp tới hạn (0 - 2 ngày)"
-            >
-              <Clock className="text-orange-500 shrink-0" size={18} />
-              <span className="text-orange-600 font-extrabold text-sm md:text-base leading-none">
-                {upcomingRecords.length}
-              </span>
-            </button>
-
             {!isDirector && (
               <button
                 onClick={() => {
@@ -1188,7 +1079,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                   setCurrentPage(1);
                   setSearchTerm("");
                 }}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap shadow-xs border cursor-pointer ${
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap shadow-sm border ${
                   activeTab === "reminder"
                     ? "bg-pink-600 text-white border-pink-700"
                     : "bg-white text-pink-700 border-pink-200 hover:bg-pink-50"
@@ -1367,31 +1258,6 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                                 Chi tiết
                               </button>
 
-                              {/* Nút Xác nhận đã nộp thuế nếu hồ sơ đang ở bước Chờ nộp thuế */}
-                              {isCapGiayRecord(r) && (r.capGiaySubStep === 'cho_nop_thue' || r.capGiaySubStep === 'cho_giay_nop_tien') && (
-                                <button
-                                  onClick={async () => {
-                                    const nowStr = new Date().toISOString();
-                                    const todayStr = nowStr.split('T')[0];
-                                    const newDeadline = calculateDeadlineHelperByDays(5, todayStr, []);
-                                    const updated: RecordFile = {
-                                      ...r,
-                                      capGiaySubStep: 'hoan_thien_trinh_duyet',
-                                      status: RecordStatus.RECEIVED,
-                                      deadline: newDeadline
-                                    };
-                                    const res = await updateRecordApi(updated);
-                                    if (res && onUpdateRecord) {
-                                      await onUpdateRecord(updated);
-                                    }
-                                  }}
-                                  title="Xác nhận người dân đã nộp tiền thuế → Chuyển bước In & Hoàn thiện"
-                                  className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-xs font-bold flex items-center gap-1 shadow-sm transition-all cursor-pointer"
-                                >
-                                  <CheckCircle size={14} /> Đã nộp thuế
-                                </button>
-                              )}
-
                               {/* Nút Trả hồ sơ (Ghi chú nội bộ) cho cá nhân */}
                               {activeTab === "pending" && (
                                 <button
@@ -1426,7 +1292,8 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
 
 
                               {activeTab === "pending_check" &&
-                                (r.status === RecordStatus.PENDING_CHECK) &&
+                                (r.status === RecordStatus.PENDING_CHECK ||
+                                  r.status === RecordStatus.CHECKED) &&
                                 isChecker && (
                                   <button
                                     onClick={() => handleForwardToSign(r)}
@@ -1537,30 +1404,6 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                             Chi tiết
                           </button>
 
-                          {isCapGiayRecord(r) && (r.capGiaySubStep === 'cho_nop_thue' || r.capGiaySubStep === 'cho_giay_nop_tien') && (
-                            <button
-                              onClick={async () => {
-                                const nowStr = new Date().toISOString();
-                                const todayStr = nowStr.split('T')[0];
-                                const newDeadline = calculateDeadlineHelperByDays(5, todayStr, []);
-                                const updated: RecordFile = {
-                                  ...r,
-                                  capGiaySubStep: 'hoan_thien_trinh_duyet',
-                                  status: RecordStatus.RECEIVED,
-                                  deadline: newDeadline
-                                };
-                                const res = await updateRecordApi(updated);
-                                if (res && onUpdateRecord) {
-                                  await onUpdateRecord(updated);
-                                }
-                              }}
-                              className="px-2.5 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-bold flex items-center gap-1 shadow-sm"
-                              title="Đã nộp thuế"
-                            >
-                              <CheckCircle size={14} /> Đã nộp thuế
-                            </button>
-                          )}
-
                           {activeTab === "pending" && (
                             <button
                               onClick={() => handleOpenReturnModal(r)}
@@ -1589,7 +1432,8 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                             ))}
 
                           {activeTab === "pending_check" &&
-                            (r.status === RecordStatus.PENDING_CHECK) &&
+                            (r.status === RecordStatus.PENDING_CHECK ||
+                              r.status === RecordStatus.CHECKED) &&
                             isChecker && (
                               <button
                                 onClick={() => handleForwardToSign(r)}
@@ -1689,11 +1533,10 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                 isArchiveRecordType(record.recordType)
               ) {
                 // Xử lý hồ sơ lưu trữ
-                const nowIso = new Date().toISOString();
                 const historyEntry = {
                   action: "Trình kiểm tra",
                   status: "pending_check",
-                  timestamp: nowIso,
+                  timestamp: new Date().toISOString(),
                   user: user.name,
                 };
 
@@ -1767,7 +1610,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
               {returnModalConfig.type === 'return_record' ? <FileX size={20} /> : <Undo size={20} />}
               <div>
                 <h3 className="font-bold text-lg leading-tight">
-                  {returnModalConfig.type === 'return_record' ? 'Ghi Chú Lý Do Trả Hồ Sơ' : 'Trả Về Bước Trước'}
+                  Trả Hồ Sơ
                 </h3>
                 <p className="text-xs text-white/80 mt-0.5">
                   Mã hồ sơ: <span className="font-mono font-bold text-white">{returnModalConfig.record.code}</span>
@@ -1796,11 +1639,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                 <textarea
                   rows={4}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-100 resize-none font-medium"
-                  placeholder={
-                    returnModalConfig.type === 'return_record'
-                      ? "Nhập lý do trả hồ sơ (sẽ lưu vào Ghi chú nội bộ, hồ sơ sẽ tiếp tục quy trình kiểm tra & trình ký)..."
-                      : "Nhập lý do trả về bước trước để người làm trước đó sửa hồ sơ..."
-                  }
+                  placeholder="Nhập lý do trả hồ sơ (sẽ lưu vào Ghi chú nội bộ)..."
                   value={returnReason}
                   onChange={(e) => setReturnReason(e.target.value)}
                 />

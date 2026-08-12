@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import * as XLSX from 'xlsx-js-style';
 import { RecordFile, RecordStatus } from '../types';
 import { isArchiveRecordType, getShortRecordType } from '../constants';
-import { formatBatchName } from '../utils/appHelpers';
+import { formatBatchName, cleanSyncNotes } from '../utils/appHelpers';
 import { X, FileDown, Calendar, Layers, MapPin, Printer, Eye, Filter } from 'lucide-react';
 
 interface ExportModalProps {
@@ -40,7 +40,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
       return records.filter(r => isArchiveRecordType(r.recordType));
     }
     if (recordCategory === 'measurement') {
-      return records.filter(r => !isArchiveRecordType(r.recordType));
+      return records.filter(r => !isArchiveRecordType(r.recordType) && !['CMD', 'Tòa án', 'Thi hành án'].includes(getShortRecordType(r.recordType)));
     }
     return records;
   }, [records, recordCategory]);
@@ -52,7 +52,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
     categoryRecords.forEach(r => {
       if (type === 'handover') {
           // Logic cho Giao 1 cửa
-          if (r.status === RecordStatus.HANDOVER || r.status === RecordStatus.SIGNED || r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED || r.exportBatch) {
+          if (r.status === RecordStatus.HANDOVER || r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED || r.exportBatch) {
               if (r.exportBatch && r.exportDate) {
                   const dateStr = r.exportDate.split('T')[0];
                   const key = `${dateStr}_${r.exportBatch}`;
@@ -72,8 +72,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
           }
       } else if (type === 'check_list') {
           // Logic cho Trình Ký: Dựa vào ngày tiếp nhận (receivedDate) để gom nhóm
-          // Lấy các hồ sơ đang Chờ ký hoặc Đã ký (nhưng chưa giao)
-          if (r.status === RecordStatus.PENDING_SIGN || r.status === RecordStatus.SIGNED) {
+          if (r.status === RecordStatus.IN_PROGRESS || r.status === RecordStatus.RECEIVED) {
              const dateStr = r.receivedDate ? r.receivedDate.split('T')[0] : null;
              if (!dateStr) return;
              const key = `date_${dateStr}`;
@@ -185,7 +184,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
         recordsToExport = records.filter(r => {
             const rDateStr = r.receivedDate ? r.receivedDate.split('T')[0] : null;
             const matchDate = rDateStr === dateStr;
-            const matchStatus = r.status === RecordStatus.PENDING_SIGN || r.status === RecordStatus.SIGNED;
+            const matchStatus = r.status === RecordStatus.IN_PROGRESS || r.status === RecordStatus.RECEIVED;
             const matchWard = selectedWard === 'all' || r.ward === selectedWard;
             return matchDate && matchStatus && matchWard;
         });
@@ -240,7 +239,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
 
     // 2. Data Mapping
     const dataRows = recordsToExport.map((r, index) => {
-        let noteText = r.notes || '';
+        let noteText = cleanSyncNotes(r.notes || '');
         if (r.status === RecordStatus.WITHDRAWN) {
             noteText = noteText ? `${noteText} (CSD rút hồ sơ)` : 'CSD rút hồ sơ';
         }
@@ -288,13 +287,9 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
         ["Độc lập - Tự do - Hạnh phúc"],
         [""],
         [title],
+        [displayDate.toUpperCase()],
+        [subTitle],
     ];
-
-    if (!isHandover) {
-        headerRows.push([displayDate.toUpperCase()]);
-    }
-
-    headerRows.push([subTitle]);
 
     let handoverNoteRowIndex: number | null = null;
     if (type === 'handover') {
@@ -395,9 +390,16 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
     ws['!rows'] = wsrows;
 
     // Merge Config
-    const merges = [];
-    for (let r = 0; r < tableHeaderRowIndex; r++) {
-        merges.push({ s: { r: r, c: 0 }, e: { r: r, c: totalCols - 1 } });
+    const merges = [
+        { s: { r: 0, c: 0 }, e: { r: 0, c: totalCols - 1 } },
+        { s: { r: 1, c: 0 }, e: { r: 1, c: totalCols - 1 } },
+        { s: { r: 3, c: 0 }, e: { r: 3, c: totalCols - 1 } },
+        { s: { r: 4, c: 0 }, e: { r: 4, c: totalCols - 1 } },
+        { s: { r: 5, c: 0 }, e: { r: 5, c: totalCols - 1 } },
+    ];
+
+    if (handoverNoteRowIndex !== null) {
+        merges.push({ s: { r: handoverNoteRowIndex, c: 0 }, e: { r: handoverNoteRowIndex, c: totalCols - 1 } });
     }
 
     // Footer Merges
@@ -425,13 +427,15 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
         sigNote: { font: { name: "Times New Roman", sz: 11, italic: true }, alignment: { horizontal: "center", vertical: "center" } }
     };
 
-    if (ws['A1']) ws['A1'].s = styles.nationalTitle;
-    if (ws['A2']) ws['A2'].s = styles.nationalSlogan;
-    if (ws['A4']) ws['A4'].s = styles.reportTitle;
+    if(ws['A1']) ws['A1'].s = styles.nationalTitle;
+    if(ws['A2']) ws['A2'].s = styles.nationalSlogan;
+    if(ws['A4']) ws['A4'].s = styles.reportTitle;
+    if(ws['A5']) ws['A5'].s = styles.reportSubTitle;
+    if(ws['A6']) ws['A6'].s = styles.reportSubTitle;
 
-    for (let r = 4; r < tableHeaderRowIndex; r++) {
-        const cellRef = XLSX.utils.encode_cell({ r: r, c: 0 });
-        if (ws[cellRef]) ws[cellRef].s = styles.reportSubTitle;
+    if (handoverNoteRowIndex !== null) {
+        const handoverNoteCell = XLSX.utils.encode_cell({ r: handoverNoteRowIndex, c: 0 });
+        if (ws[handoverNoteCell]) ws[handoverNoteCell].s = styles.reportSubTitle;
     }
 
     for (let c = 0; c < totalCols; c++) {
@@ -486,8 +490,8 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md lg:max-w-lg xl:max-w-xl animate-fade-in-up">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-md animate-fade-in-up">
         <div className="flex justify-between items-center p-5 border-b">
           <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
             <Printer className="text-blue-600" />

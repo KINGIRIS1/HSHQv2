@@ -1,18 +1,19 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { RecordFile, RecordStatus, Employee, User, UserRole, Message, RecordStatusLog } from './types';
-import { DEFAULT_WARDS as STATIC_WARDS, isArchiveRecordType, STATUS_LABELS, APP_VERSION, isCapGiayRecord, isTaxDefaultRecordType, getDefaultCapGiaySubStep, getCapGiaySubStepLabel } from './constants';
+import { DEFAULT_WARDS as STATIC_WARDS, isArchiveRecordType, STATUS_LABELS, APP_VERSION } from './constants';
 import Login from './components/Login'; 
 import MainLayout from './components/layout/MainLayout';
 import AppRoutes from './components/AppRoutes';
 import AppModals from './components/AppModals';
 
-import { DEFAULT_VISIBLE_COLUMNS, confirmAction, COLUMN_DEFS, processAssignmentTimelineCheck, calculateDeadlineHelperByDays, getCapGiayStepSLA, parseSafeDate } from './utils/appHelpers';
+import { DEFAULT_VISIBLE_COLUMNS, confirmAction, COLUMN_DEFS, processAssignmentTimelineCheck } from './utils/appHelpers';
 import { exportReportToExcel, exportReturnedListToExcel } from './utils/excelExport';
 import { generateReport } from './services/geminiService';
 import { syncTemplatesFromCloud } from './services/docxService'; 
 import { updateRecordApi, saveEmployeeApi, saveUserApi, forceUpdateRecordsBatchApi, updateRecordsBatchById } from './services/api';
 import { migrateCungCapTaiLieu } from './services/apiArchive';
+import { ReturnOptionType } from './components/RejectReturnStepModal';
 import * as XLSX from 'xlsx-js-style';
 import { CheckCircle, AlertTriangle } from 'lucide-react';
 
@@ -113,10 +114,7 @@ function App() {
   const [isRejectReturnStepModalOpen, setIsRejectReturnStepModalOpen] = useState(false);
   const [rejectReturnTargetRecords, setRejectReturnTargetRecords] = useState<RecordFile[]>([]);
   const [isExtendModalOpen, setIsExtendModalOpen] = useState(false);
-  const [extendTargetRecord, setExtendTargetRecord] = useState<RecordFile | null>(null);
   const [extendTargetRecords, setExtendTargetRecords] = useState<RecordFile[]>([]);
-  const [isSupplementModalOpen, setIsSupplementModalOpen] = useState(false);
-  const [supplementTargetRecords, setSupplementTargetRecords] = useState<RecordFile[]>([]);
 
   // Report States
   const [globalReportContent, setGlobalReportContent] = useState('');
@@ -335,8 +333,8 @@ function App() {
       if (!currentUser) return;
       setIsGeneratingReport(true);
       setGlobalReportContent(''); 
-      const from = parseSafeDate(fromDateStr) || new Date(); from.setHours(0, 0, 0, 0); 
-      const to = parseSafeDate(toDateStr) || new Date(); to.setHours(23, 59, 59, 999); 
+      const from = new Date(fromDateStr); from.setHours(0, 0, 0, 0); 
+      const to = new Date(toDateStr); to.setHours(23, 59, 59, 999); 
       
       let filtered = data;
       if (!filtered) {
@@ -404,34 +402,12 @@ function App() {
       return [newLog, ...existing];
   }, [currentUser]);
 
-  const confirmAssign = async (employeeId: string, selectedSubStep?: string) => {
+  const confirmAssign = async (employeeId: string) => {
       const nowStr = new Date().toISOString();
-      const todayStr = nowStr.split('T')[0];
-
-      const updatedTargets = assignTargetRecords.map(r => {
-          const isCG = isCapGiayRecord(r);
-          let updatedSubStep = r.capGiaySubStep;
-
-          if (isCG) {
-              if (selectedSubStep) {
-                  updatedSubStep = selectedSubStep;
-              } else if (!updatedSubStep) {
-                  updatedSubStep = getDefaultCapGiaySubStep(r.recordType);
-              }
-          }
-
-          const hasThamdinh = r.capGiaySubStep === 'tham_dinh' || selectedSubStep === 'tham_dinh';
-          const stepSLA = getCapGiayStepSLA(updatedSubStep, hasThamdinh);
-          const newDeadline = isCG ? calculateDeadlineHelperByDays(stepSLA, todayStr, holidays) : r.deadline;
-
-          const baseAssignment = processAssignmentTimelineCheck(r, employeeId, nowStr, employees, currentUser);
-
-          return {
-              ...r,
-              ...baseAssignment,
-              ...(isCG ? { capGiaySubStep: updatedSubStep, deadline: newDeadline } : {})
-          };
-      });
+      const updatedTargets = assignTargetRecords.map(r => ({
+          ...r,
+          ...processAssignmentTimelineCheck(r, employeeId, nowStr, employees, currentUser)
+      }));
 
       setRecords(prev => prev.map(r => {
           const updated = updatedTargets.find(u => u.id === r.id);
@@ -450,58 +426,17 @@ function App() {
       switch (newStatus) {
           case RecordStatus.RECEIVED:
               updates.assignedDate = null;
-              updates.submissionDate = null;
-              updates.approvalDate = null;
               updates.completedDate = null;
               updates.resultReturnedDate = null;
               updates.exportBatch = null;
               updates.exportDate = null;
               break;
-          case RecordStatus.ASSIGNED:
           case RecordStatus.IN_PROGRESS:
               updates.assignedDate = targetDateStr;
-              updates.submissionDate = null;
-              updates.approvalDate = null;
               updates.completedDate = null;
               updates.resultReturnedDate = null;
               updates.exportBatch = null;
               updates.exportDate = null;
-              break;
-          // MỚI: Trạng thái Đã thực hiện
-          case RecordStatus.IN_PROGRESS:
-              // Giữ nguyên assignedDate
-              updates.completedWorkDate = targetDateStr;
-              updates.pendingCheckDate = null;
-              updates.checkedDate = null;
-              updates.submissionDate = null; 
-              updates.approvalDate = null;
-              updates.completedDate = null;
-              break;
-          case RecordStatus.PENDING_CHECK:
-              updates.pendingCheckDate = targetDateStr;
-              updates.checkedDate = null;
-              updates.submissionDate = null;
-              updates.approvalDate = null;
-              updates.completedDate = null;
-              updates.resultReturnedDate = null;
-              break;
-          case RecordStatus.PENDING_CHECK:
-              updates.checkedDate = targetDateStr;
-              updates.submissionDate = null;
-              updates.approvalDate = null;
-              updates.completedDate = null;
-              updates.resultReturnedDate = null;
-              break;
-          case RecordStatus.PENDING_SIGN:
-              updates.submissionDate = targetDateStr; 
-              updates.approvalDate = null;
-              updates.completedDate = null;
-              updates.resultReturnedDate = null;
-              break;
-          case RecordStatus.SIGNED:
-              updates.approvalDate = targetDateStr; 
-              updates.completedDate = null;
-              updates.resultReturnedDate = null;
               break;
           case RecordStatus.HANDOVER:
               updates.completedDate = targetDateStr; 
@@ -518,132 +453,103 @@ function App() {
       return updates;
   };
 
-  const handleBulkUpdate = async (field: keyof RecordFile, value: any, customDateStr?: string, targetRecordIds?: string[], assignedToValue?: string) => {
+  const handleBulkUpdate = async (field: keyof RecordFile, value: any, customDateStr?: string, targetRecordIds?: string[], extraData?: { assignedTo?: string; customDate?: string }) => {
       const selectedIds = targetRecordIds && targetRecordIds.length > 0 ? targetRecordIds : Array.from(selectedRecordIds);
       if (selectedIds.length === 0) {
           setToast({ type: 'error', message: 'Không có hồ sơ nào được chọn để cập nhật!' });
           return;
       }
 
-      const targetDateStr = customDateStr || new Date().toISOString();
+      const targetDateStr = extraData?.customDate || customDateStr || new Date().toISOString();
       const selectedRecords = records.filter(r => selectedIds.includes(r.id));
       if (selectedRecords.length === 0) {
           setToast({ type: 'error', message: 'Không tìm thấy hồ sơ phù hợp!' });
           return;
       }
 
-      const VALID_STATUSES = [
-          RecordStatus.RECEIVED,
-          RecordStatus.ASSIGNED,
-          RecordStatus.IN_PROGRESS,
-          RecordStatus.PENDING_CHECK,
-          RecordStatus.PENDING_SIGN,
-          RecordStatus.PENDING_SUPPLEMENT,
-          RecordStatus.SIGNED,
-          RecordStatus.HANDOVER,
-          RecordStatus.RETURNED,
-          RecordStatus.WITHDRAWN,
-          RecordStatus.REJECTED
-      ];
-
-      if (field === 'status' && value && !VALID_STATUSES.includes(value as RecordStatus)) {
-          setToast({ type: 'error', message: `Trạng thái "${value}" không hợp lệ! Vui lòng chỉ chọn trạng thái đúng quy trình.` });
-          return;
-      }
-
       const updatedTargets = selectedRecords.map(r => {
           let recordUpdates: any = {};
 
-          if (field && value !== '' && value !== undefined) {
-              if (field === 'status') {
-                  recordUpdates = { ...getUpdatesForStatusChange(value as RecordStatus, targetDateStr) };
-                  recordUpdates.statusLogs = createStatusLog(r, value, 'Cập nhật trạng thái hàng loạt');
-
-                  if (value === RecordStatus.PENDING_CHECK || value === RecordStatus.PENDING_CHECK) {
-                      if (!r.checkedBy && currentUser?.employeeId) recordUpdates.checkedBy = currentUser.employeeId;
-                  } else if (value === RecordStatus.PENDING_SIGN || value === RecordStatus.SIGNED) {
-                      if (!r.submittedTo && currentUser?.employeeId) recordUpdates.submittedTo = currentUser.employeeId;
+          if (field === 'status') {
+              recordUpdates = { ...getUpdatesForStatusChange(value as RecordStatus, targetDateStr) };
+              recordUpdates.statusLogs = createStatusLog(r, value, 'Cập nhật trạng thái hàng loạt');
+              
+              if (extraData?.assignedTo) {
+                  recordUpdates.assignedTo = extraData.assignedTo;
+                  if (value === RecordStatus.PENDING_CHECK || value === RecordStatus.CHECKED) {
+                      recordUpdates.checkedBy = extraData.assignedTo;
                   }
-
-                  if (value === RecordStatus.IN_PROGRESS) {
-                      if (!r.assignedDate) recordUpdates.assignedDate = targetDateStr;
-                  } else if (value === RecordStatus.PENDING_CHECK) {
-                      if (!r.assignedDate) recordUpdates.assignedDate = targetDateStr;
-                      if (!r.completedWorkDate) recordUpdates.completedWorkDate = targetDateStr;
-                  } else if (value === RecordStatus.PENDING_CHECK) {
-                      if (!r.assignedDate) recordUpdates.assignedDate = targetDateStr;
-                      if (!r.completedWorkDate) recordUpdates.completedWorkDate = targetDateStr;
-                      if (!r.pendingCheckDate) recordUpdates.pendingCheckDate = targetDateStr;
-                  } else if (value === RecordStatus.PENDING_SIGN) {
-                      if (!r.assignedDate) recordUpdates.assignedDate = targetDateStr;
-                      if (!r.completedWorkDate) recordUpdates.completedWorkDate = targetDateStr;
-                      if (!r.pendingCheckDate) recordUpdates.pendingCheckDate = targetDateStr;
-                      if (!r.checkedDate) recordUpdates.checkedDate = targetDateStr;
-                  } else if (value === RecordStatus.SIGNED) {
-                      if (!r.assignedDate) recordUpdates.assignedDate = targetDateStr;
-                      if (!r.completedWorkDate) recordUpdates.completedWorkDate = targetDateStr;
-                      if (!r.pendingCheckDate) recordUpdates.pendingCheckDate = targetDateStr;
-                      if (!r.checkedDate) recordUpdates.checkedDate = targetDateStr;
-                      if (!r.submissionDate) recordUpdates.submissionDate = targetDateStr;
-                      if (isCapGiayRecord(r)) {
-                          recordUpdates.capGiaySubStep = 'giao_mot_cua';
-                      }
-                  } else if (value === RecordStatus.HANDOVER) {
-                      if (!r.assignedDate) recordUpdates.assignedDate = targetDateStr;
-                      if (!r.completedWorkDate) recordUpdates.completedWorkDate = targetDateStr;
-                      if (!r.pendingCheckDate) recordUpdates.pendingCheckDate = targetDateStr;
-                      if (!r.checkedDate) recordUpdates.checkedDate = targetDateStr;
-                      if (!r.submissionDate) recordUpdates.submissionDate = targetDateStr;
-                      if (!r.approvalDate) recordUpdates.approvalDate = targetDateStr;
-                  } else if (value === RecordStatus.RETURNED) {
-                      if (!r.assignedDate) recordUpdates.assignedDate = targetDateStr;
-                      if (!r.completedWorkDate) recordUpdates.completedWorkDate = targetDateStr;
-                      if (!r.pendingCheckDate) recordUpdates.pendingCheckDate = targetDateStr;
-                      if (!r.checkedDate) recordUpdates.checkedDate = targetDateStr;
-                      if (!r.submissionDate) recordUpdates.submissionDate = targetDateStr;
-                      if (!r.approvalDate) recordUpdates.approvalDate = targetDateStr;
-                      if (!r.completedDate) recordUpdates.completedDate = targetDateStr;
-                  }
-
-                  if (value === RecordStatus.REJECTED || value === RecordStatus.WITHDRAWN) {
-                      recordUpdates.completedDate = r.completedDate || targetDateStr;
-                  }
-              } else if (field === 'assignedTo') {
-                  recordUpdates.assignedTo = value;
-                  recordUpdates.assignedDate = customDateStr || r.assignedDate || targetDateStr;
-                  if (r.status === RecordStatus.RECEIVED) {
-                      recordUpdates.status = RecordStatus.IN_PROGRESS;
-                  }
-              } else if (['deadline', 'receivedDate', 'resultReturnedDate', 'assignedDate', 'completedWorkDate', 'checkedDate', 'submissionDate', 'approvalDate', 'completedDate'].includes(field as string)) {
-                  const formattedDate = value ? (value.includes('T') ? value : new Date(value + 'T12:00:00').toISOString()) : null;
-                  recordUpdates[field] = formattedDate;
-                  if (field === 'checkedDate') {
-                      recordUpdates.pendingCheckDate = formattedDate;
-                  }
-              } else if (field === 'exportDate') {
-                  const formattedDate = value ? (value.includes('T') ? value : new Date(value + 'T12:00:00').toISOString()) : targetDateStr;
-                  recordUpdates.exportDate = formattedDate;
-                  recordUpdates.handover_date = formattedDate;
-              } else if (field === 'exportBatch') {
-                  recordUpdates.exportBatch = value;
-              } else if (field === 'deadline' || field === 'receivedDate' || field === 'resultReturnedDate') {
-                  const formattedDate = value ? (value.includes('T') ? value : new Date(value + 'T12:00:00').toISOString()) : targetDateStr;
-                  recordUpdates[field] = formattedDate;
-              } else if (field === 'returnedPrice') {
-                  recordUpdates[field] = value !== '' && value !== null && value !== undefined ? Number(value) : null;
-              } else {
-                  recordUpdates[field] = value;
               }
-          }
 
-          if (assignedToValue) {
-              recordUpdates.assignedTo = assignedToValue;
-              if (!r.assignedDate && field !== 'status') {
-                  recordUpdates.assignedDate = customDateStr || targetDateStr;
+              if (value === RecordStatus.COMPLETED_WORK) {
+                  if (!r.assignedDate) recordUpdates.assignedDate = targetDateStr;
+                  if (extraData?.customDate) recordUpdates.completedWorkDate = extraData.customDate;
+              } else if (value === RecordStatus.PENDING_CHECK) {
+                  if (!r.assignedDate) recordUpdates.assignedDate = targetDateStr;
+                  if (!r.completedWorkDate) recordUpdates.completedWorkDate = targetDateStr;
+                  if (extraData?.customDate) recordUpdates.pendingCheckDate = extraData.customDate;
+              } else if (value === RecordStatus.CHECKED) {
+                  if (!r.assignedDate) recordUpdates.assignedDate = targetDateStr;
+                  if (!r.completedWorkDate) recordUpdates.completedWorkDate = targetDateStr;
+                  if (!r.pendingCheckDate) recordUpdates.pendingCheckDate = targetDateStr;
+                  if (extraData?.customDate) recordUpdates.checkedDate = extraData.customDate;
+              } else if (value === RecordStatus.PENDING_SIGN) {
+                  if (!r.assignedDate) recordUpdates.assignedDate = targetDateStr;
+                  if (!r.completedWorkDate) recordUpdates.completedWorkDate = targetDateStr;
+                  if (!r.pendingCheckDate) recordUpdates.pendingCheckDate = targetDateStr;
+                  if (!r.checkedDate) recordUpdates.checkedDate = targetDateStr;
+                  if (extraData?.customDate) recordUpdates.submissionDate = extraData.customDate;
+              } else if (value === RecordStatus.SIGNED) {
+                  if (!r.assignedDate) recordUpdates.assignedDate = targetDateStr;
+                  if (!r.completedWorkDate) recordUpdates.completedWorkDate = targetDateStr;
+                  if (!r.pendingCheckDate) recordUpdates.pendingCheckDate = targetDateStr;
+                  if (!r.checkedDate) recordUpdates.checkedDate = targetDateStr;
+                  if (!r.submissionDate) recordUpdates.submissionDate = targetDateStr;
+                  if (extraData?.customDate) recordUpdates.approvalDate = extraData.customDate;
+              } else if (value === RecordStatus.HANDOVER) {
+                  if (!r.assignedDate) recordUpdates.assignedDate = targetDateStr;
+                  if (!r.completedWorkDate) recordUpdates.completedWorkDate = targetDateStr;
+                  if (!r.pendingCheckDate) recordUpdates.pendingCheckDate = targetDateStr;
+                  if (!r.checkedDate) recordUpdates.checkedDate = targetDateStr;
+                  if (!r.submissionDate) recordUpdates.submissionDate = targetDateStr;
+                  if (!r.approvalDate) recordUpdates.approvalDate = targetDateStr;
+                  if (extraData?.customDate) recordUpdates.exportDate = extraData.customDate;
+              } else if (value === RecordStatus.RETURNED) {
+                  if (!r.assignedDate) recordUpdates.assignedDate = targetDateStr;
+                  if (!r.completedWorkDate) recordUpdates.completedWorkDate = targetDateStr;
+                  if (!r.pendingCheckDate) recordUpdates.pendingCheckDate = targetDateStr;
+                  if (!r.checkedDate) recordUpdates.checkedDate = targetDateStr;
+                  if (!r.submissionDate) recordUpdates.submissionDate = targetDateStr;
+                  if (!r.approvalDate) recordUpdates.approvalDate = targetDateStr;
+                  if (!r.completedDate) recordUpdates.completedDate = targetDateStr;
+                  if (extraData?.customDate) recordUpdates.resultReturnedDate = extraData.customDate;
               }
-              if (field !== 'status' && r.status === RecordStatus.RECEIVED) {
+
+              if (value === RecordStatus.REJECTED || value === RecordStatus.WITHDRAWN) {
+                  recordUpdates.completedDate = r.completedDate || targetDateStr;
+              }
+          } else if (field === 'assignedTo') {
+              recordUpdates.assignedTo = value;
+              recordUpdates.assignedDate = customDateStr || r.assignedDate || targetDateStr;
+              if (r.status === RecordStatus.RECEIVED) {
                   recordUpdates.status = RecordStatus.IN_PROGRESS;
               }
+          } else if (field === 'assignedDate') {
+              const formattedDate = value ? (value.includes('T') ? value : new Date(value + 'T12:00:00').toISOString()) : targetDateStr;
+              recordUpdates.assignedDate = formattedDate;
+          } else if (field === 'exportDate') {
+              const formattedDate = value ? (value.includes('T') ? value : new Date(value + 'T12:00:00').toISOString()) : targetDateStr;
+              recordUpdates.exportDate = formattedDate;
+              recordUpdates.handover_date = formattedDate;
+          } else if (field === 'exportBatch') {
+              recordUpdates.exportBatch = value;
+          } else if (field === 'deadline' || field === 'receivedDate' || field === 'resultReturnedDate') {
+              const formattedDate = value ? (value.includes('T') ? value : new Date(value + 'T12:00:00').toISOString()) : targetDateStr;
+              recordUpdates[field] = formattedDate;
+          } else if (field === 'returnedPrice') {
+              recordUpdates[field] = value !== '' && value !== null && value !== undefined ? Number(value) : null;
+          } else {
+              recordUpdates[field] = value;
           }
 
           return { ...r, ...recordUpdates };
@@ -667,45 +573,9 @@ function App() {
       const nowStr = new Date().toISOString();
       let updates: any = { [field]: value };
       
-      if (field === 'capGiaySubStep') {
-          if (value === 'hoan_thien_trinh_duyet' && (record.capGiaySubStep === 'cho_nop_thue' || record.capGiaySubStep === 'cho_giay_nop_tien')) {
-              const todayStr = nowStr.split('T')[0];
-              const newDeadline = calculateDeadlineHelperByDays(5, todayStr, holidays || []);
-              updates.status = RecordStatus.RECEIVED;
-              updates.assignedTo = "";
-              updates.deadline = newDeadline;
-              updates.statusLogs = createStatusLog(record, record.status, 'Xác nhận đã nộp tiền thuế → Trả về bước giao việc (chờ phân công in & hoàn thiện, SLA 5 ngày)');
-              setToast({ type: 'success', message: `Hồ sơ ${record.code} đã xác nhận nộp thuế, đã trả về bước giao việc cho người in!` });
-          }
-      }
-
       if (field === 'status') {
-          const VALID_STATUSES = [
-              RecordStatus.RECEIVED,
-              RecordStatus.ASSIGNED,
-              RecordStatus.IN_PROGRESS,
-              RecordStatus.PENDING_CHECK,
-              RecordStatus.PENDING_SIGN,
-              RecordStatus.PENDING_SUPPLEMENT,
-              RecordStatus.SIGNED,
-              RecordStatus.HANDOVER,
-              RecordStatus.RETURNED,
-              RecordStatus.WITHDRAWN,
-              RecordStatus.REJECTED
-          ];
-          if (!VALID_STATUSES.includes(value as RecordStatus)) {
-              setToast({ type: 'error', message: `Trạng thái "${value}" không thuộc danh sách quy trình hợp lệ!` });
-              return;
-          }
-
           updates = getUpdatesForStatusChange(value as RecordStatus);
           updates.statusLogs = createStatusLog(record, value, 'Cập nhật trạng thái nhanh');
-
-          if (value === RecordStatus.PENDING_CHECK || value === RecordStatus.PENDING_CHECK) {
-              if (!record.checkedBy && currentUser?.employeeId) updates.checkedBy = currentUser.employeeId;
-          } else if (value === RecordStatus.PENDING_SIGN || value === RecordStatus.SIGNED) {
-              if (!record.submittedTo && currentUser?.employeeId) updates.submittedTo = currentUser.employeeId;
-          }
           
           if (value === RecordStatus.PENDING_SIGN) {
               updates.completedWorkDate = record.completedWorkDate || nowStr;
@@ -716,13 +586,13 @@ function App() {
           
           if (value === RecordStatus.REJECTED || value === RecordStatus.WITHDRAWN) {
               updates.completedDate = record.completedDate || nowStr;
-              const flow = [RecordStatus.RECEIVED, RecordStatus.ASSIGNED, RecordStatus.IN_PROGRESS, RecordStatus.PENDING_CHECK, RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER];
+              const flow = [RecordStatus.RECEIVED, RecordStatus.ASSIGNED, RecordStatus.IN_PROGRESS, RecordStatus.COMPLETED_WORK, RecordStatus.PENDING_CHECK, RecordStatus.CHECKED, RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER];
               const prevIdx = flow.indexOf(record.status);
               if (prevIdx >= 0) {
                   if (prevIdx >= flow.indexOf(RecordStatus.ASSIGNED) && !record.assignedDate) updates.assignedDate = nowStr;
-                  if (prevIdx >= flow.indexOf(RecordStatus.IN_PROGRESS) && !record.completedWorkDate) updates.completedWorkDate = nowStr;
+                  if (prevIdx >= flow.indexOf(RecordStatus.COMPLETED_WORK) && !record.completedWorkDate) updates.completedWorkDate = nowStr;
                   if (prevIdx >= flow.indexOf(RecordStatus.PENDING_CHECK) && !record.pendingCheckDate) updates.pendingCheckDate = nowStr;
-                  if (prevIdx >= flow.indexOf(RecordStatus.PENDING_CHECK) && !record.checkedDate) updates.checkedDate = nowStr;
+                  if (prevIdx >= flow.indexOf(RecordStatus.CHECKED) && !record.checkedDate) updates.checkedDate = nowStr;
                   if (prevIdx >= flow.indexOf(RecordStatus.PENDING_SIGN) && !record.submissionDate) updates.submissionDate = nowStr;
                   if (prevIdx >= flow.indexOf(RecordStatus.SIGNED) && !record.approvalDate) updates.approvalDate = nowStr;
               }
@@ -746,7 +616,7 @@ function App() {
       if (!returnRecord) return;
       const nowStr = new Date().toISOString();
       const typeLabel = receiptType || 'Biên Lai';
-      const statusLogs = createStatusLog(returnRecord, RecordStatus.RETURNED, `Trả kết quả cho người dân: ${receiverName} (${typeLabel} số: ${receiptNumber}, Số tiền: ${returnedPrice.toLocaleString('vi-VN')})`);
+      const statusLogs = createStatusLog(returnRecord, RecordStatus.RETURNED, `Trả kết quả cho người dân: ${receiverName} (${typeLabel} số: ${receiptNumber}, Số tiền: ${returnedPrice.toLocaleString('vi-VN')}đ)`);
       const updates = { 
           resultReturnedDate: nowStr, 
           status: RecordStatus.RETURNED, 
@@ -792,96 +662,24 @@ function App() {
   }, [loadData]);
 
   const advanceStatus = useCallback(async (record: RecordFile) => {
-      // 1. Nếu là Hồ sơ bị trả / tạm dừng / bổ sung -> Chuyển về bước Chờ giao việc
-      if (record.status === RecordStatus.RETURNED || record.status === RecordStatus.REJECTED || record.capGiaySubStep === 'cho_bo_sung') {
-          const oldAssigned = record.assignedTo || record.lastAssignedTo || null;
-          const updates: Partial<RecordFile> = {
-              status: RecordStatus.RECEIVED,
-              lastAssignedTo: oldAssigned,
-              assignedTo: null,
-              assignedDate: null,
-              completedDate: null,
-              resultReturnedDate: null,
-              statusLogs: createStatusLog(record, RecordStatus.RECEIVED, 'Chuyển về bước Chờ giao việc để phân công thực hiện tiếp')
-          };
-          setRecords(prev => prev.map(r => r.id === record.id ? { ...r, ...updates } : r));
-          await updateRecordApi({ ...record, ...updates });
-          setToast({ 
-              type: 'success', 
-              message: `Hồ sơ ${record.code} đã chuyển về bước Chờ giao việc.${oldAssigned ? ' (Hệ thống đã ghi nhớ người thụ lý cũ)' : ''}` 
-          });
-          return;
-      }
-
-      if (record.status === RecordStatus.HANDOVER || record.status === RecordStatus.WITHDRAWN || record.resultReturnedDate) {
-          return;
-      }
-
       if (record.status === RecordStatus.RECEIVED) { 
           setAssignTargetRecords([record]); 
           setIsAssignModalOpen(true); 
           return; 
       }
       if (record.status === RecordStatus.ASSIGNED || record.status === RecordStatus.IN_PROGRESS) {
-          if (isCapGiayRecord(record)) {
-              const currentSubStep = record.capGiaySubStep || 'tham_dinh';
-              let nextSubStep = '';
-              if (currentSubStep === 'tiep_nhan' || currentSubStep === 'tiep_nhan_giao_viec') {
-                  nextSubStep = 'tham_dinh';
-              } else if (currentSubStep === 'tham_dinh' || currentSubStep === 'tham_tra') {
-                  nextSubStep = isTaxDefaultRecordType(record.recordType) ? 'phieu_chuyen_thue' : 'in_hoan_thien';
-              } else if (currentSubStep === 'phieu_chuyen_thue') {
-                  nextSubStep = 'cho_tbt';
-              } else if (currentSubStep === 'cho_tbt') {
-                  nextSubStep = 'cho_gnt';
-              } else if (currentSubStep === 'cho_gnt' || currentSubStep === 'cho_nop_thue' || currentSubStep === 'cho_giay_nop_tien') {
-                  nextSubStep = 'in_hoan_thien';
-              } else if (currentSubStep === 'in_hoan_thien' || currentSubStep === 'hoan_thien_trinh_duyet') {
-                  setSubmitTargetRecords([record]);
-                  setIsSubmitCheckModalOpen(true);
-                  return;
-              } else {
-                  setSubmitTargetRecords([record]);
-                  setIsSubmitCheckModalOpen(true);
-                  return;
-              }
-
-              if (nextSubStep) {
-                  const subStepLabel = getCapGiaySubStepLabel(nextSubStep);
-                  const updates: Partial<RecordFile> = {
-                      capGiaySubStep: nextSubStep,
-                      statusLogs: createStatusLog(record, record.status, `Chuyển bước nhỏ: ${subStepLabel}`)
-                  };
-
-                  if (nextSubStep === 'in_hoan_thien' && (currentSubStep === 'cho_gnt' || currentSubStep === 'cho_nop_thue' || currentSubStep === 'cho_giay_nop_tien')) {
-                      const nowStr = new Date().toISOString();
-                      const todayStr = nowStr.split('T')[0];
-                      const newDeadline = calculateDeadlineHelperByDays(5, todayStr, holidays || []);
-                      updates.status = RecordStatus.RECEIVED;
-                      updates.assignedTo = "";
-                      updates.deadline = newDeadline;
-                      updates.statusLogs = createStatusLog(record, record.status, 'Xác nhận đã nộp tiền thuế → Trả về bước giao việc (chờ phân công in & hoàn thiện, SLA 5 ngày)');
-                  }
-
-                  setRecords(prev => prev.map(r => r.id === record.id ? { ...r, ...updates } : r));
-                  await updateRecordApi({ ...record, ...updates });
-                  setToast({ type: 'success', message: `Hồ sơ ${record.code} đã cập nhật sang bước: ${subStepLabel}` });
-                  return;
-              }
-          }
-
-          // Các loại không phải cấp giấy đi thẳng sang trình kiểm tra
+          // Các loại đi thẳng sang trình kiểm tra (bỏ qua bước trung gian là đã thực hiện)
           setSubmitTargetRecords([record]);
           setIsSubmitCheckModalOpen(true);
           return;
       }
-      if (record.status === RecordStatus.PENDING_CHECK || (record.status as any) === RecordStatus.IN_PROGRESS) {
+      if (record.status === RecordStatus.PENDING_CHECK || record.status === RecordStatus.CHECKED || record.status === RecordStatus.COMPLETED_WORK) {
           // Đi thẳng sang trình ký (bỏ qua bước trung gian là đã kiểm tra)
           setSubmitTargetRecords([record]);
           setIsSubmitModalOpen(true);
           return;
       }
-      const flow = [RecordStatus.RECEIVED, RecordStatus.ASSIGNED, RecordStatus.IN_PROGRESS, RecordStatus.PENDING_CHECK, RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER];
+      const flow = [RecordStatus.RECEIVED, RecordStatus.ASSIGNED, RecordStatus.IN_PROGRESS, RecordStatus.COMPLETED_WORK, RecordStatus.PENDING_CHECK, RecordStatus.CHECKED, RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER];
       const idx = flow.indexOf(record.status);
       if (idx < flow.length - 1) {
           const nextStatus = flow[idx + 1];
@@ -963,7 +761,6 @@ function App() {
               status: RecordStatus.SIGNED,
               approvalDate: nowStr,
               completedDate: null,
-              ...(isCapGiayRecord(r) ? { capGiaySubStep: 'giao_mot_cua' } : {}),
               statusLogs: createStatusLog(r, RecordStatus.SIGNED, 'Ký duyệt đợt')
           }));
           setRecords(prev => prev.map(r => {
@@ -981,6 +778,48 @@ function App() {
       exportReturnedListToExcel(recordFilterProps.filteredRecords, recordFilterProps.filterFromDate, recordFilterProps.filterToDate, recordFilterProps.filterWard);
   };
 
+  const handleMarkAsRejected = async () => {
+      if (selectedRecordIds.size === 0) return;
+      if (await confirmAction(`Xác nhận đánh dấu ${selectedRecordIds.size} hồ sơ đang chọn thành "Hồ sơ trả"?\n\nHồ sơ sẽ được chuyển vào danh sách Chờ giao của bộ phận 1 cửa.`)) {
+          const nowStr = new Date().toISOString();
+          const targets = records.filter(r => selectedRecordIds.has(r.id));
+          
+          const flow = [RecordStatus.RECEIVED, RecordStatus.ASSIGNED, RecordStatus.IN_PROGRESS, RecordStatus.COMPLETED_WORK, RecordStatus.PENDING_CHECK, RecordStatus.CHECKED, RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER];
+
+          const updatesToApply = targets.map(r => {
+             const updates: any = { status: RecordStatus.REJECTED, completedDate: r.completedDate || nowStr };
+             const prevIdx = flow.indexOf(r.status);
+             if (prevIdx >= 0) {
+                 if (prevIdx >= flow.indexOf(RecordStatus.ASSIGNED) && !r.assignedDate) updates.assignedDate = nowStr;
+                 if (prevIdx >= flow.indexOf(RecordStatus.COMPLETED_WORK) && !r.completedWorkDate) updates.completedWorkDate = nowStr;
+                 if (prevIdx >= flow.indexOf(RecordStatus.PENDING_CHECK) && !r.pendingCheckDate) updates.pendingCheckDate = nowStr;
+                 if (prevIdx >= flow.indexOf(RecordStatus.CHECKED) && !r.checkedDate) updates.checkedDate = nowStr;
+                 if (prevIdx >= flow.indexOf(RecordStatus.PENDING_SIGN) && !r.submissionDate) updates.submissionDate = nowStr;
+                 if (prevIdx >= flow.indexOf(RecordStatus.SIGNED) && !r.approvalDate) updates.approvalDate = nowStr;
+             }
+             updates.statusLogs = createStatusLog(r, RecordStatus.REJECTED, 'Đánh dấu hồ sơ trả');
+             return { ...r, ...updates };
+          });
+          
+          setRecords(prev => prev.map(r => {
+              const updated = updatesToApply.find(u => u.id === r.id);
+              return updated ? updated : r;
+          }));
+          await Promise.all(updatesToApply.map(r => updateRecordApi(r)));
+          
+          setSelectedRecordIds(new Set());
+          setToast({ type: 'success', message: `Đã đánh dấu ${targets.length} hồ sơ thành "Hồ sơ trả".` });
+      }
+  };
+
+  const handleHandOverRecords = useCallback(async (recordIds: string[]) => {
+      if (recordIds.length === 0) return;
+      const updates = recordIds.map(id => ({ id, isHandedOver: true }));
+      setRecords(prev => prev.map(r => recordIds.includes(r.id) ? { ...r, isHandedOver: true } : r));
+      await updateRecordsBatchById(updates);
+      setToast({ type: 'success', message: `Đã tự động bàn giao ${recordIds.length} hồ sơ và đồng bộ dữ liệu!` });
+  }, [setRecords]);
+
   const handleOpenRejectReturnModal = useCallback((targets: RecordFile[]) => {
       setRejectReturnTargetRecords(targets);
       setIsRejectReturnStepModalOpen(true);
@@ -991,70 +830,38 @@ function App() {
       setIsExtendModalOpen(true);
   }, []);
 
-  const handleOpenSupplementModal = useCallback((targets: RecordFile | RecordFile[]) => {
-      const list = Array.isArray(targets) ? targets : [targets];
-      setSupplementTargetRecords(list);
-      setIsSupplementModalOpen(true);
-  }, []);
-
-  const handleConfirmSupplement = useCallback(async (note: string) => {
-      if (supplementTargetRecords.length === 0) return;
-      const nowStr = new Date().toLocaleString('vi-VN');
-      const userLabel = currentUser
-        ? `${currentUser.name} (${currentUser.role === UserRole.ONEDOOR ? 'Một cửa' : 'Quản trị'})`
-        : 'Hệ thống';
-
-      const updatedTargets = supplementTargetRecords.map(r => {
-        const supplementNote = `[Tiếp nhận bổ sung] Ghi chú: ${note.trim()} (Bởi: ${userLabel} lúc ${nowStr})`;
-        const existingNotes = r.privateNotes || '';
-        const updatedPrivateNotes = existingNotes ? `${existingNotes}\n${supplementNote}` : supplementNote;
-
-        const targetStatus = r.assignedTo ? RecordStatus.IN_PROGRESS : RecordStatus.RECEIVED;
-
-        return {
-          ...r,
-          status: targetStatus,
-          privateNotes: updatedPrivateNotes,
-          statusLogs: createStatusLog(r, targetStatus, `Tiếp nhận bổ sung: ${note.trim()}`)
-        };
-      });
-
-      setRecords(prev => prev.map(r => {
-          const found = updatedTargets.find(u => u.id === r.id);
-          return found ? found : r;
-      }));
-
-      await Promise.all(updatedTargets.map(r => updateRecordApi(r)));
-
-      setToast({ 
-        type: 'success', 
-        message: `Đã tiếp nhận bổ sung cho ${updatedTargets.length} hồ sơ thành công!` 
-      });
-  }, [supplementTargetRecords, currentUser]);
-
-  const handleConfirmExtendDeadline = useCallback(async (extendDate: string, reason: string) => {
+  const handleConfirmExtendDeadline = useCallback(async (newDeadline: string, reason: string, executionDateStr: string) => {
       if (extendTargetRecords.length === 0) return;
-      const nowStr = new Date().toLocaleString('vi-VN');
-      const userLabel = currentUser
-        ? `${currentUser.name} (${currentUser.role === UserRole.ONEDOOR ? 'Một cửa' : 'Quản trị'})`
-        : 'Hệ thống';
-
-      const formatDate = (dateStr?: string | null) => {
-        if (!dateStr) return 'Chưa có';
-        const d = new Date(dateStr);
-        return isNaN(d.getTime()) ? 'Chưa có' : d.toLocaleDateString('vi-VN');
+      const executionDateISO = executionDateStr ? new Date(executionDateStr).toISOString() : new Date().toISOString();
+      const newDeadlineISO = new Date(newDeadline).toISOString();
+      
+      const formatDateVN = (dStr: string) => {
+          try {
+              const d = new Date(dStr);
+              const day = String(d.getDate()).padStart(2, '0');
+              const month = String(d.getMonth() + 1).padStart(2, '0');
+              const year = d.getFullYear();
+              return `${day}/${month}/${year}`;
+          } catch {
+              return dStr;
+          }
       };
 
       const updatedTargets = extendTargetRecords.map(r => {
-        const extensionNote = `[Gia hạn ngày hẹn] Hạn cũ: ${formatDate(r.deadline)} -> Hạn mới: ${formatDate(extendDate)}. Lý do: ${reason.trim()} (Bởi: ${userLabel} lúc ${nowStr})`;
-        const existingNotes = r.privateNotes || '';
-        const updatedPrivateNotes = existingNotes ? `${existingNotes}\n${extensionNote}` : extensionNote;
+          const oldDeadlineVN = formatDateVN(r.deadline || '');
+          const newDeadlineVN = formatDateVN(newDeadline);
+          const execDateVN = formatDateVN(executionDateISO);
+          const userLabel = currentUser?.name || currentUser?.username || 'Hệ thống';
+          const extensionLog = `[GIA HẠN HẸN TRẢ - ${execDateVN}] Hạn cũ: ${oldDeadlineVN} -> Hạn mới: ${newDeadlineVN}. Lý do: ${reason} (Thực hiện bởi: ${userLabel})`;
 
-        return {
-          ...r,
-          deadline: extendDate,
-          privateNotes: updatedPrivateNotes
-        };
+          const existingNotes = r.privateNotes || '';
+          const updatedPrivateNotes = existingNotes ? `${existingNotes}\n${extensionLog}` : extensionLog;
+
+          return {
+              ...r,
+              deadline: newDeadlineISO,
+              privateNotes: updatedPrivateNotes
+          };
       });
 
       setRecords(prev => prev.map(r => {
@@ -1062,108 +869,70 @@ function App() {
           return found ? found : r;
       }));
 
-      await Promise.all(updatedTargets.map(r => updateRecordApi(r)));
-
-      setToast({ 
-        type: 'success', 
-        message: `Đã gia hạn ngày hẹn cho ${updatedTargets.length} hồ sơ thành công!` 
-      });
+      await Promise.all(updatedTargets.map(u => updateRecordApi(u)));
+      setIsExtendModalOpen(false);
+      setExtendTargetRecords([]);
+      setSelectedRecordIds(new Set());
+      setToast({ type: 'success', message: `Đã gia hạn ngày hẹn cho ${updatedTargets.length} hồ sơ thành công!` });
   }, [extendTargetRecords, currentUser]);
 
-  const handleMarkAsRejected = useCallback(() => {
-      if (selectedRecordIds.size === 0) return;
-      const validTargets = records.filter(r => 
-          selectedRecordIds.has(r.id) && 
-          r.status !== RecordStatus.HANDOVER && 
-          r.status !== RecordStatus.RETURNED && 
-          r.status !== RecordStatus.WITHDRAWN
-      );
-      if (validTargets.length === 0) {
-          setToast({ type: 'error', message: 'Không có hồ sơ hợp lệ (ở các bước trước Giao 1 cửa) để thực hiện thao tác trả!' });
-          return;
-      }
-      handleOpenRejectReturnModal(validTargets);
-  }, [selectedRecordIds, records, handleOpenRejectReturnModal]);
-
-  const handleHandOverRecords = useCallback(async (recordIds: string[]) => {
-      if (recordIds.length === 0) return;
-      const updates = recordIds.map(id => ({ id, isHandedOver: true }));
-      setRecords(prev => prev.map(r => recordIds.includes(r.id) ? { ...r, isHandedOver: true } : r));
-      await updateRecordsBatchById(updates);
-      setToast({ type: 'success', message: `Đã tự động bàn giao ${recordIds.length} hồ sơ và đồng bộ dữ liệu!` });
-  }, [setRecords]);
-
-  const handleConfirmRejectReturnStep = useCallback(async (reason: string, returnDateStr: string, returnOption: 'REJECT' | 'PAUSE' | 'PREVIOUS_STEP' = 'PREVIOUS_STEP') => {
+  const handleConfirmRejectReturnStep = useCallback(async (optionType: ReturnOptionType, reason: string, returnDateStr: string) => {
       if (rejectReturnTargetRecords.length === 0) return;
       const targetDateISO = returnDateStr ? new Date(returnDateStr).toISOString() : new Date().toISOString();
-      const nowStr = targetDateISO;
+      
+      const formatDateVN = (dStr: string) => {
+          try {
+              const d = new Date(dStr);
+              const day = String(d.getDate()).padStart(2, '0');
+              const month = String(d.getMonth() + 1).padStart(2, '0');
+              const year = d.getFullYear();
+              const hours = String(d.getHours()).padStart(2, '0');
+              const mins = String(d.getMinutes()).padStart(2, '0');
+              return `${hours}:${mins} ngày ${day}/${month}/${year}`;
+          } catch {
+              return dStr;
+          }
+      };
 
       const updatedTargets = rejectReturnTargetRecords.map(r => {
-          const oldAssigned = r.assignedTo || r.lastAssignedTo || null;
+          const formattedReturnDate = formatDateVN(targetDateISO);
+          const userLabel = currentUser?.name || currentUser?.username || 'Hệ thống';
+          let newStatus: RecordStatus = RecordStatus.IN_PROGRESS;
+          let internalLogNote = '';
 
-          if (returnOption === 'REJECT') {
-              const internalLogNote = `[TRẢ HỦY - ${new Date(targetDateISO).toLocaleDateString('vi-VN')}] Lý do: ${reason}`;
-              const existingNotes = r.privateNotes || '';
-              const updatedPrivateNotes = existingNotes ? `${existingNotes}\n${internalLogNote}` : internalLogNote;
-              return {
-                  ...r,
-                  status: RecordStatus.REJECTED,
-                  completedDate: r.completedDate || nowStr,
-                  lastAssignedTo: oldAssigned,
-                  assignedTo: oldAssigned,
-                  privateNotes: updatedPrivateNotes
-              };
-          } else if (returnOption === 'PAUSE') {
-              const internalLogNote = `[TẠM DỪNG / CHỜ BỔ SUNG - ${new Date(targetDateISO).toLocaleDateString('vi-VN')}] Lý do: ${reason}`;
-              const existingNotes = r.privateNotes || '';
-              const updatedPrivateNotes = existingNotes ? `${existingNotes}\n${internalLogNote}` : internalLogNote;
-              return {
-                  ...r,
-                  status: RecordStatus.PENDING_SUPPLEMENT, // Trạng thái Chờ bổ sung
-                  lastAssignedTo: oldAssigned,
-                  assignedTo: oldAssigned,
-                  privateNotes: updatedPrivateNotes
-              };
+          if (optionType === 'pause_supplement') {
+              newStatus = RecordStatus.PENDING_SUPPLEMENT;
+              internalLogNote = `[TRẢ DỪNG QUY TRÌNH (CHỜ BỔ SUNG) - ${formattedReturnDate}] Lý do: ${reason} (Người trả: ${userLabel})`;
+          } else if (optionType === 'cancel_reject') {
+              newStatus = RecordStatus.REJECTED;
+              internalLogNote = `[TRẢ HỦY HỒ SƠ (TẠM DỪNG / TỪ CHỐI 1 CỬA) - ${formattedReturnDate}] Lý do: ${reason} (Người trả: ${userLabel})`;
           } else {
-              // PREVIOUS_STEP (Trả về / Sửa)
-              const dateHistoryLines: string[] = [];
-              if (r.pendingCheckDate) {
-                  const pDate = new Date(r.pendingCheckDate);
-                  if (!isNaN(pDate.getTime())) {
-                      dateHistoryLines.push(`${pDate.toLocaleDateString('vi-VN')} trình kiểm tra`);
-                  }
-              }
-              if (r.submissionDate) {
-                  const sDate = new Date(r.submissionDate);
-                  if (!isNaN(sDate.getTime())) {
-                      dateHistoryLines.push(`${sDate.toLocaleDateString('vi-VN')} trình ký`);
-                  }
-              }
-
-              let internalLogNote = `[TRẢ VỀ / SỬA - ${new Date(targetDateISO).toLocaleDateString('vi-VN')}]`;
-              if (dateHistoryLines.length > 0) {
-                  internalLogNote += `\n` + dateHistoryLines.join('\n');
-              }
-              internalLogNote += `\nlý do trả: ${reason}`;
-
-              const existingNotes = r.privateNotes || '';
-              const updatedPrivateNotes = existingNotes ? `${existingNotes}\n${internalLogNote}` : internalLogNote;
-
-              return {
-                  ...r,
-                  status: RecordStatus.IN_PROGRESS, // Chuyển về Đang thực hiện
-                  assignedTo: oldAssigned,         // Giữ cán bộ thụ lý
-                  lastAssignedTo: oldAssigned,
-                  // Reset ngày tháng các bước để làm lại từ đầu
-                  pendingCheckDate: null,
-                  submissionDate: null,
-                  checkedDate: null,
-                  approvalDate: null,
-                  completedDate: null,
-                  completedWorkDate: null,
-                  privateNotes: updatedPrivateNotes
-              };
+              newStatus = RecordStatus.IN_PROGRESS;
+              const prevStatusLabel = STATUS_LABELS[r.status] || r.status;
+              internalLogNote = `[TRẢ VỀ CÁN BỘ THỤ LÝ - ${formattedReturnDate}] Trả từ bước "${prevStatusLabel}" về Đang thực hiện. Lý do: ${reason} (Người trả: ${userLabel})`;
           }
+
+          const existingNotes = r.privateNotes || '';
+          const updatedPrivateNotes = existingNotes ? `${existingNotes}\n${internalLogNote}` : internalLogNote;
+
+          const newLog: RecordStatusLog = {
+              id: `${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+              recordId: r.id,
+              previousStatus: r.status,
+              newStatus: newStatus,
+              changedBy: userLabel,
+              changedAt: targetDateISO,
+              note: `Trả hồ sơ (${optionType}). Lý do: ${reason}`
+          };
+
+          return {
+              ...r,
+              status: newStatus,
+              ...(optionType === 'cancel_reject' ? { completedDate: targetDateISO } : {}),
+              ...(optionType === 'return_handler' ? { pendingCheckDate: null, submissionDate: null, checkedDate: null, approvalDate: null } : {}),
+              privateNotes: updatedPrivateNotes,
+              statusLogs: [...(r.statusLogs || []), newLog]
+          };
       });
 
       setRecords(prev => prev.map(r => {
@@ -1175,13 +944,8 @@ function App() {
       setIsRejectReturnStepModalOpen(false);
       setRejectReturnTargetRecords([]);
       setSelectedRecordIds(new Set());
-      const msg = returnOption === 'REJECT' 
-          ? `Đã trả hủy ${updatedTargets.length} hồ sơ thành công!` 
-          : returnOption === 'PAUSE' 
-          ? `Đã chuyển ${updatedTargets.length} hồ sơ sang trạng thái Chờ bổ sung!` 
-          : `Đã trả ${updatedTargets.length} hồ sơ về cho cán bộ thụ lý sửa chữa hoàn thiện!`;
-      setToast({ type: 'success', message: msg });
-  }, [rejectReturnTargetRecords]);
+      setToast({ type: 'success', message: `Đã thực hiện trả ${updatedTargets.length} hồ sơ thành công!` });
+  }, [rejectReturnTargetRecords, currentUser]);
 
   if (!currentUser) return (
     <>
@@ -1275,13 +1039,11 @@ function App() {
             isExcelPreviewOpen={isExcelPreviewOpen} setIsExcelPreviewOpen={setIsExcelPreviewOpen}
             isBulkUpdateModalOpen={isBulkUpdateModalOpen} setIsBulkUpdateModalOpen={setIsBulkUpdateModalOpen}
             isReturnModalOpen={isReturnModalOpen} setIsReturnModalOpen={setIsReturnModalOpen}
-            isExtendModalOpen={isExtendModalOpen} setIsExtendModalOpen={setIsExtendModalOpen}
             
             editingRecord={editingRecord} setEditingRecord={setEditingRecord}
             viewingRecord={viewingRecord} setViewingRecord={setViewingRecord}
             deletingRecord={deletingRecord} setDeletingRecord={setDeletingRecord}
             returnRecord={returnRecord} setReturnRecord={setReturnRecord}
-            extendTargetRecord={extendTargetRecord} setExtendTargetRecord={setExtendTargetRecord}
             assignTargetRecords={assignTargetRecords}
             exportModalType={exportModalType}
             
@@ -1308,8 +1070,6 @@ function App() {
             users={users}
             currentUser={currentUser}
             wards={wards}
-            rolePermissions={rolePermissions}
-            departmentPermissions={departmentPermissions}
             filteredRecords={recordFilterProps.filteredRecords}
             records={records}
             selectedCount={selectedRecordIds.size}
@@ -1475,13 +1235,10 @@ function App() {
             setIsDeleteModalOpen={setIsDeleteModalOpen}
             isDiagnosticModalOpen={isDiagnosticModalOpen}
             setIsDiagnosticModalOpen={setIsDiagnosticModalOpen}
-            setIsExtendModalOpen={setIsExtendModalOpen}
-            setExtendTargetRecord={setExtendTargetRecord}
-            handleOpenExtendModal={handleOpenExtendModal}
             advanceStatus={advanceStatus}
             handleOpenReturnModal={handleOpenReturnModal}
             handleOpenRejectReturnModal={handleOpenRejectReturnModal}
-            handleOpenSupplementModal={handleOpenSupplementModal}
+            handleOpenExtendModal={handleOpenExtendModal}
         />
 
         <AppModals 
@@ -1500,17 +1257,14 @@ function App() {
             isDiagnosticModalOpen={isDiagnosticModalOpen} setIsDiagnosticModalOpen={setIsDiagnosticModalOpen}
             isRejectReturnStepModalOpen={isRejectReturnStepModalOpen} setIsRejectReturnStepModalOpen={setIsRejectReturnStepModalOpen}
             isExtendModalOpen={isExtendModalOpen} setIsExtendModalOpen={setIsExtendModalOpen}
-            isSupplementModalOpen={isSupplementModalOpen} setIsSupplementModalOpen={setIsSupplementModalOpen}
             
             editingRecord={editingRecord} setEditingRecord={setEditingRecord}
             viewingRecord={viewingRecord} setViewingRecord={setViewingRecord}
             deletingRecord={deletingRecord} setDeletingRecord={setDeletingRecord}
             returnRecord={returnRecord} setReturnRecord={setReturnRecord}
-            extendTargetRecord={extendTargetRecord} setExtendTargetRecord={setExtendTargetRecord}
-            extendTargetRecords={extendTargetRecords}
-            supplementTargetRecords={supplementTargetRecords}
             assignTargetRecords={assignTargetRecords}
             rejectReturnTargetRecords={rejectReturnTargetRecords}
+            extendTargetRecords={extendTargetRecords}
             exportModalType={exportModalType}
             
             previewWorkbook={previewWorkbook} previewExcelName={previewExcelName}
@@ -1533,19 +1287,15 @@ function App() {
             handleBatchUpdateRecords={handleBatchUpdateRecords}
             confirmReturnResult={handleConfirmReturnResult}
             onConfirmRejectReturnStep={handleConfirmRejectReturnStep}
-            onConfirmExtendDeadline={handleConfirmExtendDeadline}
-            onConfirmSupplement={handleConfirmSupplement}
             onOpenRejectReturnModal={(r) => handleOpenRejectReturnModal([r])}
+            onConfirmExtendDeadline={handleConfirmExtendDeadline}
             onOpenExtendModal={(r) => handleOpenExtendModal([r])}
-            onOpenSupplementModal={(r) => handleOpenSupplementModal([r])}
 
             employees={employees}
             users={users}
             currentUser={currentUser}
             wards={wards}
             holidays={holidays}
-            rolePermissions={rolePermissions}
-            departmentPermissions={departmentPermissions}
             filteredRecords={recordFilterProps.filteredRecords}
             records={records}
             selectedCount={selectedRecordIds.size}

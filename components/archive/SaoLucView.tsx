@@ -409,10 +409,10 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Tân Qua
     const mapStatusToEnum = (s: string): RecordStatus => {
         switch(s) {
             case 'draft': return RecordStatus.RECEIVED;
-            case 'assigned': return RecordStatus.ASSIGNED;
-            case 'executed': return RecordStatus.IN_PROGRESS;
-            case 'pending_sign': return RecordStatus.PENDING_SIGN;
-            case 'signed': return RecordStatus.SIGNED;
+            case 'assigned':
+            case 'executed':
+            case 'pending_sign':
+            case 'signed': return RecordStatus.IN_PROGRESS;
             case 'completed': return RecordStatus.RETURNED;
             default: return RecordStatus.RECEIVED;
         }
@@ -689,12 +689,7 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Tân Qua
                         <Users size={16} className="text-gray-500"/>
                         <select className="text-sm outline-none bg-transparent text-gray-700 font-medium cursor-pointer border-none focus:ring-0 min-w-[120px]" value={filterEmployee} onChange={e => setFilterEmployee(e.target.value)}>
                             <option value="">Tất cả Nhân viên</option>
-                            {employees
-                                .filter(e => {
-                                    const d = (e.department || '').toLowerCase();
-                                    return d.includes('lưu trữ') || d.includes('thông tin') || d.includes('giám đốc') || d.includes('lãnh đạo');
-                                })
-                                .map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+                            {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
                         </select>
                     </div>
                 </div>

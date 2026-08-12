@@ -1,8 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { User, Employee } from '../types';
-import { Save, Lock, User as UserIcon, Briefcase, CheckCircle, AlertCircle, Loader2, ShieldCheck, Bell, Sun, Moon } from 'lucide-react';
-import { useTheme } from '../hooks/useTheme';
+import { Save, Lock, User as UserIcon, Briefcase, CheckCircle, AlertCircle, Loader2, ShieldCheck, Bell } from 'lucide-react';
 
 interface AccountSettingsViewProps {
   currentUser: User;
@@ -34,7 +33,6 @@ const AccountSettingsView: React.FC<AccountSettingsViewProps> = ({
   
   // Notification State
   const [notification, setNotification] = useState<{ type: 'success' | 'error', message: string } | null>(null);
-  const { theme, toggleTheme } = useTheme();
 
   // Ref để cuộn lên đầu trang
   const topRef = useRef<HTMLDivElement>(null);
@@ -268,16 +266,15 @@ const AccountSettingsView: React.FC<AccountSettingsViewProps> = ({
                                     </div>
                                 )}
 
-                                {/* --- SETTING NOTIFICATION & THEME TOGGLES --- */}
-                                <div className="mt-4 pt-6 border-t border-gray-100 dark:border-slate-700 space-y-4">
-                                    <h4 className="text-sm font-medium text-gray-600 dark:text-slate-300 flex items-center gap-2">
-                                        <Bell size={16} className="text-purple-600 dark:text-purple-400"/> Cài đặt trải nghiệm
+                                {/* --- SETTING NOTIFICATION TOGGLE --- */}
+                                <div className="mt-4 pt-6 border-t border-gray-100">
+                                    <h4 className="text-sm font-medium text-gray-600 mb-4 flex items-center gap-2">
+                                        <Bell size={16} className="text-purple-600"/> Cài đặt thông báo
                                     </h4>
-                                    
                                     <div className="flex items-center justify-between bg-slate-50 p-4 rounded-2xl border border-slate-100">
                                         <div className="pr-4">
-                                            <span className="text-sm font-medium text-slate-700 dark:text-slate-200">Thông báo tin nhắn nội bộ</span>
-                                            <p className="text-[11px] text-slate-400 dark:text-slate-400 mt-0.5 font-medium leading-tight">Hiển thị thông báo ở góc màn hình khi có tin nhắn mới.</p>
+                                            <span className="text-sm font-medium text-slate-700">Thông báo tin nhắn nội bộ</span>
+                                            <p className="text-[11px] text-slate-400 mt-0.5 font-medium leading-tight">Hiển thị thông báo ở góc màn hình khi có tin nhắn mới.</p>
                                         </div>
                                         <label className="relative inline-flex items-center cursor-pointer shrink-0">
                                             <input 

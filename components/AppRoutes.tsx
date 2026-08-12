@@ -1,5 +1,5 @@
 import React from "react";
-import { isViewAllowedForUser, hasUserPermission } from "../config/roleConfig";
+import { isViewAllowedForUser } from "../config/roleConfig";
 import {
   RecordFile,
   Employee,
@@ -9,9 +9,8 @@ import {
   RolePermissions,
   DepartmentPermissions,
   DEFAULT_ROLE_PERMISSIONS,
-  RecordStatus,
 } from "../types";
-import { STATUS_LABELS, CAP_GIAY_SUB_STEPS, CAP_GIAY_RECORD_TYPES } from "../constants";
+import { STATUS_LABELS, SELECTABLE_STATUSES } from "../constants";
 import { COLUMN_DEFS, removeVietnameseTones, matchDepartmentKey } from "../utils/appHelpers";
 
 // Components
@@ -30,7 +29,6 @@ import CongVanView from "./archive/CongVanView";
 import RegistrationRecords from "./RegistrationRecords";
 import SystemView from "./SystemView";
 import BarcodeGeneratorView from "./BarcodeGeneratorView";
-import { DANGKY_11_STEPS } from "../services/apiDangkyRecords";
 
 const formatDateDDMMYYYY = (isoStr: string) => {
   if (!isoStr) return "";
@@ -73,27 +71,12 @@ import {
   ChevronUp,
   ChevronDown,
   FileText,
-  PenTool,
   UserPlus as UserPlusIcon,
   ClipboardList,
   Send,
   RefreshCw,
   Undo2,
-  BookOpen,
-  RotateCcw,
   CalendarClock,
-  ArrowRight,
-  CheckCircle2,
-  Archive,
-  Inbox,
-  FileSearch,
-  Receipt,
-  Printer,
-  ShieldCheck,
-  Building2,
-  ArrowRightLeft,
-  CreditCard,
-  PackageCheck,
 } from "lucide-react";
 
 interface AppRoutesProps {
@@ -190,8 +173,6 @@ interface AppRoutesProps {
   setFilterStatus: (s: string) => void;
   filterEmployee: string;
   setFilterEmployee: (s: string) => void;
-  capGiaySubStepFilter?: string;
-  setCapGiaySubStepFilter?: (s: string) => void;
   warningFilter: string;
   setWarningFilter: React.Dispatch<React.SetStateAction<any>>;
   handoverTab: string;
@@ -234,17 +215,13 @@ interface AppRoutesProps {
   setIsDeleteModalOpen: (b: boolean) => void;
   isDiagnosticModalOpen?: boolean;
   setIsDiagnosticModalOpen?: (b: boolean) => void;
-  setIsExtendModalOpen?: (b: boolean) => void;
-  setExtendTargetRecord?: (r: RecordFile | null) => void;
-  handleOpenExtendModal?: (records: RecordFile[]) => void;
-  onExtendDeadline?: (record: RecordFile) => void;
   advanceStatus: (r: RecordFile) => void;
   handleOpenReturnModal: (r: RecordFile) => void;
   columnOrder: string[];
   setColumnOrder: React.Dispatch<React.SetStateAction<string[]>>;
   onBulkUpdate?: (field: keyof RecordFile, value: any, customDate?: string, targetRecordIds?: string[]) => Promise<void>;
   handleOpenRejectReturnModal?: (records: RecordFile[]) => void;
-  handleOpenSupplementModal?: (records: RecordFile[]) => void;
+  handleOpenExtendModal?: (records: RecordFile[]) => void;
 }
 
 const AppRoutes: React.FC<AppRoutesProps> = (props) => {
@@ -282,7 +259,10 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
   }
 
   const hasPermission = (permissionId: string) => {
-    return hasUserPermission(currentUser, employees, permissionId, rolePermissions, departmentPermissions);
+    if (currentUser.role === UserRole.ADMIN) return true;
+
+    const rolePerms = (rolePermissions && rolePermissions[currentUser.role]) || DEFAULT_ROLE_PERMISSIONS[currentUser.role] || [];
+    return rolePerms.includes("*") || rolePerms.includes(permissionId);
   };
 
   const isAdmin = currentUser.role === UserRole.ADMIN;
@@ -308,10 +288,32 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
 
   const [showColumnSelector, setShowColumnSelector] = React.useState(false);
   const [isAddMenuOpen, setIsAddMenuOpen] = React.useState(false);
+  const [isFilterPopoverOpen, setIsFilterPopoverOpen] = React.useState(false);
+  const filterPopoverRef = React.useRef<HTMLDivElement>(null);
   const [receiveRecordSubTab, setReceiveRecordSubTab] = React.useState<'create' | 'list' | 'bulk' | 'update' | 'vphc'>('create');
-  const [vaoSoTab, setVaoSoTab] = React.useState<'pending_entry' | 'completed_entry' | 'all'>('pending_entry');
   const addMenuRef = React.useRef<HTMLDivElement>(null);
   const ignoreSubTabResetRef = React.useRef(false);
+
+  React.useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (filterPopoverRef.current && !filterPopoverRef.current.contains(event.target as Node)) {
+        setIsFilterPopoverOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const activeFilterCount = React.useMemo(() => {
+    let count = 0;
+    if (props.filterFromDate || props.filterToDate) count++;
+    if (props.filterAssignedFromDate || props.filterAssignedToDate) count++;
+    if (props.filterWard && props.filterWard !== 'all') count++;
+    if (props.filterRecordType && props.filterRecordType !== 'all') count++;
+    if (props.filterStatus && props.filterStatus !== 'all') count++;
+    if (props.filterEmployee && props.filterEmployee !== 'all') count++;
+    return count;
+  }, [props.filterFromDate, props.filterToDate, props.filterAssignedFromDate, props.filterAssignedToDate, props.filterWard, props.filterRecordType, props.filterStatus, props.filterEmployee]);
 
   const navigateToReceiveRecordSubTab = (subTab: 'create' | 'list' | 'bulk' | 'update' | 'vphc') => {
     ignoreSubTabResetRef.current = true;
@@ -373,7 +375,13 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
       "handover_list",
       "director_completed",
     ].includes(currentView);
-    const isOtherView = false;
+    const isOtherView = [
+      "other_records",
+      "other_assign_tasks",
+      "other_check_list",
+      "other_handover_list",
+      "other_director_completed",
+    ].includes(currentView);
     const isArchiveMeasurementView = [
       "archive_records",
       "archive_assign_tasks",
@@ -384,9 +392,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
       "archive_director_completed",
     ].includes(currentView);
 
-    const isDangkyView = currentView.startsWith("dangky_") || currentView === "dangky_records" || currentView === "other_records";
-
-    const isSpecializedTab = !["all_records", "other_records", "dangky_records", "archive_records"].includes(currentView);
+    const isSpecializedTab = !["all_records", "other_records", "archive_records"].includes(currentView);
 
     let title = "Danh sách Hồ sơ";
     if (
@@ -426,18 +432,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
     )
       title = "Hồ sơ chờ kiểm tra";
     else if (currentView === "all_records") title = "Hồ sơ đo đạc";
-    else if (currentView === "other_records") title = "Đăng ký - Tất cả hồ sơ";
-    else if (currentView === "other_assign_tasks") title = "Đăng ký - Chưa giao";
-    else if (currentView === "other_completed_list") title = "Đăng ký - Đang thực hiện";
-    else if (currentView === "other_pending_check_list") title = "Đăng ký - Kiểm tra";
-    else if (currentView === "other_check_list") title = "Đăng ký - Trình ký";
-    else if (currentView === "other_handover_list") title = "Đăng ký - Giao 1 cửa";
-    else if (currentView === "registration_records") title = "Đăng ký - Vô số GCN";
-    else if (currentView.startsWith("dangky_")) {
-      const stepId = currentView.replace("dangky_", "");
-      const stepObj = DANGKY_11_STEPS.find(s => s.id === stepId);
-      title = stepObj ? `Cấp giấy - ${stepObj.label}` : "Cấp giấy";
-    }
+    else if (currentView === "other_records") title = "Hồ sơ khác";
     else if (currentView === "archive_records")
       title = "Lưu trữ (Cung cấp TLĐĐ)";
     else if (currentView === "archive_completed_list") title = "Đang thực hiện";
@@ -446,7 +441,8 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
 
     return (
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col flex-1 h-full animate-fade-in-up">
-        {/* SUB-HEADER TABS FOR MEASUREMENT RECORDS */}
+          <>
+            {/* SUB-HEADER TABS FOR MEASUREMENT RECORDS */}
             {isMeasurementView && (
           <div className="flex border-b border-gray-200 bg-gray-50 px-4 overflow-x-auto">
             {!isDirector && (
@@ -592,102 +588,59 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
           </div>
         )}
 
-        {/* SUB-HEADER TABS FOR DANGKY RECORDS */}
-        {isDangkyView && (
-          <div className="flex flex-col border-b border-gray-200 bg-indigo-50/50">
-            {/* Level 1 Navigation Bar (Row 2) */}
-            <div className="flex px-3 py-1.5 overflow-x-auto no-scrollbar gap-1.5 items-center">
-              <button
-                onClick={() => props.setCurrentView("dangky_records")}
-                className={`px-3 py-1.5 text-xs font-bold flex items-center gap-1.5 border-b-2 rounded-t-lg transition-colors whitespace-nowrap ${currentView === "dangky_records" || currentView === "other_records" ? "border-indigo-600 text-indigo-700 bg-white shadow-xs" : "border-transparent text-gray-600 hover:text-indigo-600 hover:bg-white/50"}`}
-              >
-                <Layers size={14} className="text-indigo-600" />
-                <span>Tất cả hồ sơ</span>
-              </button>
-
-              <button
-                onClick={() => props.setCurrentView("dangky_tiep_nhan_giao_viec")}
-                className={`px-3 py-1.5 text-xs font-bold flex items-center gap-1.5 border-b-2 rounded-t-lg transition-colors whitespace-nowrap ${currentView === "dangky_tiep_nhan_giao_viec" ? "border-indigo-600 text-indigo-700 bg-white shadow-xs" : "border-transparent text-gray-600 hover:text-indigo-600 hover:bg-white/50"}`}
-              >
-                <Inbox size={14} className={currentView === "dangky_tiep_nhan_giao_viec" ? "text-indigo-600" : "text-gray-500"} />
-                <span>Chưa giao</span>
-              </button>
-
-              <button
-                onClick={() => props.setCurrentView("dangky_tham_dinh")}
-                className={`px-3 py-1.5 text-xs font-bold flex items-center gap-1.5 border-b-2 rounded-t-lg transition-colors whitespace-nowrap ${currentView === "dangky_tham_dinh" ? "border-indigo-600 text-indigo-700 bg-white shadow-xs" : "border-transparent text-gray-600 hover:text-indigo-600 hover:bg-white/50"}`}
-              >
-                <FileSearch size={14} className={currentView === "dangky_tham_dinh" ? "text-indigo-600" : "text-gray-500"} />
-                <span>Thẩm định</span>
-              </button>
-
-              {/* Group Tab 1: Thông báo thuế */}
-              {(() => {
-                const isTaxGroupActive = ["dangky_phieu_chuyen_thue", "dangky_cho_tbt", "dangky_cho_gnt"].includes(currentView);
-                return (
+        {/* SUB-HEADER TABS FOR OTHER RECORDS */}
+        {isOtherView && (
+          <div className="flex border-b border-gray-200 bg-gray-50 px-4 overflow-x-auto">
+            {!isDirector && (
+              <>
+                {isViewAllowedForUser(currentUser, employees, "other_records", rolePermissions, departmentPermissions) && (
                   <button
-                    onClick={() => {
-                      if (!isTaxGroupActive) props.setCurrentView("dangky_cho_tbt");
-                    }}
-                    className={`px-3 py-1.5 text-xs font-bold flex items-center gap-1.5 border-b-2 rounded-t-lg transition-colors whitespace-nowrap ${isTaxGroupActive ? "border-amber-600 text-amber-800 bg-amber-50 shadow-xs" : "border-transparent text-gray-600 hover:text-amber-700 hover:bg-white/50"}`}
+                    onClick={() => props.setCurrentView("other_records")}
+                    className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "other_records" ? "border-blue-600 text-blue-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
                   >
-                    <Receipt size={14} className={isTaxGroupActive ? "text-amber-600" : "text-gray-500"} />
-                    <span>TBT</span>
-                    <ChevronDown size={12} className={`transition-transform ${isTaxGroupActive ? 'rotate-180 text-amber-600' : 'text-gray-400'}`} />
+                    <FileText size={16} /> Tất cả hồ sơ
                   </button>
-                );
-              })()}
+                )}
 
-              <button
-                onClick={() => props.setCurrentView("dangky_in_hoan_thien")}
-                className={`px-3 py-1.5 text-xs font-bold flex items-center gap-1.5 border-b-2 rounded-t-lg transition-colors whitespace-nowrap ${currentView === "dangky_in_hoan_thien" ? "border-indigo-600 text-indigo-700 bg-white shadow-xs" : "border-transparent text-gray-600 hover:text-indigo-600 hover:bg-white/50"}`}
-              >
-                <Printer size={14} className={currentView === "dangky_in_hoan_thien" ? "text-indigo-600" : "text-gray-500"} />
-                <span>In & Hoàn thiện</span>
-              </button>
-
-              <button
-                onClick={() => props.setCurrentView("dangky_trinh_kiem_tra")}
-                className={`px-3 py-1.5 text-xs font-bold flex items-center gap-1.5 border-b-2 rounded-t-lg transition-colors whitespace-nowrap ${currentView === "dangky_trinh_kiem_tra" ? "border-indigo-600 text-indigo-700 bg-white shadow-xs" : "border-transparent text-gray-600 hover:text-indigo-600 hover:bg-white/50"}`}
-              >
-                <ShieldCheck size={14} className={currentView === "dangky_trinh_kiem_tra" ? "text-indigo-600" : "text-gray-500"} />
-                <span>Kiểm tra</span>
-              </button>
-
-              <button
-                onClick={() => props.setCurrentView("dangky_trinh_ky")}
-                className={`px-3 py-1.5 text-xs font-bold flex items-center gap-1.5 border-b-2 rounded-t-lg transition-colors whitespace-nowrap ${currentView === "dangky_trinh_ky" ? "border-indigo-600 text-indigo-700 bg-white shadow-xs" : "border-transparent text-gray-600 hover:text-indigo-600 hover:bg-white/50"}`}
-              >
-                <PenTool size={14} className={currentView === "dangky_trinh_ky" ? "text-indigo-600" : "text-gray-500"} />
-                <span>Trình ký</span>
-              </button>
-
-              {/* Group Tab 2: Giao 1 cửa */}
-              {(() => {
-                const isHandoverGroupActive = ["dangky_cho_ban_giao", "dangky_cho_giao_1cua_tra_kq", "dangky_da_tra_ket_qua"].includes(currentView);
-                return (
+                {isViewAllowedForUser(currentUser, employees, "other_assign_tasks", rolePermissions, departmentPermissions) && (
                   <button
-                    onClick={() => {
-                      if (!isHandoverGroupActive) props.setCurrentView("dangky_cho_ban_giao");
-                    }}
-                    className={`px-3 py-1.5 text-xs font-bold flex items-center gap-1.5 border-b-2 rounded-t-lg transition-colors whitespace-nowrap ${isHandoverGroupActive ? "border-emerald-600 text-emerald-800 bg-emerald-50 shadow-xs" : "border-transparent text-gray-600 hover:text-emerald-700 hover:bg-white/50"}`}
+                    onClick={() => props.setCurrentView("other_assign_tasks")}
+                    className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "other_assign_tasks" ? "border-blue-600 text-blue-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
                   >
-                    <Building2 size={14} className={isHandoverGroupActive ? "text-emerald-600" : "text-gray-500"} />
-                    <span>Giao 1 cửa</span>
-                    <ChevronDown size={12} className={`transition-transform ${isHandoverGroupActive ? 'rotate-180 text-emerald-600' : 'text-gray-400'}`} />
+                    <UserPlusIcon size={16} /> Chưa giao
                   </button>
-                );
-              })()}
-            </div>
+                )}
+              </>
+            )}
+
+            {isViewAllowedForUser(currentUser, employees, "other_check_list", rolePermissions, departmentPermissions) && (
+              <button
+                onClick={() => props.setCurrentView("other_check_list")}
+                className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "other_check_list" ? "border-purple-600 text-purple-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
+              >
+                <ClipboardList size={16} /> {isDirector ? "Chờ ký" : "Trình ký"}
+              </button>
+            )}
+
+            {isDirector && isViewAllowedForUser(currentUser, employees, "other_director_completed", rolePermissions, departmentPermissions) && (
+              <button
+                onClick={() => props.setCurrentView("other_director_completed")}
+                className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "other_director_completed" ? "border-green-600 text-green-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
+              >
+                <CheckSquare size={16} /> Hoàn thành
+              </button>
+            )}
+
+            {!isDirector && isViewAllowedForUser(currentUser, employees, "other_handover_list", rolePermissions, departmentPermissions) && (
+                <button
+                  onClick={() => props.setCurrentView("other_handover_list")}
+                  className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "other_handover_list" ? "border-green-600 text-green-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
+                >
+                  <Send size={16} /> Giao 1 cửa
+                </button>
+              )}
           </div>
         )}
-
-        {currentView === "registration_records" ? (
-          <div className="flex-1 overflow-hidden flex flex-col p-2">
-            <RegistrationRecords currentUser={currentUser} wards={wards} />
-          </div>
-        ) : (
-          <div className="flex-1 overflow-hidden flex flex-col">
 
         <div className="p-4 border-b border-gray-100 flex flex-col gap-4">
           <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
@@ -740,148 +693,57 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
               </div>
             )}
 
-            {/* SUB-TABS FOR THÔNG BÁO THUẾ & GIAO 1 CỬA NEXT TO FILTER BUTTON */}
-            {["dangky_phieu_chuyen_thue", "dangky_cho_tbt", "dangky_cho_gnt"].includes(currentView) && (
-              <div className="flex items-center gap-1.5 bg-amber-100/80 p-1 rounded-lg border border-amber-200">
-                <button
-                  onClick={() => props.setCurrentView("dangky_phieu_chuyen_thue")}
-                  className={`px-2.5 py-1 rounded-md text-xs font-bold flex items-center gap-1 transition-all whitespace-nowrap cursor-pointer ${currentView === "dangky_phieu_chuyen_thue" ? "bg-amber-600 text-white shadow-xs" : "bg-white/80 text-amber-900 hover:bg-white"}`}
-                >
-                  <ArrowRightLeft size={13} />
-                  <span>Chờ chuyển thuế</span>
-                </button>
-                <button
-                  onClick={() => props.setCurrentView("dangky_cho_tbt")}
-                  className={`px-2.5 py-1 rounded-md text-xs font-bold flex items-center gap-1 transition-all whitespace-nowrap cursor-pointer ${currentView === "dangky_cho_tbt" ? "bg-amber-600 text-white shadow-xs" : "bg-white/80 text-amber-900 hover:bg-white"}`}
-                >
-                  <FileText size={13} />
-                  <span>Chờ Thuế KV7</span>
-                </button>
-                <button
-                  onClick={() => props.setCurrentView("dangky_cho_gnt")}
-                  className={`px-2.5 py-1 rounded-md text-xs font-bold flex items-center gap-1 transition-all whitespace-nowrap cursor-pointer ${currentView === "dangky_cho_gnt" ? "bg-amber-600 text-white shadow-xs" : "bg-white/80 text-amber-900 hover:bg-white"}`}
-                >
-                  <CreditCard size={13} />
-                  <span>Chờ GNT</span>
-                </button>
-              </div>
-            )}
-
-            {["dangky_cho_ban_giao", "dangky_cho_giao_1cua_tra_kq", "dangky_da_tra_ket_qua"].includes(currentView) && (
-              <div className="flex items-center gap-1.5 bg-emerald-100/80 p-1 rounded-lg border border-emerald-200">
-                <button
-                  onClick={() => props.setCurrentView("dangky_cho_ban_giao")}
-                  className={`px-2.5 py-1 rounded-md text-xs font-bold flex items-center gap-1 transition-all whitespace-nowrap cursor-pointer ${currentView === "dangky_cho_ban_giao" ? "bg-emerald-600 text-white shadow-xs" : "bg-white/80 text-emerald-900 hover:bg-white"}`}
-                >
-                  <PackageCheck size={13} />
-                  <span>Chờ bàn giao</span>
-                </button>
-                <button
-                  onClick={() => props.setCurrentView("dangky_cho_giao_1cua_tra_kq")}
-                  className={`px-2.5 py-1 rounded-md text-xs font-bold flex items-center gap-1 transition-all whitespace-nowrap cursor-pointer ${currentView === "dangky_cho_giao_1cua_tra_kq" ? "bg-emerald-600 text-white shadow-xs" : "bg-white/80 text-emerald-900 hover:bg-white"}`}
-                >
-                  <CheckCircle2 size={13} />
-                  <span>Chờ trả kết quả</span>
-                </button>
-                <button
-                  onClick={() => props.setCurrentView("dangky_da_tra_ket_qua")}
-                  className={`px-2.5 py-1 rounded-md text-xs font-bold flex items-center gap-1 transition-all whitespace-nowrap cursor-pointer ${currentView === "dangky_da_tra_ket_qua" ? "bg-emerald-600 text-white shadow-xs" : "bg-white/80 text-emerald-900 hover:bg-white"}`}
-                >
-                  <Archive size={13} />
-                  <span>Đã trả kết quả</span>
-                </button>
-              </div>
-            )}
-
-            {/* UNIFIED POPOVER FILTER DROPDOWN FOR ALL WORKFLOW TABS */}
             {currentView !== "handover_list" &&
               currentView !== "other_handover_list" &&
               currentView !== "archive_handover_list" && (
-                <div className="relative">
+                <div className="relative inline-block" ref={filterPopoverRef}>
                   <button
-                    onClick={() =>
-                      props.setShowAdvancedDateFilter(
-                        !props.showAdvancedDateFilter,
-                      )
-                    }
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border cursor-pointer ${
-                      props.showAdvancedDateFilter
-                        ? "bg-blue-600 text-white border-blue-600 shadow-xs"
-                        : (props.filterFromDate ||
-                           props.filterToDate ||
-                           props.filterAssignedFromDate ||
-                           props.filterAssignedToDate ||
-                           (props.filterWard && props.filterWard !== "all") ||
-                           (props.filterRecordType && props.filterRecordType !== "all") ||
-                           (props.filterStatus && props.filterStatus !== "all") ||
-                           (props.filterEmployee && props.filterEmployee !== "all") ||
-                           (props.warningFilter && props.warningFilter !== "none"))
-                        ? "bg-blue-50 text-blue-700 border-blue-300 shadow-xs"
-                        : "bg-white text-slate-700 border-gray-200 hover:bg-gray-100"
+                    onClick={() => setIsFilterPopoverOpen(!isFilterPopoverOpen)}
+                    className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-sm font-bold transition-all shadow-sm ${
+                      activeFilterCount > 0
+                        ? "bg-blue-700 text-white ring-2 ring-blue-300"
+                        : "bg-blue-600 hover:bg-blue-700 text-white"
                     }`}
                     title="Mở bộ lọc tìm kiếm"
                   >
-                    <Filter
-                      size={15}
-                      className={
-                        (props.filterFromDate ||
-                         props.filterToDate ||
-                         props.filterAssignedFromDate ||
-                         props.filterAssignedToDate ||
-                         (props.filterWard && props.filterWard !== "all") ||
-                         (props.filterRecordType && props.filterRecordType !== "all") ||
-                         (props.filterStatus && props.filterStatus !== "all") ||
-                         (props.filterEmployee && props.filterEmployee !== "all") ||
-                         (props.warningFilter && props.warningFilter !== "none"))
-                          ? "text-blue-600"
-                          : "text-gray-500"
-                      }
-                    />
+                    <Filter size={16} />
                     <span>Lọc</span>
-                    {(props.filterFromDate ||
-                      props.filterToDate ||
-                      props.filterAssignedFromDate ||
-                      props.filterAssignedToDate ||
-                      (props.filterWard && props.filterWard !== "all") ||
-                      (props.filterRecordType && props.filterRecordType !== "all") ||
-                      (props.filterStatus && props.filterStatus !== "all") ||
-                      (props.filterEmployee && props.filterEmployee !== "all") ||
-                      (props.warningFilter && props.warningFilter !== "none")) && (
-                      <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse"></span>
+                    {activeFilterCount > 0 && (
+                      <span className="bg-red-500 text-white text-[11px] px-1.5 py-0.2 rounded-full font-extrabold">
+                        {activeFilterCount}
+                      </span>
                     )}
-                    <ChevronDown
-                      size={14}
-                      className={`transition-transform duration-200 ${
-                        props.showAdvancedDateFilter ? "rotate-180" : ""
-                      }`}
-                    />
+                    {isFilterPopoverOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                   </button>
 
-                  {/* Filter Popover Panel */}
-                  {props.showAdvancedDateFilter && (
-                    <div className="absolute left-0 mt-1 w-80 bg-white rounded-xl shadow-xl border border-gray-200 p-3.5 z-50 animate-in fade-in zoom-in-95 duration-100 space-y-3">
-                      <div className="flex items-center justify-between pb-2 border-b border-gray-100">
-                        <span className="text-xs font-extrabold text-gray-700 flex items-center gap-1.5">
-                          <Filter size={14} className="text-blue-600" /> Bộ lọc tìm kiếm
-                        </span>
+                  {/* POPOVER DROPDOWN CARD */}
+                  {isFilterPopoverOpen && (
+                    <div className="absolute left-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 p-4 z-50 animate-fade-in text-gray-800">
+                      {/* Popover Header */}
+                      <div className="flex items-center justify-between pb-3 border-b border-gray-100 mb-3">
+                        <div className="flex items-center gap-2 font-bold text-blue-700 text-base">
+                          <Filter size={18} />
+                          <span>Bộ lọc tìm kiếm</span>
+                        </div>
                         <button
-                          onClick={() => props.setShowAdvancedDateFilter(false)}
-                          className="text-gray-400 hover:text-gray-600 p-0.5 rounded-md hover:bg-gray-100 cursor-pointer"
+                          onClick={() => setIsFilterPopoverOpen(false)}
+                          className="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100 transition-colors"
                         >
-                          <X size={14} />
+                          <X size={18} />
                         </button>
                       </div>
 
-                      <div className="space-y-3 max-h-[75vh] overflow-y-auto pr-0.5">
-                        {/* 1. Lọc Xã / Phường */}
+                      <div className="space-y-3.5 max-h-[75vh] overflow-y-auto pr-1">
+                        {/* 1. Xã / Phường */}
                         <div>
-                          <label className="block text-[11px] font-bold text-gray-500 mb-1 flex items-center gap-1">
-                            <MapPin size={13} /> Địa danh (Xã/Phường):
+                          <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 mb-1">
+                            <MapPin size={14} className="text-gray-500" />
+                            <span>Địa danh (Xã/Phường):</span>
                           </label>
                           <select
                             value={props.filterWard}
                             onChange={(e) => props.setFilterWard(e.target.value)}
-                            className="w-full text-xs border border-gray-200 rounded-md p-1.5 outline-none focus:border-blue-500 bg-gray-50 font-medium text-gray-800 cursor-pointer"
+                            className="w-full text-sm border border-gray-200 rounded-lg p-2 font-medium bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                           >
                             <option value="all">Tất cả Xã/Phường</option>
                             {wards.map((w) => (
@@ -892,102 +754,96 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                           </select>
                         </div>
 
-                        {/* 2. Lọc thời gian nhận hồ sơ */}
-                        {!isSpecializedTab && !isDangkyView && !isOtherView && (
-                          <div>
-                            <label className="block text-[11px] font-bold text-gray-500 mb-1 flex items-center gap-1">
-                              <Calendar size={13} /> Thời gian nhận hồ sơ:
-                            </label>
-                            <div className="grid grid-cols-2 gap-2">
-                              <div>
-                                <span className="text-[10px] text-gray-400">Từ ngày</span>
-                                <input
-                                  type="date"
-                                  value={props.filterFromDate}
-                                  onChange={(e) => props.setFilterFromDate(e.target.value)}
-                                  className="w-full text-xs border border-gray-200 rounded-md p-1.5 outline-none focus:border-blue-500 bg-gray-50 font-medium text-gray-800"
-                                />
-                              </div>
-                              <div>
-                                <span className="text-[10px] text-gray-400">Đến ngày</span>
-                                <input
-                                  type="date"
-                                  value={props.filterToDate}
-                                  onChange={(e) => props.setFilterToDate(e.target.value)}
-                                  className="w-full text-xs border border-gray-200 rounded-md p-1.5 outline-none focus:border-blue-500 bg-gray-50 font-medium text-gray-800"
-                                />
-                              </div>
+                        {/* 2. Thời gian nhận hồ sơ */}
+                        <div>
+                          <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 mb-1">
+                            <Calendar size={14} className="text-gray-500" />
+                            <span>Thời gian nhận hồ sơ:</span>
+                          </label>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <span className="text-[11px] text-gray-500 font-medium block mb-0.5">Từ ngày</span>
+                              <input
+                                type="date"
+                                value={props.filterFromDate}
+                                onChange={(e) => props.setFilterFromDate(e.target.value)}
+                                className="w-full text-xs border border-gray-200 rounded-lg p-2 font-medium bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              />
+                            </div>
+                            <div>
+                              <span className="text-[11px] text-gray-500 font-medium block mb-0.5">Đến ngày</span>
+                              <input
+                                type="date"
+                                value={props.filterToDate}
+                                onChange={(e) => props.setFilterToDate(e.target.value)}
+                                className="w-full text-xs border border-gray-200 rounded-lg p-2 font-medium bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              />
                             </div>
                           </div>
-                        )}
+                        </div>
 
-                        {/* 3. Lọc thời gian giao nhân viên */}
-                        {(currentView === "all_records" ||
-                          currentView === "other_records" ||
-                          currentView === "archive_records") && (
+                        {/* 3. Thời gian giao NV */}
+                        {(currentView === "all_records" || currentView === "other_records" || currentView === "archive_records") && (
                           <div>
-                            <label className="block text-[11px] font-bold text-gray-500 mb-1 flex items-center gap-1">
-                              <Calendar size={13} /> Thời gian giao NV:
+                            <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 mb-1">
+                              <Calendar size={14} className="text-gray-500" />
+                              <span>Thời gian giao NV:</span>
                             </label>
                             <div className="grid grid-cols-2 gap-2">
                               <div>
-                                <span className="text-[10px] text-gray-400">Từ ngày</span>
+                                <span className="text-[11px] text-gray-500 font-medium block mb-0.5">Từ ngày</span>
                                 <input
                                   type="date"
                                   value={props.filterAssignedFromDate || ""}
-                                  onChange={(e) =>
-                                    props.setFilterAssignedFromDate &&
-                                    props.setFilterAssignedFromDate(e.target.value)
-                                  }
-                                  className="w-full text-xs border border-gray-200 rounded-md p-1.5 outline-none focus:border-blue-500 bg-gray-50 font-medium text-gray-800"
+                                  onChange={(e) => props.setFilterAssignedFromDate && props.setFilterAssignedFromDate(e.target.value)}
+                                  className="w-full text-xs border border-gray-200 rounded-lg p-2 font-medium bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 />
                               </div>
                               <div>
-                                <span className="text-[10px] text-gray-400">Đến ngày</span>
+                                <span className="text-[11px] text-gray-500 font-medium block mb-0.5">Đến ngày</span>
                                 <input
                                   type="date"
                                   value={props.filterAssignedToDate || ""}
-                                  onChange={(e) =>
-                                    props.setFilterAssignedToDate &&
-                                    props.setFilterAssignedToDate(e.target.value)
-                                  }
-                                  className="w-full text-xs border border-gray-200 rounded-md p-1.5 outline-none focus:border-blue-500 bg-gray-50 font-medium text-gray-800"
+                                  onChange={(e) => props.setFilterAssignedToDate && props.setFilterAssignedToDate(e.target.value)}
+                                  className="w-full text-xs border border-gray-200 rounded-lg p-2 font-medium bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 />
                               </div>
                             </div>
                           </div>
                         )}
 
-                        {/* 4. Lọc Loại hồ sơ */}
+                        {/* 4. Loại hồ sơ */}
                         {isMeasurementView && (
                           <div>
-                            <label className="block text-[11px] font-bold text-gray-500 mb-1 flex items-center gap-1">
-                              <Filter size={13} /> Loại hồ sơ Đo đạc:
+                            <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 mb-1">
+                              <Filter size={14} className="text-gray-500" />
+                              <span>Loại hồ sơ Đo đạc:</span>
                             </label>
                             <select
                               value={props.filterRecordType}
                               onChange={(e) => props.setFilterRecordType(e.target.value)}
-                              className="w-full text-xs border border-gray-200 rounded-md p-1.5 outline-none focus:border-blue-500 bg-gray-50 font-medium text-gray-800 cursor-pointer"
+                              className="w-full text-sm border border-gray-200 rounded-lg p-2 font-medium bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                             >
                               <option value="all">Tất cả loại HS</option>
                               <option value="2.1 Trích lục">2.1 Trích lục</option>
-                              <option value="2.2 Trích đo">2.2 Trích đo</option>
+                              <option value="2.3 Trích đo">2.3 Trích đo</option>
                               <option value="2.4 Cắm mốc">2.4 Cắm mốc</option>
                               <option value="2.5 Tách-Hợp thửa">2.5 Tách-Hợp thửa</option>
-                              <option value="2.3 CN Số Thửa">2.3 CN Số Thửa</option>
+                              <option value="2.6 CN Số Thửa">2.6 CN Số Thửa</option>
                             </select>
                           </div>
                         )}
 
                         {isArchiveMeasurementView && (
                           <div>
-                            <label className="block text-[11px] font-bold text-gray-500 mb-1 flex items-center gap-1">
-                              <Filter size={13} /> Loại hồ sơ Lưu trữ:
+                            <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 mb-1">
+                              <Filter size={14} className="text-gray-500" />
+                              <span>Loại hồ sơ Lưu trữ:</span>
                             </label>
                             <select
                               value={props.filterRecordType}
                               onChange={(e) => props.setFilterRecordType(e.target.value)}
-                              className="w-full text-xs border border-gray-200 rounded-md p-1.5 outline-none focus:border-blue-500 bg-gray-50 font-medium text-gray-800 cursor-pointer"
+                              className="w-full text-sm border border-gray-200 rounded-lg p-2 font-medium bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                             >
                               <option value="all">Tất cả loại HS</option>
                               <option value="1.1 Sao lục">1.1 Sao lục</option>
@@ -996,131 +852,93 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                           </div>
                         )}
 
-                        {isOtherView && (
+                        {/* 5. Trạng thái hồ sơ */}
+                        {(currentView === "all_records" || currentView === "other_records" || currentView === "archive_records") && (
                           <div>
-                            <label className="block text-[11px] font-bold text-gray-500 mb-1 flex items-center gap-1">
-                              <Filter size={13} /> Loại hồ sơ Cấp giấy:
-                            </label>
-                            <select
-                              value={props.filterRecordType}
-                              onChange={(e) => props.setFilterRecordType(e.target.value)}
-                              className="w-full text-xs border border-gray-200 rounded-md p-1.5 outline-none focus:border-blue-500 bg-gray-50 font-medium text-gray-800 cursor-pointer"
-                            >
-                              <option value="all">Tất cả thủ tục Cấp giấy (3.x)</option>
-                              {CAP_GIAY_RECORD_TYPES.map((t) => (
-                                <option key={t} value={t}>
-                                  {t}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                        )}
-
-                        {/* 5. Lọc Trạng thái hồ sơ */}
-                        {(currentView === "all_records" ||
-                          currentView === "other_records" ||
-                          currentView === "archive_records" ||
-                          isDangkyView ||
-                          isOtherView) && (
-                          <div>
-                            <label className="block text-[11px] font-bold text-gray-500 mb-1 flex items-center gap-1">
-                              <SlidersHorizontal size={13} /> Trạng thái hồ sơ:
+                            <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 mb-1">
+                              <SlidersHorizontal size={14} className="text-gray-500" />
+                              <span>Trạng thái hồ sơ:</span>
                             </label>
                             <select
                               value={props.filterStatus}
                               onChange={(e) => props.setFilterStatus(e.target.value)}
-                              className="w-full text-xs border border-gray-200 rounded-md p-1.5 outline-none focus:border-blue-500 bg-gray-50 font-medium text-gray-800 cursor-pointer"
+                              className="w-full text-sm border border-gray-200 rounded-lg p-2 font-medium bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                             >
                               <option value="all">Mọi trạng thái</option>
-                              {Object.entries(STATUS_LABELS)
-                                .filter(([key]) => key !== RecordStatus.ASSIGNED && (!isDangkyView && !isOtherView || key !== RecordStatus.IN_PROGRESS))
-                                .map(([key, label]) => (
-                                  <option key={key} value={key}>
-                                    {label}
-                                  </option>
-                                ))}
-                              {(isDangkyView || isOtherView) && (
-                                <>
-                                  <option value="cho_tham_dinh">🟢 Chờ Thẩm định</option>
-                                  <option value="phieu_chuyen_thue">🟧 Chờ chuyển thuế</option>
-                                  <option value="cho_tbt">📙 Chờ Thuế KV7</option>
-                                  <option value="cho_gnt">💳 Chờ Giấy nộp tiền</option>
-                                  <option value="in_hoan_thien">🖨️ Chờ In & hoàn thiện</option>
-                                </>
-                              )}
+                              {SELECTABLE_STATUSES.map((item) => (
+                                <option key={item.key} value={item.key}>
+                                  {item.label}
+                                </option>
+                              ))}
                             </select>
                           </div>
                         )}
 
-                        {/* 6. Lọc Cán bộ / Nhân viên */}
-                        <div>
-                          <label className="block text-[11px] font-bold text-gray-500 mb-1 flex items-center gap-1">
-                            <UserIcon size={13} /> Cán bộ xử lý:
-                          </label>
-                          <select
-                            value={props.filterEmployee}
-                            onChange={(e) => props.setFilterEmployee(e.target.value)}
-                            className="w-full text-xs border border-gray-200 rounded-md p-1.5 outline-none focus:border-blue-500 bg-gray-50 font-medium text-gray-800 cursor-pointer"
-                          >
-                            <option value="all">Tất cả cán bộ</option>
-                            <option value="unassigned">Chưa giao</option>
-                            {employees
-                              .filter((emp) => {
-                                const d = removeVietnameseTones((emp.department || '').toLowerCase());
-                                if (isArchiveMeasurementView) return d.includes('luu tru') || d.includes('thong tin');
-                                if (isMeasurementView)
-                                  return (
-                                    d.includes('do dac') ||
-                                    d.includes('ky thuat') ||
-                                    d.includes('to do') ||
-                                    d.includes('dia chinh') ||
-                                    d.includes('noi nghiep') ||
-                                    d.includes('ngoai nghiep')
-                                  );
-                                if (isOtherView || isDangkyView)
-                                  return (
-                                    d.includes('cap giay') ||
-                                    d.includes('dang ky')
-                                  );
-                                return true;
-                              })
-                              .map((emp) => (
-                                <option key={emp.id} value={emp.id}>
-                                  {emp.name} ({emp.department})
-                                </option>
-                              ))}
-                          </select>
-                        </div>
+                        {/* 6. Cán bộ xử lý */}
+                        {canPerformAction && (currentView === "all_records" || currentView === "other_records" || currentView === "archive_records") && (
+                          <div>
+                            <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 mb-1">
+                              <UserIcon size={14} className="text-gray-500" />
+                              <span>Cán bộ xử lý:</span>
+                            </label>
+                            <select
+                              value={props.filterEmployee}
+                              onChange={(e) => props.setFilterEmployee(e.target.value)}
+                              className="w-full text-sm border border-gray-200 rounded-lg p-2 font-medium bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            >
+                              <option value="all">Tất cả cán bộ</option>
+                              <option value="unassigned">Chưa giao</option>
+                              {employees
+                                .filter((emp) => {
+                                  const d = removeVietnameseTones((emp.department || "").toLowerCase());
+                                  if (isArchiveMeasurementView) return d.includes("luu tru");
+                                  if (isMeasurementView)
+                                    return (
+                                      d.includes("do dac") ||
+                                      d.includes("ky thuat") ||
+                                      d.includes("to do") ||
+                                      d.includes("dia chinh") ||
+                                      d.includes("noi nghiep") ||
+                                      d.includes("ngoai nghiep")
+                                    );
+                                  return true;
+                                })
+                                .map((emp) => (
+                                  <option key={emp.id} value={emp.id}>
+                                    {emp.name}
+                                  </option>
+                                ))}
+                            </select>
+                          </div>
+                        )}
 
-                        {/* Nút Xóa tất cả bộ lọc */}
-                        <button
-                          onClick={() => {
-                            props.setFilterFromDate("");
-                            props.setFilterToDate("");
-                            if (props.setFilterAssignedFromDate) props.setFilterAssignedFromDate("");
-                            if (props.setFilterAssignedToDate) props.setFilterAssignedToDate("");
-                            props.setFilterWard("all");
-                            props.setFilterRecordType("all");
-                            props.setFilterStatus("all");
-                            props.setFilterEmployee("all");
-                            if (props.setWarningFilter) props.setWarningFilter("none");
-                          }}
-                          className="w-full mt-2 py-1.5 text-xs text-red-600 hover:bg-red-50 border border-red-200 rounded-lg font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-                        >
-                          <RotateCcw size={13} /> Xóa tất cả bộ lọc
-                        </button>
+                        {/* 7. Reset filters button */}
+                        <div className="pt-2">
+                          <button
+                            onClick={() => {
+                              props.setFilterFromDate("");
+                              props.setFilterToDate("");
+                              if (props.setFilterAssignedFromDate) props.setFilterAssignedFromDate("");
+                              if (props.setFilterAssignedToDate) props.setFilterAssignedToDate("");
+                              props.setFilterWard("all");
+                              props.setFilterRecordType("all");
+                              props.setFilterStatus("all");
+                              props.setFilterEmployee("all");
+                            }}
+                            className="w-full py-2 border border-red-200 text-red-600 rounded-xl hover:bg-red-50 text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer"
+                          >
+                            <RefreshCw size={14} /> Xóa tất cả bộ lọc
+                          </button>
+                        </div>
                       </div>
                     </div>
                   )}
                 </div>
               )}
 
-
-
             {(currentView === "all_records" ||
               currentView === "other_records" ||
-              currentView === "archive_records" ||
-              isDangkyView) && (
+              currentView === "archive_records") && (
                 <div className="flex gap-2">
                   <button
                     onClick={() =>
@@ -1145,296 +963,243 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                 </div>
               )}
 
-            {canPerformAction && (
+            {canPerformAction && !["handover_list", "other_handover_list", "archive_handover_list"].includes(currentView) && (
               <>
-                {(currentView === "all_records" || currentView === "archive_records" || currentView.startsWith("archive_")) && (
-                  <div className="flex items-center gap-2">
-                    <div className="h-6 w-px bg-gray-300 mx-1"></div>
-                    <div className="relative inline-block text-left" ref={addMenuRef}>
-                      <button
-                        onClick={() => setIsAddMenuOpen(!isAddMenuOpen)}
-                        className="flex items-center justify-center w-8 h-8 bg-blue-600 text-white rounded-md hover:bg-blue-700 shadow-sm font-bold active:scale-95 transition-all"
-                        title="Thêm hồ sơ hoặc nhập từ Excel"
-                      >
-                        <Plus size={20} className={`transition-transform duration-200 ${isAddMenuOpen ? "rotate-45" : ""}`} />
-                      </button>
+                <div className="flex items-center gap-2">
+                  <div className="h-6 w-px bg-gray-300 mx-1"></div>
+                  <div className="relative inline-block text-left" ref={addMenuRef}>
+                    <button
+                      onClick={() => setIsAddMenuOpen(!isAddMenuOpen)}
+                      className="flex items-center justify-center w-8 h-8 bg-blue-600 text-white rounded-md hover:bg-blue-700 shadow-sm font-bold active:scale-95 transition-all"
+                      title="Thêm hồ sơ hoặc nhập từ Excel"
+                    >
+                      <Plus size={20} className={`transition-transform duration-200 ${isAddMenuOpen ? "rotate-45" : ""}`} />
+                    </button>
 
-                      {isAddMenuOpen && (
-                        <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-2xl border border-gray-100 z-50 py-1.5 animate-in fade-in zoom-in-95 duration-100 divide-y divide-slate-100">
-                          <button
-                            onClick={() => {
-                              setIsAddMenuOpen(false);
-                              props.setIsModalOpen(true);
-                              props.setEditingRecord(null);
-                            }}
-                            className="w-full text-left px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-blue-50 hover:text-blue-600 flex items-center gap-2.5 transition-colors"
-                          >
-                            <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-                              <Plus size={18} />
-                            </div>
-                            <div>
-                              <div className="font-bold text-slate-800 text-sm">Nhập hồ sơ mới</div>
-                              <div className="text-[11px] text-slate-500">Tạo thủ công một hồ sơ</div>
-                            </div>
-                          </button>
+                    {isAddMenuOpen && (
+                      <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-2xl border border-gray-100 z-50 py-1.5 animate-in fade-in zoom-in-95 duration-100 divide-y divide-slate-100">
+                        <button
+                          onClick={() => {
+                            setIsAddMenuOpen(false);
+                            props.setIsModalOpen(true);
+                            props.setEditingRecord(null);
+                          }}
+                          className="w-full text-left px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-blue-50 hover:text-blue-600 flex items-center gap-2.5 transition-colors"
+                        >
+                          <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                            <Plus size={18} />
+                          </div>
+                          <div>
+                            <div className="font-bold text-slate-800 text-sm">Nhập hồ sơ mới</div>
+                            <div className="text-[11px] text-slate-500">Tạo thủ công một hồ sơ</div>
+                          </div>
+                        </button>
 
-                          <button
-                            onClick={() => {
-                              setIsAddMenuOpen(false);
-                              navigateToReceiveRecordSubTab('bulk');
-                            }}
-                            className="w-full text-left px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-emerald-50 hover:text-emerald-600 flex items-center gap-2.5 transition-colors"
-                          >
-                            <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                              <FileSpreadsheet size={18} />
-                            </div>
-                            <div>
-                              <div className="font-bold text-slate-800 text-sm">Tiếp nhận hàng loạt</div>
-                              <div className="text-[11px] text-slate-500">Nhập danh sách từ Excel</div>
-                            </div>
-                          </button>
+                        <button
+                          onClick={() => {
+                            setIsAddMenuOpen(false);
+                            navigateToReceiveRecordSubTab('bulk');
+                          }}
+                          className="w-full text-left px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-emerald-50 hover:text-emerald-600 flex items-center gap-2.5 transition-colors"
+                        >
+                          <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                            <FileSpreadsheet size={18} />
+                          </div>
+                          <div>
+                            <div className="font-bold text-slate-800 text-sm">Tiếp nhận hàng loạt</div>
+                            <div className="text-[11px] text-slate-500">Nhập danh sách từ Excel</div>
+                          </div>
+                        </button>
 
-                          <button
-                            onClick={() => {
-                              setIsAddMenuOpen(false);
-                              if (props.setImportModalMode) props.setImportModalMode('update');
-                              props.setIsImportModalOpen(true);
-                            }}
-                            className="w-full text-left px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-amber-50 hover:text-amber-600 flex items-center gap-2.5 transition-colors"
-                          >
-                            <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
-                              <RefreshCw size={18} />
-                            </div>
-                            <div>
-                              <div className="font-bold text-slate-800 text-sm">Cập nhật thông tin</div>
-                              <div className="text-[11px] text-slate-500">Đổi trạng thái, cán bộ, hạn trả...</div>
-                            </div>
-                          </button>
-                        </div>
-                      )}
-                    </div>
+                        <button
+                          onClick={() => {
+                            setIsAddMenuOpen(false);
+                            if (props.setImportModalMode) props.setImportModalMode('update');
+                            props.setIsImportModalOpen(true);
+                          }}
+                          className="w-full text-left px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-amber-50 hover:text-amber-600 flex items-center gap-2.5 transition-colors"
+                        >
+                          <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                            <RefreshCw size={18} />
+                          </div>
+                          <div>
+                            <div className="font-bold text-slate-800 text-sm">Cập nhật thông tin</div>
+                            <div className="text-[11px] text-slate-500">Đổi trạng thái, cán bộ, hạn trả...</div>
+                          </div>
+                        </button>
+                      </div>
+                    )}
                   </div>
-                )}
+                </div>
 
                 {/* Tác vụ tab con được chuyển lên cạnh Excel */}
-                {(((currentView === "handover_list" ||
+                {(currentView === "handover_list" ||
                   currentView === "other_handover_list" ||
                   currentView === "archive_handover_list") &&
-                  props.handoverTab === "today") ||
-                  currentView === "dangky_cho_ban_giao") &&
+                  props.handoverTab === "today" &&
                   props.selectedRecordIds.size > 0 && (
                     <button
                       onClick={() => props.setIsAddToBatchModalOpen(true)}
                       className="flex items-center gap-1.5 bg-emerald-600 text-white px-3 py-1.5 rounded-md hover:bg-emerald-700 text-sm font-bold shadow-sm transition-all animate-pulse"
                     >
-                      <CheckCircle size={16} /> Chốt DS ({props.selectedRecordIds.size})
+                      <CheckCircle size={16} /> Chốt Danh Sách Giao ({props.selectedRecordIds.size})
                     </button>
                   )}
-              </>
-            )}
 
-            {(currentView === "handover_list" ||
-              currentView === "other_handover_list" ||
-              currentView === "archive_handover_list") &&
-              props.handoverTab === "returned" && (
-                <div className="flex items-center gap-2">
-                  {props.selectedRecordIds.size > 0 && (
-                    <button
-                      onClick={() => props.setIsReturnHandoverModalOpen?.(true)}
-                      className="flex items-center gap-1.5 bg-emerald-600 text-white px-3 py-1.5 rounded-md hover:bg-emerald-700 text-sm font-bold shadow-sm transition-all animate-pulse"
-                    >
-                      <Send size={16} /> Chốt DS Lưu ({props.selectedRecordIds.size})
-                    </button>
-                  )}
-                  <button
-                    onClick={props.handleExportReturnedList}
-                    className="hidden md:flex items-center gap-1.5 bg-emerald-600 text-white px-3 py-1.5 rounded-md hover:bg-emerald-700 text-sm font-bold shadow-sm transition-all"
-                  >
-                    <FileSpreadsheet size={16} /> Xuất DS TKQ
-                  </button>
-                </div>
-              )}
-
-            {(currentView === "pending_check_list" ||
-              currentView === "archive_pending_check_list" ||
-              currentView === "check_list" ||
-              currentView === "other_check_list" ||
-              currentView === "archive_check_list") &&
-              (hasPermission('BTN_REJECT_RECORD') || hasPermission('REJECT_RECORDS')) &&
-              props.selectedRecordIds.size > 0 && props.handleOpenRejectReturnModal && (
-                <button
-                  onClick={() => {
-                    const targets = records.filter((r) =>
-                      props.selectedRecordIds.has(r.id),
-                    );
-                    props.handleOpenRejectReturnModal!(targets);
-                  }}
-                  className="flex items-center gap-1.5 bg-rose-600 text-white px-3 py-1.5 rounded-md hover:bg-rose-700 text-sm font-bold shadow-sm transition-all"
-                  title="Trả hồ sơ"
-                >
-                  <Undo2 size={16} /> Trả hồ sơ ({props.selectedRecordIds.size})
-                </button>
-              )}
-
-            {(currentView === "check_list" ||
-              currentView === "other_check_list" ||
-              currentView === "archive_check_list") &&
-              (hasPermission('BTN_SUBMIT_SIGN') || hasPermission('SIGN_RECORDS')) &&
-              props.selectedRecordIds.size > 0 && (
-                <button
-                  onClick={props.handleConfirmSignBatch}
-                  className="flex items-center gap-1.5 bg-purple-600 text-white px-3 py-1.5 rounded-md hover:bg-purple-700 text-sm font-bold shadow-sm transition-all animate-pulse"
-                >
-                  <FileSignature size={16} /> Ký Duyệt ({props.selectedRecordIds.size})
-                </button>
-              )}
-
-
-
-            {hasPermission('BTN_SUBMIT_SIGN') &&
-              (currentView === "completed_list" || currentView === "other_completed_list") &&
-              props.selectedRecordIds.size > 0 && (
-                <button
-                  onClick={() => {
-                    const targets = records.filter((r) =>
-                      props.selectedRecordIds.has(r.id),
-                    );
-                    props.setSubmitTargetRecords(targets);
-                    props.setIsSubmitCheckModalOpen(true);
-                  }}
-                  className="flex items-center gap-1.5 bg-orange-600 text-white px-3 py-1.5 rounded-md hover:bg-orange-700 text-sm font-bold shadow-sm transition-all animate-pulse"
-                >
-                  <ClipboardList size={16} /> Trình Kiểm Tra ({props.selectedRecordIds.size})
-                </button>
-              )}
-
-            {currentView === "other_completed_list" &&
-              props.selectedRecordIds.size > 0 && (
-                <button
-                  onClick={async () => {
-                    const targets = records.filter((r) =>
-                      props.selectedRecordIds.has(r.id),
-                    );
-                    for (const r of targets) {
-                      if (props.advanceStatus) {
-                        await props.advanceStatus(r);
-                      }
-                    }
-                  }}
-                  className="flex items-center gap-1.5 bg-teal-600 text-white px-3 py-1.5 rounded-md hover:bg-teal-700 text-sm font-bold shadow-sm transition-all"
-                  title="Chuyển các hồ sơ đã chọn sang bước nhỏ tiếp theo"
-                >
-                  <ArrowRight size={16} /> Chuyển Bước ({props.selectedRecordIds.size})
-                </button>
-              )}
-
-            {hasPermission('BTN_SUBMIT_SIGN') &&
-              (currentView === "archive_completed_list") &&
-              props.selectedRecordIds.size > 0 && (
-                <button
-                  onClick={() => {
-                    const targets = records.filter((r) =>
-                      props.selectedRecordIds.has(r.id),
-                    );
-                    props.setSubmitTargetRecords(targets);
-                    props.setIsSubmitModalOpen(true);
-                  }}
-                  className="flex items-center gap-1.5 bg-indigo-600 text-white px-3 py-1.5 rounded-md hover:bg-indigo-700 text-sm font-bold shadow-sm transition-all animate-pulse"
-                >
-                  <FileSignature size={16} /> Trình Ký Duyệt ({props.selectedRecordIds.size})
-                </button>
-              )}
-
-            {hasPermission('BTN_SUBMIT_SIGN') &&
-              (currentView === "pending_check_list" ||
-                currentView === "archive_pending_check_list") &&
-              props.selectedRecordIds.size > 0 && (
-                <button
-                  onClick={() => {
-                    const targets = records.filter((r) =>
-                      props.selectedRecordIds.has(r.id),
-                    );
-                    props.setSubmitTargetRecords(targets);
-                    props.setIsSubmitModalOpen(true);
-                  }}
-                  className="flex items-center gap-1.5 bg-indigo-600 text-white px-3 py-1.5 rounded-md hover:bg-indigo-700 text-sm font-bold shadow-sm transition-all animate-pulse"
-                >
-                  <FileSignature size={16} /> Trình Ký Duyệt ({props.selectedRecordIds.size})
-                </button>
-              )}
-
-            {(currentView === "assign_tasks" ||
-              currentView === "other_assign_tasks" ||
-              currentView === "archive_assign_tasks" ||
-              currentView === "all_records" ||
-              currentView === "other_records" ||
-              currentView === "archive_records" ||
-              currentView === "dangky_records" ||
-              isOtherView) &&
-              props.selectedRecordIds.size > 0 && (
-                <>
-                  {isAdmin && (currentView === "all_records" || isDangkyView || isOtherView || isArchiveMeasurementView) && (
-                    <button
-                      onClick={() => props.setIsBulkUpdateModalOpen(true)}
-                      className="flex items-center gap-1.5 bg-gradient-to-r from-orange-600 to-amber-600 text-white px-3 py-1.5 rounded-md hover:from-orange-700 hover:to-amber-700 text-sm font-bold shadow-sm transition-all animate-pulse"
-                      title="Thao tác xử lý hàng loạt cho các hồ sơ đã chọn (Quyền Admin)"
-                    >
-                      <Layers size={16} /> Xử lý hàng loạt ({props.selectedRecordIds.size})
-                    </button>
-                  )}
-                  {(currentView === "all_records" || currentView === "archive_records" || currentView.startsWith("archive_")) && (() => {
-                    const supplementTargets = records.filter((r) =>
-                      props.selectedRecordIds.has(r.id) &&
-                      r.status === RecordStatus.PENDING_SUPPLEMENT
-                    );
-                    if (supplementTargets.length === 0) return null;
-                    return (
+                {(currentView === "handover_list" ||
+                  currentView === "other_handover_list" ||
+                  currentView === "archive_handover_list") &&
+                  props.handoverTab === "returned" && (
+                    <div className="flex items-center gap-2">
+                      {props.selectedRecordIds.size > 0 && (
+                        <button
+                          onClick={() => props.setIsReturnHandoverModalOpen?.(true)}
+                          className="flex items-center gap-1.5 bg-emerald-600 text-white px-3 py-1.5 rounded-md hover:bg-emerald-700 text-sm font-bold shadow-sm transition-all animate-pulse"
+                        >
+                          <Send size={16} /> Chốt DS Lưu ({props.selectedRecordIds.size})
+                        </button>
+                      )}
                       <button
-                        onClick={() => {
-                          if (props.handleOpenSupplementModal) {
-                            props.handleOpenSupplementModal(supplementTargets);
-                          }
-                        }}
-                        className="flex items-center gap-1.5 bg-amber-600 text-white px-3 py-1.5 rounded-md hover:bg-amber-700 text-sm font-bold shadow-sm transition-all cursor-pointer"
-                        title="Tiếp nhận bổ sung cho các hồ sơ đang ở trạng thái Chờ bổ sung"
+                        onClick={props.handleExportReturnedList}
+                        className="hidden md:flex items-center gap-1.5 bg-emerald-600 text-white px-3 py-1.5 rounded-md hover:bg-emerald-700 text-sm font-bold shadow-sm transition-all"
                       >
-                        <FileCheck size={16} /> Bổ sung ({supplementTargets.length})
+                        <FileSpreadsheet size={16} /> Xuất Excel (Đã trả KQ)
                       </button>
-                    );
-                  })()}
-                  {hasPermission('BTN_REJECT_RECORD') && (
+                    </div>
+                  )}
+
+                {!["assign_tasks", "other_assign_tasks", "archive_assign_tasks", "completed_list", "archive_completed_list", "pending_check_list", "archive_pending_check_list", "check_list", "other_check_list", "archive_check_list", "handover_list", "other_handover_list", "archive_handover_list", "director_completed", "archive_director_completed", "other_director_completed", "receive_record", "receive_contract", "dashboard", "reports", "account_settings", "utilities", "work_schedule"].includes(currentView) &&
+                  (hasPermission('BTN_REJECT_RECORD') || hasPermission('REJECT_RECORDS')) &&
+                  props.selectedRecordIds.size > 0 && props.handleOpenRejectReturnModal && (
                     <button
-                      onClick={props.handleMarkAsRejected}
-                      className="flex items-center gap-1.5 bg-red-600 text-white px-3 py-1.5 rounded-md hover:bg-red-700 text-sm font-bold shadow-sm transition-all"
-                      title="Trả hồ sơ"
+                      onClick={() => {
+                        const targets = records.filter((r) =>
+                          props.selectedRecordIds.has(r.id),
+                        );
+                        props.handleOpenRejectReturnModal!(targets);
+                      }}
+                      className="flex items-center gap-1.5 bg-rose-600 text-white px-3 py-1.5 rounded-md hover:bg-rose-700 text-sm font-bold shadow-sm transition-all"
+                      title="Trả hồ sơ không đạt về bước Đang thực hiện"
                     >
                       <Undo2 size={16} /> Trả hồ sơ ({props.selectedRecordIds.size})
                     </button>
                   )}
-                  {(currentView === "assign_tasks" ||
-                    currentView === "other_assign_tasks" ||
-                    currentView === "archive_assign_tasks" ||
-                    currentView === "dangky_tiep_nhan_giao_viec") &&
-                    (hasPermission('BTN_ASSIGN_STAFF') || hasPermission('ASSIGN_RECORDS')) && (() => {
-                    const unassignedTargets = records.filter((r) =>
-                      props.selectedRecordIds.has(r.id) && !r.assignedTo
-                    );
-                    if (unassignedTargets.length === 0) return null;
-                    return (
-                      <button
-                        onClick={() => {
-                          props.setAssignTargetRecords(unassignedTargets);
-                          props.setIsAssignModalOpen(true);
-                        }}
-                        className="flex items-center gap-1.5 bg-blue-600 text-white px-3 py-1.5 rounded-md hover:bg-blue-700 text-sm font-bold shadow-sm transition-all animate-pulse"
-                        title="Chỉ giao việc cho các hồ sơ chưa có cán bộ phụ trách"
-                      >
-                        <UserPlus size={16} /> Giao việc ({unassignedTargets.length})
-                      </button>
-                    );
-                  })()}
-                </>
-              )}
+
+                {!["assign_tasks", "other_assign_tasks", "archive_assign_tasks", "completed_list", "archive_completed_list", "pending_check_list", "archive_pending_check_list", "check_list", "other_check_list", "archive_check_list", "handover_list", "other_handover_list", "archive_handover_list", "director_completed", "archive_director_completed", "other_director_completed", "receive_record", "receive_contract", "dashboard", "reports", "account_settings", "utilities", "work_schedule"].includes(currentView) &&
+                  props.selectedRecordIds.size > 0 && props.handleOpenExtendModal && (
+                  <button
+                    onClick={() => {
+                      const targets = records.filter((r) =>
+                        props.selectedRecordIds.has(r.id),
+                      );
+                      props.handleOpenExtendModal!(targets);
+                    }}
+                    className="flex items-center gap-1.5 bg-amber-600 text-white px-3 py-1.5 rounded-md hover:bg-amber-700 text-sm font-bold shadow-sm transition-all"
+                    title="Gia hạn ngày hẹn trả cho các hồ sơ đã chọn"
+                  >
+                    <CalendarClock size={16} /> Gia hạn ({props.selectedRecordIds.size})
+                  </button>
+                )}
+
+                {(currentView === "check_list" ||
+                  currentView === "other_check_list" ||
+                  currentView === "archive_check_list") &&
+                  (hasPermission('BTN_SUBMIT_SIGN') || hasPermission('SIGN_RECORDS')) &&
+                  props.selectedRecordIds.size > 0 && (
+                    <button
+                      onClick={props.handleConfirmSignBatch}
+                      className="flex items-center gap-1.5 bg-purple-600 text-white px-3 py-1.5 rounded-md hover:bg-purple-700 text-sm font-bold shadow-sm transition-all animate-pulse"
+                    >
+                      <FileSignature size={16} /> Ký Duyệt ({props.selectedRecordIds.size})
+                    </button>
+                  )}
+
+
+
+                {hasPermission('BTN_SUBMIT_SIGN') &&
+                  (currentView === "completed_list") &&
+                  props.selectedRecordIds.size > 0 && (
+                    <button
+                      onClick={() => {
+                        const targets = records.filter((r) =>
+                          props.selectedRecordIds.has(r.id),
+                        );
+                        props.setSubmitTargetRecords(targets);
+                        props.setIsSubmitCheckModalOpen(true);
+                      }}
+                      className="flex items-center gap-1.5 bg-orange-600 text-white px-3 py-1.5 rounded-md hover:bg-orange-700 text-sm font-bold shadow-sm transition-all animate-pulse"
+                    >
+                      <ClipboardList size={16} /> Trình Kiểm Tra ({props.selectedRecordIds.size})
+                    </button>
+                  )}
+
+                {hasPermission('BTN_SUBMIT_SIGN') &&
+                  (currentView === "archive_completed_list") &&
+                  props.selectedRecordIds.size > 0 && (
+                    <button
+                      onClick={() => {
+                        const targets = records.filter((r) =>
+                          props.selectedRecordIds.has(r.id),
+                        );
+                        props.setSubmitTargetRecords(targets);
+                        props.setIsSubmitModalOpen(true);
+                      }}
+                      className="flex items-center gap-1.5 bg-indigo-600 text-white px-3 py-1.5 rounded-md hover:bg-indigo-700 text-sm font-bold shadow-sm transition-all animate-pulse"
+                    >
+                      <FileSignature size={16} /> Trình Ký Duyệt ({props.selectedRecordIds.size})
+                    </button>
+                  )}
+
+                {hasPermission('BTN_SUBMIT_SIGN') &&
+                  (currentView === "pending_check_list" ||
+                    currentView === "archive_pending_check_list") &&
+                  props.selectedRecordIds.size > 0 && (
+                    <button
+                      onClick={() => {
+                        const targets = records.filter((r) =>
+                          props.selectedRecordIds.has(r.id),
+                        );
+                        props.setSubmitTargetRecords(targets);
+                        props.setIsSubmitModalOpen(true);
+                      }}
+                      className="flex items-center gap-1.5 bg-indigo-600 text-white px-3 py-1.5 rounded-md hover:bg-indigo-700 text-sm font-bold shadow-sm transition-all animate-pulse"
+                    >
+                      <FileSignature size={16} /> Trình Ký Duyệt ({props.selectedRecordIds.size})
+                    </button>
+                  )}
+
+                {(currentView === "assign_tasks" ||
+                  currentView === "other_assign_tasks" ||
+                  currentView === "archive_assign_tasks") &&
+                  props.selectedRecordIds.size > 0 && (
+                    <>
+                      {hasPermission('BTN_REJECT_RECORD') && (
+                        <button
+                          onClick={props.handleMarkAsRejected}
+                          className="flex items-center gap-1.5 bg-red-600 text-white px-3 py-1.5 rounded-md hover:bg-red-700 text-sm font-bold shadow-sm transition-all"
+                          title="Trả hồ sơ về Bộ phận 1 cửa"
+                        >
+                          <ClipboardList size={16} /> Trả hồ sơ ({props.selectedRecordIds.size})
+                        </button>
+                      )}
+                      {(hasPermission('BTN_ASSIGN_STAFF') || hasPermission('ASSIGN_RECORDS')) && (
+                        <button
+                          onClick={() => {
+                            const targets = records.filter((r) =>
+                              props.selectedRecordIds.has(r.id),
+                            );
+                            props.setAssignTargetRecords(targets);
+                            props.setIsAssignModalOpen(true);
+                          }}
+                          className="flex items-center gap-1.5 bg-blue-600 text-white px-3 py-1.5 rounded-md hover:bg-blue-700 text-sm font-bold shadow-sm transition-all animate-pulse"
+                        >
+                          <UserPlus size={16} /> Giao việc ({props.selectedRecordIds.size})
+                        </button>
+                      )}
+                    </>
+                  )}
+              </>
+            )}
 
             {/* Xuất Danh Sách - không phụ thuộc canPerformAction */}
             {(currentView === "handover_list" ||
@@ -1452,7 +1217,15 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                 </button>
               )}
 
-
+            {(isAdmin || isSubadmin) && props.selectedRecordIds.size > 0 && (
+              <button
+                onClick={() => props.setIsBulkUpdateModalOpen(true)}
+                className="ml-2 flex items-center gap-1 bg-orange-600 text-white px-3 py-1.5 rounded-md hover:bg-orange-700 shadow-sm text-sm font-bold animate-pulse"
+              >
+                <Layers size={16} /> Admin: Xử lý hàng loạt (
+                {props.selectedRecordIds.size})
+              </button>
+            )}
 
             {(currentView === "all_records" ||
               currentView === "other_records" ||
@@ -1614,8 +1387,6 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                     canPerformAction={canPerformAction}
                     isSpecializedTab={isSpecializedTab}
                     currentUser={currentUser}
-                    rolePermissions={rolePermissions}
-                    departmentPermissions={departmentPermissions}
                     onToggleSelect={props.toggleSelectRecord}
                     onView={props.handleViewRecord}
                     onEdit={(rec) => {
@@ -1629,13 +1400,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                     onAdvanceStatus={props.advanceStatus}
                     onQuickUpdate={props.handleQuickUpdate}
                     onReturnResult={props.handleOpenReturnModal}
-                    onMapCorrection={currentView.startsWith('archive_') || currentView === 'archive_records' ? undefined : props.handleMapCorrectionRequest}
-                    onExtendDeadline={props.onExtendDeadline || ((rec) => {
-                      if (props.setExtendTargetRecord && props.setIsExtendModalOpen) {
-                        props.setExtendTargetRecord(rec);
-                        props.setIsExtendModalOpen(true);
-                      }
-                    })}
+                    onMapCorrection={props.handleMapCorrectionRequest}
                     canSelect={canPerformAction || hasPermission('BTN_SUBMIT_SIGN')}
                   />
                 ))
@@ -1705,8 +1470,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
             </div>
           </div>
         )}
-          </div>
-        )}
+          </>
       </div>
     );
   };
@@ -1741,10 +1505,6 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
             props.setCurrentView("receive_contract");
           }}
           onMapCorrection={props.handleMapCorrectionRequest}
-          onAssignRecord={(r) => {
-            props.setAssignTargetRecords([r]);
-            props.setIsAssignModalOpen(true);
-          }}
         />
       );
     case "receive_record":
@@ -1830,7 +1590,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
         />
       );
     case "registration_records":
-      return renderRecordList();
+      return <RegistrationRecords currentUser={currentUser} wards={wards} />;
     case "congvan_records":
       return <CongVanView currentUser={currentUser} />;
     case "barcode_generator":
@@ -1885,8 +1645,6 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
           employees={employees}
           wards={wards}
           currentUser={props.currentUser}
-          rolePermissions={rolePermissions}
-          departmentPermissions={departmentPermissions}
         />
       );
     default:

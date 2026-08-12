@@ -1,7 +1,7 @@
 
-import React, { useState, useMemo } from 'react';
-import { RecordFile, Employee, RecordStatus, UserRole } from '../types';
-import { STATUS_LABELS, isCapGiayRecord, getRecordPlotCount } from '../constants';
+import React, { useState } from 'react';
+import { RecordFile, Employee, RecordStatus } from '../types';
+import { STATUS_LABELS, SELECTABLE_STATUSES } from '../constants';
 import { X, CheckCircle2, Layers, ArrowRight } from 'lucide-react';
 
 interface BulkUpdateModalProps {
@@ -11,92 +11,19 @@ interface BulkUpdateModalProps {
   allRecords?: RecordFile[];
   employees: Employee[];
   wards: string[];
-  onConfirm: (field: keyof RecordFile, value: any, customDate?: string, targetRecordIds?: string[], assignedTo?: string) => Promise<void>;
-  currentView?: string;
+  onConfirm: (field: keyof RecordFile, value: any, customDate?: string, targetRecordIds?: string[], extraData?: { assignedTo?: string; customDate?: string }) => Promise<void>;
 }
 
 const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({ 
-  isOpen, onClose, selectedRecords, allRecords, employees, wards, onConfirm, currentView 
+  isOpen, onClose, selectedRecords, employees, wards, onConfirm 
 }) => {
   const [targetField, setTargetField] = useState<string>('status');
   const [targetValue, setTargetValue] = useState<string>('');
-  const [selectedAssignee, setSelectedAssignee] = useState<string>('');
   const [useCustomDate, setUseCustomDate] = useState<boolean>(false);
   const [customDate, setCustomDate] = useState<string>('');
+  const [statusEmployee, setStatusEmployee] = useState<string>('');
+  const [statusDate, setStatusDate] = useState<string>('');
   const [isProcessing, setIsProcessing] = useState(false);
-
-  // Map employee workload
-  const empWorkloadMap = useMemo(() => {
-    const map: Record<string, { activeCount: number; activePlotCount: number }> = {};
-    const recordsToScan = allRecords || selectedRecords || [];
-    employees.forEach(emp => {
-      const isLeader = emp && (
-        emp.position?.toLowerCase().includes('tổ') ||
-        emp.position?.toLowerCase().includes('nhóm') ||
-        emp.position?.toLowerCase().includes('trưởng') ||
-        emp.position?.toLowerCase().includes('phó')
-      );
-      const assigned = recordsToScan.filter(r => 
-        (r.assignedTo === emp.id || r.assignedTo === emp.name || (isLeader && (r.checkedBy === emp.id || r.checkedBy === emp.name))) && isCapGiayRecord(r)
-      );
-      const active = assigned.filter(r => {
-        const statusStr = String(r.status || '');
-        return (
-          r.status !== RecordStatus.RETURNED &&
-          r.status !== RecordStatus.WITHDRAWN &&
-          r.status !== RecordStatus.REJECTED &&
-          statusStr !== 'HOAN_THANH'
-        );
-      });
-      map[emp.id] = {
-        activeCount: active.length,
-        activePlotCount: active.reduce((sum, r) => sum + getRecordPlotCount(r), 0)
-      };
-    });
-    return map;
-  }, [employees, allRecords, selectedRecords]);
-
-  // Xác định tổ chuyên môn / phòng ban của hồ sơ đang chọn
-  const recordDept = useMemo(() => {
-      if (currentView) {
-          if (currentView.startsWith('archive_')) return 'Tổ Lưu trữ';
-          if (currentView.startsWith('other_') || currentView === 'registration_records') return 'Tổ Cấp giấy';
-          if (['all_records', 'assign_tasks', 'completed_list', 'pending_check_list', 'check_list', 'handover_list', 'director_completed', 'survey_list'].includes(currentView)) return 'Tổ Đo đạc';
-      }
-      if (!selectedRecords || selectedRecords.length === 0) return 'Tổ Cấp giấy';
-      const record = selectedRecords[0];
-      const type = (record.recordType || '').toLowerCase();
-      
-      if (type.includes('1.1') || type.includes('1.2') || type.includes('công văn') || type.includes('lưu trữ') || type.includes('sao lục')) {
-          return 'Tổ Lưu trữ';
-      }
-      if (type.includes('2.1') || type.includes('2.2') || type.includes('2.3') || type.includes('2.4') || type.includes('2.5') || type.includes('2.6') || type.includes('số thửa') || type.includes('trích đo') || type.includes('trích lục') || type.includes('đo đạc')) {
-          return 'Tổ Đo đạc';
-      }
-      return 'Tổ Cấp giấy';
-  }, [currentView, selectedRecords]);
-
-  // Lọc danh sách nhân viên theo yêu cầu: chỉ nhân viên của tổ chuyên môn đó và ban giám đốc
-  const filteredEmployeesForAssignment = useMemo(() => {
-      const DEPARTMENTS_CONFIG = [
-          { id: 'Tổ Cấp giấy', matchKeys: ['tổ cấp giấy', 'tổ đăng ký cấp giấy', 'đăng ký cấp giấy', 'tổ đăng ký', 'cấp giấy', 'đăng ký', 'biến động'] },
-          { id: 'Tổ Lưu trữ', matchKeys: ['tổ thông tin lưu trữ', 'tổ lưu trữ', 'thông tin lưu trữ', 'lưu trữ', 'thông tin', 'sao lục', 'công văn'] },
-          { id: 'Tổ Đo đạc', matchKeys: ['tổ đo đạc', 'đo đạc', 'đo dạc', 'kỹ thuật', 'bản đồ', 'tổ đo', 'nội nghiệp', 'ngoại nghiệp', 'địa chính'] },
-          { id: 'Tổ Hành chính', matchKeys: ['tổ hành chính', 'một cửa', 'quản trị hệ thống', 'hành chính', 'tổng hợp'] },
-          { id: 'Ban Giám đốc', matchKeys: ['ban giám đốc', 'giám đốc', 'ban lãnh đạo', 'phó giám đốc'] }
-      ];
-      const targetDeptConfig = DEPARTMENTS_CONFIG.find(c => c.id === recordDept);
-      return employees.filter(emp => {
-          const dept = (emp.department || '').toLowerCase();
-          const pos = (emp.position || '').toLowerCase();
-          const isDirectorate = pos.includes('giám đốc') || pos.includes('lãnh đạo') || dept.includes('ban giám đốc') || dept.includes('ban lãnh đạo');
-          if (isDirectorate) return true;
-          if (targetDeptConfig) {
-              return targetDeptConfig.matchKeys.some(key => dept.includes(key));
-          }
-          return dept.includes(recordDept.toLowerCase());
-      });
-  }, [employees, recordDept]);
 
   // Determine active target records
   const activeRecordsToUpdate = selectedRecords;
@@ -104,8 +31,8 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
   if (!isOpen) return null;
 
   const handleConfirm = async () => {
-    if (!targetValue && !selectedAssignee) {
-        alert("Vui lòng chọn thông tin thay đổi hoặc chọn người xử lý.");
+    if (!targetValue) {
+        alert("Vui lòng chọn giá trị cần cập nhật.");
         return;
     }
     if (activeRecordsToUpdate.length === 0) {
@@ -118,23 +45,27 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
         setIsProcessing(true);
         const isoDate = useCustomDate && customDate ? new Date(customDate + "T12:00:00").toISOString() : undefined;
         const targetIds = activeRecordsToUpdate.map(r => r.id);
-        await onConfirm(targetField as keyof RecordFile, targetValue, isoDate, targetIds, selectedAssignee || undefined);
+        const extraData = targetField === 'status' ? { 
+            assignedTo: statusEmployee || undefined, 
+            customDate: statusDate ? new Date(statusDate + "T12:00:00").toISOString() : undefined 
+        } : undefined;
+        await onConfirm(targetField as keyof RecordFile, targetValue, isoDate, targetIds, extraData);
         setIsProcessing(false);
         onClose();
     }
   };
 
-  const showDatePicker = targetField === 'status' || !!selectedAssignee;
+  const showDatePicker = targetField === 'status' || targetField === 'assignedTo';
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[70] p-2 sm:p-4 backdrop-blur-sm">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg lg:max-w-xl xl:max-w-2xl 2xl:max-w-3xl flex flex-col overflow-hidden animate-fade-in-up">
+    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[70] p-4 backdrop-blur-sm">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg flex flex-col overflow-hidden animate-fade-in-up">
         
         {/* Header */}
         <div className="p-5 border-b bg-gradient-to-r from-orange-50 to-orange-100 flex justify-between items-center">
             <div>
                 <h3 className="font-bold text-orange-800 text-lg flex items-center gap-2">
-                    <Layers size={20} /> ADMIN: Xử lý hàng loạt ({recordDept})
+                    <Layers size={20} /> ADMIN: Xử lý hàng loạt
                 </h3>
                 <p className="text-xs text-orange-700 mt-1">
                     Số lượng hồ sơ sẽ cập nhật: <strong className="text-sm font-black text-orange-900">{activeRecordsToUpdate.length}</strong> hồ sơ
@@ -144,8 +75,6 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
         </div>
 
         <div className="p-6 space-y-5 max-h-[75vh] overflow-y-auto">
-
-
             <div className="space-y-4">
                 <div>
                     <label className="block text-sm font-bold text-gray-700 mb-2">1. Chọn thông tin cần thay đổi</label>
@@ -160,9 +89,15 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
                         }}
                     >
                         <option value="status">Trạng thái hồ sơ (Quy trình)</option>
+                        <option value="assignedTo">Người xử lý (Giao việc)</option>
+                        <option value="assignedDate">Ngày giao việc</option>
+                        <option value="exportDate">Ngày xuất (Bàn giao)</option>
                         <option value="exportBatch">Đợt xuất (Bàn giao)</option>
+                        <option value="deadline">Ngày hẹn trả (Gia hạn)</option>
+                        <option value="receivedDate">Ngày nhận hồ sơ</option>
+                        <option value="resultReturnedDate">Ngày trả kết quả</option>
                         <option value="receiptNumber">Số BL/HĐ</option>
-                        <option value="returnedPrice">Số tiền</option>
+                        <option value="returnedPrice">Số tiền (VNĐ)</option>
                         <option value="ward">Xã / Phường (Địa bàn)</option>
                     </select>
                 </div>
@@ -176,17 +111,55 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
                     
                     {/* Render input based on targetField */}
                     {targetField === 'status' && (
+                        <div className="space-y-3">
+                            <select 
+                                className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-orange-500 outline-none bg-white font-medium"
+                                value={targetValue}
+                                onChange={(e) => setTargetValue(e.target.value)}
+                            >
+                                <option value="">-- Chọn trạng thái mới --</option>
+                                {SELECTABLE_STATUSES.map(item => (
+                                    <option key={item.key} value={item.key}>{item.label}</option>
+                                ))}
+                            </select>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 bg-gray-50 p-3 rounded-lg border border-gray-200">
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-700 mb-1">Người xử lý / Phụ trách</label>
+                                    <select 
+                                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-orange-500 outline-none bg-white"
+                                        value={statusEmployee}
+                                        onChange={(e) => setStatusEmployee(e.target.value)}
+                                    >
+                                        <option value="">-- Giữ nguyên / Không đổi --</option>
+                                        {employees.map(emp => (
+                                            <option key={emp.id} value={emp.id}>{emp.name} - {emp.department}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-700 mb-1">Ngày thực hiện / Ngày giao</label>
+                                    <input 
+                                        type="date"
+                                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-orange-500 outline-none bg-white"
+                                        value={statusDate}
+                                        onChange={(e) => setStatusDate(e.target.value)}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {targetField === 'assignedTo' && (
                         <select 
-                            className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-orange-500 outline-none bg-white font-medium"
+                            className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-orange-500 outline-none bg-white"
                             value={targetValue}
                             onChange={(e) => setTargetValue(e.target.value)}
                         >
-                            <option value="">-- Chọn trạng thái mới --</option>
-                            {Object.entries(STATUS_LABELS)
-                                .filter(([key]) => key !== RecordStatus.ASSIGNED)
-                                .map(([key, label]) => (
-                                    <option key={key} value={key}>{label}</option>
-                                ))}
+                            <option value="">-- Chọn nhân viên --</option>
+                            {employees.map(emp => (
+                                <option key={emp.id} value={emp.id}>{emp.name} - {emp.department}</option>
+                            ))}
                         </select>
                     )}
 
@@ -201,6 +174,15 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
                                 <option key={w} value={w}>{w}</option>
                             ))}
                         </select>
+                    )}
+
+                    {(targetField === 'deadline' || targetField === 'receivedDate' || targetField === 'resultReturnedDate' || targetField === 'assignedDate' || targetField === 'exportDate') && (
+                        <input 
+                            type="date"
+                            className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-orange-500 outline-none"
+                            value={targetValue}
+                            onChange={(e) => setTargetValue(e.target.value)}
+                        />
                     )}
 
                     {targetField === 'exportBatch' && (
@@ -232,26 +214,6 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
                             onChange={(e) => setTargetValue(e.target.value)}
                         />
                     )}
-                </div>
-
-                <div className="pt-2 border-t border-gray-100">
-                    <label className="block text-sm font-bold text-gray-700 mb-2">3. Người xử lý (Tùy chọn)</label>
-                    <select 
-                        className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-orange-500 outline-none bg-white font-medium"
-                        value={selectedAssignee}
-                        onChange={(e) => setSelectedAssignee(e.target.value)}
-                    >
-                        <option value="">-- Giữ nguyên người xử lý cũ / Không đổi --</option>
-                        {filteredEmployeesForAssignment.map(emp => {
-                            const wl = empWorkloadMap[emp.id];
-                            const wlStr = wl ? ` [Đang xử lý: ${wl.activeCount} HS - ${wl.activePlotCount} thửa]` : '';
-                            return (
-                                <option key={emp.id} value={emp.id}>
-                                    {emp.name} ({emp.department}){wlStr}
-                                </option>
-                            );
-                        })}
-                    </select>
                 </div>
 
                 {showDatePicker && (
@@ -289,7 +251,7 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
             </button>
             <button 
                 onClick={handleConfirm} 
-                disabled={isProcessing || (!targetValue && !selectedAssignee) || (useCustomDate && !customDate) || activeRecordsToUpdate.length === 0}
+                disabled={isProcessing || !targetValue || (useCustomDate && !customDate) || activeRecordsToUpdate.length === 0}
                 className="flex items-center gap-2 px-6 py-2.5 bg-orange-600 text-white rounded-lg hover:bg-orange-700 font-bold text-sm shadow-md transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
             >
                 {isProcessing ? 'Đang xử lý...' : <><CheckCircle2 size={18} /> Cập nhật ngay ({activeRecordsToUpdate.length})</>}

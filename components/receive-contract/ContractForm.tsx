@@ -4,7 +4,6 @@ import { Contract, PriceItem, SplitItem, RecordFile } from '../../types';
 import { Save, Calculator, Search, Plus, Trash2, Printer, FileCheck, CheckCircle, AlertCircle, AlertTriangle, X, RotateCcw, MapPin, Ruler, Grid, Banknote, User, FileText, Calendar, Wand2, ChevronDown, ChevronUp, Copy, ExternalLink, RefreshCw } from 'lucide-react';
 import { confirmAction } from '../../utils/appHelpers';
 import { checkContractDateErrors, getTodayDateString } from '../../utils/contractDateUtils';
-import { getRecordPlotCount } from '../../constants';
 
 interface ContractFormProps {
   initialData?: Contract;
@@ -505,7 +504,6 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
               landPlot: found.landPlot, 
               mapSheet: found.mapSheet, 
               area: found.area || 0,
-              plotCount: getRecordPlotCount(found),
               serviceType: suggestedService || prev.serviceType
               // TUYỆT ĐỐI không ghi đè code (Mã hợp đồng tự nhảy), giữ nguyên prev.code đang nạp sẵn trên form
           }));
@@ -694,8 +692,8 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
       return filtered;
   })();
 
-  const inputClass = "w-full border border-slate-300 rounded-lg px-2.5 py-1.5 md:py-2 text-xs md:text-sm 2xl:text-base outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/10 transition-all font-medium bg-white hover:border-purple-300";
-  const labelClass = "block text-[10px] md:text-xs 2xl:text-sm font-bold text-slate-500 uppercase tracking-wide mb-1 ml-0.5";
+  const inputClass = "w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/10 transition-all font-medium bg-white hover:border-purple-300";
+  const labelClass = "block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1 ml-0.5";
 
   // Check if we are in liquidation mode to show extra fields
   const isLiquidationMode = mode === 'liquidation';
@@ -706,7 +704,7 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
       : (formData.totalAmount || derivedPricing.totalAmount);
 
   return (
-    <form onSubmit={handleSubmit} className="w-full max-w-[1800px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-2.5 md:gap-3 2xl:gap-4 animate-fade-in relative">
+    <form onSubmit={handleSubmit} className="w-full grid grid-cols-1 lg:grid-cols-12 gap-3.5 animate-fade-in relative pb-6">
         <div ref={topRef} className="absolute -top-20" />
         
         {/* NOTIFICATION */}
@@ -756,23 +754,7 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                         <div><label className={labelClass}>Tờ bản đồ</label><input className={`${inputClass} text-center`} value={formData.mapSheet ?? ''} onChange={e => handleChange('mapSheet', e.target.value)} /></div>
-                        <div>
-                            <label className={labelClass}>Thửa đất</label>
-                            <input 
-                                className={`${inputClass} text-center`} 
-                                value={formData.landPlot ?? ''} 
-                                onChange={e => {
-                                    const newLandPlot = e.target.value;
-                                    const autoCount = getRecordPlotCount({ landPlot: newLandPlot });
-                                    setFormData(p => ({
-                                        ...p,
-                                        landPlot: newLandPlot,
-                                        plotCount: autoCount
-                                    }));
-                                }} 
-                                placeholder="VD: 12, 13, 14"
-                            />
-                        </div>
+                        <div><label className={labelClass}>Thửa đất</label><input className={`${inputClass} text-center`} value={formData.landPlot ?? ''} onChange={e => handleChange('landPlot', e.target.value)} /></div>
                     </div>
                     {!isLiquidationMode && (
                         <div>
@@ -906,7 +888,23 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
                                 <label className={labelClass}>Ngày thanh lý HĐ</label>
                                 <div className="flex gap-1.5 items-center">
                                     <input type="date" className={inputClass} value={dateVal(formData.liquidationDate)} onChange={e => handleChange('liquidationDate', e.target.value)} />
+                                    <button type="button" onClick={() => handleChange('liquidationDate', todayStr)} className="px-2 py-1.5 bg-orange-100 hover:bg-orange-200 text-orange-800 rounded-lg text-xs font-bold whitespace-nowrap transition-colors" title="Đặt lại ngày hôm nay">Hôm nay</button>
                                 </div>
+                            </div>
+                        )}
+
+                        {/* CẢNH BÁO KIỂM TRA NGÀY BẤT THƯỜNG / SAI SO VỚI THỜI GIAN HIỆN TẠI */}
+                        {mode !== 'liquidation' && dateCheck.messages.length > 0 && (
+                            <div className={`col-span-full p-3 rounded-xl border text-xs space-y-1 animate-fade-in ${dateCheck.hasError ? 'bg-red-50 border-red-200 text-red-800' : 'bg-amber-50 border-amber-200 text-amber-800'}`}>
+                                <div className="flex items-center gap-1.5 font-bold text-sm">
+                                    <AlertTriangle size={16} className={dateCheck.hasError ? 'text-red-600' : 'text-amber-600'} />
+                                    <span>Cảnh báo ngày bất thường (So với thời gian hiện tại: {getTodayDateString()}):</span>
+                                </div>
+                                <ul className="list-disc list-inside pl-1 space-y-1 font-medium">
+                                    {dateCheck.messages.map((m, idx) => (
+                                        <li key={idx}>{m}</li>
+                                    ))}
+                                </ul>
                             </div>
                         )}
                     </div>
@@ -960,25 +958,9 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
 
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <div className="flex justify-between items-center mb-1">
-                                            <label className="block text-xs font-bold text-purple-800/70 uppercase">
-                                                {activeTab === 'dd' ? 'Số thửa' : activeTab === 'cm' ? 'Số mốc' : 'Số lượng'}
-                                            </label>
-                                            {activeTab === 'dd' && (
-                                                <button 
-                                                    type="button" 
-                                                    onClick={() => {
-                                                        const autoCount = getRecordPlotCount({ landPlot: formData.landPlot });
-                                                        handleChange('plotCount', autoCount);
-                                                        setNotification({ type: 'success', message: `Đã tự động tính ${autoCount} thửa từ thông tin thửa đất: "${formData.landPlot || 'Mặc định'}"` });
-                                                    }}
-                                                    className="text-[10px] text-purple-700 hover:text-purple-900 font-bold bg-purple-100 hover:bg-purple-200 px-2 py-0.5 rounded transition-all flex items-center gap-1 border border-purple-200"
-                                                    title="Tự động tính lại số thửa từ ô Thửa đất"
-                                                >
-                                                    <Wand2 size={11} /> Tự động tính
-                                                </button>
-                                            )}
-                                        </div>
+                                        <label className="block text-xs font-bold text-purple-800/70 mb-1 uppercase">
+                                            {activeTab === 'dd' ? 'Số thửa' : activeTab === 'cm' ? 'Số mốc' : 'Số lượng'}
+                                        </label>
                                         <input 
                                             type="number" 
                                             className={`${inputClass} border-purple-200 bg-white/80`} 
@@ -1279,22 +1261,22 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
             </div>
         </div>
 
-        {/* ACTION BAR AT BOTTOM - FIXED STICKY AT BOTTOM OF CONTAINER */}
-        <div className="lg:col-span-12 sticky bottom-0 z-20 bg-white/85 backdrop-blur-md border-t border-slate-200/80 py-2 px-4 md:px-6 shadow-lg flex items-center justify-end gap-2.5 transition-all mt-1.5 -mx-2.5 -mb-2.5 md:-mx-3.5 md:-mb-3.5">
+        {/* ACTION BAR AT BOTTOM - COMPACT STYLE MATCHING RECORD FORM */}
+        <div className="lg:col-span-12 bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-end gap-2.5 transition-all mt-1">
             <button 
                 type="submit" 
                 disabled={loading} 
-                className={`px-6 py-2.5 text-white rounded-xl font-bold text-xs md:text-sm shadow-md hover:shadow-lg transition-all active:scale-95 disabled:opacity-70 flex items-center justify-center gap-1.5 ${isLiquidationMode ? 'bg-orange-600 hover:bg-orange-700 shadow-orange-500/30' : 'bg-purple-600 hover:bg-purple-700 shadow-purple-500/30'}`}
+                className={`px-5 py-1.5 text-white rounded-lg font-bold text-xs shadow-md transition-all active:scale-95 disabled:opacity-70 flex items-center justify-center gap-1.5 ${isLiquidationMode ? 'bg-orange-600 hover:bg-orange-700 shadow-orange-500/20' : 'bg-purple-600 hover:bg-purple-700 shadow-purple-500/20'}`}
             >
-                <Save size={16} /> {loading ? 'Đang xử lý...' : (initialData ? 'Cập nhật & In' : 'Lưu & In')}
+                <Save size={15} /> {loading ? 'Đang xử lý...' : (initialData ? (isLiquidationMode ? 'CẬP NHẬT VÀ IN THANH LÝ' : 'CẬP NHẬT VÀ IN HỢP ĐỒNG') : (isLiquidationMode ? 'LƯU VÀ IN THANH LÝ' : 'LƯU VÀ IN HỢP ĐỒNG'))}
             </button>
             <button 
                 type="button" 
                 onClick={() => handleReset(false)} 
-                className="px-5 py-2.5 bg-white text-slate-700 rounded-xl hover:bg-slate-50 transition-all shadow-sm hover:shadow font-bold border border-slate-300 flex items-center gap-1.5 text-xs md:text-sm" 
+                className="px-3.5 py-1.5 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors shadow-2xs font-bold border border-slate-200 flex items-center gap-1.5 text-xs" 
                 title="Làm mới form"
             >
-                {initialData ? <X size={16} className="text-red-500" /> : <RotateCcw size={16} />}
+                {initialData ? <X size={15} className="text-red-500" /> : <RotateCcw size={15} />}
                 <span>Làm mới</span>
             </button>
         </div>

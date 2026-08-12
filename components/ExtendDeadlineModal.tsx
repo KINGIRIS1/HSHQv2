@@ -1,161 +1,212 @@
-import React, { useState, useEffect } from 'react';
-import { RecordFile, User } from '../types';
-import { CalendarClock, X, Loader2, Save, AlertCircle } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, CalendarClock, AlertCircle, Calendar, MessageSquare, Clock } from 'lucide-react';
+import { RecordFile, User, Employee } from '../types';
 
 interface ExtendDeadlineModalProps {
   isOpen: boolean;
   onClose: () => void;
-  record?: RecordFile | null;
-  records?: RecordFile[];
-  currentUser?: User | null;
-  onConfirm?: (extendDate: string, reason: string) => Promise<void>;
-  onRefreshData?: () => void;
+  records: RecordFile[];
+  currentUser: User | null;
+  employees: Employee[];
+  users?: User[];
+  onConfirm: (newDeadline: string, reason: string, executionDateStr: string) => Promise<void>;
 }
 
 export const ExtendDeadlineModal: React.FC<ExtendDeadlineModalProps> = ({
   isOpen,
   onClose,
-  record,
-  records = [],
+  records,
   currentUser,
+  employees,
+  users = [],
   onConfirm
 }) => {
-  const [extendDate, setExtendDate] = useState('');
-  const [extendReason, setExtendReason] = useState('');
+  const [newDeadline, setNewDeadline] = useState(() => {
+    if (records.length > 0 && records[0].deadline) {
+      return records[0].deadline.split('T')[0];
+    }
+    const d = new Date();
+    d.setDate(d.getDate() + 7);
+    return d.toISOString().split('T')[0];
+  });
+  const [reason, setReason] = useState('');
+  const [executionDate, setExecutionDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [isAgreed, setIsAgreed] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  const targetRecords = records.length > 0 ? records : (record ? [record] : []);
+  if (!isOpen || records.length === 0) return null;
 
-  useEffect(() => {
-    if (isOpen && targetRecords.length > 0) {
-      const firstRec = targetRecords[0];
-      setExtendDate(firstRec.deadline ? firstRec.deadline.split('T')[0] : new Date().toISOString().split('T')[0]);
-      setExtendReason('');
-      setErrorMsg('');
+  const formatDateVN = (dStr?: string | null) => {
+    if (!dStr) return 'Chưa có';
+    try {
+      const d = new Date(dStr);
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const year = d.getFullYear();
+      return `${day}/${month}/${year}`;
+    } catch {
+      return dStr;
     }
-  }, [isOpen]);
-
-  if (!isOpen || targetRecords.length === 0) return null;
-
-  const formatDate = (dateStr?: string | null) => {
-    if (!dateStr) return 'Chưa có';
-    const d = new Date(dateStr);
-    return isNaN(d.getTime()) ? 'Chưa có' : d.toLocaleDateString('vi-VN');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!extendDate) {
-      setErrorMsg('Vui lòng chọn ngày hẹn trả mới.');
+    if (!newDeadline) {
+      setErrorMsg('Vui lòng chọn ngày hẹn trả mới!');
       return;
     }
-    if (!extendReason.trim()) {
-      setErrorMsg('Vui lòng nhập lý do gia hạn.');
+    if (!reason.trim()) {
+      setErrorMsg('Vui lòng nhập lý do gia hạn!');
       return;
     }
-
+    if (!isAgreed) {
+      setErrorMsg('Vui lòng tích chọn đồng ý trước khi thực hiện!');
+      return;
+    }
     setErrorMsg('');
     setIsSubmitting(true);
     try {
-      if (onConfirm) {
-        await onConfirm(extendDate, extendReason.trim());
-      }
+      await onConfirm(newDeadline, reason.trim(), executionDate);
+      setReason('');
+      setIsAgreed(false);
       onClose();
     } catch (err) {
-      console.error('Lỗi gia hạn:', err);
-      setErrorMsg('Có lỗi xảy ra khi thực hiện gia hạn.');
+      console.error(err);
+      setErrorMsg('Có lỗi xảy ra khi thực hiện gia hạn. Vui lòng thử lại.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-fade-in">
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[70] p-4 animate-fade-in">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl overflow-hidden flex flex-col border border-amber-100 animate-fade-in-up">
         {/* Header */}
-        <div className="bg-purple-700 px-5 py-4 text-white flex justify-between items-center shadow-sm">
-          <div className="flex items-center gap-2 font-bold text-lg">
-            <CalendarClock size={22} />
-            <span>Thao Tác Gia Hạn Ngày Hẹn Hồ Sơ</span>
+        <div className="bg-amber-600 px-5 py-3.5 text-white flex justify-between items-center shadow-sm">
+          <div className="flex items-center gap-2.5 font-bold text-lg">
+            <CalendarClock size={22} className="shrink-0" />
+            <span>Thao Tác Gia Hạn Hẹn Trả</span>
           </div>
-          <button onClick={onClose} className="text-purple-100 hover:text-white p-1 rounded-lg transition-colors cursor-pointer">
+          <button 
+            type="button"
+            onClick={onClose} 
+            className="text-amber-100 hover:text-white p-1 rounded-lg hover:bg-amber-700 transition-colors"
+          >
             <X size={20} />
           </button>
         </div>
 
-        {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-5 space-y-4 overflow-y-auto">
+        {/* Content Form */}
+        <form onSubmit={handleSubmit} className="p-5 space-y-4 max-h-[85vh] overflow-y-auto">
           {errorMsg && (
-            <div className="bg-rose-50 border border-rose-200 text-rose-700 px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-2">
+            <div className="p-3 bg-red-50 border border-red-200 text-red-600 text-xs font-bold rounded-xl flex items-center gap-2">
               <AlertCircle size={16} className="shrink-0" />
               <span>{errorMsg}</span>
             </div>
           )}
 
-          {/* List of target records summary */}
-          <div className="bg-purple-50/70 border border-purple-100 p-3 rounded-xl">
-            <p className="text-xs font-bold text-purple-900 mb-1 flex items-center justify-between">
-              <span>Hồ sơ thực hiện gia hạn ({targetRecords.length}):</span>
-              <span className="bg-purple-200 text-purple-800 text-[10px] px-2 py-0.5 rounded-full font-mono font-bold">
-                {targetRecords.length} hồ sơ
+          {/* Section 1: Target Records */}
+          <div className="bg-amber-50/60 border border-amber-100 p-3.5 rounded-xl">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold text-amber-900">
+                Hồ sơ thực hiện gia hạn ({records.length}):
               </span>
-            </p>
-            <div className="max-h-28 overflow-y-auto space-y-1 text-xs font-medium text-slate-700 divide-y divide-purple-100/60 pr-1">
-              {targetRecords.map((r) => (
-                <div key={r.id} className="pt-1 first:pt-0 flex items-center justify-between">
-                  <span className="font-mono font-bold text-purple-950">{r.code}</span>
-                  <span className="truncate max-w-[180px] text-slate-600">{r.customerName}</span>
-                  <span className="text-[11px] text-purple-800 font-semibold bg-purple-100/80 px-1.5 py-0.5 rounded">
-                    Hạn cũ: {formatDate(r.deadline)}
+              <span className="bg-amber-200/80 text-amber-900 text-[11px] px-2 py-0.5 rounded-full font-bold">
+                {records.length} hồ sơ
+              </span>
+            </div>
+            <div className="max-h-28 overflow-y-auto space-y-1.5 text-xs pr-1">
+              {records.map(r => (
+                <div key={r.id} className="flex items-center justify-between bg-white p-2 rounded-lg border border-amber-100/80 font-medium shadow-xs">
+                  <span className="font-bold text-slate-800 font-mono tracking-tight">{r.code}</span>
+                  <span className="text-slate-700 font-semibold truncate max-w-[160px] uppercase">{r.customerName}</span>
+                  <span className="text-amber-800 font-bold text-[11px] bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                    Hạn cũ: {formatDateVN(r.deadline)}
                   </span>
                 </div>
               ))}
             </div>
           </div>
 
+          {/* Section 2: New Deadline Date */}
           <div>
-            <label className="text-xs font-bold text-slate-800 block mb-1.5">
-              Ngày hẹn trả mới <span className="text-red-500">*</span>
+            <label className="block text-xs font-bold text-slate-800 mb-1.5 flex items-center gap-1.5">
+              <Clock size={15} className="text-amber-600" />
+              <span>Ngày hẹn trả mới (Hạn giao mới)</span>
+              <span className="text-red-500">*</span>
             </label>
             <input
               type="date"
               required
-              value={extendDate}
-              onChange={(e) => setExtendDate(e.target.value)}
-              className="w-full text-xs font-semibold px-3 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none"
+              className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none font-bold text-amber-900 bg-amber-50/40"
+              value={newDeadline}
+              onChange={(e) => setNewDeadline(e.target.value)}
             />
           </div>
 
+          {/* Section 3: Extension Reason */}
           <div>
-            <label className="text-xs font-bold text-slate-800 block mb-1.5">
-              Lý do gia hạn <span className="text-red-500">*</span>
+            <label className="block text-xs font-bold text-slate-800 mb-1.5 flex items-center gap-1.5">
+              <MessageSquare size={15} className="text-amber-600" />
+              <span>Lý do gia hạn hẹn trả</span>
+              <span className="text-red-500">*</span>
             </label>
             <textarea
               rows={3}
               required
-              value={extendReason}
-              onChange={(e) => setExtendReason(e.target.value)}
-              placeholder="Nhập chi tiết lý do gia hạn ngày hẹn trả..."
-              className="w-full text-xs p-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none resize-none font-medium text-slate-800"
+              className="w-full border border-slate-300 rounded-xl p-3 text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none font-medium text-slate-800 placeholder:text-slate-400 resize-none"
+              placeholder="Nhập chi tiết lý do gia hạn ngày hẹn..."
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
             />
           </div>
 
-          <div className="flex gap-2 justify-end pt-3 border-t border-slate-100">
+          {/* Section 4: Execution Date */}
+          <div>
+            <label className="block text-xs font-bold text-slate-800 mb-1.5 flex items-center gap-1.5">
+              <Calendar size={15} className="text-indigo-600" />
+              <span>Ngày thực hiện gia hạn</span>
+            </label>
+            <input
+              type="date"
+              className="w-full border border-slate-300 rounded-xl px-3.5 py-2 text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none font-semibold text-slate-700 bg-slate-50"
+              value={executionDate}
+              onChange={(e) => setExecutionDate(e.target.value)}
+            />
+          </div>
+
+          {/* Section 5: Agreement Checkbox */}
+          <div className="bg-amber-50/80 border border-amber-200/80 p-3.5 rounded-xl flex items-start gap-2.5">
+            <input
+              type="checkbox"
+              id="agree-extend-checkbox"
+              checked={isAgreed}
+              onChange={(e) => setIsAgreed(e.target.checked)}
+              className="mt-0.5 w-4 h-4 text-amber-600 rounded focus:ring-amber-500 cursor-pointer"
+            />
+            <label htmlFor="agree-extend-checkbox" className="text-xs font-semibold text-amber-950 cursor-pointer select-none leading-relaxed">
+              Tôi đã xác nhận nội dung trên và <span className="font-bold underline text-amber-700">ĐỒNG Ý</span> thực hiện gia hạn hẹn trả cho hồ sơ này.
+            </label>
+          </div>
+
+          {/* Section 6: Footer Actions */}
+          <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+              disabled={isSubmitting}
+              className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-sm transition-colors active:scale-95"
             >
               Hủy
             </button>
             <button
               type="submit"
-              disabled={isSubmitting}
-              className="px-5 py-2.5 bg-purple-700 hover:bg-purple-800 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md transition-all cursor-pointer disabled:opacity-50"
+              disabled={isSubmitting || !newDeadline || !reason.trim() || !isAgreed}
+              className="flex items-center gap-2 px-6 py-2.5 bg-amber-600 hover:bg-amber-700 disabled:opacity-40 text-white rounded-xl font-bold text-sm shadow-md transition-all active:scale-95"
             >
-              {isSubmitting ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
-              Lưu gia hạn
+              <CalendarClock size={16} />
+              {isSubmitting ? 'Đang xử lý...' : 'Đồng Ý & Thực Hiện'}
             </button>
           </div>
         </form>
@@ -165,4 +216,3 @@ export const ExtendDeadlineModal: React.FC<ExtendDeadlineModalProps> = ({
 };
 
 export default ExtendDeadlineModal;
-

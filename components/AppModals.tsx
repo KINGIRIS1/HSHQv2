@@ -12,12 +12,10 @@ import AddToBatchModal from './AddToBatchModal';
 import ReturnBatchHandoverModal from './ReturnBatchHandoverModal';
 import ExcelPreviewModal from './ExcelPreviewModal';
 import BulkUpdateModal from './BulkUpdateModal';
-
 import ReturnResultModal from './ReturnResultModal';
 import BatchErrorDiagnosticModal from './BatchErrorDiagnosticModal';
-import RejectReturnStepModal from './RejectReturnStepModal';
-import { ExtendDeadlineModal } from './ExtendDeadlineModal';
-import SupplementModal from './SupplementModal';
+import RejectReturnStepModal, { ReturnOptionType } from './RejectReturnStepModal';
+import ExtendDeadlineModal from './ExtendDeadlineModal';
 import * as XLSX from 'xlsx-js-style';
 
 interface AppModalsProps {
@@ -37,18 +35,15 @@ interface AppModalsProps {
     isDiagnosticModalOpen?: boolean;
     isRejectReturnStepModalOpen?: boolean;
     isExtendModalOpen?: boolean;
-    isSupplementModalOpen?: boolean;
     
     // Data States
     editingRecord: RecordFile | null;
     viewingRecord: RecordFile | null;
     deletingRecord: RecordFile | null;
     returnRecord: RecordFile | null;
-    extendTargetRecord?: RecordFile | null;
-    extendTargetRecords?: RecordFile[];
     assignTargetRecords: RecordFile[];
     rejectReturnTargetRecords?: RecordFile[];
-    supplementTargetRecords?: RecordFile[];
+    extendTargetRecords?: RecordFile[];
     exportModalType: 'handover' | 'check_list';
     
     // Preview Data
@@ -70,13 +65,11 @@ interface AppModalsProps {
     setIsDiagnosticModalOpen?: (v: boolean) => void;
     setIsRejectReturnStepModalOpen?: (v: boolean) => void;
     setIsExtendModalOpen?: (v: boolean) => void;
-    setIsSupplementModalOpen?: (v: boolean) => void;
     
     setEditingRecord: (r: RecordFile | null) => void;
     setViewingRecord: (r: RecordFile | null) => void;
     setDeletingRecord: (r: RecordFile | null) => void;
     setReturnRecord: (r: RecordFile | null) => void;
-    setExtendTargetRecord?: (r: RecordFile | null) => void;
 
     // Handlers
     handleAddOrUpdate: (data: any) => Promise<RecordFile | null>;
@@ -85,7 +78,7 @@ interface AppModalsProps {
     handleDeleteEmployee: (id: string) => void;
     handleDeleteAllData: () => void;
     onRefreshData?: () => void; // New callback
-    confirmAssign: (empId: string, subStep?: string) => void;
+    confirmAssign: (empId: string) => void;
     handleDeleteRecord: () => void;
     confirmDelete: (r: RecordFile) => void;
     handleExcelPreview: (wb: XLSX.WorkBook, name: string) => void;
@@ -93,15 +86,13 @@ interface AppModalsProps {
     executeReturnBatchHandover?: (batch: number, date: string, deptName: string) => void;
     onCreateLiquidation: (record: RecordFile) => void;
     onCreateContract?: (record: Partial<RecordFile>) => void;
-    handleBulkUpdate: (field: keyof RecordFile, value: any, customDateStr?: string, targetRecordIds?: string[], assignedTo?: string) => Promise<void>;
+    handleBulkUpdate: (field: keyof RecordFile, value: any, customDateStr?: string, targetRecordIds?: string[]) => Promise<void>;
     handleBatchUpdateRecords?: (updates: Partial<RecordFile>[]) => Promise<void>;
     confirmReturnResult: (receiptNumber: string, receiverName: string, returnedPrice: number, receiptType?: 'Biên Lai' | 'Hóa Đơn') => void;
-    onConfirmRejectReturnStep?: (reason: string, returnDateStr: string) => Promise<void>;
-    onConfirmExtendDeadline?: (extendDate: string, reason: string) => Promise<void>;
-    onConfirmSupplement?: (note: string) => Promise<void>;
+    onConfirmRejectReturnStep?: (optionType: ReturnOptionType, reason: string, returnDateStr: string) => Promise<void>;
     onOpenRejectReturnModal?: (record: RecordFile) => void;
+    onConfirmExtendDeadline?: (newDeadline: string, reason: string, executionDateStr: string) => Promise<void>;
     onOpenExtendModal?: (record: RecordFile) => void;
-    onOpenSupplementModal?: (record: RecordFile) => void;
 
     // Shared Data
     employees: Employee[];
@@ -109,8 +100,6 @@ interface AppModalsProps {
     currentUser: User;
     wards: string[];
     holidays?: any[];
-    rolePermissions?: Record<string, string[]>;
-    departmentPermissions?: Record<string, string[]>;
     filteredRecords: RecordFile[];
     records: RecordFile[];
     selectedCount: number;
@@ -152,7 +141,6 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
                 onConfirm={props.confirmAssign} 
                 employees={props.employees} 
                 selectedRecords={props.assignTargetRecords} 
-                allRecords={props.records}
                 currentView={props.currentView}
                 currentUser={props.currentUser}
                 filterDepartment={(() => {
@@ -189,8 +177,6 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
                     employees={props.employees} 
                     users={props.users}
                     currentUser={props.currentUser} 
-                    rolePermissions={props.rolePermissions}
-                    departmentPermissions={props.departmentPermissions}
                     onEdit={props.canPerformAction ? (r) => { props.setEditingRecord(r); props.setIsModalOpen(true); } : undefined}
                     onDelete={props.canPerformAction ? props.confirmDelete : undefined}
                     onCreateLiquidation={props.onCreateLiquidation}
@@ -198,7 +184,6 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
                     onRefreshData={props.onRefreshData}
                     onOpenRejectReturnModal={props.onOpenRejectReturnModal}
                     onOpenExtendModal={props.onOpenExtendModal}
-                    onOpenSupplementModal={props.onOpenSupplementModal}
                 />
             )}
             
@@ -248,7 +233,7 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
                 fileName={props.previewExcelName} 
             />
 
-            <BulkUpdateModal
+            <BulkUpdateModal 
                 isOpen={props.isBulkUpdateModalOpen}
                 onClose={() => props.setIsBulkUpdateModalOpen(false)}
                 selectedRecords={props.selectedRecordsForBulk}
@@ -256,10 +241,7 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
                 employees={props.employees}
                 wards={props.wards}
                 onConfirm={props.handleBulkUpdate}
-                currentView={props.currentView}
             />
-
-
 
             <ReturnResultModal
                 isOpen={props.isReturnModalOpen}
@@ -291,25 +273,12 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
 
             <ExtendDeadlineModal
                 isOpen={!!props.isExtendModalOpen}
-                onClose={() => {
-                    if (props.setIsExtendModalOpen) props.setIsExtendModalOpen(false);
-                    if (props.setExtendTargetRecord) props.setExtendTargetRecord(null);
-                }}
-                record={props.extendTargetRecord || null}
+                onClose={() => props.setIsExtendModalOpen && props.setIsExtendModalOpen(false)}
                 records={props.extendTargetRecords || []}
-                currentUser={props.currentUser}
-                onConfirm={props.onConfirmExtendDeadline}
-                onRefreshData={props.onRefreshData}
-            />
-
-            <SupplementModal
-                isOpen={!!props.isSupplementModalOpen}
-                onClose={() => props.setIsSupplementModalOpen && props.setIsSupplementModalOpen(false)}
-                records={props.supplementTargetRecords || []}
                 currentUser={props.currentUser}
                 employees={props.employees}
                 users={props.users}
-                onConfirm={props.onConfirmSupplement || (async () => {})}
+                onConfirm={props.onConfirmExtendDeadline || (async () => {})}
             />
         </>
     );

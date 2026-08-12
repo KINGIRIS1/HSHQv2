@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { FolderCog, Loader2, CheckCircle, AlertCircle, X, Calculator, FileText, Gavel, Info, Table2, Grid, FileSpreadsheet, BookOpen } from 'lucide-react';
+import { FolderCog, Loader2, CheckCircle, AlertCircle, X, Calculator, FileText, Gavel, Info, Table2, Grid, FileSpreadsheet, BookOpen, Wrench } from 'lucide-react';
 import { User as UserType, RecordFile, NotifyFunction, NotifyType, Employee } from '../types';
 import { isViewAllowedForUser } from '../config/roleConfig';
 import SoanBienBanTab from './utilities/SoanBienBanTab';
@@ -11,6 +11,7 @@ import ChinhLyBienDongTab from './utilities/ChinhLyBienDongTab';
 import HoSoTachThuaTab from './utilities/HoSoTachThuaTab';
 import ChuyenDoiToBanDoTab from './utilities/ChuyenDoiToBanDoTab';
 import ExcerptManagement from './ExcerptManagement';
+import { MeasurementAndArchiveSyncTab } from './utilities/MeasurementAndArchiveSyncTab';
 
 interface UtilitiesViewProps {
     currentUser: UserType;
@@ -37,15 +38,16 @@ const UtilitiesView: React.FC<UtilitiesViewProps> = ({
     onAddWard,
     onDeleteWard,
     onResetWards,
+    onSaveRecord,
+    onRefreshData,
 }) => {
-  const isSotltdAllowed = isViewAllowedForUser(currentUser, employees || [], 'excerpt_management');
-  const [activeTab, setActiveTab] = useState<'bienban' | 'thongtin' | 'vphc' | 'saiso' | 'chinhly' | 'tachthua' | 'chuyendoi' | 'sotltd'>(() => {
-      return isViewAllowedForUser(currentUser, employees || [], 'excerpt_management') ? 'sotltd' : 'bienban';
-  });
+  const [activeTab, setActiveTab] = useState<'bienban' | 'thongtin' | 'vphc' | 'saiso' | 'chinhly' | 'tachthua' | 'chuyendoi' | 'sotltd' | 'vaoloi'>('bienban');
   const [defaultExportPath, setDefaultExportPath] = useState('');
   
   // State cho thông báo Custom (Toast)
   const [notification, setNotification] = useState<{ type: NotifyType, message: string } | null>(null);
+
+  const isSotltdAllowed = isViewAllowedForUser(currentUser, employees || [], 'excerpt_management');
 
   // Auto-switch to correction tab if initial record is provided
   useEffect(() => {
@@ -122,14 +124,6 @@ const UtilitiesView: React.FC<UtilitiesViewProps> = ({
       {/* Header Tabs */}
       <div className="bg-white border-b border-slate-300 p-2 flex items-center gap-4 shrink-0 shadow-sm z-20">
           <div className="flex bg-slate-100 p-1 rounded-lg overflow-x-auto">
-              {isSotltdAllowed && (
-                  <button 
-                      onClick={() => setActiveTab('sotltd')}
-                      className={`px-4 py-2 text-sm font-bold rounded-md transition-all whitespace-nowrap flex items-center gap-2 ${activeTab === 'sotltd' ? 'bg-white text-teal-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                  >
-                      <BookOpen size={16} /> Số TL/TĐ
-                  </button>
-              )}
               <button 
                   onClick={() => setActiveTab('bienban')}
                   className={`px-4 py-2 text-sm font-bold rounded-md transition-all whitespace-nowrap flex items-center gap-2 ${activeTab === 'bienban' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
@@ -172,6 +166,14 @@ const UtilitiesView: React.FC<UtilitiesViewProps> = ({
               >
                   <FileSpreadsheet size={16} /> Chuyển đổi tờ bản đồ
               </button>
+              {isSotltdAllowed && (
+                  <button 
+                      onClick={() => setActiveTab('sotltd')}
+                      className={`px-4 py-2 text-sm font-bold rounded-md transition-all whitespace-nowrap flex items-center gap-2 ${activeTab === 'sotltd' ? 'bg-white text-teal-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                  >
+                      <BookOpen size={16} /> Số TL/TĐ
+                  </button>
+              )}
           </div>
           
           {activeTab !== 'saiso' && activeTab !== 'chinhly' && activeTab !== 'tachthua' && activeTab !== 'chuyendoi' && activeTab !== 'sotltd' && (

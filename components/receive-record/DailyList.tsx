@@ -138,14 +138,14 @@ const DailyList: React.FC<DailyListProps> = ({ records, wards, currentUser, empl
       
       const tableHeader = ["STT", "Mã Hồ Sơ", "Chủ Sử Dụng", "Xã / Phường", "Tờ", "Thửa", "Loại Hồ Sơ", "Hẹn Trả", "Ngày Trả KQ", "Số BL/HĐ", "Số Tiền", "Ghi Chú"];
       
-      const formatPrice = (p: any) => p ? new Intl.NumberFormat('vi-VN').format(Number(p)) : '';
+      const formatPrice = (p: any) => p ? new Intl.NumberFormat('vi-VN').format(Number(p)) + ' đ' : '';
       const formatDateStr = (d: any) => d ? new Date(d).toLocaleDateString('vi-VN') : '';
 
       const dataRows = filteredDailyRecords.map((r, i) => [
           i + 1, r.code, r.customerName, 
           getNormalizedWard(r.ward), 
           r.mapSheet || '', r.landPlot || '', 
-          getShortRecordType(r), 
+          getShortRecordType(r.recordType), 
           formatDateStr(r.deadline),
           formatDateStr(r.resultReturnedDate),
           r.receiptNumber || '',
@@ -309,7 +309,7 @@ const DailyList: React.FC<DailyListProps> = ({ records, wards, currentUser, empl
                                     </td>
                                     <td className="p-3 text-center font-mono align-middle">{r.mapSheet || '-'}</td>
                                     <td className="p-3 text-center font-mono align-middle">{r.landPlot || '-'}</td>
-                                    <td className="p-3 text-gray-600 truncate align-middle" title={r.recordType || ''}>{getShortRecordType(r)}</td> 
+                                    <td className="p-3 text-gray-600 truncate align-middle" title={r.recordType || ''}>{getShortRecordType(r.recordType)}</td> 
                                     <td className="p-3 text-center text-blue-700 font-medium align-middle">{r.deadline ? new Date(r.deadline).toLocaleDateString('vi-VN') : '-'}</td> 
                                     <td className="p-3 text-gray-500 italic truncate align-middle" title={r.content || ''}>{r.content}</td>
                                     <td className="p-2 align-middle text-center sticky right-0 bg-white group-hover:bg-blue-50/50 shadow-l">
@@ -317,7 +317,7 @@ const DailyList: React.FC<DailyListProps> = ({ records, wards, currentUser, empl
                                             <button onClick={() => onEdit(r)} className="p-1.5 text-blue-600 hover:bg-blue-100 rounded transition-colors" title="Sửa">
                                                 <Pencil size={15} />
                                             </button>
-                                            {r.recordType && (getShortRecordType(r.recordType).startsWith('2.2') || getShortRecordType(r.recordType).startsWith('2.4')) && onCreateContract && (
+                                            {r.recordType && (getShortRecordType(r.recordType).startsWith('2.3') || getShortRecordType(r.recordType).startsWith('2.4')) && onCreateContract && (
                                                 <button onClick={() => onCreateContract(r)} className="p-1.5 text-amber-600 hover:bg-amber-100 rounded transition-colors" title="Lập hợp đồng">
                                                     <FileSignature size={15} />
                                                 </button>

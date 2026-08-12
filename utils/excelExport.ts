@@ -2,7 +2,7 @@
 import * as XLSX from 'xlsx-js-style';
 import { RecordFile, RecordStatus, Employee } from '../types';
 import { getNormalizedWard, getShortRecordType, STATUS_LABELS } from '../constants';
-import { isRecordOverdue, removeVietnameseTones, parseSafeDate, getRecordReceivedDate, formatCheckOrSignDate } from './appHelpers';
+import { isRecordOverdue, removeVietnameseTones, cleanSyncNotes } from './appHelpers';
 import { fetchContracts } from '../services/api';
 
 export const exportReportToExcel = async (
@@ -13,16 +13,15 @@ export const exportReportToExcel = async (
     employees: Employee[],
     customTitle?: string
 ) => {
-    const from = parseSafeDate(fromDateStr) || new Date();
+    const from = new Date(fromDateStr);
     from.setHours(0, 0, 0, 0);
-    const to = parseSafeDate(toDateStr) || new Date();
+    const to = new Date(toDateStr);
     to.setHours(23, 59, 59, 999);
 
-    // Filter records safely
+    // Filter records
     const filtered = records.filter(r => {
-        const rDate = getRecordReceivedDate(r);
-        if (!rDate || isNaN(rDate.getTime())) return true;
-        rDate.setHours(12, 0, 0, 0);
+        if (!r.receivedDate) return false;
+        const rDate = new Date(r.receivedDate);
         const matchDate = rDate >= from && rDate <= to;
         
         let matchWard = true;
@@ -35,10 +34,7 @@ export const exportReportToExcel = async (
         return matchDate && matchWard;
     });
 
-    // Fall back to passed records if pre-filtered list was passed directly
-    const dataForExport = filtered.length > 0 ? filtered : records;
-
-    if (dataForExport.length === 0) {
+    if (filtered.length === 0) {
         alert("Không có hồ sơ nào trong khoảng thời gian và địa bàn này.");
         return;
     }
@@ -67,48 +63,44 @@ export const exportReportToExcel = async (
     // Helper find Employee Name
     const getEmployeeName = (empId?: string) => {
         if (!empId) return '';
-        const emp = employees.find(e => e.id === empId || e.name.toLowerCase() === empId.toLowerCase());
-        return emp ? emp.name : empId;
+        const emp = employees.find(e => e.id === empId);
+        return emp ? emp.name : '';
     };
 
     // Prepare Data
     const formatDate = (d: string | undefined | null) => {
         if (!d) return '';
-        const date = parseSafeDate(d);
-        if (!date) return '';
+        const date = new Date(d);
+        if (isNaN(date.getTime())) return '';
         return `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getFullYear()}`;
     };
 
     // Summary Stats
-    let total = dataForExport.length;
-    let completed = dataForExport.filter(r => r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED || r.status === RecordStatus.SIGNED || !!r.exportBatch).length;
+    let total = filtered.length;
+    let completed = filtered.filter(r => r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED).length;
     let processing = total - completed;
     
     // Tính trễ hạn tách biệt
     let overduePending = 0;
     let overdueCompleted = 0;
 
-    dataForExport.forEach(r => {
+    filtered.forEach(r => {
         if (r.deadline) {
-            const deadline = parseSafeDate(r.deadline);
-            if (deadline) {
-                deadline.setHours(0,0,0,0);
-                
-                const isCompleted = r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED || r.status === RecordStatus.SIGNED || !!r.exportBatch;
-                
-                if (isCompleted) {
-                    if (r.completedDate) {
-                        const completedDate = parseSafeDate(r.completedDate);
-                        if (completedDate) {
-                            completedDate.setHours(0,0,0,0);
-                            if (completedDate > deadline) overdueCompleted++;
-                        }
-                    }
-                } else if (r.status !== RecordStatus.WITHDRAWN && r.status !== RecordStatus.REJECTED) {
-                    const today = new Date();
-                    today.setHours(0,0,0,0);
-                    if (today > deadline) overduePending++;
+            const deadline = new Date(r.deadline);
+            deadline.setHours(0,0,0,0);
+            
+            const isCompleted = r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED;
+            
+            if (isCompleted) {
+                if (r.completedDate) {
+                    const completedDate = new Date(r.completedDate);
+                    completedDate.setHours(0,0,0,0);
+                    if (completedDate > deadline) overdueCompleted++;
                 }
+            } else if (r.status !== RecordStatus.WITHDRAWN && r.status !== RecordStatus.REJECTED) {
+                const today = new Date();
+                today.setHours(0,0,0,0);
+                if (today > deadline) overduePending++;
             }
         }
     });
@@ -129,21 +121,21 @@ export const exportReportToExcel = async (
         "Giá trị TL", // Yêu cầu 1: Thêm cột Giá trị thanh lý
         "Ngày Nhận", 
         "Hẹn Trả", 
-        "Ngày kiểm tra",
-        "Ngày trình ký",
         "Ngày hoàn thành",
         "Ngày trả kết quả",
         "Trạng Thái", 
         "Ghi Chú"
     ];
     
-    const dataRows = dataForExport.map((r, i) => {
+    const dataRows = filtered.map((r, i) => {
         const contractInfo = getContractInfo(r.code);
         
         // Tổng hợp ghi chú cho Excel
         const notesParts: string[] = [];
-        if (r.notes) notesParts.push(r.notes);
-        if (r.content && r.content !== r.notes) notesParts.push(r.content);
+        const cleanedNotes = cleanSyncNotes(r.notes);
+        if (cleanedNotes) notesParts.push(cleanedNotes);
+        const cleanedContent = cleanSyncNotes(r.content);
+        if (cleanedContent && cleanedContent !== cleanedNotes) notesParts.push(cleanedContent);
         
         const fullNotesText = notesParts.join('; ') || '';
 
@@ -162,8 +154,6 @@ export const exportReportToExcel = async (
             contractInfo.liquidation, // Giá trị TL
             formatDate(r.receivedDate),
             formatDate(r.deadline),
-            formatCheckOrSignDate(r.checkedDate || r.pendingCheckDate, r, 'check'),
-            formatCheckOrSignDate(r.submissionDate, r, 'sign'),
             formatDate(r.completedDate),      
             formatDate(r.resultReturnedDate),
             STATUS_LABELS[r.status],
@@ -477,7 +467,7 @@ export const exportReturnedListToExcel = (records: RecordFile[], fromDateStr?: s
         formatDate(r.deadline),
         formatDate(r.resultReturnedDate),
         r.receiverName || '',
-        r.notes || ''
+        cleanSyncNotes(r.notes) || ''
     ]);
 
     let displayDate = "";

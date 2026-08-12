@@ -1,11 +1,10 @@
 
 import React from 'react';
 import { RecordFile, RecordStatus, Employee, UserRole } from '../types';
-import { getNormalizedWard, getShortRecordType, getWardLabel, isCapGiayRecord, getCapGiaySubStepLabel, getCapGiaySubStepBadgeColor } from '../constants';
+import { getNormalizedWard, getShortRecordType, getWardLabel } from '../constants';
 import { isRecordOverdue, isRecordApproaching, toTitleCase, formatBatchName, getBatchDisplayParts } from '../utils/appHelpers';
-import { hasUserPermission } from '../config/roleConfig';
 import StatusBadge from './StatusBadge';
-import { CheckSquare, Square, AlertCircle, Clock, Eye, ArrowRight, Pencil, Trash2, Bell, FileCheck, Phone, Map, CalendarClock, Check } from 'lucide-react';
+import { CheckSquare, Square, AlertCircle, Clock, Eye, ArrowRight, Pencil, Trash2, Bell, FileCheck, Phone, Map } from 'lucide-react';
 
 interface RecordRowProps {
   record: RecordFile;
@@ -15,8 +14,6 @@ interface RecordRowProps {
   canPerformAction: boolean;
   isSpecializedTab?: boolean;
   currentUser?: any;
-  rolePermissions?: Record<string, string[]>;
-  departmentPermissions?: Record<string, string[]>;
   onToggleSelect: (id: string) => void;
   onView: (record: RecordFile) => void;
   onEdit: (record: RecordFile) => void;
@@ -25,16 +22,14 @@ interface RecordRowProps {
   onQuickUpdate: (id: string, field: keyof RecordFile, value: string) => void;
   onReturnResult?: (record: RecordFile) => void;
   onMapCorrection?: (record: RecordFile) => void; // New Handler
-  onExtendDeadline?: (record: RecordFile) => void;
   columnOrder?: string[];
   canSelect?: boolean;
-  holidays?: any[];
 }
 
 const formatDate = (dateStr?: string | null) => {
     if (!dateStr) return '';
     const d = new Date(dateStr);
-    return isNaN(d.getTime()) ? '' : `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+    return isNaN(d.getTime()) ? '' : `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getFullYear()).slice(-2)}`;
 };
 
 const RecordRow: React.FC<RecordRowProps> = ({
@@ -45,8 +40,6 @@ const RecordRow: React.FC<RecordRowProps> = ({
   canPerformAction,
   isSpecializedTab = false,
   currentUser,
-  rolePermissions,
-  departmentPermissions,
   onToggleSelect,
   onView,
   onEdit,
@@ -55,36 +48,16 @@ const RecordRow: React.FC<RecordRowProps> = ({
   onQuickUpdate,
   onReturnResult,
   onMapCorrection,
-  onExtendDeadline,
   columnOrder,
-  canSelect,
-  holidays
+  canSelect
 }) => {
-  const canExtendDeadline = hasUserPermission(
-    currentUser,
-    employees,
-    'BTN_EXTEND_DEADLINE',
-    rolePermissions,
-    departmentPermissions
-  ) && (
-    record.status !== RecordStatus.HANDOVER && 
-    record.status !== RecordStatus.RETURNED && 
-    record.status !== RecordStatus.WITHDRAWN
-  );
   const [localMsr, setLocalMsr] = React.useState(record.measurementNumber || "");
   const [localExc, setLocalExc] = React.useState(record.excerptNumber || "");
   const [localRec, setLocalRec] = React.useState(record.receiptNumber || "");
   React.useEffect(() => { setLocalMsr(record.measurementNumber || ""); }, [record.measurementNumber]);
   React.useEffect(() => { setLocalExc(record.excerptNumber || ""); }, [record.excerptNumber]);
   React.useEffect(() => { setLocalRec(record.receiptNumber || ""); }, [record.receiptNumber]);
-  const normalizeName = (str: string) => str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
-  const employee = employees.find(e => 
-      e.id === record.assignedTo || 
-      (e as any).employeeId === record.assignedTo || 
-      e.name === record.assignedTo ||
-      (record.assignedTo && normalizeName(e.name) === normalizeName(record.assignedTo))
-  );
-  const assignedDisplayName = employee ? employee.name : record.assignedTo;
+  const employee = employees.find(e => e.id === record.assignedTo);
   const isOverdue = isRecordOverdue(record);
   const isApproaching = isRecordApproaching(record);
   
@@ -92,6 +65,10 @@ const RecordRow: React.FC<RecordRowProps> = ({
                             record.status !== RecordStatus.HANDOVER && 
                             record.status !== RecordStatus.WITHDRAWN;
 
+  const resultReturnedDateStr = record.resultReturnedDate ? formatDate(record.resultReturnedDate) : '';
+
+  // LOGIC MỚI: Tự động xác định trạng thái hiển thị
+  // Nếu có thông tin xuất (Batch/Date) và chưa hoàn thành (Trả/Rút/Từ chối), coi như là Đã giao 1 cửa
   const getDisplayStatus = (r: RecordFile) => {
       if (r.resultReturnedDate) {
           return RecordStatus.RETURNED;
@@ -103,8 +80,6 @@ const RecordRow: React.FC<RecordRowProps> = ({
   };
   
   const displayStatus = getDisplayStatus(record);
-
-  const isReturned = displayStatus === RecordStatus.RETURNED || record.status === RecordStatus.RETURNED || !!record.resultReturnedDate;
 
   // Class chung cho các ô: Căn giữa cho sự cân đối, tăng padding thông thoáng hơn trên PC
   const cellClass = "p-3 md:p-3.5 align-middle text-slate-700 border-b border-slate-100/80 transition-colors duration-200";
@@ -157,15 +132,13 @@ const RecordRow: React.FC<RecordRowProps> = ({
                </div>
                
                <div className={`flex items-center justify-between px-2.5 py-1.5 ${isOverdue ? 'bg-red-50' : isApproaching ? 'bg-orange-50' : 'bg-white'}`} title="Hẹn trả kết quả">
-                  <span className={`text-[10px] font-extrabold uppercase tracking-tight mr-1 ${isOverdue ? 'text-red-500' : isApproaching ? 'text-orange-500' : 'text-blue-500'}`}>Trả</span>
-                  <div className="flex flex-col items-end gap-0.5">
-                      <div className="flex items-center gap-1">
-                          <span className={`text-sm font-bold font-mono whitespace-nowrap ${isOverdue ? 'text-red-600' : isApproaching ? 'text-orange-600' : 'text-blue-700'}`}>
-                              {formatDate(record.deadline)}
-                          </span>
-                          {isOverdue && <AlertCircle size={13} className="text-red-500 animate-pulse shrink-0" />}
-                          {isApproaching && <Clock size={13} className="text-orange-500 shrink-0" />}
-                      </div>
+                  <span className={`text-[10px] font-extrabold uppercase tracking-tight mr-3 ${isOverdue ? 'text-red-500' : isApproaching ? 'text-orange-500' : 'text-blue-500'}`}>Trả</span>
+                  <div className="flex items-center gap-1.5">
+                      <span className={`text-sm font-bold font-mono whitespace-nowrap ${isOverdue ? 'text-red-600' : isApproaching ? 'text-orange-600' : 'text-blue-700'}`}>
+                          {formatDate(record.deadline)}
+                      </span>
+                      {isOverdue && <AlertCircle size={13} className="text-red-500 animate-pulse shrink-0" />}
+                      {isApproaching && <Clock size={13} className="text-orange-500 shrink-0" />}
                   </div>
                </div>
             </div>
@@ -193,16 +166,18 @@ const RecordRow: React.FC<RecordRowProps> = ({
       case 'assigned':
         return (
           <td key="assigned" className={`${cellClass} text-center`}>
-              {assignedDisplayName || record.assignedDate ? (
+              {employee ? (
                   <div className="flex flex-col items-center gap-0.5">
                       {record.assignedDate && (
                           <span className="text-xs text-gray-500">{formatDate(record.assignedDate)}</span>
                       )}
-                      {assignedDisplayName && (
-                          <span className="text-xs text-indigo-600 font-bold bg-indigo-50 px-1.5 py-0.5 rounded break-words max-w-full leading-tight" title={assignedDisplayName}>{assignedDisplayName}</span>
-                      )}
+                      <span className="text-xs text-indigo-600 font-bold bg-indigo-50 px-1.5 py-0.5 rounded break-words max-w-full leading-tight" title={employee.name}>{employee.name}</span>
                   </div>
-              ) : '--'}
+              ) : (
+                  record.assignedDate ? (
+                      <span className="text-sm text-gray-600">{formatDate(record.assignedDate)}</span>
+                  ) : '--'
+              )}
           </td>
         );
       case 'completed':
@@ -223,7 +198,7 @@ const RecordRow: React.FC<RecordRowProps> = ({
                </div>
             ) : record.status === RecordStatus.REJECTED ? (
                <div className="flex flex-col items-center">
-                  <span className="text-xs font-bold bg-red-100 text-red-700 border border-red-200 px-2 py-0.5 rounded mb-1">Hồ sơ trả</span>
+                  <span className="text-xs font-bold bg-red-100 text-red-700 border border-red-200 px-2 py-0.5 rounded mb-1">Trả hồ sơ</span>
                   <span className="text-sm font-bold text-red-700">{formatDate(record.completedDate)}</span>
                </div>
             ) : (
@@ -235,24 +210,21 @@ const RecordRow: React.FC<RecordRowProps> = ({
         return (
           <td key="type" className={`${cellClass} text-center text-gray-700`}>
               <div className="break-words leading-normal text-sm" title={record.recordType || ''}> 
-                  {getShortRecordType(record)}
+                  {getShortRecordType(record.recordType)}
               </div>
           </td>
         );
       case 'tech':
         const recTypeLower = (record.recordType || '').toLowerCase();
-        const isCG = isCapGiayRecord(record);
         const isMeasurement = recTypeLower.includes('trích đo') || recTypeLower.includes('đo đạc') || recTypeLower.includes('đo') || recTypeLower.includes('tách thửa');
         const isExcerpt = recTypeLower.includes('trích lục');
-        const showMsr = !isCG && (isMeasurement || (!isMeasurement && !isExcerpt));
-        const showExc = !isCG && (isExcerpt || (!isMeasurement && !isExcerpt));
+        const showMsr = isMeasurement || (!isMeasurement && !isExcerpt);
+        const showExc = isExcerpt || (!isMeasurement && !isExcerpt);
 
         return (
           <td key="tech" className={cellClass}>
             <div className="flex flex-col gap-1.5 items-center">
-              {!showMsr && !showExc ? (
-                <span className="text-gray-400 text-xs font-mono block text-center">-</span>
-              ) : canPerformAction ? (
+              {canPerformAction ? (
                   <>
                       {showMsr && (
                           <input type="text" className="w-full text-sm border border-gray-200 rounded px-1 py-1 focus:border-blue-500 outline-none bg-white/50 text-center" value={localMsr} onChange={(e) => setLocalMsr(e.target.value)} onBlur={() => localMsr !== (record.measurementNumber || '') && onQuickUpdate(record.id, 'measurementNumber', localMsr)} placeholder="TĐ" title="Số Trích Đo" />
@@ -346,56 +318,15 @@ const RecordRow: React.FC<RecordRowProps> = ({
             <div className="flex items-center gap-1">
               <button onClick={(e) => { e.stopPropagation(); onView(record); }} className="p-1 text-slate-600 hover:text-green-700 hover:bg-green-100/80 rounded transition-colors border border-slate-200/80 bg-white" title="Xem chi tiết"><Eye size={15} /></button>
               
-              {onReturnResult && displayStatus === RecordStatus.HANDOVER && !isReturned && !record.resultReturnedDate && (
+              {onReturnResult && displayStatus === RecordStatus.HANDOVER && !record.resultReturnedDate && (
                   <button onClick={(e) => { e.stopPropagation(); onReturnResult(record); }} className="p-1 text-emerald-700 hover:bg-emerald-100 rounded transition-colors border border-emerald-200 bg-emerald-50" title="Trả kết quả">
                       <FileCheck size={15} />
                   </button>
               )}
 
-              {/* NÚT CHUYỂN BƯỚC / CHUYỂN VỀ GIAO VIỆC / XÁC NHẬN NỘP THUẾ */}
-              {!isReturned && (() => {
-                const isCG = isCapGiayRecord(record);
-                const isRejectedOnly = record.status === RecordStatus.REJECTED || displayStatus === RecordStatus.REJECTED || record.capGiaySubStep === 'cho_bo_sung';
-                const isTaxWaiting = isCG && (record.capGiaySubStep === 'cho_nop_thue' || record.capGiaySubStep === 'cho_giay_nop_tien');
-                
-                if (isRejectedOnly) {
-                  return (
-                    <button 
-                      onClick={(e) => { e.stopPropagation(); onAdvanceStatus(record); }} 
-                      className="p-1 text-amber-700 hover:bg-amber-100 rounded transition-colors border border-amber-300 bg-amber-50 font-bold" 
-                      title="Chuyển về bước Chờ giao việc (Phân công lại/Gợi ý người thụ lý cũ)"
-                    >
-                      <ArrowRight size={15} />
-                    </button>
-                  );
-                }
-
-                if (isTaxWaiting) {
-                  return (
-                    <button 
-                      onClick={(e) => { e.stopPropagation(); onAdvanceStatus(record); }} 
-                      className="p-1 text-purple-700 hover:bg-purple-100 rounded transition-colors border border-purple-300 bg-purple-50 font-bold" 
-                      title="Xác nhận nộp thuế → Trả về bước Chờ giao việc (Chờ phân công người in)"
-                    >
-                      <ArrowRight size={15} />
-                    </button>
-                  );
-                }
-
-                if (displayStatus !== RecordStatus.HANDOVER && displayStatus !== RecordStatus.WITHDRAWN && record.status !== RecordStatus.HANDOVER && record.status !== RecordStatus.WITHDRAWN && !record.resultReturnedDate) {
-                  return (
-                    <button 
-                      onClick={(e) => { e.stopPropagation(); onAdvanceStatus(record); }} 
-                      className="p-1 text-green-700 hover:bg-green-100 rounded transition-colors border border-green-200 bg-green-50" 
-                      title="Chuyển bước"
-                    >
-                      <ArrowRight size={15} />
-                    </button>
-                  );
-                }
-
-                return null;
-              })()}
+              {displayStatus !== RecordStatus.HANDOVER && displayStatus !== RecordStatus.WITHDRAWN && displayStatus !== RecordStatus.REJECTED && !record.resultReturnedDate && currentUser?.role !== 'ONEDOOR' && (
+                <button onClick={() => onAdvanceStatus(record)} className="p-1 text-green-700 hover:bg-green-100 rounded transition-colors border border-green-200 bg-green-50" title="Chuyển bước"><ArrowRight size={15} /></button>
+              )}
             </div>
 
             {/* Hàng dưới: Sửa & Xóa */}
@@ -403,7 +334,7 @@ const RecordRow: React.FC<RecordRowProps> = ({
               {currentUser?.role !== 'ONEDOOR' && currentUser?.role !== UserRole.ONEDOOR && (
                 <button onClick={() => onEdit(record)} className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors border border-blue-200 bg-blue-50/50" title="Sửa"><Pencil size={15} /></button>
               )}
-              {(currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.SUBADMIN || currentUser?.role === UserRole.TEAM_LEADER) && !isReturned && (
+              {(currentUser?.role === 'ADMIN' || currentUser?.role === 'SUBADMIN') && (
                   <button onClick={() => onDelete(record)} className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors border border-red-200 bg-red-50/50" title="Xóa"><Trash2 size={15} /></button>
               )}
             </div>

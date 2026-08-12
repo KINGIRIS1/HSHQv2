@@ -27,34 +27,39 @@ export const migrateCungCapTaiLieu = async () => {
     // Reverse migration: move 'Cung cấp tài liệu đất đai' from archive_records to land_records
     if (!isConfigured) return;
     try {
-        const timeoutPromise = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('Migration Timeout')), 5000)
-        );
-
-        const fetchPromise = supabase
+        const { data: archiveData, error: fetchError } = await supabase
             .from('archive_records')
             .select('*')
             .eq('type', 'saoluc');
-
-        const res: any = await Promise.race([fetchPromise, timeoutPromise]);
-        const { data: archiveData, error: fetchError } = res || {};
             
-        if (fetchError || !archiveData || archiveData.length === 0) return;
+        if (fetchError) {
+            if (
+                fetchError.code === 'PGRST205' || 
+                fetchError.code === '42P01' || 
+                fetchError.message?.includes('archive_records') ||
+                fetchError.message?.includes('schema cache')
+            ) {
+                console.info('ℹ️ Bảng "archive_records" chưa tồn tại trên Supabase. Bỏ qua reverse migration.');
+                return;
+            }
+            throw fetchError;
+        }
+        if (!archiveData || archiveData.length === 0) return;
 
         // Di chuyển toàn bộ các hồ sơ Sao Lục cũ, chuyển đổi sang loại 'Cung cấp tài liệu đất đai' chuẩn
         const cungCapRecords = archiveData;
         console.log(`Found ${cungCapRecords.length} records to reverse migrate.`);
 
-        const landRecordsToInsert = cungCapRecords.map((r: any) => {
+        const landRecordsToInsert = cungCapRecords.map(r => {
             const rData = r.data || {};
             const { xa_phuong, to_ban_do, thua_dat, hen_tra, ...originalData } = rData;
             
             // Đồng bộ chuyển đổi trạng thái bản ghi tương thích
             let status = 'RECEIVED';
             if (r.status === 'assigned') status = 'ASSIGNED';
-            else if (r.status === 'executed') status = 'IN_PROGRESS';
+            else if (r.status === 'executed') status = 'COMPLETED_WORK';
             else if (r.status === 'pending_check') status = 'PENDING_CHECK';
-            else if (r.status === 'checked') status = 'PENDING_CHECK';
+            else if (r.status === 'checked') status = 'CHECKED';
             else if (r.status === 'pending_sign') status = 'PENDING_SIGN';
             else if (r.status === 'signed') status = 'SIGNED';
             else if (r.status === 'completed') status = 'RETURNED';
@@ -101,31 +106,50 @@ export const migrateCungCapTaiLieu = async () => {
             return safeData;
         });
 
-        // Insert into luutru_records using upsert to avoid conflicts on duplicate IDs
+        // Insert into land_records using upsert to avoid conflicts on duplicate IDs
         const { error: insertError } = await supabase
-            .from('luutru_records')
+            .from('land_records')
             .upsert(landRecordsToInsert);
             
         if (insertError) throw insertError;
 
-        const idsToDelete = cungCapRecords.map((r: any) => r.id);
+        const idsToDelete = cungCapRecords.map(r => r.id);
         const { error: deleteError } = await supabase
             .from('archive_records')
             .delete()
             .in('id', idsToDelete);
             
-        if (deleteError) throw deleteError;
+        if (deleteError) {
+            if (
+                deleteError.code === 'PGRST205' || 
+                deleteError.code === '42P01' || 
+                deleteError.message?.includes('archive_records') ||
+                deleteError.message?.includes('schema cache')
+            ) {
+                console.info('ℹ️ Bảng "archive_records" không tồn tại khi xóa dữ liệu đã di chuyển.');
+                return;
+            }
+            throw deleteError;
+        }
 
         console.log('Reverse migration completed successfully.');
     } catch (error: any) {
-        console.warn('Reverse migration skipped or failed:', error?.message || error);
+        if (
+            error?.code === 'PGRST205' || 
+            error?.code === '42P01' || 
+            error?.message?.includes('archive_records') ||
+            error?.message?.includes('schema cache')
+        ) {
+            console.info('ℹ️ Bảng "archive_records" chưa có trên Supabase. Bỏ qua reverse migration.');
+            return;
+        }
+        console.error('Reverse migration failed:', error);
     }
 };
 
 export const fetchArchiveRecords = async (type: 'saoluc' | 'vaoso' | 'congvan'): Promise<ArchiveRecord[]> => {
     if (!isConfigured) {
         const cached = getFromCache<ArchiveRecord[]>(CACHE_KEY_ARCHIVE, []);
-        // Nếu cache rỗng và chưa có mock in-mem, dùng mảng rỗng. Nếu mock có data thì dùng mock (để sync trong session)
         if (MOCK_ARCHIVE.length === 0 && cached.length > 0) MOCK_ARCHIVE = cached;
         return MOCK_ARCHIVE.filter(r => r.type === type);
     }
@@ -143,7 +167,20 @@ export const fetchArchiveRecords = async (type: 'saoluc' | 'vaoso' | 'congvan'):
                 .order('created_at', { ascending: false })
                 .range(page * pageSize, (page + 1) * pageSize - 1);
 
-            if (error) throw error;
+            if (error) {
+                if (
+                    error.code === 'PGRST205' || 
+                    error.code === '42P01' || 
+                    error.message?.includes('archive_records') ||
+                    error.message?.includes('schema cache')
+                ) {
+                    console.warn(`⚠️ Bảng 'archive_records' chưa có trên Supabase. Dùng bộ nhớ đệm local.`);
+                    const cached = getFromCache<ArchiveRecord[]>(CACHE_KEY_ARCHIVE, []);
+                    if (MOCK_ARCHIVE.length === 0 && cached.length > 0) MOCK_ARCHIVE = cached;
+                    return MOCK_ARCHIVE.filter(r => r.type === type);
+                }
+                throw error;
+            }
             
             if (data && data.length > 0) {
                 allData = [...allData, ...data as ArchiveRecord[]];
@@ -154,8 +191,20 @@ export const fetchArchiveRecords = async (type: 'saoluc' | 'vaoso' | 'congvan'):
             }
         }
         return allData;
-    } catch (error) {
+    } catch (error: any) {
+        if (
+            error?.code === 'PGRST205' || 
+            error?.code === '42P01' || 
+            error?.message?.includes('archive_records') ||
+            error?.message?.includes('schema cache')
+        ) {
+            const cached = getFromCache<ArchiveRecord[]>(CACHE_KEY_ARCHIVE, []);
+            if (MOCK_ARCHIVE.length === 0 && cached.length > 0) MOCK_ARCHIVE = cached;
+            return MOCK_ARCHIVE.filter(r => r.type === type);
+        }
         logError(`fetchArchiveRecords-${type}`, error, true);
+        const cached = getFromCache<ArchiveRecord[]>(CACHE_KEY_ARCHIVE, []);
+        if (MOCK_ARCHIVE.length === 0 && cached.length > 0) MOCK_ARCHIVE = cached;
         return MOCK_ARCHIVE.filter(r => r.type === type);
     }
 };
@@ -254,11 +303,27 @@ export const deleteArchiveRecord = async (id: string): Promise<boolean> => {
     }
     try {
         const { error } = await supabase.from('archive_records').delete().eq('id', id);
-        if (error) throw error;
+        if (error) {
+            if (
+                error.code === 'PGRST205' || 
+                error.code === '42P01' || 
+                error.message?.includes('archive_records') ||
+                error.message?.includes('schema cache')
+            ) {
+                const idx = MOCK_ARCHIVE.findIndex(r => r.id === id);
+                if (idx !== -1) MOCK_ARCHIVE.splice(idx, 1);
+                saveToCache(CACHE_KEY_ARCHIVE, MOCK_ARCHIVE);
+                return true;
+            }
+            throw error;
+        }
         return true;
     } catch (error) {
-        logError("deleteArchiveRecord", error);
-        return false;
+        logError("deleteArchiveRecord", error, true);
+        const idx = MOCK_ARCHIVE.findIndex(r => r.id === id);
+        if (idx !== -1) MOCK_ARCHIVE.splice(idx, 1);
+        saveToCache(CACHE_KEY_ARCHIVE, MOCK_ARCHIVE);
+        return true;
     }
 };
 
@@ -285,10 +350,22 @@ export const importArchiveRecords = async (records: Partial<ArchiveRecord>[]): P
         });
 
         const { error } = await supabase.from('archive_records').insert(payload);
-        if (error) throw error;
+        if (error) {
+            if (
+                error.code === 'PGRST205' || 
+                error.code === '42P01' || 
+                error.message?.includes('archive_records') ||
+                error.message?.includes('schema cache')
+            ) {
+                payload.forEach(newRec => MOCK_ARCHIVE.unshift(newRec as ArchiveRecord));
+                saveToCache(CACHE_KEY_ARCHIVE, MOCK_ARCHIVE);
+                return true;
+            }
+            throw error;
+        }
         return true;
     } catch (error) {
-        logError("importArchiveRecords", error);
+        logError("importArchiveRecords", error, true);
         return false;
     }
 };
@@ -307,22 +384,30 @@ export const updateArchiveRecordsBatch = async (ids: string[], updates: Partial<
         return true;
     }
     try {
-        // Lưu ý: data field trong supabase update sẽ replace toàn bộ jsonb nếu không dùng jsonb_set.
-        // Tuy nhiên, ở đây ta giả định updates.data chứa các trường cần merge, nhưng Supabase JS client update jsonb là replace.
-        // Để merge, ta cần logic phức tạp hơn hoặc fetch về rồi update.
-        // Nhưng với yêu cầu "Chuyển Scan", ta chỉ update thêm trường vào data.
-        // Cách đơn giản: Dùng RPC hoặc chấp nhận fetch-update nếu số lượng ít.
-        // Hoặc: update từng dòng (chậm nhưng an toàn cho JSON merge).
-        
-        // Cách tối ưu hơn cho Supabase: Update các trường thường, còn JSON thì...
-        // Tạm thời loop update để đảm bảo merge JSON đúng (an toàn nhất mà không cần store procedure)
-        
         const { data: currentRecords, error: fetchError } = await supabase
             .from('archive_records')
             .select('id, data')
             .in('id', ids);
             
-        if (fetchError) throw fetchError;
+        if (fetchError) {
+            if (
+                fetchError.code === 'PGRST205' || 
+                fetchError.code === '42P01' || 
+                fetchError.message?.includes('archive_records') ||
+                fetchError.message?.includes('schema cache')
+            ) {
+                MOCK_ARCHIVE = MOCK_ARCHIVE.map(r => {
+                    if (ids.includes(r.id)) {
+                        const newData = updates.data ? { ...r.data, ...updates.data } : r.data;
+                        return { ...r, ...updates, data: newData } as ArchiveRecord;
+                    }
+                    return r;
+                });
+                saveToCache(CACHE_KEY_ARCHIVE, MOCK_ARCHIVE);
+                return true;
+            }
+            throw fetchError;
+        }
 
         const promises = currentRecords.map(r => {
             let mergedData = { ...r.data, ...(updates.data || {}) };
@@ -341,7 +426,7 @@ export const updateArchiveRecordsBatch = async (ids: string[], updates: Partial<
         await Promise.all(promises);
         return true;
     } catch (error) {
-        logError("updateArchiveRecordsBatch", error);
+        logError("updateArchiveRecordsBatch", error, true);
         return false;
     }
 };
@@ -364,7 +449,17 @@ export const fetchListsByDate = async (type: 'saoluc' | 'congvan', date: string)
             .eq('type', type)
             .contains('data', { ngay_hoan_thanh: date });
 
-        if (error) throw error;
+        if (error) {
+            if (
+                error.code === 'PGRST205' || 
+                error.code === '42P01' || 
+                error.message?.includes('archive_records') ||
+                error.message?.includes('schema cache')
+            ) {
+                return [];
+            }
+            throw error;
+        }
 
         const lists = new Set<string>();
         data?.forEach((r: any) => {
@@ -375,7 +470,7 @@ export const fetchListsByDate = async (type: 'saoluc' | 'congvan', date: string)
         
         return Array.from(lists).sort();
     } catch (error) {
-        logError(`fetchListsByDate-${type}`, error);
+        logError(`fetchListsByDate-${type}`, error, true);
         return [];
     }
 };

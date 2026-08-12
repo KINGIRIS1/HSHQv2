@@ -9,7 +9,6 @@ import TemplateConfigModal from './TemplateConfigModal';
 import DocxPreviewModal from './DocxPreviewModal';
 import GetContractNumberModal from './GetContractNumberModal';
 import { confirmAction, removeVietnameseTones } from '../utils/appHelpers';
-import { getRecordPlotCount } from '../constants';
 import saveAs from 'file-saver'; // Import saveAs
 
 // Child Components
@@ -113,12 +112,12 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
               let targetContractType = existingContract.contractType;
               if (recType.includes('2.4') || recType.includes('cắm mốc')) {
                   targetContractType = 'Cắm mốc';
-              } else if (recType.includes('2.1') || (recType.includes('trích lục') && !recType.includes('trích đo'))) {
+              } else if (recType.includes('2.3') || recType.includes('đo đạc') || recType.includes('trích đo')) {
+                  targetContractType = 'Đo đạc';
+              } else if (recType.includes('2.1') || recType.includes('2.2') || recType.includes('trích lục')) {
                   targetContractType = 'Trích lục';
               } else if (recType.includes('2.5') || recType.includes('tách thửa')) {
                   targetContractType = 'Tách thửa';
-              } else {
-                  targetContractType = 'Đo đạc';
               }
 
               setEditingContract({
@@ -153,7 +152,7 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
                       // Cố gắng map chính xác tên dịch vụ trong bảng giá
                       const match = priceList.find(p => p.serviceName.toLowerCase().includes('cắm mốc'));
                       serviceType = match ? match.serviceName : 'Cắm mốc ranh giới';
-                  } else if (recType.includes('2.1') || (recType.includes('trích lục') && !recType.includes('trích đo'))) {
+                  } else if (recType.includes('2.1') || recType.includes('2.2') || recType.includes('trích lục')) {
                       contractType = 'Trích lục';
                       const match = priceList.find(p => p.serviceName.toLowerCase().includes('trích lục'));
                       serviceType = match ? match.serviceName : 'Trích lục bản đồ địa chính';
@@ -194,7 +193,7 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
                       serviceType: serviceType, 
                       areaType: areaType,       
                       
-                      plotCount: getRecordPlotCount(record),
+                      plotCount: 1,
                       markerCount: 1,
                       quantity: 1, 
                       unitPrice: 0, // Form sẽ tự tính lại dựa trên serviceType
@@ -298,7 +297,7 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
                   contractType: contractType,
                   serviceType: serviceType, 
                   areaType: areaType,       
-                  plotCount: getRecordPlotCount(record),
+                  plotCount: 1,
                   markerCount: 1,
                   quantity: 1, 
                   unitPrice: 0, 
@@ -655,52 +654,56 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col h-full animate-fade-in-up overflow-hidden">
       
       {/* HEADER WITH TABS */}
-      <div className="px-3 py-1 md:px-4 md:py-1 border-b border-gray-100 flex flex-wrap sm:flex-nowrap justify-between items-center gap-2 bg-purple-50/50 shrink-0 z-10 relative">
+      <div className="p-0 border-b border-gray-100 flex flex-col bg-purple-50/50 shrink-0 z-10 relative">
+        <div className="flex justify-between items-center p-4">
+            <div><h2 className="text-xl font-bold text-gray-800 flex items-center gap-2"><FileSignature className="text-purple-600" /> Quản Lý Hợp Đồng</h2></div>
+            
+            <div className="flex gap-2">
+                {activeModule !== 'liquidation' && (
+                    <button onClick={() => setIsGetContractNumberOpen(true)} className="p-2 bg-white border border-gray-200 text-purple-600 hover:text-purple-700 hover:bg-purple-50 rounded-lg transition-colors shadow-sm" title="Lấy số Hợp đồng Tự động">
+                        <Hash size={20} />
+                    </button>
+                )}
+                <button onClick={() => setIsPriceConfigOpen(true)} className="p-2 bg-white border border-gray-200 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors shadow-sm" title="Cấu hình Bảng giá Dịch vụ">
+                    <Settings2 size={20} />
+                </button>
+                <button onClick={() => setIsTemplateModalOpen(true)} className="p-2 bg-white border border-gray-200 text-gray-600 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors shadow-sm" title="Cấu hình Mẫu in Hợp đồng">
+                    <Settings size={20} />
+                </button>
+            </div>
+        </div>
+
         {/* MAIN TABS */}
-        <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+        <div className="flex px-4 gap-2 overflow-x-auto">
             <button 
                 onClick={() => { setActiveModule('contract'); setEditingContract(undefined); }}
-                className={`px-3.5 sm:px-5 py-2 rounded-lg font-bold text-xs sm:text-sm transition-all border whitespace-nowrap flex items-center gap-1.5 ${activeModule === 'contract' ? 'bg-purple-600 text-white border-purple-600 shadow-sm' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}
+                className={`px-6 py-2.5 rounded-t-lg font-bold text-sm transition-all border-t border-l border-r whitespace-nowrap ${activeModule === 'contract' ? 'bg-white text-purple-700 border-gray-200 relative top-[1px]' : 'bg-gray-100 text-gray-500 border-transparent hover:bg-gray-200'}`}
             >
-                <FileText size={16} /> Lập Hợp Đồng
+                <FileText size={16} className="inline mr-2" /> Lập Hợp Đồng
             </button>
             <button 
                 onClick={() => { setActiveModule('liquidation'); setEditingContract(undefined); }}
-                className={`px-3.5 sm:px-5 py-2 rounded-lg font-bold text-xs sm:text-sm transition-all border whitespace-nowrap flex items-center gap-1.5 ${activeModule === 'liquidation' ? 'bg-orange-600 text-white border-orange-600 shadow-sm' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}
+                className={`px-6 py-2.5 rounded-t-lg font-bold text-sm transition-all border-t border-l border-r whitespace-nowrap ${activeModule === 'liquidation' ? 'bg-white text-green-700 border-gray-200 relative top-[1px]' : 'bg-gray-100 text-gray-500 border-transparent hover:bg-gray-200'}`}
             >
-                <FileCheck size={16} /> Thanh Lý Hợp Đồng
+                <FileCheck size={16} className="inline mr-2" /> Thanh Lý Hợp Đồng
             </button>
             <button 
                 onClick={() => { setActiveModule('list'); }}
-                className={`px-3.5 sm:px-5 py-2 rounded-lg font-bold text-xs sm:text-sm transition-all border whitespace-nowrap flex items-center gap-1.5 ${activeModule === 'list' ? 'bg-purple-600 text-white border-purple-600 shadow-sm' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}
+                className={`px-6 py-2.5 rounded-t-lg font-bold text-sm transition-all border-t border-l border-r whitespace-nowrap ${activeModule === 'list' ? 'bg-white text-blue-700 border-gray-200 relative top-[1px]' : 'bg-gray-100 text-gray-500 border-transparent hover:bg-gray-200'}`}
             >
-                <LayoutList size={16} /> Danh sách Hợp đồng
+                <LayoutList size={16} className="inline mr-2" /> Danh sách Hợp đồng
             </button>
             <button 
                 onClick={() => { setActiveModule('liquidation_list'); }}
-                className={`px-3.5 sm:px-5 py-2 rounded-lg font-bold text-xs sm:text-sm transition-all border whitespace-nowrap flex items-center gap-1.5 ${activeModule === 'liquidation_list' ? 'bg-orange-600 text-white border-orange-600 shadow-sm' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}
+                className={`px-6 py-2.5 rounded-t-lg font-bold text-sm transition-all border-t border-l border-r whitespace-nowrap ${activeModule === 'liquidation_list' ? 'bg-white text-orange-700 border-gray-200 relative top-[1px]' : 'bg-gray-100 text-gray-500 border-transparent hover:bg-gray-200'}`}
             >
-                <ClipboardList size={16} /> Danh sách Thanh lý
-            </button>
-        </div>
-
-        <div className="flex items-center gap-2 shrink-0">
-            {activeModule !== 'liquidation' && (
-                <button onClick={() => setIsGetContractNumberOpen(true)} className="p-2 bg-white border border-gray-200 text-purple-600 hover:text-purple-700 hover:bg-purple-50 rounded-lg transition-colors shadow-sm" title="Lấy số Hợp đồng Tự động">
-                    <Hash size={20} />
-                </button>
-            )}
-            <button onClick={() => setIsPriceConfigOpen(true)} className="p-2 bg-white border border-gray-200 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors shadow-sm" title="Cấu hình Bảng giá Dịch vụ">
-                <Settings2 size={20} />
-            </button>
-            <button onClick={() => setIsTemplateModalOpen(true)} className="p-2 bg-white border border-gray-200 text-gray-600 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors shadow-sm" title="Cấu hình Mẫu in Hợp đồng">
-                <Settings size={20} />
+                <ClipboardList size={16} className="inline mr-2" /> Danh sách Thanh lý
             </button>
         </div>
       </div>
 
       <div className="flex-1 overflow-hidden flex flex-col">
-        <div className="flex-1 overflow-y-auto px-2.5 pt-1.5 pb-0 md:px-3.5 md:pt-2 bg-gray-50">
+        <div className="flex-1 overflow-y-auto p-6 bg-gray-50">
             {activeModule === 'contract' && (
                 <ContractForm 
                     initialData={editingContract}

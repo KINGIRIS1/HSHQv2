@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { RecordFile, Employee, User, UserRole, SplitItem, RecordStatus } from '../../types';
-import { getNormalizedWard, getShortRecordType, isCapGiayRecord } from '../../constants';
+import { getNormalizedWard, getShortRecordType } from '../../constants';
 import StatusBadge from '../StatusBadge';
 import { 
   X, MapPin, FileText, User as UserIcon, Receipt, DollarSign, 
@@ -15,8 +15,7 @@ import DocxPreviewModal from '../DocxPreviewModal';
 import { updateRecordApi, fetchContracts } from '../../services/api';
 import SystemReceiptTemplate from '../receive-record/SystemReceiptTemplate';
 import SystemAnnexTemplate from '../receive-record/SystemAnnexTemplate';
-import { getBatchDisplayParts } from '../../utils/appHelpers';
-import { RecordTimelineProgress } from '../RecordTimelineProgress';
+import { cleanSyncNotes } from '../../utils/appHelpers';
 
 interface MobileDetailModalProps {
   isOpen: boolean;
@@ -411,24 +410,23 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
 
   // LOGIC CHECK NẾU ĐÃ THỰC HIỆN XONG (Để hiển thị bước "Đã thực hiện")
   const isWorkDone = [
-    RecordStatus.IN_PROGRESS, RecordStatus.PENDING_CHECK, RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, 
     RecordStatus.HANDOVER, RecordStatus.RETURNED
   ].includes(record.status) || !!record.completedWorkDate;
   
   const isPendingCheckActive = [
-      RecordStatus.PENDING_CHECK, RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER, RecordStatus.RETURNED
+      RecordStatus.HANDOVER, RecordStatus.RETURNED
   ].includes(record.status) || !!record.pendingCheckDate;
 
   const isCheckedActive = [
-      RecordStatus.PENDING_CHECK, RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER, RecordStatus.RETURNED
+      RecordStatus.HANDOVER, RecordStatus.RETURNED
   ].includes(record.status) || !!record.checkedDate;
 
   const isPendingSignActive = [
-      RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER, RecordStatus.RETURNED
+      RecordStatus.HANDOVER, RecordStatus.RETURNED
   ].includes(record.status) || !!record.submissionDate;
 
   const isSignedActive = [
-      RecordStatus.SIGNED, RecordStatus.HANDOVER, RecordStatus.RETURNED
+      RecordStatus.HANDOVER, RecordStatus.RETURNED
   ].includes(record.status) || !!record.approvalDate;
 
   const recordTypeLower = (record?.recordType || '').toLowerCase();
@@ -455,7 +453,7 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                   <Pencil size={20} />
                 </button>
               )}
-              {canPerformAction && onDelete && (currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.SUBADMIN || currentUser?.role === UserRole.TEAM_LEADER) && (
+              {canPerformAction && onDelete && (currentUser?.role === 'ADMIN' || currentUser?.role === 'SUBADMIN') && (
                 <button onClick={() => { onClose(); onDelete(record); }} className="p-2 text-slate-500 hover:text-red-600 active:bg-slate-100 rounded-xl transition-colors cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center">
                   <Trash2 size={20} />
                 </button>
@@ -574,13 +572,13 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                 </div>
                 
                 {/* Số trích đo & trích lục */}
-                {!isCapGiayRecord(record) && recordTypeLower.includes('trích đo') && (
+                {recordTypeLower.includes('trích đo') && (
                   <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
                     <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">Số trích đo</p>
                     <p className="text-sm font-bold text-slate-800">{record.measurementNumber || '---'}</p>
                   </div>
                 )}
-                {!isCapGiayRecord(record) && recordTypeLower.includes('trích lục') && (
+                {recordTypeLower.includes('trích lục') && (
                   <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
                     <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">Số trích lục</p>
                     <p className="text-sm font-bold text-slate-800">{record.excerptNumber || '---'}</p>
@@ -617,10 +615,10 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                   </div>
                   <span className="text-sm font-bold text-green-800">
                     {record.returnedPrice !== undefined && record.returnedPrice !== null
-                      ? record.returnedPrice.toLocaleString('vi-VN')
+                      ? record.returnedPrice.toLocaleString('vi-VN') + ' đ'
                       : (record.recordType === 'Cung cấp tài liệu đất đai'
-                          ? (record.price ? record.price.toLocaleString('vi-VN') : '310.000')
-                          : (contractPrice !== null ? contractPrice.toLocaleString('vi-VN') : '---'))}
+                          ? (record.price ? record.price.toLocaleString('vi-VN') + ' đ' : '310.000 đ')
+                          : (contractPrice !== null ? contractPrice.toLocaleString('vi-VN') + ' đ' : '---'))}
                   </span>
                 </div>
                 {liquidationInfo && (
@@ -629,12 +627,12 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                       <Calculator size={16} className="text-orange-600" />
                       <span className="text-xs font-bold text-orange-700">{liquidationInfo.content}</span>
                     </div>
-                    <span className="text-sm font-bold text-orange-800">{liquidationInfo.amount.toLocaleString('vi-VN')}</span>
+                    <span className="text-sm font-bold text-orange-800">{liquidationInfo.amount.toLocaleString('vi-VN')} đ</span>
                   </div>
                 )}
 
                 {/* LIÊN KẾT HỢP ĐỒNG */}
-                {record && record.recordType && (getShortRecordType(record.recordType).startsWith('2.2') || getShortRecordType(record.recordType).startsWith('2.4')) && (
+                {record && record.recordType && (getShortRecordType(record.recordType).startsWith('2.3') || getShortRecordType(record.recordType).startsWith('2.4')) && (
                   <div className="pt-3 border-t border-dashed border-slate-100">
                     {matchedContract ? (
                       <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3 flex flex-col gap-2.5">
@@ -729,18 +727,91 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
 
         {activeTab === 'timeline' && (
           <div className="p-4 space-y-4">
-            <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 space-y-4">
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+              <div className="flex flex-col items-center text-center mb-8 pb-6 border-b border-slate-50">
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">Hạn trả kết quả</p>
+                <p className="text-3xl font-black text-slate-800">{formatDate(record.deadline)}</p>
+                <div className="mt-3 flex items-center gap-2 text-[10px] font-bold text-slate-500 bg-slate-50 px-3 py-1 rounded-full">
+                  <Calendar size={12} /> Ngày nhận: {formatDate(record.receivedDate)}
+                </div>
 
 
-              <RecordTimelineProgress 
-                record={record}
-                employees={employees}
-                users={users}
-                formatDate={formatDate}
-              />
+              </div>
 
+              <div className="space-y-0">
+                <TimelineItem 
+                  date={record.receivedDate} 
+                  label="TIẾP NHẬN MỚI" 
+                  icon={UserIcon}
+                  colorClass={{text: 'text-emerald-600', border: 'border-emerald-600', bg: 'bg-emerald-600'}}
+                  subText={record.receivedBy ? (() => {
+                      const receiver = users.find(u => u.employeeId === record.receivedBy);
+                      if (!receiver) return undefined;
+                      const emp = employees.find(e => e.id === receiver.employeeId);
+                      return `${receiver.name} (${emp?.position || 'Nhân viên'})`;
+                  })() : undefined}
+                />
+                <TimelineItem 
+                  date={record.assignedDate || record.completedWorkDate} 
+                  forceActive={isWorkDone || !!record.assignedDate}
+                  label="ĐANG THỰC HIỆN" 
+                  icon={UserIcon}
+                  colorClass={{text: 'text-blue-600', border: 'border-blue-600', bg: 'bg-blue-600'}}
+                  subText={record.assignedTo ? (() => {
+                      const emp = employees.find(e => e.id === record.assignedTo);
+                      if (!emp) return undefined;
+                      return `${emp.name} (${emp.department})`;
+                  })() : undefined}
+                />
 
+                {/* Ẩn mốc kiểm tra cho một số loại hồ sơ */}
+                {!(record.recordType === 'Cung cấp tài liệu đất đai' || record.recordType === 'Sao lục' || record.recordType === 'Công văn') && (
+                  <TimelineItem 
+                    date={record.pendingCheckDate || record.checkedDate} 
+                    forceActive={isPendingCheckActive || isCheckedActive}
+                    label="TRÌNH KIỂM TRA" 
+                    icon={Send}
+                    colorClass={{text: 'text-orange-600', border: 'border-orange-600', bg: 'bg-orange-600'}}
+                    subText={record.checkedBy ? (() => {
+                        const checker = employees.find(e => e.id === record.checkedBy);
+                        if (!checker) return undefined;
+                        return `${checker.name} (${checker?.position || 'Người kiểm tra'})`;
+                    })() : undefined}
+                  />
+                )}
+
+                <TimelineItem 
+                  date={record.submissionDate || record.approvalDate} 
+                  forceActive={isPendingSignActive || isSignedActive}
+                  label="TRÌNH KÝ DUYỆT" 
+                  icon={Send}
+                  colorClass={{text: 'text-purple-600', border: 'border-purple-600', bg: 'bg-purple-600'}}
+                  subText={record.submittedTo ? (() => {
+                      const director = users.find(u => u.employeeId === record.submittedTo);
+                      if (!director) return undefined;
+                      const emp = employees.find(e => e.id === director.employeeId);
+                      return `${director.name} (${emp?.position || (director.role === UserRole.ADMIN ? 'Giám đốc' : 'Phó giám đốc')})`;
+                  })() : undefined}
+                />
+
+                <TimelineItem 
+                  date={record.completedDate} 
+                  label={record.status === RecordStatus.REJECTED ? "TRẢ HỒ SƠ" : record.status === RecordStatus.WITHDRAWN ? "CSD RÚT HỒ SƠ" : "HOÀN THÀNH"} 
+                  icon={CheckSquare}
+                  isLast={false}
+                  colorClass={{text: record.status === RecordStatus.REJECTED ? 'text-red-700' : 'text-green-700', border: record.status === RecordStatus.REJECTED ? 'border-red-600' : 'border-green-600', bg: record.status === RecordStatus.REJECTED ? 'bg-red-600' : 'bg-green-600'}}
+                />
+
+                <TimelineItem 
+                  date={record.resultReturnedDate} 
+                  label="TRẢ KẾT QUẢ" 
+                  icon={FileCheck}
+                  isLast={true}
+                  colorClass={{text: 'text-emerald-600', border: 'border-emerald-600', bg: 'bg-emerald-600'}}
+                />
+              </div>
             </div>
+
           </div>
         )}
 
@@ -752,18 +823,18 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                 <FileText size={16} /> Nội dung chi tiết (Trích yếu)
               </h3>
               <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-slate-800 text-sm font-semibold leading-relaxed whitespace-pre-line">
-                {record.content || 'Không có nội dung chi tiết.'}
+                {cleanSyncNotes(record.content) || 'Không có nội dung chi tiết.'}
               </div>
             </div>
 
             {/* Ghi chú hồ sơ */}
-            {record.notes && (
+            {cleanSyncNotes(record.notes) && (
               <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 space-y-3">
                 <h3 className="text-xs font-bold text-blue-600 uppercase flex items-center gap-2">
                   <StickyNote size={16} /> Ghi chú hồ sơ
                 </h3>
                 <div className="bg-blue-50/40 p-4 rounded-xl border border-blue-100 text-slate-800 text-sm font-medium leading-relaxed whitespace-pre-line">
-                  {record.notes}
+                  {cleanSyncNotes(record.notes)}
                 </div>
               </div>
             )}

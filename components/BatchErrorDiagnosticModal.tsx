@@ -128,7 +128,7 @@ export const BatchErrorDiagnosticModal: React.FC<BatchErrorDiagnosticModalProps>
 
       // MẢNG 3: Kiểm tra & Trình ký
       if (
-        (r.status === RecordStatus.PENDING_CHECK ||
+        (r.status === RecordStatus.CHECKED ||
           r.status === RecordStatus.PENDING_SIGN ||
           r.status === RecordStatus.SIGNED) &&
         (!r.checkedBy || !r.checkedBy.trim())
@@ -146,7 +146,7 @@ export const BatchErrorDiagnosticModal: React.FC<BatchErrorDiagnosticModalProps>
       }
 
       if (
-        (r.status === RecordStatus.PENDING_CHECK ||
+        (r.status === RecordStatus.CHECKED ||
           r.status === RecordStatus.PENDING_SIGN) &&
         !r.pendingCheckDate &&
         !r.checkedDate
@@ -164,7 +164,7 @@ export const BatchErrorDiagnosticModal: React.FC<BatchErrorDiagnosticModalProps>
       }
 
       if (
-        (r.status === RecordStatus.IN_PROGRESS ||
+        (r.status === RecordStatus.COMPLETED_WORK ||
           r.status === RecordStatus.PENDING_CHECK) &&
         !r.completedWorkDate
       ) {
@@ -198,7 +198,8 @@ export const BatchErrorDiagnosticModal: React.FC<BatchErrorDiagnosticModalProps>
       // MẢNG 4: Phân công & Nhân sự
       if (
         (r.status === RecordStatus.ASSIGNED ||
-          r.status === RecordStatus.IN_PROGRESS) &&
+          r.status === RecordStatus.IN_PROGRESS ||
+          r.status === RecordStatus.COMPLETED_WORK) &&
         (!r.assignedTo || !r.assignedTo.trim())
       ) {
         errors.push({
@@ -215,12 +216,7 @@ export const BatchErrorDiagnosticModal: React.FC<BatchErrorDiagnosticModalProps>
       if (
         r.assignedTo &&
         employees.length > 0 &&
-        !employees.some((e) => {
-          const normalizeName = (str: string) => str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().replace(/\s+/g, ' ');
-          const empNorm = normalizeName(e.name);
-          const rNorm = normalizeName(r.assignedTo!);
-          return e.name === r.assignedTo || e.id === r.assignedTo || (e as any).employeeId === r.assignedTo || empNorm === rNorm || (rNorm.length >= 3 && empNorm.includes(rNorm));
-        })
+        !employees.some((e) => e.name === r.assignedTo || e.id === r.assignedTo)
       ) {
         errors.push({
           code: 'ERR_UNKNOWN_EMPLOYEE',

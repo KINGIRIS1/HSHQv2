@@ -1,19 +1,16 @@
 
 import React, { useState, useEffect } from 'react';
-import { Database, AlertTriangle, Cloud, Loader2, CheckCircle, Save, Globe, Calendar, Plus, Trash2, ShieldAlert, Key, FolderArchive, Upload, Download, RefreshCw, FolderOpen, LayoutDashboard, SlidersHorizontal, Eye, EyeOff, ArrowLeft, ArrowRight, ChevronUp, ChevronDown, Search, RotateCcw, Clock, Sparkles } from 'lucide-react';
+import { Database, AlertTriangle, Cloud, Loader2, CheckCircle, Save, Globe, Calendar, Plus, Trash2, ShieldAlert, Key, FolderArchive, Upload, Download, RefreshCw, FolderOpen, LayoutDashboard, SlidersHorizontal, Eye, EyeOff, ArrowLeft, ArrowRight, ChevronUp, ChevronDown, Search, RotateCcw } from 'lucide-react';
 import { Holiday, UserRole, RolePermissions, DepartmentPermissions, DEFAULT_ROLE_PERMISSIONS, AVAILABLE_PERMISSIONS, Employee } from '../types';
 import { fetchHolidays, saveHolidays, testDatabaseConnection, saveUpdateInfo, fetchUpdateInfo, getSystemSetting, saveSystemSetting } from '../services/api';
-import { APP_VERSION, ARCHIVE_RECORD_TYPES, MEASUREMENT_RECORD_TYPES, CAP_GIAY_RECORD_TYPES, CAP_GIAY_RECORD_TYPE_DESCRIPTIONS } from '../constants';
+import { APP_VERSION } from '../constants';
 import { confirmAction, calculateDeadlineHelper, matchDepartmentKey } from '../utils/appHelpers';
 import { createFullBackupData, downloadBackupAsFile, saveBackupToServer, restoreFullBackupToSupabase } from '../services/backupService';
 import { isConfigured } from '../services/supabaseClient';
 
 const PERMISSION_DEPARTMENTS = [
-  { id: 'Tổ Đo đạc', name: 'Tổ Đo đạc', label: 'Tổ Đo đạc', desc: 'Bộ phận phụ trách đo đạc, chỉnh lý bản đồ và trích đo địa chính' },
   { id: 'Tổ Lưu trữ', name: 'Tổ Lưu trữ', label: 'Tổ Lưu trữ', desc: 'Bộ phận phụ trách lưu trữ, khai thác thông tin đất đai và hồ sơ lưu trữ' },
-  { id: 'Tổ Cấp giấy', name: 'Tổ Cấp giấy', label: 'Tổ Cấp giấy', desc: 'Bộ phận phụ trách tiếp nhận, xử lý và thẩm định hồ sơ đăng ký cấp giấy' },
-  { id: 'Tổ Hành chính', name: 'Tổ Hành chính', label: 'Tổ Hành chính', desc: 'Bộ phận hành chính, tiếp nhận và văn thư' },
-  { id: 'Một cửa', name: 'Một cửa', label: 'Một cửa', desc: 'Bộ phận Một cửa tiếp nhận và trả kết quả' }
+  { id: 'Tổ Đo đạc', name: 'Tổ Đo đạc', label: 'Tổ Đo đạc', desc: 'Bộ phận phụ trách đo đạc, chỉnh lý bản đồ và trích đo địa chính' }
 ];
 
 const ROLES_FOR_DEPARTMENT = [
@@ -33,7 +30,7 @@ const ROLE_OPTIONS = [
 const PERMISSION_GROUPS = [
   {
     id: 'hoso',
-    title: '1. Hồ sơ',
+    title: '1. Hồ sơ (Chức năng tại Tab Hồ sơ)',
     desc: 'Các quyền & chức năng để thực hiện tại Tab Hồ sơ và Tiếp nhận hồ sơ',
     items: [
       { id: 'receive_record', label: 'Tiếp nhận hồ sơ mới (Tab Tiếp nhận)' },
@@ -41,12 +38,11 @@ const PERMISSION_GROUPS = [
       { id: 'VIEW_RECORDS', label: 'Xem danh sách hồ sơ' },
       { id: 'ADD_RECORDS', label: 'Thêm / Nhập mới hồ sơ' },
       { id: 'EXPORT_RECORDS', label: 'Xuất danh sách hồ sơ (Excel)' },
-      { id: 'BTN_EXTEND_DEADLINE', label: '⏱️ Thao tác: Gia hạn (Hồ sơ)' },
     ]
   },
   {
     id: 'hopdong',
-    title: '2. Hợp đồng',
+    title: '2. Hợp đồng (Chức năng tại Tab Hợp đồng)',
     desc: 'Các quyền & chức năng để thực hiện tại Tab Hợp đồng dịch vụ',
     items: [
       { id: 'receive_contract', label: 'Tiếp nhận & Quản lý hợp đồng (Tab Hợp đồng)' },
@@ -60,84 +56,55 @@ const PERMISSION_GROUPS = [
   },
   {
     id: 'dodac',
-    title: '3. Đo đạc',
-    desc: 'Quy trình, danh mục và các nút bấm thao tác tại Tab Đo đạc và Trích lục bản đồ',
+    title: '3. Đo đạc (Chức năng tại Tab Đo đạc)',
+    desc: 'Các quyền & chức năng để thực hiện tại Tab Đo đạc và Trích lục bản đồ',
     items: [
-      { id: 'all_records', label: 'Quy trình xử lý hồ sơ đo đạc (Tab Đo đạc)' },
       { id: 'survey_list', label: 'Danh sách kỹ thuật đo đạc (Tab Đo đạc)' },
       { id: 'VIEW_EXCERPTS', label: 'Xem trích lục bản đồ' },
-      { id: 'MANAGE_EXCERPTS', label: 'Quản lý & cấp số trích lục bản đồ' },
-      { id: 'DODAC_VIEW_DETAILS', label: '👁️ Thao tác: Xem chi tiết hồ sơ (Đo đạc)' },
-      { id: 'DODAC_EDIT_RECORDS', label: '✏️ Thao tác: Sửa thông tin hồ sơ (Đo đạc)' },
-      { id: 'DODAC_DELETE_RECORDS', label: '🗑️ Thao tác: Xóa hồ sơ (Đo đạc)' },
-      { id: 'DODAC_CHECK_RECORDS', label: '✅ Thao tác: Kiểm tra & Ký kiểm tra (Đo đạc)' },
-      { id: 'DODAC_HANDOVER_RECORDS', label: '📤 Thao tác: Bàn giao hồ sơ sang 1 cửa (Đo đạc)' },
-      { id: 'DODAC_BTN_ASSIGN_STAFF', label: '👤 Thao tác: Giao việc / Phân công cán bộ (Đo đạc)' },
-      { id: 'DODAC_BTN_SUBMIT_SIGN', label: '✍️ Thao tác: Trình ký / Phê duyệt / Ký duyệt (Đo đạc)' },
-      { id: 'DODAC_BTN_REJECT_RECORD', label: '↩️ Thao tác: Trả hồ sơ / Từ chối (Yêu cầu sửa) (Đo đạc)' },
-      { id: 'DODAC_BTN_RETURN_RESULT', label: '🎁 Thao tác: Trả kết quả hồ sơ (Đo đạc)' },
-      { id: 'DODAC_BTN_CLOSE_BATCH', label: '📦 Thao tác: Tạo đợt bàn giao / Chốt đợt (Đo đạc)' },
-      { id: 'DODAC_BTN_EXTEND_DEADLINE', label: '⏱️ Thao tác: Gia hạn (Đo đạc)' },
+      { id: 'MANAGE_EXCERPTS', label: 'Quản lý & Cấp số trích lục bản đồ' },
     ]
   },
-
   {
     id: 'luutru',
-    title: '4. Lưu trữ',
-    desc: 'Quy trình, danh mục và các nút bấm thao tác tại Tab Kho lưu trữ hồ sơ & Công văn',
+    title: '4. Lưu trữ (Chức năng tại Tab Lưu trữ)',
+    desc: 'Các quyền & chức năng để thực hiện tại Tab Kho lưu trữ hồ sơ & Công văn',
     items: [
       { id: 'archive_records', label: 'Kho lưu trữ hồ sơ & Công văn (Tab Lưu trữ)' },
       { id: 'VIEW_ARCHIVE', label: 'Xem & Tra cứu hồ sơ lưu trữ' },
       { id: 'MANAGE_ARCHIVE', label: 'Quản lý kho lưu trữ (Mượn/trả, vị trí)' },
-      { id: 'ARCHIVE_VIEW_DETAILS', label: '👁️ Thao tác: Xem chi tiết hồ sơ (Lưu trữ)' },
-      { id: 'ARCHIVE_EDIT_RECORDS', label: '✏️ Thao tác: Sửa thông tin hồ sơ (Lưu trữ)' },
-      { id: 'ARCHIVE_DELETE_RECORDS', label: '🗑️ Thao tác: Xóa hồ sơ (Lưu trữ)' },
-      { id: 'ARCHIVE_CHECK_RECORDS', label: '✅ Thao tác: Kiểm tra & Ký kiểm tra (Lưu trữ)' },
-      { id: 'ARCHIVE_HANDOVER_RECORDS', label: '📤 Thao tác: Bàn giao hồ sơ sang 1 cửa (Lưu trữ)' },
-      { id: 'ARCHIVE_BTN_ASSIGN_STAFF', label: '👤 Thao tác: Giao việc / Phân công cán bộ (Lưu trữ)' },
-      { id: 'ARCHIVE_BTN_SUBMIT_SIGN', label: '✍️ Thao tác: Trình ký / Phê duyệt / Ký duyệt (Lưu trữ)' },
-      { id: 'ARCHIVE_BTN_REJECT_RECORD', label: '↩️ Thao tác: Trả hồ sơ / Từ chối (Yêu cầu sửa) (Lưu trữ)' },
-      { id: 'ARCHIVE_BTN_RETURN_RESULT', label: '🎁 Thao tác: Trả kết quả hồ sơ (Lưu trữ)' },
-      { id: 'ARCHIVE_BTN_CLOSE_BATCH', label: '📦 Thao tác: Tạo đợt bàn giao / Chốt đợt (Lưu trữ)' },
-      { id: 'ARCHIVE_BTN_EXTEND_DEADLINE', label: '⏱️ Thao tác: Gia hạn (Lưu trữ)' },
-    ]
-  },
-  {
-    id: 'capgiay',
-    title: '5. Cấp giấy',
-    desc: 'Quy trình, danh mục và các nút bấm thao tác tại Tab Đăng ký cấp giấy',
-    items: [
-      { id: 'registration_records', label: 'Quy trình xử lý hồ sơ Cấp giấy (Tab Cấp giấy)' },
-      { id: 'CAPGIAY_VIEW_DETAILS', label: '👁️ Thao tác: Xem chi tiết hồ sơ (Cấp giấy)' },
-      { id: 'CAPGIAY_EDIT_RECORDS', label: '✏️ Thao tác: Sửa thông tin hồ sơ (Cấp giấy)' },
-      { id: 'CAPGIAY_DELETE_RECORDS', label: '🗑️ Thao tác: Xóa hồ sơ (Cấp giấy)' },
-      { id: 'CAPGIAY_CHECK_RECORDS', label: '✅ Thao tác: Kiểm tra & Ký kiểm tra (Cấp giấy)' },
-      { id: 'CAPGIAY_HANDOVER_RECORDS', label: '📤 Thao tác: Bàn giao hồ sơ sang 1 cửa (Cấp giấy)' },
-      { id: 'CAPGIAY_BTN_ASSIGN_STAFF', label: '👤 Thao tác: Giao việc / Phân công cán bộ (Cấp giấy)' },
-      { id: 'CAPGIAY_BTN_SUBMIT_SIGN', label: '✍️ Thao tác: Trình ký / Phê duyệt / Ký duyệt (Cấp giấy)' },
-      { id: 'CAPGIAY_BTN_REJECT_RECORD', label: '↩️ Thao tác: Trả hồ sơ / Từ chối (Yêu cầu sửa) (Cấp giấy)' },
-      { id: 'CAPGIAY_BTN_RETURN_RESULT', label: '🎁 Thao tác: Trả kết quả hồ sơ (Cấp giấy)' },
-      { id: 'CAPGIAY_BTN_CLOSE_BATCH', label: '📦 Thao tác: Tạo đợt bàn giao / Chốt đợt (Cấp giấy)' },
-      { id: 'CAPGIAY_BTN_EXTEND_DEADLINE', label: '⏱️ Thao tác: Gia hạn (Cấp giấy)' },
     ]
   },
   {
     id: 'tienich',
-    title: '6. Tiện ích & Báo cáo',
+    title: '5. Tiện ích & Báo cáo (Lịch, Tiện ích, Báo cáo)',
     desc: 'Các chức năng Lịch công tác, Báo cáo thống kê, Chat nội bộ, Quản lý nhân sự & Hệ thống',
     items: [
       { id: 'VIEW_SCHEDULE', label: 'Xem lịch công tác tuần' },
       { id: 'MANAGE_SCHEDULE', label: 'Quản lý lịch công tác tuần' },
       { id: 'VIEW_REPORTS', label: 'Xem báo cáo & Thống kê' },
-      { id: 'REPORT_TAB_REGISTRATION', label: 'Hiển thị Tab Báo cáo Cấp giấy' },
-      { id: 'REPORT_TAB_MEASUREMENT', label: 'Hiển thị Tab Báo cáo Đo đạc' },
-      { id: 'REPORT_TAB_ARCHIVE', label: 'Hiển thị Tab Báo cáo Lưu trữ' },
-      { id: 'REPORT_TAB_REVENUE', label: 'Hiển thị Tab Báo cáo Doanh thu' },
       { id: 'VIEW_CHAT', label: 'Sử dụng chat nội bộ' },
       { id: 'VIEW_PERSONAL_PROFILE', label: 'Xem hồ sơ cá nhân' },
       { id: 'MANAGE_EMPLOYEES', label: 'Quản lý danh sách nhân sự' },
       { id: 'MANAGE_USERS', label: 'Quản lý tài khoản người dùng' },
       { id: 'SYSTEM_SETTINGS', label: 'Cài đặt & Phân quyền hệ thống' },
+    ]
+  },
+  {
+    id: 'buttons_actions',
+    title: '6. Nhóm Thao tác & Nút chức năng',
+    desc: 'Gom nhóm các nút bấm thao tác quy trình (Xem chi tiết, Sửa, Xóa, Giao việc, Ký duyệt, Trả hồ sơ, Trả KQ, Chốt đợt, Gia hạn ngày hẹn)',
+    items: [
+      { id: 'VIEW_DETAILS', label: 'Thao tác: Xem chi tiết hồ sơ' },
+      { id: 'EDIT_RECORDS', label: 'Thao tác: Sửa thông tin hồ sơ' },
+      { id: 'DELETE_RECORDS', label: 'Thao tác: Xóa hồ sơ' },
+      { id: 'CHECK_RECORDS', label: 'Thao tác: Kiểm tra & Ký kiểm tra' },
+      { id: 'HANDOVER_RECORDS', label: 'Thao tác: Bàn giao hồ sơ sang 1 cửa' },
+      { id: 'BTN_ASSIGN_STAFF', label: 'Thao tác: Giao việc / Phân công cán bộ' },
+      { id: 'BTN_SUBMIT_SIGN', label: 'Thao tác: Trình ký / Phê duyệt / Ký duyệt' },
+      { id: 'BTN_REJECT_RECORD', label: 'Thao tác: Trả hồ sơ / Từ chối (Yêu cầu sửa)' },
+      { id: 'BTN_RETURN_RESULT', label: 'Thao tác: Trả kết quả hồ sơ' },
+      { id: 'BTN_CLOSE_BATCH', label: 'Thao tác: Tạo đợt bàn giao / Chốt đợt' },
+      { id: 'BTN_EXTEND_DEADLINE', label: 'Thao tác: Gia hạn ngày hẹn' },
     ]
   }
 ];
@@ -153,179 +120,10 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
   onHolidaysChanged,
   employees
 }) => {
-  const [activeTab, setActiveTab] = useState<'general' | 'holidays' | 'permissions' | 'workflow' | 'data'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'holidays' | 'permissions' | 'data'>('general');
   const [isDeletingData, setIsDeletingData] = useState(false);
   const [dbTestStatus, setDbTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [dbTestMsg, setDbTestMsg] = useState('');
-  
-  // Workflow & SLA States
-  const DEFAULT_WORKFLOW_STEPS: Record<string, Array<{ id: string; label: string; shortLabel: string; slaDays: number; slaHours?: number; isExternalWait?: boolean; color?: string }>> = {
-    'Tổ Cấp giấy': [
-      { id: 'tiep_nhan', label: '1. Chưa giao', shortLabel: 'Chưa giao', slaDays: 1, slaHours: 8, color: 'bg-slate-50 text-slate-700 border-slate-200' },
-      { id: 'tham_dinh', label: '2. Thẩm định hồ sơ', shortLabel: 'Thẩm định hồ sơ', slaDays: 1, slaHours: 8, color: 'bg-blue-50 text-blue-700 border-blue-200' },
-      { id: 'phieu_chuyen_thue', label: '3. Phiếu chuyển thuế', shortLabel: 'Phiếu chuyển thuế', slaDays: 2.5, slaHours: 20, color: 'bg-purple-50 text-purple-700 border-purple-200' },
-      { id: 'cho_tbt', label: '4. Chờ Thuế KV7 (5 ngày)', shortLabel: 'Chờ Thuế KV7', slaDays: 5, slaHours: 40, isExternalWait: true, color: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
-      { id: 'cho_nop_thue', label: '5. Chờ Giấy nộp tiền (GNT)', shortLabel: 'Chờ Giấy nộp tiền', slaDays: 0, slaHours: 0, isExternalWait: true, color: 'bg-amber-50 text-amber-700 border-amber-200' },
-      { id: 'hoan_thien_trinh_duyet', label: '6. In & Hoàn thiện', shortLabel: 'In & Hoàn thiện', slaDays: 5, slaHours: 40, color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-      { id: 'kiem_tra', label: '7. Trình kiểm tra', shortLabel: 'Trình kiểm tra', slaDays: 1, slaHours: 8, color: 'bg-cyan-50 text-cyan-700 border-cyan-200' },
-      { id: 'trinh_ky', label: '8. Trình ký', shortLabel: 'Trình ký', slaDays: 1, slaHours: 8, color: 'bg-violet-50 text-violet-700 border-violet-200' },
-      { id: 'cho_ban_giao', label: '9. Giao 1 cửa', shortLabel: 'Giao 1 cửa', slaDays: 0.5, slaHours: 4, color: 'bg-rose-50 text-rose-700 border-rose-200' },
-    ],
-    'Tổ Cấp giấy__3.1.1 Chuyển nhượng': [
-      { id: 'tiep_nhan', label: '1. Chưa giao', shortLabel: 'Chưa giao', slaDays: 1, slaHours: 8, color: 'bg-slate-50 text-slate-700 border-slate-200' },
-      { id: 'tham_dinh', label: '2. Thẩm định hồ sơ', shortLabel: 'Thẩm định hồ sơ', slaDays: 1, slaHours: 8, color: 'bg-blue-50 text-blue-700 border-blue-200' },
-      { id: 'phieu_chuyen_thue', label: '3. Phiếu chuyển thuế', shortLabel: 'Phiếu chuyển thuế', slaDays: 2.5, slaHours: 20, color: 'bg-purple-50 text-purple-700 border-purple-200' },
-      { id: 'cho_tbt', label: '4. Chờ Thông báo thuế (5 ngày)', shortLabel: 'Chờ Thông báo thuế', slaDays: 5, slaHours: 40, isExternalWait: true, color: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
-      { id: 'cho_nop_thue', label: '5. Chờ Giấy nộp tiền (GNT)', shortLabel: 'Chờ Giấy nộp tiền', slaDays: 0, slaHours: 0, isExternalWait: true, color: 'bg-amber-50 text-amber-700 border-amber-200' },
-      { id: 'hoan_thien_trinh_duyet', label: '6. In & Hoàn thiện', shortLabel: 'In & Hoàn thiện', slaDays: 5, slaHours: 40, color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-      { id: 'kiem_tra', label: '7. Trình kiểm tra', shortLabel: 'Trình kiểm tra', slaDays: 1, slaHours: 8, color: 'bg-cyan-50 text-cyan-700 border-cyan-200' },
-      { id: 'trinh_ky', label: '8. Trình ký', shortLabel: 'Trình ký', slaDays: 1, slaHours: 8, color: 'bg-violet-50 text-violet-700 border-violet-200' },
-      { id: 'cho_ban_giao', label: '9. Giao 1 cửa', shortLabel: 'Giao 1 cửa', slaDays: 0.5, slaHours: 4, color: 'bg-rose-50 text-rose-700 border-rose-200' },
-    ],
-    'Tổ Cấp giấy__3.1.2 Tặng cho': [
-      { id: 'tiep_nhan', label: '1. Tiếp nhận', shortLabel: 'Tiếp nhận', slaDays: 1, slaHours: 8, color: 'bg-slate-50 text-slate-700 border-slate-200' },
-      { id: 'tham_dinh', label: '2. Thẩm định', shortLabel: 'Thẩm định', slaDays: 1, slaHours: 8, color: 'bg-blue-50 text-blue-700 border-blue-200' },
-      { id: 'phieu_chuyen_thue', label: '3. Phiếu chuyển thuế', shortLabel: 'Phiếu chuyển thuế', slaDays: 2.5, slaHours: 20, color: 'bg-purple-50 text-purple-700 border-purple-200' },
-      { id: 'cho_tbt', label: '4. Chờ TBT (5 ngày)', shortLabel: 'Chờ TBT', slaDays: 5, slaHours: 40, isExternalWait: true, color: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
-      { id: 'cho_nop_thue', label: '5. Chờ nộp thuế (GNT)', shortLabel: 'Chờ nộp thuế', slaDays: 0, slaHours: 0, isExternalWait: true, color: 'bg-amber-50 text-amber-700 border-amber-200' },
-      { id: 'hoan_thien_trinh_duyet', label: '6. In & Hoàn thiện', shortLabel: 'In & Hoàn thiện', slaDays: 5, slaHours: 40, color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-      { id: 'kiem_tra', label: '7. Kiểm tra', shortLabel: 'Kiểm tra', slaDays: 1, slaHours: 8, color: 'bg-cyan-50 text-cyan-700 border-cyan-200' },
-      { id: 'trinh_ky', label: '8. Trình ký', shortLabel: 'Trình ký', slaDays: 1, slaHours: 8, color: 'bg-violet-50 text-violet-700 border-violet-200' },
-      { id: 'cho_ban_giao', label: '9. Giao 1 cửa', shortLabel: 'Giao 1 cửa', slaDays: 0.5, slaHours: 4, color: 'bg-rose-50 text-rose-700 border-rose-200' },
-    ],
-    'Tổ Cấp giấy__3.1.3 Thừa kế': [
-      { id: 'tiep_nhan', label: '1. Tiếp nhận', shortLabel: 'Tiếp nhận', slaDays: 1, slaHours: 8, color: 'bg-slate-50 text-slate-700 border-slate-200' },
-      { id: 'tham_dinh', label: '2. Thẩm định', shortLabel: 'Thẩm định', slaDays: 1, slaHours: 8, color: 'bg-blue-50 text-blue-700 border-blue-200' },
-      { id: 'phieu_chuyen_thue', label: '3. Phiếu chuyển thuế', shortLabel: 'Phiếu chuyển thuế', slaDays: 2.5, slaHours: 20, color: 'bg-purple-50 text-purple-700 border-purple-200' },
-      { id: 'cho_tbt', label: '4. Chờ TBT (5 ngày)', shortLabel: 'Chờ TBT', slaDays: 5, slaHours: 40, isExternalWait: true, color: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
-      { id: 'cho_nop_thue', label: '5. Chờ nộp thuế (GNT)', shortLabel: 'Chờ nộp thuế', slaDays: 0, slaHours: 0, isExternalWait: true, color: 'bg-amber-50 text-amber-700 border-amber-200' },
-      { id: 'hoan_thien_trinh_duyet', label: '6. In & Hoàn thiện', shortLabel: 'In & Hoàn thiện', slaDays: 5, slaHours: 40, color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-      { id: 'kiem_tra', label: '7. Kiểm tra', shortLabel: 'Kiểm tra', slaDays: 1, slaHours: 8, color: 'bg-cyan-50 text-cyan-700 border-cyan-200' },
-      { id: 'trinh_ky', label: '8. Trình ký', shortLabel: 'Trình ký', slaDays: 1, slaHours: 8, color: 'bg-violet-50 text-violet-700 border-violet-200' },
-      { id: 'cho_ban_giao', label: '9. Giao 1 cửa', shortLabel: 'Giao 1 cửa', slaDays: 0.5, slaHours: 4, color: 'bg-rose-50 text-rose-700 border-rose-200' },
-    ],
-    'Tổ Cấp giấy__3.1.4 Thỏa thuận': [
-      { id: 'tiep_nhan', label: '1. Tiếp nhận', shortLabel: 'Tiếp nhận', slaDays: 1, slaHours: 8, color: 'bg-slate-50 text-slate-700 border-slate-200' },
-      { id: 'tham_dinh', label: '2. Thẩm định', shortLabel: 'Thẩm định', slaDays: 1, slaHours: 8, color: 'bg-blue-50 text-blue-700 border-blue-200' },
-      { id: 'phieu_chuyen_thue', label: '3. Phiếu chuyển thuế', shortLabel: 'Phiếu chuyển thuế', slaDays: 2.5, slaHours: 20, color: 'bg-purple-50 text-purple-700 border-purple-200' },
-      { id: 'cho_tbt', label: '4. Chờ TBT (5 ngày)', shortLabel: 'Chờ TBT', slaDays: 5, slaHours: 40, isExternalWait: true, color: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
-      { id: 'cho_nop_thue', label: '5. Chờ nộp thuế (GNT)', shortLabel: 'Chờ nộp thuế', slaDays: 0, slaHours: 0, isExternalWait: true, color: 'bg-amber-50 text-amber-700 border-amber-200' },
-      { id: 'hoan_thien_trinh_duyet', label: '6. In & Hoàn thiện', shortLabel: 'In & Hoàn thiện', slaDays: 5, slaHours: 40, color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-      { id: 'kiem_tra', label: '7. Kiểm tra', shortLabel: 'Kiểm tra', slaDays: 1, slaHours: 8, color: 'bg-cyan-50 text-cyan-700 border-cyan-200' },
-      { id: 'trinh_ky', label: '8. Trình ký', shortLabel: 'Trình ký', slaDays: 1, slaHours: 8, color: 'bg-violet-50 text-violet-700 border-violet-200' },
-      { id: 'cho_ban_giao', label: '9. Giao 1 cửa', shortLabel: 'Giao 1 cửa', slaDays: 0.5, slaHours: 4, color: 'bg-rose-50 text-rose-700 border-rose-200' },
-    ],
-    'Tổ Cấp giấy__3.2.2 Cấp đổi (có thuế)': [
-      { id: 'tiep_nhan', label: '1. Tiếp nhận', shortLabel: 'Tiếp nhận', slaDays: 1, slaHours: 8, color: 'bg-slate-50 text-slate-700 border-slate-200' },
-      { id: 'tham_dinh', label: '2. Thẩm định', shortLabel: 'Thẩm định', slaDays: 1, slaHours: 8, color: 'bg-blue-50 text-blue-700 border-blue-200' },
-      { id: 'phieu_chuyen_thue', label: '3. Phiếu chuyển thuế', shortLabel: 'Phiếu chuyển thuế', slaDays: 2.5, slaHours: 20, color: 'bg-purple-50 text-purple-700 border-purple-200' },
-      { id: 'cho_tbt', label: '4. Chờ TBT (5 ngày)', shortLabel: 'Chờ TBT', slaDays: 5, slaHours: 40, isExternalWait: true, color: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
-      { id: 'cho_nop_thue', label: '5. Chờ nộp thuế (GNT)', shortLabel: 'Chờ nộp thuế', slaDays: 0, slaHours: 0, isExternalWait: true, color: 'bg-amber-50 text-amber-700 border-amber-200' },
-      { id: 'hoan_thien_trinh_duyet', label: '6. In & Hoàn thiện', shortLabel: 'In & Hoàn thiện', slaDays: 5, slaHours: 40, color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-      { id: 'kiem_tra', label: '7. Kiểm tra', shortLabel: 'Kiểm tra', slaDays: 1, slaHours: 8, color: 'bg-cyan-50 text-cyan-700 border-cyan-200' },
-      { id: 'trinh_ky', label: '8. Trình ký', shortLabel: 'Trình ký', slaDays: 1, slaHours: 8, color: 'bg-violet-50 text-violet-700 border-violet-200' },
-      { id: 'cho_ban_giao', label: '9. Giao 1 cửa', shortLabel: 'Giao 1 cửa', slaDays: 0.5, slaHours: 4, color: 'bg-rose-50 text-rose-700 border-rose-200' },
-    ],
-    'Tổ Cấp giấy__3.2.1 Cấp đổi': [
-      { id: 'tiep_nhan', label: '1. Tiếp nhận', shortLabel: 'Tiếp nhận', slaDays: 0.5, slaHours: 4, color: 'bg-slate-50 text-slate-700 border-slate-200' },
-      { id: 'hoan_thien_trinh_duyet', label: '2. In & Hoàn thiện', shortLabel: 'In & Hoàn thiện', slaDays: 5, slaHours: 40, color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-      { id: 'kiem_tra', label: '3. Kiểm tra', shortLabel: 'Kiểm tra', slaDays: 1, slaHours: 8, color: 'bg-cyan-50 text-cyan-700 border-cyan-200' },
-      { id: 'trinh_ky', label: '4. Trình ký', shortLabel: 'Trình ký', slaDays: 1, slaHours: 8, color: 'bg-violet-50 text-violet-700 border-violet-200' },
-      { id: 'cho_ban_giao', label: '5. Giao 1 cửa', shortLabel: 'Giao 1 cửa', slaDays: 0.5, slaHours: 4, color: 'bg-rose-50 text-rose-700 border-rose-200' },
-    ],
-    'Tổ Cấp giấy__3.5.1 Gia hạn': [
-      { id: 'tiep_nhan', label: '1. Tiếp nhận', shortLabel: 'Tiếp nhận', slaDays: 0.5, slaHours: 4, color: 'bg-slate-50 text-slate-700 border-slate-200' },
-      { id: 'hoan_thien_trinh_duyet', label: '2. In & Hoàn thiện', shortLabel: 'In & Hoàn thiện', slaDays: 5, slaHours: 40, color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-      { id: 'kiem_tra', label: '3. Kiểm tra', shortLabel: 'Kiểm tra', slaDays: 1, slaHours: 8, color: 'bg-cyan-50 text-cyan-700 border-cyan-200' },
-      { id: 'trinh_ky', label: '4. Trình ký', shortLabel: 'Trình ký', slaDays: 1, slaHours: 8, color: 'bg-violet-50 text-violet-700 border-violet-200' },
-      { id: 'cho_ban_giao', label: '5. Giao 1 cửa', shortLabel: 'Giao 1 cửa', slaDays: 0.5, slaHours: 4, color: 'bg-rose-50 text-rose-700 border-rose-200' },
-    ],
-    'Tổ Đo đạc': [
-      { id: 'tiep_nhan_dodac', label: '1. Tiếp nhận', shortLabel: 'Tiếp nhận', slaDays: 1, slaHours: 8, color: 'bg-blue-50 text-blue-700 border-blue-200' },
-      { id: 'bien_tap', label: '2. Biên tập', shortLabel: 'Biên tập', slaDays: 6.5, slaHours: 52, color: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
-      { id: 'kiem_tra_kt', label: '3. Kiểm tra', shortLabel: 'Kiểm tra', slaDays: 1, slaHours: 8, color: 'bg-cyan-50 text-cyan-700 border-cyan-200' },
-      { id: 'trinh_ky', label: '4. Trình ký', shortLabel: 'Trình ký', slaDays: 1, slaHours: 8, color: 'bg-violet-50 text-violet-700 border-violet-200' },
-      { id: 'ban_giao_1_cua', label: '5. Bàn giao 1 cửa', shortLabel: 'Bàn giao 1 cửa', slaDays: 0.5, slaHours: 4, color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-    ],
-    'Tổ Đo đạc__2.2 Trích đo': [
-      { id: 'tiep_nhan_dodac', label: '1. Tiếp nhận', shortLabel: 'Tiếp nhận', slaDays: 1, slaHours: 8, color: 'bg-blue-50 text-blue-700 border-blue-200' },
-      { id: 'bien_tap', label: '2. Biên tập', shortLabel: 'Biên tập', slaDays: 26.5, slaHours: 212, color: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
-      { id: 'kiem_tra_kt', label: '3. Kiểm tra', shortLabel: 'Kiểm tra', slaDays: 1, slaHours: 8, color: 'bg-cyan-50 text-cyan-700 border-cyan-200' },
-      { id: 'trinh_ky', label: '4. Trình ký', shortLabel: 'Trình ký', slaDays: 1, slaHours: 8, color: 'bg-violet-50 text-violet-700 border-violet-200' },
-      { id: 'ban_giao_1_cua', label: '5. Bàn giao 1 cửa', shortLabel: 'Bàn giao 1 cửa', slaDays: 0.5, slaHours: 4, color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-    ],
-    'Tổ Đo đạc__2.4 Trích đo Cắm mốc': [
-      { id: 'tiep_nhan_dodac', label: '1. Tiếp nhận', shortLabel: 'Tiếp nhận', slaDays: 1, slaHours: 8, color: 'bg-blue-50 text-blue-700 border-blue-200' },
-      { id: 'bien_tap', label: '2. Biên tập', shortLabel: 'Biên tập', slaDays: 26.5, slaHours: 212, color: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
-      { id: 'kiem_tra_kt', label: '3. Kiểm tra', shortLabel: 'Kiểm tra', slaDays: 1, slaHours: 8, color: 'bg-cyan-50 text-cyan-700 border-cyan-200' },
-      { id: 'trinh_ky', label: '4. Trình ký', shortLabel: 'Trình ký', slaDays: 1, slaHours: 8, color: 'bg-violet-50 text-violet-700 border-violet-200' },
-      { id: 'ban_giao_1_cua', label: '5. Bàn giao 1 cửa', shortLabel: 'Bàn giao 1 cửa', slaDays: 0.5, slaHours: 4, color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-    ],
-    'Tổ Đo đạc__2.5 Trích đo Tách - Hợp thửa': [
-      { id: 'tiep_nhan_dodac', label: '1. Tiếp nhận', shortLabel: 'Tiếp nhận', slaDays: 1, slaHours: 8, color: 'bg-blue-50 text-blue-700 border-blue-200' },
-      { id: 'bien_tap', label: '2. Biên tập', shortLabel: 'Biên tập', slaDays: 26.5, slaHours: 212, color: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
-      { id: 'kiem_tra_kt', label: '3. Kiểm tra', shortLabel: 'Kiểm tra', slaDays: 1, slaHours: 8, color: 'bg-cyan-50 text-cyan-700 border-cyan-200' },
-      { id: 'trinh_ky', label: '4. Trình ký', shortLabel: 'Trình ký', slaDays: 1, slaHours: 8, color: 'bg-violet-50 text-violet-700 border-violet-200' },
-      { id: 'ban_giao_1_cua', label: '5. Bàn giao 1 cửa', shortLabel: 'Bàn giao 1 cửa', slaDays: 0.5, slaHours: 4, color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-    ],
-    'Tổ Lưu trữ': [
-      { id: 'tiep_nhan_yeu_cau', label: '1. Tiếp nhận', shortLabel: 'Tiếp nhận', slaDays: 1, slaHours: 8, color: 'bg-blue-50 text-blue-700 border-blue-200' },
-      { id: 'tra_cuu_ho_so', label: '2. Tra cứu kho lưu trữ', shortLabel: 'Tra cứu', slaDays: 6.5, slaHours: 52, color: 'bg-amber-50 text-amber-700 border-amber-200' },
-      { id: 'kiem_tra', label: '3. Kiểm tra', shortLabel: 'Kiểm tra', slaDays: 1, slaHours: 8, color: 'bg-cyan-50 text-cyan-700 border-cyan-200' },
-      { id: 'trinh_ky', label: '4. Trình ký', shortLabel: 'Trình ký', slaDays: 1, slaHours: 8, color: 'bg-violet-50 text-violet-700 border-violet-200' },
-      { id: 'ban_giao_1_cua', label: '5. Bàn giao 1 cửa', shortLabel: 'Bàn giao 1 cửa', slaDays: 0.5, slaHours: 4, color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-    ]
-  };
-
-  const [workflowDept, setWorkflowDept] = useState<string>('Tổ Đo đạc');
-  const availableProcedures = React.useMemo(() => {
-    if (workflowDept === 'Tổ Cấp giấy') return CAP_GIAY_RECORD_TYPES;
-    if (workflowDept === 'Tổ Đo đạc') return MEASUREMENT_RECORD_TYPES;
-    if (workflowDept === 'Tổ Lưu trữ') return ARCHIVE_RECORD_TYPES;
-    return [];
-  }, [workflowDept]);
-
-  const [selectedProcedureKey, setSelectedProcedureKey] = useState<string>(MEASUREMENT_RECORD_TYPES[0] || '');
-
-  useEffect(() => {
-    if (availableProcedures.length > 0 && !availableProcedures.includes(selectedProcedureKey)) {
-      setSelectedProcedureKey(availableProcedures[0]);
-    }
-  }, [workflowDept, availableProcedures]);
-
-  const [workflowConfigs, setWorkflowConfigs] = useState<Record<string, Array<{ id: string; label: string; shortLabel: string; slaDays: number; slaHours?: number; isExternalWait?: boolean; color?: string }>>>(DEFAULT_WORKFLOW_STEPS);
-  const [savedWorkflowConfigs, setSavedWorkflowConfigs] = useState<Record<string, any>>({});
-  const [isSavingWorkflow, setIsSavingWorkflow] = useState(false);
-  const [newStepId, setNewStepId] = useState('');
-  const [newStepLabel, setNewStepLabel] = useState('');
-  const [newStepSla, setNewStepSla] = useState<number>(1);
-  const [targetTotalDays, setTargetTotalDays] = useState<number>(15);
-
-  const activeConfigKey = React.useMemo(() => {
-    return `${workflowDept}__${selectedProcedureKey}`;
-  }, [workflowDept, selectedProcedureKey]);
-
-  const activeSteps = React.useMemo(() => {
-    if (workflowConfigs[activeConfigKey]) {
-      return workflowConfigs[activeConfigKey];
-    }
-    if (DEFAULT_WORKFLOW_STEPS[activeConfigKey]) {
-      return DEFAULT_WORKFLOW_STEPS[activeConfigKey];
-    }
-    if (workflowConfigs[workflowDept]) {
-      return workflowConfigs[workflowDept];
-    }
-    return DEFAULT_WORKFLOW_STEPS[workflowDept] || [];
-  }, [workflowConfigs, activeConfigKey, workflowDept]);
-
-  useEffect(() => {
-    const totalH = activeSteps.reduce((acc, s) => acc + (s.slaHours ?? ((s.slaDays || 0) * 8)), 0);
-    if (totalH > 0) {
-      setTargetTotalDays(Math.round((totalH / 8) * 10) / 10);
-    } else {
-      setTargetTotalDays(15);
-    }
-  }, [activeConfigKey, activeSteps]);
   
   // Update State (Manual Config)
   const [manualVersion, setManualVersion] = useState('');
@@ -343,25 +141,6 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
   const [savingHolidays, setSavingHolidays] = useState(false);
 
   // Permissions States
-  const [reportTabVisibility, setReportTabVisibility] = useState<{
-    registration: boolean;
-    measurement: boolean;
-    archive: boolean;
-    revenue: boolean;
-  }>(() => {
-    try {
-      const saved = localStorage.getItem('report_tab_visibility');
-      if (saved) return JSON.parse(saved);
-    } catch (e) {}
-    return { registration: true, measurement: true, archive: true, revenue: true };
-  });
-
-  const toggleReportTabVis = (key: 'registration' | 'measurement' | 'archive' | 'revenue') => {
-    const updated = { ...reportTabVisibility, [key]: !reportTabVisibility[key] };
-    setReportTabVisibility(updated);
-    localStorage.setItem('report_tab_visibility', JSON.stringify(updated));
-  };
-
   const [rolePermissions, setRolePermissions] = useState<RolePermissions>(DEFAULT_ROLE_PERMISSIONS);
   const [departmentPermissions, setDepartmentPermissions] = useState<DepartmentPermissions>({});
   const [selectedRole, setSelectedRole] = useState<UserRole | string>(UserRole.TEAM_LEADER);
@@ -373,8 +152,26 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
   const [permissionTab, setPermissionTab] = useState<'department' | 'role'>('department');
 
   const allDepartmentOptions = React.useMemo(() => {
-    return PERMISSION_DEPARTMENTS.map(d => d.id);
-  }, []);
+    const excludedNormalized = [
+      'tổ đăng ký cấp giấy',
+      'quản trị hệ thống',
+      'tổ đo đạc',
+      'ban giám đốc'
+    ];
+
+    const list = PERMISSION_DEPARTMENTS.map(d => d.id).filter(id => !excludedNormalized.includes(id.toLowerCase().trim()));
+    if (employees && employees.length > 0) {
+      employees.forEach(emp => {
+        if (emp.department && emp.department.trim()) {
+          const deptName = emp.department.trim();
+          if (!excludedNormalized.includes(deptName.toLowerCase()) && !list.includes(deptName)) {
+            list.push(deptName);
+          }
+        }
+      });
+    }
+    return list.length > 0 ? list : ['Tổ Lưu trữ'];
+  }, [employees]);
 
   // Contract Number Settings States
   const [contractPrefix, setContractPrefix] = useState('HĐ-{năm}-');
@@ -569,56 +366,6 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
           setContractNextSeq(savedSeq);
       } else {
           setContractNextSeq('1');
-      }
-      
-      const savedWorkflow = await getSystemSetting('workflow_sla_configs');
-      if (savedWorkflow) {
-          try {
-              const parsed = JSON.parse(savedWorkflow);
-              setWorkflowConfigs(parsed);
-              setSavedWorkflowConfigs(parsed);
-          } catch (e) {}
-      }
-  };
-
-  const handleSaveWorkflowConfigs = async () => {
-      setIsSavingWorkflow(true);
-      const success = await saveSystemSetting('workflow_sla_configs', JSON.stringify(workflowConfigs));
-      setIsSavingWorkflow(false);
-      if (success) {
-          setSavedWorkflowConfigs(workflowConfigs);
-          alert("Đã lưu cấu hình quy trình và phân bổ số ngày SLA thành công!");
-          if (onHolidaysChanged) onHolidaysChanged();
-      } else {
-          alert("Lỗi khi lưu cấu hình quy trình.");
-      }
-  };
-
-  const handleResetWorkflow = async () => {
-      const confirmMsg = `Bạn có chắc chắn muốn khôi phục các bước quy trình SLA của thủ tục '${selectedProcedureKey}' về mặc định ban đầu không?\n\nNếu đồng ý, các thay đổi sẽ được xóa và khôi phục về giá trị mặc định ban đầu.`;
-
-      if (window.confirm(confirmMsg)) {
-          const copy = { ...workflowConfigs };
-          const savedCopy = { ...savedWorkflowConfigs };
-
-          const customKey = `${workflowDept}__${selectedProcedureKey}`;
-          if (DEFAULT_WORKFLOW_STEPS[customKey]) {
-              copy[customKey] = JSON.parse(JSON.stringify(DEFAULT_WORKFLOW_STEPS[customKey]));
-          } else {
-              delete copy[customKey];
-          }
-          delete savedCopy[customKey];
-
-          setWorkflowConfigs(copy);
-          setSavedWorkflowConfigs(savedCopy);
-
-          await saveSystemSetting('workflow_sla_configs', JSON.stringify(copy));
-          try {
-              localStorage.setItem('workflow_sla_configs', JSON.stringify(copy));
-          } catch (e) {}
-
-          alert(`Đã khôi phục quy trình thủ tục '${selectedProcedureKey}' về mặc định ban đầu và bỏ ký hiệu ★.`);
-          if (onHolidaysChanged) onHolidaysChanged();
       }
   };
 
@@ -944,12 +691,6 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                 <Key size={16} /> Phân quyền
             </button>
             <button 
-                onClick={() => setActiveTab('workflow')}
-                className={`px-4 py-3 text-xs md:text-sm font-black uppercase tracking-widest flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'workflow' ? 'border-indigo-600 text-indigo-700 bg-white' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
-            >
-                <SlidersHorizontal size={16} /> Lập quy trình & SLA
-            </button>
-            <button 
                 onClick={() => setActiveTab('data')}
                 className={`px-4 py-3 text-xs md:text-sm font-black uppercase tracking-widest flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'data' ? 'border-red-600 text-red-700 bg-white' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
             >
@@ -957,429 +698,7 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
             </button>
         </div>
 
-        <div className={`overflow-y-auto flex-1 bg-slate-50/30 ${(activeTab === 'permissions' || activeTab === 'workflow') ? '' : 'p-4 md:p-6'}`}>
-            {activeTab === 'workflow' && (
-                <div className="bg-slate-50 relative min-h-full">
-                    {/* Sticky Header Wrapper containing 4 rows */}
-                    <div className="sticky top-0 z-20 bg-white border-b border-slate-200 shadow-xs px-4 md:px-6 py-3.5 space-y-3">
-                            {/* Dòng 1: Các tab chọn Tổ (TỔ CẤP GIẤY, TỔ ĐO ĐẠC, TỔ LƯU TRỮ) + Nút Khôi phục & Lưu */}
-                            <div className="flex flex-wrap items-center justify-between gap-3">
-                                {/* Department selector tabs */}
-                                <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
-                                    {['Tổ Đo đạc', 'Tổ Lưu trữ'].map(dept => {
-                                        const isSelected = workflowDept === dept;
-                                        const deptStepsCount = (workflowConfigs[dept] || DEFAULT_WORKFLOW_STEPS[dept] || []).length;
-                                        return (
-                                            <button
-                                                key={dept}
-                                                type="button"
-                                                onClick={() => {
-                                                    setWorkflowDept(dept);
-                                                    setSelectedProcedureKey('all');
-                                                }}
-                                                className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all border flex items-center gap-2 cursor-pointer ${
-                                                    isSelected
-                                                        ? 'bg-indigo-600 text-white border-indigo-700 shadow-sm'
-                                                        : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                                                }`}
-                                            >
-                                                <span>{dept}</span>
-                                                <span className={`text-[10px] px-2 py-0.5 rounded-full ${isSelected ? 'bg-indigo-500 text-white' : 'bg-slate-200 text-slate-700'}`}>
-                                                    {deptStepsCount} bước
-                                                </span>
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-
-                                {/* Action buttons */}
-                                <div className="flex items-center gap-2.5">
-                                    <button
-                                        type="button"
-                                        onClick={handleResetWorkflow}
-                                        className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl border border-slate-300 transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
-                                        title="Khôi phục quy trình mặc định"
-                                    >
-                                        <RotateCcw size={14} /> Khôi phục
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={handleSaveWorkflowConfigs}
-                                        disabled={isSavingWorkflow}
-                                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                                    >
-                                        {isSavingWorkflow ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-                                        Lưu
-                                    </button>
-                                </div>
-                            </div>
-
-                            {/* Dòng 2: Ô chọn Loại thủ tục áp dụng SLA */}
-                            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 shadow-2xs">
-                                <div className="flex flex-col">
-                                    <span className="text-xs font-black uppercase text-slate-800 tracking-wider flex items-center gap-2">
-                                        <span className="w-2 h-2 rounded-full bg-indigo-600"></span>
-                                        Chọn thủ tục / loại hồ sơ để cấu hình SLA riêng:
-                                    </span>
-                                    <span className="text-[11px] font-medium text-slate-500 mt-0.5">
-                                        Mỗi thủ tục thuộc <strong className="text-indigo-700">{workflowDept}</strong> có số ngày hẹn và thời hạn xử lý riêng biệt.
-                                    </span>
-                                </div>
-                                <div className="w-full md:w-96 flex items-center gap-2">
-                                    <select
-                                        value={selectedProcedureKey}
-                                        onChange={(e) => setSelectedProcedureKey(e.target.value)}
-                                        className="w-full bg-white border border-indigo-300 font-bold text-xs text-indigo-950 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500 shadow-2xs cursor-pointer"
-                                    >
-                                        {availableProcedures.map(proc => {
-                                            const procKey = `${workflowDept}__${proc}`;
-                                            const defaultConfig = DEFAULT_WORKFLOW_STEPS[procKey] || DEFAULT_WORKFLOW_STEPS[workflowDept];
-                                            const currentConfig = workflowConfigs[procKey] || savedWorkflowConfigs[procKey];
-                                            const hasCustom = currentConfig && JSON.stringify(currentConfig) !== JSON.stringify(defaultConfig);
-                                            const procSteps = currentConfig || defaultConfig || [];
-                                            const procTotalH = procSteps.reduce((acc: number, s: any) => acc + (s.slaHours ?? ((s.slaDays || 0) * 8)), 0);
-                                            return (
-                                                <option key={proc} value={proc}>
-                                                    {proc} ({(procTotalH / 8).toFixed(1)} ngày SLA){hasCustom ? ' ★' : ''}
-                                                </option>
-                                            );
-                                        })}
-                                    </select>
-                                </div>
-                            </div>
-
-                            {/* Dòng 3: Tiêu đề CÁC BƯỚC QUY TRÌNH + Tổng SLA + Nút Gợi ý + Chỉ số SLA Cơ quan */}
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-0.5">
-                                <h4 className="text-sm font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
-                                    <span className="w-2 h-2 rounded-full bg-indigo-600 inline-block"></span>
-                                    Các bước quy trình: <span className="text-indigo-600">{selectedProcedureKey}</span>
-                                </h4>
-                                <div className="flex flex-wrap items-center gap-2 shrink-0">
-                                    <div className="flex items-center bg-white border border-indigo-300 rounded-xl px-2.5 py-1.5 shadow-2xs text-xs">
-                                        <span className="font-bold text-slate-600 mr-1.5">Tổng SLA:</span>
-                                        <input 
-                                            type="number"
-                                            min="0.1"
-                                            step="0.5"
-                                            value={targetTotalDays}
-                                            onChange={(e) => setTargetTotalDays(parseFloat(e.target.value) || 0)}
-                                            className="w-14 text-center font-black text-indigo-700 outline-none border-b border-indigo-400 focus:border-indigo-600 text-xs py-0.5"
-                                        />
-                                        <span className="font-bold text-indigo-600 ml-1">ngày ({Math.round(targetTotalDays * 8)}h)</span>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            const currentSteps = activeSteps;
-                                            if (currentSteps.length === 0) return;
-                                            const targetHours = targetTotalDays * 8;
-
-                                            // Tách các bước chờ bên ngoài (Chờ TBT/Thuế) và bước cơ quan
-                                            const externalWaitSteps = currentSteps.filter(s => s.isExternalWait);
-                                            const agencySteps = currentSteps.filter(s => !s.isExternalWait);
-                                            const totalExtHours = externalWaitSteps.reduce((acc, s) => acc + (s.slaHours ?? ((s.slaDays || 0) * 8)), 0);
-
-                                            // Số giờ dành riêng cho các bước nội bộ cơ quan
-                                            const targetAgencyHours = agencySteps.length > 0 && targetHours > totalExtHours 
-                                                ? targetHours - totalExtHours 
-                                                : targetHours;
-
-                                            const totalExistingAgencyHours = agencySteps.reduce((acc, s) => acc + (s.slaHours ?? ((s.slaDays || 0) * 8)), 0);
-
-                                            let agencyRemaining = targetAgencyHours;
-                                            const updated = currentSteps.map((step) => {
-                                                // Nếu là bước chờ bên ngoài (chờ TBT), giữ nguyên số giờ hiện tại
-                                                if (step.isExternalWait && targetHours > totalExtHours) {
-                                                    const extH = step.slaHours ?? ((step.slaDays || 0) * 8);
-                                                    return {
-                                                        ...step,
-                                                        slaHours: extH,
-                                                        slaDays: Math.round((extH / 8) * 10) / 10
-                                                    };
-                                                }
-
-                                                const curH = step.slaHours ?? ((step.slaDays || 0) * 8);
-                                                const agencyStepIdx = agencySteps.findIndex(s => s.id === step.id);
-                                                const isLastAgencyStep = agencyStepIdx === agencySteps.length - 1;
-
-                                                if (isLastAgencyStep) {
-                                                    const finalH = Math.max(0, Math.round(agencyRemaining * 10) / 10);
-                                                    return {
-                                                        ...step,
-                                                        slaHours: finalH,
-                                                        slaDays: Math.round((finalH / 8) * 10) / 10
-                                                    };
-                                                }
-
-                                                const propH = totalExistingAgencyHours > 0 
-                                                    ? Math.round((curH / totalExistingAgencyHours) * targetAgencyHours * 10) / 10
-                                                    : Math.round((targetAgencyHours / Math.max(1, agencySteps.length)) * 10) / 10;
-                                                
-                                                agencyRemaining -= propH;
-                                                return {
-                                                    ...step,
-                                                    slaHours: propH,
-                                                    slaDays: Math.round((propH / 8) * 10) / 10
-                                                };
-                                            });
-                                            setWorkflowConfigs(prev => ({ ...prev, [activeConfigKey]: updated }));
-                                        }}
-                                        className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white text-xs font-black rounded-xl shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
-                                    >
-                                        <Sparkles size={14} /> Gợi ý
-                                    </button>
-                                    <div className="flex items-center gap-2 text-xs font-bold bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200">
-                                        {(() => {
-                                            const totalH = activeSteps.reduce((acc, s) => acc + (s.slaHours ?? ((s.slaDays || 0) * 8)), 0);
-                                            const extH = activeSteps.reduce((acc, s) => acc + (s.isExternalWait ? (s.slaHours ?? ((s.slaDays || 0) * 8)) : 0), 0);
-                                            const agencyH = totalH - extH;
-                                            return (
-                                                <>
-                                                    <span className="text-slate-600">SLA Cơ quan:</span>
-                                                    <span className="text-emerald-700 font-black">{agencyH} giờ ({(agencyH / 8).toFixed(1)} ngày)</span>
-                                                    {extH > 0 && (
-                                                        <>
-                                                            <span className="text-slate-300">|</span>
-                                                            <span className="text-indigo-700 font-black" title="Bước chờ TBT/Thuế dùng theo dõi nhắc nhở, không tính vào thời gian xử lý của cơ quan">
-                                                                +{(extH / 8).toFixed(1)} ngày Chờ TBT
-                                                            </span>
-                                                        </>
-                                                    )}
-                                                    <span className="text-slate-300">|</span>
-                                                    <span className="text-slate-500 font-semibold">Tổng: {(totalH / 8).toFixed(1)}d</span>
-                                                </>
-                                            );
-                                        })()}
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Dòng 4: Hàng tiêu đề của bảng */}
-                        </div>
-
-                    {/* Body & Add Step Form */}
-                    <div className="p-4 md:p-6 space-y-4">
-                        <div className="border border-slate-200 rounded-xl overflow-hidden shadow-2xs bg-white">
-                            <table className="w-full text-left border-collapse table-fixed">
-                                <colgroup>
-                                    <col className="w-14" />
-                                    <col className="w-32" />
-                                    <col />
-                                    <col className="w-36" />
-                                    <col className="w-28" />
-                                    <col className="w-28" />
-                                    <col className="w-24" />
-                                    <col className="w-16" />
-                                </colgroup>
-                                <thead>
-                                    <tr className="bg-slate-100 text-[11px] font-black uppercase tracking-wider text-slate-600 border-b border-slate-200">
-                                        <th className="py-3 px-4 text-center">STT</th>
-                                        <th className="py-3 px-4">Mã bước (ID)</th>
-                                        <th className="py-3 px-4">Tên bước quy trình</th>
-                                        <th className="py-3 px-4 text-center">Loại tính SLA</th>
-                                        <th className="py-3 px-4 text-center">SLA (Giờ)</th>
-                                        <th className="py-3 px-4 text-center">Tương đương</th>
-                                        <th className="py-3 px-4 text-center">Thứ tự</th>
-                                        <th className="py-3 px-4 text-center">Xóa</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100 text-xs">
-                                    {activeSteps.map((step, idx) => {
-                                            const stepHours = step.slaHours ?? ((step.slaDays || 0) * 8);
-
-                                            return (
-                                                <tr key={step.id} className={`hover:bg-slate-50/80 transition-colors ${step.isExternalWait ? 'bg-amber-50/30' : ''}`}>
-                                                    <td className="py-3 px-4 text-center font-black text-slate-400">
-                                                        #{idx + 1}
-                                                    </td>
-                                                    <td className="py-3 px-4 font-mono font-bold text-indigo-700">
-                                                        {step.id}
-                                                    </td>
-                                                    <td className="py-3 px-4">
-                                                        <div className="flex items-center gap-2">
-                                                            <input
-                                                                type="text"
-                                                                value={step.label}
-                                                                onChange={(e) => {
-                                                                    const val = e.target.value;
-                                                                    setWorkflowConfigs(prev => {
-                                                                        const list = [...activeSteps];
-                                                                        list[idx] = { ...list[idx], label: val };
-                                                                        return { ...prev, [activeConfigKey]: list };
-                                                                    });
-                                                                }}
-                                                                className="w-full border border-slate-200 rounded-lg px-3 py-1.5 font-bold text-slate-800 bg-white focus:border-indigo-500 outline-none"
-                                                            />
-                                                        </div>
-                                                    </td>
-                                                    <td className="py-3 px-4 text-center">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => {
-                                                                setWorkflowConfigs(prev => {
-                                                                    const list = [...activeSteps];
-                                                                    list[idx] = { ...list[idx], isExternalWait: !list[idx].isExternalWait };
-                                                                    return { ...prev, [activeConfigKey]: list };
-                                                                });
-                                                            }}
-                                                            className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-tight border transition-all cursor-pointer ${
-                                                                step.isExternalWait
-                                                                    ? 'bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200'
-                                                                    : 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
-                                                            }`}
-                                                            title={step.isExternalWait ? "Bước chờ bên ngoài / Cơ quan Thuế (Không tính phạt quá hạn vào thời gian xử lý cơ quan)" : "Bước xử lý nội bộ cơ quan (Tính vào SLA cơ quan)"}
-                                                        >
-                                                            {step.isExternalWait ? 'Chờ Thuế (Trừ SLA CQ)' : 'SLA Cơ Quan'}
-                                                        </button>
-                                                    </td>
-                                                    <td className="py-3 px-4 text-center">
-                                                        <input
-                                                            type="number"
-                                                            min="0"
-                                                            step="0.5"
-                                                            value={stepHours}
-                                                            onChange={(e) => {
-                                                                const valH = parseFloat(e.target.value) || 0;
-                                                                setWorkflowConfigs(prev => {
-                                                                    const list = [...activeSteps];
-                                                                    list[idx] = { 
-                                                                        ...list[idx], 
-                                                                        slaHours: valH,
-                                                                        slaDays: Math.round((valH / 8) * 10) / 10
-                                                                    };
-                                                                    return { ...prev, [activeConfigKey]: list };
-                                                                });
-                                                            }}
-                                                            className="w-20 text-center border border-slate-200 rounded-lg px-2 py-1.5 font-black text-indigo-600 bg-white focus:border-indigo-500 outline-none"
-                                                        />
-                                                    </td>
-                                                    <td className="py-3 px-4 text-center font-bold text-slate-600">
-                                                        {(stepHours / 8).toFixed(1)} ngày
-                                                    </td>
-                                                    <td className="py-3 px-4 text-center">
-                                                        <div className="flex items-center justify-center gap-1">
-                                                            <button
-                                                                type="button"
-                                                                disabled={idx === 0}
-                                                                onClick={() => {
-                                                                    if (idx === 0) return;
-                                                                    setWorkflowConfigs(prev => {
-                                                                        const list = [...activeSteps];
-                                                                        const temp = list[idx];
-                                                                        list[idx] = list[idx - 1];
-                                                                        list[idx - 1] = temp;
-                                                                        return { ...prev, [activeConfigKey]: list };
-                                                                    });
-                                                                }}
-                                                                className="p-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-600 disabled:opacity-30 cursor-pointer"
-                                                                title="Đẩy lên"
-                                                            >
-                                                                <ChevronUp size={14} />
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                disabled={idx === activeSteps.length - 1}
-                                                                onClick={() => {
-                                                                    if (idx === activeSteps.length - 1) return;
-                                                                    setWorkflowConfigs(prev => {
-                                                                        const list = [...activeSteps];
-                                                                        const temp = list[idx];
-                                                                        list[idx] = list[idx + 1];
-                                                                        list[idx + 1] = temp;
-                                                                        return { ...prev, [activeConfigKey]: list };
-                                                                    });
-                                                                }}
-                                                                className="p-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-600 disabled:opacity-30 cursor-pointer"
-                                                                title="Đẩy xuống"
-                                                            >
-                                                                <ChevronDown size={14} />
-                                                            </button>
-                                                        </div>
-                                                    </td>
-                                                    <td className="py-3 px-4 text-center">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => {
-                                                                setWorkflowConfigs(prev => {
-                                                                    const list = activeSteps.filter((_, i) => i !== idx);
-                                                                    return { ...prev, [activeConfigKey]: list };
-                                                                });
-                                                            }}
-                                                            className="p-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 transition-colors cursor-pointer"
-                                                            title="Xóa bước này"
-                                                        >
-                                                            <Trash2 size={14} />
-                                                        </button>
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
-                            </div>
-
-                            {/* Add New Step Form */}
-                            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 mt-4 flex flex-col md:flex-row items-center gap-3">
-                                <span className="text-xs font-black text-slate-700 uppercase tracking-wider shrink-0">
-                                    Thêm bước mới:
-                                </span>
-                                <input
-                                    type="text"
-                                    placeholder="Mã ID (VD: buoc_moi)"
-                                    value={newStepId}
-                                    onChange={(e) => setNewStepId(e.target.value)}
-                                    className="w-full md:w-44 border border-slate-200 rounded-xl px-3 py-2 text-xs bg-white font-mono outline-none focus:border-indigo-500"
-                                />
-                                <input
-                                    type="text"
-                                    placeholder="Tên bước quy trình..."
-                                    value={newStepLabel}
-                                    onChange={(e) => setNewStepLabel(e.target.value)}
-                                    className="flex-1 w-full border border-slate-200 rounded-xl px-3 py-2 text-xs bg-white font-bold outline-none focus:border-indigo-500"
-                                />
-                                <div className="flex items-center gap-2 w-full md:w-auto">
-                                    <input
-                                        type="number"
-                                        min="0"
-                                        placeholder="Số ngày SLA"
-                                        value={newStepSla}
-                                        onChange={(e) => setNewStepSla(parseInt(e.target.value) || 0)}
-                                        className="w-24 border border-slate-200 rounded-xl px-3 py-2 text-xs bg-white font-bold text-center outline-none focus:border-indigo-500"
-                                        title="Số ngày SLA"
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            if (!newStepId.trim() || !newStepLabel.trim()) {
-                                                alert("Vui lòng nhập đầy đủ Mã ID và Tên bước!");
-                                                return;
-                                            }
-                                            const stepToAdd = {
-                                                id: newStepId.trim().toLowerCase().replace(/\s+/g, '_'),
-                                                label: newStepLabel.trim(),
-                                                shortLabel: newStepLabel.trim().split(' ').slice(1).join(' ') || newStepLabel.trim(),
-                                                slaDays: newStepSla,
-                                                slaHours: newStepSla * 8,
-                                                color: 'bg-slate-50 text-slate-700 border-slate-200'
-                                            };
-                                            setWorkflowConfigs(prev => {
-                                                const list = [...activeSteps, stepToAdd];
-                                                return { ...prev, [activeConfigKey]: list };
-                                            });
-                                            setNewStepId('');
-                                            setNewStepLabel('');
-                                            setNewStepSla(1);
-                                        }}
-                                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
-                                    >
-                                        <Plus size={14} /> Thêm bước
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-            )}
-
+        <div className="p-4 md:p-6 overflow-y-auto flex-1 bg-slate-50/30">
             {activeTab === 'general' && (
                 <div className="space-y-6 max-w-4xl mx-auto">
                     {/* Cloud Database Info */}
@@ -1535,192 +854,174 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
             )}
 
             {activeTab === 'permissions' && (
-                <div className="bg-slate-50 relative">
-                    {/* Top Sticky Header Container (stuck flush below main tabs bar) */}
-                    <div className="sticky top-0 z-20 bg-white border-b border-slate-200 shadow-xs">
-                        {/* Row 1: Header tabs (Theo Vai trò | Theo Phòng ban) + Search + Floating Pill Buttons */}
-                        <div className="bg-slate-100/90 border-b border-slate-200 px-4 py-2 flex items-center justify-between flex-wrap gap-2">
-                            <div className="flex items-center gap-2">
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setPermissionTab('role');
-                                        setSelectedDepartmentScope('all');
-                                    }}
-                                    className={`px-4 py-2 text-xs font-black transition-all border-b-2 ${
-                                        permissionTab === 'role'
-                                            ? 'border-purple-600 text-purple-800 bg-white rounded-t-xl shadow-2xs'
-                                            : 'border-transparent text-slate-500 hover:text-slate-800'
-                                    }`}
-                                >
-                                    Theo Vai trò
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setPermissionTab('department');
-                                        if (selectedDepartmentScope === 'all' || !allDepartmentOptions.includes(selectedDepartmentScope)) {
-                                            setSelectedDepartmentScope(allDepartmentOptions[0] || 'Tổ Đo đạc');
-                                        }
-                                    }}
-                                    className={`px-4 py-2 text-xs font-black transition-all border-b-2 ${
-                                        permissionTab === 'department'
-                                            ? 'border-purple-600 text-purple-800 bg-white rounded-t-xl shadow-2xs'
-                                            : 'border-transparent text-slate-500 hover:text-slate-800'
-                                    }`}
-                                >
-                                    Theo Phòng ban
-                                </button>
-                            </div>
-
-                            <div className="flex items-center gap-3">
-                                {/* Search Filter Box */}
-                                <div className="relative w-36 sm:w-48">
-                                    <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
-                                    <input
-                                        type="text"
-                                        placeholder="Tìm kiếm quyền..."
-                                        value={permSearchQuery}
-                                        onChange={(e) => setPermSearchQuery(e.target.value)}
-                                        className="w-full bg-white text-slate-800 placeholder-slate-400 text-xs rounded-full pl-8 pr-7 py-1.5 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all shadow-2xs"
-                                    />
-                                    {permSearchQuery && (
-                                        <button 
-                                            type="button"
-                                            onClick={() => setPermSearchQuery('')}
-                                            className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600 text-xs font-bold"
-                                        >
-                                            ✕
-                                        </button>
-                                    )}
-                                </div>
-
-                                {/* Floating Action Buttons: Mặc định & Lưu */}
-                                <div className="flex items-center gap-2">
-                                    <button
-                                        onClick={handleResetPermissions}
-                                        type="button"
-                                        title="Khôi phục quyền mặc định"
-                                        className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-full transition-all border border-slate-300 flex items-center gap-1.5 active:scale-95 shadow-2xs cursor-pointer"
-                                    >
-                                        <RotateCcw size={14} />
-                                        <span>Mặc định</span>
-                                    </button>
-                                    <button
-                                        onClick={handleSavePermissions}
-                                        disabled={isSavingPermissions}
-                                        title="Lưu cấu hình phân quyền"
-                                        className="px-4 py-1.5 bg-gradient-to-r from-purple-700 to-indigo-800 hover:from-purple-800 hover:to-indigo-900 text-white font-black text-xs rounded-full transition-all shadow-md disabled:opacity-50 flex items-center gap-1.5 active:scale-95 cursor-pointer"
-                                    >
-                                        {isSavingPermissions ? <Loader2 className="animate-spin" size={14} /> : <Save size={14} />}
-                                        <span>Lưu</span>
-                                    </button>
-                                </div>
-                            </div>
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex flex-col h-[calc(100vh-170px)] min-h-[550px] relative">
+                    {/* Header tabs: Theo Vai trò | Theo Phòng ban */}
+                    <div className="bg-slate-100/90 border-b border-slate-200 px-4 pt-3 flex items-center justify-between flex-wrap gap-2">
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setPermissionTab('role');
+                                    setSelectedDepartmentScope('all');
+                                }}
+                                className={`px-5 py-2.5 text-xs font-black transition-all border-b-2 ${
+                                    permissionTab === 'role'
+                                        ? 'border-purple-600 text-purple-800 bg-white rounded-t-xl shadow-2xs'
+                                        : 'border-transparent text-slate-500 hover:text-slate-800'
+                                }`}
+                            >
+                                Theo Vai trò
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setPermissionTab('department');
+                                    if (selectedDepartmentScope === 'all' || !allDepartmentOptions.includes(selectedDepartmentScope)) {
+                                        setSelectedDepartmentScope(allDepartmentOptions[0] || 'Tổ Lưu trữ');
+                                    }
+                                }}
+                                className={`px-5 py-2.5 text-xs font-black transition-all border-b-2 ${
+                                    permissionTab === 'department'
+                                        ? 'border-purple-600 text-purple-800 bg-white rounded-t-xl shadow-2xs'
+                                        : 'border-transparent text-slate-500 hover:text-slate-800'
+                                }`}
+                            >
+                                Theo Phòng ban
+                            </button>
                         </div>
 
-                        {/* Row 2 (if role tab): Role selector row */}
-                        {permissionTab === 'role' ? (
-                            <div className="bg-white border-b border-slate-200 px-6 py-2.5 flex items-center justify-between gap-4 overflow-x-auto no-scrollbar">
-                                <div className="flex items-center gap-6">
-                                    {[
-                                        { role: UserRole.SUBADMIN, label: 'SUBADMIN' },
-                                        { role: UserRole.TEAM_LEADER, label: 'TEAM_LEADER' },
-                                        { role: UserRole.EMPLOYEE, label: 'EMPLOYEE' },
-                                        { role: UserRole.ONEDOOR, label: 'ONEDOOR' },
-                                        { role: UserRole.ADMIN, label: 'ADMIN' },
-                                    ].map((item) => {
-                                        const isSelected = selectedRole === item.role;
-                                        return (
-                                            <button
-                                                key={item.role}
-                                                type="button"
-                                                onClick={() => setSelectedRole(item.role)}
-                                                className={`text-xs font-black tracking-wider uppercase transition-all pb-0.5 border-b-2 cursor-pointer ${
-                                                    isSelected
-                                                        ? 'border-purple-600 text-purple-800 font-extrabold'
-                                                        : 'border-transparent text-slate-400 hover:text-slate-600 font-bold'
-                                                }`}
-                                            >
-                                                {item.label}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                                <div className="text-[11px] font-medium text-slate-500 hidden md:block">
-                                    Đang cấu hình: <strong className="text-purple-900 uppercase font-black">{selectedRole}</strong>
-                                    {selectedRole === UserRole.ADMIN && (
-                                        <span className="ml-2 text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
-                                            🔒 ADMIN có toàn bộ quyền mặc định
-                                        </span>
-                                    )}
-                                </div>
-                            </div>
-                        ) : (
-                            /* Row 2 & 3 (if department tab): Department selector & Role within department */
-                            <div className="bg-white border-b border-slate-200 px-6 py-2 flex flex-col gap-2">
-                                {/* Department selector */}
-                                <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
-                                    <span className="text-[11px] font-black uppercase tracking-wider text-slate-500 shrink-0 mr-1">
-                                        Phòng / Tổ:
-                                    </span>
-                                    {allDepartmentOptions.map((deptName) => {
-                                        const isSelected = selectedDepartmentScope === deptName;
-                                        const compositeKey = `${deptName}_${selectedRole}`;
-                                        const hasCustomOverride = !!(departmentPermissions && departmentPermissions[compositeKey]);
-                                        return (
-                                            <button
-                                                key={deptName}
-                                                type="button"
-                                                onClick={() => setSelectedDepartmentScope(deptName)}
-                                                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all border flex items-center gap-1.5 cursor-pointer ${
-                                                    isSelected
-                                                        ? 'bg-purple-700 text-white border-purple-800 shadow-sm font-black'
-                                                        : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                                                }`}
-                                            >
-                                                <span>{deptName}</span>
-                                                {hasCustomOverride && (
-                                                    <span className={`w-2 h-2 rounded-full ${isSelected ? 'bg-amber-300 animate-pulse' : 'bg-purple-500'}`} title="Đã có cấu hình riêng" />
-                                                )}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
+                        {/* Search Filter Box */}
+                        <div className="relative w-full sm:w-64 pb-2 sm:pb-0">
+                            <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
+                            <input
+                                type="text"
+                                placeholder="Tìm kiếm quyền..."
+                                value={permSearchQuery}
+                                onChange={(e) => setPermSearchQuery(e.target.value)}
+                                className="w-full bg-white text-slate-800 placeholder-slate-400 text-xs rounded-xl pl-8 pr-7 py-1.5 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all shadow-2xs"
+                            />
+                            {permSearchQuery && (
+                                <button 
+                                    type="button"
+                                    onClick={() => setPermSearchQuery('')}
+                                    className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600 text-xs font-bold"
+                                >
+                                    ✕
+                                </button>
+                            )}
+                        </div>
+                    </div>
 
-                                {/* Role selector within Department */}
-                                <div className="flex items-center gap-4 pt-1.5 border-t border-slate-100">
-                                    <span className="text-[11px] font-black uppercase tracking-wider text-slate-500 shrink-0">
-                                        Vai trò trong tổ:
-                                    </span>
-                                    {[
-                                        { role: UserRole.TEAM_LEADER, label: 'TEAM_LEADER' },
-                                        { role: UserRole.EMPLOYEE, label: 'EMPLOYEE' },
-                                        { role: UserRole.ONEDOOR, label: 'ONEDOOR' }
-                                    ].map((item) => {
-                                        const isSelected = selectedRole === item.role;
-                                        return (
-                                            <button
-                                                key={item.role}
-                                                type="button"
-                                                onClick={() => setSelectedRole(item.role)}
-                                                className={`text-xs font-black tracking-wider uppercase transition-all pb-0.5 border-b-2 cursor-pointer ${
-                                                    isSelected
-                                                        ? 'border-purple-600 text-purple-800'
-                                                        : 'border-transparent text-slate-400 hover:text-slate-600 font-bold'
-                                                }`}
-                                            >
-                                                {item.label}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
+                    {/* Sub-navigation bar */}
+                    {permissionTab === 'role' ? (
+                        <div className="bg-white border-b border-slate-200 px-6 py-3 flex items-center gap-6 overflow-x-auto no-scrollbar shrink-0">
+                            {[
+                                { role: UserRole.SUBADMIN, label: 'SUBADMIN' },
+                                { role: UserRole.TEAM_LEADER, label: 'TEAM_LEADER' },
+                                { role: UserRole.EMPLOYEE, label: 'EMPLOYEE' },
+                                { role: UserRole.ONEDOOR, label: 'ONEDOOR' },
+                                { role: UserRole.ADMIN, label: 'ADMIN' },
+                            ].map((item) => {
+                                const isSelected = selectedRole === item.role;
+                                return (
+                                    <button
+                                        key={item.role}
+                                        type="button"
+                                        onClick={() => setSelectedRole(item.role)}
+                                        className={`text-xs font-black tracking-wider uppercase transition-all pb-1 border-b-2 ${
+                                            isSelected
+                                                ? 'border-purple-600 text-purple-800 font-extrabold'
+                                                : 'border-transparent text-slate-400 hover:text-slate-600 font-bold'
+                                        }`}
+                                    >
+                                        {item.label}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    ) : (
+                        <div className="bg-white border-b border-slate-200 px-6 py-2.5 flex flex-col gap-2 shrink-0">
+                            {/* Department selector */}
+                            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+                                <span className="text-[11px] font-black uppercase tracking-wider text-slate-500 shrink-0 mr-1">
+                                    Phòng / Tổ:
+                                </span>
+                                {allDepartmentOptions.map((deptName) => {
+                                    const isSelected = selectedDepartmentScope === deptName;
+                                    const compositeKey = `${deptName}_${selectedRole}`;
+                                    const hasCustomOverride = !!(departmentPermissions && departmentPermissions[compositeKey]);
+                                    return (
+                                        <button
+                                            key={deptName}
+                                            type="button"
+                                            onClick={() => setSelectedDepartmentScope(deptName)}
+                                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border flex items-center gap-1.5 ${
+                                                isSelected
+                                                    ? 'bg-purple-700 text-white border-purple-800 shadow-sm font-black'
+                                                    : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                                            }`}
+                                        >
+                                            <span>{deptName}</span>
+                                            {hasCustomOverride && (
+                                                <span className={`w-2 h-2 rounded-full ${isSelected ? 'bg-amber-300 animate-pulse' : 'bg-purple-500'}`} title="Đã có cấu hình riêng" />
+                                            )}
+                                        </button>
+                                    );
+                                })}
                             </div>
+
+                            {/* Role selector within Department */}
+                            <div className="flex items-center gap-4 pt-1.5 border-t border-slate-100">
+                                <span className="text-[11px] font-black uppercase tracking-wider text-slate-500 shrink-0">
+                                    Vai trò trong tổ:
+                                </span>
+                                {[
+                                    { role: UserRole.TEAM_LEADER, label: 'TEAM_LEADER' },
+                                    { role: UserRole.EMPLOYEE, label: 'EMPLOYEE' },
+                                    { role: UserRole.ONEDOOR, label: 'ONEDOOR' }
+                                ].map((item) => {
+                                    const isSelected = selectedRole === item.role;
+                                    return (
+                                        <button
+                                            key={item.role}
+                                            type="button"
+                                            onClick={() => setSelectedRole(item.role)}
+                                            className={`text-xs font-black tracking-wider uppercase transition-all pb-0.5 border-b-2 ${
+                                                isSelected
+                                                    ? 'border-purple-600 text-purple-800'
+                                                    : 'border-transparent text-slate-400 hover:text-slate-600 font-bold'
+                                            }`}
+                                        >
+                                            {item.label}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Banner info */}
+                    <div className="bg-purple-50/50 border-b border-purple-100/60 px-6 py-2 flex items-center justify-between text-xs text-purple-950 shrink-0">
+                        <div className="flex items-center gap-2">
+                            <span className="font-extrabold uppercase text-[10px] bg-purple-200/80 px-2 py-0.5 rounded text-purple-900">
+                                {selectedRole}
+                            </span>
+                            <span className="text-slate-600 text-[11px]">
+                                {permissionTab === 'role'
+                                    ? `Đang thiết lập quyền mặc định cho Vai trò [${selectedRole}]`
+                                    : `Đang thiết lập quyền riêng cho [${selectedDepartmentScope}] - [${selectedRole}]`
+                                }
+                            </span>
+                        </div>
+                        {selectedRole === UserRole.ADMIN && (
+                            <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-full">
+                                🔒 ADMIN có toàn bộ quyền mặc định
+                            </span>
                         )}
                     </div>
 
                     {/* Categorized Permissions Grid */}
-                    <div className="p-4 md:p-6 bg-slate-50/60 space-y-6">
+                    <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-slate-50/60 custom-scrollbar space-y-6">
                         {PERMISSION_GROUPS.map((group) => {
                             const filteredItems = group.items.filter(item => {
                                 if (!permSearchQuery.trim()) return true;
@@ -1762,7 +1063,7 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                                                             if (!isPermChecked(item.id)) toggleDeptRolePerm(item.id);
                                                         });
                                                     }}
-                                                    className="text-[11px] font-bold text-purple-700 hover:text-purple-900 bg-purple-50 hover:bg-purple-100 px-2.5 py-1 rounded-lg border border-purple-200 transition-all cursor-pointer"
+                                                    className="text-[11px] font-bold text-purple-700 hover:text-purple-900 bg-purple-50 hover:bg-purple-100 px-2.5 py-1 rounded-lg border border-purple-200 transition-all"
                                                 >
                                                     Chọn tất cả
                                                 </button>
@@ -1773,7 +1074,7 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                                                             if (isPermChecked(item.id)) toggleDeptRolePerm(item.id);
                                                         });
                                                     }}
-                                                    className="text-[11px] font-bold text-slate-600 hover:text-slate-800 bg-white hover:bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200 transition-all cursor-pointer"
+                                                    className="text-[11px] font-bold text-slate-600 hover:text-slate-800 bg-white hover:bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200 transition-all"
                                                 >
                                                     Bỏ chọn
                                                 </button>
@@ -1821,6 +1122,31 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                                 </div>
                             );
                         })}
+                    </div>
+
+                    {/* Bottom Sticky Action Bar */}
+                    <div className="bg-white border-t border-slate-200 p-4 px-6 flex items-center justify-between gap-3 shadow-md shrink-0">
+                        <div className="text-xs text-slate-600 font-medium flex items-center gap-2">
+                            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                            <span>Đang cấu hình: <strong className="text-purple-900">{selectedRole}</strong></span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <button
+                                onClick={handleResetPermissions}
+                                type="button"
+                                className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-all border border-slate-200 flex items-center gap-1.5 active:scale-95"
+                            >
+                                <RotateCcw size={15} /> Mặc định
+                            </button>
+                            <button
+                                onClick={handleSavePermissions}
+                                disabled={isSavingPermissions}
+                                className="px-6 py-2.5 bg-gradient-to-r from-purple-700 to-indigo-800 hover:from-purple-800 hover:to-indigo-900 text-white font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-md disabled:opacity-50 flex items-center gap-2 active:scale-95"
+                            >
+                                {isSavingPermissions ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />}
+                                Lưu cấu hình phân quyền
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

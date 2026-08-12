@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { getNormalizedWard, STATUS_LABELS } from '../../constants';
 import { exportDailyStatsToExcel } from '../../utils/excelExport';
-import { parseSafeDate, getRecordReceivedDate, removeVietnameseTones } from '../../utils/appHelpers';
+import { parseSafeDate, removeVietnameseTones } from '../../utils/appHelpers';
 
 interface DailyStatsViewProps {
     records: RecordFile[];
@@ -70,42 +70,28 @@ const DailyStatsView: React.FC<DailyStatsViewProps> = ({
     const [mobileVisibleCount, setMobileVisibleCount] = useState(20);
 
     // Dynamic filtering helper per category (to update card counts reactively based on general filters)
-    const checkEmpMatch = (rec: RecordFile) => {
-        if (modalEmployee === 'all') return true;
-        if (modalEmployee === 'unassigned') return !rec.assignedTo && !rec.checkedBy;
-        if (rec.assignedTo === modalEmployee) return true;
-        const emp = employees.find(e => e.id === modalEmployee);
-        const isLeader = emp && (
-            emp.position?.toLowerCase().includes('tổ') ||
-            emp.position?.toLowerCase().includes('nhóm') ||
-            emp.position?.toLowerCase().includes('trưởng') ||
-            emp.position?.toLowerCase().includes('phó')
-        );
-        return isLeader ? rec.checkedBy === modalEmployee : false;
-    };
-
     const filteredReceivedRecords = useMemo(() => {
         return records.filter(r => {
             let matchDate = true;
-            const rDate = getRecordReceivedDate(r);
+            const rDate = parseSafeDate(r.receivedDate);
             if (!rDate) {
                 matchDate = false;
             } else {
                 rDate.setHours(0,0,0,0);
                 if (effectiveFrom) {
-                    const from = parseSafeDate(effectiveFrom) || new Date(); from.setHours(0,0,0,0);
+                    const from = parseSafeDate(effectiveFrom) || new Date(effectiveFrom); from.setHours(0,0,0,0);
                     if (rDate < from) matchDate = false;
                 }
                 if (effectiveTo) {
-                    const to = parseSafeDate(effectiveTo) || new Date(); to.setHours(23,59,59,999);
+                    const to = parseSafeDate(effectiveTo) || new Date(effectiveTo); to.setHours(23,59,59,999);
                     if (rDate > to) matchDate = false;
                 }
             }
             const matchWard = isWardMatch(r.ward || undefined);
-            const matchEmployee = checkEmpMatch(r);
+            const matchEmployee = modalEmployee === 'all' || (modalEmployee === 'unassigned' ? !r.assignedTo : r.assignedTo === modalEmployee);
             return matchDate && matchWard && matchEmployee;
         });
-    }, [records, effectiveFrom, effectiveTo, selectedWard, modalEmployee, employees]);
+    }, [records, effectiveFrom, effectiveTo, selectedWard, modalEmployee]);
 
     const filteredAssignedRecords = useMemo(() => {
         return records.filter(r => {
@@ -116,19 +102,19 @@ const DailyStatsView: React.FC<DailyStatsViewProps> = ({
             } else {
                 rDate.setHours(0,0,0,0);
                 if (effectiveFrom) {
-                    const from = parseSafeDate(effectiveFrom) || new Date(); from.setHours(0,0,0,0);
+                    const from = parseSafeDate(effectiveFrom) || new Date(effectiveFrom); from.setHours(0,0,0,0);
                     if (rDate < from) matchDate = false;
                 }
                 if (effectiveTo) {
-                    const to = parseSafeDate(effectiveTo) || new Date(); to.setHours(23,59,59,999);
+                    const to = parseSafeDate(effectiveTo) || new Date(effectiveTo); to.setHours(23,59,59,999);
                     if (rDate > to) matchDate = false;
                 }
             }
             const matchWard = isWardMatch(r.ward || undefined);
-            const matchEmployee = checkEmpMatch(r);
+            const matchEmployee = modalEmployee === 'all' || (modalEmployee === 'unassigned' ? !r.assignedTo : r.assignedTo === modalEmployee);
             return matchDate && matchWard && matchEmployee;
         });
-    }, [records, effectiveFrom, effectiveTo, selectedWard, modalEmployee, employees]);
+    }, [records, effectiveFrom, effectiveTo, selectedWard, modalEmployee]);
 
     const filteredHandoverRecords = useMemo(() => {
         return records.filter(r => {
@@ -139,19 +125,19 @@ const DailyStatsView: React.FC<DailyStatsViewProps> = ({
             } else {
                 rDate.setHours(0,0,0,0);
                 if (effectiveFrom) {
-                    const from = parseSafeDate(effectiveFrom) || new Date(); from.setHours(0,0,0,0);
+                    const from = parseSafeDate(effectiveFrom) || new Date(effectiveFrom); from.setHours(0,0,0,0);
                     if (rDate < from) matchDate = false;
                 }
                 if (effectiveTo) {
-                    const to = parseSafeDate(effectiveTo) || new Date(); to.setHours(23,59,59,999);
+                    const to = parseSafeDate(effectiveTo) || new Date(effectiveTo); to.setHours(23,59,59,999);
                     if (rDate > to) matchDate = false;
                 }
             }
             const matchWard = isWardMatch(r.ward || undefined);
-            const matchEmployee = checkEmpMatch(r);
+            const matchEmployee = modalEmployee === 'all' || (modalEmployee === 'unassigned' ? !r.assignedTo : r.assignedTo === modalEmployee);
             return matchDate && matchWard && matchEmployee;
         });
-    }, [records, effectiveFrom, effectiveTo, selectedWard, modalEmployee, employees]);
+    }, [records, effectiveFrom, effectiveTo, selectedWard, modalEmployee]);
 
     // Main records for the selected card/type
     const modalFilteredRecords = useMemo(() => {
@@ -342,8 +328,6 @@ const DailyStatsView: React.FC<DailyStatsViewProps> = ({
                                             <span className={`px-2.5 py-1 rounded text-[10px] uppercase font-bold tracking-wider border ${
                                                 r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED ? 'bg-green-50 text-green-800 border-green-200' : 
                                                 r.status === RecordStatus.WITHDRAWN ? 'bg-gray-100 text-gray-600 border-gray-200' :
-                                                r.status === RecordStatus.PENDING_SIGN || r.status === RecordStatus.SIGNED ? 'bg-purple-100 text-purple-700 border-purple-200' :
-                                                r.status === RecordStatus.IN_PROGRESS ? 'bg-teal-100 text-teal-700 border-teal-200' :
                                                 'bg-blue-100 text-blue-700 border-blue-200'
                                             }`}>
                                                 {STATUS_LABELS[r.status] || r.status}

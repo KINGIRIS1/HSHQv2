@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, CheckCircle, AlertCircle, FileSignature } from 'lucide-react';
 import { RecordFile, UserRole, User, Employee } from '../../types';
-import { isArchiveRecordType, isCapGiayRecord } from '../../constants';
+import { isArchiveRecordType } from '../../constants';
 
 interface SubmitModalProps {
     isOpen: boolean;
@@ -24,26 +24,20 @@ const SubmitModal: React.FC<SubmitModalProps> = ({ isOpen, onClose, records, onC
         
         if (isCheckMode) {
             // Chế độ trình kiểm tra:
-            // - CHỈ lấy Tổ trưởng hoặc Tổ phó (Loại bỏ Ban Giám đốc, Lãnh đạo, Admin, Subadmin không thuộc Ban chỉ đạo Tổ)
+            // - Nếu là hồ sơ lưu trữ: CHỈ Tổ trưởng, Tổ phó của Tổ Thông tin lưu trữ (Lưu trữ)
+            // - Ngược lại (hồ sơ khác): CHỈ Tổ trưởng, Tổ phó của Tổ đo đạc
             const dept = emp.department?.toLowerCase() || '';
             const pos = emp.position?.toLowerCase() || '';
             
-            const isTeamLeader = (pos.includes('tổ trưởng') || pos.includes('tổ phó')) && !pos.includes('giám đốc');
-            if (!isTeamLeader) return false;
-
-            const isCapGiayType = records.some(r => isCapGiayRecord(r));
             const isArchiveType = records.some(r => isArchiveRecordType(r.recordType));
+            const isLeader = pos.includes('tổ trưởng') || pos.includes('tổ phó');
             
-            if (isCapGiayType) {
-                // Với hồ sơ Cấp giấy: Chỉ lấy Tổ trưởng/Tổ phó Tổ Cấp giấy / Đăng ký (Loại bỏ Tổ Đo đạc, Tổ Lưu trữ, Ban Giám đốc)
-                const isDoDacOrLuuTruOrBGD = dept.includes('đo đạc') || dept.includes('lưu trữ') || dept.includes('thông tin') || dept.includes('ban giám đốc');
-                return !isDoDacOrLuuTruOrBGD;
-            } else if (isArchiveType) {
+            if (isArchiveType) {
                 const isLuuTru = dept.includes('lưu trữ') || dept.includes('thông tin');
-                return isLuuTru;
+                return isLuuTru && isLeader;
             } else {
                 const isDoDac = dept.includes('đo đạc');
-                return isDoDac;
+                return isDoDac && isLeader;
             }
         } else {
             // Chế độ trình ký: CHỈ Giám đốc, Phó giám đốc
@@ -69,8 +63,8 @@ const SubmitModal: React.FC<SubmitModalProps> = ({ isOpen, onClose, records, onC
     };
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4 backdrop-blur-sm animate-fade-in">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md lg:max-w-lg overflow-hidden transform transition-all animate-fade-in-up">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 backdrop-blur-sm animate-fade-in">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all animate-fade-in-up">
                 <div className={`${isCheckMode ? 'bg-orange-600' : 'bg-indigo-600'} p-4 flex justify-between items-center text-white`}>
                     <h2 className="text-lg font-bold flex items-center gap-2">
                         <FileSignature size={20} />

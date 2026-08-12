@@ -1,10 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { ArchiveRecord, fetchArchiveRecords, saveArchiveRecord, deleteArchiveRecord, importArchiveRecords, updateArchiveRecordsBatch } from '../../services/apiArchive';
 import { useArchiveRealtime } from '../../hooks/useArchiveRealtime';
-import { User, RecordStatus } from '../../types';
-import { fetchCapGiayRecordsForVaoSo, updateRecordFieldsApi } from '../../services/apiRecords';
-import { isCapGiayRecord } from '../../constants';
-import { Loader2, Plus, Search, Trash2, Upload, FileSpreadsheet, Send, CheckCircle2, X, History, Calendar, FileOutput, Settings, Hash, Edit, FileText, ChevronDown, Filter, MapPin, RotateCcw } from 'lucide-react';
+import { User } from '../../types';
+import { Loader2, Plus, Search, Trash2, Upload, FileSpreadsheet, Send, CheckCircle2, X, History, Calendar, FileOutput, Settings, Hash, Edit, FileText } from 'lucide-react';
 import * as XLSX from 'xlsx-js-style';
 import { confirmAction, matchDepartmentKey } from '../../utils/appHelpers';
 import { saveAs } from 'file-saver';
@@ -34,20 +32,13 @@ const COLUMNS = [
 interface VaoSoViewProps {
     currentUser: User;
     wards: string[];
-    activeTab?: 'pending_entry' | 'completed_entry' | 'all';
-    onTabChange?: (tab: 'pending_entry' | 'completed_entry' | 'all') => void;
 }
 
-const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards, activeTab: propActiveTab, onTabChange }) => {
+const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
     const [records, setRecords] = useState<ArchiveRecord[]>([]);
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
-    const [internalActiveTab, setInternalActiveTab] = useState<'pending_entry' | 'completed_entry' | 'all' | 'scanned'>('pending_entry');
-    const activeTab = propActiveTab ?? internalActiveTab;
-    const setActiveTab = (tab: 'pending_entry' | 'completed_entry' | 'all' | 'scanned') => {
-        setInternalActiveTab(tab);
-        if (onTabChange) onTabChange(tab as any);
-    };
+    const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'scanned'>('all');
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [savingId, setSavingId] = useState<string | null>(null);
     const [editingId, setEditingId] = useState<string | null>(null);
@@ -56,10 +47,6 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards, activeTab: pr
     // Pagination State
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 10;
-
-    // Dropdown Action Menu State
-    const [showActionDropdown, setShowActionDropdown] = useState(false);
-    const [showFilterDropdown, setShowFilterDropdown] = useState(false);
 
     // Batch Modal State
     const [showBatchModal, setShowBatchModal] = useState(false);
@@ -134,57 +121,13 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards, activeTab: pr
 
     const loadData = async () => {
         setLoading(true);
-        const [data, savedPerms, savedDeptPerms, empData, landRecords] = await Promise.all([
+        const [data, savedPerms, savedDeptPerms, empData] = await Promise.all([
             fetchArchiveRecords('vaoso'),
             getSystemSetting('role_permissions'),
             getSystemSetting('department_permissions'),
-            fetchEmployees(),
-            fetchCapGiayRecordsForVaoSo().catch(() => [])
+            fetchEmployees()
         ]);
-
-        const existingIds = new Set((data || []).map(r => r.id));
-        const existingCodeSet = new Set((data || []).map(r => r.data?.ma_ho_so).filter(Boolean));
-
-        const mappedLandRecords: ArchiveRecord[] = (landRecords || [])
-            .filter(r => {
-                const isCapGiay = isCapGiayRecord(r) || (r as any).recordGroup === 'cap_giay';
-                const isApprovedOrSignedOrHandover = r.status === RecordStatus.SIGNED || r.status === RecordStatus.HANDOVER || !!r.approvalDate || !!r.entryNumber;
-                return isCapGiay && isApprovedOrSignedOrHandover && !existingIds.has(r.id) && !existingCodeSet.has(r.code);
-            })
-            .map(r => ({
-                id: r.id,
-                type: 'vaoso' as const,
-                status: r.status === RecordStatus.HANDOVER ? 'completed' : 'executed',
-                so_hieu: r.issueNumber || '',
-                trich_yeu: r.content || r.recordType || '',
-                ngay_thang: r.receivedDate || (r as any).created_at || new Date().toISOString(),
-                noi_nhan_gui: r.customerName || '',
-                created_by: r.receivedBy || 'Hệ thống',
-                created_at: (r as any).created_at || new Date().toISOString(),
-                data: {
-                    so_vao_so: r.entryNumber || '',
-                    ma_ho_so: r.code || '',
-                    ten_chu_su_dung: r.customerName || '',
-                    cccd: r.cccd || '',
-                    dia_chi_chu: r.customerAddress || '',
-                    loai_bien_dong: r.recordType || '',
-                    loai_gcn: r.issueNumber ? 'GCN mới' : 'GCN cũ',
-                    ngay_nhan: r.receivedDate || '',
-                    so_to: r.mapSheet || '',
-                    so_thua: r.landPlot || '',
-                    tong_dien_tich: r.area ? String(r.area) : '',
-                    dien_tich_tho_cu: r.residentialArea ? String(r.residentialArea) : '',
-                    dia_danh: r.ward || '',
-                    so_phat_hanh: r.issueNumber || '',
-                    ngay_ky_gcn: r.issueDate || r.approvalDate || '',
-                    ngay_ky_phieu_tk: r.submissionDate || '',
-                    ghi_chu: r.privateNotes || '',
-                    is_land_record: true
-                }
-            }));
-
-        const mergedRecords = [...(data || []), ...mappedLandRecords];
-        setRecords(mergedRecords);
+        setRecords(data || []);
         
         if (savedPerms) {
             try { setRolePermissions(JSON.parse(savedPerms)); } catch(e) {}
@@ -198,7 +141,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards, activeTab: pr
         
         // Calculate max book number from existing records
         let maxNum = 0;
-        mergedRecords.forEach(r => {
+        (data || []).forEach(r => {
             const val = r.data?.so_vao_so || '';
             if (val.startsWith('CN ')) {
                 const numPart = val.replace('CN ', '');
@@ -234,15 +177,15 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards, activeTab: pr
         // Let's make the dropdown control the activeTab state for consistency.
         // But here we use activeTab directly.
         
-        if (activeTab === 'pending_entry') {
-            // Chờ vô sổ: Các hồ sơ chưa có số vào sổ
-            filtered = records.filter(r => !r.data?.so_vao_so || r.data?.so_vao_so.trim() === '');
-        } else if (activeTab === 'completed_entry') {
-            // Đã vô sổ: Các hồ sơ đã có số vào sổ
-            filtered = records.filter(r => r.data?.so_vao_so && r.data?.so_vao_so.trim() !== '');
-        } else if (activeTab === 'all') {
-            // Tất cả hồ sơ: Hiển thị tối đa 1000 dòng mới nhất
+        if (activeTab === 'all') {
+            // Danh sách tổng: Hiển thị tối đa 1000 dòng mới nhất
             filtered = records.slice(0, 1000);
+        } else if (activeTab === 'pending') {
+            // Chờ chuyển Scan: Đã được đánh dấu chuyển scan NHƯNG chưa có đợt scan (chưa scan xong)
+            filtered = records.filter(r => r.data?.is_pending_scan && !r.data?.is_scanned);
+        } else if (activeTab === 'scanned') {
+            // Đã chuyển Scan: Đã có đợt scan
+            filtered = records.filter(r => r.data?.is_scanned);
         }
 
         // Filter by Date (Ngày nhận)
@@ -329,25 +272,9 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards, activeTab: pr
         }));
     };
 
-    const syncLandRecordOnVaoSo = async (record: ArchiveRecord, newSoVaoSo: string) => {
-        if (!newSoVaoSo || !newSoVaoSo.trim()) return;
-        try {
-            await updateRecordFieldsApi(record.id, {
-                entryNumber: newSoVaoSo,
-                status: RecordStatus.HANDOVER,
-                capGiaySubStep: 'cho_ban_giao'
-            });
-        } catch (e) {
-            console.warn("Lỗi đồng bộ hồ sơ cấp giấy sang Giao 1 cửa:", e);
-        }
-    };
-
     const handleBlur = async (record: ArchiveRecord) => {
         setSavingId(record.id);
         await saveArchiveRecord(record);
-        if (record.data?.so_vao_so) {
-            await syncLandRecordOnVaoSo(record, record.data.so_vao_so);
-        }
         setSavingId(null);
     };
 
@@ -389,7 +316,6 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards, activeTab: pr
 
         setSavingId(record.id);
         await saveArchiveRecord(updatedRecord);
-        await syncLandRecordOnVaoSo(updatedRecord, formattedNum);
         setSavingId(null);
     };
 
@@ -919,235 +845,128 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards, activeTab: pr
     return (
         <div className="flex flex-col h-full bg-white">
             {/* Header */}
-            <div className="p-4 border-b border-gray-100 flex flex-col gap-3">
-                <div className="flex flex-col sm:flex-row justify-between items-center gap-3">
-                    <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2 shrink-0">
-                        Quản lý Vô sổ GCN
+            <div className="p-4 border-b border-gray-100 flex flex-col gap-4">
+                <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+                    <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                        Vào số GCN
                     </h2>
-                    <div className="relative flex-1 sm:w-64 max-w-md w-full">
+                    <div className="relative flex-1 sm:w-64 max-w-md">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                         <input 
-                            className="w-full pl-10 pr-4 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 bg-gray-50/50" 
-                            placeholder="Tìm kiếm mã hồ sơ, chủ sử dụng..." 
+                            className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" 
+                            placeholder="Tìm kiếm..." 
                             value={searchTerm} 
                             onChange={e => setSearchTerm(e.target.value)} 
                         />
                     </div>
                 </div>
 
-                {/* Single Unified Toolbar Row */}
-                <div className="flex flex-wrap items-center gap-2 bg-gray-50/90 p-2 rounded-xl border border-gray-100 relative">
-                    {/* 1. Nút Lọc dữ liệu Dropdown */}
-                    <div className="relative">
-                        <button 
-                            onClick={() => setShowFilterDropdown(!showFilterDropdown)}
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border cursor-pointer ${
-                                (fromDate || toDate || filterWard)
-                                    ? 'bg-blue-50 text-blue-700 border-blue-300 shadow-xs'
-                                    : 'bg-white text-slate-700 border-gray-200 hover:bg-gray-100'
-                            }`}
-                            title="Mở bộ lọc ngày tháng và địa danh"
-                        >
-                            <Filter size={15} className={(fromDate || toDate || filterWard) ? 'text-blue-600' : 'text-gray-500'} />
-                            <span>Lọc</span>
-                            {(fromDate || toDate || filterWard) && (
-                                <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse"></span>
-                            )}
-                            <ChevronDown size={14} className={`transition-transform duration-200 ${showFilterDropdown ? 'rotate-180' : ''}`} />
-                        </button>
+                {/* Filters */}
+                <div className="flex flex-wrap gap-3 items-center bg-gray-50 p-2 rounded-lg border border-gray-100">
+                    <div className="flex items-center gap-2 bg-white px-2 py-1.5 rounded-md border border-gray-200 shadow-sm">
+                        <Calendar size={16} className="text-gray-500"/>
+                        <input type="date" className="text-sm outline-none bg-transparent text-gray-700 w-28" value={fromDate} onChange={e => setFromDate(e.target.value)} placeholder="Từ ngày" />
+                        <span className="text-gray-400">-</span>
+                        <input type="date" className="text-sm outline-none bg-transparent text-gray-700 w-28" value={toDate} onChange={e => setToDate(e.target.value)} placeholder="Đến ngày" />
+                    </div>
 
-                        {/* Filter Dropdown Popover */}
-                        {showFilterDropdown && (
-                            <div className="absolute left-0 mt-1 w-72 bg-white rounded-xl shadow-xl border border-gray-200 p-3 z-50 animate-in fade-in zoom-in-95 duration-100">
-                                <div className="flex items-center justify-between pb-2 mb-2 border-b border-gray-100">
-                                    <span className="text-xs font-extrabold text-gray-700 flex items-center gap-1.5">
-                                        <Filter size={14} className="text-blue-600"/> Bộ lọc tìm kiếm
-                                    </span>
-                                    <button 
-                                        onClick={() => setShowFilterDropdown(false)} 
-                                        className="text-gray-400 hover:text-gray-600 p-0.5 rounded-md hover:bg-gray-100 cursor-pointer"
-                                    >
-                                        <X size={14} />
+                    <div className="flex items-center gap-2 bg-white px-2 py-1.5 rounded-md border border-gray-200 shadow-sm">
+                        <Settings size={16} className="text-gray-500"/>
+                        <select className="text-sm outline-none bg-transparent text-gray-700 font-medium cursor-pointer border-none focus:ring-0 min-w-[120px]" value={filterWard} onChange={e => setFilterWard(e.target.value)}>
+                            <option value="">Tất cả Địa danh</option>
+                            {wards.map(w => <option key={w} value={w}>{w}</option>)}
+                        </select>
+                    </div>
+
+                    <div className="flex items-center gap-2 bg-white px-2 py-1.5 rounded-md border border-gray-200 shadow-sm">
+                        <CheckCircle2 size={16} className="text-gray-500"/>
+                        <select className="text-sm outline-none bg-transparent text-gray-700 font-medium cursor-pointer border-none focus:ring-0 min-w-[120px]" value={activeTab} onChange={e => setActiveTab(e.target.value as any)}>
+                            <option value="all">Tất cả Trạng thái</option>
+                            <option value="pending">Chờ chuyển Scan</option>
+                            <option value="scanned">Đã chuyển Scan</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3 bg-gray-50 p-2 rounded-lg relative">
+                    <div className="flex bg-white rounded-md border border-gray-200 p-1 mr-2 shadow-sm">
+                        <button 
+                            onClick={() => setActiveTab('all')}
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${activeTab === 'all' ? 'bg-blue-100 text-blue-700 shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
+                        >
+                            Danh sách
+                        </button>
+                        <button 
+                            onClick={() => setActiveTab('pending')}
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${activeTab === 'pending' ? 'bg-orange-100 text-orange-700 shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
+                        >
+                            Chờ chuyển Scan/1 Cửa
+                        </button>
+                        <button 
+                            onClick={() => setActiveTab('scanned')}
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${activeTab === 'scanned' ? 'bg-green-100 text-green-700 shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
+                        >
+                            Đã chuyển Scan/1 Cửa
+                        </button>
+                    </div>
+
+                    <div className="flex items-center gap-2 ml-auto">
+                        {activeTab === 'all' && (
+                            <>
+                                <button 
+                                    onClick={() => setShowSettingsModal(true)} 
+                                    className="flex items-center gap-2 bg-gray-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-gray-700 shadow-sm"
+                                    title="Cài đặt số vào sổ"
+                                >
+                                    <Settings size={16}/>
+                                </button>
+                                <button onClick={handleDownloadTemplate} className="flex items-center gap-2 bg-emerald-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-emerald-700 shadow-sm" title="Tải mẫu Excel">
+                                    <FileSpreadsheet size={16}/> Tải mẫu
+                                </button>
+                                <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".xlsx, .xls" className="hidden" />
+                                <button onClick={handleImportClick} className="flex items-center gap-2 bg-blue-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-blue-700 shadow-sm">
+                                    <Upload size={16}/> Import Excel
+                                </button>
+                                <button onClick={handleAddNew} className="flex items-center gap-2 bg-teal-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-teal-700 shadow-sm">
+                                    <Plus size={16}/> Thêm mới
+                                </button>
+                                {selectedIds.size > 0 && (
+                                    <button onClick={handleMoveToPending} className="flex items-center gap-2 bg-indigo-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-indigo-700 shadow-sm animate-pulse">
+                                        <Send size={16}/> Chuyển Scan ({selectedIds.size})
                                     </button>
-                                </div>
-
-                                <div className="space-y-3">
-                                    {/* Lọc ngày tháng */}
-                                    <div>
-                                        <label className="block text-[11px] font-bold text-gray-500 mb-1 flex items-center gap-1">
-                                            <Calendar size={13} /> Thời gian vào sổ:
-                                        </label>
-                                        <div className="grid grid-cols-2 gap-2">
-                                            <div>
-                                                <span className="text-[10px] text-gray-400">Từ ngày</span>
-                                                <input 
-                                                    type="date" 
-                                                    className="w-full text-xs border border-gray-200 rounded-md p-1.5 outline-none focus:border-blue-500 bg-gray-50 font-medium" 
-                                                    value={fromDate} 
-                                                    onChange={e => setFromDate(e.target.value)} 
-                                                />
-                                            </div>
-                                            <div>
-                                                <span className="text-[10px] text-gray-400">Đến ngày</span>
-                                                <input 
-                                                    type="date" 
-                                                    className="w-full text-xs border border-gray-200 rounded-md p-1.5 outline-none focus:border-blue-500 bg-gray-50 font-medium" 
-                                                    value={toDate} 
-                                                    onChange={e => setToDate(e.target.value)} 
-                                                />
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Lọc địa danh */}
-                                    <div>
-                                        <label className="block text-[11px] font-bold text-gray-500 mb-1 flex items-center gap-1">
-                                            <MapPin size={13} /> Địa danh (Xã/Phường):
-                                        </label>
-                                        <select 
-                                            className="w-full text-xs border border-gray-200 rounded-md p-1.5 outline-none focus:border-blue-500 bg-gray-50 font-medium text-gray-800 cursor-pointer"
-                                            value={filterWard} 
-                                            onChange={e => setFilterWard(e.target.value)}
-                                        >
-                                            <option value="">Tất cả Địa danh</option>
-                                            {wards.map(w => <option key={w} value={w}>{w}</option>)}
-                                        </select>
-                                    </div>
-
-                                    {/* Clear Filter Button */}
-                                    {(fromDate || toDate || filterWard) && (
-                                        <button 
-                                            onClick={() => { setFromDate(''); setToDate(''); setFilterWard(''); }}
-                                            className="w-full mt-2 py-1.5 text-xs text-red-600 hover:bg-red-50 border border-red-200 rounded-lg font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-                                        >
-                                            <RotateCcw size={13} /> Xóa tất cả bộ lọc
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
+                                )}
+                            </>
                         )}
-                    </div>
 
-                    {/* 2. Sub-tabs Vô sổ GCN (chỉ hiển thị nếu không truyền propActiveTab) */}
-                    {!propActiveTab && (
-                        <div className="flex bg-white rounded-lg border border-gray-200 p-0.5 shadow-xs overflow-x-auto shrink-0">
-                            <button 
-                                onClick={() => setActiveTab('pending_entry')}
-                                className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
-                                    activeTab === 'pending_entry' ? 'bg-amber-600 text-white shadow-xs' : 'text-slate-700 hover:bg-gray-100'
-                                }`}
-                            >
-                                Chờ vô sổ
+                        {activeTab === 'pending' && selectedIds.size > 0 && hasBatchPermission() && (
+                            <button onClick={handleOpenBatchModal} className="flex items-center gap-2 bg-orange-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-orange-700 shadow-sm animate-pulse">
+                                <CheckCircle2 size={16}/> Tạo đợt ({selectedIds.size})
                             </button>
-                            <button 
-                                onClick={() => setActiveTab('completed_entry')}
-                                className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
-                                    activeTab === 'completed_entry' ? 'bg-teal-700 text-white shadow-xs' : 'text-slate-700 hover:bg-gray-100'
-                                }`}
-                            >
-                                Đã vô sổ
-                            </button>
-                            <button 
-                                onClick={() => setActiveTab('all')}
-                                className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
-                                    activeTab === 'all' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-700 hover:bg-gray-100'
-                                }`}
-                            >
-                                Lưu kho
-                            </button>
-                        </div>
-                    )}
-
-                    {/* 3. Nút Thêm mới */}
-                    {(activeTab === 'pending_entry' || activeTab === 'all') && (
-                        <button onClick={handleAddNew} className="flex items-center gap-1.5 bg-teal-600 text-white px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-teal-700 shadow-xs cursor-pointer transition-colors shrink-0">
-                            <Plus size={16}/> Thêm mới
-                        </button>
-                    )}
-
-                    {/* 4. Nút Chuyển Scan khi chọn hồ sơ */}
-                    {selectedIds.size > 0 && (
-                        <button onClick={handleMoveToPending} className="flex items-center gap-1.5 bg-indigo-600 text-white px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-indigo-700 shadow-xs animate-pulse cursor-pointer shrink-0">
-                            <Send size={15}/> Chuyển Scan ({selectedIds.size})
-                        </button>
-                    )}
-
-                    {/* Hidden input for Excel file upload */}
-                    <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".xlsx, .xls" className="hidden" />
-
-                    {/* 5. Dropdown Menu dạng sổ dọc gom tất cả thao tác Xuất / Nhập sổ */}
-                    <div className="relative shrink-0">
-                        <button 
-                            onClick={() => setShowActionDropdown(!showActionDropdown)}
-                            className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg font-bold text-xs shadow-xs transition-all cursor-pointer"
-                        >
-                            <FileSpreadsheet size={15}/>
-                            <span>Xuất / Nhập Sổ & Excel</span>
-                            <ChevronDown size={14} className={`transition-transform duration-200 ${showActionDropdown ? 'rotate-180' : ''}`} />
-                        </button>
-
-                        {showActionDropdown && (
-                            <div 
-                                className="absolute right-0 mt-1 w-56 bg-white rounded-xl shadow-xl border border-gray-200 py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100"
-                                onMouseLeave={() => setShowActionDropdown(false)}
-                            >
-                                <div className="px-3 py-1 text-[10px] font-extrabold text-gray-400 uppercase tracking-wider border-b border-gray-100 mb-1">
-                                    Thao tác Nhập dữ liệu
-                                </div>
-                                <button 
-                                    onClick={() => { setShowActionDropdown(false); handleImportClick(); }}
-                                    className="w-full text-left px-3.5 py-2 text-xs font-semibold text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2.5 transition-colors cursor-pointer"
-                                >
-                                    <Upload size={15} className="text-blue-600"/> Import Excel
-                                </button>
-                                <button 
-                                    onClick={() => { setShowActionDropdown(false); handleDownloadTemplate(); }}
-                                    className="w-full text-left px-3.5 py-2 text-xs font-semibold text-gray-700 hover:bg-emerald-50 hover:text-emerald-700 flex items-center gap-2.5 transition-colors cursor-pointer"
-                                >
-                                    <FileSpreadsheet size={15} className="text-emerald-600"/> Tải file mẫu Excel
-                                </button>
-
-                                <div className="px-3 py-1 text-[10px] font-extrabold text-gray-400 uppercase tracking-wider border-b border-gray-100 my-1">
-                                    Thao tác Xuất dữ liệu
-                                </div>
-                                <button 
-                                    onClick={() => { setShowActionDropdown(false); handleExportExcel(); }}
-                                    className="w-full text-left px-3.5 py-2 text-xs font-semibold text-gray-700 hover:bg-green-50 hover:text-green-700 flex items-center gap-2.5 transition-colors cursor-pointer"
-                                >
-                                    <FileSpreadsheet size={15} className="text-green-600"/> Xuất Excel
-                                </button>
-                                <button 
-                                    onClick={() => {
-                                        setShowActionDropdown(false);
-                                        if (selectedIds.size > 0) {
-                                            const selectedRecords = records.filter(r => selectedIds.has(r.id));
-                                            exportSoDiaChinh(selectedRecords);
-                                        } else {
-                                            setShowExportSoDiaChinhModal(true);
-                                        }
-                                    }}
-                                    className="w-full text-left px-3.5 py-2 text-xs font-semibold text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2.5 transition-colors cursor-pointer"
-                                >
-                                    <FileText size={15} className="text-blue-600"/> Xuất Sổ địa chính
-                                </button>
-                                <button 
-                                    onClick={() => { setShowActionDropdown(false); setShowExportSoMucKeModal(true); }}
-                                    className="w-full text-left px-3.5 py-2 text-xs font-semibold text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 flex items-center gap-2.5 transition-colors cursor-pointer"
-                                >
-                                    <FileText size={15} className="text-indigo-600"/> Xuất Sổ mục kê
-                                </button>
-                            </div>
                         )}
-                    </div>
 
-                    {/* 6. Nút Cài đặt sổ nằm ngoài cùng bên tay phải (Chỉ hiển thị icon) */}
-                    <button 
-                        onClick={() => setShowSettingsModal(true)} 
-                        className="p-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 shadow-xs transition-colors cursor-pointer shrink-0 ml-auto flex items-center justify-center"
-                        title="Cài đặt số vào sổ"
-                    >
-                        <Settings size={16}/>
-                    </button>
+                        {activeTab === 'scanned' && (
+                            <button onClick={() => setShowExportHandoverModal(true)} className="flex items-center gap-2 bg-purple-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-purple-700 shadow-sm">
+                                <FileOutput size={16}/> Xuất danh sách
+                            </button>
+                        )}
+
+                        <button onClick={handleExportExcel} className="hidden md:flex items-center gap-2 bg-green-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-green-700 shadow-sm">
+                            <FileSpreadsheet size={16}/> Xuất Excel
+                        </button>
+                        <button onClick={() => {
+                            if (selectedIds.size > 0) {
+                                const selectedRecords = records.filter(r => selectedIds.has(r.id));
+                                exportSoDiaChinh(selectedRecords);
+                            } else {
+                                setShowExportSoDiaChinhModal(true);
+                            }
+                        }} className="flex items-center gap-2 bg-blue-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-blue-700 shadow-sm">
+                            <FileText size={16}/> Xuất Sổ địa chính
+                        </button>
+                        <button onClick={() => setShowExportSoMucKeModal(true)} className="flex items-center gap-2 bg-indigo-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-indigo-700 shadow-sm">
+                            <FileText size={16}/> Xuất Sổ mục kê
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -1431,9 +1250,9 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards, activeTab: pr
                                 )) : (
                                     <tr>
                                         <td colSpan={COLUMNS.length + 5} className="p-8 text-center text-gray-400 italic">
-                                            {activeTab === 'pending_entry' ? 'Chưa có hồ sơ chờ vô sổ.' : 
-                                             activeTab === 'completed_entry' ? 'Chưa có hồ sơ đã vô sổ.' :
-                                             'Chưa có dữ liệu. Nhấn "Import Excel" hoặc "Thêm mới".'}
+                                            {activeTab === 'all' ? 'Chưa có dữ liệu. Nhấn "Import Excel" hoặc "Thêm mới".' : 
+                                             activeTab === 'pending' ? 'Chưa có hồ sơ chờ chuyển scan.' :
+                                             'Chưa có hồ sơ nào được chuyển Scan.'}
                                         </td>
                                     </tr>
                                 )}
