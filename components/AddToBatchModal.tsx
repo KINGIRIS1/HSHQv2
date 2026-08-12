@@ -1,9 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { RecordFile, RecordStatus, User } from '../types';
-import { X, Plus, History, CheckCircle2, AlertTriangle, Map } from 'lucide-react';
-import { fetchChinhLyRecords } from '../services/apiUtilities';
 import { getWardLabel } from '../constants';
 import { formatDateDDMMYYYY, formatBatchName } from '../utils/appHelpers';
+import { fetchChinhLyRecords } from '../services/apiUtilities';
 
 interface AddToBatchModalProps {
   isOpen: boolean;
@@ -11,10 +10,9 @@ interface AddToBatchModalProps {
   onConfirm: (batch: string, date: string, handoverWard?: string) => void;
   records: RecordFile[];
   selectedCount: number;
-  targetRecords?: RecordFile[]; // Prop này quan trọng để kiểm tra warning
+  targetRecords?: RecordFile[];
   wards?: string[];
   currentUser?: User | null;
-  defaultDepartment?: string;
 }
 
 const AddToBatchModal: React.FC<AddToBatchModalProps> = ({ 
@@ -28,11 +26,11 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
 }) => {
   const [mode, setMode] = useState<'new' | 'existing'>('new');
   const [selectedExistingBatch, setSelectedExistingBatch] = useState<string>('');
+  const [isPhiDiaGioiSelected, setIsPhiDiaGioiSelected] = useState<boolean>(false);
+  const [selectedHandoverWard, setSelectedHandoverWard] = useState<string>('');
   
   // State xác nhận danh sách chỉnh lý
   const [needsCorrectionConfirm, setNeedsCorrectionConfirm] = useState(false);
-  
-  const [selectedHandoverWard, setSelectedHandoverWard] = useState<string>('');
 
   // Ngày hiện tại cho đợt mới (YYYY-MM-DD)
   const todayStr = new Date().toISOString().split('T')[0];
@@ -40,6 +38,7 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
   useEffect(() => {
       if (isOpen) {
           setSelectedHandoverWard('');
+          setIsPhiDiaGioiSelected(false);
           setNeedsCorrectionConfirm(false);
           setMode('new');
       }
@@ -81,7 +80,7 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
       checkWarnings();
   }, [isOpen, targetIdsKey]);
 
-  // Tính số đợt tiếp theo trong ngày hôm nay (không phân biệt Tổ)
+  // Tính số đợt tiếp theo trong ngày hôm nay
   const nextBatchInfo = useMemo(() => {
       let maxBatch = 0;
       records.forEach(r => {
@@ -108,7 +107,7 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
       };
   }, [records, todayStr]);
 
-  // Danh sách đợt đã có (Toàn bộ các đợt trong hệ thống)
+  // Danh sách đợt đã có
   const historyBatches = useMemo(() => {
       const batches: Record<string, { label: string, date: string, count: number, fullDate: string }> = {};
       
@@ -147,18 +146,20 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
 
   if (!isOpen) return null;
 
+  const todayFmt = formatDateDDMMYYYY(todayStr);
+
   const handleConfirm = () => {
       if (filteredWarningList.length > 0 && !needsCorrectionConfirm) {
-          alert("Vui lòng xác nhận bạn đã lập danh sách chỉnh lý cho các hồ sơ được cảnh báo.");
+          alert("Vui lòng xác nhận bạn đã kiểm tra / lập danh sách chỉnh lý cho các hồ sơ cảnh báo.");
           return;
       }
 
-      if (!selectedHandoverWard) {
+      if (isPhiDiaGioiSelected && !selectedHandoverWard) {
           alert("Vui lòng chọn xã/phường nhận kết quả.");
           return;
       }
 
-      const handoverWard = selectedHandoverWard;
+      const handoverWard = isPhiDiaGioiSelected ? selectedHandoverWard : 'SAME_AS_WARD';
 
       if (mode === 'new') {
           onConfirm(nextBatchInfo.batchName, nextBatchInfo.date, handoverWard);
@@ -180,48 +181,54 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg animate-fade-in-up flex flex-col overflow-hidden">
+    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[70] p-4 backdrop-blur-sm">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md flex flex-col overflow-hidden animate-fade-in-up">
+        
+        {/* Header */}
         <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
-            <h3 className="font-bold text-gray-800 text-lg">Chốt Danh Sách Giao 1 Cửa</h3>
-            <button onClick={onClose} className="text-gray-400 hover:text-red-500"><X size={20}/></button>
+            <h3 className="font-bold text-gray-800 text-base">Chốt DS Giao 1 Cửa</h3>
+            <button onClick={onClose} className="text-gray-400 hover:text-red-500 font-bold text-lg">✕</button>
         </div>
 
-        <div className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
-            <p className="text-sm text-gray-600 mb-1">
-                Bạn đang thực hiện chốt <strong>{selectedCount > 0 ? selectedCount : 'toàn bộ'}</strong> hồ sơ sang trạng thái "Đã giao 1 cửa".
+        {/* Body */}
+        <div className="p-5 space-y-4 max-h-[75vh] overflow-y-auto">
+            
+            <p className="text-sm text-gray-600 leading-relaxed">
+                Bạn đang thực hiện chốt <strong className="text-sm font-bold text-gray-800">{selectedCount > 0 ? selectedCount : 'toàn bộ'}</strong> hồ sơ sang trạng thái "Đã giao".
             </p>
 
-            {/* CẢNH BÁO CHỈNH LÝ BẢN ĐỒ */}
+            {/* Cảnh báo chỉnh lý bản đồ nếu có */}
             {filteredWarningList.length > 0 && (
-                <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 animate-pulse">
-                    <div className="flex items-center gap-2 text-orange-700 font-bold text-sm mb-2">
-                        <AlertTriangle size={18} /> CẢNH BÁO: CÓ HỒ SƠ CẦN CHỈNH LÝ
+                <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
+                    <div className="text-orange-700 font-bold text-xs mb-1.5 uppercase">
+                        Cảnh báo: Có hồ sơ cần chỉnh lý bản đồ
                     </div>
-                    <p className="text-xs text-orange-800 mb-2">
-                        Có <strong>{filteredWarningList.length}</strong> hồ sơ cần chỉnh lý bản đồ nhưng chưa có trong danh sách "Đã chuyển":
-                    </p>
-                    <ul className="list-disc list-inside text-xs text-orange-800 font-mono mb-3 max-h-20 overflow-y-auto bg-orange-100/50 p-2 rounded">
+                    <ul className="list-disc list-inside text-[11px] text-orange-800 font-mono mb-2 max-h-16 overflow-y-auto bg-orange-100/40 p-1.5 rounded">
                         {filteredWarningList.map(r => (
-                            <li key={r.id} className="flex items-center gap-2">
-                                <Map size={10} /> {r.code} - {r.customerName}
-                            </li>
+                            <li key={r.id}>{r.code} - {r.customerName}</li>
                         ))}
                     </ul>
-                    <label className="flex items-center gap-2 cursor-pointer bg-white p-2 rounded border border-orange-200 hover:border-orange-400 transition-colors">
+                    <label className="flex items-center gap-1.5 cursor-pointer bg-white p-1.5 rounded border border-orange-200 hover:border-orange-300 transition-colors">
                         <input 
                             type="checkbox" 
-                            className="w-4 h-4 text-orange-600 focus:ring-orange-500 rounded"
+                            className="w-3.5 h-3.5 text-orange-600 rounded"
                             checked={needsCorrectionConfirm}
                             onChange={(e) => setNeedsCorrectionConfirm(e.target.checked)}
                         />
-                        <span className="text-xs font-bold text-gray-700">Tôi xác nhận đã kiểm tra / lập danh sách.</span>
+                        <span className="text-[11px] font-bold text-gray-700">Tôi xác nhận đã kiểm tra / lập danh sách.</span>
                     </label>
                 </div>
             )}
 
-            {/* Option 1: New Batch */}
-            <label className={`flex items-start gap-3 p-3.5 rounded-lg border cursor-pointer transition-all ${mode === 'new' ? 'bg-blue-50 border-blue-500 shadow-sm' : 'bg-white border-gray-200 hover:border-blue-300'}`}>
+            {/* Option 1: Tạo đợt mới (Hôm nay) */}
+            <div 
+                onClick={() => setMode('new')}
+                className={`flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition-all ${
+                    mode === 'new' 
+                    ? 'bg-blue-50/70 border-blue-500 shadow-sm ring-1 ring-blue-500/20' 
+                    : 'bg-white border-gray-200 hover:border-blue-300'
+                }`}
+            >
                 <input 
                     type="radio" 
                     name="batchMode" 
@@ -229,21 +236,26 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
                     onChange={() => setMode('new')}
                     className="mt-1 w-4 h-4 text-blue-600 focus:ring-blue-500"
                 />
-                <div className="flex-1">
-                    <div className="flex items-center gap-2 font-bold text-gray-800">
-                        <Plus size={16} className="text-blue-600" /> Tạo đợt mới trong ngày
+                <div className="flex-1 space-y-1">
+                    <div className="font-bold text-gray-800 text-sm">
+                        + Tạo đợt mới (Hôm nay)
                     </div>
-                    <div className="mt-1.5 bg-white p-2.5 rounded border border-blue-200">
-                        <div className="text-xs text-gray-500 mb-1">Tên đợt giao tự động:</div>
-                        <div className="font-mono font-bold text-sm text-blue-800 break-all">
-                            {nextBatchInfo.batchName}
-                        </div>
+                    <div className="text-xs text-gray-500 space-y-0.5">
+                        <div>Đợt tiếp theo: <span className="font-bold text-blue-600">Đợt {nextBatchInfo.batchNum}</span></div>
+                        <div>Ngày: {todayFmt}</div>
                     </div>
                 </div>
-            </label>
+            </div>
 
-            {/* Option 2: Existing Batch */}
-            <label className={`flex items-start gap-3 p-3.5 rounded-lg border cursor-pointer transition-all ${mode === 'existing' ? 'bg-green-50 border-green-500 shadow-sm' : 'bg-white border-gray-200 hover:border-green-300'}`}>
+            {/* Option 2: Thêm vào đợt cũ */}
+            <div 
+                onClick={() => setMode('existing')}
+                className={`flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition-all ${
+                    mode === 'existing' 
+                    ? 'bg-green-50/50 border-green-500 shadow-sm ring-1 ring-green-500/20' 
+                    : 'bg-white border-gray-200 hover:border-green-300'
+                }`}
+            >
                 <input 
                     type="radio" 
                     name="batchMode" 
@@ -251,62 +263,84 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
                     onChange={() => setMode('existing')}
                     className="mt-1 w-4 h-4 text-green-600 focus:ring-green-500"
                 />
-                <div className="flex-1">
-                    <div className="flex items-center gap-2 font-bold text-gray-800">
-                        <History size={16} className="text-green-600" /> Thêm vào đợt cũ đã tạo
+                <div className="flex-1 space-y-2">
+                    <div className="font-bold text-gray-800 text-sm">
+                        ↺ Thêm vào đợt cũ
                     </div>
                     
-                    <div className="mt-2">
-                        <select 
-                            className="w-full border border-gray-300 rounded px-2.5 py-2 text-xs font-semibold focus:ring-2 focus:ring-green-500 outline-none disabled:bg-gray-100 disabled:text-gray-400 bg-white"
-                            disabled={mode !== 'existing'}
-                            value={selectedExistingBatch}
-                            onChange={(e) => setSelectedExistingBatch(e.target.value)}
-                        >
-                            {historyBatches.length > 0 ? (
-                                historyBatches.map(h => (
-                                    <option key={h.label} value={h.label}>
-                                        {h.label} ({h.count} hồ sơ)
-                                    </option>
-                                ))
-                            ) : (
-                                <option value="">Chưa có đợt nào trong hệ thống</option>
-                            )}
-                        </select>
-                    </div>
+                    <select 
+                        className="w-full border border-gray-350 rounded-lg px-3 py-1.5 text-xs font-medium focus:ring-1 focus:ring-green-500 outline-none disabled:bg-gray-100 disabled:text-gray-400 bg-white text-gray-700"
+                        disabled={mode !== 'existing'}
+                        value={selectedExistingBatch}
+                        onChange={(e) => setSelectedExistingBatch(e.target.value)}
+                        onClick={(e) => e.stopPropagation()} // Prevent radio selection toggle on select click
+                    >
+                        {historyBatches.length > 0 ? (
+                            historyBatches.map(h => (
+                                <option key={h.label} value={h.label}>
+                                    {h.label} - Ngày {formatDateDDMMYYYY(h.date)} (Đã có {h.count} HS)
+                                </option>
+                            ))
+                        ) : (
+                            <option value="">Chưa có đợt nào trong hệ thống</option>
+                        )}
+                    </select>
                 </div>
-            </label>
-
-            {/* Xã nhận kết quả */}
-            <div className="mt-4 border-t pt-4">
-                <label className="block text-sm font-bold text-gray-700 mb-2">
-                    Xã nhận kết quả <span className="text-red-500">*</span>
-                </label>
-                <select 
-                    className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none font-medium bg-white"
-                    value={selectedHandoverWard}
-                    onChange={(e) => setSelectedHandoverWard(e.target.value)}
-                >
-                    <option value="">-- Chọn xã/phường nhận kết quả --</option>
-                    {wards.map(w => (
-                        <option key={w} value={w}>{getWardLabel(w)}</option>
-                    ))}
-                </select>
             </div>
+
+            {/* Checkbox: Giao phi địa giới (Giao khác địa bàn) */}
+            <div className="pt-2">
+                <label className="flex items-center gap-2 cursor-pointer">
+                    <input 
+                        type="checkbox" 
+                        className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                        checked={isPhiDiaGioiSelected}
+                        onChange={(e) => setIsPhiDiaGioiSelected(e.target.checked)}
+                    />
+                    <span className="text-sm font-bold text-gray-700">
+                        Giao phi địa giới (Giao khác địa bàn)
+                    </span>
+                </label>
+            </div>
+
+            {/* Xã nhận kết quả (Chỉ hiển thị khi chọn Giao phi địa giới) */}
+            {isPhiDiaGioiSelected && (
+                <div className="space-y-1.5 bg-gray-50 p-3 rounded-lg border border-gray-200 animate-fade-in">
+                    <label className="block text-xs font-bold text-gray-800">
+                        Xã nhận kết quả <span className="text-red-500">*</span>
+                    </label>
+                    <select 
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-blue-500 outline-none font-medium bg-white text-gray-800"
+                        value={selectedHandoverWard}
+                        onChange={(e) => setSelectedHandoverWard(e.target.value)}
+                    >
+                        <option value="">-- Chọn xã/phường nhận kết quả --</option>
+                        {wards.map(w => (
+                            <option key={w} value={w}>{getWardLabel(w)}</option>
+                        ))}
+                    </select>
+                </div>
+            )}
+
         </div>
 
-        <div className="p-4 border-t bg-gray-50 flex justify-end gap-3">
-            <button onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100 font-medium text-sm">
+        {/* Footer */}
+        <div className="p-4 border-t bg-gray-50 flex justify-end gap-2.5">
+            <button 
+                onClick={onClose} 
+                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 font-medium text-sm transition-colors"
+            >
                 Hủy bỏ
             </button>
             <button 
                 onClick={handleConfirm} 
                 disabled={filteredWarningList.length > 0 && !needsCorrectionConfirm}
-                className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-bold text-sm shadow-sm transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold text-sm shadow-sm transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-                <CheckCircle2 size={16} /> Xác nhận chốt đợt
+                Xác nhận chốt
             </button>
         </div>
+
       </div>
     </div>
   );

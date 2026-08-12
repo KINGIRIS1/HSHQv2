@@ -155,7 +155,6 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
     const excludedNormalized = [
       'tổ đăng ký cấp giấy',
       'quản trị hệ thống',
-      'tổ đo đạc',
       'ban giám đốc'
     ];
 

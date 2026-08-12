@@ -61,12 +61,11 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
 
     // Calculate Stats (Used for AI and Lists, visual cards are handled by parent ReportSection)
     const stats = useMemo(() => {
-        const targetRecords = selectedEmpId 
-            ? recordsInTimeRange.filter(r => r.assignedTo === selectedEmpId)
-            : recordsInTimeRange;
+        const emp = selectedEmpId ? employees.find(e => e.id === selectedEmpId) : null;
+        const pos = emp ? (emp.position || '').toLowerCase() : '';
+        const isSelectedSupervisor = pos.includes('tổ trưởng') || pos.includes('tổ phó') || pos.includes('trưởng') || pos.includes('phó') || pos.includes('giám đốc') || pos.includes('lãnh đạo');
 
-        const total = targetRecords.length;
-        
+        const today = new Date(); today.setHours(0,0,0,0);
         let completedCount = 0;
         let processingCount = 0;
         let overduePendingCount = 0;
@@ -74,36 +73,126 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
         
         const overdueRecords: { record: RecordFile, daysOver: number }[] = [];
 
-        targetRecords.forEach(r => {
-            // Xác định đã xong hay chưa
-            const isFinished = [
-                RecordStatus.HANDOVER, 
-                RecordStatus.RETURNED, 
-                RecordStatus.WITHDRAWN, 
-                RecordStatus.SIGNED
-            ].includes(r.status) || !!r.exportBatch || !!r.exportDate;
+        if (selectedEmpId && isSelectedSupervisor && emp) {
+            const empDept = (emp.department || '').toLowerCase();
+            const isArchiveEmp = empDept.includes('lưu trữ');
+            const isMeasurementEmp = empDept.includes('đo đạc') || empDept.includes('kỹ thuật');
 
-            if (isFinished) {
+            // 1. Records checked by them
+            const checkedRecords = recordsInTimeRange.filter(r => r.checkedBy === selectedEmpId);
+            checkedRecords.forEach(r => {
                 completedCount++;
-                if (r.deadline && r.completedDate) {
+                if (r.deadline && r.checkedDate) {
                     const d = new Date(r.deadline); d.setHours(0,0,0,0);
-                    const c = new Date(r.completedDate); c.setHours(0,0,0,0);
+                    const c = new Date(r.checkedDate); c.setHours(0,0,0,0);
                     if (c > d) overdueCompletedCount++;
+                } else if (r.pendingCheckDate && r.checkedDate) {
+                    const p = new Date(r.pendingCheckDate);
+                    const c = new Date(r.checkedDate);
+                    const diff = c.getTime() - p.getTime();
+                    if (diff > 2 * 24 * 60 * 60 * 1000) overdueCompletedCount++;
                 }
-            } else {
-                processingCount++;
-                if (r.deadline) {
-                    const d = new Date(r.deadline); d.setHours(0,0,0,0);
-                    const today = new Date(); today.setHours(0,0,0,0);
-                    if (today > d) {
-                        overduePendingCount++;
-                        const diffTime = today.getTime() - d.getTime();
-                        const daysOver = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                        overdueRecords.push({ record: r, daysOver });
+            });
+
+            // 2. Records assigned to them but not checked by themselves (to avoid double count)
+            const assignedRecords = recordsInTimeRange.filter(r => r.assignedTo === selectedEmpId && r.checkedBy !== selectedEmpId);
+            assignedRecords.forEach(r => {
+                const isFinished = [
+                    RecordStatus.HANDOVER, 
+                    RecordStatus.RETURNED, 
+                    RecordStatus.WITHDRAWN, 
+                    RecordStatus.SIGNED
+                ].includes(r.status) || !!r.exportBatch || !!r.exportDate;
+
+                if (isFinished) {
+                    completedCount++;
+                    if (r.deadline && r.completedDate) {
+                        const d = new Date(r.deadline); d.setHours(0,0,0,0);
+                        const c = new Date(r.completedDate); c.setHours(0,0,0,0);
+                        if (c > d) overdueCompletedCount++;
+                    }
+                } else {
+                    processingCount++;
+                    if (r.deadline) {
+                        const d = new Date(r.deadline); d.setHours(0,0,0,0);
+                        if (today > d) {
+                            overduePendingCount++;
+                            const diffTime = today.getTime() - d.getTime();
+                            const daysOver = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                            overdueRecords.push({ record: r, daysOver });
+                        }
                     }
                 }
-            }
-        });
+            });
+
+            // 3. Records currently pending check in their department (not yet checked by them)
+            const pendingCheckRecords = recordsInTimeRange.filter(r => 
+                r.status === RecordStatus.PENDING_CHECK && 
+                (!r.checkedBy || r.checkedBy === selectedEmpId)
+            );
+            pendingCheckRecords.forEach(r => {
+                const recordDept = (r.recordType || '').toLowerCase();
+                const isArchiveRecord = recordDept.includes('sao lục') || recordDept.includes('công văn') || recordDept.includes('vào sổ');
+                const isMatch = (isArchiveRecord && isArchiveEmp) || (!isArchiveRecord && isMeasurementEmp);
+
+                if (isMatch) {
+                    processingCount++;
+                    if (r.deadline) {
+                        const d = new Date(r.deadline); d.setHours(0,0,0,0);
+                        if (today > d) {
+                            overduePendingCount++;
+                            const diffTime = today.getTime() - d.getTime();
+                            const daysOver = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                            overdueRecords.push({ record: r, daysOver });
+                        }
+                    } else if (r.pendingCheckDate) {
+                        const p = new Date(r.pendingCheckDate); p.setHours(0,0,0,0);
+                        if (today > p) {
+                            overduePendingCount++;
+                            const diffTime = today.getTime() - p.getTime();
+                            const daysOver = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                            overdueRecords.push({ record: r, daysOver });
+                        }
+                    }
+                }
+            });
+        } else {
+            const targetRecords = selectedEmpId 
+                ? recordsInTimeRange.filter(r => r.assignedTo === selectedEmpId)
+                : recordsInTimeRange;
+
+            targetRecords.forEach(r => {
+                // Xác định đã xong hay chưa
+                const isFinished = [
+                    RecordStatus.HANDOVER, 
+                    RecordStatus.RETURNED, 
+                    RecordStatus.WITHDRAWN, 
+                    RecordStatus.SIGNED
+                ].includes(r.status) || !!r.exportBatch || !!r.exportDate;
+
+                if (isFinished) {
+                    completedCount++;
+                    if (r.deadline && r.completedDate) {
+                        const d = new Date(r.deadline); d.setHours(0,0,0,0);
+                        const c = new Date(r.completedDate); c.setHours(0,0,0,0);
+                        if (c > d) overdueCompletedCount++;
+                    }
+                } else {
+                    processingCount++;
+                    if (r.deadline) {
+                        const d = new Date(r.deadline); d.setHours(0,0,0,0);
+                        if (today > d) {
+                            overduePendingCount++;
+                            const diffTime = today.getTime() - d.getTime();
+                            const daysOver = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                            overdueRecords.push({ record: r, daysOver });
+                        }
+                    }
+                }
+            });
+        }
+
+        const total = completedCount + processingCount;
 
         overdueRecords.sort((a, b) => b.daysOver - a.daysOver);
         const longestOverdue = overdueRecords.length > 0 ? overdueRecords[0] : null;
@@ -119,53 +208,146 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
             longOverdueList,
             totalOverdue: overduePendingCount + overdueCompletedCount
         };
-    }, [recordsInTimeRange, selectedEmpId]);
+    }, [recordsInTimeRange, selectedEmpId, employees]);
 
     // Summary table for all employees when no specific employee is selected
     const employeeSummaryList = useMemo(() => {
         const today = new Date(); today.setHours(0,0,0,0);
 
         return filteredEmployeesByDept.map(emp => {
-            const empRecords = recordsInTimeRange.filter(r => r.assignedTo === emp.id);
-            const totalAssigned = empRecords.length;
+            const pos = (emp.position || '').toLowerCase();
+            const isSupervisor = pos.includes('tổ trưởng') || pos.includes('tổ phó') || pos.includes('trưởng') || pos.includes('phó') || pos.includes('giám đốc') || pos.includes('lãnh đạo');
 
-            let completed = 0;
-            let processing = 0;
-            let overdueCompleted = 0;
-            let overduePending = 0;
+            if (isSupervisor) {
+                const checkedRecords = recordsInTimeRange.filter(r => r.checkedBy === emp.id);
+                const assignedRecords = recordsInTimeRange.filter(r => r.assignedTo === emp.id && r.checkedBy !== emp.id);
+                
+                let completed = 0;
+                let processing = 0;
+                let overdueCompleted = 0;
+                let overduePending = 0;
 
-            empRecords.forEach(r => {
-                const isFinished = [
-                    RecordStatus.HANDOVER, 
-                    RecordStatus.RETURNED, 
-                    RecordStatus.WITHDRAWN, 
-                    RecordStatus.SIGNED
-                ].includes(r.status) || !!r.exportBatch || !!r.exportDate;
-
-                if (isFinished) {
+                // Process Checked Records
+                checkedRecords.forEach(r => {
                     completed++;
-                    if (r.deadline && r.completedDate) {
+                    if (r.deadline && r.checkedDate) {
                         const d = new Date(r.deadline); d.setHours(0,0,0,0);
-                        const c = new Date(r.completedDate); c.setHours(0,0,0,0);
+                        const c = new Date(r.checkedDate); c.setHours(0,0,0,0);
                         if (c > d) overdueCompleted++;
+                    } else if (r.pendingCheckDate && r.checkedDate) {
+                        const p = new Date(r.pendingCheckDate);
+                        const c = new Date(r.checkedDate);
+                        const diff = c.getTime() - p.getTime();
+                        if (diff > 2 * 24 * 60 * 60 * 1000) overdueCompleted++;
                     }
-                } else {
-                    processing++;
-                    if (r.deadline) {
-                        const d = new Date(r.deadline); d.setHours(0,0,0,0);
-                        if (today > d) overduePending++;
-                    }
-                }
-            });
+                });
 
-            return {
-                employee: emp,
-                totalAssigned,
-                completed,
-                processing,
-                overdueCompleted,
-                overduePending
-            };
+                // Process Assigned Records
+                assignedRecords.forEach(r => {
+                    const isFinished = [
+                        RecordStatus.HANDOVER, 
+                        RecordStatus.RETURNED, 
+                        RecordStatus.WITHDRAWN, 
+                        RecordStatus.SIGNED
+                    ].includes(r.status) || !!r.exportBatch || !!r.exportDate;
+
+                    if (isFinished) {
+                        completed++;
+                        if (r.deadline && r.completedDate) {
+                            const d = new Date(r.deadline); d.setHours(0,0,0,0);
+                            const c = new Date(r.completedDate); c.setHours(0,0,0,0);
+                            if (c > d) overdueCompleted++;
+                        }
+                    } else {
+                        processing++;
+                        if (r.deadline) {
+                            const d = new Date(r.deadline); d.setHours(0,0,0,0);
+                            if (today > d) overduePending++;
+                        }
+                    }
+                });
+
+                // Add currently pending check records
+                const empDept = (emp.department || '').toLowerCase();
+                const isArchiveEmp = empDept.includes('lưu trữ');
+                const isMeasurementEmp = empDept.includes('đo đạc') || empDept.includes('kỹ thuật');
+
+                const pendingCheckRecords = recordsInTimeRange.filter(r => 
+                    r.status === RecordStatus.PENDING_CHECK && 
+                    (!r.checkedBy || r.checkedBy === emp.id)
+                );
+
+                pendingCheckRecords.forEach(r => {
+                    const recordDept = (r.recordType || '').toLowerCase();
+                    const isArchiveRecord = recordDept.includes('sao lục') || recordDept.includes('công văn') || recordDept.includes('vào sổ');
+                    const isMatch = (isArchiveRecord && isArchiveEmp) || (!isArchiveRecord && isMeasurementEmp);
+                    
+                    if (isMatch) {
+                        processing++;
+                        if (r.deadline) {
+                            const d = new Date(r.deadline); d.setHours(0,0,0,0);
+                            if (today > d) overduePending++;
+                        } else if (r.pendingCheckDate) {
+                            const p = new Date(r.pendingCheckDate); p.setHours(0,0,0,0);
+                            if (today > p) overduePending++;
+                        }
+                    }
+                });
+
+                const totalAssigned = completed + processing;
+
+                return {
+                    employee: emp,
+                    totalAssigned,
+                    completed,
+                    processing,
+                    overdueCompleted,
+                    overduePending,
+                    isSupervisor: true
+                };
+            } else {
+                const empRecords = recordsInTimeRange.filter(r => r.assignedTo === emp.id);
+                const totalAssigned = empRecords.length;
+
+                let completed = 0;
+                let processing = 0;
+                let overdueCompleted = 0;
+                let overduePending = 0;
+
+                empRecords.forEach(r => {
+                    const isFinished = [
+                        RecordStatus.HANDOVER, 
+                        RecordStatus.RETURNED, 
+                        RecordStatus.WITHDRAWN, 
+                        RecordStatus.SIGNED
+                    ].includes(r.status) || !!r.exportBatch || !!r.exportDate;
+
+                    if (isFinished) {
+                        completed++;
+                        if (r.deadline && r.completedDate) {
+                            const d = new Date(r.deadline); d.setHours(0,0,0,0);
+                            const c = new Date(r.completedDate); c.setHours(0,0,0,0);
+                            if (c > d) overdueCompleted++;
+                        }
+                    } else {
+                        processing++;
+                        if (r.deadline) {
+                            const d = new Date(r.deadline); d.setHours(0,0,0,0);
+                            if (today > d) overduePending++;
+                        }
+                    }
+                });
+
+                return {
+                    employee: emp,
+                    totalAssigned,
+                    completed,
+                    processing,
+                    overdueCompleted,
+                    overduePending,
+                    isSupervisor: false
+                };
+            }
         }).sort((a, b) => b.totalAssigned - a.totalAssigned);
     }, [filteredEmployeesByDept, recordsInTimeRange]);
 
@@ -202,7 +384,17 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
         if (!stats || !selectedEmpId) return;
         setIsGenerating(true);
         const emp = employees.find(e => e.id === selectedEmpId);
-        const empName = emp ? emp.name : "Nhân viên";
+        let empName = emp ? emp.name : "Nhân viên";
+        
+        const pos = emp ? (emp.position || '').toLowerCase() : '';
+        const isSupervisor = pos.includes('tổ trưởng') || pos.includes('tổ phó') || pos.includes('trưởng') || pos.includes('phó') || pos.includes('giám đốc') || pos.includes('lãnh đạo');
+        
+        if (emp && emp.position) {
+            empName += ` (${emp.position})`;
+        }
+        if (isSupervisor) {
+            empName += " - Vai trò: Kiểm duyệt & Thẩm định";
+        }
         
         const badRecordsSimple = stats.longOverdueList.map(i => ({
             code: i.record.code,
@@ -235,7 +427,32 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
         const emp = employees.find(e => e.id === selectedEmpId);
         const empName = emp ? emp.name : "NhanVien";
         
-        const targetRecords = recordsInTimeRange.filter(r => r.assignedTo === selectedEmpId);
+        const pos = emp ? (emp.position || '').toLowerCase() : '';
+        const isSupervisor = pos.includes('tổ trưởng') || pos.includes('tổ phó') || pos.includes('trưởng') || pos.includes('phó') || pos.includes('giám đốc') || pos.includes('lãnh đạo');
+
+        let targetRecords: RecordFile[] = [];
+        if (emp && isSupervisor) {
+            const empDept = (emp.department || '').toLowerCase();
+            const isArchiveEmp = empDept.includes('lưu trữ');
+            const isMeasurementEmp = empDept.includes('đo đạc') || empDept.includes('kỹ thuật');
+
+            const checked = recordsInTimeRange.filter(r => r.checkedBy === selectedEmpId);
+            const assigned = recordsInTimeRange.filter(r => r.assignedTo === selectedEmpId && r.checkedBy !== selectedEmpId);
+            const pending = recordsInTimeRange.filter(r => {
+                if (r.status !== RecordStatus.PENDING_CHECK) return false;
+                if (r.checkedBy && r.checkedBy !== selectedEmpId) return false;
+                
+                const recordDept = (r.recordType || '').toLowerCase();
+                const isArchiveRecord = recordDept.includes('sao lục') || recordDept.includes('công văn') || recordDept.includes('vào sổ');
+                return (isArchiveRecord && isArchiveEmp) || (!isArchiveRecord && isMeasurementEmp);
+            });
+
+            const uniqueMap = new Map<string, RecordFile>();
+            [...checked, ...assigned, ...pending].forEach(r => uniqueMap.set(r.id, r));
+            targetRecords = Array.from(uniqueMap.values());
+        } else {
+            targetRecords = recordsInTimeRange.filter(r => r.assignedTo === selectedEmpId);
+        }
         
         if (targetRecords.length === 0) {
             alert("Không có hồ sơ nào trong khoảng thời gian này.");
@@ -434,7 +651,6 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
                             </span>
                         </div>
                     </div>
-
                     {/* Table */}
                     <div className="flex-1 overflow-x-auto overflow-y-auto custom-scrollbar">
                         <table className="w-full text-left text-xs sm:text-sm border-collapse">
@@ -460,8 +676,18 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
                                             {idx + 1}
                                         </td>
                                         <td className="py-3.5 px-4">
-                                            <div className="font-bold text-slate-800 text-sm group-hover:text-indigo-600 transition-colors">
+                                            <div className="font-bold text-slate-800 text-sm group-hover:text-indigo-600 transition-colors flex items-center gap-2">
                                                 {item.employee.name}
+                                                {item.employee.position && (
+                                                    <span className="text-[10px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded font-semibold border border-indigo-100">
+                                                        {item.employee.position}
+                                                    </span>
+                                                )}
+                                                {item.isSupervisor && (
+                                                    <span className="text-[10px] bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded font-bold border border-amber-100">
+                                                        Kiểm duyệt
+                                                    </span>
+                                                )}
                                             </div>
                                             <div className="text-xs text-slate-400 font-normal mt-0.5">
                                                 {item.employee.department || 'Tổ chuyên môn'}

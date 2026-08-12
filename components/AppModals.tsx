@@ -241,6 +241,7 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
                 employees={props.employees}
                 wards={props.wards}
                 onConfirm={props.handleBulkUpdate}
+                currentView={props.currentView}
             />
 
             <ReturnResultModal

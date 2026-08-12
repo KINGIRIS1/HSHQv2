@@ -65,6 +65,9 @@ export const normalizeCode = (code: any): string => {
     return str;
 };
 
+// Variable to prevent multiple alerts on connection failures during a single session
+let hasShownConnectionAlert = false;
+
 export const logError = (context: string, error: any, silent: boolean = false) => {
     // 1. Log Raw Error object để debug trong Console
     // console.error(`[Raw Error] ${context}:`, error);
@@ -107,7 +110,10 @@ export const logError = (context: string, error: any, silent: boolean = false) =
 
     if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('configuration') || msg.includes('Load failed')) {
         console.error(`❌ [Lỗi kết nối] ${context}: Không thể kết nối tới cơ sở dữ liệu Cloud Supabase. Vui lòng kiểm tra lại mạng.`);
-        alert(`LỖI KẾT NỐI: Không thể kết nối tới cơ sở dữ liệu Cloud Supabase. Vui lòng kiểm tra kết nối mạng của bạn.`);
+        if (!hasShownConnectionAlert) {
+            hasShownConnectionAlert = true;
+            alert(`LỖI KẾT NỐI: Không thể kết nối tới cơ sở dữ liệu Cloud Supabase.\n\nHệ thống sẽ tự động chuyển sang chế độ Ngoại tuyến (Offline Mode) và tải dữ liệu từ bộ nhớ lưu trữ tạm thời trên trình duyệt của bạn.`);
+        }
     } else if (code === '42P01' || code === 'PGRST205' || (typeof msg === 'string' && msg.includes('schema cache'))) {
         console.error(`❌ Lỗi tại ${context}: Bảng dữ liệu chưa tồn tại trên Supabase! (Code: ${code || 'PGRST205'})`);
         if (!silent) {

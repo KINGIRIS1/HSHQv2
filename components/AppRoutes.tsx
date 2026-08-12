@@ -1032,20 +1032,6 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                   </div>
                 </div>
 
-                {/* Tác vụ tab con được chuyển lên cạnh Excel */}
-                {(currentView === "handover_list" ||
-                  currentView === "other_handover_list" ||
-                  currentView === "archive_handover_list") &&
-                  props.handoverTab === "today" &&
-                  props.selectedRecordIds.size > 0 && (
-                    <button
-                      onClick={() => props.setIsAddToBatchModalOpen(true)}
-                      className="flex items-center gap-1.5 bg-emerald-600 text-white px-3 py-1.5 rounded-md hover:bg-emerald-700 text-sm font-bold shadow-sm transition-all animate-pulse"
-                    >
-                      <CheckCircle size={16} /> Chốt Danh Sách Giao ({props.selectedRecordIds.size})
-                    </button>
-                  )}
-
                 {(currentView === "handover_list" ||
                   currentView === "other_handover_list" ||
                   currentView === "archive_handover_list") &&
@@ -1085,21 +1071,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                     </button>
                   )}
 
-                {!["assign_tasks", "other_assign_tasks", "archive_assign_tasks", "completed_list", "archive_completed_list", "pending_check_list", "archive_pending_check_list", "check_list", "other_check_list", "archive_check_list", "handover_list", "other_handover_list", "archive_handover_list", "director_completed", "archive_director_completed", "other_director_completed", "receive_record", "receive_contract", "dashboard", "reports", "account_settings", "utilities", "work_schedule"].includes(currentView) &&
-                  props.selectedRecordIds.size > 0 && props.handleOpenExtendModal && (
-                  <button
-                    onClick={() => {
-                      const targets = records.filter((r) =>
-                        props.selectedRecordIds.has(r.id),
-                      );
-                      props.handleOpenExtendModal!(targets);
-                    }}
-                    className="flex items-center gap-1.5 bg-amber-600 text-white px-3 py-1.5 rounded-md hover:bg-amber-700 text-sm font-bold shadow-sm transition-all"
-                    title="Gia hạn ngày hẹn trả cho các hồ sơ đã chọn"
-                  >
-                    <CalendarClock size={16} /> Gia hạn ({props.selectedRecordIds.size})
-                  </button>
-                )}
+
 
                 {(currentView === "check_list" ||
                   currentView === "other_check_list" ||
@@ -1201,20 +1173,32 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
               </>
             )}
 
-            {/* Xuất Danh Sách - không phụ thuộc canPerformAction */}
+            {/* Xuất Danh Sách & Chốt DS trong tab Giao 1 cửa (handover) */}
             {(currentView === "handover_list" ||
               currentView === "other_handover_list" ||
-              currentView === "archive_handover_list") &&
-              props.handoverTab !== "returned" && (
-                <button
-                  onClick={() => {
-                    props.setExportModalType("handover");
-                    props.setIsExportModalOpen(true);
-                  }}
-                  className="flex items-center gap-1.5 bg-white text-gray-700 border border-gray-300 px-3 py-1.5 rounded-md hover:bg-gray-50 text-sm font-semibold shadow-sm"
-                >
-                  <FileOutput size={16} /> Xuất Danh Sách
-                </button>
+              currentView === "archive_handover_list") && (
+                <div className="flex items-center gap-2 ml-auto">
+                  {props.handoverTab === "today" && props.selectedRecordIds.size > 0 && (
+                    <button
+                      onClick={() => props.setIsAddToBatchModalOpen(true)}
+                      className="flex items-center gap-1.5 bg-blue-600 text-white px-3.5 py-1.5 rounded-lg hover:bg-blue-700 text-sm font-bold shadow-sm transition-all animate-pulse"
+                    >
+                      <CheckCircle size={16} /> Chốt DS ({props.selectedRecordIds.size})
+                    </button>
+                  )}
+
+                  {props.handoverTab !== "returned" && (
+                    <button
+                      onClick={() => {
+                        props.setExportModalType("handover");
+                        props.setIsExportModalOpen(true);
+                      }}
+                      className="flex items-center gap-1.5 bg-white text-gray-700 border border-gray-300 px-3 py-1.5 rounded-md hover:bg-gray-50 text-sm font-semibold shadow-sm"
+                    >
+                      <FileOutput size={16} /> Xuất Danh Sách
+                    </button>
+                  )}
+                </div>
               )}
 
             {(isAdmin || isSubadmin) && props.selectedRecordIds.size > 0 && (

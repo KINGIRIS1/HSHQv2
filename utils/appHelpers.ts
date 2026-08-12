@@ -438,13 +438,13 @@ export function getDepartmentForRecord(r: RecordFile): string {
     if (type.includes('1.1') || type.includes('1.2') || type.includes('công văn') || type.includes('sao lục') || code.startsWith('1.')) {
         return 'Tổ Lưu trữ';
     }
-    if (type.includes('2.1') || type.includes('2.2') || type.includes('trích lục')) {
-        return 'Tổ Cấp giấy';
-    }
     if (type.includes('2.3') || type.includes('2.4') || type.includes('2.5') || type.includes('2.6') || type.includes('số thửa') || type.includes('trích đo') || type.includes('đo đạc') || code.startsWith('2.')) {
         return 'Tổ Đo đạc';
     }
-    return 'Tổ Cấp giấy';
+    if (type.includes('2.1') || type.includes('2.2') || type.includes('trích lục')) {
+        return 'Tổ Cấp giấy';
+    }
+    return 'Tổ Đo đạc';
 }
 
 export function getDeptAbbr(deptName: string): string {
