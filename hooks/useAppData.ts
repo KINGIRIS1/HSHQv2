@@ -106,9 +106,20 @@ export const useAppData = (currentUser: User | null) => {
         }
     }, []);
 
-    // Initial Load (NO POLLING)
+    // Initial Load & Auto-polling (Real-time background sync every 10 seconds)
     useEffect(() => {
         loadData();
+        const intervalId = setInterval(() => {
+            fetchRecords().then(recData => {
+                if (recData && Array.isArray(recData)) {
+                    const { migratedRecords } = migrateUnbatchedRecords(recData);
+                    setRecords(migratedRecords);
+                }
+            }).catch(err => {
+                console.error("Background sync poll error:", err);
+            });
+        }, 10000); // 10 seconds auto-sync
+        return () => clearInterval(intervalId);
     }, [loadData]);
 
     // Lắng nghe thay đổi Realtime từ bảng land_records

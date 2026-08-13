@@ -719,6 +719,120 @@ export function cleanSyncNotes(text?: string | null): string {
     return str;
 }
 
+// --- TÍNH TOÁN KHỐI LƯỢNG CÔNG VIỆC THEO SỐ THỬA ĐẤT ---
+export function getRecordPlotCount(r: RecordFile): number {
+    if (!r) return 1;
+    // 1. Check data.plotCount
+    if (r.data && typeof r.data.plotCount === 'number' && r.data.plotCount > 0) {
+        return r.data.plotCount;
+    }
+    if (r.data && r.data.plotCount && !isNaN(Number(r.data.plotCount)) && Number(r.data.plotCount) > 0) {
+        return Number(r.data.plotCount);
+    }
+    // 2. Check doDacItems / splitItems / tachThuaItems
+    if (r.data?.doDacItems && Array.isArray(r.data.doDacItems) && r.data.doDacItems.length > 0) {
+        return r.data.doDacItems.length;
+    }
+    if (r.data?.splitItems && Array.isArray(r.data.splitItems) && r.data.splitItems.length > 0) {
+        return r.data.splitItems.length;
+    }
+    if (r.data?.tachThuaItems && Array.isArray(r.data.tachThuaItems) && r.data.tachThuaItems.length > 0) {
+        return r.data.tachThuaItems.length;
+    }
+    // 3. Check landPlot string separated by commas, semicolons, etc.
+    if (r.landPlot && typeof r.landPlot === 'string') {
+        const raw = r.landPlot.trim();
+        if (raw) {
+            const parts = raw.split(/[,;\n+]/).map(p => p.trim()).filter(Boolean);
+            if (parts.length > 1) {
+                return parts.length;
+            }
+        }
+    }
+    return 1;
+}
+
+export interface EmployeeWorkloadStats {
+    inProgressPlots: number;
+    completedPlots: number;
+}
+
+export function calculateEmployeeWorkload(
+    records: RecordFile[],
+    employee: Employee
+): EmployeeWorkloadStats {
+    if (!records || records.length === 0 || !employee) {
+        return { inProgressPlots: 0, completedPlots: 0 };
+    }
+
+    const empName = (employee.name || '').trim().toLowerCase();
+    const empId = (employee.id || '').trim().toLowerCase();
+    const position = (employee.position || '').toLowerCase();
+    const department = (employee.department || '').toLowerCase();
+
+    const isBoard = department.includes('ban giám đốc') || position.includes('giám đốc');
+    const isLead = position.includes('trưởng') || position.includes('phó') || position.includes('lãnh đạo');
+
+    let inProgressPlots = 0;
+    let completedPlots = 0;
+
+    for (const r of records) {
+        const plotCount = getRecordPlotCount(r);
+        
+        const rAssigned = (r.assignedTo || '').trim().toLowerCase();
+        const rChecked = (r.checkedBy || '').trim().toLowerCase();
+        const rSubmitted = (r.submittedTo || '').trim().toLowerCase();
+
+        const isAssigned = rAssigned === empName || rAssigned === empId;
+        const isCheckedBy = rChecked === empName || rChecked === empId;
+        const isSubmittedTo = rSubmitted === empName || rSubmitted === empId;
+
+        // Has status log transitioned by this user
+        const hasLog = r.statusLogs?.some(log => {
+            const cb = (log.changedBy || '').trim().toLowerCase();
+            return cb === empName || cb === empId;
+        });
+
+        if (isBoard) {
+            // Ban Giám đốc khi nhận trình ký:
+            // Đang xử lý: Hồ sơ PENDING_SIGN được trình cho Giám đốc này (hoặc r.submittedTo == emp)
+            if (r.status === RecordStatus.PENDING_SIGN && (isSubmittedTo || isAssigned)) {
+                inProgressPlots += plotCount;
+            }
+            // Đã hoàn thành: Hồ sơ đã ký duyệt/hoàn thành (SIGNED, HANDOVER, RETURNED) mà Giám đốc đã duyệt/trình
+            if ((r.status === RecordStatus.SIGNED || r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED) && (isSubmittedTo || isAssigned || hasLog)) {
+                completedPlots += plotCount;
+            }
+        } else if (isLead) {
+            // Tổ trưởng / Tổ phó khi nhận kiểm tra:
+            // Đang xử lý: Hồ sơ đang PENDING_CHECK / CHECKING được giao cho cán bộ này kiểm tra (hoặc đang phân công xử lý trực tiếp)
+            if ((r.status === RecordStatus.PENDING_CHECK || (r.status as string) === 'CHECKING') && (isCheckedBy || isAssigned)) {
+                inProgressPlots += plotCount;
+            } else if ((r.status === RecordStatus.ASSIGNED || r.status === RecordStatus.IN_PROGRESS || r.status === RecordStatus.COMPLETED_WORK) && isAssigned) {
+                inProgressPlots += plotCount;
+            }
+
+            // Đã hoàn thành: Hồ sơ đã qua bước kiểm tra (CHECKED, PENDING_SIGN, SIGNED, HANDOVER, RETURNED) mà do cán bộ này kiểm tra/xử lý
+            if ((r.status === RecordStatus.CHECKED || r.status === RecordStatus.PENDING_SIGN || r.status === RecordStatus.SIGNED || r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED) && (isCheckedBy || isAssigned || hasLog)) {
+                completedPlots += plotCount;
+            }
+        } else {
+            // Chuyên viên / Tổ viên:
+            // Đang xử lý: Hồ sơ được giao cho chuyên viên xử lý ở các bước chưa trình/hoàn thành (RECEIVED, ASSIGNED, IN_PROGRESS, COMPLETED_WORK)
+            if (isAssigned && (r.status === RecordStatus.RECEIVED || r.status === RecordStatus.ASSIGNED || r.status === RecordStatus.IN_PROGRESS || r.status === RecordStatus.COMPLETED_WORK)) {
+                inProgressPlots += plotCount;
+            }
+
+            // Đã hoàn thành: Hồ sơ chuyên viên đó chịu trách nhiệm (assignedTo hoặc có log) đã chuyển bước tiếp theo (PENDING_CHECK, CHECKED, PENDING_SIGN, SIGNED, HANDOVER, RETURNED)
+            if ((isAssigned || hasLog) && (r.status === RecordStatus.PENDING_CHECK || r.status === RecordStatus.CHECKED || r.status === RecordStatus.PENDING_SIGN || r.status === RecordStatus.SIGNED || r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED)) {
+                completedPlots += plotCount;
+            }
+        }
+    }
+
+    return { inProgressPlots, completedPlots };
+}
+
 
 
 

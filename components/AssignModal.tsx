@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Employee, RecordFile, User as AppUser } from '../types';
 import { X, Check, MapPin, User, Users, Search, Briefcase, Star, Clock } from 'lucide-react';
-import { removeVietnameseTones } from '../utils/appHelpers';
+import { removeVietnameseTones, calculateEmployeeWorkload, EmployeeWorkloadStats } from '../utils/appHelpers';
 
 interface DeptConfig {
     id: string;
@@ -52,6 +52,7 @@ interface AssignModalProps {
   filterDepartment?: string;
   currentView?: string;
   currentUser?: AppUser | null;
+  allRecords?: RecordFile[];
 }
 
 interface EmployeeItemProps {
@@ -60,10 +61,11 @@ interface EmployeeItemProps {
     isTargetWardMatch: boolean;
     isSelected: boolean;
     onSelect: (id: string) => void;
+    workloadStats?: EmployeeWorkloadStats;
 }
 
 // Component hiển thị một dòng nhân viên trong danh sách tổ chuyên môn
-const EmployeeItem: React.FC<EmployeeItemProps> = ({ emp, isLastAssigned, isTargetWardMatch, isSelected, onSelect }) => (
+const EmployeeItem: React.FC<EmployeeItemProps> = ({ emp, isLastAssigned, isTargetWardMatch, isSelected, onSelect, workloadStats }) => (
     <div 
         onClick={() => onSelect(emp.id)}
         className={`relative flex flex-col justify-between p-3 rounded-xl border cursor-pointer transition-all duration-200 group h-full ${
@@ -106,6 +108,20 @@ const EmployeeItem: React.FC<EmployeeItemProps> = ({ emp, isLastAssigned, isTarg
                     <Briefcase size={12} className="text-gray-400 shrink-0" />
                     <span className="truncate">{emp.position || 'Nhân viên'} - <span className="text-indigo-700 font-bold">{emp.department || 'Tổ chuyên môn'}</span></span>
                 </div>
+
+                {/* Khối lượng công việc cân bằng (Đang xử lý | Đã hoàn thành theo số thửa) */}
+                {workloadStats && (
+                    <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                        <span className="text-[11px] bg-amber-50 text-amber-800 px-2 py-0.5 rounded-md border border-amber-200/80 font-bold flex items-center gap-1 shadow-2xs">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                            Đang xử lý: {workloadStats.inProgressPlots} thửa
+                        </span>
+                        <span className="text-[11px] bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded-md border border-emerald-200/80 font-bold flex items-center gap-1 shadow-2xs">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                            Đã hoàn thành: {workloadStats.completedPlots} thửa
+                        </span>
+                    </div>
+                )}
             </div>
         </div>
 
@@ -133,7 +149,7 @@ const EmployeeItem: React.FC<EmployeeItemProps> = ({ emp, isLastAssigned, isTarg
     </div>
 );
 
-const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, employees, selectedRecords, filterDepartment, currentView, currentUser }) => {
+const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, employees, selectedRecords, filterDepartment, currentView, currentUser, allRecords }) => {
   const [selectedDept, setSelectedDept] = useState<string>('');
   const [selectedEmpId, setSelectedEmpId] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -435,6 +451,7 @@ const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, e
                                     isTargetWardMatch={isWardMatch(emp)}
                                     isSelected={selectedEmpId === emp.id}
                                     onSelect={setSelectedEmpId}
+                                    workloadStats={calculateEmployeeWorkload(allRecords || [], emp)}
                                 />
                             ))}
                          </div>

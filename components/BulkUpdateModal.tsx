@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { RecordFile, Employee, RecordStatus } from '../types';
 import { STATUS_LABELS, SELECTABLE_STATUSES } from '../constants';
 import { X, CheckCircle2, Layers, ArrowRight, UserCheck, Calendar } from 'lucide-react';
-import { getDepartmentForRecord } from '../utils/appHelpers';
+import { getDepartmentForRecord, calculateEmployeeWorkload } from '../utils/appHelpers';
 
 interface BulkUpdateModalProps {
   isOpen: boolean;
@@ -16,7 +16,7 @@ interface BulkUpdateModalProps {
 }
 
 const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({ 
-  isOpen, onClose, selectedRecords, employees, wards, onConfirm, currentView 
+  isOpen, onClose, selectedRecords, allRecords, employees, wards, onConfirm, currentView 
 }) => {
   const [targetField, setTargetField] = useState<string>('status');
   const [targetValue, setTargetValue] = useState<string>('');
@@ -213,9 +213,14 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
                                 onChange={(e) => setTargetValue(e.target.value)}
                             >
                                 <option value="">-- Chọn nhân viên --</option>
-                                {employees.map(emp => (
-                                    <option key={emp.id} value={emp.id}>{emp.name} - {emp.department}</option>
-                                ))}
+                                {employees.map(emp => {
+                                    const stats = calculateEmployeeWorkload(allRecords || [], emp);
+                                    return (
+                                        <option key={emp.id} value={emp.id}>
+                                            {emp.name} (Đang xử lý: {stats.inProgressPlots} thửa | Đã hoàn thành: {stats.completedPlots} thửa)
+                                        </option>
+                                    );
+                                })}
                             </select>
                         )}
 
@@ -285,11 +290,14 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
                             onChange={(e) => setStatusEmployee(e.target.value)}
                         >
                             <option value="">-- Giữ nguyên / Không đổi --</option>
-                            {filteredEmployees.map(emp => (
-                                <option key={emp.id} value={emp.id}>
-                                    {emp.name} - {emp.position || 'Chuyên viên'} ({emp.department})
-                                </option>
-                            ))}
+                            {filteredEmployees.map(emp => {
+                                const stats = calculateEmployeeWorkload(allRecords || [], emp);
+                                return (
+                                    <option key={emp.id} value={emp.id}>
+                                        {emp.name} - {emp.position || 'Chuyên viên'} (Đang xử lý: {stats.inProgressPlots} thửa | Đã hoàn thành: {stats.completedPlots} thửa)
+                                    </option>
+                                );
+                            })}
                         </select>
                         <p className="text-[11px] text-gray-500 leading-normal">
                             Danh sách nhân sự đã được tự động tối ưu hóa cho phù hợp với trạng thái và tổ chuyên môn đang mở.
