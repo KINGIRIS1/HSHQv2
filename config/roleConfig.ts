@@ -133,27 +133,30 @@ export function isViewAllowedForUser(
     } else if (DEFAULT_ROLE_PERMISSIONS[user.role]) {
       activePerms = DEFAULT_ROLE_PERMISSIONS[user.role];
     }
+  }
 
-    // Nếu không có phân quyền tùy chỉnh riêng cho phòng ban, áp dụng quy tắc phân tách mặc định:
-    // - Tổ đo đạc không tự động có quyền Tab Lưu trữ
-    // - Tổ Lưu trữ không tự động có quyền Tab Đo đạc
-    if (!isCustomDeptPerm && user.employeeId && employees && activePerms) {
-      const emp = employees.find(e => e.id === user.employeeId);
-      if (emp && emp.department) {
-        if (matchDepartmentKey('đo đạc', emp.department)) {
-          const ARCHIVE_PERMS = [
-            'archive_records', 'archive_sub_all', 'archive_assign_tasks',
-            'archive_completed_list', 'archive_pending_check_list', 'archive_check_list',
-            'archive_handover_list', 'archive_director_completed', 'VIEW_ARCHIVE', 'MANAGE_ARCHIVE'
-          ];
-          activePerms = activePerms.filter(p => !ARCHIVE_PERMS.includes(p));
-        } else if (matchDepartmentKey('lưu trữ', emp.department)) {
-          const SURVEY_PERMS = [
-            'all_records', 'all_sub_all', 'assign_tasks', 'completed_list',
-            'pending_check_list', 'check_list', 'handover_list', 'director_completed', 'survey_list'
-          ];
-          activePerms = activePerms.filter(p => !SURVEY_PERMS.includes(p));
-        }
+  // Luôn áp dụng quy tắc phân tách thuộc tính tổ chuyên môn (Department isolation):
+  // - Tài khoản thuộc Tổ Đo đạc (không thuộc Lưu trữ) sẽ không thể thấy Tab Lưu trữ
+  // - Tài khoản thuộc Tổ Lưu trữ (không thuộc Đo đạc) sẽ không thể thấy Tab Đo đạc
+  if (user.role !== UserRole.ADMIN && user.employeeId && employees && activePerms) {
+    const emp = employees.find(e => e.id === user.employeeId);
+    if (emp && emp.department) {
+      const isDodac = matchDepartmentKey('đo đạc', emp.department);
+      const isLuutru = matchDepartmentKey('lưu trữ', emp.department);
+
+      if (isDodac && !isLuutru) {
+        const ARCHIVE_PERMS = [
+          'archive_records', 'archive_sub_all', 'archive_assign_tasks',
+          'archive_completed_list', 'archive_pending_check_list', 'archive_check_list',
+          'archive_handover_list', 'archive_director_completed', 'VIEW_ARCHIVE', 'MANAGE_ARCHIVE'
+        ];
+        activePerms = activePerms.filter(p => !ARCHIVE_PERMS.includes(p));
+      } else if (isLuutru && !isDodac) {
+        const SURVEY_PERMS = [
+          'all_records', 'all_sub_all', 'assign_tasks', 'completed_list',
+          'pending_check_list', 'check_list', 'handover_list', 'director_completed', 'survey_list'
+        ];
+        activePerms = activePerms.filter(p => !SURVEY_PERMS.includes(p));
       }
     }
   }

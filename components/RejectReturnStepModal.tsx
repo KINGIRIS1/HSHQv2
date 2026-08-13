@@ -34,7 +34,7 @@ export const RejectReturnStepModal: React.FC<RejectReturnStepModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!reason.trim()) {
-      setErrorMsg('Vui lòng nhập lý do trả hồ sơ!');
+      setErrorMsg('Vui lòng nhập lý do giải trình trả hồ sơ!');
       return;
     }
     setErrorMsg('');

@@ -88,6 +88,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
 }) => {
   // Thêm tab 'pending_sign'
   const [activeTab, setActiveTab] = useState<
+    | "all"
     | "pending"
     | "pending_check"
     | "pending_sign"
@@ -323,6 +324,11 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
     }
   }, [isChecker]);
 
+  // 0. Tất cả hồ sơ cá nhân
+  const allMyRecords = useMemo(() => {
+    return filterAndSort([...myRecords], searchTerm, sortConfig);
+  }, [myRecords, searchTerm, sortConfig]);
+
   // 1. Hồ sơ Đang thực hiện (ASSIGNED, IN_PROGRESS, COMPLETED_WORK)
   const pendingRecords = useMemo(() => {
     let list = myRecords.filter(
@@ -422,15 +428,17 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
 
   // Xác định danh sách hiển thị dựa trên Tab đang chọn
   const displayRecords =
-    activeTab === "pending"
-      ? pendingRecords
-      : activeTab === "pending_check"
-        ? pendingCheckRecords
-        : activeTab === "pending_sign"
-          ? reviewRecords
-          : activeTab === "finished"
-            ? finishedRecords
-            : reminderRecords;
+    activeTab === "all"
+      ? allMyRecords
+      : activeTab === "pending"
+        ? pendingRecords
+        : activeTab === "pending_check"
+          ? pendingCheckRecords
+          : activeTab === "pending_sign"
+            ? reviewRecords
+            : activeTab === "finished"
+              ? finishedRecords
+              : reminderRecords;
 
   const totalPages = Math.ceil(displayRecords.length / itemsPerPage);
 
@@ -953,12 +961,16 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
   // Helper để lấy tên Tab hiện tại cho placeholder
   const getTabLabel = () => {
     switch (activeTab) {
+      case "all":
+        return "Tất cả hồ sơ";
       case "pending":
         return "Đang thực hiện";
       case "pending_check":
         return "Chờ kiểm tra";
       case "pending_sign":
         return "Chờ ký";
+      case "finished":
+        return "Hoàn thành";
       case "reminder":
         return "Nhắc việc";
       default:
@@ -996,10 +1008,22 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
             Danh sách hồ sơ bạn đang phụ trách.
           </p>
         </div>
-        <div className={`grid ${isChecker || isMeasurementTeam ? "grid-cols-4" : "grid-cols-3"} sm:flex gap-1.5 md:gap-4 w-full md:w-auto justify-center`}>
+        <div className={`grid ${isChecker || isMeasurementTeam ? "grid-cols-5" : "grid-cols-4"} sm:flex gap-1.5 md:gap-4 w-full md:w-auto justify-center`}>
+          <div 
+            onClick={() => { setActiveTab("all"); setCurrentPage(1); setSearchTerm(""); }}
+            className={`cursor-pointer active:scale-95 transition-all text-center p-1.5 md:px-4 md:py-2 bg-slate-100 rounded-lg border ${activeTab === "all" ? "ring-2 ring-slate-600 border-slate-500 font-extrabold shadow-sm" : "border-slate-200 hover:border-slate-400"} min-w-0 md:min-w-[90px] flex flex-col justify-center`}
+            title="Xem tất cả hồ sơ"
+          >
+            <div className="text-base md:text-2xl font-bold text-slate-800">
+              {myRecords.length}
+            </div>
+            <div className="text-[9px] md:text-xs text-slate-700 uppercase font-bold leading-tight mt-0.5">
+              Tất cả
+            </div>
+          </div>
           <div 
             onClick={() => { setActiveTab("pending"); setCurrentPage(1); setSearchTerm(""); }}
-            className={`cursor-pointer active:scale-95 transition-all text-center p-1.5 md:px-4 md:py-2 bg-blue-50 rounded-lg border ${activeTab === "pending" ? "ring-2 ring-blue-500 border-blue-400 font-extrabold shadow-sm" : "border-blue-100 hover:border-blue-300"} min-w-0 md:min-w-[100px] flex flex-col justify-center`}
+            className={`cursor-pointer active:scale-95 transition-all text-center p-1.5 md:px-4 md:py-2 bg-blue-50 rounded-lg border ${activeTab === "pending" ? "ring-2 ring-blue-500 border-blue-400 font-extrabold shadow-sm" : "border-blue-100 hover:border-blue-300"} min-w-0 md:min-w-[90px] flex flex-col justify-center`}
             title="Xem danh sách đang thực hiện"
           >
             <div className="text-base md:text-2xl font-bold text-blue-700">
