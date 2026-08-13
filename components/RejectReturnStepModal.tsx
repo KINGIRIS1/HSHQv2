@@ -26,7 +26,6 @@ export const RejectReturnStepModal: React.FC<RejectReturnStepModalProps> = ({
   const [returnOption, setReturnOption] = useState<ReturnOptionType>('pause_supplement');
   const [reason, setReason] = useState('');
   const [returnDate, setReturnDate] = useState(() => new Date().toISOString().split('T')[0]);
-  const [isAgreed, setIsAgreed] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -38,16 +37,11 @@ export const RejectReturnStepModal: React.FC<RejectReturnStepModalProps> = ({
       setErrorMsg('Vui lòng nhập lý do trả hồ sơ!');
       return;
     }
-    if (!isAgreed) {
-      setErrorMsg('Vui lòng tích chọn đồng ý đã giải trình đầy đủ lý do trước khi thực hiện!');
-      return;
-    }
     setErrorMsg('');
     setIsSubmitting(true);
     try {
       await onConfirm(returnOption, reason.trim(), returnDate);
       setReason('');
-      setIsAgreed(false);
       onClose();
     } catch (err) {
       console.error(err);
@@ -220,20 +214,6 @@ export const RejectReturnStepModal: React.FC<RejectReturnStepModalProps> = ({
             />
           </div>
 
-          {/* Section 5: Checkbox agreement */}
-          <div className="bg-amber-50/80 border border-amber-200/80 p-3.5 rounded-xl flex items-start gap-2.5">
-            <input
-              type="checkbox"
-              id="agree-checkbox"
-              checked={isAgreed}
-              onChange={(e) => setIsAgreed(e.target.checked)}
-              className="mt-0.5 w-4 h-4 text-rose-600 rounded focus:ring-rose-500 cursor-pointer"
-            />
-            <label htmlFor="agree-checkbox" className="text-xs font-semibold text-amber-950 cursor-pointer select-none leading-relaxed">
-              Tôi đã giải trình đầy đủ lý do trên và <span className="font-bold underline text-red-600">ĐỒNG Ý</span> thực hiện thao tác này.
-            </label>
-          </div>
-
           {/* Section 6: Footer buttons */}
           <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
             <button
@@ -246,7 +226,7 @@ export const RejectReturnStepModal: React.FC<RejectReturnStepModalProps> = ({
             </button>
             <button
               type="submit"
-              disabled={isSubmitting || !reason.trim() || !isAgreed}
+              disabled={isSubmitting || !reason.trim()}
               className="flex items-center gap-2 px-6 py-2.5 bg-rose-500 hover:bg-rose-600 disabled:opacity-40 text-white rounded-xl font-bold text-sm shadow-md transition-all active:scale-95"
             >
               <Undo2 size={16} />

@@ -146,7 +146,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
           };
           fetchPrice();
       }
-  }, [record]);
+  }, [record?.id, record?.personalNotes, record?.reminderDate, isOpen]);
 
   if (!isOpen || !record) return null;
 

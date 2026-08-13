@@ -226,6 +226,8 @@ const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, e
           : emp.department === deptId;
   };
 
+  const selectedRecordIdsStr = useMemo(() => (selectedRecords || []).map(r => r.id).join(','), [selectedRecords]);
+
   // Mỗi khi mở modal, tự động đặt tổ chuyên môn mặc định khớp với Tab chuyên môn đang đứng
   useEffect(() => {
       if (isOpen) {
@@ -233,7 +235,7 @@ const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, e
           setSelectedDept(defaultDept);
           setSearchTerm('');
       }
-  }, [isOpen, selectedRecords, currentView, filterDepartment]);
+  }, [isOpen, selectedRecordIdsStr, currentView, filterDepartment]);
 
   // Xác định người được giao việc gần nhất của tổ đang chọn
   const lastAssignedIdForCurrentDept = useMemo(() => {

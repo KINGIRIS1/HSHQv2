@@ -26,7 +26,6 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
 }) => {
   const [mode, setMode] = useState<'new' | 'existing'>('new');
   const [selectedExistingBatch, setSelectedExistingBatch] = useState<string>('');
-  const [isPhiDiaGioiSelected, setIsPhiDiaGioiSelected] = useState<boolean>(false);
   const [selectedHandoverWard, setSelectedHandoverWard] = useState<string>('');
   
   // State xác nhận danh sách chỉnh lý
@@ -38,7 +37,6 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
   useEffect(() => {
       if (isOpen) {
           setSelectedHandoverWard('');
-          setIsPhiDiaGioiSelected(false);
           setNeedsCorrectionConfirm(false);
           setMode('new');
       }
@@ -149,17 +147,7 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
   const todayFmt = formatDateDDMMYYYY(todayStr);
 
   const handleConfirm = () => {
-      if (filteredWarningList.length > 0 && !needsCorrectionConfirm) {
-          alert("Vui lòng xác nhận bạn đã kiểm tra / lập danh sách chỉnh lý cho các hồ sơ cảnh báo.");
-          return;
-      }
-
-      if (isPhiDiaGioiSelected && !selectedHandoverWard) {
-          alert("Vui lòng chọn xã/phường nhận kết quả.");
-          return;
-      }
-
-      const handoverWard = isPhiDiaGioiSelected ? selectedHandoverWard : 'SAME_AS_WARD';
+      const handoverWard = selectedHandoverWard || 'SAME_AS_WARD';
 
       if (mode === 'new') {
           onConfirm(nextBatchInfo.batchName, nextBatchInfo.date, handoverWard);
@@ -196,29 +184,6 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
             <p className="text-sm text-gray-600 leading-relaxed">
                 Bạn đang thực hiện chốt <strong className="text-sm font-bold text-gray-800">{selectedCount > 0 ? selectedCount : 'toàn bộ'}</strong> hồ sơ sang trạng thái "Đã giao".
             </p>
-
-            {/* Cảnh báo chỉnh lý bản đồ nếu có */}
-            {filteredWarningList.length > 0 && (
-                <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
-                    <div className="text-orange-700 font-bold text-xs mb-1.5 uppercase">
-                        Cảnh báo: Có hồ sơ cần chỉnh lý bản đồ
-                    </div>
-                    <ul className="list-disc list-inside text-[11px] text-orange-800 font-mono mb-2 max-h-16 overflow-y-auto bg-orange-100/40 p-1.5 rounded">
-                        {filteredWarningList.map(r => (
-                            <li key={r.id}>{r.code} - {r.customerName}</li>
-                        ))}
-                    </ul>
-                    <label className="flex items-center gap-1.5 cursor-pointer bg-white p-1.5 rounded border border-orange-200 hover:border-orange-300 transition-colors">
-                        <input 
-                            type="checkbox" 
-                            className="w-3.5 h-3.5 text-orange-600 rounded"
-                            checked={needsCorrectionConfirm}
-                            onChange={(e) => setNeedsCorrectionConfirm(e.target.checked)}
-                        />
-                        <span className="text-[11px] font-bold text-gray-700">Tôi xác nhận đã kiểm tra / lập danh sách.</span>
-                    </label>
-                </div>
-            )}
 
             {/* Option 1: Tạo đợt mới (Hôm nay) */}
             <div 
@@ -288,39 +253,22 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
                 </div>
             </div>
 
-            {/* Checkbox: Giao phi địa giới (Giao khác địa bàn) */}
-            <div className="pt-2">
-                <label className="flex items-center gap-2 cursor-pointer">
-                    <input 
-                        type="checkbox" 
-                        className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                        checked={isPhiDiaGioiSelected}
-                        onChange={(e) => setIsPhiDiaGioiSelected(e.target.checked)}
-                    />
-                    <span className="text-sm font-bold text-gray-700">
-                        Giao phi địa giới (Giao khác địa bàn)
-                    </span>
+            {/* Giao khác địa bàn */}
+            <div className="space-y-1.5 pt-2">
+                <label className="block text-xs font-bold text-gray-800">
+                    Giao khác địa bàn (Xã/phường nhận kết quả)
                 </label>
+                <select 
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-blue-500 outline-none font-medium bg-white text-gray-800"
+                    value={selectedHandoverWard}
+                    onChange={(e) => setSelectedHandoverWard(e.target.value)}
+                >
+                    <option value="">-- Mặc định (Theo địa bàn từng hồ sơ) --</option>
+                    {wards.map(w => (
+                        <option key={w} value={w}>{getWardLabel(w)}</option>
+                    ))}
+                </select>
             </div>
-
-            {/* Xã nhận kết quả (Chỉ hiển thị khi chọn Giao phi địa giới) */}
-            {isPhiDiaGioiSelected && (
-                <div className="space-y-1.5 bg-gray-50 p-3 rounded-lg border border-gray-200 animate-fade-in">
-                    <label className="block text-xs font-bold text-gray-800">
-                        Xã nhận kết quả <span className="text-red-500">*</span>
-                    </label>
-                    <select 
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-blue-500 outline-none font-medium bg-white text-gray-800"
-                        value={selectedHandoverWard}
-                        onChange={(e) => setSelectedHandoverWard(e.target.value)}
-                    >
-                        <option value="">-- Chọn xã/phường nhận kết quả --</option>
-                        {wards.map(w => (
-                            <option key={w} value={w}>{getWardLabel(w)}</option>
-                        ))}
-                    </select>
-                </div>
-            )}
 
         </div>
 
@@ -334,7 +282,6 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
             </button>
             <button 
                 onClick={handleConfirm} 
-                disabled={filteredWarningList.length > 0 && !needsCorrectionConfirm}
                 className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold text-sm shadow-sm transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
             >
                 Xác nhận chốt
