@@ -41,7 +41,9 @@ export const DEFAULT_ROLE_PERMISSIONS: RolePermissions = {
     'reports', 'VIEW_REPORTS',
     'work_schedule', 'VIEW_SCHEDULE',
     'utilities',
-    'BTN_SUBMIT_SIGN', 'BTN_REJECT_RECORD', 'BTN_CLOSE_BATCH', 'BTN_EXTEND_DEADLINE'
+    'BTN_ASSIGN_STAFF', 'BTN_SUBMIT_SIGN', 'BTN_APPROVE_SIGN', 'BTN_SUBMIT_CHECK', 'BTN_REJECT_RECORD', 'HANDOVER_RECORDS', 'BTN_RETURN_RESULT', 'BTN_EXTEND_DEADLINE', 'EDIT_RECORDS', 'DELETE_RECORDS', 'VIEW_DETAILS',
+    'dodac_BTN_ASSIGN_STAFF', 'dodac_BTN_SUBMIT_CHECK', 'dodac_BTN_SUBMIT_SIGN', 'dodac_BTN_APPROVE_SIGN', 'dodac_BTN_REJECT_RECORD', 'dodac_HANDOVER_RECORDS', 'dodac_BTN_RETURN_RESULT', 'dodac_VIEW_EXCERPTS', 'dodac_MANAGE_EXCERPTS', 'dodac_BTN_EXTEND_DEADLINE', 'dodac_EDIT_RECORDS', 'dodac_DELETE_RECORDS', 'dodac_VIEW_DETAILS',
+    'luutru_BTN_ASSIGN_STAFF', 'luutru_BTN_SUBMIT_CHECK', 'luutru_BTN_SUBMIT_SIGN', 'luutru_BTN_APPROVE_SIGN', 'luutru_BTN_REJECT_RECORD', 'luutru_HANDOVER_RECORDS', 'luutru_BTN_RETURN_RESULT', 'luutru_VIEW_ARCHIVE', 'luutru_MANAGE_ARCHIVE', 'luutru_BTN_EXTEND_DEADLINE', 'luutru_EDIT_RECORDS', 'luutru_DELETE_RECORDS', 'luutru_VIEW_DETAILS'
   ],
   [UserRole.ONEDOOR]: [
     'receive_record', 'receive_sub_create', 'receive_sub_bulk', 'receive_sub_list', 'receive_sub_vphc', 'ADD_RECORDS',
@@ -54,7 +56,9 @@ export const DEFAULT_ROLE_PERMISSIONS: RolePermissions = {
     'reports', 'VIEW_REPORTS',
     'work_schedule', 'VIEW_SCHEDULE',
     'utilities', 'VIEW_CHAT', 'VIEW_PERSONAL_PROFILE',
-    'BTN_CLOSE_BATCH', 'BTN_EXTEND_DEADLINE'
+    'BTN_ASSIGN_STAFF', 'BTN_SUBMIT_SIGN', 'BTN_APPROVE_SIGN', 'BTN_SUBMIT_CHECK', 'BTN_REJECT_RECORD', 'HANDOVER_RECORDS', 'BTN_RETURN_RESULT', 'BTN_EXTEND_DEADLINE', 'EDIT_RECORDS', 'DELETE_RECORDS', 'VIEW_DETAILS',
+    'dodac_BTN_ASSIGN_STAFF', 'dodac_BTN_SUBMIT_CHECK', 'dodac_BTN_SUBMIT_SIGN', 'dodac_BTN_APPROVE_SIGN', 'dodac_BTN_REJECT_RECORD', 'dodac_HANDOVER_RECORDS', 'dodac_BTN_RETURN_RESULT', 'dodac_VIEW_EXCERPTS', 'dodac_MANAGE_EXCERPTS', 'dodac_BTN_EXTEND_DEADLINE', 'dodac_EDIT_RECORDS', 'dodac_DELETE_RECORDS', 'dodac_VIEW_DETAILS',
+    'luutru_BTN_ASSIGN_STAFF', 'luutru_BTN_SUBMIT_CHECK', 'luutru_BTN_SUBMIT_SIGN', 'luutru_BTN_APPROVE_SIGN', 'luutru_BTN_REJECT_RECORD', 'luutru_HANDOVER_RECORDS', 'luutru_BTN_RETURN_RESULT', 'luutru_VIEW_ARCHIVE', 'luutru_MANAGE_ARCHIVE', 'luutru_BTN_EXTEND_DEADLINE', 'luutru_EDIT_RECORDS', 'luutru_DELETE_RECORDS', 'luutru_VIEW_DETAILS'
   ],
   [UserRole.EMPLOYEE]: [
     'receive_contract', 'VIEW_CONTRACTS', 'LIQUIDATE_CONTRACTS',
@@ -65,7 +69,9 @@ export const DEFAULT_ROLE_PERMISSIONS: RolePermissions = {
     'excerpt_management', 'VIEW_EXCERPTS',
     'work_schedule', 'VIEW_SCHEDULE',
     'utilities',
-    'BTN_SUBMIT_SIGN'
+    'BTN_ASSIGN_STAFF', 'BTN_SUBMIT_SIGN', 'BTN_APPROVE_SIGN', 'BTN_SUBMIT_CHECK', 'BTN_REJECT_RECORD', 'HANDOVER_RECORDS', 'BTN_RETURN_RESULT', 'BTN_EXTEND_DEADLINE', 'EDIT_RECORDS', 'DELETE_RECORDS', 'VIEW_DETAILS',
+    'dodac_BTN_ASSIGN_STAFF', 'dodac_BTN_SUBMIT_CHECK', 'dodac_BTN_SUBMIT_SIGN', 'dodac_BTN_APPROVE_SIGN', 'dodac_BTN_REJECT_RECORD', 'dodac_HANDOVER_RECORDS', 'dodac_BTN_RETURN_RESULT', 'dodac_VIEW_EXCERPTS', 'dodac_MANAGE_EXCERPTS', 'dodac_BTN_EXTEND_DEADLINE', 'dodac_EDIT_RECORDS', 'dodac_DELETE_RECORDS', 'dodac_VIEW_DETAILS',
+    'luutru_BTN_ASSIGN_STAFF', 'luutru_BTN_SUBMIT_CHECK', 'luutru_BTN_SUBMIT_SIGN', 'luutru_BTN_APPROVE_SIGN', 'luutru_BTN_REJECT_RECORD', 'luutru_HANDOVER_RECORDS', 'luutru_BTN_RETURN_RESULT', 'luutru_VIEW_ARCHIVE', 'luutru_MANAGE_ARCHIVE', 'luutru_BTN_EXTEND_DEADLINE', 'luutru_EDIT_RECORDS', 'luutru_DELETE_RECORDS', 'luutru_VIEW_DETAILS'
   ]
 };
 
@@ -99,12 +105,14 @@ export const AVAILABLE_PERMISSIONS = [
   { id: 'VIEW_SCHEDULE', label: 'Xem lịch công tác' },
   { id: 'MANAGE_SCHEDULE', label: 'Quản lý lịch công tác' },
   { id: 'VIEW_PERSONAL_PROFILE', label: 'Xem hồ sơ cá nhân' },
-  { id: 'BTN_ASSIGN_STAFF', label: 'Thao tác: Giao nhân viên' },
-  { id: 'BTN_RETURN_RESULT', label: 'Thao tác: Trả kết quả hồ sơ' },
-  { id: 'BTN_REJECT_RECORD', label: 'Thao tác: Trả hồ sơ / Từ chối' },
-  { id: 'BTN_SUBMIT_SIGN', label: 'Thao tác: Trình ký / Ký duyệt' },
-  { id: 'BTN_CLOSE_BATCH', label: 'Thao tác: Tạo đợt / Chốt đợt' },
-  { id: 'BTN_EXTEND_DEADLINE', label: 'Thao tác: Gia hạn ngày hẹn' }
+  { id: 'BTN_ASSIGN_STAFF', label: 'Giao việc' },
+  { id: 'BTN_RETURN_RESULT', label: 'Trả kết quả hồ sơ' },
+  { id: 'BTN_REJECT_RECORD', label: 'Trả hồ sơ' },
+  { id: 'BTN_SUBMIT_SIGN', label: 'Trình ký' },
+  { id: 'BTN_APPROVE_SIGN', label: 'Ký duyệt' },
+  { id: 'BTN_SUBMIT_CHECK', label: 'Trình kiểm tra' },
+  { id: 'BTN_CLOSE_BATCH', label: 'Tạo đợt / Chốt đợt' },
+  { id: 'BTN_EXTEND_DEADLINE', label: 'Gia hạn' }
 ];
 
 export interface User {

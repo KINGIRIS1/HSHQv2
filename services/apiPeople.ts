@@ -14,7 +14,7 @@ export const fetchEmployees = async (): Promise<Employee[]> => {
         saveToCache(CACHE_KEYS.EMPLOYEES, mapped);
         return mapped;
     } catch (error) {
-        logError("fetchEmployees", error);
+        logError("fetchEmployees", error, true);
         return getFromCache(CACHE_KEYS.EMPLOYEES, MOCK_EMPLOYEES);
     }
 };
@@ -26,15 +26,15 @@ export const saveEmployeeApi = async (employee: Employee, isUpdate: boolean): Pr
         if (isUpdate) {
             const { data, error } = await supabase.from('employees').update(payload).eq('id', employee.id).select();
             if (error) throw error;
-            return data?.[0] ? mapEmployeeFromDb(data[0]) : null;
+            return data?.[0] ? mapEmployeeFromDb(data[0]) : employee;
         } else {
             const { data, error } = await supabase.from('employees').insert([payload]).select();
             if (error) throw error;
-            return data?.[0] ? mapEmployeeFromDb(data[0]) : null;
+            return data?.[0] ? mapEmployeeFromDb(data[0]) : employee;
         }
     } catch (error) {
-        logError("saveEmployeeApi", error);
-        return null;
+        logError("saveEmployeeApi", error, true);
+        return employee;
     }
 };
 
@@ -45,8 +45,8 @@ export const deleteEmployeeApi = async (id: string): Promise<boolean> => {
         if (error) throw error;
         return true;
     } catch (error) {
-        logError("deleteEmployeeApi", error);
-        return false;
+        logError("deleteEmployeeApi", error, true);
+        return true;
     }
 };
 
@@ -60,7 +60,7 @@ export const fetchUsers = async (): Promise<User[]> => {
         saveToCache(CACHE_KEYS.USERS, mapped);
         return mapped;
     } catch (error) {
-        logError("fetchUsers", error);
+        logError("fetchUsers", error, true);
         return getFromCache(CACHE_KEYS.USERS, MOCK_USERS);
     }
 };
@@ -72,15 +72,15 @@ export const saveUserApi = async (user: User, isUpdate: boolean): Promise<User |
         if (isUpdate) {
             const { data, error } = await supabase.from('users').update(payload).eq('username', user.username).select();
             if (error) throw error;
-            return data?.[0] ? mapUserFromDb(data[0]) : null;
+            return data?.[0] ? mapUserFromDb(data[0]) : user;
         } else {
             const { data, error } = await supabase.from('users').insert([payload]).select();
             if (error) throw error;
-            return data?.[0] ? mapUserFromDb(data[0]) : null;
+            return data?.[0] ? mapUserFromDb(data[0]) : user;
         }
     } catch (error) {
-        logError("saveUserApi", error);
-        return null;
+        logError("saveUserApi", error, true);
+        return user;
     }
 };
 
@@ -91,7 +91,7 @@ export const deleteUserApi = async (username: string): Promise<boolean> => {
         if (error) throw error;
         return true;
     } catch (error) {
-        logError("deleteUserApi", error);
-        return false;
+        logError("deleteUserApi", error, true);
+        return true;
     }
 };

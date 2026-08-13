@@ -138,7 +138,7 @@ export function isViewAllowedForUser(
   // Luôn áp dụng quy tắc phân tách thuộc tính tổ chuyên môn (Department isolation):
   // - Tài khoản thuộc Tổ Đo đạc (không thuộc Lưu trữ) sẽ không thể thấy Tab Lưu trữ
   // - Tài khoản thuộc Tổ Lưu trữ (không thuộc Đo đạc) sẽ không thể thấy Tab Đo đạc
-  if (user.role !== UserRole.ADMIN && user.employeeId && employees && activePerms) {
+  if (user.employeeId && employees && activePerms) {
     const emp = employees.find(e => e.id === user.employeeId);
     if (emp && emp.department) {
       const isDodac = matchDepartmentKey('đo đạc', emp.department);
@@ -280,7 +280,7 @@ export function isViewAllowedForUser(
         return activePerms.includes('utilities') || activePerms.includes('SYSTEM_SETTINGS');
 
       default:
-        return activePerms.includes(viewId);
+        return activePerms.includes(viewId) || activePerms.includes(`dodac_${viewId}`) || activePerms.includes(`luutru_${viewId}`);
     }
   }
 

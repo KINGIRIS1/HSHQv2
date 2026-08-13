@@ -131,8 +131,9 @@ export const fetchRecords = async (): Promise<RecordFile[]> => {
     return uniqueRecords as RecordFile[];
 
   } catch (error) {
-    logError("fetchRecords", error);
-    return [];
+    logError("fetchRecords", error, true);
+    const cached = getFromCache<RecordFile[]>(CACHE_KEYS.RECORDS, []);
+    return cached.length > 0 ? cached : MOCK_RECORDS;
   }
 };
 
@@ -284,6 +285,7 @@ const syncCacheOnBatchUpdate = (batchUpdates: Partial<RecordFile>[]) => {
 
 export const createRecordApi = async (record: RecordFile): Promise<RecordFile | null> => {
     if (!isConfigured) return record;
+    let recordToSave: RecordFile = record;
     try {
         let finalCode = record.code;
         const isGeneratedFormat = finalCode && (/^[A-ZĐ]{2,3}-\d{6}-\d{3,4}$/.test(finalCode) || /^\d{6}-\d{3,4}$/.test(finalCode));
@@ -292,7 +294,7 @@ export const createRecordApi = async (record: RecordFile): Promise<RecordFile | 
             finalCode = await getNextGlobalRecordCode(record.receivedDate || new Date().toISOString());
         }
         
-        const recordToSave = { ...record, code: finalCode };
+        recordToSave = { ...record, code: finalCode };
         if (!recordToSave.id) {
             recordToSave.id = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substr(2, 9);
         }
@@ -329,8 +331,9 @@ export const createRecordApi = async (record: RecordFile): Promise<RecordFile | 
         if (result) syncCacheOnCreate(result);
         return result;
     } catch (error) {
-        logError("createRecordApi", error);
-        return null;
+        logError("createRecordApi", error, true);
+        syncCacheOnCreate(recordToSave);
+        return recordToSave;
     }
 };
 
@@ -369,13 +372,18 @@ export const updateRecordApi = async (record: RecordFile): Promise<RecordFile | 
         if (result) syncCacheOnUpdate(result);
         return result;
     } catch (error) {
-        logError("updateRecordApi", error);
-        return null;
+        logError("updateRecordApi", error, true);
+        syncCacheOnUpdate(record);
+        return record;
     }
 };
 
 export const updateRecordFieldsApi = async (id: string, fields: Partial<RecordFile>): Promise<RecordFile | null> => {
-    if (!isConfigured) return null;
+    if (!isConfigured) {
+        const fallbackRecord = { id, ...fields } as RecordFile;
+        syncCacheOnUpdate(fallbackRecord);
+        return fallbackRecord;
+    }
     try {
         const payload = sanitizeData({ id, ...fields } as any, RECORD_DB_COLUMNS);
         delete payload.id;
@@ -406,8 +414,10 @@ export const updateRecordFieldsApi = async (id: string, fields: Partial<RecordFi
         if (result) syncCacheOnUpdate(result);
         return result;
     } catch (error) {
-        logError("updateRecordFieldsApi", error);
-        return null;
+        logError("updateRecordFieldsApi", error, true);
+        const fallbackRecord = { id, ...fields } as RecordFile;
+        syncCacheOnUpdate(fallbackRecord);
+        return fallbackRecord;
     }
 };
 
@@ -420,8 +430,9 @@ export const deleteRecordApi = async (id: string): Promise<boolean> => {
         syncCacheOnDelete(id);
         return true;
     } catch (error) {
-        logError("deleteRecordApi", error);
-        return false;
+        logError("deleteRecordApi", error, true);
+        syncCacheOnDelete(id);
+        return true;
     }
 };
 

@@ -31,37 +31,53 @@ const PERMISSION_GROUPS = [
   {
     id: 'group_onedoor',
     title: '1. Phân hệ Tổ Tiếp nhận & Một cửa',
-    desc: 'Quyền xem Tab Tiếp nhận & các nút chức năng giao dịch một cửa',
+    desc: 'Quyền xem Tab Tiếp nhận & các chức năng giao dịch một cửa',
     items: [
       { id: 'receive_record', label: 'Xem & Truy cập Tab Tiếp nhận hồ sơ' },
       { id: 'ADD_RECORDS', label: 'Thêm / Nhập mới hồ sơ' },
-      { id: 'BTN_RETURN_RESULT', label: 'Thao tác: Trả kết quả hồ sơ (In biên lai, trả người dân)' },
-      { id: 'BTN_CLOSE_BATCH', label: 'Thao tác: Tạo đợt bàn giao / Chốt đợt giao 1 cửa' },
-      { id: 'HANDOVER_RECORDS', label: 'Thao tác: Bàn giao hồ sơ sang 1 cửa' },
       { id: 'EXPORT_RECORDS', label: 'Xuất danh sách hồ sơ (Excel)' },
     ]
   },
   {
     id: 'group_dodac',
-    title: '2. Phân hệ Tổ Đo đạc & Kỹ thuật',
-    desc: 'Quyền xem Tab Đo đạc & các nút chức năng xử lý hồ sơ kỹ thuật',
+    title: '2. Tổ Đo đạc',
+    desc: 'Quyền xem Tab Đo đạc & các chức năng xử lý hồ sơ kỹ thuật',
     items: [
       { id: 'all_records', label: 'Xem & Truy cập Tab Đo đạc (Hồ sơ kỹ thuật)' },
-      { id: 'BTN_ASSIGN_STAFF', label: 'Thao tác: Giao việc / Phân công cán bộ đo đạc' },
-      { id: 'CHECK_RECORDS', label: 'Thao tác: Kiểm tra & Ký kiểm tra kỹ thuật (Tổ trưởng/Tổ phó)' },
-      { id: 'VIEW_EXCERPTS', label: 'Xem trích lục bản đồ' },
-      { id: 'MANAGE_EXCERPTS', label: 'Quản lý & Cấp số trích lục bản đồ' },
-      { id: 'BTN_EXTEND_DEADLINE', label: 'Thao tác: Gia hạn ngày hẹn trả' },
+      { id: 'dodac_BTN_ASSIGN_STAFF', label: 'Giao việc' },
+      { id: 'dodac_BTN_SUBMIT_CHECK', label: 'Trình kiểm tra' },
+      { id: 'dodac_BTN_SUBMIT_SIGN', label: 'Trình ký' },
+      { id: 'dodac_BTN_APPROVE_SIGN', label: 'Ký duyệt' },
+      { id: 'dodac_BTN_REJECT_RECORD', label: 'Trả hồ sơ' },
+      { id: 'dodac_HANDOVER_RECORDS', label: 'Bàn giao 1 cửa' },
+      { id: 'dodac_BTN_RETURN_RESULT', label: 'Trả kết quả hồ sơ' },
+      { id: 'dodac_VIEW_EXCERPTS', label: 'Xem trích lục bản đồ' },
+      { id: 'dodac_MANAGE_EXCERPTS', label: 'Quản lý & Cấp số trích lục bản đồ' },
+      { id: 'dodac_BTN_EXTEND_DEADLINE', label: 'Gia hạn' },
+      { id: 'dodac_EDIT_RECORDS', label: 'Sửa thông tin hồ sơ' },
+      { id: 'dodac_DELETE_RECORDS', label: 'Xóa hồ sơ' },
+      { id: 'dodac_VIEW_DETAILS', label: 'Xem chi tiết hồ sơ' },
     ]
   },
   {
     id: 'group_luutru',
-    title: '3. Phân hệ Tổ Đăng ký & Lưu trữ',
-    desc: 'Quyền xem Tab Lưu trữ & các nút chức năng quản lý kho tài liệu',
+    title: '3. Tổ Lưu trữ',
+    desc: 'Quyền xem Tab Lưu trữ & các chức năng quản lý kho tài liệu',
     items: [
       { id: 'archive_records', label: 'Xem & Truy cập Tab Lưu trữ (Hồ sơ & Công văn)' },
-      { id: 'VIEW_ARCHIVE', label: 'Xem & Tra cứu thông tin hồ sơ lưu trữ' },
-      { id: 'MANAGE_ARCHIVE', label: 'Quản lý kho lưu trữ (Mượn/trả, vị trí công văn)' },
+      { id: 'luutru_BTN_ASSIGN_STAFF', label: 'Giao việc' },
+      { id: 'luutru_BTN_SUBMIT_CHECK', label: 'Trình kiểm tra' },
+      { id: 'luutru_BTN_SUBMIT_SIGN', label: 'Trình ký' },
+      { id: 'luutru_BTN_APPROVE_SIGN', label: 'Ký duyệt' },
+      { id: 'luutru_BTN_REJECT_RECORD', label: 'Trả hồ sơ' },
+      { id: 'luutru_HANDOVER_RECORDS', label: 'Bàn giao 1 cửa' },
+      { id: 'luutru_BTN_RETURN_RESULT', label: 'Trả kết quả hồ sơ' },
+      { id: 'luutru_VIEW_ARCHIVE', label: 'Xem & Tra cứu thông tin hồ sơ lưu trữ' },
+      { id: 'luutru_MANAGE_ARCHIVE', label: 'Quản lý kho lưu trữ (Mượn/trả, vị trí công văn)' },
+      { id: 'luutru_BTN_EXTEND_DEADLINE', label: 'Gia hạn' },
+      { id: 'luutru_EDIT_RECORDS', label: 'Sửa thông tin hồ sơ' },
+      { id: 'luutru_DELETE_RECORDS', label: 'Xóa hồ sơ' },
+      { id: 'luutru_VIEW_DETAILS', label: 'Xem chi tiết hồ sơ' },
     ]
   },
   {
@@ -91,18 +107,6 @@ const PERMISSION_GROUPS = [
       { id: 'MANAGE_EMPLOYEES', label: 'Quản lý danh sách nhân sự' },
       { id: 'MANAGE_USERS', label: 'Quản lý tài khoản người dùng' },
       { id: 'SYSTEM_SETTINGS', label: 'Cài đặt & Phân quyền hệ thống' },
-    ]
-  },
-  {
-    id: 'group_leadership',
-    title: '6. Thao tác Phê duyệt & Quản trị Hồ sơ (Ban Giám đốc)',
-    desc: 'Trình ký, ký duyệt, từ chối trả hồ sơ, sửa xóa & xem chi tiết',
-    items: [
-      { id: 'BTN_SUBMIT_SIGN', label: 'Thao tác: Trình ký / Phê duyệt / Ký duyệt hồ sơ' },
-      { id: 'BTN_REJECT_RECORD', label: 'Thao tác: Trả hồ sơ / Từ chối (Yêu cầu sửa / bổ sung)' },
-      { id: 'EDIT_RECORDS', label: 'Thao tác: Sửa thông tin hồ sơ' },
-      { id: 'DELETE_RECORDS', label: 'Thao tác: Xóa hồ sơ' },
-      { id: 'VIEW_DETAILS', label: 'Thao tác: Xem chi tiết hồ sơ' },
     ]
   }
 ];
@@ -405,19 +409,28 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
       if (savedPerms) {
           try {
               const parsed = JSON.parse(savedPerms);
-              // Tự động hợp nhất đầy đủ tất cả quyền mặc định của ONEDOOR
-              const defaultOneDoor = DEFAULT_ROLE_PERMISSIONS[UserRole.ONEDOOR] || [];
-              const existingOneDoor = parsed[UserRole.ONEDOOR] || [];
-              parsed[UserRole.ONEDOOR] = Array.from(new Set([...existingOneDoor, ...defaultOneDoor]));
+              Object.keys(DEFAULT_ROLE_PERMISSIONS).forEach(roleKey => {
+                  const defPerms = DEFAULT_ROLE_PERMISSIONS[roleKey as UserRole] || [];
+                  const existingPerms = (parsed[roleKey] || []).filter((p: string) => p !== 'CHECK_RECORDS' && p !== 'BTN_CLOSE_BATCH');
+                  parsed[roleKey] = Array.from(new Set([...existingPerms, ...defPerms]));
+              });
               setRolePermissions(parsed);
           } catch (e) {
               console.error("Failed to parse role_permissions", e);
           }
+      } else {
+          setRolePermissions(DEFAULT_ROLE_PERMISSIONS);
       }
       const savedDeptPerms = await getSystemSetting('department_permissions');
       if (savedDeptPerms) {
           try {
-              setDepartmentPermissions(JSON.parse(savedDeptPerms));
+              const parsedDept = JSON.parse(savedDeptPerms);
+              Object.keys(parsedDept).forEach(key => {
+                  if (Array.isArray(parsedDept[key])) {
+                      parsedDept[key] = parsedDept[key].filter((p: string) => p !== 'CHECK_RECORDS' && p !== 'BTN_CLOSE_BATCH');
+                  }
+              });
+              setDepartmentPermissions(parsedDept);
           } catch (e) {
               console.error("Failed to parse department_permissions", e);
           }
@@ -684,7 +697,7 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col flex-1 h-full animate-fade-in-up">
+    <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col flex-1 h-full min-h-0 animate-fade-in-up">
         {/* Tabs */}
         <div className="flex border-b border-gray-200 bg-gray-50 px-2 overflow-x-auto no-scrollbar shrink-0">
             <button 
@@ -713,7 +726,9 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
             </button>
         </div>
 
-        <div className="p-4 md:p-6 overflow-y-auto flex-1 bg-slate-50/30">
+        <div className={`flex-1 bg-slate-50/30 min-h-0 ${
+            activeTab === 'permissions' ? 'p-2 md:p-3 overflow-hidden flex flex-col' : 'p-4 md:p-6 overflow-y-auto'
+        }`}>
             {activeTab === 'general' && (
                 <div className="space-y-6 max-w-4xl mx-auto">
                     {/* Cloud Database Info */}
@@ -869,7 +884,7 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
             )}
 
             {activeTab === 'permissions' && (
-                <div className="bg-slate-50 border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex flex-col h-[calc(100vh-170px)] min-h-[550px] relative">
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex flex-col flex-1 min-h-0 relative">
                     {/* Header tabs (Row 1): Sticky Top */}
                     <div className="sticky top-0 z-20 bg-slate-100 border-b border-slate-200 px-4 py-2 flex items-center justify-between flex-wrap gap-2 shadow-2xs">
                         <div className="flex items-center gap-2">
@@ -1052,7 +1067,7 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                     </div>
 
                     {/* Categorized Permissions Grid */}
-                    <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-slate-50/60 custom-scrollbar space-y-6">
+                    <div className="flex-1 overflow-y-auto min-h-0 p-4 md:p-6 bg-slate-50/60 custom-scrollbar space-y-6">
                         {PERMISSION_GROUPS.map((group) => {
                             const filteredItems = group.items.filter(item => {
                                 if (!permSearchQuery.trim()) return true;

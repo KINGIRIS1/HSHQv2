@@ -55,9 +55,18 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
     : 'Tổ Đo đạc');
 
   // Classify selected target statuses
-  const isPendingSign = targetValue === RecordStatus.PENDING_SIGN || targetValue === RecordStatus.SIGNED;
-  const isPendingCheck = targetValue === RecordStatus.PENDING_CHECK || targetValue === RecordStatus.CHECKED;
-  const isInProgress = targetValue === RecordStatus.IN_PROGRESS || targetValue === RecordStatus.ASSIGNED || targetValue === RecordStatus.COMPLETED_WORK;
+  const isPendingSign = 
+    (targetField === 'status' && (targetValue === RecordStatus.PENDING_SIGN || targetValue === RecordStatus.SIGNED)) ||
+    (targetField === 'historyStatus' && targetValue === 'SIGNING');
+
+  const isPendingCheck = 
+    (targetField === 'status' && (targetValue === RecordStatus.PENDING_CHECK || targetValue === RecordStatus.CHECKED)) ||
+    (targetField === 'historyStatus' && targetValue === 'CHECKING');
+
+  const isInProgress = 
+    (targetField === 'status' && (targetValue === RecordStatus.IN_PROGRESS || targetValue === RecordStatus.ASSIGNED || targetValue === RecordStatus.COMPLETED_WORK)) ||
+    (targetField === 'historyStatus' && (targetValue === 'ASSIGNED' || targetValue === 'COMPLETED' || targetValue === 'RETURNED'));
+
   const requiresEmployee = targetField === 'status' && (isPendingSign || isPendingCheck || isInProgress);
 
   // Helper to filter employees dynamically based on selected status and tab department
@@ -78,33 +87,40 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
       return empDept === normDept;
     };
 
+    let result: Employee[] = [];
+
     if (isPendingSign) {
-      // Chỉ chọn ban giám đốc
-      return employees.filter(emp => 
+      // Chỉ chọn ban giám đốc / lãnh đạo
+      result = employees.filter(emp => 
         (emp.department || '').toLowerCase().includes('giám đốc') || 
         (emp.position || '').toLowerCase().includes('giám đốc') ||
         (emp.position || '').toLowerCase().includes('lãnh đạo')
       );
-    }
-
-    if (isPendingCheck) {
-      // Chỉ chọn Tổ trưởng / Tổ phó of that department
-      return employees.filter(emp => {
+    } else if (isPendingCheck) {
+      // Chỉ chọn Tổ trưởng / Tổ phó của tổ chuyên môn
+      result = employees.filter(emp => {
         const pos = (emp.position || '').toLowerCase();
         const isLead = pos.includes('tổ trưởng') || pos.includes('tổ phó') || pos.includes('trưởng') || pos.includes('phó') || pos.includes('lãnh đạo');
         return isLead && matchDept(emp);
       });
-    }
-
-    if (isInProgress) {
+    } else if (isInProgress) {
       // Chỉ nhân viên theo tổ đang xử lý (không gồm BGĐ)
-      return employees.filter(emp => 
+      result = employees.filter(emp => 
         matchDept(emp) && 
         !(emp.department || '').toLowerCase().includes('giám đốc')
       );
+    } else {
+      result = employees.filter(matchDept);
     }
 
-    return [];
+    if (result.length === 0) {
+      result = employees.filter(matchDept);
+    }
+    if (result.length === 0) {
+      result = employees;
+    }
+
+    return result;
   };
 
   const filteredEmployees = getFilteredEmployees();
@@ -125,8 +141,8 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
         const isoDate = customDate ? new Date(customDate + "T12:00:00").toISOString() : undefined;
         const targetIds = activeRecordsToUpdate.map(r => r.id);
         
-        // Pass assignedTo and customDate cleanly within extraData when targetField is status
-        const extraData = targetField === 'status' ? { 
+        // Pass assignedTo and customDate cleanly within extraData when targetField is status or historyStatus
+        const extraData = (targetField === 'status' || targetField === 'historyStatus') ? { 
             assignedTo: statusEmployee || undefined, 
             customDate: isoDate 
         } : undefined;
@@ -145,7 +161,7 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
         <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
             <div>
                 <h3 className="font-bold text-gray-800 text-base">
-                    ADMIN: Xử lý hàng loạt
+                    Xử lý All
                 </h3>
                 <p className="text-xs text-gray-500 mt-0.5">
                     Số lượng hồ sơ sẽ cập nhật: <strong className="font-bold text-orange-600">{activeRecordsToUpdate.length}</strong> hồ sơ
@@ -176,6 +192,7 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
                             }}
                         >
                             <option value="status">Trạng thái hồ sơ (Quy trình)</option>
+                            <option value="historyStatus">Trạng thái hồ sơ (Cập nhật lịch sử)</option>
                             <option value="assignedTo">Người xử lý (Giao việc)</option>
                             <option value="assignedDate">Ngày giao việc</option>
                             <option value="exportDate">Ngày xuất (Bàn giao)</option>
@@ -206,18 +223,33 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
                             </select>
                         )}
 
+                        {targetField === 'historyStatus' && (
+                            <select 
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-orange-500 outline-none bg-white font-medium"
+                                value={targetValue}
+                                onChange={(e) => setTargetValue(e.target.value)}
+                            >
+                                <option value="">-- Chọn bước quy trình --</option>
+                                <option value="ASSIGNED">Bước 1: Phân công / Giao việc</option>
+                                <option value="CHECKING">Bước 2: Chờ kiểm tra kỹ thuật</option>
+                                <option value="SIGNING">Bước 3: Chờ trình ký / Ký duyệt</option>
+                                <option value="COMPLETED">Bước 4: Đã hoàn thành / Bàn giao 1 cửa</option>
+                                <option value="RETURNED">Bước 5: Đã trả kết quả</option>
+                            </select>
+                        )}
+
                         {targetField === 'assignedTo' && (
                             <select 
                                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-orange-500 outline-none bg-white font-medium"
                                 value={targetValue}
                                 onChange={(e) => setTargetValue(e.target.value)}
                             >
-                                <option value="">-- Chọn nhân viên --</option>
+                                <option value="">-- Chọn nhân sự --</option>
                                 {employees.map(emp => {
                                     const stats = calculateEmployeeWorkload(allRecords || [], emp);
                                     return (
-                                        <option key={emp.id} value={emp.id}>
-                                            {emp.name} (Đang xử lý: {stats.inProgressPlots} thửa | Đã hoàn thành: {stats.completedPlots} thửa)
+                                        <option key={emp.id} value={emp.name}>
+                                            {emp.name} - {emp.position || 'Cán bộ'} ({emp.department || ''})
                                         </option>
                                     );
                                 })}
@@ -319,6 +351,42 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
                         />
                         <p className="text-[11px] text-gray-500 leading-normal">
                             Bỏ trống nếu muốn sử dụng mốc thời gian hiện tại.
+                        </p>
+                    </div>
+                )}
+
+                {/* Cấu hình Lịch sử bước quy trình */}
+                {targetField === 'historyStatus' && targetValue && (
+                    <div className="space-y-3 bg-amber-50 p-3 rounded-lg border border-amber-200">
+                        <label className="block text-xs font-bold text-amber-900">
+                            Cấu hình thông tin lịch sử cho bước đã chọn:
+                        </label>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label className="block text-xs font-semibold text-gray-700 mb-1">Cán bộ thực hiện bước này:</label>
+                                <select 
+                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-orange-500 outline-none bg-white font-medium text-gray-800"
+                                    value={statusEmployee}
+                                    onChange={(e) => setStatusEmployee(e.target.value)}
+                                >
+                                    <option value="">-- Chọn cán bộ --</option>
+                                    {filteredEmployees.map(emp => (
+                                        <option key={emp.id} value={emp.name}>{emp.name} - {emp.position || 'Cán bộ'} ({emp.department || ''})</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-semibold text-gray-700 mb-1">Ngày thực hiện bước này:</label>
+                                <input 
+                                    type="date"
+                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-orange-500 outline-none font-medium bg-white"
+                                    value={customDate}
+                                    onChange={(e) => setCustomDate(e.target.value)}
+                                />
+                            </div>
+                        </div>
+                        <p className="text-[11px] text-amber-700 leading-normal">
+                            Ghi chú: Thao tác này chỉ lưu vết tên cán bộ và ngày thực hiện vào lịch sử của bước được chọn. Danh sách cán bộ được tự động lọc theo vai trò và tổ chuyên môn.
                         </p>
                     </div>
                 )}

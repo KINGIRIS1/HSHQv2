@@ -1298,7 +1298,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                                 (isArchiveRecordType(r.recordType) ? (
                                   <button
                                     onClick={() => handleForwardToSign(r)}
-                                    title="Trình ký duyệt"
+                                    title="Trình ký"
                                     className="px-3 py-1.5 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-xs font-bold flex items-center gap-2 shadow-sm transition-all"
                                   >
                                     <Send size={14} /> Trình ký
@@ -1313,15 +1313,13 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                                   </button>
                                 ))}
 
-
-
                               {activeTab === "pending_check" &&
                                 (r.status === RecordStatus.PENDING_CHECK ||
                                   r.status === RecordStatus.CHECKED) &&
                                 isChecker && (
                                   <button
                                     onClick={() => handleForwardToSign(r)}
-                                    title="Trình ký duyệt"
+                                    title="Trình ký"
                                     className="px-3 py-1.5 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-xs font-bold flex items-center gap-2 shadow-sm transition-all"
                                   >
                                     <Send size={14} /> Trình ký

@@ -59,9 +59,11 @@ export const useAppData = (currentUser: User | null) => {
             if (permsData) {
                 try {
                     const parsed = JSON.parse(permsData);
-                    const defaultOneDoor = DEFAULT_ROLE_PERMISSIONS[UserRole.ONEDOOR] || [];
-                    const existingOneDoor = parsed[UserRole.ONEDOOR] || [];
-                    parsed[UserRole.ONEDOOR] = Array.from(new Set([...existingOneDoor, ...defaultOneDoor]));
+                    Object.keys(DEFAULT_ROLE_PERMISSIONS).forEach(roleKey => {
+                        const defPerms = DEFAULT_ROLE_PERMISSIONS[roleKey as UserRole] || [];
+                        const existingPerms = (parsed[roleKey] || []).filter((p: string) => p !== 'CHECK_RECORDS' && p !== 'BTN_CLOSE_BATCH');
+                        parsed[roleKey] = Array.from(new Set([...existingPerms, ...defPerms]));
+                    });
                     setRolePermissions(parsed);
                 } catch (e) {
                     console.error("Failed to parse role_permissions", e);
@@ -71,9 +73,8 @@ export const useAppData = (currentUser: User | null) => {
                 try {
                     const parsedDept = JSON.parse(deptPermsData);
                     Object.keys(parsedDept).forEach(key => {
-                        if (key.endsWith(`_${UserRole.ONEDOOR}`)) {
-                            const defaultOneDoor = DEFAULT_ROLE_PERMISSIONS[UserRole.ONEDOOR] || [];
-                            parsedDept[key] = Array.from(new Set([...(parsedDept[key] || []), ...defaultOneDoor]));
+                        if (Array.isArray(parsedDept[key])) {
+                            parsedDept[key] = parsedDept[key].filter((p: string) => p !== 'CHECK_RECORDS' && p !== 'BTN_CLOSE_BATCH');
                         }
                     });
                     setDepartmentPermissions(parsedDept);

@@ -367,7 +367,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
                         <span className="p-0.5 bg-green-100 text-green-600 rounded">
                             <MapPin size={13} />
                         </span> 
-                        {isCongVan ? 'Văn bản Công văn' : 'Thông tin giấy chứng nhận'}
+                        {isCongVan ? 'Văn bản Công văn' : 'Thông tin thửa đất & Giấy chứng nhận'}
                     </h3>
                     
                     {isCongVan ? (

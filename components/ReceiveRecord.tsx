@@ -346,28 +346,28 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col h-full animate-fade-in-up overflow-hidden">
-      <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-blue-50/50 shrink-0 z-10">
-        <div className="flex bg-white p-1 rounded-lg border border-gray-200">
+      <div className="p-4 border-b border-gray-100 flex flex-wrap sm:flex-nowrap justify-between items-center gap-3 bg-blue-50/50 shrink-0 z-10">
+        <div className="flex flex-wrap items-center gap-1 bg-white p-1 rounded-lg border border-gray-200">
             {canCreate && (
               <button 
                   onClick={() => { setViewMode('create'); setEditingRecord(null); }} 
-                  className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${viewMode === 'create' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
+                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-md text-sm font-semibold transition-all whitespace-nowrap cursor-pointer ${viewMode === 'create' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
               >
                   <PlusCircle size={16} /> Nhập mới
               </button>
             )}
             {canBulk && (
-              <button onClick={() => setViewMode('bulk')} className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${viewMode === 'bulk' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}>
+              <button onClick={() => setViewMode('bulk')} className={`flex items-center gap-2 px-3.5 py-1.5 rounded-md text-sm font-semibold transition-all whitespace-nowrap cursor-pointer ${viewMode === 'bulk' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}>
                   <FileSpreadsheet size={16} /> Tiếp nhận hàng loạt
               </button>
             )}
             {canList && (
-              <button onClick={() => setViewMode('list')} className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${viewMode === 'list' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}>
+              <button onClick={() => setViewMode('list')} className={`flex items-center gap-2 px-3.5 py-1.5 rounded-md text-sm font-semibold transition-all whitespace-nowrap cursor-pointer ${viewMode === 'list' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}>
                   <LayoutList size={16} /> Danh sách hôm nay
               </button>
             )}
             {canVphc && (
-              <button onClick={() => setViewMode('vphc')} className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${viewMode === 'vphc' ? 'bg-red-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}>
+              <button onClick={() => setViewMode('vphc')} className={`flex items-center gap-2 px-3.5 py-1.5 rounded-md text-sm font-semibold transition-all whitespace-nowrap cursor-pointer ${viewMode === 'vphc' ? 'bg-red-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}>
                   <Gavel size={16} /> Biên bản VPHC
               </button>
             )}

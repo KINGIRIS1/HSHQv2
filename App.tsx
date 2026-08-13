@@ -580,12 +580,35 @@ function App() {
               if (value === RecordStatus.REJECTED || value === RecordStatus.WITHDRAWN) {
                   recordUpdates.completedDate = r.completedDate || targetDateStr;
               }
+          } else if ((field as string) === 'historyStatus') {
+              const stepKey = String(value);
+              const empName = extraData?.assignedTo;
+              const stepDate = extraData?.customDate || customDateStr;
+
+              if (stepKey === 'ASSIGNED') {
+                  if (empName) recordUpdates.assignedTo = empName;
+                  if (stepDate) recordUpdates.assignedDate = stepDate;
+              } else if (stepKey === 'CHECKING') {
+                  if (empName) recordUpdates.checkedBy = empName;
+                  if (stepDate) recordUpdates.checkedDate = stepDate;
+              } else if (stepKey === 'SIGNING') {
+                  if (empName) recordUpdates.submittedTo = empName;
+                  if (stepDate) recordUpdates.approvalDate = stepDate;
+              } else if (stepKey === 'COMPLETED') {
+                  if (empName) recordUpdates.created_by = empName;
+                  if (stepDate) recordUpdates.completedDate = stepDate;
+              } else if (stepKey === 'RETURNED') {
+                  if (empName) recordUpdates.returnedBy = empName;
+                  if (stepDate) recordUpdates.resultReturnedDate = stepDate;
+              }
           } else if (field === 'assignedTo') {
               recordUpdates.assignedTo = value;
               recordUpdates.assignedDate = customDateStr || r.assignedDate || targetDateStr;
               if (r.status === RecordStatus.RECEIVED) {
                   recordUpdates.status = RecordStatus.IN_PROGRESS;
               }
+          } else if (field === 'checkedBy' || field === 'submittedTo') {
+              recordUpdates[field] = value;
           } else if (field === 'assignedDate') {
               const formattedDate = value ? (value.includes('T') ? value : new Date(value + 'T12:00:00').toISOString()) : targetDateStr;
               recordUpdates.assignedDate = formattedDate;
@@ -595,7 +618,7 @@ function App() {
               recordUpdates.handover_date = formattedDate;
           } else if (field === 'exportBatch') {
               recordUpdates.exportBatch = value;
-          } else if (field === 'deadline' || field === 'receivedDate' || field === 'resultReturnedDate') {
+          } else if (field === 'deadline' || field === 'receivedDate' || field === 'resultReturnedDate' || field === 'checkedDate' || field === 'approvalDate') {
               const formattedDate = value ? (value.includes('T') ? value : new Date(value + 'T12:00:00').toISOString()) : targetDateStr;
               recordUpdates[field] = formattedDate;
           } else if (field === 'returnedPrice') {
@@ -1262,6 +1285,7 @@ function App() {
             {...recordFilterProps}
             
             selectedRecordIds={selectedRecordIds}
+            setSelectedRecordIds={setSelectedRecordIds}
             toggleSelectAll={toggleSelectAll}
             toggleSelectRecord={toggleSelectRecord}
             visibleColumns={visibleColumns}

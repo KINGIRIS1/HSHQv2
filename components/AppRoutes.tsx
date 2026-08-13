@@ -60,6 +60,7 @@ import {
   FileSpreadsheet,
   Layers,
   CheckCircle,
+  CheckCircle2,
   FileSignature,
   UserPlus,
   FileOutput,
@@ -186,6 +187,7 @@ interface AppRoutesProps {
   setItemsPerPage: React.Dispatch<React.SetStateAction<number>>;
 
   selectedRecordIds: Set<string>;
+  setSelectedRecordIds?: React.Dispatch<React.SetStateAction<Set<string>>>;
   toggleSelectAll: () => void;
   toggleSelectRecord: (id: string) => void;
   visibleColumns: Record<string, boolean>;
@@ -257,6 +259,11 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
       </div>
     );
   }
+
+  // Tự động bỏ chọn hồ sơ khi chuyển tab bàn giao
+  React.useEffect(() => {
+    props.setSelectedRecordIds?.(new Set());
+  }, [props.handoverTab]);
 
   const hasPermission = (permissionId: string) => {
     if (currentUser.role === UserRole.ADMIN) return true;
@@ -671,25 +678,57 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
             {(currentView === "handover_list" ||
               currentView === "other_handover_list" ||
               currentView === "archive_handover_list") && (
-              <div className="flex bg-white rounded-md border border-gray-200 p-1 mr-2 shadow-sm">
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex bg-white rounded-md border border-gray-200 p-1 shadow-sm">
                   <button
-                    onClick={() => props.setHandoverTab("today")}
+                    onClick={() => {
+                      props.setHandoverTab("today");
+                      props.setSelectedRecordIds?.(new Set());
+                    }}
                     className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${props.handoverTab === "today" ? "bg-green-600 text-white shadow-sm" : "text-gray-600 hover:bg-gray-100"}`}
                   >
                     <ListChecks size={16} /> Chờ bàn giao
                   </button>
-                <button
-                  onClick={() => props.setHandoverTab("history")}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${props.handoverTab === "history" ? "bg-green-600 text-white shadow-sm" : "text-gray-600 hover:bg-gray-100"}`}
-                >
-                  <History size={16} /> Chờ trả kết quả
-                </button>
-                <button
-                  onClick={() => props.setHandoverTab("returned")}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${props.handoverTab === "returned" ? "bg-emerald-600 text-white shadow-sm" : "text-gray-600 hover:bg-gray-100"}`}
-                >
-                  <FileCheck size={16} /> Đã trả kết quả
-                </button>
+                  <button
+                    onClick={() => {
+                      props.setHandoverTab("history");
+                      props.setSelectedRecordIds?.(new Set());
+                    }}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${props.handoverTab === "history" ? "bg-green-600 text-white shadow-sm" : "text-gray-600 hover:bg-gray-100"}`}
+                  >
+                    <History size={16} /> Chờ trả kết quả
+                  </button>
+                  <button
+                    onClick={() => {
+                      props.setHandoverTab("returned");
+                      props.setSelectedRecordIds?.(new Set());
+                    }}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${props.handoverTab === "returned" ? "bg-emerald-600 text-white shadow-sm" : "text-gray-600 hover:bg-gray-100"}`}
+                  >
+                    <FileCheck size={16} /> Đã trả kết quả
+                  </button>
+                </div>
+
+                {/* Chốt DS (khi ở tab today - Chờ bàn giao và có chọn hồ sơ) */}
+                {props.handoverTab === "today" && props.selectedRecordIds.size > 0 && (
+                  <button
+                    onClick={() => props.setIsAddToBatchModalOpen(true)}
+                    className="flex items-center gap-1.5 bg-blue-600 text-white px-3.5 py-1.5 rounded-lg hover:bg-blue-700 text-sm font-bold shadow-sm transition-all animate-pulse cursor-pointer whitespace-nowrap"
+                  >
+                    <CheckCircle size={16} /> Chốt DS ({props.selectedRecordIds.size})
+                  </button>
+                )}
+
+                {/* Chốt HS lưu (khi ở tab returned - Đã trả kết quả và có chọn hồ sơ) */}
+                {props.handoverTab === "returned" && props.selectedRecordIds.size > 0 && (
+                  <button
+                    onClick={() => props.setIsReturnHandoverModalOpen?.(true)}
+                    className="flex items-center gap-1.5 bg-emerald-600 text-white px-3.5 py-1.5 rounded-lg hover:bg-emerald-700 text-sm font-bold shadow-sm transition-all cursor-pointer animate-pulse whitespace-nowrap"
+                    title="Chốt danh sách hồ sơ lưu tại Đã trả kết quả"
+                  >
+                    <Send size={16} /> Chốt HS lưu ({props.selectedRecordIds.size})
+                  </button>
+                )}
               </div>
             )}
 
@@ -964,197 +1003,82 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
               )}
 
             {canPerformAction && !["handover_list", "other_handover_list", "archive_handover_list"].includes(currentView) && (
-              <>
-                <div className="flex items-center gap-2">
-                  <div className="h-6 w-px bg-gray-300 mx-1"></div>
-                  <div className="relative inline-block text-left" ref={addMenuRef}>
-                    <button
-                      onClick={() => setIsAddMenuOpen(!isAddMenuOpen)}
-                      className="flex items-center justify-center w-8 h-8 bg-blue-600 text-white rounded-md hover:bg-blue-700 shadow-sm font-bold active:scale-95 transition-all"
-                      title="Thêm hồ sơ hoặc nhập từ Excel"
-                    >
-                      <Plus size={20} className={`transition-transform duration-200 ${isAddMenuOpen ? "rotate-45" : ""}`} />
-                    </button>
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="h-6 w-px bg-gray-300 mx-1"></div>
+                <div className="relative inline-block text-left" ref={addMenuRef}>
+                  <button
+                    onClick={() => setIsAddMenuOpen(!isAddMenuOpen)}
+                    className="flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-sm font-bold text-sm active:scale-95 transition-all cursor-pointer whitespace-nowrap"
+                    title="Thêm hồ sơ hoặc nhập từ Excel"
+                  >
+                    <Plus size={16} />
+                    <span>Nhập mới</span>
+                    <ChevronDown size={14} className={`transition-transform duration-200 ${isAddMenuOpen ? "rotate-180" : ""}`} />
+                  </button>
 
-                    {isAddMenuOpen && (
-                      <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-2xl border border-gray-100 z-50 py-1.5 animate-in fade-in zoom-in-95 duration-100 divide-y divide-slate-100">
-                        <button
-                          onClick={() => {
-                            setIsAddMenuOpen(false);
-                            props.setIsModalOpen(true);
-                            props.setEditingRecord(null);
-                          }}
-                          className="w-full text-left px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-blue-50 hover:text-blue-600 flex items-center gap-2.5 transition-colors"
-                        >
-                          <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-                            <Plus size={18} />
-                          </div>
-                          <div>
-                            <div className="font-bold text-slate-800 text-sm">Nhập hồ sơ mới</div>
-                            <div className="text-[11px] text-slate-500">Tạo thủ công một hồ sơ</div>
-                          </div>
-                        </button>
-
-                        <button
-                          onClick={() => {
-                            setIsAddMenuOpen(false);
-                            navigateToReceiveRecordSubTab('bulk');
-                          }}
-                          className="w-full text-left px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-emerald-50 hover:text-emerald-600 flex items-center gap-2.5 transition-colors"
-                        >
-                          <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                            <FileSpreadsheet size={18} />
-                          </div>
-                          <div>
-                            <div className="font-bold text-slate-800 text-sm">Tiếp nhận hàng loạt</div>
-                            <div className="text-[11px] text-slate-500">Nhập danh sách từ Excel</div>
-                          </div>
-                        </button>
-
-                        <button
-                          onClick={() => {
-                            setIsAddMenuOpen(false);
-                            if (props.setImportModalMode) props.setImportModalMode('update');
-                            props.setIsImportModalOpen(true);
-                          }}
-                          className="w-full text-left px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-amber-50 hover:text-amber-600 flex items-center gap-2.5 transition-colors"
-                        >
-                          <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
-                            <RefreshCw size={18} />
-                          </div>
-                          <div>
-                            <div className="font-bold text-slate-800 text-sm">Cập nhật thông tin</div>
-                            <div className="text-[11px] text-slate-500">Đổi trạng thái, cán bộ, hạn trả...</div>
-                          </div>
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {(currentView === "handover_list" ||
-                  currentView === "other_handover_list" ||
-                  currentView === "archive_handover_list") &&
-                  props.handoverTab === "returned" && (
-                    <div className="flex items-center gap-2">
-                      {props.selectedRecordIds.size > 0 && (
-                        <button
-                          onClick={() => props.setIsReturnHandoverModalOpen?.(true)}
-                          className="flex items-center gap-1.5 bg-emerald-600 text-white px-3 py-1.5 rounded-md hover:bg-emerald-700 text-sm font-bold shadow-sm transition-all animate-pulse"
-                        >
-                          <Send size={16} /> Chốt DS Lưu ({props.selectedRecordIds.size})
-                        </button>
-                      )}
+                  {isAddMenuOpen && (
+                    <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-2xl border border-gray-100 z-50 py-1.5 animate-in fade-in zoom-in-95 duration-100 divide-y divide-slate-100">
                       <button
-                        onClick={props.handleExportReturnedList}
-                        className="hidden md:flex items-center gap-1.5 bg-emerald-600 text-white px-3 py-1.5 rounded-md hover:bg-emerald-700 text-sm font-bold shadow-sm transition-all"
+                        onClick={() => {
+                          setIsAddMenuOpen(false);
+                          props.setIsModalOpen(true);
+                          props.setEditingRecord(null);
+                        }}
+                        className="w-full text-left px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-blue-50 hover:text-blue-600 flex items-center gap-2.5 transition-colors"
                       >
-                        <FileSpreadsheet size={16} /> Xuất Excel (Đã trả KQ)
+                        <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                          <Plus size={18} />
+                        </div>
+                        <div>
+                          <div className="font-bold text-slate-800 text-sm">Nhập hồ sơ mới</div>
+                          <div className="text-[11px] text-slate-500">Tạo thủ công một hồ sơ</div>
+                        </div>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setIsAddMenuOpen(false);
+                          navigateToReceiveRecordSubTab('bulk');
+                        }}
+                        className="w-full text-left px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-emerald-50 hover:text-emerald-600 flex items-center gap-2.5 transition-colors"
+                      >
+                        <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                          <FileSpreadsheet size={18} />
+                        </div>
+                        <div>
+                          <div className="font-bold text-slate-800 text-sm">Tiếp nhận hàng loạt</div>
+                          <div className="text-[11px] text-slate-500">Nhập danh sách từ Excel</div>
+                        </div>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setIsAddMenuOpen(false);
+                          if (props.setImportModalMode) props.setImportModalMode('update');
+                          props.setIsImportModalOpen(true);
+                        }}
+                        className="w-full text-left px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-amber-50 hover:text-amber-600 flex items-center gap-2.5 transition-colors"
+                      >
+                        <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                          <RefreshCw size={18} />
+                        </div>
+                        <div>
+                          <div className="font-bold text-slate-800 text-sm">Cập nhật thông tin</div>
+                          <div className="text-[11px] text-slate-500">Đổi trạng thái, cán bộ, hạn trả...</div>
+                        </div>
                       </button>
                     </div>
                   )}
+                </div>
 
-                {!["assign_tasks", "other_assign_tasks", "archive_assign_tasks", "completed_list", "archive_completed_list", "pending_check_list", "archive_pending_check_list", "check_list", "other_check_list", "archive_check_list", "handover_list", "other_handover_list", "archive_handover_list", "director_completed", "archive_director_completed", "other_director_completed", "receive_record", "receive_contract", "dashboard", "reports", "account_settings", "utilities", "work_schedule"].includes(currentView) &&
-                  (hasPermission('BTN_REJECT_RECORD') || hasPermission('REJECT_RECORDS')) &&
-                  props.selectedRecordIds.size > 0 && props.handleOpenRejectReturnModal && (
-                    <button
-                      onClick={() => {
-                        const targets = records.filter((r) =>
-                          props.selectedRecordIds.has(r.id),
-                        );
-                        props.handleOpenRejectReturnModal!(targets);
-                      }}
-                      className="flex items-center gap-1.5 bg-rose-600 text-white px-3 py-1.5 rounded-md hover:bg-rose-700 text-sm font-bold shadow-sm transition-all"
-                      title="Trả hồ sơ không đạt về bước Đang thực hiện"
-                    >
-                      <Undo2 size={16} /> Trả hồ sơ ({props.selectedRecordIds.size})
-                    </button>
-                  )}
-
-
-
-                {(currentView === "check_list" ||
-                  currentView === "other_check_list" ||
-                  currentView === "archive_check_list") &&
-                  (hasPermission('BTN_SUBMIT_SIGN') || hasPermission('SIGN_RECORDS')) &&
-                  props.selectedRecordIds.size > 0 && (
-                    <button
-                      onClick={props.handleConfirmSignBatch}
-                      className="flex items-center gap-1.5 bg-purple-600 text-white px-3 py-1.5 rounded-md hover:bg-purple-700 text-sm font-bold shadow-sm transition-all animate-pulse"
-                    >
-                      <FileSignature size={16} /> Ký Duyệt ({props.selectedRecordIds.size})
-                    </button>
-                  )}
-
-
-
-                {hasPermission('BTN_SUBMIT_SIGN') &&
-                  (currentView === "completed_list") &&
-                  props.selectedRecordIds.size > 0 && (
-                    <button
-                      onClick={() => {
-                        const targets = records.filter((r) =>
-                          props.selectedRecordIds.has(r.id),
-                        );
-                        props.setSubmitTargetRecords(targets);
-                        props.setIsSubmitCheckModalOpen(true);
-                      }}
-                      className="flex items-center gap-1.5 bg-orange-600 text-white px-3 py-1.5 rounded-md hover:bg-orange-700 text-sm font-bold shadow-sm transition-all animate-pulse"
-                    >
-                      <ClipboardList size={16} /> Trình Kiểm Tra ({props.selectedRecordIds.size})
-                    </button>
-                  )}
-
-                {hasPermission('BTN_SUBMIT_SIGN') &&
-                  (currentView === "archive_completed_list") &&
-                  props.selectedRecordIds.size > 0 && (
-                    <button
-                      onClick={() => {
-                        const targets = records.filter((r) =>
-                          props.selectedRecordIds.has(r.id),
-                        );
-                        props.setSubmitTargetRecords(targets);
-                        props.setIsSubmitModalOpen(true);
-                      }}
-                      className="flex items-center gap-1.5 bg-indigo-600 text-white px-3 py-1.5 rounded-md hover:bg-indigo-700 text-sm font-bold shadow-sm transition-all animate-pulse"
-                    >
-                      <FileSignature size={16} /> Trình Ký Duyệt ({props.selectedRecordIds.size})
-                    </button>
-                  )}
-
-                {hasPermission('BTN_SUBMIT_SIGN') &&
-                  (currentView === "pending_check_list" ||
-                    currentView === "archive_pending_check_list") &&
-                  props.selectedRecordIds.size > 0 && (
-                    <button
-                      onClick={() => {
-                        const targets = records.filter((r) =>
-                          props.selectedRecordIds.has(r.id),
-                        );
-                        props.setSubmitTargetRecords(targets);
-                        props.setIsSubmitModalOpen(true);
-                      }}
-                      className="flex items-center gap-1.5 bg-indigo-600 text-white px-3 py-1.5 rounded-md hover:bg-indigo-700 text-sm font-bold shadow-sm transition-all animate-pulse"
-                    >
-                      <FileSignature size={16} /> Trình Ký Duyệt ({props.selectedRecordIds.size})
-                    </button>
-                  )}
-
-                {(currentView === "assign_tasks" ||
-                  currentView === "other_assign_tasks" ||
-                  currentView === "archive_assign_tasks") &&
-                  props.selectedRecordIds.size > 0 && (
-                    <>
-                      {hasPermission('BTN_REJECT_RECORD') && (
-                        <button
-                          onClick={props.handleMarkAsRejected}
-                          className="flex items-center gap-1.5 bg-red-600 text-white px-3 py-1.5 rounded-md hover:bg-red-700 text-sm font-bold shadow-sm transition-all"
-                          title="Trả hồ sơ về Bộ phận 1 cửa"
-                        >
-                          <ClipboardList size={16} /> Trả hồ sơ ({props.selectedRecordIds.size})
-                        </button>
-                      )}
-                      {(hasPermission('BTN_ASSIGN_STAFF') || hasPermission('ASSIGN_RECORDS')) && (
+                {/* Các nút thao tác theo lô chính đặt cạnh Nhập mới */}
+                {props.selectedRecordIds.size > 0 && (
+                  <>
+                    {/* Bulk Assign (Giao việc) */}
+                    {(currentView === "assign_tasks" ||
+                      currentView === "other_assign_tasks" ||
+                      currentView === "archive_assign_tasks") &&
+                      (hasPermission('BTN_ASSIGN_STAFF') || hasPermission('ASSIGN_RECORDS')) && (
                         <button
                           onClick={() => {
                             const targets = records.filter((r) =>
@@ -1163,124 +1087,222 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                             props.setAssignTargetRecords(targets);
                             props.setIsAssignModalOpen(true);
                           }}
-                          className="flex items-center gap-1.5 bg-blue-600 text-white px-3 py-1.5 rounded-md hover:bg-blue-700 text-sm font-bold shadow-sm transition-all animate-pulse"
+                          className="flex items-center gap-1.5 bg-blue-600 text-white px-3.5 py-1.5 rounded-lg hover:bg-blue-700 text-sm font-bold shadow-sm transition-all animate-pulse cursor-pointer whitespace-nowrap"
                         >
                           <UserPlus size={16} /> Giao việc ({props.selectedRecordIds.size})
                         </button>
                       )}
-                    </>
-                  )}
-              </>
-            )}
 
-            {/* Xuất Danh Sách & Chốt DS trong tab Giao 1 cửa (handover) */}
-            {(currentView === "handover_list" ||
-              currentView === "other_handover_list" ||
-              currentView === "archive_handover_list") && (
-                <div className="flex items-center gap-2 ml-auto">
-                  {props.handoverTab === "today" && props.selectedRecordIds.size > 0 && (
-                    <button
-                      onClick={() => props.setIsAddToBatchModalOpen(true)}
-                      className="flex items-center gap-1.5 bg-blue-600 text-white px-3.5 py-1.5 rounded-lg hover:bg-blue-700 text-sm font-bold shadow-sm transition-all animate-pulse"
-                    >
-                      <CheckCircle size={16} /> Chốt DS ({props.selectedRecordIds.size})
-                    </button>
-                  )}
+                    {/* Bulk Approve / Sign (Ký Duyệt) */}
+                    {(currentView === "check_list" ||
+                      currentView === "other_check_list" ||
+                      currentView === "archive_check_list") &&
+                      (hasPermission('BTN_APPROVE_SIGN') || hasPermission('BTN_SUBMIT_SIGN') || hasPermission('SIGN_RECORDS')) && (
+                        <button
+                          onClick={props.handleConfirmSignBatch}
+                          className="flex items-center gap-1.5 bg-purple-600 text-white px-3.5 py-1.5 rounded-lg hover:bg-purple-700 text-sm font-bold shadow-sm transition-all animate-pulse cursor-pointer whitespace-nowrap"
+                        >
+                          <FileSignature size={16} /> Ký Duyệt ({props.selectedRecordIds.size})
+                        </button>
+                      )}
 
-                  {props.handoverTab !== "returned" && (
-                    <button
-                      onClick={() => {
-                        props.setExportModalType("handover");
-                        props.setIsExportModalOpen(true);
-                      }}
-                      className="flex items-center gap-1.5 bg-white text-gray-700 border border-gray-300 px-3 py-1.5 rounded-md hover:bg-gray-50 text-sm font-semibold shadow-sm"
-                    >
-                      <FileOutput size={16} /> Xuất Danh Sách
-                    </button>
-                  )}
-                </div>
-              )}
+                    {/* Bulk Submit Check (Trình Kiểm Tra) */}
+                    {(hasPermission('BTN_SUBMIT_CHECK') || hasPermission('BTN_SUBMIT_SIGN')) &&
+                      (currentView === "completed_list") && (
+                        <button
+                          onClick={() => {
+                            const targets = records.filter((r) =>
+                              props.selectedRecordIds.has(r.id),
+                            );
+                            props.setSubmitTargetRecords(targets);
+                            props.setIsSubmitCheckModalOpen(true);
+                          }}
+                          className="flex items-center gap-1.5 bg-orange-600 text-white px-3.5 py-1.5 rounded-lg hover:bg-orange-700 text-sm font-bold shadow-sm transition-all animate-pulse cursor-pointer whitespace-nowrap"
+                        >
+                          <ClipboardList size={16} /> Trình Kiểm Tra ({props.selectedRecordIds.size})
+                        </button>
+                      )}
 
-            {(isAdmin || isSubadmin) && props.selectedRecordIds.size > 0 && (
-              <button
-                onClick={() => props.setIsBulkUpdateModalOpen(true)}
-                className="ml-2 flex items-center gap-1 bg-orange-600 text-white px-3 py-1.5 rounded-md hover:bg-orange-700 shadow-sm text-sm font-bold animate-pulse"
-              >
-                <Layers size={16} /> Admin: Xử lý hàng loạt (
-                {props.selectedRecordIds.size})
-              </button>
-            )}
+                    {/* Bulk Submit Sign (Trình Ký) */}
+                    {hasPermission('BTN_SUBMIT_SIGN') &&
+                      (currentView === "archive_completed_list" ||
+                       currentView === "pending_check_list" ||
+                       currentView === "archive_pending_check_list") && (
+                        <button
+                          onClick={() => {
+                            const targets = records.filter((r) =>
+                              props.selectedRecordIds.has(r.id),
+                            );
+                            props.setSubmitTargetRecords(targets);
+                            props.setIsSubmitModalOpen(true);
+                          }}
+                          className="flex items-center gap-1.5 bg-indigo-600 text-white px-3.5 py-1.5 rounded-lg hover:bg-indigo-700 text-sm font-bold shadow-sm transition-all animate-pulse cursor-pointer whitespace-nowrap"
+                        >
+                          <FileSignature size={16} /> Trình Ký ({props.selectedRecordIds.size})
+                        </button>
+                      )}
 
-            {(currentView === "all_records" ||
-              currentView === "other_records" ||
-              currentView === "archive_records") && (
-              <div className="relative ml-auto">
-                <button
-                  onClick={() => setShowColumnSelector(!showColumnSelector)}
-                  className="p-2 bg-white border border-gray-200 rounded-md hover:bg-gray-100"
-                >
-                  <SlidersHorizontal size={16} />
-                </button>
-                {showColumnSelector && (
-                  <div className="absolute right-0 top-full mt-2 w-64 bg-white border border-gray-200 rounded-lg shadow-xl z-50 p-2 divide-y divide-gray-100 max-h-96 overflow-y-auto">
-                    {orderedColumnDefs.map((col, index) => (
-                      <div
-                        key={col.key}
-                        className="flex items-center justify-between p-2 hover:bg-gray-50 rounded group/item"
-                      >
-                        <label className="flex items-center gap-2 cursor-pointer flex-1 select-none">
-                          <input
-                            type="checkbox"
-                            checked={props.visibleColumns[col.key]}
-                            onChange={() =>
-                              props.setVisibleColumns((prev) => ({
-                                ...prev,
-                                [col.key]: !prev[col.key],
-                              }))
-                            }
-                            className="rounded text-blue-600 focus:ring-blue-500"
-                          />
-                          <span className="text-sm text-gray-700 font-medium">
-                            {col.label}
-                          </span>
-                        </label>
-                        <div className="flex items-center gap-1 opacity-0 group-hover/item:opacity-100 transition-opacity">
-                          <button
-                            disabled={index === 0}
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              handleMoveColumn(col.key, -1);
-                            }}
-                            className="p-1 text-gray-400 hover:text-blue-600 hover:bg-gray-100 rounded disabled:opacity-30"
-                            title="Di chuyển lên"
-                          >
-                            <ChevronUp size={14} />
-                          </button>
-                          <button
-                            disabled={index === orderedColumnDefs.length - 1}
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              handleMoveColumn(col.key, 1);
-                            }}
-                            className="p-1 text-gray-400 hover:text-blue-600 hover:bg-gray-100 rounded disabled:opacity-30"
-                            title="Di chuyển xuống"
-                          >
-                            <ChevronDown size={14} />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                    {/* Bulk Handover (Bàn giao 1 cửa) */}
+                    {(currentView === "director_completed" ||
+                      currentView === "other_director_completed" ||
+                      currentView === "archive_director_completed") &&
+                      (hasPermission('HANDOVER_RECORDS') || hasPermission('EXPORT_RECORDS')) && (
+                        <button
+                          onClick={() => {
+                            props.setExportModalType("handover");
+                            props.setIsExportModalOpen(true);
+                          }}
+                          className="flex items-center gap-1.5 bg-teal-600 text-white px-3.5 py-1.5 rounded-lg hover:bg-teal-700 text-sm font-bold shadow-sm transition-all cursor-pointer whitespace-nowrap"
+                        >
+                          <Send size={16} /> Bàn giao 1 cửa ({props.selectedRecordIds.size})
+                        </button>
+                      )}
+                  </>
                 )}
               </div>
             )}
+
+            {/* Action buttons on the right side */}
+            <div className="ml-auto flex items-center gap-2 flex-wrap">
+              {/* Thao tác Trả hồ sơ & Xử lý All bên phải khi có chọn hồ sơ */}
+              {props.selectedRecordIds.size > 0 && (
+                <>
+                  {/* Bulk Reject (Trả hồ sơ) - Bỏ ở các tab bàn giao/trả kết quả */}
+                  {!["handover_list", "other_handover_list", "archive_handover_list"].includes(currentView) &&
+                    (hasPermission('BTN_REJECT_RECORD') || hasPermission('REJECT_RECORDS') ||
+                     hasPermission('dodac_BTN_REJECT_RECORD') || hasPermission('luutru_BTN_REJECT_RECORD')) && (
+                    <button
+                      onClick={() => {
+                        const targets = records.filter((r) =>
+                          props.selectedRecordIds.has(r.id),
+                        );
+                        if (props.handleOpenRejectReturnModal) {
+                          props.handleOpenRejectReturnModal(targets);
+                        } else if (props.handleMarkAsRejected) {
+                          props.handleMarkAsRejected();
+                        }
+                      }}
+                      className="flex items-center gap-1.5 bg-rose-600 text-white px-3.5 py-1.5 rounded-lg hover:bg-rose-700 text-sm font-bold shadow-sm transition-all cursor-pointer whitespace-nowrap"
+                      title="Trả hồ sơ"
+                    >
+                      <Undo2 size={16} /> Trả hồ sơ ({props.selectedRecordIds.size})
+                    </button>
+                  )}
+
+                  {/* Bulk Update (Xử lý All) */}
+                  <button
+                    onClick={() => props.setIsBulkUpdateModalOpen(true)}
+                    className="flex items-center gap-1.5 bg-orange-600 text-white px-3.5 py-1.5 rounded-lg hover:bg-orange-700 shadow-sm text-sm font-bold animate-pulse cursor-pointer whitespace-nowrap"
+                    title="Xử lý All"
+                  >
+                    <Layers size={16} /> Xử lý All ({props.selectedRecordIds.size})
+                  </button>
+                </>
+              )}
+              {/* Tab "Đã trả kết quả": Xuất Excel TKQ */}
+              {(currentView === "handover_list" ||
+                currentView === "other_handover_list" ||
+                currentView === "archive_handover_list") &&
+                props.handoverTab === "returned" && (
+                  <button
+                    onClick={props.handleExportReturnedList}
+                    className="flex items-center gap-1.5 bg-emerald-700 text-white px-3.5 py-1.5 rounded-lg hover:bg-emerald-800 text-sm font-bold shadow-sm transition-all cursor-pointer whitespace-nowrap"
+                    title="Xuất file Excel cho danh sách Đã trả kết quả (TKQ)"
+                  >
+                    <FileSpreadsheet size={16} /> Xuất Excel TKQ
+                  </button>
+                )}
+
+              {/* Các tab "Chờ bàn giao" & "Chờ trả kết quả": Nút Xuất DS */}
+              {(currentView === "director_completed" ||
+                currentView === "other_director_completed" ||
+                currentView === "archive_director_completed" ||
+                ((currentView === "handover_list" ||
+                  currentView === "other_handover_list" ||
+                  currentView === "archive_handover_list") &&
+                 props.handoverTab !== "returned")) && (
+                <button
+                  onClick={() => {
+                    props.setExportModalType("handover");
+                    props.setIsExportModalOpen(true);
+                  }}
+                  className="flex items-center gap-1.5 bg-white text-gray-700 border border-gray-300 px-3.5 py-1.5 rounded-lg hover:bg-gray-50 text-sm font-semibold shadow-xs transition-all cursor-pointer whitespace-nowrap"
+                  title="Xuất danh sách hồ sơ ra file Excel"
+                >
+                  <FileOutput size={16} className="text-emerald-600" />
+                  <span>Xuất DS</span>
+                </button>
+              )}
+
+              {/* Nút Cài đặt cột tiêu đề bảng */}
+              {(currentView === "all_records" ||
+                currentView === "other_records" ||
+                currentView === "archive_records") && (
+                <div className="relative">
+                  <button
+                    onClick={() => setShowColumnSelector(!showColumnSelector)}
+                    className="p-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-100 shadow-xs flex items-center justify-center cursor-pointer"
+                    title="Cài đặt cột tiêu đề bảng"
+                  >
+                    <SlidersHorizontal size={18} className="text-gray-600" />
+                  </button>
+                  {showColumnSelector && (
+                    <div className="absolute right-0 top-full mt-2 w-64 bg-white border border-gray-200 rounded-lg shadow-xl z-50 p-2 divide-y divide-gray-100 max-h-96 overflow-y-auto">
+                      {orderedColumnDefs.map((col, index) => (
+                        <div
+                          key={col.key}
+                          className="flex items-center justify-between p-2 hover:bg-gray-50 rounded group/item"
+                        >
+                          <label className="flex items-center gap-2 cursor-pointer flex-1 select-none">
+                            <input
+                              type="checkbox"
+                              checked={props.visibleColumns[col.key]}
+                              onChange={() =>
+                                props.setVisibleColumns((prev) => ({
+                                  ...prev,
+                                  [col.key]: !prev[col.key],
+                                }))
+                              }
+                              className="rounded text-blue-600 focus:ring-blue-500"
+                            />
+                            <span className="text-sm text-gray-700 font-medium">
+                              {col.label}
+                            </span>
+                          </label>
+                          <div className="flex items-center gap-1 opacity-0 group-hover/item:opacity-100 transition-opacity">
+                            <button
+                              disabled={index === 0}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleMoveColumn(col.key, -1);
+                              }}
+                              className="p-1 text-gray-400 hover:text-blue-600 hover:bg-gray-100 rounded disabled:opacity-30"
+                              title="Di chuyển lên"
+                            >
+                              <ChevronUp size={14} />
+                            </button>
+                            <button
+                              disabled={index === orderedColumnDefs.length - 1}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleMoveColumn(col.key, 1);
+                              }}
+                              className="p-1 text-gray-400 hover:text-blue-600 hover:bg-gray-100 rounded disabled:opacity-30"
+                              title="Di chuyển xuống"
+                            >
+                              <ChevronDown size={14} />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
-
-
-
-
         </div>
 
         <div className="flex-1 overflow-auto min-h-0 bg-white">
