@@ -655,8 +655,8 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
       
       {/* HEADER WITH TABS */}
       <div className="p-0 border-b border-gray-100 flex flex-col bg-purple-50/50 shrink-0 z-10 relative">
-        <div className="flex justify-between items-center p-4">
-            <div><h2 className="text-xl font-bold text-gray-800 flex items-center gap-2"><FileSignature className="text-purple-600" /> Quản Lý Hợp Đồng</h2></div>
+        <div className="flex justify-between items-center p-3.5 md:p-4">
+            <div><h2 className="text-lg md:text-xl font-bold text-gray-800 flex items-center gap-2"><FileSignature className="text-purple-600" /> Quản Lý Hợp Đồng</h2></div>
             
             <div className="flex gap-2">
                 {activeModule !== 'liquidation' && (
@@ -674,36 +674,36 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
         </div>
 
         {/* MAIN TABS */}
-        <div className="flex px-4 gap-2 overflow-x-auto">
+        <div className="flex px-3.5 md:px-4 gap-1.5 md:gap-2 overflow-x-auto">
             <button 
                 onClick={() => { setActiveModule('contract'); setEditingContract(undefined); }}
-                className={`px-6 py-2.5 rounded-t-lg font-bold text-sm transition-all border-t border-l border-r whitespace-nowrap ${activeModule === 'contract' ? 'bg-white text-purple-700 border-gray-200 relative top-[1px]' : 'bg-gray-100 text-gray-500 border-transparent hover:bg-gray-200'}`}
+                className={`px-4 md:px-6 py-2 md:py-2.5 rounded-t-lg font-bold text-xs md:text-sm transition-all border-t border-l border-r whitespace-nowrap ${activeModule === 'contract' ? 'bg-white text-purple-700 border-gray-200 relative top-[1px]' : 'bg-gray-100 text-gray-500 border-transparent hover:bg-gray-200'}`}
             >
-                <FileText size={16} className="inline mr-2" /> Lập Hợp Đồng
+                <FileText size={16} className="inline mr-1.5 md:mr-2" /> Lập Hợp Đồng
             </button>
             <button 
                 onClick={() => { setActiveModule('liquidation'); setEditingContract(undefined); }}
-                className={`px-6 py-2.5 rounded-t-lg font-bold text-sm transition-all border-t border-l border-r whitespace-nowrap ${activeModule === 'liquidation' ? 'bg-white text-green-700 border-gray-200 relative top-[1px]' : 'bg-gray-100 text-gray-500 border-transparent hover:bg-gray-200'}`}
+                className={`px-4 md:px-6 py-2 md:py-2.5 rounded-t-lg font-bold text-xs md:text-sm transition-all border-t border-l border-r whitespace-nowrap ${activeModule === 'liquidation' ? 'bg-white text-green-700 border-gray-200 relative top-[1px]' : 'bg-gray-100 text-gray-500 border-transparent hover:bg-gray-200'}`}
             >
-                <FileCheck size={16} className="inline mr-2" /> Thanh Lý Hợp Đồng
+                <FileCheck size={16} className="inline mr-1.5 md:mr-2" /> Thanh Lý Hợp Đồng
             </button>
             <button 
                 onClick={() => { setActiveModule('list'); }}
-                className={`px-6 py-2.5 rounded-t-lg font-bold text-sm transition-all border-t border-l border-r whitespace-nowrap ${activeModule === 'list' ? 'bg-white text-blue-700 border-gray-200 relative top-[1px]' : 'bg-gray-100 text-gray-500 border-transparent hover:bg-gray-200'}`}
+                className={`px-4 md:px-6 py-2 md:py-2.5 rounded-t-lg font-bold text-xs md:text-sm transition-all border-t border-l border-r whitespace-nowrap ${activeModule === 'list' ? 'bg-white text-blue-700 border-gray-200 relative top-[1px]' : 'bg-gray-100 text-gray-500 border-transparent hover:bg-gray-200'}`}
             >
-                <LayoutList size={16} className="inline mr-2" /> Danh sách Hợp đồng
+                <LayoutList size={16} className="inline mr-1.5 md:mr-2" /> Danh sách Hợp đồng
             </button>
             <button 
                 onClick={() => { setActiveModule('liquidation_list'); }}
-                className={`px-6 py-2.5 rounded-t-lg font-bold text-sm transition-all border-t border-l border-r whitespace-nowrap ${activeModule === 'liquidation_list' ? 'bg-white text-orange-700 border-gray-200 relative top-[1px]' : 'bg-gray-100 text-gray-500 border-transparent hover:bg-gray-200'}`}
+                className={`px-4 md:px-6 py-2 md:py-2.5 rounded-t-lg font-bold text-xs md:text-sm transition-all border-t border-l border-r whitespace-nowrap ${activeModule === 'liquidation_list' ? 'bg-white text-orange-700 border-gray-200 relative top-[1px]' : 'bg-gray-100 text-gray-500 border-transparent hover:bg-gray-200'}`}
             >
-                <ClipboardList size={16} className="inline mr-2" /> Danh sách Thanh lý
+                <ClipboardList size={16} className="inline mr-1.5 md:mr-2" /> Danh sách Thanh lý
             </button>
         </div>
       </div>
 
       <div className="flex-1 overflow-hidden flex flex-col">
-        <div className="flex-1 overflow-y-auto p-6 bg-gray-50">
+        <div className="flex-1 overflow-y-auto p-3.5 md:p-5 lg:p-6 bg-gray-50">
             {activeModule === 'contract' && (
                 <ContractForm 
                     initialData={editingContract}

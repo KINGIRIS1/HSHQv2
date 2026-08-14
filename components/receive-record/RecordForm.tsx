@@ -265,8 +265,8 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
       if (onCancelEdit && initialData) onCancelEdit();
   };
 
-  const inputClass = "w-full border border-gray-300 rounded-md px-2 py-1 text-xs outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 transition-all font-medium text-slate-700 bg-white hover:border-gray-400";
-  const labelClass = "block text-[11px] font-bold text-gray-700 mb-0.5";
+  const inputClass = "w-full border border-gray-300 rounded-lg px-3 py-1.5 2xl:py-2 text-xs sm:text-sm 2xl:text-base outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 transition-all font-medium text-slate-700 bg-white hover:border-gray-400 shadow-2xs";
+  const labelClass = "block text-xs 2xl:text-sm font-bold text-slate-700 mb-1 2xl:mb-1.5";
   const iconWrapperClass = "absolute left-3 top-[34px] text-slate-400 pointer-events-none";
 
   const dateVal = (v: any) => { if (!v) return ''; const str = String(v); return str.includes('T') ? str.split('T')[0] : str; };
@@ -274,31 +274,31 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
   const isCongVan = formData.recordType ? getShortRecordType(formData.recordType) === '1.2 Công văn' : false;
 
   return (
-    <form onSubmit={handleSubmit} className="w-full space-y-2.5 animate-fade-in relative pb-2">
+    <form onSubmit={handleSubmit} className="w-full max-w-[2200px] mx-auto space-y-4 2xl:space-y-6 animate-fade-in relative pb-4">
         <div ref={topRef} />
         {notification && (
-            <div className={`p-2.5 rounded-lg border shadow-sm flex items-start gap-2 transition-all duration-300 animate-fade-in-up ${notification.type === 'success' ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'}`}>
-                {notification.type === 'success' ? <CheckCircle className="shrink-0 mt-0.5" size={16} /> : <AlertCircle className="shrink-0 mt-0.5" size={16} />}
+            <div className={`p-3 rounded-xl border shadow-sm flex items-start gap-2.5 transition-all duration-300 animate-fade-in-up ${notification.type === 'success' ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'}`}>
+                {notification.type === 'success' ? <CheckCircle className="shrink-0 mt-0.5" size={18} /> : <AlertCircle className="shrink-0 mt-0.5" size={18} />}
                 <div className="flex-1"><h4 className="font-bold text-xs uppercase">{notification.type === 'success' ? 'Thành công' : 'Có lỗi xảy ra'}</h4><p className="text-xs">{notification.message}</p></div>
-                <button type="button" onClick={() => setNotification(null)} className="text-gray-400 hover:text-gray-600"><X size={15} /></button>
+                <button type="button" onClick={() => setNotification(null)} className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
             </div>
         )}
         {initialData && (
-            <div className="bg-amber-50 border border-amber-200 text-amber-800 p-2 rounded-lg flex items-center justify-between shadow-sm text-xs">
-                <span className="font-bold flex items-center gap-2"><Loader2 className="animate-spin text-amber-600" size={15}/> Đang sửa: <span className="bg-white px-2 py-0.5 rounded border border-amber-200">{initialData.code}</span></span>
-                <button type="button" onClick={() => handleReset(false)} className="text-xs font-bold underline hover:text-amber-900 bg-white/50 px-2 py-0.5 rounded">Hủy</button>
+            <div className="bg-amber-50 border border-amber-200 text-amber-800 p-2.5 rounded-xl flex items-center justify-between shadow-xs text-xs">
+                <span className="font-bold flex items-center gap-2"><Loader2 className="animate-spin text-amber-600" size={16}/> Đang sửa: <span className="bg-white px-2 py-0.5 rounded border border-amber-200 font-mono">{initialData.code}</span></span>
+                <button type="button" onClick={() => handleReset(false)} className="text-xs font-bold underline hover:text-amber-900 bg-white/60 px-2.5 py-1 rounded-md">Hủy</button>
             </div>
         )}
 
         {/* HÀNG 1: LOẠI HỒ SƠ, MÃ HỒ SƠ, NGÀY NHẬN, HẸN TRẢ (MỞ HẾT KHỔ GỘP THÀNH 1 HÀNG) */}
-        <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-sm">
-            <div className={`grid grid-cols-1 sm:grid-cols-2 ${isCongVan ? 'lg:grid-cols-3' : 'lg:grid-cols-4'} gap-2.5 items-end`}>
+        <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200 shadow-xs">
+            <div className={`grid grid-cols-1 sm:grid-cols-2 ${isCongVan ? 'lg:grid-cols-3 xl:grid-cols-3' : 'lg:grid-cols-4 xl:grid-cols-4'} gap-3 items-end`}>
                 <div>
-                    <label className={`${labelClass} text-xs font-bold text-slate-800 uppercase flex items-center gap-1.5 mb-1`}>
-                        <span className="p-0.5 bg-blue-100 text-blue-600 rounded"><FileCheck size={13} /></span>
+                    <label className={`${labelClass} uppercase flex items-center gap-1.5`}>
+                        <span className="p-1 bg-blue-100 text-blue-600 rounded-md"><FileCheck size={14} /></span>
                         Loại hồ sơ <span className="text-red-500">*</span>
                     </label>
-                    <select className={`${inputClass} text-xs font-semibold`} value={formData.recordType || ''} onChange={(e) => handleChange('recordType', e.target.value)}>
+                    <select className={`${inputClass} font-semibold`} value={formData.recordType || ''} onChange={(e) => handleChange('recordType', e.target.value)}>
                         <option value="">-- Chọn loại hồ sơ --</option>
                         {RECORD_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                     </select>
@@ -316,28 +316,28 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
 
                 {!isCongVan && (
                     <div>
-                        <label className={`${labelClass} text-purple-600`}>Hẹn trả <span className="text-red-500">*</span></label>
-                        <input type="date" required className={`${inputClass} bg-purple-50 border-purple-200 text-purple-700 font-bold`} value={dateVal(formData.deadline)} onChange={(e) => handleChange('deadline', e.target.value)} />
+                        <label className={`${labelClass} text-purple-700`}>Hẹn trả <span className="text-red-500">*</span></label>
+                        <input type="date" required className={`${inputClass} bg-purple-50/80 border-purple-200 text-purple-800 font-bold`} value={dateVal(formData.deadline)} onChange={(e) => handleChange('deadline', e.target.value)} />
                     </div>
                 )}
             </div>
         </div>
 
         {/* PHÍA DƯỚI: CHIA LÀM 2 CỘT CÂN ĐỐI */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-2.5 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5 xl:gap-5 items-start">
             {/* CỘT 1: Người nộp hồ sơ & Thông tin giấy chứng nhận */}
-            <div className="space-y-2.5">
+            <div className="space-y-3.5 sm:space-y-4">
                 {/* Người nộp hồ sơ hoặc Nơi gửi / nhận */}
-                <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-sm">
-                    <h3 className="text-xs font-bold text-slate-800 uppercase mb-2 flex items-center gap-1.5">
-                        <span className="p-0.5 bg-blue-100 text-blue-600 rounded">
-                            <UserIcon size={13} />
+                <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200 shadow-xs">
+                    <h3 className="text-xs sm:text-sm font-bold text-slate-800 uppercase mb-3 flex items-center gap-1.5 border-b pb-2 border-slate-100">
+                        <span className="p-1 bg-blue-100 text-blue-600 rounded-md">
+                            <UserIcon size={14} />
                         </span> 
                         {isCongVan ? 'Thông tin nơi gửi / nhận' : 'Người nộp hồ sơ'}
                     </h3>
                     
                     {isCongVan ? (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div>
                                 <label className={labelClass}>Số, ký hiệu Công văn <span className="text-red-500">*</span></label>
                                 <input type="text" required className={inputClass} placeholder="VD: 123/UBND-TH..." value={formData.customerName || ''} onChange={(e) => handleChange('customerName', e.target.value)} />
@@ -352,7 +352,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
                             </div>
                         </div>
                     ) : (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div><label className={labelClass}>Chủ sử dụng <span className="text-red-500">*</span></label><input type="text" required className={inputClass} placeholder="Nguyễn Văn A..." value={formData.customerName || ''} onChange={(e) => handleChange('customerName', e.target.value)} /></div>
                             <div><label className={labelClass}>CCCD</label><input type="text" className={inputClass} placeholder="0123456789..." value={formData.cccd || ''} onChange={(e) => handleChange('cccd', e.target.value)} /></div>
                             <div><label className={labelClass}>Địa chỉ chủ sử dụng</label><input type="text" className={inputClass} placeholder="Địa chỉ thường trú..." value={formData.customerAddress || ''} onChange={(e) => handleChange('customerAddress', e.target.value)} /></div>
@@ -362,16 +362,16 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
                 </div>
 
                 {/* Thông tin giấy chứng nhận */}
-                <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-sm flex flex-col">
-                    <h3 className="text-xs font-bold text-slate-800 uppercase mb-2 flex items-center gap-1.5">
-                        <span className="p-0.5 bg-green-100 text-green-600 rounded">
-                            <MapPin size={13} />
+                <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col">
+                    <h3 className="text-xs sm:text-sm font-bold text-slate-800 uppercase mb-3 flex items-center gap-1.5 border-b pb-2 border-slate-100">
+                        <span className="p-1 bg-green-100 text-green-600 rounded-md">
+                            <MapPin size={14} />
                         </span> 
                         {isCongVan ? 'Văn bản Công văn' : 'Thông tin thửa đất & Giấy chứng nhận'}
                     </h3>
                     
                     {isCongVan ? (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div>
                                 <label className={labelClass}>Cơ quan ban hành / Nơi gửi</label>
                                 <input type="text" className={inputClass} placeholder="VD: UBND huyện, Tòa án..." value={formData.issueNumber || ''} onChange={(e) => handleChange('issueNumber', e.target.value)} />
@@ -389,19 +389,19 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
                             </div>
                         </div>
                     ) : (
-                        <div className="space-y-2">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div className="space-y-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div><label className={labelClass}>Xã / Phường <span className="text-red-500">*</span></label><select required className={inputClass} value={formData.ward || ''} onChange={(e) => handleChange('ward', e.target.value)}><option value="">-- Chọn xã / phường --</option>{wards.map(w => <option key={w} value={w}>{getWardLabel(w)}</option>)}</select></div>
                                 <div><label className={labelClass}>Số phát hành</label><input type="text" className={inputClass} placeholder="VD: CD 123456" value={formData.issueNumber || ''} onChange={(e) => handleChange('issueNumber', e.target.value)} /></div>
                                 <div><label className={labelClass}>Số vào sổ</label><input type="text" className={inputClass} placeholder="VD: CH 01234" value={formData.entryNumber || ''} onChange={(e) => handleChange('entryNumber', e.target.value)} /></div>
                                 <div><label className={labelClass}>Ngày cấp</label><input type="date" className={inputClass} value={dateVal(formData.issueDate)} onChange={(e) => handleChange('issueDate', e.target.value)} /></div>
                             </div>
                             
-                            <div className="bg-green-50/50 p-2 rounded-lg border border-green-100 grid grid-cols-2 sm:grid-cols-4 gap-1.5 mt-0.5">
-                                <div><label className="block text-[9px] font-bold text-green-700 uppercase mb-0.5 text-center">Tờ bản đồ</label><input type="text" className="w-full border border-green-200 rounded px-1.5 py-0.5 text-center font-bold text-green-800 bg-white outline-none text-xs" placeholder="0" value={formData.mapSheet || ''} onChange={(e) => handleChange('mapSheet', e.target.value)} /></div>
-                                <div><label className="block text-[9px] font-bold text-green-700 uppercase mb-0.5 text-center">Thửa đất</label><input type="text" className="w-full border border-green-200 rounded px-1.5 py-0.5 text-center font-bold text-green-800 bg-white outline-none text-xs" placeholder="0" value={formData.landPlot || ''} onChange={(e) => handleChange('landPlot', e.target.value)} /></div>
-                                <div><label className="block text-[9px] font-bold text-green-700 uppercase mb-0.5 text-center">Tổng dt (m²)</label><input type="number" className="w-full border border-green-200 rounded px-1.5 py-0.5 text-center font-bold text-green-800 bg-white outline-none text-xs" placeholder="0" value={formData.area || ''} onChange={(e) => handleChange('area', e.target.value)} /></div>
-                                <div><label className="block text-[9px] font-bold text-green-700 uppercase mb-0.5 text-center">ONT/ODT (m²)</label><input type="number" className="w-full border border-green-200 rounded px-1.5 py-0.5 text-center font-bold text-green-800 bg-white outline-none text-xs" placeholder="0" value={formData.residentialArea || ''} onChange={(e) => handleChange('residentialArea', e.target.value)} /></div>
+                            <div className="bg-green-50/60 p-2.5 rounded-xl border border-green-100 grid grid-cols-2 sm:grid-cols-4 gap-2 mt-1">
+                                <div><label className="block text-[10px] font-bold text-green-700 uppercase mb-1 text-center">Tờ bản đồ</label><input type="text" className="w-full border border-green-200 rounded-md px-2 py-1 text-center font-bold text-green-800 bg-white outline-none text-xs sm:text-sm" placeholder="0" value={formData.mapSheet || ''} onChange={(e) => handleChange('mapSheet', e.target.value)} /></div>
+                                <div><label className="block text-[10px] font-bold text-green-700 uppercase mb-1 text-center">Thửa đất</label><input type="text" className="w-full border border-green-200 rounded-md px-2 py-1 text-center font-bold text-green-800 bg-white outline-none text-xs sm:text-sm" placeholder="0" value={formData.landPlot || ''} onChange={(e) => handleChange('landPlot', e.target.value)} /></div>
+                                <div><label className="block text-[10px] font-bold text-green-700 uppercase mb-1 text-center">Tổng dt (m²)</label><input type="number" className="w-full border border-green-200 rounded-md px-2 py-1 text-center font-bold text-green-800 bg-white outline-none text-xs sm:text-sm" placeholder="0" value={formData.area || ''} onChange={(e) => handleChange('area', e.target.value)} /></div>
+                                <div><label className="block text-[10px] font-bold text-green-700 uppercase mb-1 text-center">ONT/ODT (m²)</label><input type="number" className="w-full border border-green-200 rounded-md px-2 py-1 text-center font-bold text-green-800 bg-white outline-none text-xs sm:text-sm" placeholder="0" value={formData.residentialArea || ''} onChange={(e) => handleChange('residentialArea', e.target.value)} /></div>
                             </div>
                         </div>
                     )}
@@ -409,66 +409,66 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
             </div>
 
             {/* CỘT 2: Nội dung chi tiết, Giấy tờ kèm theo & Người được ủy quyền */}
-            <div className="space-y-2.5">
+            <div className="space-y-3.5 sm:space-y-4">
                 {/* Nội dung chi tiết */}
-                <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-sm flex flex-col">
-                    <h3 className="text-xs font-bold text-slate-800 uppercase mb-1.5 flex items-center gap-1.5">
-                        <span className="p-0.5 bg-orange-100 text-orange-600 rounded"><FileCheck size={13} /></span> 
+                <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col">
+                    <h3 className="text-xs sm:text-sm font-bold text-slate-800 uppercase mb-2 flex items-center gap-1.5 border-b pb-2 border-slate-100">
+                        <span className="p-1 bg-orange-100 text-orange-600 rounded-md"><FileCheck size={14} /></span> 
                         Nội dung chi tiết
                     </h3>
                     
                     <div>
-                        <textarea rows={2} className="w-full p-2 border border-gray-300 rounded-md text-xs outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 transition-all font-medium text-slate-700 bg-white resize-none" value={formData.content || ''} onChange={(e) => handleChange('content', e.target.value)} placeholder={isCongVan ? "Nhập trích yếu nội dung công văn hành chính..." : "Nhập nội dung chi tiết / ghi chú..."} />
+                        <textarea rows={3} className="w-full p-2.5 border border-gray-300 rounded-lg text-xs sm:text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 transition-all font-medium text-slate-700 bg-white resize-y" value={formData.content || ''} onChange={(e) => handleChange('content', e.target.value)} placeholder={isCongVan ? "Nhập trích yếu nội dung công văn hành chính..." : "Nhập nội dung chi tiết / ghi chú..."} />
                     </div>
                 </div>
 
                 {/* Giấy tờ kèm theo khác (nếu có) */}
-                <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-sm flex flex-col">
-                    <div className="flex justify-between items-center mb-2">
-                        <h3 className="text-xs font-bold text-slate-800 uppercase flex items-center gap-1.5">
-                            <span className="p-0.5 bg-teal-100 text-teal-600 rounded"><FileText size={13} /></span> 
+                <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col">
+                    <div className="flex justify-between items-center mb-2.5 border-b pb-2 border-slate-100">
+                        <h3 className="text-xs sm:text-sm font-bold text-slate-800 uppercase flex items-center gap-1.5">
+                            <span className="p-1 bg-teal-100 text-teal-600 rounded-md"><FileText size={14} /></span> 
                             Giấy tờ kèm theo khác (nếu có)
                         </h3>
                         <button
                             type="button"
                             onClick={handleAddDoc}
-                            className="text-[10px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded border border-blue-200 hover:bg-blue-100 font-bold flex items-center gap-1 transition-all active:scale-95"
+                            className="text-xs bg-blue-50 text-blue-600 px-2.5 py-1 rounded-md border border-blue-200 hover:bg-blue-100 font-bold flex items-center gap-1 transition-all active:scale-95"
                         >
                             + THÊM
                         </button>
                     </div>
                     
                     {attachedDocs.length === 0 ? (
-                        <div className="text-center py-2 text-[11px] text-slate-400 italic bg-slate-50 rounded-lg border border-dashed border-slate-200">
+                        <div className="text-center py-3 text-xs text-slate-400 italic bg-slate-50/80 rounded-lg border border-dashed border-slate-200">
                             Không có giấy tờ kèm theo nào.
                         </div>
                     ) : (
-                        <div className="overflow-x-auto border border-slate-200 rounded-lg">
-                            <table className="w-full text-left border-collapse bg-white text-xs">
+                        <div className="overflow-x-auto border border-slate-200 rounded-xl">
+                            <table className="w-full text-left border-collapse bg-white text-xs sm:text-sm">
                                 <thead>
-                                    <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                                        <th className="py-1 px-1.5 text-center w-6">#</th>
-                                        <th className="py-1 px-1.5">Tên giấy tờ</th>
-                                        <th className="py-1 px-1.5 w-24 text-center">Loại</th>
-                                        <th className="py-1 px-1.5 w-6 text-center">Xóa</th>
+                                    <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                                        <th className="py-1.5 px-2 text-center w-8">#</th>
+                                        <th className="py-1.5 px-2">Tên giấy tờ</th>
+                                        <th className="py-1.5 px-2 w-28 text-center">Loại</th>
+                                        <th className="py-1.5 px-2 w-8 text-center">Xóa</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-slate-100 text-xs">
+                                <tbody className="divide-y divide-slate-100 text-xs sm:text-sm">
                                     {attachedDocs.map((doc, idx) => (
                                         <tr key={doc.id} className="hover:bg-slate-50/50">
-                                            <td className="py-0.5 px-1.5 text-center font-bold text-slate-400 text-[10px]">{idx + 1}</td>
-                                            <td className="py-0.5 px-1.5">
+                                            <td className="py-1 px-2 text-center font-bold text-slate-400 text-xs">{idx + 1}</td>
+                                            <td className="py-1 px-2">
                                                 <input
                                                     type="text"
                                                     required
-                                                    className="w-full px-1.5 py-0.5 text-xs border border-slate-200 rounded focus:border-blue-500 outline-none"
+                                                    className="w-full px-2 py-1 text-xs sm:text-sm border border-slate-200 rounded-md focus:border-blue-500 outline-none"
                                                     placeholder="Tên giấy tờ..."
                                                     value={doc.name}
                                                     onChange={(e) => handleUpdateDoc(idx, 'name', e.target.value)}
                                                 />
                                             </td>
-                                            <td className="py-0.5 px-1.5">
-                                                <div className="flex items-center justify-center gap-1 text-[10px]">
+                                            <td className="py-1 px-2">
+                                                <div className="flex items-center justify-center gap-1.5 text-xs">
                                                     <label className="flex items-center gap-0.5 cursor-pointer">
                                                          <input
                                                              type="radio"
@@ -491,13 +491,13 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
                                                      </label>
                                                 </div>
                                             </td>
-                                            <td className="py-0.5 px-1.5 text-center">
+                                            <td className="py-1 px-2 text-center">
                                                 <button
                                                     type="button"
                                                     onClick={() => handleDeleteDoc(idx)}
-                                                    className="p-0.5 text-slate-400 hover:text-red-500 rounded hover:bg-slate-100"
+                                                    className="p-1 text-slate-400 hover:text-red-500 rounded-md hover:bg-slate-100"
                                                 >
-                                                    <X size={13} />
+                                                    <X size={14} />
                                                 </button>
                                             </td>
                                         </tr>
@@ -509,24 +509,24 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
                 </div>
 
                 {/* Thông tin người được ủy quyền (nếu có) */}
-                <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
-                    <div className="p-2.5 flex items-center justify-between gap-2 bg-white rounded-xl">
-                        <h3 className="text-xs font-bold text-slate-800 uppercase flex items-center gap-1.5">
-                            <span className="p-0.5 bg-indigo-100 text-indigo-600 rounded"><UserIcon size={13} /></span>
+                <div className="bg-white rounded-xl border border-slate-200 shadow-xs">
+                    <div className="p-3.5 sm:p-4 flex items-center justify-between gap-2 bg-white rounded-xl">
+                        <h3 className="text-xs sm:text-sm font-bold text-slate-800 uppercase flex items-center gap-1.5">
+                            <span className="p-1 bg-indigo-100 text-indigo-600 rounded-md"><UserIcon size={14} /></span>
                             Người ủy quyền (nếu có)
                         </h3>
                         <button
                             type="button"
                             onClick={() => setIsAuthOpen(!isAuthOpen)}
-                            className="text-[10px] font-bold uppercase rounded border border-slate-200 hover:bg-slate-50 px-2 py-0.5 text-slate-600 bg-white shadow-sm"
+                            className="text-xs font-bold uppercase rounded-md border border-slate-200 hover:bg-slate-50 px-2.5 py-1 text-slate-600 bg-white shadow-xs"
                         >
                             {isAuthOpen ? '▲ ẨN' : '▼ HIỆN'}
                         </button>
                     </div>
 
                     {isAuthOpen && (
-                        <div className="p-2.5 bg-slate-50/30 space-y-2 animate-fade-in border-t border-slate-100">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div className="p-3.5 bg-slate-50/50 space-y-3 animate-fade-in border-t border-slate-100 rounded-b-xl">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div>
                                     <label className={labelClass}>Họ và tên</label>
                                     <input
@@ -571,12 +571,12 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
         </div>
 
         {/* BUTTONS CỐ ĐỊNH STICKY DƯỚI CÙNG */}
-        <div className="sticky bottom-0 left-0 right-0 z-20 bg-slate-50/95 backdrop-blur-md border-t border-slate-200 py-2 px-3 -mx-4 flex flex-col sm:flex-row justify-end gap-2 shadow-sm rounded-b-xl mt-2">
-            <button type="button" onClick={() => handleReset(false)} className="px-4 py-1.5 bg-white text-slate-600 rounded-lg hover:bg-slate-100 transition-colors shadow-sm text-xs font-bold border border-slate-200 flex items-center justify-center gap-1.5">
-                {initialData ? <><XCircle size={15} className="text-red-500" /> Hủy</> : <><RotateCcw size={15} /> Làm mới</>}
+        <div className="sticky bottom-0 left-0 right-0 z-20 bg-slate-50/95 backdrop-blur-md border-t border-slate-200 py-2.5 px-4 2xl:py-3.5 2xl:px-8 -mx-4 flex flex-col sm:flex-row justify-end gap-2.5 2xl:gap-4 shadow-md rounded-b-xl mt-3 2xl:mt-6">
+            <button type="button" onClick={() => handleReset(false)} className="px-4 2xl:px-8 py-2 2xl:py-3 bg-white text-slate-600 rounded-lg hover:bg-slate-100 transition-colors shadow-xs text-xs sm:text-sm 2xl:text-base font-bold border border-slate-200 flex items-center justify-center gap-1.5 cursor-pointer">
+                {initialData ? <><XCircle size={16} className="text-red-500" /> Hủy</> : <><RotateCcw size={16} /> Làm mới</>}
             </button>
-            <button type="submit" disabled={loading} className="px-5 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-md text-xs font-bold transition-all active:scale-95 disabled:opacity-70 flex items-center justify-center gap-1.5">
-                <Save size={15} /> {loading ? 'Đang xử lý...' : (initialData ? 'CẬP NHẬT' : 'LƯU VÀ IN')}
+            <button type="submit" disabled={loading} className="px-6 2xl:px-10 py-2 2xl:py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-md text-xs sm:text-sm 2xl:text-base font-bold transition-all active:scale-95 disabled:opacity-70 flex items-center justify-center gap-1.5 cursor-pointer">
+                <Save size={16} /> {loading ? 'Đang xử lý...' : (initialData ? 'CẬP NHẬT' : 'LƯU VÀ IN')}
             </button>
         </div>
     </form>

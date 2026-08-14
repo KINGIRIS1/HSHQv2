@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { RecordFile, Employee, User, Holiday, RecordStatus, RolePermissions, DepartmentPermissions } from '../types';
 import { getNormalizedWard } from '../constants';
-import { PlusCircle, FileSpreadsheet, LayoutList, Settings, RotateCcw, RefreshCw, Gavel } from 'lucide-react';
+import { PlusCircle, FileSpreadsheet, LayoutList, Settings, RotateCcw, RefreshCw } from 'lucide-react';
 import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../services/docxService';
 import * as XLSX from 'xlsx-js-style';
 import { confirmAction, calculateDeadlineHelper } from '../utils/appHelpers';
@@ -12,7 +12,6 @@ import { isViewAllowedForUser } from '../config/roleConfig';
 import RecordForm from './receive-record/RecordForm';
 import BulkImport from './receive-record/BulkImport';
 import DailyList from './receive-record/DailyList';
-import VPHCTab from './utilities/VPHCTab';
 import TemplateConfigModal from './TemplateConfigModal';
 import DocxPreviewModal from './DocxPreviewModal';
 import ExcelPreviewModal from './ExcelPreviewModal';
@@ -72,33 +71,30 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
   const canCreate = !currentUser || isViewAllowedForUser(currentUser, employees || [], 'receive_sub_create', rolePermissions, departmentPermissions);
   const canBulk = !currentUser || isViewAllowedForUser(currentUser, employees || [], 'receive_sub_bulk', rolePermissions, departmentPermissions);
   const canList = !currentUser || isViewAllowedForUser(currentUser, employees || [], 'receive_sub_list', rolePermissions, departmentPermissions);
-  const canVphc = !currentUser || isViewAllowedForUser(currentUser, employees || [], 'receive_sub_vphc', rolePermissions, departmentPermissions);
+  const canVphc = false;
 
   useEffect(() => {
-    if (initialTab) {
+    if (initialTab && initialTab !== 'vphc') {
       setViewMode(initialTab);
+    } else if (initialTab === 'vphc') {
+      setViewMode('create');
     }
   }, [initialTab]);
 
   useEffect(() => {
-    if (viewMode === 'create' && !canCreate) {
+    if (viewMode === 'vphc') {
+      setViewMode('create');
+    } else if (viewMode === 'create' && !canCreate) {
       if (canBulk) setViewMode('bulk');
       else if (canList) setViewMode('list');
-      else if (canVphc) setViewMode('vphc');
     } else if (viewMode === 'bulk' && !canBulk) {
       if (canCreate) setViewMode('create');
       else if (canList) setViewMode('list');
-      else if (canVphc) setViewMode('vphc');
     } else if (viewMode === 'list' && !canList) {
       if (canCreate) setViewMode('create');
       else if (canBulk) setViewMode('bulk');
-      else if (canVphc) setViewMode('vphc');
-    } else if (viewMode === 'vphc' && !canVphc) {
-      if (canCreate) setViewMode('create');
-      else if (canBulk) setViewMode('bulk');
-      else if (canList) setViewMode('list');
     }
-  }, [canCreate, canBulk, canList, canVphc, viewMode]);
+  }, [canCreate, canBulk, canList, viewMode]);
   // Removed local holidays state and useEffect
   
   // State chỉnh sửa
@@ -366,11 +362,6 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
                   <LayoutList size={16} /> Danh sách hôm nay
               </button>
             )}
-            {canVphc && (
-              <button onClick={() => setViewMode('vphc')} className={`flex items-center gap-2 px-3.5 py-1.5 rounded-md text-sm font-semibold transition-all whitespace-nowrap cursor-pointer ${viewMode === 'vphc' ? 'bg-red-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}>
-                  <Gavel size={16} /> Biên bản VPHC
-              </button>
-            )}
         </div>
         
         {viewMode === 'create' && (
@@ -422,18 +413,6 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
                 onCreateContract={onCreateContract}
                 onHandOverRecords={onHandOverRecords}
             />
-        )}
-
-        {viewMode === 'vphc' && (
-            <div className="h-full flex flex-col min-h-0">
-                <VPHCTab 
-                    currentUser={currentUser}
-                    notify={(msg, type) => {
-                        if (type === 'error') alert(`Lỗi: ${msg}`);
-                        else alert(msg);
-                    }}
-                />
-            </div>
         )}
       </div>
 

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Contract, PriceItem, SplitItem, RecordFile } from '../../types';
-import { Save, Calculator, Search, Plus, Trash2, Printer, FileCheck, CheckCircle, AlertCircle, AlertTriangle, X, RotateCcw, MapPin, Ruler, Grid, Banknote, User, FileText, Calendar, Wand2, ChevronDown, ChevronUp, Copy, ExternalLink, RefreshCw } from 'lucide-react';
+import { Save, Calculator, Search, Plus, Trash2, Printer, FileCheck, FileSignature, CheckCircle, AlertCircle, AlertTriangle, X, RotateCcw, MapPin, Ruler, Grid, Banknote, User, FileText, Calendar, Wand2, ChevronDown, ChevronUp, Copy, ExternalLink, RefreshCw } from 'lucide-react';
 import { confirmAction } from '../../utils/appHelpers';
 import { checkContractDateErrors, getTodayDateString } from '../../utils/contractDateUtils';
 
@@ -692,8 +692,8 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
       return filtered;
   })();
 
-  const inputClass = "w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/10 transition-all font-medium bg-white hover:border-purple-300";
-  const labelClass = "block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1 ml-0.5";
+  const inputClass = "w-full border border-slate-300 rounded-lg px-3 py-1.5 2xl:py-2 text-xs sm:text-sm 2xl:text-base outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/10 transition-all font-medium bg-white hover:border-purple-300 shadow-2xs";
+  const labelClass = "block text-[10px] sm:text-xs 2xl:text-sm font-bold text-slate-500 uppercase tracking-wide mb-1 2xl:mb-1.5 ml-0.5";
 
   // Check if we are in liquidation mode to show extra fields
   const isLiquidationMode = mode === 'liquidation';
@@ -704,13 +704,56 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
       : (formData.totalAmount || derivedPricing.totalAmount);
 
   return (
-    <form onSubmit={handleSubmit} className="w-full grid grid-cols-1 lg:grid-cols-12 gap-3.5 animate-fade-in relative pb-6">
+    <form onSubmit={handleSubmit} className="w-full max-w-[2200px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-3.5 xl:gap-5 2xl:gap-8 animate-fade-in relative pb-6">
         <div ref={topRef} className="absolute -top-20" />
+
+        {/* STICKY TOP ACTION BAR - CỐ ĐỊNH TRÊN CÙNG KHI CUỘN */}
+        <div className="lg:col-span-12 sticky top-0 z-30 bg-white/95 backdrop-blur-md p-2.5 px-3.5 sm:px-4 2xl:p-4 2xl:px-8 rounded-xl border border-slate-200 shadow-md flex flex-wrap items-center justify-between gap-3 2xl:gap-6 transition-all">
+            <div className="flex items-center gap-2 2xl:gap-3">
+                <span className={`p-1.5 2xl:p-2 rounded-lg text-white font-bold flex items-center justify-center shadow-xs ${isLiquidationMode ? 'bg-orange-600' : 'bg-purple-600'}`}>
+                    <FileSignature size={18} />
+                </span>
+                <div className="flex items-center gap-2 2xl:gap-3 flex-wrap">
+                    <h3 className="font-bold text-xs sm:text-sm 2xl:text-base uppercase text-slate-800">
+                        {isLiquidationMode ? 'Thanh Lý Hợp Đồng' : 'Lập Hợp Đồng'}
+                    </h3>
+                    {formData.code && (
+                        <span className="font-mono font-bold text-xs 2xl:text-sm text-purple-700 bg-purple-50 px-2 py-0.5 2xl:px-3 2xl:py-1 rounded-md border border-purple-200">
+                            {formData.code}
+                        </span>
+                    )}
+                    {initialData && (
+                        <span className="text-[11px] 2xl:text-xs font-bold text-amber-700 bg-amber-50 px-2 py-0.5 2xl:px-3 2xl:py-1 rounded-md border border-amber-200">
+                            Đang chỉnh sửa
+                        </span>
+                    )}
+                </div>
+            </div>
+
+            <div className="flex items-center gap-2 2xl:gap-3">
+                <button 
+                    type="submit" 
+                    disabled={loading} 
+                    className={`px-4 sm:px-5 2xl:px-8 py-2 2xl:py-3 text-white rounded-lg font-bold text-xs sm:text-sm 2xl:text-base shadow-md transition-all active:scale-95 disabled:opacity-70 flex items-center justify-center gap-1.5 cursor-pointer ${isLiquidationMode ? 'bg-orange-600 hover:bg-orange-700 shadow-orange-500/20' : 'bg-purple-600 hover:bg-purple-700 shadow-purple-500/20'}`}
+                >
+                    <Save size={16} /> {loading ? 'Đang xử lý...' : (initialData ? (isLiquidationMode ? 'CẬP NHẬT VÀ IN THANH LÝ' : 'CẬP NHẬT VÀ IN HỢP ĐỒNG') : (isLiquidationMode ? 'LƯU VÀ IN THANH LÝ' : 'LƯU VÀ IN HỢP ĐỒNG'))}
+                </button>
+                <button 
+                    type="button" 
+                    onClick={() => handleReset(false)} 
+                    className="px-3.5 2xl:px-6 py-2 2xl:py-3 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors shadow-2xs font-bold border border-slate-200 flex items-center gap-1.5 text-xs sm:text-sm 2xl:text-base cursor-pointer" 
+                    title="Làm mới form"
+                >
+                    {initialData ? <X size={16} className="text-red-500" /> : <RotateCcw size={16} />}
+                    <span>Làm mới</span>
+                </button>
+            </div>
+        </div>
         
         {/* NOTIFICATION */}
         <div className="lg:col-span-12">
             {notification && (
-                <div className={`p-3 rounded-xl border shadow-md flex items-start gap-2.5 transition-all duration-300 animate-fade-in-up mb-2 ${notification.type === 'success' ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'}`}>
+                <div className={`p-3 rounded-xl border shadow-md flex items-start gap-2.5 transition-all duration-300 animate-fade-in-up mb-1 ${notification.type === 'success' ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'}`}>
                     {notification.type === 'success' ? <CheckCircle className="shrink-0 mt-0.5" size={18} /> : <AlertCircle className="shrink-0 mt-0.5" size={18} />}
                     <div className="flex-1">
                         <h4 className="font-bold text-xs uppercase">{notification.type === 'success' ? 'Thành công' : 'Thông báo'}</h4>

@@ -362,20 +362,22 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
                             Cấu hình thông tin lịch sử cho bước đã chọn:
                         </label>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <div>
-                                <label className="block text-xs font-semibold text-gray-700 mb-1">Cán bộ thực hiện bước này:</label>
-                                <select 
-                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-orange-500 outline-none bg-white font-medium text-gray-800"
-                                    value={statusEmployee}
-                                    onChange={(e) => setStatusEmployee(e.target.value)}
-                                >
-                                    <option value="">-- Chọn cán bộ --</option>
-                                    {filteredEmployees.map(emp => (
-                                        <option key={emp.id} value={emp.name}>{emp.name} - {emp.position || 'Cán bộ'} ({emp.department || ''})</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div>
+                            {targetValue !== 'COMPLETED' && targetValue !== 'RETURNED' && (
+                                <div>
+                                    <label className="block text-xs font-semibold text-gray-700 mb-1">Cán bộ thực hiện bước này:</label>
+                                    <select 
+                                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-orange-500 outline-none bg-white font-medium text-gray-800"
+                                        value={statusEmployee}
+                                        onChange={(e) => setStatusEmployee(e.target.value)}
+                                    >
+                                        <option value="">-- Chọn cán bộ --</option>
+                                        {filteredEmployees.map(emp => (
+                                            <option key={emp.id} value={emp.name}>{emp.name} - {emp.position || 'Cán bộ'} ({emp.department || ''})</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
+                            <div className={targetValue === 'COMPLETED' || targetValue === 'RETURNED' ? 'col-span-2' : ''}>
                                 <label className="block text-xs font-semibold text-gray-700 mb-1">Ngày thực hiện bước này:</label>
                                 <input 
                                     type="date"
@@ -386,7 +388,7 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
                             </div>
                         </div>
                         <p className="text-[11px] text-amber-700 leading-normal">
-                            Ghi chú: Thao tác này chỉ lưu vết tên cán bộ và ngày thực hiện vào lịch sử của bước được chọn. Danh sách cán bộ được tự động lọc theo vai trò và tổ chuyên môn.
+                            Ghi chú: Thao tác này chỉ lưu vết {targetValue !== 'COMPLETED' && targetValue !== 'RETURNED' ? 'tên cán bộ và ' : ''}ngày thực hiện vào lịch sử của bước được chọn.
                         </p>
                     </div>
                 )}
