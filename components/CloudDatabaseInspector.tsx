@@ -13,14 +13,12 @@ export const CloudDatabaseInspector: React.FC<CloudDatabaseInspectorProps> = ({ 
     dangky: { count: number; error?: string; samples: any[] };
     land: { count: number; error?: string; samples: any[] };
     luutru: { count: number; error?: string; samples: any[] };
-    employees: { count: number; error?: string; samples: any[] };
   }>({
     dangky: { count: 0, samples: [] },
     land: { count: 0, samples: [] },
     luutru: { count: 0, samples: [] },
-    employees: { count: 0, samples: [] },
   });
-  const [activeTab, setActiveTab] = useState<'dangky' | 'land' | 'luutru' | 'employees'>('dangky');
+  const [activeTab, setActiveTab] = useState<'dangky' | 'land' | 'luutru'>('dangky');
 
   const checkDatabase = async () => {
     if (!isConfigured) return;
@@ -30,7 +28,6 @@ export const CloudDatabaseInspector: React.FC<CloudDatabaseInspectorProps> = ({ 
       dangky: { count: 0, error: undefined as string | undefined, samples: [] as any[] },
       land: { count: 0, error: undefined as string | undefined, samples: [] as any[] },
       luutru: { count: 0, error: undefined as string | undefined, samples: [] as any[] },
-      employees: { count: 0, error: undefined as string | undefined, samples: [] as any[] },
     };
 
     // 1. Check dangky_records
@@ -76,20 +73,6 @@ export const CloudDatabaseInspector: React.FC<CloudDatabaseInspectorProps> = ({ 
       stats.luutru.samples = data || [];
     } catch (e: any) {
       stats.luutru.error = e.message || 'Lỗi kết nối bảng luutru_records';
-    }
-
-    // 4. Check employees table
-    try {
-      const { count, error, data } = await supabase
-        .from('employees')
-        .select('*', { count: 'exact', head: false })
-        .limit(5);
-
-      if (error) throw error;
-      stats.employees.count = count ?? (data ? data.length : 0);
-      stats.employees.samples = data || [];
-    } catch (e: any) {
-      stats.employees.error = e.message || 'Lỗi kết nối bảng employees';
     }
 
     setTableStats(stats);
@@ -150,13 +133,13 @@ export const CloudDatabaseInspector: React.FC<CloudDatabaseInspectorProps> = ({ 
           ) : (
             <>
               {/* Summary Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 
                 {/* 1. Dangky Records */}
                 <div className={`bg-white p-4 rounded-xl border transition-all shadow-xs ${tableStats.dangky.error ? 'border-red-200 bg-red-50/30' : 'border-purple-200 hover:border-purple-300'}`}>
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-purple-100 text-purple-700 flex items-center gap-1">
-                      <FileText className="w-3 h-3" /> Cấp giấy
+                      <FileText className="w-3 h-3" /> Tab Đăng ký
                     </span>
                     {tableStats.dangky.error ? (
                       <AlertTriangle className="w-4 h-4 text-red-500" />
@@ -177,7 +160,7 @@ export const CloudDatabaseInspector: React.FC<CloudDatabaseInspectorProps> = ({ 
                 <div className={`bg-white p-4 rounded-xl border transition-all shadow-xs ${tableStats.land.error ? 'border-red-200 bg-red-50/30' : 'border-blue-200 hover:border-blue-300'}`}>
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-blue-100 text-blue-700 flex items-center gap-1">
-                      <Layers className="w-3 h-3" /> Đo đạc
+                      <Layers className="w-3 h-3" /> Tab Đo đạc
                     </span>
                     {tableStats.land.error ? (
                       <AlertTriangle className="w-4 h-4 text-red-500" />
@@ -198,7 +181,7 @@ export const CloudDatabaseInspector: React.FC<CloudDatabaseInspectorProps> = ({ 
                 <div className={`bg-white p-4 rounded-xl border transition-all shadow-xs ${tableStats.luutru.error ? 'border-red-200 bg-red-50/30' : 'border-amber-200 hover:border-amber-300'}`}>
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-amber-100 text-amber-700 flex items-center gap-1">
-                      <FolderArchive className="w-3 h-3" /> Lưu trữ
+                      <FolderArchive className="w-3 h-3" /> Tab Lưu trữ
                     </span>
                     {tableStats.luutru.error ? (
                       <AlertTriangle className="w-4 h-4 text-red-500" />
@@ -215,55 +198,28 @@ export const CloudDatabaseInspector: React.FC<CloudDatabaseInspectorProps> = ({ 
                   )}
                 </div>
 
-                {/* 4. Employees */}
-                <div className={`bg-white p-4 rounded-xl border transition-all shadow-xs ${tableStats.employees.error ? 'border-red-200 bg-red-50/30' : 'border-emerald-200 hover:border-emerald-300'}`}>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-700 flex items-center gap-1">
-                      <Server className="w-3 h-3" /> Nhân sự
-                    </span>
-                    {tableStats.employees.error ? (
-                      <AlertTriangle className="w-4 h-4 text-red-500" />
-                    ) : (
-                      <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                    )}
-                  </div>
-                  <div className="text-2xl font-black text-gray-800 mb-1">
-                    {loading ? '...' : tableStats.employees.count} <span className="text-xs font-normal text-gray-500">bản ghi</span>
-                  </div>
-                  <div className="text-xs text-emerald-700 font-mono font-medium">employees</div>
-                  {tableStats.employees.error && (
-                    <div className="mt-2 text-[11px] text-red-600 bg-red-100/60 p-1.5 rounded">{tableStats.employees.error}</div>
-                  )}
-                </div>
-
               </div>
 
               {/* Sample Data Inspection Section */}
               <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-xs">
-                <div className="flex flex-wrap border-b border-gray-200 bg-gray-50 px-4 pt-3 gap-2">
+                <div className="flex border-b border-gray-200 bg-gray-50 px-4 pt-3 gap-2">
                   <button
                     onClick={() => setActiveTab('dangky')}
-                    className={`px-3 py-2 font-bold text-xs rounded-t-lg transition-all border-t border-x ${activeTab === 'dangky' ? 'bg-white text-purple-700 border-gray-200 relative top-[1px]' : 'text-gray-500 border-transparent hover:bg-gray-100'}`}
+                    className={`px-4 py-2 font-bold text-xs rounded-t-lg transition-all border-t border-x ${activeTab === 'dangky' ? 'bg-white text-purple-700 border-gray-200 relative top-[1px]' : 'text-gray-500 border-transparent hover:bg-gray-100'}`}
                   >
-                    Đăng ký (dangky_records) [{tableStats.dangky.samples.length}]
+                    Bản ghi Đăng ký (dangky_records) [{tableStats.dangky.samples.length}]
                   </button>
                   <button
                     onClick={() => setActiveTab('land')}
-                    className={`px-3 py-2 font-bold text-xs rounded-t-lg transition-all border-t border-x ${activeTab === 'land' ? 'bg-white text-blue-700 border-gray-200 relative top-[1px]' : 'text-gray-500 border-transparent hover:bg-gray-100'}`}
+                    className={`px-4 py-2 font-bold text-xs rounded-t-lg transition-all border-t border-x ${activeTab === 'land' ? 'bg-white text-blue-700 border-gray-200 relative top-[1px]' : 'text-gray-500 border-transparent hover:bg-gray-100'}`}
                   >
-                    Cấp giấy (land_records) [{tableStats.land.samples.length}]
+                    Bản ghi Đo đạc (land_records) [{tableStats.land.samples.length}]
                   </button>
                   <button
                     onClick={() => setActiveTab('luutru')}
-                    className={`px-3 py-2 font-bold text-xs rounded-t-lg transition-all border-t border-x ${activeTab === 'luutru' ? 'bg-white text-amber-700 border-gray-200 relative top-[1px]' : 'text-gray-500 border-transparent hover:bg-gray-100'}`}
+                    className={`px-4 py-2 font-bold text-xs rounded-t-lg transition-all border-t border-x ${activeTab === 'luutru' ? 'bg-white text-amber-700 border-gray-200 relative top-[1px]' : 'text-gray-500 border-transparent hover:bg-gray-100'}`}
                   >
-                    Lưu trữ (luutru_records) [{tableStats.luutru.samples.length}]
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('employees')}
-                    className={`px-3 py-2 font-bold text-xs rounded-t-lg transition-all border-t border-x ${activeTab === 'employees' ? 'bg-white text-emerald-700 border-gray-200 relative top-[1px]' : 'text-gray-500 border-transparent hover:bg-gray-100'}`}
-                  >
-                    Nhân sự (employees) [{tableStats.employees.samples.length}]
+                    Bản ghi Lưu trữ (luutru_records) [{tableStats.luutru.samples.length}]
                   </button>
                 </div>
 
@@ -280,9 +236,6 @@ export const CloudDatabaseInspector: React.FC<CloudDatabaseInspectorProps> = ({ 
                       )}
                       {activeTab === 'luutru' && (
                         <SampleTable records={tableStats.luutru.samples} tableName="luutru_records" emptyMessage="Chưa có bản ghi nào trong bảng luutru_records." />
-                      )}
-                      {activeTab === 'employees' && (
-                        <EmployeeSampleTable employees={tableStats.employees.samples} emptyMessage="Chưa có nhân sự nào trong bảng employees." />
                       )}
                     </>
                   )}
@@ -362,41 +315,6 @@ const SampleTable: React.FC<{ records: any[]; tableName: string; emptyMessage: s
             <td className="p-2.5">
               <span className="px-2 py-0.5 rounded font-mono text-[10px] bg-purple-100 text-purple-700 font-bold">
                 {tableName}
-              </span>
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
-};
-
-const EmployeeSampleTable: React.FC<{ employees: any[]; emptyMessage: string }> = ({ employees, emptyMessage }) => {
-  if (!employees || employees.length === 0) {
-    return <div className="text-center py-8 text-gray-400 text-xs italic">{emptyMessage}</div>;
-  }
-
-  return (
-    <table className="w-full text-left text-xs border-collapse">
-      <thead>
-        <tr className="border-b border-gray-200 text-gray-500 bg-gray-50">
-          <th className="p-2.5 font-semibold">Họ tên nhân sự</th>
-          <th className="p-2.5 font-semibold">Chức vụ / Vị trí</th>
-          <th className="p-2.5 font-semibold">Số điện thoại</th>
-          <th className="p-2.5 font-semibold">Email</th>
-          <th className="p-2.5 font-semibold">Bảng lưu (Table)</th>
-        </tr>
-      </thead>
-      <tbody className="divide-y divide-gray-100">
-        {employees.map((e, idx) => (
-          <tr key={e.id || idx} className="hover:bg-gray-50/80">
-            <td className="p-2.5 font-bold text-gray-800">{e.name || e.fullName || '---'}</td>
-            <td className="p-2.5 text-gray-600">{e.role || e.position || '---'}</td>
-            <td className="p-2.5 text-gray-600 font-mono">{e.phone || e.phoneNumber || '---'}</td>
-            <td className="p-2.5 text-gray-500">{e.email || '---'}</td>
-            <td className="p-2.5">
-              <span className="px-2 py-0.5 rounded font-mono text-[10px] bg-emerald-100 text-emerald-700 font-bold">
-                employees
               </span>
             </td>
           </tr>
