@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { RecordFile, RecordStatus, Employee, UserRole } from '../types';
-import { getNormalizedWard, getShortRecordType, getWardLabel } from '../constants';
+import { getNormalizedWard, getShortRecordType, getWardLabel, isArchiveRecordType } from '../constants';
 import { isRecordOverdue, isRecordApproaching, toTitleCase, formatBatchName, getBatchDisplayParts } from '../utils/appHelpers';
 import StatusBadge from './StatusBadge';
 import { CheckSquare, Square, AlertCircle, Clock, Eye, ArrowRight, Pencil, Trash2, Bell, FileCheck, Phone, Map } from 'lucide-react';
@@ -215,6 +215,14 @@ const RecordRow: React.FC<RecordRowProps> = ({
           </td>
         );
       case 'tech':
+        const isArchive = isArchiveRecordType(record.recordType || '');
+        if (isArchive) {
+          return (
+            <td key="tech" className={`${cellClass} text-center text-gray-400`}>
+              -
+            </td>
+          );
+        }
         const recTypeLower = (record.recordType || '').toLowerCase();
         const isMeasurement = recTypeLower.includes('trích đo') || recTypeLower.includes('đo đạc') || recTypeLower.includes('đo') || recTypeLower.includes('tách thửa');
         const isExcerpt = recTypeLower.includes('trích lục');

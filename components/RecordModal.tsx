@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { RecordFile, RecordStatus, Employee, User, UserRole } from '../types';
-import { GROUPS, EXTENDED_RECORD_TYPES, STATUS_LABELS, SELECTABLE_STATUSES, getShortRecordType, getWardLabel, getNormalizedWard } from '../constants';
+import { GROUPS, EXTENDED_RECORD_TYPES, STATUS_LABELS, SELECTABLE_STATUSES, getShortRecordType, getWardLabel, getNormalizedWard, isArchiveRecordType } from '../constants';
 import { X, Save, Lock, User as UserIcon, MapPin, FileText, Calendar, FileCheck, ChevronDown, ChevronUp, History } from 'lucide-react';
-import { calculateDeadlineHelper } from '../utils/appHelpers';
+import { calculateDeadlineHelper, getDepartmentForRecord } from '../utils/appHelpers';
 
 interface AttachedDocItem {
   id: string;
@@ -148,19 +148,31 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
 
   const filteredEmployees = useMemo(() => {
     if (!employees || employees.length === 0) return [];
-    const userEmp = employees.find(e => (currentUser?.employeeId && e.id === currentUser.employeeId) || e.name.toLowerCase() === currentUser?.name?.toLowerCase() || e.id === currentUser?.username);
-    const userDept = userEmp?.department || '';
-    if (!userDept || currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.SUBADMIN || userDept.toLowerCase().includes('giám đốc') || userDept.toLowerCase().includes('lãnh đạo')) {
-      return employees;
-    }
-    const sameDept = employees.filter(e => e.department && e.department.trim().toLowerCase() === userDept.trim().toLowerCase());
-    if (sameDept.length === 0) return employees;
-    if (formData.assignedTo && !sameDept.some(e => e.id === formData.assignedTo)) {
+    
+    // Xác định tổ xử lý hồ sơ dựa theo loại hồ sơ hoặc phòng ban trả kết quả
+    const targetDept = getDepartmentForRecord(formData as RecordFile);
+    const targetDeptLower = targetDept.toLowerCase();
+
+    const isArchive = targetDeptLower.includes('lưu trữ');
+    const isMeasurement = targetDeptLower.includes('đo đạc') || targetDeptLower.includes('kỹ thuật');
+    const isRegistration = targetDeptLower.includes('đăng ký') || targetDeptLower.includes('cấp giấy');
+
+    const sameDept = employees.filter(emp => {
+      const empDept = (emp.department || '').toLowerCase().trim();
+      if (isArchive) return empDept.includes('lưu trữ');
+      if (isMeasurement) return empDept.includes('đo đạc') || empDept.includes('kỹ thuật');
+      if (isRegistration) return empDept.includes('đăng ký') || empDept.includes('cấp giấy');
+      return empDept.includes(targetDeptLower);
+    });
+
+    const result = sameDept.length > 0 ? sameDept : employees;
+
+    if (formData.assignedTo && !result.some(e => e.id === formData.assignedTo)) {
       const assignedEmp = employees.find(e => e.id === formData.assignedTo);
-      if (assignedEmp) sameDept.push(assignedEmp);
+      if (assignedEmp) return [assignedEmp, ...result];
     }
-    return sameDept;
-  }, [employees, currentUser, formData.assignedTo]);
+    return result;
+  }, [employees, formData.recordType, formData.returnHandoverDept, formData.code, formData.assignedTo]);
 
   useEffect(() => {
     if (isOpen) {
@@ -428,10 +440,11 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
   const val = (v: any) => v === undefined || v === null ? '' : v;
   const dateVal = (v: any) => { if (!v) return ''; const str = String(v); return str.includes('T') ? str.split('T')[0] : str; };
 
+  const isArchive = isArchiveRecordType(formData.recordType || '') || (getDepartmentForRecord(formData as RecordFile).toLowerCase().includes('lưu trữ'));
   const isCongVan = formData.recordType ? getShortRecordType(formData.recordType) === '1.2 Công văn' : false;
   const recTypeLower = (formData.recordType || '').toLowerCase();
-  const showMsr = recTypeLower.includes('trích đo') || recTypeLower.includes('đo đạc') || recTypeLower.includes('đo') || recTypeLower.includes('tách thửa') || (!recTypeLower.includes('trích đo') && !recTypeLower.includes('trích lục'));
-  const showExc = recTypeLower.includes('trích lục') || (!recTypeLower.includes('trích đo') && !recTypeLower.includes('trích lục'));
+  const showMsr = !isArchive && (recTypeLower.includes('trích đo') || recTypeLower.includes('đo đạc') || recTypeLower.includes('đo') || recTypeLower.includes('tách thửa') || (!recTypeLower.includes('trích đo') && !recTypeLower.includes('trích lục')));
+  const showExc = !isArchive && (recTypeLower.includes('trích lục') || (!recTypeLower.includes('trích đo') && !recTypeLower.includes('trích lục')));
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[100] p-0 md:p-4 backdrop-blur-sm">
