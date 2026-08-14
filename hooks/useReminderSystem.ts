@@ -25,20 +25,15 @@ export const useReminderSystem = (
     onUpdateRecord: (id: string, fields: Partial<RecordFile>) => void,
     currentUser: User | null
 ) => {
-    const [activeRemindersCount, setActiveRemindersCount] = useState(0);
-
-    // Tính toán số lượng nhắc nhở active (đã đến giờ và chưa hoàn thành)
-    useEffect(() => {
-        const count = records.filter(r => {
+    // Tính toán số lượng nhắc nhở active bằng useMemo thay vì useEffect + useState
+    const activeRemindersCount = useMemo(() => {
+        const now = Date.now();
+        return records.filter(r => {
             if (!r.reminderDate) return false;
-            // Nếu hồ sơ đã xong hoặc rút thì không tính là active reminder
             if (r.status === RecordStatus.HANDOVER || r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED) return false;
-            
             const reminderTime = new Date(r.reminderDate).getTime();
-            const now = Date.now();
             return reminderTime <= now;
         }).length;
-        setActiveRemindersCount(count);
     }, [records]);
 
     // Dùng ref để tránh việc effect chạy lại mỗi khi records thay đổi
@@ -123,7 +118,7 @@ export const useReminderSystem = (
         prevRecordsRef.current = records;
     }, [records, currentUser]);
 
-    // Logic Polling để bắn thông báo và kiểm tra quá hạn
+    // Logic Polling để bắn thông báo nhắc lịch hẹn
     useEffect(() => {
         let isCancelled = false;
 
@@ -136,7 +131,6 @@ export const useReminderSystem = (
 
                 // --- KIỂM TRA NHẮC LỊCH HẸN THƯỜNG ---
                 if (r.reminderDate) {
-                    // Bỏ qua nếu hồ sơ đã xong
                     const isFinished = r.status === RecordStatus.HANDOVER || r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED;
                     const reminderTime = new Date(r.reminderDate).getTime();
                     
@@ -144,7 +138,6 @@ export const useReminderSystem = (
                         // Kiểm tra điều kiện nhắc lại (2 tiếng)
                         let shouldNotify = false;
                         if (!r.lastRemindedAt) {
-                            // Nếu chưa nhắc trong DB, kiểm tra xem phiên này đã nhắc chưa
                             if (!remindedIds.current.has(r.id)) {
                                 shouldNotify = true;
                             }
@@ -164,67 +157,19 @@ export const useReminderSystem = (
                                 `Đã đến giờ hẹn xử lý hồ sơ khách hàng: ${r.customerName}. Vui lòng kiểm tra!`
                             );
 
-                            // Cập nhật lastRemindedAt để không spam
                             const nextLastRemindedAt = new Date().toISOString();
-                            // Gọi update local trước thông qua ref để luôn lấy hàm mới nhất
                             onUpdateRef.current(r.id, { lastRemindedAt: nextLastRemindedAt });
-                            // Cập nhật recordsRef ngay để tránh vòng lặp
                             recordsRef.current = recordsRef.current.map(rec => rec.id === r.id ? { ...rec, lastRemindedAt: nextLastRemindedAt } : rec);
                             
-                            // Gọi API update DB
                             try {
                                 await updateRecordFieldsApi(r.id, { lastRemindedAt: nextLastRemindedAt });
                             } catch (err) {
                                 console.error('Failed to update reminder state', err);
                             }
                             
-                            // Xóa id khỏi set sau 2 tiếng để cho phép nhắc lại (nếu DB thực sự không lưu được)
                             setTimeout(() => {
                                 remindedIds.current.delete(r.id);
                             }, REPEAT_HOURS * 60 * 60 * 1000);
-                        }
-                    }
-                }
-
-                // --- KIỂM TRA NHẮC QUÁ HẠN GIẢI QUYẾT (CHỈ NHẮC 1 LẦN) ---
-                if (r.deadline && !r.deadlineReminded) {
-                    const isFinishedOrWithdrawn = [
-                        RecordStatus.HANDOVER, 
-                        RecordStatus.RETURNED, 
-                        RecordStatus.WITHDRAWN
-                    ].includes(r.status);
-
-                    if (!isFinishedOrWithdrawn) {
-                        const deadlineDate = new Date(r.deadline);
-                        const deadlineTime = deadlineDate.getTime();
-                        
-                        if (!isNaN(deadlineTime) && now >= deadlineTime) {
-                            const isAssignedToCurrentUser = currentUser && currentUser.employeeId === r.assignedTo;
-                            const isPrivilegedUser = currentUser && (
-                                currentUser.role === UserRole.ADMIN ||
-                                currentUser.role === UserRole.SUBADMIN ||
-                                currentUser.role === UserRole.TEAM_LEADER
-                            );
-
-                            if (isAssignedToCurrentUser || isPrivilegedUser) {
-                                // Tắt chế độ thông báo khi hồ sơ hết hạn giải quyết theo yêu cầu người dùng
-                                /*
-                                triggerSystemNotification(
-                                    `Cảnh báo quá hạn: ${r.code}`,
-                                    `Hồ sơ của khách hàng ${r.customerName} đã trễ hạn giải quyết vào ngày ${deadlineDate.toLocaleDateString('vi-VN')}.`
-                                );
-                                */
-
-                                // Đánh dấu đã nhắc nhở quá hạn (nhắc duy nhất 1 lần)
-                                onUpdateRef.current(r.id, { deadlineReminded: true });
-                                recordsRef.current = recordsRef.current.map(rec => rec.id === r.id ? { ...rec, deadlineReminded: true } : rec);
-
-                                try {
-                                    await updateRecordFieldsApi(r.id, { deadlineReminded: true });
-                                } catch (err) {
-                                    console.error('Failed to update deadline reminder state', err);
-                                }
-                            }
                         }
                     }
                 }
@@ -237,7 +182,7 @@ export const useReminderSystem = (
             isCancelled = true;
             clearInterval(intervalId);
         };
-    }, [currentUser]); // Thêm currentUser vào deps để lọc chính xác khi đổi tài khoản
+    }, [currentUser]);
 
     return { activeRemindersCount };
 };

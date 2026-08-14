@@ -107,19 +107,29 @@ export const useAppData = (currentUser: User | null) => {
         }
     }, []);
 
-    // Initial Load & Auto-polling (Real-time background sync every 10 seconds)
+    // Initial Load & Fallback Auto-polling (Realtime handles instant updates)
     useEffect(() => {
         loadData();
         const intervalId = setInterval(() => {
             fetchRecords().then(recData => {
                 if (recData && Array.isArray(recData)) {
                     const { migratedRecords } = migrateUnbatchedRecords(recData);
-                    setRecords(migratedRecords);
+                    setRecords(prev => {
+                        // Prevent unnecessary re-renders if data has not changed
+                        if (prev.length === migratedRecords.length) {
+                            const isSame = prev.every((r, idx) => {
+                                const m = migratedRecords[idx];
+                                return m && r.id === m.id && r.status === m.status && r.assignedTo === m.assignedTo && r.deadline === m.deadline;
+                            });
+                            if (isSame) return prev;
+                        }
+                        return migratedRecords;
+                    });
                 }
             }).catch(err => {
                 console.error("Background sync poll error:", err);
             });
-        }, 10000); // 10 seconds auto-sync
+        }, 60000); // 60s fallback sync
         return () => clearInterval(intervalId);
     }, [loadData]);
 
@@ -223,8 +233,8 @@ export const useAppData = (currentUser: User | null) => {
             };
         }
 
-        // Tự động kiểm tra định kỳ mỗi 5 giây + khi chuyển cửa sổ (focus)
-        const intervalId = setInterval(checkUpdateStatus, 5000);
+        // Tự động kiểm tra định kỳ mỗi 3 phút + khi chuyển cửa sổ (focus)
+        const intervalId = setInterval(checkUpdateStatus, 180000);
         const handleFocus = () => checkUpdateStatus();
         window.addEventListener('focus', handleFocus);
 

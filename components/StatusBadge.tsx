@@ -33,4 +33,4 @@ const StatusBadge: React.FC<StatusBadgeProps> = ({ status }) => {
   );
 };
 
-export default StatusBadge;
+export default React.memo(StatusBadge);
