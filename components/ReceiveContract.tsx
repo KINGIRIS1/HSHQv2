@@ -653,51 +653,48 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col h-full animate-fade-in-up overflow-hidden">
       
-      {/* HEADER WITH TABS */}
-      <div className="p-0 border-b border-gray-100 flex flex-col bg-purple-50/50 shrink-0 z-10 relative">
-        <div className="flex justify-between items-center p-3.5 md:p-4">
-            <div><h2 className="text-lg md:text-xl font-bold text-gray-800 flex items-center gap-2"><FileSignature className="text-purple-600" /> Quản Lý Hợp Đồng</h2></div>
-            
-            <div className="flex gap-2">
-                {activeModule !== 'liquidation' && (
-                    <button onClick={() => setIsGetContractNumberOpen(true)} className="p-2 bg-white border border-gray-200 text-purple-600 hover:text-purple-700 hover:bg-purple-50 rounded-lg transition-colors shadow-sm" title="Lấy số Hợp đồng Tự động">
-                        <Hash size={20} />
-                    </button>
-                )}
-                <button onClick={() => setIsPriceConfigOpen(true)} className="p-2 bg-white border border-gray-200 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors shadow-sm" title="Cấu hình Bảng giá Dịch vụ">
-                    <Settings2 size={20} />
-                </button>
-                <button onClick={() => setIsTemplateModalOpen(true)} className="p-2 bg-white border border-gray-200 text-gray-600 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors shadow-sm" title="Cấu hình Mẫu in Hợp đồng">
-                    <Settings size={20} />
-                </button>
-            </div>
-        </div>
-
-        {/* MAIN TABS */}
-        <div className="flex px-3.5 md:px-4 gap-1.5 md:gap-2 overflow-x-auto">
+      {/* HEADER WITH TABS REPLACING TITLE */}
+      <div className="p-0 border-b border-gray-100 flex flex-col sm:flex-row justify-between items-center bg-purple-50/50 shrink-0 z-10 relative px-3.5 md:px-4 py-2.5 gap-2">
+        {/* MAIN TABS REPLACING TITLE */}
+        <div className="flex gap-1.5 md:gap-2 overflow-x-auto w-full sm:w-auto">
             <button 
                 onClick={() => { setActiveModule('contract'); setEditingContract(undefined); }}
-                className={`px-4 md:px-6 py-2 md:py-2.5 rounded-t-lg font-bold text-xs md:text-sm transition-all border-t border-l border-r whitespace-nowrap ${activeModule === 'contract' ? 'bg-white text-purple-700 border-gray-200 relative top-[1px]' : 'bg-gray-100 text-gray-500 border-transparent hover:bg-gray-200'}`}
+                className={`px-3.5 md:px-5 py-2 rounded-lg font-bold text-xs md:text-sm transition-all border whitespace-nowrap flex items-center gap-1.5 ${activeModule === 'contract' ? 'bg-white text-purple-700 border-purple-200 shadow-xs' : 'bg-gray-100/80 text-gray-600 border-transparent hover:bg-gray-200'}`}
             >
-                <FileText size={16} className="inline mr-1.5 md:mr-2" /> Lập Hợp Đồng
+                <FileText size={16} /> Lập Hợp Đồng
             </button>
             <button 
                 onClick={() => { setActiveModule('liquidation'); setEditingContract(undefined); }}
-                className={`px-4 md:px-6 py-2 md:py-2.5 rounded-t-lg font-bold text-xs md:text-sm transition-all border-t border-l border-r whitespace-nowrap ${activeModule === 'liquidation' ? 'bg-white text-green-700 border-gray-200 relative top-[1px]' : 'bg-gray-100 text-gray-500 border-transparent hover:bg-gray-200'}`}
+                className={`px-3.5 md:px-5 py-2 rounded-lg font-bold text-xs md:text-sm transition-all border whitespace-nowrap flex items-center gap-1.5 ${activeModule === 'liquidation' ? 'bg-white text-green-700 border-green-200 shadow-xs' : 'bg-gray-100/80 text-gray-600 border-transparent hover:bg-gray-200'}`}
             >
-                <FileCheck size={16} className="inline mr-1.5 md:mr-2" /> Thanh Lý Hợp Đồng
+                <FileCheck size={16} /> Thanh Lý Hợp Đồng
             </button>
             <button 
                 onClick={() => { setActiveModule('list'); }}
-                className={`px-4 md:px-6 py-2 md:py-2.5 rounded-t-lg font-bold text-xs md:text-sm transition-all border-t border-l border-r whitespace-nowrap ${activeModule === 'list' ? 'bg-white text-blue-700 border-gray-200 relative top-[1px]' : 'bg-gray-100 text-gray-500 border-transparent hover:bg-gray-200'}`}
+                className={`px-3.5 md:px-5 py-2 rounded-lg font-bold text-xs md:text-sm transition-all border whitespace-nowrap flex items-center gap-1.5 ${activeModule === 'list' ? 'bg-white text-blue-700 border-blue-200 shadow-xs' : 'bg-gray-100/80 text-gray-600 border-transparent hover:bg-gray-200'}`}
             >
-                <LayoutList size={16} className="inline mr-1.5 md:mr-2" /> Danh sách Hợp đồng
+                <LayoutList size={16} /> Danh sách Hợp đồng
             </button>
             <button 
                 onClick={() => { setActiveModule('liquidation_list'); }}
-                className={`px-4 md:px-6 py-2 md:py-2.5 rounded-t-lg font-bold text-xs md:text-sm transition-all border-t border-l border-r whitespace-nowrap ${activeModule === 'liquidation_list' ? 'bg-white text-orange-700 border-gray-200 relative top-[1px]' : 'bg-gray-100 text-gray-500 border-transparent hover:bg-gray-200'}`}
+                className={`px-3.5 md:px-5 py-2 rounded-lg font-bold text-xs md:text-sm transition-all border whitespace-nowrap flex items-center gap-1.5 ${activeModule === 'liquidation_list' ? 'bg-white text-orange-700 border-orange-200 shadow-xs' : 'bg-gray-100/80 text-gray-600 border-transparent hover:bg-gray-200'}`}
             >
-                <ClipboardList size={16} className="inline mr-1.5 md:mr-2" /> Danh sách Thanh lý
+                <ClipboardList size={16} /> Danh sách Thanh lý
+            </button>
+        </div>
+
+        {/* UTILITY BUTTONS */}
+        <div className="flex gap-2 shrink-0">
+            {activeModule !== 'liquidation' && (
+                <button onClick={() => setIsGetContractNumberOpen(true)} className="p-2 bg-white border border-gray-200 text-purple-600 hover:text-purple-700 hover:bg-purple-50 rounded-lg transition-colors shadow-xs" title="Lấy số Hợp đồng Tự động">
+                    <Hash size={18} />
+                </button>
+            )}
+            <button onClick={() => setIsPriceConfigOpen(true)} className="p-2 bg-white border border-gray-200 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors shadow-xs" title="Cấu hình Bảng giá Dịch vụ">
+                <Settings2 size={18} />
+            </button>
+            <button onClick={() => setIsTemplateModalOpen(true)} className="p-2 bg-white border border-gray-200 text-gray-600 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors shadow-xs" title="Cấu hình Mẫu in Hợp đồng">
+                <Settings size={18} />
             </button>
         </div>
       </div>
