@@ -29,11 +29,13 @@ import SubmitModal from './components/receive-record/SubmitModal';
 import GlobalConfirmModal from './components/GlobalConfirmModal';
 import GlobalAlertModal from './components/GlobalAlertModal';
 import { checkAndTriggerWeeklyBackup, downloadBackupAsFile } from './services/backupService';
+import CloudDatabaseInspector from './components/CloudDatabaseInspector';
 
 function App() {
   const isMobile = useIsMobile(768);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [backupNotification, setBackupNotification] = useState<{ show: boolean, filePath?: string, backupData?: any } | null>(null);
+  const [isCloudDatabaseInspectorOpen, setIsCloudDatabaseInspectorOpen] = useState(false);
 
   // Tự động kiểm tra và thực hiện sao lưu hàng tuần cho admin đã tắt theo yêu cầu
 
@@ -1276,6 +1278,7 @@ function App() {
             onResetWards={() => setWards(STATIC_WARDS)}
             handleQuickUpdate={handleQuickUpdate}
             handleUpdateCurrentAccount={handleUpdateCurrentAccount}
+            onOpenCloudInspector={() => setIsCloudDatabaseInspectorOpen(true)}
             
             globalReportContent={globalReportContent}
             isGeneratingReport={isGeneratingReport}
@@ -1492,6 +1495,7 @@ function App() {
         )}
         <GlobalConfirmModal />
         <GlobalAlertModal />
+        <CloudDatabaseInspector isOpen={isCloudDatabaseInspectorOpen} onClose={() => setIsCloudDatabaseInspectorOpen(false)} />
     </MainLayout>
   );
 }

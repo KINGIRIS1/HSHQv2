@@ -20,18 +20,20 @@ const RECORD_DB_COLUMNS = [
     'statusLogs', 'archiveHandoverDate', 'archiveHandoverBatch'
 ];
 
-const getTargetTable = (record: Partial<RecordFile>): 'land_records' | 'luutru_records' => {
+const getTargetTable = (record: Partial<RecordFile>): 'dangky_records' | 'land_records' | 'luutru_records' => {
+    if (record.sourceTable) return record.sourceTable;
     if (record.recordType && isArchiveRecordType(record.recordType)) {
         return 'luutru_records';
     }
     if (record.id) {
         const cached: RecordFile[] = getFromCache(CACHE_KEYS.RECORDS, []);
         const found = cached.find(r => r.id === record.id);
-        if (found && isArchiveRecordType(found.recordType)) {
-            return 'luutru_records';
+        if (found) {
+            if (found.sourceTable) return found.sourceTable;
+            if (isArchiveRecordType(found.recordType)) return 'luutru_records';
         }
     }
-    return 'land_records';
+    return 'dangky_records';
 };
 
 const OPTIONAL_NEW_COLUMNS = [
@@ -52,43 +54,76 @@ export const fetchRecords = async (): Promise<RecordFile[]> => {
 
   try {
     let allRecords: any[] = [];
-    let from = 0;
     const step = 1000;
-    let hasMore = true;
     let retryCount = 0;
     const maxRetries = 1;
 
-    // 1. Fetch from land_records
-    while (hasMore) {
+    // 1. Fetch from dangky_records
+    try {
+        let fromDk = 0;
+        let hasMoreDk = true;
+        while (hasMoreDk) {
+            const { data, error } = await supabase
+                .from('dangky_records')
+                .select('*')
+                .order('receivedDate', { ascending: false })
+                .order('id', { ascending: true }) 
+                .range(fromDk, fromDk + step - 1);
+
+            if (error) {
+                if (error.code === 'PGRST205' || error.code === '42P01' || error.message?.includes('does not exist')) {
+                    console.info('Bảng dangky_records chưa tồn tại, bỏ qua.');
+                } else {
+                    console.warn('Lỗi khi fetch dangky_records:', error);
+                }
+                hasMoreDk = false;
+            } else if (data && data.length > 0) {
+                const mapped = data.map(item => ({ ...item, sourceTable: 'dangky_records' as const }));
+                allRecords = [...allRecords, ...mapped];
+                fromDk += step;
+                if (data.length < step) hasMoreDk = false;
+            } else {
+                hasMoreDk = false;
+            }
+        }
+    } catch (dkError) {
+        console.warn('Lỗi fetch dangky_records:', dkError);
+    }
+
+    // 2. Fetch from land_records
+    let hasMoreLand = true;
+    let fromLand = 0;
+    while (hasMoreLand) {
         try {
             const { data, error } = await supabase
                 .from('land_records')
                 .select('*')
                 .order('receivedDate', { ascending: false })
                 .order('id', { ascending: true }) 
-                .range(from, from + step - 1);
+                .range(fromLand, fromLand + step - 1);
 
             if (error) throw error;
 
             if (data && data.length > 0) {
-                allRecords = [...allRecords, ...data];
-                from += step;
-                if (data.length < step) hasMore = false;
+                const mapped = data.map(item => ({ ...item, sourceTable: item.sourceTable || ('land_records' as const) }));
+                allRecords = [...allRecords, ...mapped];
+                fromLand += step;
+                if (data.length < step) hasMoreLand = false;
             } else {
-                hasMore = false;
+                hasMoreLand = false;
             }
         } catch (fetchError: any) {
             if (retryCount < maxRetries && (fetchError.message?.includes('fetch') || !fetchError.code)) {
-                console.warn(`Lỗi fetchRecords, đang thử lại lần ${retryCount + 1}...`);
+                console.warn(`Lỗi fetch land_records, đang thử lại lần ${retryCount + 1}...`);
                 retryCount++;
                 await new Promise(resolve => setTimeout(resolve, 1000));
                 continue; 
             }
-            throw fetchError;
+            break;
         }
     }
 
-    // 2. Fetch from luutru_records
+    // 3. Fetch from luutru_records
     try {
         let fromLt = 0;
         let hasMoreLt = true;
@@ -108,7 +143,8 @@ export const fetchRecords = async (): Promise<RecordFile[]> => {
                 }
                 hasMoreLt = false;
             } else if (data && data.length > 0) {
-                allRecords = [...allRecords, ...data];
+                const mapped = data.map(item => ({ ...item, sourceTable: 'luutru_records' as const }));
+                allRecords = [...allRecords, ...mapped];
                 fromLt += step;
                 if (data.length < step) hasMoreLt = false;
             } else {
@@ -127,7 +163,7 @@ export const fetchRecords = async (): Promise<RecordFile[]> => {
     });
     const uniqueRecords = Array.from(uniqueMap.values());
     
-    console.log(`[Fetch] Total fetched: ${uniqueRecords.length}`);
+    console.log(`[Fetch] Total fetched across all cloud tables: ${uniqueRecords.length}`);
     return uniqueRecords as RecordFile[];
 
   } catch (error) {

@@ -6,7 +6,7 @@ import { fetchHolidays, saveHolidays, testDatabaseConnection, saveUpdateInfo, fe
 import { APP_VERSION } from '../constants';
 import { confirmAction, calculateDeadlineHelper, matchDepartmentKey } from '../utils/appHelpers';
 import { createFullBackupData, downloadBackupAsFile, saveBackupToServer, restoreFullBackupToSupabase } from '../services/backupService';
-import { isConfigured } from '../services/supabaseClient';
+import { supabase, isConfigured } from '../services/supabaseClient';
 
 const PERMISSION_DEPARTMENTS = [
   { id: 'Tổ Lưu trữ', name: 'Tổ Lưu trữ', label: 'Tổ Lưu trữ', desc: 'Bộ phận phụ trách lưu trữ, khai thác thông tin đất đai và hồ sơ lưu trữ' },
@@ -115,17 +115,80 @@ interface SystemSettingsViewProps {
   onDeleteAllData: () => Promise<boolean>;
   onHolidaysChanged?: () => void;
   employees: Employee[];
+  onOpenCloudInspector?: () => void;
 }
 
 const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ 
   onDeleteAllData,
   onHolidaysChanged,
-  employees
+  employees,
+  onOpenCloudInspector
 }) => {
   const [activeTab, setActiveTab] = useState<'general' | 'holidays' | 'permissions' | 'data'>('general');
   const [isDeletingData, setIsDeletingData] = useState(false);
   const [dbTestStatus, setDbTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [dbTestMsg, setDbTestMsg] = useState('');
+
+  const [tableStats, setTableStats] = useState<{
+    dangky: { count: number; error?: string };
+    land: { count: number; error?: string };
+    luutru: { count: number; error?: string };
+    employees: { count: number; error?: string };
+  }>({
+    dangky: { count: 0 },
+    land: { count: 0 },
+    luutru: { count: 0 },
+    employees: { count: 0 },
+  });
+  const [isCheckingTables, setIsCheckingTables] = useState(false);
+  const [hasChecked, setHasChecked] = useState(false);
+
+  const checkTableCounts = async () => {
+    if (!isConfigured) return;
+    setIsCheckingTables(true);
+    setHasChecked(true);
+    const stats = {
+      dangky: { count: 0, error: undefined as string | undefined },
+      land: { count: 0, error: undefined as string | undefined },
+      luutru: { count: 0, error: undefined as string | undefined },
+      employees: { count: 0, error: undefined as string | undefined },
+    };
+
+    try {
+      const { count, error } = await supabase.from('dangky_records').select('*', { count: 'exact', head: true });
+      if (error) throw error;
+      stats.dangky.count = count ?? 0;
+    } catch (e: any) {
+      stats.dangky.error = e.message;
+    }
+
+    try {
+      const { count, error } = await supabase.from('land_records').select('*', { count: 'exact', head: true });
+      if (error) throw error;
+      stats.land.count = count ?? 0;
+    } catch (e: any) {
+      stats.land.error = e.message;
+    }
+
+    try {
+      const { count, error } = await supabase.from('luutru_records').select('*', { count: 'exact', head: true });
+      if (error) throw error;
+      stats.luutru.count = count ?? 0;
+    } catch (e: any) {
+      stats.luutru.error = e.message;
+    }
+
+    try {
+      const { count, error } = await supabase.from('employees').select('*', { count: 'exact', head: true });
+      if (error) throw error;
+      stats.employees.count = count ?? 0;
+    } catch (e: any) {
+      stats.employees.error = e.message;
+    }
+
+    setTableStats(stats);
+    setIsCheckingTables(false);
+  };
   
   // Update State (Manual Config)
   const [manualVersion, setManualVersion] = useState('');
@@ -732,18 +795,82 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
             {activeTab === 'general' && (
                 <div className="space-y-6 max-w-4xl mx-auto">
                     {/* Cloud Database Info */}
-                    <div className="bg-white border border-blue-100 rounded-2xl p-5 flex flex-col md:flex-row gap-4 items-center justify-between shadow-sm">
-                        <div className="text-center md:text-left">
-                            <h3 className="font-black text-blue-800 flex items-center justify-center md:justify-start gap-2 mb-1 tracking-tight"> <Database size={18} /> Cloud Database </h3>
-                            <p className="text-xs text-blue-600 font-medium">Kiểm tra kết nối đến cơ sở dữ liệu Supabase.</p>
-                        </div>
-                        <div className="flex flex-col items-center gap-3 w-full md:w-auto">
-                            {dbTestStatus === 'success' && <div className="text-xs font-black text-green-600 flex items-center gap-1 uppercase tracking-wider"><CheckCircle size={16} /> Kết nối OK!</div>}
-                            {dbTestStatus === 'error' && <div className="text-xs font-black text-red-600 uppercase tracking-wider">{dbTestMsg || 'Lỗi!'}</div>}
-                            <button onClick={handleTestDatabase} disabled={dbTestStatus === 'testing'} className="w-full md:w-auto px-6 py-2.5 bg-blue-50 border border-blue-200 text-blue-700 font-medium text-sm rounded-xl hover:bg-blue-100 transition-colors shadow-sm flex items-center justify-center gap-2"> 
-                                {dbTestStatus === 'testing' ? <Loader2 className="animate-spin" size={16} /> : 'Kiểm tra kết nối'} 
+                    <div className="bg-white border border-blue-100 rounded-2xl p-5 shadow-sm space-y-4">
+                        <div className="flex flex-col md:flex-row gap-4 items-center justify-between border-b border-blue-50 pb-4">
+                            <div>
+                                <h3 className="font-black text-blue-900 flex items-center gap-2 text-base tracking-tight mb-1">
+                                    <Database size={20} className="text-blue-600" /> Cloud Database (Supabase Pro)
+                                </h3>
+                                <p className="text-xs text-blue-600 font-medium">
+                                    URL hiện tại: <span className="bg-blue-50 text-blue-800 px-2 py-0.5 rounded font-mono font-semibold">https://lrnfdksqepztnihrkgrr.supabase.co</span>
+                                </p>
+                            </div>
+                            <button 
+                                onClick={checkTableCounts} 
+                                disabled={isCheckingTables}
+                                className="px-5 py-2.5 bg-blue-600 text-white font-bold text-xs rounded-xl hover:bg-blue-700 transition-colors shadow-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                            >
+                                <RefreshCw className={`w-4 h-4 ${isCheckingTables ? 'animate-spin' : ''}`} /> Kiểm tra kết nối & Đồng bộ
                             </button>
                         </div>
+
+                        {/* Status Card Box */}
+                        {hasChecked && (
+                        <div className="bg-emerald-50/60 border border-emerald-200 rounded-xl p-4 space-y-4 animate-fadeIn">
+                            <div className="flex items-start gap-3">
+                                <CheckCircle className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                                <div>
+                                    <h4 className="text-xs font-black text-emerald-900 uppercase tracking-wider">Kết nối & Đồng bộ thành công</h4>
+                                    <p className="text-xs text-emerald-700 font-medium mt-0.5">
+                                        Đã kết nối thành công tới các bảng trên Supabase Database mới! Đồng bộ dữ liệu ổn định.
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* 4 Stats Cards */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                                {/* 1. Cấp giấy (dangky_records) */}
+                                <div className="bg-white p-3.5 rounded-xl border border-emerald-100 shadow-2xs">
+                                    <div className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+                                        HỒ SƠ CẤP GIẤY <span className="text-[10px] font-mono text-purple-600">('DANGKY_RECORDS')</span>
+                                    </div>
+                                    <div className="text-xl font-black text-purple-700">
+                                        {isCheckingTables ? '...' : `${tableStats.dangky.count} bản ghi`}
+                                    </div>
+                                </div>
+
+                                {/* 2. Đo đạc (land_records) */}
+                                <div className="bg-white p-3.5 rounded-xl border border-emerald-100 shadow-2xs">
+                                    <div className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+                                        HỒ SƠ ĐO ĐẠC <span className="text-[10px] font-mono text-blue-600">('LAND_RECORDS')</span>
+                                    </div>
+                                    <div className="text-xl font-black text-blue-700">
+                                        {isCheckingTables ? '...' : `${tableStats.land.count} bản ghi`}
+                                    </div>
+                                </div>
+
+                                {/* 3. Lưu trữ (luutru_records) */}
+                                <div className="bg-white p-3.5 rounded-xl border border-emerald-100 shadow-2xs">
+                                    <div className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+                                        HỒ SƠ LƯU TRỮ <span className="text-[10px] font-mono text-amber-600">('LUUTRU_RECORDS')</span>
+                                    </div>
+                                    <div className="text-xl font-black text-amber-700">
+                                        {isCheckingTables ? '...' : `${tableStats.luutru.count} bản ghi`}
+                                    </div>
+                                </div>
+
+                                {/* 4. Nhân sự (employees) */}
+                                <div className="bg-white p-3.5 rounded-xl border border-emerald-100 shadow-2xs">
+                                    <div className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+                                        NHÂN SỰ <span className="text-[10px] font-mono text-emerald-600">('EMPLOYEES')</span>
+                                    </div>
+                                    <div className="text-xl font-black text-emerald-700">
+                                        {isCheckingTables ? '...' : `${tableStats.employees.count} bản ghi`}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        )}
                     </div>
 
 

@@ -17,6 +17,7 @@ interface SystemViewProps {
     wards: string[];
     onDeleteAllData: () => Promise<boolean>;
     onHolidaysChanged: () => void;
+    onOpenCloudInspector?: () => void;
 }
 
 const SystemView: React.FC<SystemViewProps> = ({
@@ -30,7 +31,8 @@ const SystemView: React.FC<SystemViewProps> = ({
     onDeleteEmployee,
     wards,
     onDeleteAllData,
-    onHolidaysChanged
+    onHolidaysChanged,
+    onOpenCloudInspector
 }) => {
     const isAdmin = currentUser.role === UserRole.ADMIN;
     const [activeTab, setActiveTab] = useState<'users' | 'employees' | 'settings'>('employees');
@@ -88,6 +90,7 @@ const SystemView: React.FC<SystemViewProps> = ({
                         onDeleteAllData={onDeleteAllData} 
                         onHolidaysChanged={onHolidaysChanged} 
                         employees={employees}
+                        onOpenCloudInspector={onOpenCloudInspector}
                     />
                 )}
             </div>

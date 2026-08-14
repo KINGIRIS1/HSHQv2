@@ -123,6 +123,7 @@ interface AppRoutesProps {
     value: string,
   ) => void;
   handleUpdateCurrentAccount: (data: any) => Promise<boolean>;
+  onOpenCloudInspector?: () => void;
 
   // Report Props
   globalReportContent: string;
@@ -1638,6 +1639,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
           wards={wards}
           onDeleteAllData={props.handleDeleteAllData}
           onHolidaysChanged={props.onRefreshData}
+          onOpenCloudInspector={props.onOpenCloudInspector}
         />
       );
     case "reports":

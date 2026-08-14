@@ -219,6 +219,9 @@ export interface RecordFile {
   statusLogs?: RecordStatusLog[];
   archiveHandoverDate?: string | null;
   archiveHandoverBatch?: number | null;
+
+  // Phân loại bảng Cloud Database
+  sourceTable?: 'dangky_records' | 'land_records' | 'luutru_records';
 }
 
 export interface RecordStatusLog {
