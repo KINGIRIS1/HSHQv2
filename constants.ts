@@ -71,7 +71,7 @@ export const RECORD_TYPES = [
   '1.2 Công văn',
   '2.1 Trích lục',
   '2.2 Trích đo',
-  '2.3 Cập nhật số thửa',
+  '2.3 Duyệt đơn-số thửa',
   '2.4 Trích đo Cắm mốc',
   '2.5 Trích đo Tách - Hợp thửa'
 ];
@@ -130,14 +130,14 @@ export const getShortRecordType = (type: string | null | undefined): string => {
   if (t.startsWith('1.2') || t === 'công văn') return '1.2 Công văn';
   if (t.startsWith('2.1') || t === 'trích lục' || t === 'trích lục quy hoạch' || t === 'trích lục qh') return '2.1 Trích lục';
   if (t.startsWith('2.2') || t === '2.3 trích đo' || t === 'trích đo') return '2.2 Trích đo';
-  if (t.startsWith('2.3') || t.startsWith('2.6') || t === 'cung cấp số thửa đất' || t === 'cung cấp số thửa' || t === 'cc số thửa' || t === 'cập nhập số thửa' || t === 'cập nhật số thửa' || t === 'cn số thửa') return '2.3 Cập nhật số thửa';
+  if (t.startsWith('2.3') || t.startsWith('2.6') || t === 'cung cấp số thửa đất' || t === 'cung cấp số thửa' || t === 'cc số thửa' || t === 'cập nhập số thửa' || t === 'cập nhật số thửa' || t === 'cn số thửa' || t.includes('duyệt đơn-số thửa') || t.includes('duyệt đơn')) return '2.3 Duyệt đơn-số thửa';
   if (t.startsWith('2.4') || t === 'cắm mốc' || t === 'trích đo cắm mốc') return '2.4 Cắm mốc';
   if (t.startsWith('2.5') || t === 'tách thửa' || t === 'tách-hợp thửa' || t === 'trích đo tách - hợp thửa') return '2.5 Tách-Hợp thửa';
 
   // Fallbacks for legacy other categories
   if (t.includes('cung cấp tài liệu đất đai') || t.includes('cung cấp dữ liệu') || t.includes('sao lục') || t.includes('sao luc') || t.includes('cc dl đđ')) return '1.1 Sao lục';
   if (t.includes('trích lục quy hoạch')) return '2.1 Trích lục';
-  if (t.includes('cung cấp số thửa đất') || t.includes('số thửa') || t.includes('cập nhập số thửa') || t.includes('cập nhật số thửa') || t.includes('2.6')) return '2.3 Cập nhật số thửa';
+  if (t.includes('cung cấp số thửa đất') || t.includes('số thửa') || t.includes('cập nhập số thửa') || t.includes('cập nhật số thửa') || t.includes('2.6') || t.includes('duyệt đơn')) return '2.3 Duyệt đơn-số thửa';
   if (t.includes('trích đo') && t.includes('cắm mốc')) return '2.4 Cắm mốc';
   if (t.includes('trích đo') && (t.includes('tách') || t.includes('hợp'))) return '2.5 Tách-Hợp thửa';
   if (t.includes('trích đo') || t.includes('2.2')) return '2.2 Trích đo';

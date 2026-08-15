@@ -49,10 +49,29 @@ const ReturnResultModal: React.FC<ReturnResultModalProps> = ({
 
                 // 3. Tra cứu hợp đồng
                 const fetchedContracts = await fetchContracts();
-                const match = fetchedContracts.find(c => 
-                    (c.customerAddress && record.code && c.customerAddress.trim().toLowerCase() === record.code.trim().toLowerCase()) ||
-                    (c.code && record.code && c.code.trim().toLowerCase() === record.code.trim().toLowerCase())
-                );
+                const match = fetchedContracts.find(c => {
+                    if (!c || !record) return false;
+                    const cAddr = (c.customerAddress || '').trim().toLowerCase();
+                    const cCode = (c.code || '').trim().toLowerCase();
+                    const rCode = (record.code || '').trim().toLowerCase();
+                    const cName = (c.customerName || '').trim().toLowerCase();
+                    const rName = (record.customerName || '').trim().toLowerCase();
+                    const cPlot = (c.landPlot || '').trim().toLowerCase();
+                    const rPlot = (record.landPlot || '').trim().toLowerCase();
+                    const cMap = (c.mapSheet || '').trim().toLowerCase();
+                    const rMap = (record.mapSheet || '').trim().toLowerCase();
+
+                    const clean = (str: string) => str.replace(/[^a-z0-9]/gi, '').toLowerCase();
+
+                    if (rCode && (cAddr === rCode || cCode === rCode)) return true;
+                    if (rCode && cCode && clean(rCode).length >= 3 && clean(rCode) === clean(cCode)) return true;
+                    if (rCode && cAddr && clean(rCode).length >= 3 && clean(rCode) === clean(cAddr)) return true;
+                    if (rName && cName && rName === cName) {
+                        if (rPlot && cPlot && rPlot === cPlot) return true;
+                        if (rMap && cMap && rMap === cMap) return true;
+                    }
+                    return false;
+                });
                 
                 if (match) {
                     const priceVal = match.liquidationAmount !== null && match.liquidationAmount !== undefined

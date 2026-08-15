@@ -331,7 +331,7 @@ export const KiemTraDoDacTab: React.FC<KiemTraDoDacTabProps> = ({
             } else if (groupBy === 'type') {
                 key = r.recordType || 'Chưa phân loại';
                 if (key.startsWith('2.2')) key = '2.2 Trích đo';
-                else if (key.startsWith('2.3')) key = '2.3 Cập nhật số thửa';
+                else if (key.startsWith('2.3')) key = '2.3 Duyệt đơn-số thửa';
                 else if (key.startsWith('2.4')) key = '2.4 Trích đo Cắm mốc';
                 else if (key.startsWith('2.5')) key = '2.5 Trích đo Tách - Hợp thửa';
             } else if (groupBy === 'status') {

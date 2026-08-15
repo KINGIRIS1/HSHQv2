@@ -273,6 +273,7 @@ const RecordRow: React.FC<RecordRowProps> = ({
           </td>
         );
       case 'status':
+        const isArchiveRecord = isArchiveRecordType(record.recordType || '') || record.sourceTable === 'luutru_records';
         return (
           <td key="status" className={`${cellClass} text-center`}>
               <div className="transform origin-top pt-1 flex flex-col items-center">
@@ -280,7 +281,7 @@ const RecordRow: React.FC<RecordRowProps> = ({
               </div>
               
               {/* NÚT CHỈNH LÝ (Thay thế checkbox) */}
-              {onMapCorrection && (
+              {onMapCorrection && !isArchiveRecord && (
                   <div className="mt-2 flex justify-center">
                       <button 
                           onClick={(e) => { e.stopPropagation(); onMapCorrection(record); }}

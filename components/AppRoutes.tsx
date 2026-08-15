@@ -894,7 +894,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                               <option value="all">Tất cả loại HS</option>
                               <option value="2.1 Trích lục">2.1 Trích lục</option>
                               <option value="2.2 Trích đo">2.2 Trích đo</option>
-                              <option value="2.3 Cập nhật số thửa">2.3 Cập nhật số thửa</option>
+                              <option value="2.3 Duyệt đơn-số thửa">2.3 Duyệt đơn-số thửa</option>
                               <option value="2.4 Trích đo Cắm mốc">2.4 Trích đo Cắm mốc</option>
                               <option value="2.5 Trích đo Tách - Hợp thửa">2.5 Trích đo Tách - Hợp thửa</option>
                             </select>

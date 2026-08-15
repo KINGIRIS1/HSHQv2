@@ -729,6 +729,11 @@ function App() {
   }, [returnRecord, createStatusLog]);
 
   const handleMapCorrectionRequest = useCallback(async (record: RecordFile) => {
+      const isArchive = isArchiveRecordType(record.recordType || '') || record.sourceTable === 'luutru_records';
+      if (isArchive) {
+          setToast({ type: 'error', message: 'Hồ sơ lưu trữ không áp dụng tính năng chỉnh lý bản đồ.' });
+          return;
+      }
       const newValue = !record.needsMapCorrection;
       const updatedRecord = { ...record, needsMapCorrection: newValue };
       setRecords(prev => prev.map(r => r.id === record.id ? updatedRecord : r));

@@ -1248,7 +1248,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                           </td>
 
                           <td className="p-3 text-center align-middle">
-                            {onMapCorrection && (
+                            {onMapCorrection && !(isArchiveRecordType(r.recordType || '') || r.sourceTable === 'luutru_records') && (
                               <button
                                 onClick={() => onMapCorrection(r)}
                                 className={`flex items-center justify-center gap-1 px-2 py-1 rounded border transition-all text-[10px] font-bold shadow-sm mx-auto ${
@@ -1404,7 +1404,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
 
                       {/* Action buttons */}
                       <div className="border-t border-gray-100 pt-3 flex justify-between items-center gap-2">
-                        {onMapCorrection && (
+                        {onMapCorrection && !(isArchiveRecordType(r.recordType || '') || r.sourceTable === 'luutru_records') && (
                           <button
                             onClick={() => onMapCorrection(r)}
                             className={`p-1.5 rounded-lg border transition-all ${

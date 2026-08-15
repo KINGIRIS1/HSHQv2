@@ -180,8 +180,8 @@ export const calculateDeadlineHelper = (type: string, receivedDateStr: string, h
 
     if (lowerType.includes('1.1') || lowerType.includes('cung cấp tài liệu đất đai') || lowerType.includes('cung cấp dữ liệu') ||
         lowerType.includes('2.1') || lowerType.includes('trích lục') || 
-        lowerType.includes('2.3 cập nhật') || lowerType.includes('2.3 cập nhập') || lowerType.includes('2.3 số thửa') ||
-        lowerType.includes('2.6') || lowerType.includes('số thửa') || lowerType.includes('cập nhật số thửa') || lowerType.includes('cập nhập số thửa') ||
+        lowerType.includes('2.3 cập nhật') || lowerType.includes('2.3 cập nhập') || lowerType.includes('2.3 số thửa') || lowerType.includes('2.3 duyệt') || lowerType.includes('duyệt đơn-số thửa') ||
+        lowerType.includes('2.6') || lowerType.includes('số thửa') || lowerType.includes('cập nhật số thửa') || lowerType.includes('cập nhập số thửa') || lowerType.includes('duyệt đơn') ||
         lowerType.includes('quy hoạch')) {
         daysToAdd = 10;
     } else if (lowerType.includes('trích đo chỉnh lý') || lowerType.includes('chỉnh lý bản đồ')) {
