@@ -426,34 +426,51 @@ export function processAssignmentTimelineCheck(
 // --- HÀM XỬ LÝ VÀ ĐỊNH DẠNG ĐỢT GIAO 1 CỬA ---
 
 export function getDepartmentForRecord(r: RecordFile): string {
+    const type = (r.recordType || '').toLowerCase();
+    const code = (r.code || '').toLowerCase();
+
+    // 1. Nhóm Lưu trữ: mã 1.x hoặc chứa từ khóa sao lục, công văn
+    if (
+        code.startsWith('1.') || 
+        type.includes('1.1') || type.includes('1.2') ||
+        type.includes('sao lục') || 
+        type.includes('công văn') || 
+        type.includes('lưu trữ')
+    ) {
+        return 'Tổ Lưu trữ';
+    }
+
+    // 2. Nhóm Đo đạc: mã 2.1 đến 2.6 hoặc chứa các từ khóa đo đạc, trích đo, cắm mốc, số thửa, duyệt đơn, trích lục
+    if (
+        code.startsWith('2.') || 
+        type.includes('2.1') || type.includes('2.2') || type.includes('2.3') || type.includes('2.4') || type.includes('2.5') || type.includes('2.6') || 
+        type.includes('đo đạc') || type.includes('đo dạc') || 
+        type.includes('trích đo') || 
+        type.includes('cắm mốc') || 
+        type.includes('số thửa') || 
+        type.includes('duyệt đơn') || 
+        type.includes('trích lục')
+    ) {
+        return 'Tổ Đo đạc';
+    }
+
+    // 3. Fallback theo returnHandoverDept nếu không khớp ở trên
     if (r.returnHandoverDept) {
         const d = r.returnHandoverDept.toLowerCase();
         if (d.includes('lưu trữ') || d.includes('thông tin')) return 'Tổ Lưu trữ';
         if (d.includes('đo đạc') || d.includes('đo dạc')) return 'Tổ Đo đạc';
-        if (d.includes('cấp giấy') || d.includes('đăng ký')) return 'Tổ Cấp giấy';
+        if (d.includes('cấp giấy') || d.includes('đăng ký')) return 'Tổ Đo đạc';
     }
-    const type = (r.recordType || '').toLowerCase();
-    const code = (r.code || '').toLowerCase();
 
-    if (type.includes('1.1') || type.includes('1.2') || type.includes('công văn') || type.includes('sao lục') || code.startsWith('1.')) {
-        return 'Tổ Lưu trữ';
-    }
-    if (type.includes('2.3') || type.includes('2.4') || type.includes('2.5') || type.includes('2.6') || type.includes('số thửa') || type.includes('trích đo') || type.includes('đo đạc') || code.startsWith('2.')) {
-        return 'Tổ Đo đạc';
-    }
-    if (type.includes('2.1') || type.includes('2.2') || type.includes('trích lục')) {
-        return 'Tổ Cấp giấy';
-    }
     return 'Tổ Đo đạc';
 }
 
 export function getDeptAbbr(deptName: string): string {
-    if (!deptName) return 'CG';
+    if (!deptName) return 'DD';
     const d = deptName.toLowerCase();
     if (d.includes('lưu trữ') || d.includes('thông tin') || d === 'lt') return 'LT';
-    if (d.includes('đo đạc') || d.includes('đo dạc') || d.includes('kỹ thuật') || d === 'dd') return 'DD';
-    if (d.includes('cấp giấy') || d.includes('đăng ký') || d === 'cg') return 'CG';
-    return deptName;
+    if (d.includes('đo đạc') || d.includes('đo dạc') || d.includes('kỹ thuật') || d.includes('cấp giấy') || d.includes('đăng ký') || d === 'dd' || d === 'cg') return 'DD';
+    return 'DD';
 }
 
 export function formatDateDDMMYYYY(d?: string | null): string {
@@ -495,78 +512,74 @@ export function getPureBatchNumber(batch: number | string | null | undefined): s
     return bStr;
 }
 
+export function extractDateFromBatch(batch: number | string | null | undefined): string | null {
+    if (!batch) return null;
+    const bStr = String(batch);
+    const match = bStr.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+    if (match) {
+        const day = match[1].padStart(2, '0');
+        const month = match[2].padStart(2, '0');
+        const year = match[3];
+        return `${year}-${month}-${day}`;
+    }
+    return null;
+}
+
 export function formatBatchName(batch: number | string | null | undefined, _deptName?: string, dateStr?: string | null): string {
     if (!batch && batch !== 0) return '';
     let bStr = String(batch).trim();
     if (!bStr) return '';
 
-    // Loại bỏ các mã tổ chuyên môn cũ nếu có (-CG-, -LT-, -DD-, -Tổ Cấp giấy-)
+    // 1. Loại bỏ các mã tổ chuyên môn cũ nếu có (-CG-, -LT-, -DD-, -Tổ Cấp giấy-)
     bStr = bStr.replace(/-(CG|LT|DD|Tổ\s*[^-\s]+)-/gi, '-');
 
-    let dateFormatted = formatDateDDMMYYYY(dateStr);
-    const dateInBatchMatch = bStr.match(/(\d{1,2}\/\d{1,2}\/\d{2,4})/);
-    if (dateInBatchMatch) {
-        let matchedDate = dateInBatchMatch[1];
-        const parts = matchedDate.split('/');
-        if (parts.length === 3) {
-            if (parts[2].length === 2) parts[2] = '20' + parts[2];
-            matchedDate = `${parts[0].padStart(2, '0')}/${parts[1].padStart(2, '0')}/${parts[2]}`;
+    // 2. Trích xuất số đợt
+    let batchNum: string = '';
+    const numMatch = bStr.match(/Đợt\s*0*(\d+)/i) || bStr.match(/^(\d+)$/);
+    if (numMatch && numMatch[1]) {
+        batchNum = numMatch[1];
+    } else {
+        const fallbackMatch = bStr.match(/(\d+)/);
+        if (fallbackMatch) {
+            batchNum = fallbackMatch[1];
         }
-        dateFormatted = matchedDate;
     }
 
-    const match = bStr.match(/Đợt\s*0*(\d+)/i) || bStr.match(/^(\d+)$/);
-    if (match && match[1]) {
-        const num = parseInt(match[1], 10);
+    // 3. Trích xuất ngày
+    let dateFormatted = formatDateDDMMYYYY(dateStr);
+    const dateInBatchMatch = bStr.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+    if (dateInBatchMatch) {
+        let day = dateInBatchMatch[1].padStart(2, '0');
+        let month = dateInBatchMatch[2].padStart(2, '0');
+        let year = dateInBatchMatch[3];
+        if (year.length === 2) year = '20' + year;
+        dateFormatted = `${day}/${month}/${year}`;
+    }
+
+    // 4. Trả về định dạng duy nhất, sạch sẽ
+    if (batchNum) {
+        const num = parseInt(batchNum, 10);
         return dateFormatted ? `Đợt ${num} - Ngày ${dateFormatted}` : `Đợt ${num}`;
     }
 
-    if (bStr.startsWith('Đợt')) {
-        if (!bStr.includes('Ngày') && dateFormatted) {
-            const cleanStr = bStr.replace(/Đợt\s*0*(\d+).*/i, 'Đợt $1');
-            return `${cleanStr} - Ngày ${dateFormatted}`;
-        }
-        return bStr;
-    }
-
-    const num = isNaN(Number(bStr)) ? bStr : parseInt(bStr, 10);
-    return `Đợt ${num}${dateFormatted ? ` - Ngày ${dateFormatted}` : ''}`;
+    let cleanStr = bStr;
+    cleanStr = cleanStr.split(/\s*-\s*Ngày/i)[0];
+    cleanStr = cleanStr.split(/\s*-\s*Ngày/)[0];
+    
+    return dateFormatted ? `${cleanStr} - Ngày ${dateFormatted}` : cleanStr;
 }
 
 export function getBatchDisplayParts(batch: number | string | null | undefined, dateStr?: string | null): { batchName: string; dateName: string } {
     if (!batch && batch !== 0) return { batchName: '', dateName: '' };
-    let bStr = String(batch).trim();
+    const bStr = String(batch).trim();
     if (!bStr) return { batchName: '', dateName: '' };
 
-    // Loại bỏ mã tổ chuyên môn cũ nếu có
-    bStr = bStr.replace(/-(CG|LT|DD|Tổ\s*[^-\s]+)-/gi, '-');
-
-    let dateFormatted = formatDateDDMMYYYY(dateStr);
-    const dateInBatchMatch = bStr.match(/(\d{1,2}\/\d{1,2}\/\d{2,4})/);
-    if (dateInBatchMatch) {
-        let matchedDate = dateInBatchMatch[1];
-        const parts = matchedDate.split('/');
-        if (parts.length === 3) {
-            if (parts[2].length === 2) parts[2] = '20' + parts[2];
-            matchedDate = `${parts[0].padStart(2, '0')}/${parts[1].padStart(2, '0')}/${parts[2]}`;
-        }
-        dateFormatted = matchedDate;
-    }
-
-    const match = bStr.match(/Đợt\s*0*(\d+)/i) || bStr.match(/^(\d+)$/);
-    let batchName = '';
-    if (match && match[1]) {
-        batchName = `Đợt ${parseInt(match[1], 10)}`;
-    } else if (bStr.startsWith('Đợt')) {
-        batchName = bStr.split('-')[0].replace(/Ngày.*/i, '').trim();
-    } else {
-        const num = isNaN(Number(bStr)) ? bStr : parseInt(bStr, 10);
-        batchName = `Đợt ${num}`;
-    }
-
+    const formatted = formatBatchName(bStr, '', dateStr);
+    const parts = formatted.split(/\s*-\s*Ngày\s*/i);
+    
     return {
-        batchName,
-        dateName: dateFormatted ? `Ngày ${dateFormatted}` : ''
+        batchName: parts[0] || 'Đợt lẻ',
+        dateName: parts[1] ? `Ngày ${parts[1]}` : ''
     };
 }
 

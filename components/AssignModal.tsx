@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Employee, RecordFile, User as AppUser } from '../types';
 import { X, Check, MapPin, User, Users, Search, Briefcase } from 'lucide-react';
-import { removeVietnameseTones } from '../utils/appHelpers';
+import { removeVietnameseTones, getDepartmentForRecord } from '../utils/appHelpers';
 
 interface DeptConfig {
     id: string;
@@ -165,7 +165,7 @@ const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, e
       if (filterDept) {
           const normFilter = filterDept.toLowerCase();
           if (normFilter.includes('đo đạc') || normFilter.includes('đo dạc')) return 'Tổ Đo đạc';
-          if (normFilter.includes('cấp giấy') || normFilter.includes('đăng ký')) return 'Tổ Cấp giấy';
+          if (normFilter.includes('cấp giấy') || normFilter.includes('đăng ký')) return 'Tổ Đo đạc';
           if (normFilter.includes('lưu trữ')) return 'Tổ Lưu trữ';
           if (normFilter.includes('hành chính') || normFilter.includes('một cửa')) return 'Tổ Hành chính';
       }
@@ -177,7 +177,7 @@ const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, e
               return 'Tổ Lưu trữ';
           }
           if (normView.includes('other')) {
-              return 'Tổ Cấp giấy';
+              return 'Tổ Đo đạc';
           }
           if (normView.includes('all_records') || normView.includes('assign_tasks') || normView.includes('check_list') || normView.includes('handover_list') || normView.includes('completed')) {
               return 'Tổ Đo đạc';
@@ -186,18 +186,7 @@ const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, e
 
       // 3. Nếu có hồ sơ chọn, kiểm tra theo loại hồ sơ
       if (records && records.length > 0) {
-          const record = records[0];
-          const type = (record.recordType || '').toLowerCase();
-          
-          if (type.includes('1.1') || type.includes('1.2') || type.includes('công văn') || type.includes('lưu trữ')) {
-              return 'Tổ Lưu trữ';
-          }
-          if (type.includes('2.1') || type.includes('2.2') || type.includes('trích lục')) {
-              return 'Tổ Cấp giấy';
-          }
-          if (type.includes('2.3') || type.includes('2.4') || type.includes('2.5') || type.includes('2.6') || type.includes('số thửa') || type.includes('trích đo') || type.includes('đo đạc')) {
-              return 'Tổ Đo đạc';
-          }
+          return getDepartmentForRecord(records[0]);
       }
 
       return 'Tổ Đo đạc';

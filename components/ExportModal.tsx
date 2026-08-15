@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import * as XLSX from 'xlsx-js-style';
 import { RecordFile, RecordStatus } from '../types';
 import { isArchiveRecordType, getShortRecordType } from '../constants';
-import { formatBatchName, cleanSyncNotes } from '../utils/appHelpers';
+import { formatBatchName, cleanSyncNotes, extractDateFromBatch } from '../utils/appHelpers';
 import { X, FileDown, Calendar, Layers, MapPin, Printer, Eye, Filter } from 'lucide-react';
 
 interface ExportModalProps {
@@ -53,8 +53,11 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
       if (type === 'handover') {
           // Logic cho Giao 1 cửa
           if (r.status === RecordStatus.HANDOVER || r.status === RecordStatus.SIGNED || r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED || r.exportBatch) {
-              if (r.exportBatch && r.exportDate) {
-                  const dateStr = r.exportDate.split('T')[0];
+              if (r.exportBatch) {
+                  let dateStr = r.exportDate ? r.exportDate.split('T')[0] : extractDateFromBatch(r.exportBatch);
+                  if (!dateStr) {
+                      dateStr = (r.completedDate || r.receivedDate || new Date().toISOString()).split('T')[0];
+                  }
                   const key = `${dateStr}_${r.exportBatch}`;
                   if (!batches[key]) {
                       batches[key] = { date: dateStr, batch: r.exportBatch, count: 0 };
@@ -85,10 +88,20 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
       }
     });
 
-    // Sắp xếp giảm dần theo ngày
+    // Sắp xếp giảm dần theo ngày chuyển, sau đó giảm dần theo số thứ tự đợt
     return Object.entries(batches)
         .map(([key, value]) => ({ key, ...value }))
-        .sort((a, b) => b.date.localeCompare(a.date));
+        .sort((a, b) => {
+            const dateCompare = b.date.localeCompare(a.date);
+            if (dateCompare !== 0) return dateCompare;
+            
+            const getBatchNum = (batchVal: any) => {
+                const bStr = String(batchVal);
+                const match = bStr.match(/Đợt\s*(\d+)/i) || bStr.match(/^(\d+)$/);
+                return match ? parseInt(match[1], 10) : 0;
+            };
+            return getBatchNum(b.batch) - getBatchNum(a.batch);
+        });
   }, [categoryRecords, isOpen, type]);
 
   // Synchronize filters and selected batch key stably to prevent resetting selection

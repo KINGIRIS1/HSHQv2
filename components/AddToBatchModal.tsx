@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { RecordFile, RecordStatus, User } from '../types';
 import { getWardLabel } from '../constants';
-import { formatDateDDMMYYYY, formatBatchName } from '../utils/appHelpers';
+import { formatDateDDMMYYYY, formatBatchName, extractDateFromBatch } from '../utils/appHelpers';
 import { fetchChinhLyRecords } from '../services/apiUtilities';
 
 interface AddToBatchModalProps {
@@ -110,8 +110,11 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
       const batches: Record<string, { label: string, date: string, count: number, fullDate: string }> = {};
       
       records.forEach(r => {
-          if ((r.status === RecordStatus.HANDOVER || r.status === RecordStatus.SIGNED || r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED || r.exportBatch) && r.exportBatch && r.exportDate) {
-              const datePart = r.exportDate.split('T')[0];
+          if ((r.status === RecordStatus.HANDOVER || r.status === RecordStatus.SIGNED || r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED || r.exportBatch) && r.exportBatch) {
+              let datePart = r.exportDate ? r.exportDate.split('T')[0] : extractDateFromBatch(r.exportBatch);
+              if (!datePart) {
+                  datePart = (r.completedDate || r.receivedDate || new Date().toISOString()).split('T')[0];
+              }
               const label = formatBatchName(r.exportBatch, '', datePart);
               
               if (!batches[label]) {
@@ -119,14 +122,24 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
                       label,
                       date: datePart, 
                       count: 0,
-                      fullDate: r.exportDate 
+                      fullDate: r.exportDate || new Date(datePart).toISOString() 
                   };
               }
               batches[label].count++;
           }
       });
 
-      return Object.values(batches).sort((a, b) => b.label.localeCompare(a.label));
+      // Sắp xếp giảm dần theo ngày chuyển, sau đó giảm dần theo số thứ tự đợt
+      return Object.values(batches).sort((a, b) => {
+          const dateCompare = b.date.localeCompare(a.date);
+          if (dateCompare !== 0) return dateCompare;
+          
+          const getBatchNum = (batchVal: string) => {
+              const match = batchVal.match(/Đợt\s*(\d+)/i) || batchVal.match(/^(\d+)$/);
+              return match ? parseInt(match[1], 10) : 0;
+          };
+          return getBatchNum(b.label) - getBatchNum(a.label);
+      });
   }, [records]);
 
   useEffect(() => {

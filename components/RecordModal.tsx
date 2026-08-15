@@ -150,19 +150,17 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
   const filteredEmployees = useMemo(() => {
     if (!employees || employees.length === 0) return [];
     
-    // Xác định tổ xử lý hồ sơ dựa theo loại hồ sơ hoặc phòng ban trả kết quả
+    // Xác định tổ xử lý chuyên môn dựa theo hàm helper trung tâm (đã đồng bộ loại bỏ Tổ Cấp giấy)
     const targetDept = getDepartmentForRecord(formData as RecordFile);
     const targetDeptLower = targetDept.toLowerCase();
-
+    
     const isArchive = targetDeptLower.includes('lưu trữ');
     const isMeasurement = targetDeptLower.includes('đo đạc') || targetDeptLower.includes('kỹ thuật');
-    const isRegistration = targetDeptLower.includes('đăng ký') || targetDeptLower.includes('cấp giấy');
 
     const sameDept = employees.filter(emp => {
       const empDept = (emp.department || '').toLowerCase().trim();
       if (isArchive) return empDept.includes('lưu trữ');
       if (isMeasurement) return empDept.includes('đo đạc') || empDept.includes('kỹ thuật');
-      if (isRegistration) return empDept.includes('đăng ký') || empDept.includes('cấp giấy');
       return empDept.includes(targetDeptLower);
     });
 
@@ -173,7 +171,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
       if (assignedEmp) return [assignedEmp, ...result];
     }
     return result;
-  }, [employees, formData.recordType, formData.returnHandoverDept, formData.code, formData.assignedTo]);
+  }, [employees, formData.recordType, formData.code, formData.assignedTo]);
 
   useEffect(() => {
     if (isOpen) {
