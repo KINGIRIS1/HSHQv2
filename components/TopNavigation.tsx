@@ -211,6 +211,7 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
                        const isSubActive = currentView === sub.id;
                        return (
                         <button
+                          id={`nav-item-${sub.id}`}
                           key={sub.id}
                           onClick={() => handleMenuClick(sub.id)}
                           className={`
@@ -269,6 +270,7 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
    
                          return (
                           <button
+                            id={`nav-item-${sub.id}`}
                             key={sub.id}
                             onClick={() => handleMenuClick(sub.id)}
                             className={`
@@ -296,6 +298,7 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
                return (
                  <div key={item.id} className="mb-4 pb-4 border-b-2 border-blue-400/20 mx-1">
                    <button
+                     id="nav-item-dashboard"
                      onClick={() => handleMenuClick(item.id)}
                      className={`
                        w-full flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl transition-all relative duration-300 group
@@ -318,6 +321,7 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
 
             return (
               <button
+                id={`nav-item-${item.id}`}
                 key={item.id}
                 onClick={() => handleMenuClick(item.id)}
                 className={`

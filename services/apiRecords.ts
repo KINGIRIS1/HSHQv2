@@ -1,4 +1,3 @@
-
 import { supabase, isConfigured } from './supabaseClient';
 import { RecordFile } from '../types';
 import { MOCK_RECORDS, API_BASE_URL, isArchiveRecordType } from '../constants';
@@ -20,20 +19,28 @@ const RECORD_DB_COLUMNS = [
     'statusLogs', 'archiveHandoverDate', 'archiveHandoverBatch'
 ];
 
-const getTargetTable = (record: Partial<RecordFile>): 'dangky_records' | 'land_records' | 'luutru_records' => {
-    if (record.sourceTable) return record.sourceTable;
-    if (record.recordType && isArchiveRecordType(record.recordType)) {
+export const getTargetTable = (record: Partial<RecordFile>): 'dangky_records' | 'land_records' | 'luutru_records' => {
+    if (record.sourceTable === 'luutru_records' || record.sourceTable === 'archive_records') return 'luutru_records';
+    if (record.sourceTable === 'dangky_records') return 'dangky_records';
+    if (record.sourceTable === 'land_records') return 'land_records';
+
+    // Check if recordType or content is an archive type
+    if (isArchiveRecordType(record.recordType) || isArchiveRecordType(record.content)) {
         return 'luutru_records';
     }
+
     if (record.id) {
         const cached: RecordFile[] = getFromCache(CACHE_KEYS.RECORDS, []);
         const found = cached.find(r => r.id === record.id);
         if (found) {
-            if (found.sourceTable) return found.sourceTable;
-            if (isArchiveRecordType(found.recordType)) return 'luutru_records';
+            if (found.sourceTable === 'luutru_records' || found.sourceTable === 'archive_records') return 'luutru_records';
+            if (found.sourceTable === 'dangky_records' || found.sourceTable === 'land_records') return found.sourceTable;
+            if (isArchiveRecordType(found.recordType) || isArchiveRecordType(found.content)) {
+                return 'luutru_records';
+            }
         }
     }
-    return 'dangky_records';
+    return 'land_records';
 };
 
 const OPTIONAL_NEW_COLUMNS = [
@@ -123,7 +130,7 @@ export const fetchRecords = async (): Promise<RecordFile[]> => {
         }
     }
 
-    // 3. Fetch from luutru_records
+    // 3. Fetch from luutru_records (bảng lưu trữ chính thức)
     try {
         let fromLt = 0;
         let hasMoreLt = true;
@@ -137,7 +144,7 @@ export const fetchRecords = async (): Promise<RecordFile[]> => {
 
             if (error) {
                 if (error.code === 'PGRST205' || error.code === '42P01' || error.message?.includes('does not exist')) {
-                    console.info('Bảng luutru_records không tồn tại, bỏ qua.');
+                    console.info('Bảng luutru_records chưa tồn tại, bỏ qua.');
                 } else {
                     console.warn('Lỗi khi fetch luutru_records:', error);
                 }
@@ -335,8 +342,8 @@ export const createRecordApi = async (record: RecordFile): Promise<RecordFile | 
             recordToSave.id = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substr(2, 9);
         }
         
+        const targetTable = getTargetTable(recordToSave);
         const payload = sanitizeData(recordToSave, RECORD_DB_COLUMNS);
-        const targetTable = isArchiveRecordType(recordToSave.recordType) ? 'luutru_records' : 'land_records';
         let { data, error } = await supabase.from(targetTable).insert([payload]).select();
         
         if (error && (error.code === '22P02' || String(error.message || '').includes('22P02') || String(error.message || '').includes('invalid input syntax'))) {
@@ -357,13 +364,13 @@ export const createRecordApi = async (record: RecordFile): Promise<RecordFile | 
             OPTIONAL_NEW_COLUMNS.forEach(col => delete fallbackPayload[col]);
             const { data: fallbackData, error: fallbackError } = await supabase.from(targetTable).insert([fallbackPayload]).select();
             if (fallbackError) throw fallbackError;
-            const result = mapRecordFromDb({ ...recordToSave, ...(fallbackData?.[0] || {}) }) as RecordFile;
+            const result = mapRecordFromDb({ ...recordToSave, ...(fallbackData?.[0] || {}), sourceTable: targetTable }) as RecordFile;
             if (result) syncCacheOnCreate(result);
             return result;
         }
         
         if (error) throw error;
-        const result = mapRecordFromDb({ ...recordToSave, ...(data?.[0] || {}) }) as RecordFile;
+        const result = mapRecordFromDb({ ...recordToSave, ...(data?.[0] || {}), sourceTable: targetTable }) as RecordFile;
         if (result) syncCacheOnCreate(result);
         return result;
     } catch (error) {
@@ -376,8 +383,8 @@ export const createRecordApi = async (record: RecordFile): Promise<RecordFile | 
 export const updateRecordApi = async (record: RecordFile): Promise<RecordFile | null> => {
     if (!isConfigured) return record;
     try {
+        const targetTable = getTargetTable(record);
         const payload = sanitizeData(record, RECORD_DB_COLUMNS);
-        const targetTable = isArchiveRecordType(record.recordType) ? 'luutru_records' : 'land_records';
         let { data, error } = await supabase.from(targetTable).update(payload).eq('id', record.id).select();
         
         if (error && (error.code === '22P02' || String(error.message || '').includes('22P02') || String(error.message || '').includes('invalid input syntax'))) {
@@ -398,13 +405,13 @@ export const updateRecordApi = async (record: RecordFile): Promise<RecordFile | 
             OPTIONAL_NEW_COLUMNS.forEach(col => delete fallbackPayload[col]);
             const { data: fallbackData, error: fallbackError } = await supabase.from(targetTable).update(fallbackPayload).eq('id', record.id).select();
             if (fallbackError) throw fallbackError;
-            const result = mapRecordFromDb({ ...record, ...(fallbackData?.[0] || {}) }) as RecordFile;
+            const result = mapRecordFromDb({ ...record, ...(fallbackData?.[0] || {}), sourceTable: targetTable }) as RecordFile;
             if (result) syncCacheOnUpdate(result);
             return result;
         }
         
         if (error) throw error;
-        const result = mapRecordFromDb({ ...record, ...(data?.[0] || {}) }) as RecordFile;
+        const result = mapRecordFromDb({ ...record, ...(data?.[0] || {}), sourceTable: targetTable }) as RecordFile;
         if (result) syncCacheOnUpdate(result);
         return result;
     } catch (error) {
@@ -421,9 +428,9 @@ export const updateRecordFieldsApi = async (id: string, fields: Partial<RecordFi
         return fallbackRecord;
     }
     try {
+        const targetTable = getTargetTable({ id, ...fields });
         const payload = sanitizeData({ id, ...fields } as any, RECORD_DB_COLUMNS);
         delete payload.id;
-        const targetTable = getTargetTable({ id, ...fields });
         let { data, error } = await supabase.from(targetTable).update(payload).eq('id', id).select();
         
         if (error && (error.code === '22P02' || String(error.message || '').includes('22P02') || String(error.message || '').includes('invalid input syntax'))) {
@@ -440,13 +447,13 @@ export const updateRecordFieldsApi = async (id: string, fields: Partial<RecordFi
             OPTIONAL_NEW_COLUMNS.forEach(col => delete fallbackPayload[col]);
             const { data: fallbackData, error: fallbackError } = await supabase.from(targetTable).update(fallbackPayload).eq('id', id).select();
             if (fallbackError) throw fallbackError;
-            const result = mapRecordFromDb({ id, ...fields, ...(fallbackData?.[0] || {}) }) as RecordFile;
+            const result = mapRecordFromDb({ id, ...fields, ...(fallbackData?.[0] || {}), sourceTable: targetTable }) as RecordFile;
             if (result) syncCacheOnUpdate(result);
             return result;
         }
         
         if (error) throw error;
-        const result = mapRecordFromDb({ id, ...fields, ...(data?.[0] || {}) }) as RecordFile;
+        const result = mapRecordFromDb({ id, ...fields, ...(data?.[0] || {}), sourceTable: targetTable }) as RecordFile;
         if (result) syncCacheOnUpdate(result);
         return result;
     } catch (error) {
@@ -460,9 +467,11 @@ export const updateRecordFieldsApi = async (id: string, fields: Partial<RecordFi
 export const deleteRecordApi = async (id: string): Promise<boolean> => {
     if (!isConfigured) return true;
     try {
-        const { error: error1 } = await supabase.from('land_records').delete().eq('id', id);
-        const { error: error2 } = await supabase.from('luutru_records').delete().eq('id', id);
-        if (error1 && error2) throw error1;
+        const { error: landErr } = await supabase.from('land_records').delete().eq('id', id);
+        if (landErr) {
+            await supabase.from('dangky_records').delete().eq('id', id);
+        }
+        await supabase.from('luutru_records').delete().eq('id', id);
         syncCacheOnDelete(id);
         return true;
     } catch (error) {
@@ -476,7 +485,8 @@ export const createRecordsBatchApi = async (records: RecordFile[], onProgress?: 
     if (!isConfigured) return true;
     try {
         const landPayload: any[] = [];
-        const archivePayload: any[] = [];
+        const dangkyPayload: any[] = [];
+        const luutruPayload: any[] = [];
         
         for (const r of records) {
             let finalCode = r.code;
@@ -489,15 +499,17 @@ export const createRecordsBatchApi = async (records: RecordFile[], onProgress?: 
                 recordPayload.id = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substr(2, 9);
             }
             
-            const sanitized = sanitizeData(recordPayload, RECORD_DB_COLUMNS);
-            if (isArchiveRecordType(r.recordType)) {
-                archivePayload.push(sanitized);
+            const targetTable = getTargetTable(recordPayload);
+            if (targetTable === 'luutru_records') {
+                luutruPayload.push(sanitizeData(recordPayload, RECORD_DB_COLUMNS));
+            } else if (targetTable === 'dangky_records') {
+                dangkyPayload.push(sanitizeData(recordPayload, RECORD_DB_COLUMNS));
             } else {
-                landPayload.push(sanitized);
+                landPayload.push(sanitizeData(recordPayload, RECORD_DB_COLUMNS));
             }
         }
 
-        const insertIntoTableInChunks = async (table: 'land_records' | 'luutru_records', payload: any[]) => {
+        const insertIntoTableInChunks = async (table: 'land_records' | 'dangky_records' | 'luutru_records', payload: any[]) => {
             const CHUNK_SIZE = 500;
             for (let i = 0; i < payload.length; i += CHUNK_SIZE) {
                 const chunk = payload.slice(i, i + CHUNK_SIZE);
@@ -520,6 +532,10 @@ export const createRecordsBatchApi = async (records: RecordFile[], onProgress?: 
                     const { error: fallbackError } = await supabase.from(table).insert(fallbackPayload);
                     if (fallbackError) throw fallbackError;
                 } else if (error) {
+                    if (table === 'dangky_records' && (error.code === '42P01' || error.code === 'PGRST205')) {
+                        await supabase.from('land_records').insert(chunk);
+                        return;
+                    }
                     throw error;
                 }
             }
@@ -528,8 +544,11 @@ export const createRecordsBatchApi = async (records: RecordFile[], onProgress?: 
         if (landPayload.length > 0) {
             await insertIntoTableInChunks('land_records', landPayload);
         }
-        if (archivePayload.length > 0) {
-            await insertIntoTableInChunks('luutru_records', archivePayload);
+        if (dangkyPayload.length > 0) {
+            await insertIntoTableInChunks('dangky_records', dangkyPayload);
+        }
+        if (luutruPayload.length > 0) {
+            await insertIntoTableInChunks('luutru_records', luutruPayload);
         }
 
         if (onProgress) {
@@ -539,11 +558,9 @@ export const createRecordsBatchApi = async (records: RecordFile[], onProgress?: 
         // Synchronize local cache with the batch of new records
         try {
             const cached: RecordFile[] = getFromCache(CACHE_KEYS.RECORDS, []);
-            const allPayloads = [...landPayload, ...archivePayload];
-            allPayloads.forEach(p => {
-                const mapped = mapRecordFromDb(p);
-                if (!cached.some(r => r.id === mapped.id)) {
-                    cached.unshift(mapped);
+            records.forEach(r => {
+                if (!cached.some(c => c.id === r.id)) {
+                    cached.unshift(r);
                 }
             });
             saveToCache(CACHE_KEYS.RECORDS, cached);
@@ -566,7 +583,6 @@ export const forceUpdateRecordsBatchApi = async (records: RecordFile[], onProgre
         return { success: true, count: 0 };
     }
 
-    // Helper tạo danh sách biến thể mã hồ sơ phong phú để truy vấn DB chính xác nhất
     const getCodeSearchVariants = (code: string): string[] => {
         if (!code) return [];
         const clean = code.trim();
@@ -576,13 +592,11 @@ export const forceUpdateRecordsBatchApi = async (records: RecordFile[], onProgre
         variants.add(clean.toLowerCase());
         variants.add(clean.toUpperCase());
         
-        // Gỡ tất cả khoảng trắng
         const noSpaces = clean.replace(/\s+/g, '');
         variants.add(noSpaces);
         variants.add(noSpaces.toLowerCase());
         variants.add(noSpaces.toUpperCase());
 
-        // Xử lý dấu gạch ngang
         if (clean.includes('-')) {
             const parts = clean.split('-');
             const withSpaces = parts.map(p => p.trim()).join(' - ');
@@ -595,7 +609,6 @@ export const forceUpdateRecordsBatchApi = async (records: RecordFile[], onProgre
             variants.add(spaceInstead.toLowerCase());
             variants.add(spaceInstead.toUpperCase());
         } else {
-            // Chèn dấu gạch ngang nếu là định dạng HS123 -> HS-123
             const match = clean.match(/^([A-Za-z]+)(\d+)$/);
             if (match) {
                 const withDash = `${match[1]}-${match[2]}`;
@@ -631,7 +644,6 @@ export const forceUpdateRecordsBatchApi = async (records: RecordFile[], onProgre
             const chunkRecords = records.slice(i, i + CHUNK_SIZE);
             const chunkCodes = chunkRecords.map(r => r.code).filter(c => c);
             
-            // Generate all variants for querying Supabase
             const searchCodesSet = new Set<string>();
             chunkCodes.forEach(code => {
                 getCodeSearchVariants(code).forEach(variant => {
@@ -646,15 +658,15 @@ export const forceUpdateRecordsBatchApi = async (records: RecordFile[], onProgre
                 continue;
             }
 
-            // Fetch existing from both tables
-            const [{ data: existingLand, error: landError }, { data: existingLuutru, error: luutruError }] = await Promise.all([
+            const [{ data: existingLand, error: landError }, { data: existingLuutru, error: luutruError }, { data: existingDangky, error: dangkyError }] = await Promise.all([
                 supabase.from('land_records').select('*').in('code', searchCodes),
-                supabase.from('luutru_records').select('*').in('code', searchCodes)
+                supabase.from('luutru_records').select('*').in('code', searchCodes),
+                supabase.from('dangky_records').select('*').in('code', searchCodes)
             ]);
 
             if (landError) throw landError;
 
-            const dbMap = new Map<string, { record: any; table: 'land_records' | 'luutru_records' }>();
+            const dbMap = new Map<string, { record: any; table: 'land_records' | 'luutru_records' | 'dangky_records' }>();
             if (existingLand) {
                 existingLand.forEach((r: any) => {
                     if (r.code) dbMap.set(normalizeCode(r.code), { record: r, table: 'land_records' });
@@ -665,9 +677,15 @@ export const forceUpdateRecordsBatchApi = async (records: RecordFile[], onProgre
                     if (r.code) dbMap.set(normalizeCode(r.code), { record: r, table: 'luutru_records' });
                 });
             }
+            if (existingDangky) {
+                existingDangky.forEach((r: any) => {
+                    if (r.code) dbMap.set(normalizeCode(r.code), { record: r, table: 'dangky_records' });
+                });
+            }
 
             const landUpdates: any[] = [];
             const luutruUpdates: any[] = [];
+            const dangkyUpdates: any[] = [];
 
             chunkRecords.forEach((excelRecord) => {
                 const normCode = normalizeCode(excelRecord.code);
@@ -693,6 +711,8 @@ export const forceUpdateRecordsBatchApi = async (records: RecordFile[], onProgre
                         const sanitized = sanitizeData(merged, RECORD_DB_COLUMNS);
                         if (dbEntry.table === 'luutru_records') {
                             luutruUpdates.push(sanitized);
+                        } else if (dbEntry.table === 'dangky_records') {
+                            dangkyUpdates.push(sanitized);
                         } else {
                             landUpdates.push(sanitized);
                         }
@@ -701,7 +721,7 @@ export const forceUpdateRecordsBatchApi = async (records: RecordFile[], onProgre
                 }
             });
 
-            const upsertIntoTable = async (table: 'land_records' | 'luutru_records', updates: any[]) => {
+            const upsertIntoTable = async (table: 'land_records' | 'luutru_records' | 'dangky_records', updates: any[]) => {
                 if (updates.length === 0) return;
                 let { error: upsertError } = await supabase.from(table).upsert(updates);
                 
@@ -728,7 +748,8 @@ export const forceUpdateRecordsBatchApi = async (records: RecordFile[], onProgre
 
             await Promise.all([
                 upsertIntoTable('land_records', landUpdates),
-                upsertIntoTable('luutru_records', luutruUpdates)
+                upsertIntoTable('luutru_records', luutruUpdates),
+                upsertIntoTable('dangky_records', dangkyUpdates)
             ]);
             
             if (onProgress) {
@@ -763,18 +784,21 @@ export const updateRecordsBatchById = async (updates: Partial<RecordFile>[], onP
     try {
         const rows = updates.map(u => sanitizeData(u, RECORD_DB_COLUMNS));
         const landRows: any[] = [];
+        const dangkyRows: any[] = [];
         const luutruRows: any[] = [];
 
-        rows.forEach((row, idx) => {
-            const table = getTargetTable(updates[idx]);
+        updates.forEach((u, idx) => {
+            const table = getTargetTable(u);
             if (table === 'luutru_records') {
-                luutruRows.push(row);
+                luutruRows.push(rows[idx]);
+            } else if (table === 'dangky_records') {
+                dangkyRows.push(rows[idx]);
             } else {
-                landRows.push(row);
+                landRows.push(rows[idx]);
             }
         });
 
-        const upsertIntoTable = async (table: 'land_records' | 'luutru_records', payload: any[]) => {
+        const upsertIntoTable = async (table: 'land_records' | 'dangky_records' | 'luutru_records', payload: any[]) => {
             if (payload.length === 0) return;
             let { error } = await supabase.from(table).upsert(payload);
 
@@ -795,12 +819,17 @@ export const updateRecordsBatchById = async (updates: Partial<RecordFile>[], onP
                 const { error: fallbackError } = await supabase.from(table).upsert(fallbackPayload);
                 if (fallbackError) throw fallbackError;
             } else if (error) {
+                if (table === 'dangky_records' && (error.code === '42P01' || error.code === 'PGRST205')) {
+                    await supabase.from('land_records').upsert(payload);
+                    return;
+                }
                 throw error;
             }
         };
 
         await Promise.all([
             upsertIntoTable('land_records', landRows),
+            upsertIntoTable('dangky_records', dangkyRows),
             upsertIntoTable('luutru_records', luutruRows)
         ]);
         

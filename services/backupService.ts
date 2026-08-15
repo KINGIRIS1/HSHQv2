@@ -205,18 +205,18 @@ export const restoreFullBackupToSupabase = async (backupData: FullBackupData): P
             }
         }
 
-        // 6. Khôi phục archive_records (gộp vaoso, saoluc, congvan)
+        // 6. Khôi phục luutru_records (gộp vaoso, saoluc, congvan)
         const combinedArchive: any[] = [];
         if (bData.archive_vaoso) combinedArchive.push(...bData.archive_vaoso);
         if (bData.archive_saoluc) combinedArchive.push(...bData.archive_saoluc);
         if (bData.archive_congvan) combinedArchive.push(...bData.archive_congvan);
         
         if (combinedArchive.length > 0) {
-            const { error } = await supabase.from('archive_records').delete().neq('id', '0');
-            if (error) console.warn("Lỗi xóa archive_records:", error);
+            const { error } = await supabase.from('luutru_records').delete().neq('id', '0');
+            if (error) console.warn("Lỗi xóa luutru_records:", error);
             const chunks = chunkArray(combinedArchive, 200);
             for (const chunk of chunks) {
-                const { error: insErr } = await supabase.from('archive_records').insert(chunk);
+                const { error: insErr } = await supabase.from('luutru_records').insert(chunk);
                 if (insErr) throw insErr;
             }
         }

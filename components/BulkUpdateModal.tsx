@@ -245,14 +245,11 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
                                 onChange={(e) => setTargetValue(e.target.value)}
                             >
                                 <option value="">-- Chọn nhân sự --</option>
-                                {employees.map(emp => {
-                                    const stats = calculateEmployeeWorkload(allRecords || [], emp);
-                                    return (
-                                        <option key={emp.id} value={emp.name}>
-                                            {emp.name} - {emp.position || 'Cán bộ'} ({emp.department || ''})
-                                        </option>
-                                    );
-                                })}
+                                {employees.map(emp => (
+                                    <option key={emp.id} value={emp.name}>
+                                        {emp.name} - {emp.position || 'Cán bộ'} ({emp.department || ''})
+                                    </option>
+                                ))}
                             </select>
                         )}
 
@@ -281,7 +278,7 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
                         {targetField === 'exportBatch' && (
                             <input 
                                 type="text"
-                                placeholder="Nhập tên/số đợt mới (vd: Đợt 1, Đợt 2...)"
+                                placeholder="Nhập số đợt xuất (vd: 1, 2, 3...)"
                                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-orange-500 outline-none font-medium"
                                 value={targetValue}
                                 onChange={(e) => setTargetValue(e.target.value)}

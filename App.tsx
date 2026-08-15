@@ -12,7 +12,7 @@ import { exportReportToExcel, exportReturnedListToExcel } from './utils/excelExp
 import { generateReport } from './services/geminiService';
 import { syncTemplatesFromCloud } from './services/docxService'; 
 import { updateRecordApi, saveEmployeeApi, saveUserApi, forceUpdateRecordsBatchApi, updateRecordsBatchById } from './services/api';
-import { migrateCungCapTaiLieu } from './services/apiArchive';
+import { migrateArchiveRecordsFromLandRecords } from './services/apiArchive';
 import { ReturnOptionType } from './components/RejectReturnStepModal';
 import * as XLSX from 'xlsx-js-style';
 import { CheckCircle, AlertTriangle } from 'lucide-react';
@@ -154,10 +154,10 @@ function App() {
   // Sync Templates
   useEffect(() => { syncTemplatesFromCloud(); }, []);
 
-  // Run migration for Cung cấp tài liệu đất đai
+  // Run migration for archive records from land_records to archive_records
   useEffect(() => {
       if (currentUser) {
-          migrateCungCapTaiLieu();
+          migrateArchiveRecordsFromLandRecords();
       }
   }, [currentUser]);
 
@@ -411,14 +411,25 @@ function App() {
           ...processAssignmentTimelineCheck(r, employeeId, nowStr, employees, currentUser)
       }));
 
+      // Optimistic UI update immediately
       setRecords(prev => prev.map(r => {
           const updated = updatedTargets.find(u => u.id === r.id);
           return updated ? updated : r;
       }));
-      await Promise.all(updatedTargets.map(r => updateRecordApi(r)));
       setIsAssignModalOpen(false); 
       setSelectedRecordIds(new Set()); 
       setToast({ type: 'success', message: `Đã giao ${assignTargetRecords.length} hồ sơ thành công!` });
+
+      // Background batch update for high performance
+      try {
+          const res = await updateRecordsBatchById(updatedTargets);
+          if (!res.success) {
+              await Promise.all(updatedTargets.map(r => updateRecordApi(r)));
+          }
+      } catch (e) {
+          console.error("Batch assign error:", e);
+          await Promise.all(updatedTargets.map(r => updateRecordApi(r)));
+      }
   };
 
   const getUpdatesForStatusChange = (newStatus: RecordStatus, customDateStr?: string) => {
@@ -636,11 +647,19 @@ function App() {
           const updated = updatedTargets.find(u => u.id === r.id);
           return updated ? updated : r;
       }));
-      
-      await Promise.all(updatedTargets.map(r => updateRecordApi(r)));
       setToast({ type: 'success', message: `Đã cập nhật ${updatedTargets.length} hồ sơ thành công!` });
       setIsBulkUpdateModalOpen(false);
       setSelectedRecordIds(new Set()); 
+
+      try {
+          const res = await updateRecordsBatchById(updatedTargets);
+          if (!res.success) {
+              await Promise.all(updatedTargets.map(r => updateRecordApi(r)));
+          }
+      } catch (e) {
+          console.error("Batch update error:", e);
+          await Promise.all(updatedTargets.map(r => updateRecordApi(r)));
+      } 
   };
 
   const handleQuickUpdate = useCallback(async (id: string, field: keyof RecordFile, value: string) => {
@@ -847,9 +866,18 @@ function App() {
               const updated = updatedTargets.find(p => p.id === r.id);
               return updated ? updated : r;
           }));
-          await Promise.all(updatedTargets.map(r => updateRecordApi(r)));
           setSelectedRecordIds(new Set());
           setToast({ type: 'success', message: `Đã chuyển ${pendingSign.length} hồ sơ sang "Đã ký".` });
+
+          try {
+              const res = await updateRecordsBatchById(updatedTargets);
+              if (!res.success) {
+                  await Promise.all(updatedTargets.map(r => updateRecordApi(r)));
+              }
+          } catch (e) {
+              console.error("Batch sign error:", e);
+              await Promise.all(updatedTargets.map(r => updateRecordApi(r)));
+          }
       }
   };
 
@@ -885,10 +913,18 @@ function App() {
               const updated = updatesToApply.find(u => u.id === r.id);
               return updated ? updated : r;
           }));
-          await Promise.all(updatesToApply.map(r => updateRecordApi(r)));
-          
           setSelectedRecordIds(new Set());
           setToast({ type: 'success', message: `Đã đánh dấu ${targets.length} hồ sơ thành "Hồ sơ trả".` });
+
+          try {
+              const res = await updateRecordsBatchById(updatesToApply);
+              if (!res.success) {
+                  await Promise.all(updatesToApply.map(r => updateRecordApi(r)));
+              }
+          } catch (e) {
+              console.error("Batch reject error:", e);
+              await Promise.all(updatesToApply.map(r => updateRecordApi(r)));
+          }
       }
   };
 

@@ -484,11 +484,10 @@ export function formatDateDDMMYY(d?: string | null): string {
     return d;
 }
 
-export function formatBatchName(batch: number | string | null | undefined, _deptName?: string, _dateStr?: string | null): string {
+export function getPureBatchNumber(batch: number | string | null | undefined): string {
     if (!batch && batch !== 0) return '';
     const bStr = String(batch).trim();
     if (!bStr) return '';
-
     const match = bStr.match(/(\d+)/);
     if (match && match[1]) {
         return `${parseInt(match[1], 10)}`;
@@ -496,17 +495,78 @@ export function formatBatchName(batch: number | string | null | undefined, _dept
     return bStr;
 }
 
-export function getBatchDisplayParts(batch: number | string | null | undefined, _dateStr?: string | null): { batchName: string; dateName: string } {
+export function formatBatchName(batch: number | string | null | undefined, _deptName?: string, dateStr?: string | null): string {
+    if (!batch && batch !== 0) return '';
+    let bStr = String(batch).trim();
+    if (!bStr) return '';
+
+    // Loại bỏ các mã tổ chuyên môn cũ nếu có (-CG-, -LT-, -DD-, -Tổ Cấp giấy-)
+    bStr = bStr.replace(/-(CG|LT|DD|Tổ\s*[^-\s]+)-/gi, '-');
+
+    let dateFormatted = formatDateDDMMYYYY(dateStr);
+    const dateInBatchMatch = bStr.match(/(\d{1,2}\/\d{1,2}\/\d{2,4})/);
+    if (dateInBatchMatch) {
+        let matchedDate = dateInBatchMatch[1];
+        const parts = matchedDate.split('/');
+        if (parts.length === 3) {
+            if (parts[2].length === 2) parts[2] = '20' + parts[2];
+            matchedDate = `${parts[0].padStart(2, '0')}/${parts[1].padStart(2, '0')}/${parts[2]}`;
+        }
+        dateFormatted = matchedDate;
+    }
+
+    const match = bStr.match(/Đợt\s*0*(\d+)/i) || bStr.match(/^(\d+)$/);
+    if (match && match[1]) {
+        const num = parseInt(match[1], 10);
+        return dateFormatted ? `Đợt ${num} - Ngày ${dateFormatted}` : `Đợt ${num}`;
+    }
+
+    if (bStr.startsWith('Đợt')) {
+        if (!bStr.includes('Ngày') && dateFormatted) {
+            const cleanStr = bStr.replace(/Đợt\s*0*(\d+).*/i, 'Đợt $1');
+            return `${cleanStr} - Ngày ${dateFormatted}`;
+        }
+        return bStr;
+    }
+
+    const num = isNaN(Number(bStr)) ? bStr : parseInt(bStr, 10);
+    return `Đợt ${num}${dateFormatted ? ` - Ngày ${dateFormatted}` : ''}`;
+}
+
+export function getBatchDisplayParts(batch: number | string | null | undefined, dateStr?: string | null): { batchName: string; dateName: string } {
     if (!batch && batch !== 0) return { batchName: '', dateName: '' };
-    const bStr = String(batch).trim();
+    let bStr = String(batch).trim();
     if (!bStr) return { batchName: '', dateName: '' };
 
-    const match = bStr.match(/(\d+)/);
-    const batchName = match && match[1] ? `${parseInt(match[1], 10)}` : bStr;
+    // Loại bỏ mã tổ chuyên môn cũ nếu có
+    bStr = bStr.replace(/-(CG|LT|DD|Tổ\s*[^-\s]+)-/gi, '-');
+
+    let dateFormatted = formatDateDDMMYYYY(dateStr);
+    const dateInBatchMatch = bStr.match(/(\d{1,2}\/\d{1,2}\/\d{2,4})/);
+    if (dateInBatchMatch) {
+        let matchedDate = dateInBatchMatch[1];
+        const parts = matchedDate.split('/');
+        if (parts.length === 3) {
+            if (parts[2].length === 2) parts[2] = '20' + parts[2];
+            matchedDate = `${parts[0].padStart(2, '0')}/${parts[1].padStart(2, '0')}/${parts[2]}`;
+        }
+        dateFormatted = matchedDate;
+    }
+
+    const match = bStr.match(/Đợt\s*0*(\d+)/i) || bStr.match(/^(\d+)$/);
+    let batchName = '';
+    if (match && match[1]) {
+        batchName = `Đợt ${parseInt(match[1], 10)}`;
+    } else if (bStr.startsWith('Đợt')) {
+        batchName = bStr.split('-')[0].replace(/Ngày.*/i, '').trim();
+    } else {
+        const num = isNaN(Number(bStr)) ? bStr : parseInt(bStr, 10);
+        batchName = `Đợt ${num}`;
+    }
 
     return {
         batchName,
-        dateName: ''
+        dateName: dateFormatted ? `Ngày ${dateFormatted}` : ''
     };
 }
 

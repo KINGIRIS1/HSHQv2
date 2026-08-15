@@ -117,7 +117,7 @@ export const logError = (context: string, error: any, silent: boolean = false) =
     } else if (code === '42P01' || code === 'PGRST205' || (typeof msg === 'string' && msg.includes('schema cache'))) {
         console.error(`❌ Lỗi tại ${context}: Bảng dữ liệu chưa tồn tại trên Supabase! (Code: ${code || 'PGRST205'})`);
         if (!silent) {
-            alert(`LỖI BẢNG DỮ LIỆU: Bảng '${context.includes('Contract') ? 'contracts' : 'archive_records'}' chưa tồn tại trên Supabase!\n\nVui lòng truy cập SQL Editor trên trang quản trị Supabase và chạy file SQL tạo bảng tương ứng.`);
+            alert(`LỖI BẢNG DỮ LIỆU: Bảng '${context.includes('Contract') ? 'contracts' : 'luutru_records'}' chưa tồn tại trên Supabase!\n\nVui lòng truy cập SQL Editor trên trang quản trị Supabase và chạy file SQL tạo bảng tương ứng.`);
         }
     } else if (code === '22P02') {
         console.error(`❌ Lỗi tại ${context}: Định dạng dữ liệu không khớp kiểu cột Supabase (Lỗi 22P02). Hệ thống sẽ tự động xử lý ép kiểu an toàn.`);
@@ -135,7 +135,7 @@ export const logError = (context: string, error: any, silent: boolean = false) =
          alert(`LỖI TRÙNG LẶP: File Excel có chứa nhiều dòng cùng Mã Hồ Sơ. Hệ thống đã cố gắng xử lý nhưng Server từ chối.\nVui lòng kiểm tra file Excel và xóa các dòng trùng lặp mã.`);
     } else if (code === '42501') {
          console.error(`❌ Lỗi tại ${context}: Lỗi phân quyền bảo mật RLS (Code: 42501)`);
-         alert(`LỖI PHÂN QUYỀN (Row-Level Security): \nSupabase đang từ chối LƯU HOẶC SỬA dữ liệu do bạn đang bật tính năng bảo mật Row-Level Security (RLS) trên bảng dữ liệu nhưng chưa cấu hình Policy.\n\nHƯỚNG DẪN SỬA LỖI:\n1. Mở trang Quản lý Supabase của bạn\n2. Chọn phần "SQL Editor"\n3. Copy và chạy tập lệnh sau để cho phép truy cập:\n\nALTER TABLE land_records DISABLE ROW LEVEL SECURITY;\nALTER TABLE archive_records DISABLE ROW LEVEL SECURITY;\nALTER TABLE system_settings DISABLE ROW LEVEL SECURITY;`);
+         alert(`LỖI PHÂN QUYỀN (Row-Level Security): \nSupabase đang từ chối LƯU HOẶC SỬA dữ liệu do bạn đang bật tính năng bảo mật Row-Level Security (RLS) trên bảng dữ liệu nhưng chưa cấu hình Policy.\n\nHƯỚNG DẪN SỬA LỖI:\n1. Mở trang Quản lý Supabase của bạn\n2. Chọn phần "SQL Editor"\n3. Copy và chạy tập lệnh sau để cho phép truy cập:\n\nALTER TABLE land_records DISABLE ROW LEVEL SECURITY;\nALTER TABLE luutru_records DISABLE ROW LEVEL SECURITY;\nALTER TABLE system_settings DISABLE ROW LEVEL SECURITY;`);
     } else {
         console.error(`❌ [Chi tiết] ${context}: ${msg} ${code ? `(Code: ${code})` : ''} ${details ? `Details: ${details}` : ''}`);
     }

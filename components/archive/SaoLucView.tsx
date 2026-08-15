@@ -29,7 +29,7 @@ interface SaoLucFormData {
     ngay_nhan: string;      // Ngày nhận (Map vào ngay_thang)
     hen_tra: string;        // Hẹn trả (Lưu trong data)
     noi_dung: string;       // Nội dung yêu cầu (Map vào trich_yeu)
-    status: 'draft' | 'assigned' | 'executed' | 'pending_check' | 'checked' | 'pending_sign' | 'signed' | 'completed';
+    status: 'draft' | 'assigned' | 'executed' | 'pending_supplement' | 'pending_check' | 'checked' | 'pending_sign' | 'signed' | 'completed' | 'withdrawn' | 'rejected';
     ngay_hoan_thanh?: string;
     danh_sach?: string;
 }
@@ -168,9 +168,28 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Tân Qua
             }
         };
         
-        await updateArchiveRecordsBatch(Array.from(selectedIds), updates);
+        const selectedArr = Array.from(selectedIds);
+        // Optimistic UI update for instant feedback
+        setRecords(prev => prev.map(r => {
+            if (selectedArr.includes(r.id)) {
+                const oldHistory = Array.isArray(r.data?.history) ? r.data.history : [];
+                return {
+                    ...r,
+                    status: 'assigned',
+                    data: {
+                        ...(r.data || {}),
+                        assigned_to: employeeId,
+                        assigned_date: new Date().toISOString(),
+                        history: [...oldHistory, historyEntry]
+                    }
+                };
+            }
+            return r;
+        }));
         setShowAssignModal(false);
         setSelectedIds(new Set());
+
+        await updateArchiveRecordsBatch(selectedArr, updates);
         loadData();
     };
 

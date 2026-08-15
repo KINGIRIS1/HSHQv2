@@ -47,7 +47,7 @@ export const ROLE_VIEWS_CONFIG: Record<UserRole, RoleConfig> = {
     departmentSpecificViews: [
       {
         keyword: 'đo đạc',
-        views: ['all_records', 'assign_tasks', 'completed_list', 'pending_check_list', 'check_list', 'handover_list', 'director_completed']
+        views: ['all_records', 'assign_tasks', 'completed_list', 'pending_supplement_list', 'pending_check_list', 'check_list', 'handover_list', 'director_completed']
       },
       {
         keyword: 'đăng ký',
@@ -154,7 +154,7 @@ export function isViewAllowedForUser(
       } else if (isLuutru && !isDodac) {
         const SURVEY_PERMS = [
           'all_records', 'all_sub_all', 'assign_tasks', 'completed_list',
-          'pending_check_list', 'check_list', 'handover_list', 'director_completed', 'survey_list'
+          'pending_supplement_list', 'pending_check_list', 'check_list', 'handover_list', 'director_completed', 'survey_list'
         ];
         activePerms = activePerms.filter(p => !SURVEY_PERMS.includes(p));
       }
@@ -188,7 +188,7 @@ export function isViewAllowedForUser(
                activePerms.includes('ADD_CONTRACTS') ||
                activePerms.includes('LIQUIDATE_CONTRACTS');
       case 'records_group':
-        return activePerms.includes('all_records') || activePerms.includes('all_sub_all') || activePerms.includes('assign_tasks') || activePerms.includes('check_list') || activePerms.includes('handover_list') || activePerms.includes('completed_list') || activePerms.includes('pending_check_list') || activePerms.includes('director_completed') ||
+        return activePerms.includes('all_records') || activePerms.includes('all_sub_all') || activePerms.includes('assign_tasks') || activePerms.includes('check_list') || activePerms.includes('handover_list') || activePerms.includes('completed_list') || activePerms.includes('pending_supplement_list') || activePerms.includes('pending_check_list') || activePerms.includes('director_completed') ||
                activePerms.includes('archive_records') || activePerms.includes('registration_records') || activePerms.includes('other_records');
       case 'tools_group':
         return activePerms.includes('reports') || activePerms.includes('VIEW_REPORTS') || activePerms.includes('excerpt_management') || activePerms.includes('MANAGE_EXCERPTS') || activePerms.includes('utilities') || activePerms.includes('work_schedule');
@@ -207,6 +207,7 @@ export function isViewAllowedForUser(
                activePerms.includes('all_sub_all') ||
                activePerms.includes('assign_tasks') ||
                activePerms.includes('completed_list') ||
+               activePerms.includes('pending_supplement_list') ||
                activePerms.includes('pending_check_list') ||
                activePerms.includes('check_list') ||
                activePerms.includes('handover_list') ||
@@ -241,6 +242,7 @@ export function isViewAllowedForUser(
       case 'all_sub_all':
       case 'assign_tasks':
       case 'completed_list':
+      case 'pending_supplement_list':
       case 'pending_check_list':
       case 'check_list':
       case 'handover_list':

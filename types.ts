@@ -221,7 +221,7 @@ export interface RecordFile {
   archiveHandoverBatch?: number | null;
 
   // Phân loại bảng Cloud Database
-  sourceTable?: 'dangky_records' | 'land_records' | 'luutru_records';
+  sourceTable?: 'dangky_records' | 'land_records' | 'archive_records' | 'luutru_records';
 }
 
 export interface RecordStatusLog {

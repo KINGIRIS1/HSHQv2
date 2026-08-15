@@ -300,9 +300,28 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
             }
         };
         
-        await updateArchiveRecordsBatch(Array.from(selectedIds), updates);
+        const selectedArr = Array.from(selectedIds);
+        // Optimistic UI update for instant feedback
+        setRecords(prev => prev.map(r => {
+            if (selectedArr.includes(r.id)) {
+                const oldHistory = Array.isArray(r.data?.history) ? r.data.history : [];
+                return {
+                    ...r,
+                    status: 'assigned',
+                    data: {
+                        ...(r.data || {}),
+                        assigned_to: employeeId,
+                        assigned_date: new Date().toISOString(),
+                        history: [...oldHistory, historyEntry]
+                    }
+                };
+            }
+            return r;
+        }));
         setShowAssignModal(false);
         setSelectedIds(new Set());
+
+        await updateArchiveRecordsBatch(selectedArr, updates);
         loadData();
     };
 
@@ -678,7 +697,7 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
                         <h3 className="font-bold text-gray-800 mb-4">{editingId ? 'Cập nhật Công văn' : 'Thêm mới Công văn'}</h3>
                         <form onSubmit={handleSave} className="space-y-3 flex-1 overflow-y-auto">
                             <div><label className="text-xs font-bold text-gray-500 uppercase">Số hiệu</label><input className="w-full border rounded px-3 py-2 text-sm" value={formData.so_hieu} onChange={e => setFormData({...formData, so_hieu: e.target.value})} placeholder="Số CV..." /></div>
-                            <div><label className="text-xs font-bold text-gray-500 uppercase">Ngày tháng</label><input type="date" className="w-full border rounded px-3 py-2 text-sm" value={formData.ngay_thang} onChange={e => setFormData({...formData, ngay_thang: e.target.value})} /></div>
+                            <div><label className="text-xs font-bold text-gray-500 uppercase">Ngày tháng</label><input type="date" className="w-full border rounded px-3 py-2 text-sm" value={formData.ngay_thang || ''} onChange={e => setFormData({...formData, ngay_thang: e.target.value})} /></div>
                             <div><label className="text-xs font-bold text-gray-500 uppercase">Trích yếu</label><textarea rows={3} className="w-full border rounded px-3 py-2 text-sm" value={formData.trich_yeu} onChange={e => setFormData({...formData, trich_yeu: e.target.value})} placeholder="Nội dung..." /></div>
                             <div><label className="text-xs font-bold text-gray-500 uppercase">Cơ quan phát hành</label><input className="w-full border rounded px-3 py-2 text-sm" value={formData.noi_nhan_gui} onChange={e => setFormData({...formData, noi_nhan_gui: toTitleCase(e.target.value)})} placeholder="Đơn vị..." /></div>
                             

@@ -378,6 +378,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
       "all_records",
       "assign_tasks",
       "completed_list",
+      "pending_supplement_list",
       "pending_check_list",
       "check_list",
       "handover_list",
@@ -434,6 +435,8 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
       currentView === "archive_completed_list"
     )
       title = "Hồ sơ đang thực hiện";
+    else if (currentView === "pending_supplement_list")
+      title = "Hồ sơ chờ bổ sung";
     else if (
       currentView === "pending_check_list" ||
       currentView === "archive_pending_check_list"
@@ -457,6 +460,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
               <>
                 {isViewAllowedForUser(currentUser, employees, "all_records", rolePermissions, departmentPermissions) && (
                   <button
+                    id="tab-records-all"
                     onClick={() => props.setCurrentView("all_records")}
                     className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "all_records" ? "border-blue-600 text-blue-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
                   >
@@ -466,6 +470,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
 
                 {isViewAllowedForUser(currentUser, employees, "assign_tasks", rolePermissions, departmentPermissions) && (
                   <button
+                    id="tab-records-assign-tasks"
                     onClick={() => props.setCurrentView("assign_tasks")}
                     className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "assign_tasks" ? "border-blue-600 text-blue-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
                   >
@@ -475,6 +480,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
 
                 {isViewAllowedForUser(currentUser, employees, "completed_list", rolePermissions, departmentPermissions) && (
                   <button
+                    id="tab-records-completed-list"
                     onClick={() => props.setCurrentView("completed_list")}
                     className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "completed_list" || currentView === "archive_completed_list" ? "border-blue-600 text-blue-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
                   >
@@ -484,6 +490,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
 
                 {isViewAllowedForUser(currentUser, employees, "pending_check_list", rolePermissions, departmentPermissions) && (
                   <button
+                    id="tab-records-pending-check-list"
                     onClick={() => props.setCurrentView("pending_check_list")}
                     className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "pending_check_list" ? "border-orange-600 text-orange-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
                   >
@@ -495,6 +502,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
 
             {isViewAllowedForUser(currentUser, employees, "check_list", rolePermissions, departmentPermissions) && (
               <button
+                id="tab-records-check-list"
                 onClick={() => props.setCurrentView("check_list")}
                 className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "check_list" ? "border-purple-600 text-purple-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
               >
@@ -504,6 +512,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
 
             {isDirector && isViewAllowedForUser(currentUser, employees, "director_completed", rolePermissions, departmentPermissions) && (
               <button
+                id="tab-records-director-completed"
                 onClick={() => props.setCurrentView("director_completed")}
                 className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "director_completed" ? "border-green-600 text-green-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
               >
@@ -513,6 +522,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
 
             {!isDirector && isViewAllowedForUser(currentUser, employees, "handover_list", rolePermissions, departmentPermissions) && (
                 <button
+                  id="tab-records-handover-list"
                   onClick={() => props.setCurrentView("handover_list")}
                   className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "handover_list" ? "border-green-600 text-green-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
                 >
@@ -529,6 +539,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
               <>
                 {isViewAllowedForUser(currentUser, employees, "archive_records", rolePermissions, departmentPermissions) && (
                   <button
+                    id="tab-archive-records"
                     onClick={() => props.setCurrentView("archive_records")}
                     className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "archive_records" ? "border-blue-600 text-blue-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
                   >
@@ -538,6 +549,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
 
                 {isViewAllowedForUser(currentUser, employees, "archive_assign_tasks", rolePermissions, departmentPermissions) && (
                   <button
+                    id="tab-archive-assign-tasks"
                     onClick={() => props.setCurrentView("archive_assign_tasks")}
                     className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "archive_assign_tasks" ? "border-blue-600 text-blue-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
                   >
@@ -547,6 +559,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
 
                 {isViewAllowedForUser(currentUser, employees, "archive_completed_list", rolePermissions, departmentPermissions) && (
                   <button
+                    id="tab-archive-completed-list"
                     onClick={() => props.setCurrentView("archive_completed_list")}
                     className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "archive_completed_list" ? "border-blue-600 text-blue-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
                   >
@@ -556,6 +569,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
 
                 {isViewAllowedForUser(currentUser, employees, "archive_pending_check_list", rolePermissions, departmentPermissions) && (
                   <button
+                    id="tab-archive-pending-check-list"
                     onClick={() => props.setCurrentView("archive_pending_check_list")}
                     className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "archive_pending_check_list" ? "border-orange-600 text-orange-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
                   >
@@ -567,6 +581,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
 
             {isViewAllowedForUser(currentUser, employees, "archive_check_list", rolePermissions, departmentPermissions) && (
               <button
+                id="tab-archive-check-list"
                 onClick={() => props.setCurrentView("archive_check_list")}
                 className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "archive_check_list" ? "border-purple-600 text-purple-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
               >
@@ -576,6 +591,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
 
             {isDirector && isViewAllowedForUser(currentUser, employees, "archive_director_completed", rolePermissions, departmentPermissions) && (
               <button
+                id="tab-archive-director-completed"
                 onClick={() =>
                   props.setCurrentView("archive_director_completed")
                 }
@@ -587,6 +603,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
 
             {!isDirector && isViewAllowedForUser(currentUser, employees, "archive_handover_list", rolePermissions, departmentPermissions) && (
                 <button
+                  id="tab-archive-handover-list"
                   onClick={() => props.setCurrentView("archive_handover_list")}
                   className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "archive_handover_list" ? "border-green-600 text-green-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
                 >
@@ -603,6 +620,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
               <>
                 {isViewAllowedForUser(currentUser, employees, "other_records", rolePermissions, departmentPermissions) && (
                   <button
+                    id="tab-other-records"
                     onClick={() => props.setCurrentView("other_records")}
                     className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "other_records" ? "border-blue-600 text-blue-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
                   >
@@ -612,6 +630,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
 
                 {isViewAllowedForUser(currentUser, employees, "other_assign_tasks", rolePermissions, departmentPermissions) && (
                   <button
+                    id="tab-other-assign-tasks"
                     onClick={() => props.setCurrentView("other_assign_tasks")}
                     className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "other_assign_tasks" ? "border-blue-600 text-blue-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
                   >
@@ -623,6 +642,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
 
             {isViewAllowedForUser(currentUser, employees, "other_check_list", rolePermissions, departmentPermissions) && (
               <button
+                id="tab-other-check-list"
                 onClick={() => props.setCurrentView("other_check_list")}
                 className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "other_check_list" ? "border-purple-600 text-purple-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
               >
@@ -632,6 +652,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
 
             {isDirector && isViewAllowedForUser(currentUser, employees, "other_director_completed", rolePermissions, departmentPermissions) && (
               <button
+                id="tab-other-director-completed"
                 onClick={() => props.setCurrentView("other_director_completed")}
                 className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "other_director_completed" ? "border-green-600 text-green-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
               >
@@ -641,6 +662,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
 
             {!isDirector && isViewAllowedForUser(currentUser, employees, "other_handover_list", rolePermissions, departmentPermissions) && (
                 <button
+                  id="tab-other-handover-list"
                   onClick={() => props.setCurrentView("other_handover_list")}
                   className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "other_handover_list" ? "border-green-600 text-green-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
                 >
@@ -682,6 +704,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
               <div className="flex items-center gap-2 flex-wrap">
                 <div className="flex bg-white rounded-md border border-gray-200 p-1 shadow-sm">
                   <button
+                    id="tab-handover-today"
                     onClick={() => {
                       props.setHandoverTab("today");
                       props.setSelectedRecordIds?.(new Set());
@@ -691,6 +714,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                     <ListChecks size={16} /> Chờ bàn giao
                   </button>
                   <button
+                    id="tab-handover-history"
                     onClick={() => {
                       props.setHandoverTab("history");
                       props.setSelectedRecordIds?.(new Set());
@@ -700,6 +724,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                     <History size={16} /> Chờ trả kết quả
                   </button>
                   <button
+                    id="tab-handover-returned"
                     onClick={() => {
                       props.setHandoverTab("returned");
                       props.setSelectedRecordIds?.(new Set());
@@ -713,6 +738,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                 {/* Chốt DS (khi ở tab today - Chờ bàn giao và có chọn hồ sơ) */}
                 {props.handoverTab === "today" && props.selectedRecordIds.size > 0 && (
                   <button
+                    id="btn-close-handover-batch"
                     onClick={() => props.setIsAddToBatchModalOpen(true)}
                     className="flex items-center gap-1.5 bg-blue-600 text-white px-3.5 py-1.5 rounded-lg hover:bg-blue-700 text-sm font-bold shadow-sm transition-all animate-pulse cursor-pointer whitespace-nowrap"
                   >
@@ -723,6 +749,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                 {/* Chốt HS lưu (khi ở tab returned - Đã trả kết quả và có chọn hồ sơ) */}
                 {props.handoverTab === "returned" && props.selectedRecordIds.size > 0 && (
                   <button
+                    id="btn-close-return-handover-batch"
                     onClick={() => props.setIsReturnHandoverModalOpen?.(true)}
                     className="flex items-center gap-1.5 bg-emerald-600 text-white px-3.5 py-1.5 rounded-lg hover:bg-emerald-700 text-sm font-bold shadow-sm transition-all cursor-pointer animate-pulse whitespace-nowrap"
                     title="Chốt danh sách hồ sơ lưu tại Đã trả kết quả"

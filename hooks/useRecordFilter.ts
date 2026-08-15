@@ -109,7 +109,7 @@ export const useRecordFilter = (
         // Filter for TEAM_LEADER by managed wards in professional/measurement tab
         const isMeasurementViewTab = [
             'all_records', 'assign_tasks', 'completed_list', 
-            'pending_check_list', 'check_list', 'handover_list', 'director_completed'
+            'pending_supplement_list', 'pending_check_list', 'check_list', 'handover_list', 'director_completed'
         ].includes(currentView);
 
         if (currentUser && currentUser.role === UserRole.TEAM_LEADER && isMeasurementViewTab) {
@@ -175,12 +175,14 @@ export const useRecordFilter = (
             }
         } else if (currentView === 'assign_tasks' || currentView === 'other_assign_tasks' || currentView === 'archive_assign_tasks') {
             result = result.filter(r => r.status === RecordStatus.RECEIVED);
+        } else if (currentView === 'pending_supplement_list') {
+            result = result.filter(r => r.status === RecordStatus.PENDING_SUPPLEMENT);
         }
 
         // Filter by recordType based on view group
         const isOtherView = ['other_records', 'other_assign_tasks', 'other_check_list', 'other_handover_list', 'other_director_completed'].includes(currentView);
         const isArchiveMeasurementView = ['archive_records', 'archive_assign_tasks', 'archive_completed_list', 'archive_pending_check_list', 'archive_check_list', 'archive_handover_list', 'archive_director_completed'].includes(currentView);
-        const isMeasurementView = ['all_records', 'assign_tasks', 'completed_list', 'pending_check_list', 'check_list', 'handover_list', 'director_completed'].includes(currentView);
+        const isMeasurementView = ['all_records', 'assign_tasks', 'completed_list', 'pending_supplement_list', 'pending_check_list', 'check_list', 'handover_list', 'director_completed'].includes(currentView);
         
         if (isArchiveMeasurementView) {
             result = result.filter(r => isArchiveRecordType(r.recordType));

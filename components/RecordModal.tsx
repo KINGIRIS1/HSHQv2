@@ -760,7 +760,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-indigo-50/80 p-3.5 rounded-lg border border-indigo-200/80">
                                 <div>
                                     <label className="block text-[10px] font-bold text-indigo-800 uppercase mb-1">Đợt xuất (Batch)</label>
-                                    <input type="text" className="w-full border border-indigo-200 rounded-md px-2.5 py-1.5 text-sm bg-white font-medium" value={val(formData.exportBatch)} onChange={(e) => handleChange('exportBatch', e.target.value)} placeholder="VD: CG - Đợt 01 - 29/07/26..." />
+                                    <input type="text" className="w-full border border-indigo-200 rounded-md px-2.5 py-1.5 text-sm bg-white font-medium" value={val(formData.exportBatch)} onChange={(e) => handleChange('exportBatch', e.target.value)} placeholder="VD: 1, 2, 3..." />
                                 </div>
                                 <div>
                                     <label className="block text-[10px] font-bold text-indigo-800 uppercase mb-1">Ngày xuất</label>
