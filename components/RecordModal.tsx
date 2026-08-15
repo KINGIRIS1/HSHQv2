@@ -128,7 +128,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
     allowedRecordTypes = [
       '2.1 Trích lục',
       '2.2 Trích đo',
-      '2.3 Duyệt đơn-số thửa',
+      '2.3 Duyệt đơn & Cung cấp số thửa',
       '2.4 Trích đo Cắm mốc',
       '2.5 Trích đo Tách - Hợp thửa'
     ];
@@ -138,7 +138,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
       '1.2 Công văn',
       '2.1 Trích lục',
       '2.2 Trích đo',
-      '2.3 Duyệt đơn-số thửa',
+      '2.3 Duyệt đơn & Cung cấp số thửa',
       '2.4 Trích đo Cắm mốc',
       '2.5 Trích đo Tách - Hợp thửa',
       'CMD',
@@ -252,20 +252,14 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
             };
             determinePrice();
         } else {
-            const defaultRecType = allowedRecordTypes[0] || EXTENDED_RECORD_TYPES[0];
             const recDate = new Date().toISOString();
-            const initDeadline = calculateDeadlineHelper(defaultRecType, recDate.split('T')[0], holidays || []);
-            let initPrice: number | undefined = undefined;
-            if (defaultRecType.includes('1.1') || defaultRecType.includes('1.2') || defaultRecType.includes('sao lục') || defaultRecType.includes('công văn')) {
-              initPrice = 310000;
-            }
 
             setFormData({
               ...defaultState,
-              recordType: defaultRecType,
+              recordType: '',
               receivedDate: recDate,
-              deadline: initDeadline,
-              price: initPrice,
+              deadline: '',
+              price: undefined,
               code: `HS-${new Date().getFullYear()}-${Math.floor(Math.random() * 1000)}`
             });
             setAttachedDocs([]);
@@ -314,6 +308,11 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const finalData = { ...formData };
+    
+    if (!finalData.recordType) {
+        alert("Vui lòng chọn Loại hồ sơ trước khi lưu.");
+        return;
+    }
     
     // Logic tự động set ngày khi trạng thái thay đổi hoặc xóa ngày khi quay lui
     // Chỉ áp dụng logic này nếu trạng thái khác với ban đầu (hoặc là tạo mới)

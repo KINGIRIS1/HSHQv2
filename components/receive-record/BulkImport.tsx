@@ -93,11 +93,11 @@ const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calc
               'TD': '2.2 Trích đo',
               'TRÍCH ĐO': '2.2 Trích đo',
               '2.2': '2.2 Trích đo',
-              'CN SỐ THỬA': '2.3 Duyệt đơn-số thửa',
-              'CẬP NHẬT SỐ THỬA': '2.3 Duyệt đơn-số thửa',
-              'CẬP NHẬP SỐ THỬA': '2.3 Duyệt đơn-số thửa',
-              '2.3': '2.3 Duyệt đơn-số thửa',
-              '2.6': '2.3 Duyệt đơn-số thửa',
+              'CN SỐ THỬA': '2.3 Duyệt đơn & Cung cấp số thửa',
+              'CẬP NHẬT SỐ THỬA': '2.3 Duyệt đơn & Cung cấp số thửa',
+              'CẬP NHẬP SỐ THỬA': '2.3 Duyệt đơn & Cung cấp số thửa',
+              '2.3': '2.3 Duyệt đơn & Cung cấp số thửa',
+              '2.6': '2.3 Duyệt đơn & Cung cấp số thửa',
               'ĐĐ': '2.4 Trích đo Cắm mốc',
               'DD': '2.4 Trích đo Cắm mốc',
               'ĐO ĐẠC': '2.4 Trích đo Cắm mốc',
@@ -135,7 +135,7 @@ const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calc
                   if (lower.includes('1.2') || lower.includes('công văn') || lower.includes('cong van') || lower.includes('cung cấp tài liệu')) recordType = '1.2 Công văn';
                   else if (lower.includes('trích lục')) recordType = '2.1 Trích lục';
                   else if (lower.includes('chỉnh lý') || lower.includes('hiến đường')) recordType = 'Trích đo chỉnh lý bản đồ địa chính';
-                  else if (lower.includes('số thửa') || lower.includes('cập nhật') || lower.includes('cập nhập') || lower.includes('2.6') || lower.includes('duyệt đơn')) recordType = '2.3 Duyệt đơn-số thửa';
+                  else if (lower.includes('số thửa') || lower.includes('cập nhật') || lower.includes('cập nhập') || lower.includes('2.6') || lower.includes('duyệt đơn')) recordType = '2.3 Duyệt đơn & Cung cấp số thửa';
                   else if (lower.includes('tách thửa')) recordType = '2.5 Trích đo Tách - Hợp thửa';
                   else if (lower.includes('trích đo') || lower.includes('hợp thửa')) recordType = '2.2 Trích đo';
                   else if (lower.includes('đo đạc') || lower.includes('cắm mốc')) recordType = '2.4 Trích đo Cắm mốc';

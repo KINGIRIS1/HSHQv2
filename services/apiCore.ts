@@ -331,8 +331,8 @@ export const mapRecordFromDb = (item: any): any => {
     r.recordType = val(r.recordType, r.recordtype, r.record_type);
     if (r.recordType === '2.3 Trích đo' || r.recordType === 'Trích đo bản đồ địa chính') {
         r.recordType = '2.2 Trích đo';
-    } else if (r.recordType && (r.recordType.startsWith('2.6') || r.recordType.includes('CN số thửa') || r.recordType.includes('Cập số thửa') || r.recordType.includes('Cập nhập số thửa') || r.recordType.includes('Cập nhật số thửa') || r.recordType.includes('Duyệt đơn') || r.recordType.includes('duyệt đơn'))) {
-        r.recordType = '2.3 Duyệt đơn-số thửa';
+    } else if (r.recordType && (r.recordType === '2.3 Duyệt đơn-số thửa' || r.recordType.startsWith('2.6') || r.recordType.includes('CN số thửa') || r.recordType.includes('Cập số thửa') || r.recordType.includes('Cập nhập số thửa') || r.recordType.includes('Cập nhật số thửa') || r.recordType.includes('Duyệt đơn') || r.recordType.includes('duyệt đơn'))) {
+        r.recordType = '2.3 Duyệt đơn & Cung cấp số thửa';
     }
     
     r.receivedBy = val(r.receivedBy, r.receivedby, r.received_by);
