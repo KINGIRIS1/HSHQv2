@@ -312,9 +312,15 @@ const RecordRow: React.FC<RecordRowProps> = ({
       <td className={`${cellClass} text-center`}>
         <div className="mt-1">
             {(canSelect !== undefined ? canSelect : canPerformAction) ? (
-            <button onClick={() => onToggleSelect(record.id)} className={`${isSelected ? 'text-blue-600' : 'text-gray-400'}`}>
-                {isSelected ? <CheckSquare size={16} /> : <Square size={16} />}
-            </button>
+              Boolean(record.returnBatch) ? (
+                <span title={`Đã chốt danh sách lưu (Đợt ${record.returnBatch})`} className="inline-block text-gray-300 cursor-not-allowed">
+                  <CheckSquare size={16} />
+                </span>
+              ) : (
+                <button onClick={() => onToggleSelect(record.id)} className={`${isSelected ? 'text-blue-600' : 'text-gray-400'}`}>
+                    {isSelected ? <CheckSquare size={16} /> : <Square size={16} />}
+                </button>
+              )
             ) : (
             <div className="w-4 h-4" />
             )}

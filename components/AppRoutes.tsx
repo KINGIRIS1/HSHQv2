@@ -418,12 +418,8 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
       currentView === "archive_director_completed"
     )
       title = "Danh sách Hoàn thành";
-    else if (currentView === "handover_list")
-      title = "Danh sách Giao 1 cửa (Hồ sơ đo đạc)";
-    else if (currentView === "archive_handover_list")
-      title = "Danh sách Giao 1 cửa (Hồ sơ lưu trữ)";
-    else if (currentView === "other_handover_list")
-      title = "Danh sách Giao 1 cửa (Hồ sơ khác)";
+    else if (currentView === "handover_list" || currentView === "archive_handover_list" || currentView === "other_handover_list")
+      title = "Danh sách bàn giao tổ lưu trữ";
     else if (
       currentView === "assign_tasks" ||
       currentView === "other_assign_tasks" ||
@@ -683,18 +679,51 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                 </span>
               )}
             </h2>
-            <div className="relative flex-1 sm:w-64 max-w-md">
-              <Search
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                size={18}
-              />
-              <input
-                type="text"
-                placeholder="Tìm kiếm..."
-                className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                value={props.searchTerm}
-                onChange={(e) => props.setSearchTerm(e.target.value)}
-              />
+            <div className="flex items-center gap-2 relative shrink-0">
+              <div className="relative w-40 sm:w-48">
+                <Search
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                  size={16}
+                />
+                <input
+                  type="text"
+                  placeholder="Tìm kiếm..."
+                  className="w-full pl-9 pr-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={props.searchTerm}
+                  onChange={(e) => props.setSearchTerm(e.target.value)}
+                />
+              </div>
+
+              {/* Chốt DS đặt ngay cạnh ô tìm kiếm thu nhỏ khi có hồ sơ chọn */}
+              {(currentView === "handover_list" ||
+                currentView === "other_handover_list" ||
+                currentView === "archive_handover_list") &&
+                props.handoverTab === "today" &&
+                props.selectedRecordIds.size > 0 && (
+                <button
+                  id="btn-close-handover-batch-header"
+                  onClick={() => props.setIsAddToBatchModalOpen(true)}
+                  className="flex items-center gap-1.5 bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 text-xs font-bold shadow-sm transition-all animate-pulse cursor-pointer whitespace-nowrap"
+                  title="Chốt đợt bàn giao cho các hồ sơ đã chọn"
+                >
+                  <CheckCircle size={15} /> Chốt DS ({props.selectedRecordIds.size})
+                </button>
+              )}
+
+              {(currentView === "handover_list" ||
+                currentView === "other_handover_list" ||
+                currentView === "archive_handover_list") &&
+                props.handoverTab === "returned" &&
+                props.selectedRecordIds.size > 0 && (
+                <button
+                  id="btn-close-return-handover-batch-header"
+                  onClick={() => props.setIsReturnHandoverModalOpen?.(true)}
+                  className="flex items-center gap-1.5 bg-emerald-600 text-white px-3 py-1.5 rounded-lg hover:bg-emerald-700 text-xs font-bold shadow-sm transition-all animate-pulse cursor-pointer whitespace-nowrap"
+                  title="Chốt danh sách đợt xuất lưu trữ"
+                >
+                  <Send size={15} /> Chốt DS lưu ({props.selectedRecordIds.size})
+                </button>
+              )}
             </div>
           </div>
 
@@ -1707,6 +1736,10 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
           onReturnRecord={props.handleOpenReturnModal}
           onExtendDeadline={(r) => {
             props.handleOpenExtendModal?.([r]);
+          }}
+          onExportReturnBatch={() => {
+            props.setExportModalType("handover");
+            props.setIsExportModalOpen(true);
           }}
         />
       );
