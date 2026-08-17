@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { RecordFile, Employee, RecordStatus } from '../types';
 import { STATUS_LABELS, SELECTABLE_STATUSES } from '../constants';
 import { X, CheckCircle2, Layers, ArrowRight, UserCheck, Calendar } from 'lucide-react';
-import { getDepartmentForRecord, calculateEmployeeWorkload } from '../utils/appHelpers';
+import { getDepartmentForRecord, calculateEmployeeWorkload, extractBatchOnly } from '../utils/appHelpers';
 
 interface BulkUpdateModalProps {
   isOpen: boolean;
@@ -147,7 +147,12 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
             customDate: isoDate 
         } : undefined;
 
-        await onConfirm(targetField as keyof RecordFile, targetValue, isoDate, targetIds, extraData);
+        let finalValue = targetValue;
+        if (targetField === 'exportBatch' && targetValue) {
+            finalValue = extractBatchOnly(targetValue);
+        }
+
+        await onConfirm(targetField as keyof RecordFile, finalValue, isoDate, targetIds, extraData);
         setIsProcessing(false);
         onClose();
     }

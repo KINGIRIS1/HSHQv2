@@ -9,7 +9,7 @@ import DocxPreviewModal from './DocxPreviewModal';
 import { updateRecordApi, fetchContracts } from '../services/api';
 import SystemReceiptTemplate from './receive-record/SystemReceiptTemplate';
 import SystemAnnexTemplate from './receive-record/SystemAnnexTemplate';
-import { getEmployeeName as getEmpNameHelper } from '../utils/appHelpers';
+import { getEmployeeName as getEmpNameHelper, extractBatchOnly } from '../utils/appHelpers';
 
 
 interface DetailModalProps {
@@ -473,16 +473,16 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
 
   // LOGIC HIỂN THỊ STATUS
   const getDisplayStatus = (r: RecordFile) => {
-      if (r.resultReturnedDate) {
-          return RecordStatus.RETURNED;
-      }
       if (r.status) {
           return r.status;
+      }
+      if (r.resultReturnedDate) {
+          return RecordStatus.RETURNED;
       }
       if ((r.exportBatch || r.exportDate) && r.status !== RecordStatus.WITHDRAWN && r.status !== RecordStatus.RETURNED && r.status !== RecordStatus.REJECTED) {
           return RecordStatus.HANDOVER;
       }
-      return r.status || RecordStatus.RECEIVED;
+      return RecordStatus.RECEIVED;
   };
   const displayStatus = getDisplayStatus(record);
   const recordTypeLower = (record?.recordType || '').toLowerCase();
@@ -764,8 +764,9 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                         {/* HÀNG BÁO HỢP ĐỒNG (CHỈ ÁP DỤNG CHO 2.2 VÀ 2.4) & SỐ TRÍCH ĐO / TRÍCH LỤC */}
                         {(() => {
                             const isArchive = isArchiveRecordType(record?.recordType || '');
+                            const is23Procedure = (record?.recordType || '').toLowerCase().includes('2.3') || (record?.recordType || '').toLowerCase().includes('dđ & cc số thửa') || (record?.recordType || '').toLowerCase().includes('dd & cc so thua');
                             const isContractProcedure = !!(record?.recordType && (getShortRecordType(record.recordType).startsWith('2.2') || getShortRecordType(record.recordType).startsWith('2.4')));
-                            const hasExcerptOrMeasurement = !isArchive && !!(recordTypeLower.includes('trích đo') || recordTypeLower.includes('trích lục') || record?.measurementNumber || record?.excerptNumber);
+                            const hasExcerptOrMeasurement = !isArchive && !is23Procedure && !!(recordTypeLower.includes('trích đo') || recordTypeLower.includes('trích lục') || record?.measurementNumber || record?.excerptNumber);
 
                             if (!isContractProcedure && !hasExcerptOrMeasurement) return null;
 
@@ -839,39 +840,43 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                             </div>
                         )}
 
-                        {/* KHU VỰC THÔNG TIN THU PHÍ & TRẢ KẾT QUẢ */}
-                        <div className="border-t border-gray-100 pt-4 mt-2">
-                            <label className="text-[11px] font-bold text-slate-700 uppercase block mb-2.5 flex items-center gap-1.5">
-                                <Receipt size={15} className="text-emerald-600" />
-                                <span>Thông tin Trả kết quả & Thu phí / Lệ phí</span>
-                            </label>
-                            
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                {/* Thẻ Số tiền */}
-                                <div className="bg-emerald-50/80 p-3 rounded-xl border border-emerald-200/80 flex flex-col justify-center min-w-0">
-                                    <label className="text-[10px] text-emerald-700 uppercase font-bold block whitespace-nowrap truncate">
-                                        Số tiền thu
-                                    </label>
-                                    <p className="text-sm font-black text-emerald-800 whitespace-nowrap truncate mt-0.5">
-                                        {record.returnedPrice !== undefined && record.returnedPrice !== null
-                                            ? record.returnedPrice.toLocaleString('vi-VN') + ' đ'
-                                            : (record.recordType === 'Cung cấp tài liệu đất đai' 
-                                                ? '310.000 đ' 
-                                                : (contractPrice !== null && contractPrice !== undefined ? contractPrice.toLocaleString('vi-VN') + ' đ' : '---'))}
-                                    </p>
-                                </div>
+                        {/* KHU VỰC THÔNG TIN THU PHÍ & TRẢ KẾT QUẢ - ẨN KHI LÀ THỦ TỤC 2.3 KHÔNG THU PHÍ */}
+                        {!((record?.recordType || '').toLowerCase().includes('2.3') || (record?.recordType || '').toLowerCase().includes('dđ & cc số thửa') || (record?.recordType || '').toLowerCase().includes('dd & cc so thua')) && (
+                            <div className="border-t border-gray-100 pt-4 mt-2">
+                                <label className="text-[11px] font-bold text-slate-700 uppercase block mb-2.5 flex items-center gap-1.5">
+                                    <Receipt size={15} className="text-emerald-600" />
+                                    <span>Thông tin Trả kết quả & Thu phí / Lệ phí</span>
+                                </label>
+                                
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    {/* Thẻ Số tiền */}
+                                    <div className="bg-emerald-50/80 p-3 rounded-xl border border-emerald-200/80 flex flex-col justify-center min-w-0">
+                                        <label className="text-[10px] text-emerald-700 uppercase font-bold block whitespace-nowrap truncate">
+                                            Số tiền thu
+                                        </label>
+                                        <p className="text-sm font-black text-emerald-800 whitespace-nowrap truncate mt-0.5">
+                                            {record.returnedPrice !== undefined && record.returnedPrice !== null
+                                                ? record.returnedPrice.toLocaleString('vi-VN') + ' đ'
+                                                : (record.price !== undefined && record.price !== null && record.price > 0
+                                                    ? record.price.toLocaleString('vi-VN') + ' đ'
+                                                    : (record.recordType === 'Cung cấp tài liệu đất đai' 
+                                                        ? '310.000 đ' 
+                                                        : (contractPrice !== null && contractPrice !== undefined ? contractPrice.toLocaleString('vi-VN') + ' đ' : '---')))}
+                                        </p>
+                                    </div>
 
-                                {/* Thẻ Số BL/HĐ */}
-                                <div className="bg-blue-50/80 p-3 rounded-xl border border-blue-200/80 flex flex-col justify-center min-w-0">
-                                    <label className="text-[10px] text-blue-700 uppercase font-bold block whitespace-nowrap truncate">
-                                        {record.receiptType === 'Biên Lai' ? 'SỐ BIÊN LAI' : record.receiptType === 'Hóa Đơn' ? 'SỐ HÓA ĐƠN' : 'SỐ BIÊN LAI / HÓA ĐƠN'}
-                                    </label>
-                                    <p className="text-xs font-black text-blue-900 font-mono whitespace-nowrap truncate mt-0.5">
-                                        {record.receiptNumber || '---'}
-                                    </p>
+                                    {/* Thẻ Số BL/HĐ */}
+                                    <div className="bg-blue-50/80 p-3 rounded-xl border border-blue-200/80 flex flex-col justify-center min-w-0">
+                                        <label className="text-[10px] text-blue-700 uppercase font-bold block whitespace-nowrap truncate">
+                                            {record.receiptType === 'Biên Lai' ? 'SỐ BIÊN LAI' : record.receiptType === 'Hóa Đơn' ? 'SỐ HÓA ĐƠN' : 'SỐ BIÊN LAI / HÓA ĐƠN'}
+                                        </label>
+                                        <p className="text-xs font-black text-blue-900 font-mono whitespace-nowrap truncate mt-0.5">
+                                            {record.receiptNumber || '---'}
+                                        </p>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
+                        )}
 
                         {/* Chi tiết tách thửa */}
                         {contractSplitItems && contractSplitItems.length > 0 && (
@@ -990,7 +995,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                                 icon={CheckSquare}
                                 isLast={false}
                                 colorClass={{text: record.status === RecordStatus.REJECTED ? 'text-red-700' : 'text-green-700', border: record.status === RecordStatus.REJECTED ? 'border-red-600' : 'border-green-600', bg: record.status === RecordStatus.REJECTED ? 'bg-red-600' : 'bg-green-600'}}
-                                subText={record.exportBatch ? `Đợt xuất: ${String(record.exportBatch).padStart(2, '0')}` : undefined}
+                                subText={record.exportBatch ? `Đợt xuất: ${extractBatchOnly(record.exportBatch)}` : undefined}
                             />
                             
                             <TimelineItem 

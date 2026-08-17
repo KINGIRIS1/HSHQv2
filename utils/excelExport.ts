@@ -2,7 +2,7 @@
 import * as XLSX from 'xlsx-js-style';
 import { RecordFile, RecordStatus, Employee } from '../types';
 import { getNormalizedWard, getShortRecordType, STATUS_LABELS } from '../constants';
-import { isRecordOverdue, removeVietnameseTones, cleanSyncNotes } from './appHelpers';
+import { isRecordOverdue, removeVietnameseTones, cleanSyncNotes, extractBatchNumber } from './appHelpers';
 import { fetchContracts } from '../services/api';
 
 export const exportReportToExcel = async (
@@ -122,6 +122,7 @@ export const exportReportToExcel = async (
         "Ngày Nhận", 
         "Hẹn Trả", 
         "Ngày hoàn thành",
+        "Đợt Xuất",
         "Ngày trả kết quả",
         "Trạng Thái", 
         "Ghi Chú"
@@ -155,6 +156,7 @@ export const exportReportToExcel = async (
             formatDate(r.receivedDate),
             formatDate(r.deadline),
             formatDate(r.completedDate),      
+            r.exportBatch ? extractBatchNumber(r.exportBatch) : '',
             formatDate(r.resultReturnedDate),
             STATUS_LABELS[r.status],
             ""
@@ -230,6 +232,7 @@ export const exportReportToExcel = async (
         { wch: 12 }, // Ngày Nhận
         { wch: 12 }, // Hẹn Trả
         { wch: 14 }, // Ngày hoàn thành
+        { wch: 10 }, // Đợt Xuất
         { wch: 14 }, // Ngày trả kết quả
         { wch: 15 }, // Trạng thái
         { wch: 20 }  // Ghi chú
@@ -255,9 +258,9 @@ export const exportReportToExcel = async (
             const cellRef = XLSX.utils.encode_cell({ r, c });
             if (!ws[cellRef]) ws[cellRef] = { v: "", t: "s" };
             
-            // Căn giữa: STT, Tờ, Thửa, NV, BL, Ngày, Trạng thái. Căn phải: Tiền.
-            // Index: 0(STT), 4(Tờ), 5(Thửa), 8(NV), 9(BL), 10(HĐ), 11(TL), 12(NgayNhan), 13(Hen), 14(Xong), 15(TraKQ), 16(Status)
-            if ([0, 4, 5, 8, 9, 12, 13, 14, 15, 16].includes(c)) ws[cellRef].s = centerStyle;
+            // Căn giữa: STT, Tờ, Thửa, NV, BL, Ngày, Đợt, Trạng thái. Căn phải: Tiền.
+            // Index: 0(STT), 4(Tờ), 5(Thửa), 8(NV), 9(BL), 10(HĐ), 11(TL), 12(NgayNhan), 13(Hen), 14(Xong), 15(DotXuat), 16(TraKQ), 17(Status)
+            if ([0, 4, 5, 8, 9, 12, 13, 14, 15, 16, 17].includes(c)) ws[cellRef].s = centerStyle;
             else if (c === 10 || c === 11) ws[cellRef].s = rightStyle;
             else ws[cellRef].s = cellStyle;
         }

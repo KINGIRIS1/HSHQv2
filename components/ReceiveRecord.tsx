@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { RecordFile, Employee, User, Holiday, RecordStatus, RolePermissions, DepartmentPermissions } from '../types';
 import { getNormalizedWard } from '../constants';
-import { PlusCircle, FileSpreadsheet, LayoutList, Settings, RotateCcw, RefreshCw } from 'lucide-react';
+import { PlusCircle, FileSpreadsheet, LayoutList, Search, Settings, RotateCcw, RefreshCw } from 'lucide-react';
 import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../services/docxService';
 import * as XLSX from 'xlsx-js-style';
 import { confirmAction, calculateDeadlineHelper } from '../utils/appHelpers';
@@ -12,6 +12,7 @@ import { isViewAllowedForUser } from '../config/roleConfig';
 import RecordForm from './receive-record/RecordForm';
 import BulkImport from './receive-record/BulkImport';
 import DailyList from './receive-record/DailyList';
+import RecordLookupView from './records/RecordLookupView';
 import TemplateConfigModal from './TemplateConfigModal';
 import DocxPreviewModal from './DocxPreviewModal';
 import ExcelPreviewModal from './ExcelPreviewModal';
@@ -28,9 +29,13 @@ interface ReceiveRecordProps {
   onCreateContract?: (record: Partial<RecordFile>) => void;
   onHandOverRecords?: (recordIds: string[]) => Promise<void>;
   onBulkUpdate?: (field: keyof RecordFile, value: any, customDate?: string, targetRecordIds?: string[]) => Promise<void>;
-  initialTab?: 'create' | 'list' | 'bulk' | 'update' | 'vphc';
+  initialTab?: 'create' | 'list' | 'bulk' | 'lookup' | 'update' | 'vphc';
   rolePermissions?: RolePermissions;
   departmentPermissions?: DepartmentPermissions;
+  onViewRecord?: (record: RecordFile) => void;
+  onEditRecord?: (record: RecordFile) => void;
+  onReturnRecord?: (record: RecordFile) => void;
+  onExtendDeadline?: (record: RecordFile) => void;
 }
 
 // Hàm chuyển đổi Âm lịch sang Dương lịch (Cố định cho các ngày lễ chính 2024-2026)
@@ -65,8 +70,26 @@ const formatDateKey = (date: Date): string => {
     return `${year}-${month}-${day}`;
 };
 
-const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, employees, currentUser, records = [], holidays, onCreateContract, onHandOverRecords, onBulkUpdate, initialTab = 'create', rolePermissions, departmentPermissions }) => {
-  const [viewMode, setViewMode] = useState<'create' | 'list' | 'bulk' | 'update' | 'vphc'>(initialTab);
+const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ 
+  onSave, 
+  onDelete, 
+  wards, 
+  employees, 
+  currentUser, 
+  records = [], 
+  holidays, 
+  onCreateContract, 
+  onHandOverRecords, 
+  onBulkUpdate, 
+  initialTab = 'create', 
+  rolePermissions, 
+  departmentPermissions,
+  onViewRecord,
+  onEditRecord,
+  onReturnRecord,
+  onExtendDeadline
+}) => {
+  const [viewMode, setViewMode] = useState<'create' | 'list' | 'bulk' | 'lookup' | 'update' | 'vphc'>(initialTab);
 
   const canCreate = !currentUser || isViewAllowedForUser(currentUser, employees || [], 'receive_sub_create', rolePermissions, departmentPermissions);
   const canBulk = !currentUser || isViewAllowedForUser(currentUser, employees || [], 'receive_sub_bulk', rolePermissions, departmentPermissions);
@@ -87,12 +110,15 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
     } else if (viewMode === 'create' && !canCreate) {
       if (canBulk) setViewMode('bulk');
       else if (canList) setViewMode('list');
+      else setViewMode('lookup');
     } else if (viewMode === 'bulk' && !canBulk) {
       if (canCreate) setViewMode('create');
       else if (canList) setViewMode('list');
+      else setViewMode('lookup');
     } else if (viewMode === 'list' && !canList) {
       if (canCreate) setViewMode('create');
       else if (canBulk) setViewMode('bulk');
+      else setViewMode('lookup');
     }
   }, [canCreate, canBulk, canList, viewMode]);
   // Removed local holidays state and useEffect
@@ -362,6 +388,12 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
                   <LayoutList size={16} /> Danh sách hôm nay
               </button>
             )}
+            <button 
+                onClick={() => setViewMode('lookup')} 
+                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-md text-sm font-semibold transition-all whitespace-nowrap cursor-pointer ${viewMode === 'lookup' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
+            >
+                <Search size={16} /> Tra cứu hồ sơ
+            </button>
         </div>
         
         {viewMode === 'create' && (
@@ -412,6 +444,19 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
                 onPrint={handlePreviewDocx}
                 onCreateContract={onCreateContract}
                 onHandOverRecords={onHandOverRecords}
+            />
+        )}
+
+        {viewMode === 'lookup' && (
+            <RecordLookupView 
+                records={combinedRecords}
+                wards={wards}
+                currentUser={currentUser}
+                employees={employees}
+                onViewRecord={onViewRecord || ((r) => {})}
+                onEditRecord={onEditRecord}
+                onReturnRecord={onReturnRecord}
+                onExtendDeadline={onExtendDeadline}
             />
         )}
       </div>

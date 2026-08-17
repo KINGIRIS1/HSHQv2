@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { RecordFile, RecordStatus, Employee, User, UserRole } from '../types';
 import { GROUPS, EXTENDED_RECORD_TYPES, STATUS_LABELS, SELECTABLE_STATUSES, getShortRecordType, getWardLabel, getNormalizedWard, isArchiveRecordType } from '../constants';
 import { X, Save, Lock, User as UserIcon, MapPin, FileText, Calendar, FileCheck, ChevronDown, ChevronUp, History } from 'lucide-react';
-import { calculateDeadlineHelper, getDepartmentForRecord } from '../utils/appHelpers';
+import { calculateDeadlineHelper, getDepartmentForRecord, extractBatchOnly } from '../utils/appHelpers';
 import { fetchContracts } from '../services/api';
 
 interface AttachedDocItem {
@@ -180,6 +180,9 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
             const rLower = String(dataToSet.recordType || '').toLowerCase();
             if ((rLower.includes('1.2') || rLower.includes('công văn') || rLower.includes('cong van') || rLower.includes('sao lục') || dataToSet.recordType === '1.1 Sao lục' || dataToSet.recordType === '1.1 CC DL ĐĐ' || dataToSet.recordType === '1.1 Sao lục hồ sơ' || dataToSet.recordType === '1.1 Cung cấp dữ liệu đất đai') && !dataToSet.price) {
                 dataToSet.price = 310000;
+            }
+            if (dataToSet.exportBatch) {
+                dataToSet.exportBatch = extractBatchOnly(dataToSet.exportBatch);
             }
             setFormData(dataToSet);
             setAttachedDocs(parseAttachedDocs(initialData.otherDocs));
@@ -423,9 +426,23 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
     if (finalData.status === RecordStatus.WITHDRAWN && !finalData.completedDate) finalData.completedDate = new Date().toISOString();
     if (finalData.status === RecordStatus.REJECTED && !finalData.completedDate) finalData.completedDate = new Date().toISOString();
     
-    if (finalData.resultReturnedDate && finalData.status !== RecordStatus.RETURNED) {
-        finalData.status = RecordStatus.RETURNED;
-        if (!finalData.completedDate) finalData.completedDate = finalData.resultReturnedDate;
+    // Nếu người dùng chọn trạng thái khác RETURNED, xóa bỏ ngày trả kết quả và thông tin liên quan
+    if (finalData.status !== RecordStatus.RETURNED) {
+        finalData.resultReturnedDate = undefined;
+        finalData.receiptNumber = undefined;
+        finalData.receiverName = undefined;
+        finalData.returnedPrice = undefined;
+    } else {
+        if (!finalData.completedDate && finalData.resultReturnedDate) {
+            finalData.completedDate = finalData.resultReturnedDate;
+        }
+        if (formData.returnedPrice !== undefined && formData.returnedPrice !== null && !isNaN(Number(formData.returnedPrice))) {
+            finalData.returnedPrice = Number(formData.returnedPrice);
+            finalData.price = Number(formData.returnedPrice);
+        } else if (formData.price !== undefined && formData.price !== null && !isNaN(Number(formData.price))) {
+            finalData.returnedPrice = Number(formData.price);
+            finalData.price = Number(formData.price);
+        }
     }
     
     // Nếu trạng thái là HANDOVER (Đã giao 1 cửa), bổ sung completedDate nếu chưa có
@@ -435,11 +452,15 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
         }
     } else if (finalData.status !== RecordStatus.WITHDRAWN && finalData.status !== RecordStatus.RETURNED && finalData.status !== RecordStatus.REJECTED) {
         // Nếu người dùng chọn trạng thái khác (Đã ký, Chờ ký, Đã kiểm tra...), tôn trọng trạng thái đã chọn
-        // Nếu trước đó là HANDOVER và người dùng đã xóa thông tin xuất, làm sạch exportBatch và exportDate
-        if (initialData?.status === RecordStatus.HANDOVER && !formData.exportBatch && !formData.exportDate) {
+        // Nếu trước đó là HANDOVER hoặc người dùng xóa thông tin xuất, làm sạch exportBatch và exportDate
+        if (!formData.exportBatch && !formData.exportDate) {
             finalData.exportBatch = undefined;
             finalData.exportDate = undefined;
         }
+    }
+
+    if (finalData.exportBatch) {
+        finalData.exportBatch = extractBatchOnly(finalData.exportBatch);
     }
 
     // Tự động ghi Log lịch sử thay đổi trạng thái
@@ -531,9 +552,10 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
 
   const isArchive = isArchiveRecordType(formData.recordType || '') || (getDepartmentForRecord(formData as RecordFile).toLowerCase().includes('lưu trữ'));
   const isCongVan = formData.recordType ? getShortRecordType(formData.recordType) === '1.2 Công văn' : false;
+  const is23Procedure = (formData.recordType || '').toLowerCase().includes('2.3') || (formData.recordType || '').toLowerCase().includes('dđ & cc số thửa') || (formData.recordType || '').toLowerCase().includes('dd & cc so thua');
   const recTypeLower = (formData.recordType || '').toLowerCase();
-  const showMsr = !isArchive && (recTypeLower.includes('trích đo') || recTypeLower.includes('đo đạc') || recTypeLower.includes('đo') || recTypeLower.includes('tách thửa') || (!recTypeLower.includes('trích đo') && !recTypeLower.includes('trích lục')));
-  const showExc = !isArchive && (recTypeLower.includes('trích lục') || (!recTypeLower.includes('trích đo') && !recTypeLower.includes('trích lục')));
+  const showMsr = !isArchive && !is23Procedure && (recTypeLower.includes('trích đo') || recTypeLower.includes('đo đạc') || recTypeLower.includes('đo') || recTypeLower.includes('tách thửa') || (!recTypeLower.includes('trích đo') && !recTypeLower.includes('trích lục')));
+  const showExc = !isArchive && !is23Procedure && (recTypeLower.includes('trích lục') || (!recTypeLower.includes('trích đo') && !recTypeLower.includes('trích lục')));
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[100] p-0 md:p-4 backdrop-blur-sm">
@@ -849,7 +871,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-indigo-50/80 p-3.5 rounded-lg border border-indigo-200/80">
                                 <div>
                                     <label className="block text-[10px] font-bold text-indigo-800 uppercase mb-1">Đợt xuất (Batch)</label>
-                                    <input type="text" className="w-full border border-indigo-200 rounded-md px-2.5 py-1.5 text-sm bg-white font-medium" value={val(formData.exportBatch)} onChange={(e) => handleChange('exportBatch', e.target.value)} placeholder="VD: 1, 2, 3..." />
+                                    <input type="text" className="w-full border border-indigo-200 rounded-md px-2.5 py-1.5 text-sm bg-white font-medium" value={val(formData.exportBatch ? extractBatchOnly(formData.exportBatch) : '')} onChange={(e) => handleChange('exportBatch', e.target.value)} placeholder="VD: 1, 2, 3..." />
                                 </div>
                                 <div>
                                     <label className="block text-[10px] font-bold text-indigo-800 uppercase mb-1">Ngày xuất</label>
@@ -872,21 +894,34 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                         {canEditResult && (
                             <div className="bg-emerald-50 p-4 rounded-lg border border-emerald-200">
                                 <h4 className="text-sm font-bold text-emerald-800 flex items-center gap-2 mb-3"><FileCheck size={16} /> TRẢ KẾT QUẢ CHO DÂN</h4>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className={`grid grid-cols-1 ${is23Procedure ? 'md:grid-cols-1' : 'md:grid-cols-3'} gap-4`}>
                                     <div>
                                         <label className="block text-xs font-bold text-emerald-700 mb-1">Ngày trả kết quả</label>
                                         <input type="date" className="w-full border border-emerald-300 rounded-md px-3 py-2 bg-white font-bold text-emerald-800" value={dateVal(formData.resultReturnedDate)} onChange={(e) => handleChange('resultReturnedDate', e.target.value)} />
                                     </div>
-                                    <div>
-                                        <label className="block text-xs font-bold text-emerald-700 mb-1">
-                                            {formData.receiptType === 'Biên Lai' ? 'Số Biên lai' : formData.receiptType === 'Hóa Đơn' ? 'Số Hóa đơn' : 'Số Biên lai / Hóa đơn'}
-                                        </label>
-                                        <input type="text" className="w-full border border-emerald-300 rounded-md px-3 py-2 font-mono bg-white" value={val(formData.receiptNumber)} onChange={(e) => handleChange('receiptNumber', e.target.value)} placeholder="Nhập số biên lai/hóa đơn..." />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-bold text-emerald-700 mb-1">Số tiền (VNĐ)</label>
-                                        <input type="number" className="w-full border border-emerald-300 rounded-md px-3 py-2 font-bold text-emerald-900 bg-white" value={formData.returnedPrice !== undefined && formData.returnedPrice !== null ? formData.returnedPrice : ''} onChange={(e) => handleChange('returnedPrice', parseFloat(e.target.value) || 0)} placeholder="Nhập số tiền..." />
-                                    </div>
+                                    {!is23Procedure && (
+                                        <>
+                                            <div>
+                                                <label className="block text-xs font-bold text-emerald-700 mb-1">
+                                                    {formData.receiptType === 'Biên Lai' ? 'Số Biên lai' : formData.receiptType === 'Hóa Đơn' ? 'Số Hóa đơn' : 'Số Biên lai / Hóa đơn'}
+                                                </label>
+                                                <input type="text" className="w-full border border-emerald-300 rounded-md px-3 py-2 font-mono bg-white" value={val(formData.receiptNumber)} onChange={(e) => handleChange('receiptNumber', e.target.value)} placeholder="Nhập số biên lai/hóa đơn..." />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-bold text-emerald-700 mb-1">Số tiền (VNĐ)</label>
+                                                <input 
+                                                    type="number" 
+                                                    className="w-full border border-emerald-300 rounded-md px-3 py-2 font-bold text-emerald-900 bg-white" 
+                                                    value={formData.returnedPrice !== undefined && formData.returnedPrice !== null ? formData.returnedPrice : (formData.price !== undefined && formData.price !== null ? formData.price : '')} 
+                                                    onChange={(e) => {
+                                                        const parsed = e.target.value === '' ? undefined : (parseFloat(e.target.value) || 0);
+                                                        setFormData(prev => ({ ...prev, returnedPrice: parsed, price: parsed }));
+                                                    }} 
+                                                    placeholder="Nhập số tiền..." 
+                                                />
+                                            </div>
+                                        </>
+                                    )}
                                 </div>
                             </div>
                         )}

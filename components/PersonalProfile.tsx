@@ -28,7 +28,7 @@ import {
 } from "lucide-react";
 import * as XLSX from "xlsx-js-style";
 import { getShortRecordType, isArchiveRecordType } from "../constants";
-import { confirmAction, cleanSyncNotes } from "../utils/appHelpers";
+import { confirmAction, cleanSyncNotes, extractBatchNumber } from "../utils/appHelpers";
 import { updateRecordApi, fetchContracts } from "../services/api";
 import {
   fetchArchiveRecords,
@@ -476,6 +476,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
       "Ngày trình ký": r.submissionDate ? r.submissionDate.split("T")[0] : "",
       "Ngày duyệt": r.approvalDate ? r.approvalDate.split("T")[0] : "",
       "Ngày hoàn thành": r.completedDate ? r.completedDate.split("T")[0] : "",
+      "Đợt xuất": r.exportBatch ? extractBatchNumber(r.exportBatch) : "",
       "Ngày trả kết quả": r.resultReturnedDate
         ? r.resultReturnedDate.split("T")[0]
         : "",

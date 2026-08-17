@@ -720,6 +720,7 @@ function App() {
           receiptType: typeLabel,
           receiverName: receiverName,
           returnedPrice: returnedPrice,
+          price: returnedPrice,
           statusLogs
       }; 
       setRecords(prev => prev.map(r => r.id === returnRecord.id ? { ...r, ...updates } : r));
@@ -973,7 +974,8 @@ function App() {
           const newDeadlineVN = formatDateVN(newDeadline);
           const execDateVN = formatDateVN(executionDateISO);
           const userLabel = currentUser?.name || currentUser?.username || 'Hệ thống';
-          const extensionLog = `[GIA HẠN HẸN TRẢ - ${execDateVN}] Hạn cũ: ${oldDeadlineVN} -> Hạn mới: ${newDeadlineVN}. Lý do: ${reason} (Thực hiện bởi: ${userLabel})`;
+          const reasonSuffix = reason && reason.trim() ? `. Lý do: ${reason.trim()}` : '';
+          const extensionLog = `[GIA HẠN HẸN TRẢ - ${execDateVN}] Hạn cũ: ${oldDeadlineVN} -> Hạn mới: ${newDeadlineVN}${reasonSuffix} (Thực hiện bởi: ${userLabel})`;
 
           const existingNotes = r.privateNotes || '';
           const updatedPrivateNotes = existingNotes ? `${existingNotes}\n${extensionLog}` : extensionLog;

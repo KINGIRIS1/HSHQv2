@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { LayoutDashboard, FileText, ClipboardList, Send, BarChart3, Settings, LogOut, UserCircle, Users, Briefcase, BookOpen, UserPlus, ShieldAlert, X, FolderInput, FileSignature, MessageSquare, Loader2, UserCog, ShieldCheck, PenTool, CalendarDays, Archive, FolderArchive, ChevronDown, Bell, FilePlus, Ruler, ChevronRight, User, Shield, Settings2, Layers } from 'lucide-react';
+import { LayoutDashboard, FileText, ClipboardList, Send, BarChart3, Settings, LogOut, UserCircle, Users, Briefcase, BookOpen, UserPlus, ShieldAlert, X, FolderInput, FileSignature, MessageSquare, Loader2, UserCog, ShieldCheck, PenTool, CalendarDays, Archive, FolderArchive, ChevronDown, Bell, FilePlus, Ruler, ChevronRight, User, Shield, Settings2, Layers, Search } from 'lucide-react';
 import { User as UserType, UserRole, RolePermissions, DepartmentPermissions, Employee, DEFAULT_ROLE_PERMISSIONS } from '../types';
 import { matchDepartmentKey } from '../utils/appHelpers';
 import { isViewAllowedForUser } from '../config/roleConfig';
@@ -46,12 +46,6 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
 
   const hasPermission = (permissionId: string) => {
     if (isAdmin) return true;
-    
-    // Đối với vai trò Một cửa, luôn cho phép các quyền mặc định của Một cửa
-    if (currentUser.role === UserRole.ONEDOOR) {
-        const defaultOneDoor = DEFAULT_ROLE_PERMISSIONS[UserRole.ONEDOOR] || [];
-        if (defaultOneDoor.includes(permissionId)) return true;
-    }
 
     if (currentUser.employeeId && employees) {
         const emp = employees.find(e => e.id === currentUser.employeeId);
@@ -73,10 +67,6 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
     const rolePerms = (rolePermissions && rolePermissions[currentUser.role]) || DEFAULT_ROLE_PERMISSIONS[currentUser.role] || [];
     return rolePerms.includes('*') || rolePerms.includes(permissionId);
   };
-
-  // Cập nhật danh sách các view được phép
-  const oneDoorAllowedViews = ['dashboard', 'receive_record', 'receive_contract', 'all_records', 'registration_records', 'other_records', 'personal_profile', 'account_settings', 'utilities', 'handover_list', 'work_schedule', 'archive_records', 'receive_group', 'records_group', 'reports', 'tools_group'];
-  const teamLeaderAllowedViews = ['dashboard', 'personal_profile', 'all_records', 'registration_records', 'other_records', 'excerpt_management', 'reports', 'account_settings', 'utilities', 'work_schedule', 'archive_records', 'records_group', 'tools_group'];
 
   // Define menu structure
   const menuItems = [

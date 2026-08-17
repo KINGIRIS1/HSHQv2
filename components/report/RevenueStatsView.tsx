@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { RecordFile, RecordStatus, Employee } from '../../types';
 import { getShortRecordType } from '../../constants';
 import { removeVietnameseTones } from '../../utils/appHelpers';
@@ -41,7 +41,7 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
         return 'Hóa Đơn';
     };
 
-    // Calculate revenue records filtered strictly by resultReturnedDate / exportDate
+    // Calculate revenue records: CHỈ KHI trạng thái "Đã trả kết quả" (RETURNED) và có Số Biên lai / Hóa đơn > 0 và có số tiền > 0
     const revenueRecords = useMemo(() => {
         let dateStart: Date | null = null;
         let dateEnd: Date | null = null;
@@ -56,31 +56,25 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
 
         return records
             .filter(r => {
-                if (r.status === RecordStatus.RETURNED) return true;
-                if (r.status === RecordStatus.HANDOVER) {
-                    const hasReturnDate = !!(r.resultReturnedDate || r.exportDate || r.completedDate);
-                    const hasReceipt = !!(r.receiptNumber && r.receiptNumber.trim() !== '');
-                    const hasReturnedPrice = r.returnedPrice !== undefined && r.returnedPrice !== null && String(r.returnedPrice).trim() !== '' && Number(r.returnedPrice) > 0;
-                    return hasReturnDate || hasReceipt || hasReturnedPrice;
-                }
-                return false;
+                // 1. Chỉ khi hồ sơ nằm trạng thái "Đã trả kết quả"
+                if (r.status !== RecordStatus.RETURNED) return false;
+
+                // 2. Có Số Biên lai / Hóa đơn > 0
+                if (!r.receiptNumber) return false;
+                const rawReceipt = String(r.receiptNumber).trim();
+                if (!rawReceipt) return false;
+                const numMatch = rawReceipt.match(/\d+/);
+                if (!numMatch || parseInt(numMatch[0], 10) <= 0) return false;
+
+                // 3. Có số tiền > 0 tại Số tiền (VNĐ)
+                const price = Number(r.returnedPrice) || Number(r.price) || 0;
+                if (price <= 0) return false;
+
+                return true;
             })
             .map(r => {
-                const contractP = (r as any).contractPrice;
-                const price = Number(r.price) || Number(contractP) || 0;
-                let returned = 0;
-                if (r.returnedPrice !== undefined && r.returnedPrice !== null && String(r.returnedPrice).trim() !== '' && !isNaN(Number(r.returnedPrice))) {
-                    returned = Number(r.returnedPrice);
-                } else if (r.recordType === 'Cung cấp tài liệu đất đai') {
-                    returned = 310000;
-                } else if (contractP !== undefined && contractP !== null && !isNaN(Number(contractP)) && Number(contractP) > 0) {
-                    returned = Number(contractP);
-                } else if (r.price !== undefined && r.price !== null && !isNaN(Number(r.price)) && Number(r.price) > 0) {
-                    returned = Number(r.price);
-                } else if (r.status === RecordStatus.RETURNED || r.status === RecordStatus.HANDOVER) {
-                    returned = price;
-                }
-                
+                // Lấy số tiền tại ô Số tiền (VNĐ) trong tab Cập nhật thông tin hồ sơ
+                const price = Number(r.returnedPrice) || Number(r.price) || 0;
                 const receiptType = getRecordReceiptType(r);
 
                 // Determine assigned ward for resolving the record
@@ -107,13 +101,11 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
                 return {
                     ...r,
                     calcPrice: price,
-                    calcReturned: returned,
+                    calcReturned: price,
                     computedReceiptType: receiptType,
                     assignedWard
                 };
             })
-            // Only include records with revenue or receipt/invoice recorded
-            .filter(r => r.calcReturned > 0 || (r.receiptNumber && r.receiptNumber.trim() !== ''))
             // Filter strictly by resultReturnedDate or exportDate or completedDate
             .filter(r => {
                 if (!dateStart || !dateEnd) return true;
@@ -236,6 +228,11 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
         return filteredRecords.slice(start, start + pageSize);
     }, [filteredRecords, currentPage, pageSize]);
 
+    // Sync filtered records with parent for global export
+    useEffect(() => {
+        onFilteredRecordsChange?.(filteredRecords);
+    }, [filteredRecords, onFilteredRecordsChange]);
+
     // Reset page when filters change
     const handleCardFilterChange = (type: 'all' | 'bien_lai' | 'hoa_don') => {
         setActiveCardFilter(type);
@@ -322,7 +319,7 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
                     </div>
 
                     {/* Search Input & Export Button */}
-                    <div className="flex items-center gap-3 w-full sm:w-auto">
+                    <div className="flex items-center gap-2.5 w-full sm:w-auto">
                         <div className="relative flex-1 sm:w-56">
                             <Search size={14} className="absolute left-3 top-3 text-slate-400" />
                             <input 
@@ -334,7 +331,15 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
                             />
                         </div>
 
-                        {/* Single shared Excel button is on top toolbar */}
+                        <button
+                            type="button"
+                            onClick={handleExportExcel}
+                            className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-xl font-bold text-xs shadow-xs transition-all cursor-pointer h-[38px] shrink-0"
+                            title="Xuất Báo Cáo Doanh Thu (.xlsx)"
+                        >
+                            <FileSpreadsheet size={15} />
+                            <span className="hidden sm:inline">Xuất Excel</span>
+                        </button>
                     </div>
                 </div>
 

@@ -74,6 +74,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
     const [itemsPerPage, setItemsPerPage] = useState(20);
 
     const [dailyStatsRecords, setDailyStatsRecords] = useState<RecordFile[]>([]);
+    const [revenueStatsRecords, setRevenueStatsRecords] = useState<RecordFile[]>([]);
 
     // --- NEW LOGIC FOR MAIN TABS (Đo đạc vs Lưu trữ) ---
     // Tìm nhân sự ứng với tài khoản hiện tại
@@ -382,6 +383,9 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
         if (activeTab === 'daily_stats') {
             return dailyStatsRecords.length || filteredData.length;
         }
+        if (activeTab === 'revenue') {
+            return revenueStatsRecords.length;
+        }
         if (activeTab === 'employee' && selectedEmpId) {
             return filteredData.filter(r => r.assignedTo === selectedEmpId).length;
         }
@@ -389,7 +393,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
             return finalFilteredData.length;
         }
         return filteredData.length;
-    }, [activeTab, dailyStatsRecords, filteredData, finalFilteredData, selectedEmpId]);
+    }, [activeTab, dailyStatsRecords, revenueStatsRecords, filteredData, finalFilteredData, selectedEmpId]);
 
     const handleExportExcelClick = () => {
         if (!fromDate || !toDate) { alert("Vui lòng chọn đầy đủ thời gian."); return; }
@@ -422,6 +426,8 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
             dataToExport = finalFilteredData;
         } else if (activeTab === 'daily_stats') {
             dataToExport = dailyStatsRecords.length > 0 ? dailyStatsRecords : filteredData;
+        } else if (activeTab === 'revenue') {
+            dataToExport = revenueStatsRecords.length > 0 ? revenueStatsRecords : filteredData;
         } else if (activeTab === 'employee') {
             dataToExport = selectedEmpId ? filteredData.filter(r => r.assignedTo === selectedEmpId) : filteredData;
         } else if (activeTab === 'overdue') {
@@ -1000,6 +1006,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                         selectedWard={selectedWard}
                         fromDate={fromDate}
                         toDate={toDate}
+                        onFilteredRecordsChange={setRevenueStatsRecords}
                     />
                 )}
 

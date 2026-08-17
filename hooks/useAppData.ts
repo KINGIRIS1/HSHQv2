@@ -59,12 +59,11 @@ export const useAppData = (currentUser: User | null) => {
             if (permsData) {
                 try {
                     const parsed = JSON.parse(permsData);
-                    Object.keys(DEFAULT_ROLE_PERMISSIONS).forEach(roleKey => {
-                        const defPerms = DEFAULT_ROLE_PERMISSIONS[roleKey as UserRole] || [];
-                        const existingPerms = (parsed[roleKey] || []).filter((p: string) => p !== 'CHECK_RECORDS' && p !== 'BTN_CLOSE_BATCH');
-                        parsed[roleKey] = Array.from(new Set([...existingPerms, ...defPerms]));
+                    const sanitized: RolePermissions = {};
+                    Object.keys(parsed).forEach(roleKey => {
+                        sanitized[roleKey] = (parsed[roleKey] || []).filter((p: string) => p !== 'CHECK_RECORDS' && p !== 'BTN_CLOSE_BATCH');
                     });
-                    setRolePermissions(parsed);
+                    setRolePermissions(sanitized);
                 } catch (e) {
                     console.error("Failed to parse role_permissions", e);
                 }

@@ -7,6 +7,7 @@ import BarcodeGeneratorView from '../BarcodeGeneratorView';
 import PersonalProfile from '../PersonalProfile';
 import WorkScheduleView from '../WorkScheduleView';
 import ReportSection from '../ReportSection';
+import RecordLookupView from '../records/RecordLookupView';
 
 interface MobileRoutesProps {
   currentView: string;
@@ -133,6 +134,18 @@ const MobileRoutes: React.FC<MobileRoutesProps> = (props) => {
     case 'work_schedule':
       return (
         <WorkScheduleView currentUser={currentUser} />
+      );
+
+    case 'lookup_records':
+      return (
+        <RecordLookupView
+          records={records}
+          employees={employees}
+          wards={wards}
+          currentUser={currentUser}
+          onViewRecord={props.handleViewRecord}
+          onEditRecord={(r) => { props.setEditingRecord(r); props.setIsModalOpen(true); }}
+        />
       );
 
     case 'reports':

@@ -29,6 +29,7 @@ import CongVanView from "./archive/CongVanView";
 import RegistrationRecords from "./RegistrationRecords";
 import SystemView from "./SystemView";
 import BarcodeGeneratorView from "./BarcodeGeneratorView";
+import RecordLookupView from "./records/RecordLookupView";
 
 const formatDateDDMMYYYY = (isoStr: string) => {
   if (!isoStr) return "";
@@ -1561,6 +1562,15 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
           }}
           onHandOverRecords={props.handleHandOverRecords}
           onBulkUpdate={props.onBulkUpdate}
+          onViewRecord={props.handleViewRecord}
+          onEditRecord={(r) => {
+            props.setEditingRecord(r);
+            props.setIsModalOpen(true);
+          }}
+          onReturnRecord={props.handleOpenReturnModal}
+          onExtendDeadline={(r) => {
+            props.handleOpenExtendModal?.([r]);
+          }}
         />
       );
     case "receive_contract":
@@ -1680,6 +1690,24 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
           employees={employees}
           wards={wards}
           currentUser={props.currentUser}
+        />
+      );
+    case "lookup_records":
+      return (
+        <RecordLookupView
+          records={records}
+          employees={employees}
+          wards={wards}
+          currentUser={currentUser}
+          onViewRecord={props.handleViewRecord}
+          onEditRecord={(r) => {
+            props.setEditingRecord(r);
+            props.setIsModalOpen(true);
+          }}
+          onReturnRecord={props.handleOpenReturnModal}
+          onExtendDeadline={(r) => {
+            props.handleOpenExtendModal?.([r]);
+          }}
         />
       );
     default:

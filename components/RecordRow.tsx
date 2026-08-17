@@ -70,16 +70,16 @@ const RecordRow: React.FC<RecordRowProps> = ({
   // LOGIC MỚI: Tự động xác định trạng thái hiển thị
   // Nếu có thông tin xuất (Batch/Date) và chưa hoàn thành (Trả/Rút/Từ chối), coi như là Đã giao 1 cửa
   const getDisplayStatus = (r: RecordFile) => {
-      if (r.resultReturnedDate) {
-          return RecordStatus.RETURNED;
-      }
       if (r.status) {
           return r.status;
+      }
+      if (r.resultReturnedDate) {
+          return RecordStatus.RETURNED;
       }
       if ((r.exportBatch || r.exportDate) && r.status !== RecordStatus.WITHDRAWN && r.status !== RecordStatus.RETURNED && r.status !== RecordStatus.REJECTED) {
           return RecordStatus.HANDOVER;
       }
-      return r.status || RecordStatus.RECEIVED;
+      return RecordStatus.RECEIVED;
   };
   
   const displayStatus = getDisplayStatus(record);
@@ -88,7 +88,7 @@ const RecordRow: React.FC<RecordRowProps> = ({
   const cellClass = "p-3 md:p-3.5 align-middle text-slate-700 border-b border-slate-100/80 transition-colors duration-200";
 
   const orderedKeys = React.useMemo(() => {
-    const defaultOrder = ['code', 'customer', 'deadline', 'ward', 'mapSheet', 'landPlot', 'assigned', 'completed', 'type', 'tech', 'receipt', 'status'];
+    const defaultOrder = ['code', 'customer', 'type', 'deadline', 'ward', 'mapSheet', 'landPlot', 'assigned', 'completed', 'status'];
     if (columnOrder && columnOrder.length > 0) {
       return columnOrder;
     }
@@ -330,7 +330,7 @@ const RecordRow: React.FC<RecordRowProps> = ({
             <div className="flex items-center gap-1">
               <button onClick={(e) => { e.stopPropagation(); onView(record); }} className="p-1 text-slate-600 hover:text-green-700 hover:bg-green-100/80 rounded transition-colors border border-slate-200/80 bg-white" title="Xem chi tiết"><Eye size={15} /></button>
               
-              {onReturnResult && (displayStatus === RecordStatus.HANDOVER || displayStatus === RecordStatus.SIGNED) && !record.resultReturnedDate && (
+              {onReturnResult && displayStatus === RecordStatus.HANDOVER && !record.resultReturnedDate && (
                   <button onClick={(e) => { e.stopPropagation(); onReturnResult(record); }} className="p-1 text-emerald-700 hover:bg-emerald-100 rounded transition-colors border border-emerald-200 bg-emerald-50" title="Trả kết quả">
                       <FileCheck size={15} />
                   </button>

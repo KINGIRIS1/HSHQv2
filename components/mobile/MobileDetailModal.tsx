@@ -617,9 +617,11 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                   <span className="text-sm font-bold text-green-800">
                     {record.returnedPrice !== undefined && record.returnedPrice !== null
                       ? record.returnedPrice.toLocaleString('vi-VN') + ' đ'
-                      : (record.recordType === 'Cung cấp tài liệu đất đai'
-                          ? (record.price ? record.price.toLocaleString('vi-VN') + ' đ' : '310.000 đ')
-                          : (contractPrice !== null ? contractPrice.toLocaleString('vi-VN') + ' đ' : '---'))}
+                      : (record.price !== undefined && record.price !== null && record.price > 0
+                          ? record.price.toLocaleString('vi-VN') + ' đ'
+                          : (record.recordType === 'Cung cấp tài liệu đất đai'
+                              ? '310.000 đ'
+                              : (contractPrice !== null ? contractPrice.toLocaleString('vi-VN') + ' đ' : '---')))}
                   </span>
                 </div>
                 {liquidationInfo && (

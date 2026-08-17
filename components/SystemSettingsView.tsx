@@ -30,10 +30,9 @@ const ROLE_OPTIONS = [
 const PERMISSION_GROUPS = [
   {
     id: 'group_onedoor',
-    title: '1. Phân hệ Tổ Tiếp nhận & Một cửa',
-    desc: 'Quyền xem Tab Tiếp nhận & các chức năng giao dịch một cửa',
+    title: '1. Tiếp nhận',
+    desc: 'Các chức năng giao dịch và quản lý hồ sơ tiếp nhận',
     items: [
-      { id: 'receive_record', label: 'Xem & Truy cập Tab Tiếp nhận hồ sơ' },
       { id: 'ADD_RECORDS', label: 'Thêm / Nhập mới hồ sơ' },
       { id: 'EXPORT_RECORDS', label: 'Xuất danh sách hồ sơ (Excel)' },
     ]
@@ -41,9 +40,8 @@ const PERMISSION_GROUPS = [
   {
     id: 'group_dodac',
     title: '2. Tổ Đo đạc',
-    desc: 'Quyền xem Tab Đo đạc & các chức năng xử lý hồ sơ kỹ thuật',
+    desc: 'Các chức năng xử lý hồ sơ kỹ thuật & đo đạc',
     items: [
-      { id: 'all_records', label: 'Xem & Truy cập Tab Đo đạc (Hồ sơ kỹ thuật)' },
       { id: 'dodac_BTN_ASSIGN_STAFF', label: 'Giao việc' },
       { id: 'dodac_BTN_SUBMIT_CHECK', label: 'Trình kiểm tra' },
       { id: 'dodac_BTN_SUBMIT_SIGN', label: 'Trình ký' },
@@ -62,9 +60,8 @@ const PERMISSION_GROUPS = [
   {
     id: 'group_luutru',
     title: '3. Tổ Lưu trữ',
-    desc: 'Quyền xem Tab Lưu trữ & các chức năng quản lý kho tài liệu',
+    desc: 'Các chức năng quản lý kho tài liệu & hồ sơ lưu trữ',
     items: [
-      { id: 'archive_records', label: 'Xem & Truy cập Tab Lưu trữ (Hồ sơ & Công văn)' },
       { id: 'luutru_BTN_ASSIGN_STAFF', label: 'Giao việc' },
       { id: 'luutru_BTN_SUBMIT_CHECK', label: 'Trình kiểm tra' },
       { id: 'luutru_BTN_SUBMIT_SIGN', label: 'Trình ký' },
@@ -82,11 +79,9 @@ const PERMISSION_GROUPS = [
   },
   {
     id: 'group_hopdong',
-    title: '4. Phân hệ Tổ Hợp đồng dịch vụ',
-    desc: 'Quyền xem Tab Hợp đồng & các chức năng quản lý hợp đồng',
+    title: '4. Hợp đồng dịch vụ',
+    desc: 'Các chức năng quản lý hợp đồng',
     items: [
-      { id: 'receive_contract', label: 'Xem & Truy cập Tab Hợp đồng dịch vụ' },
-      { id: 'VIEW_CONTRACTS', label: 'Xem danh sách hợp đồng' },
       { id: 'ADD_CONTRACTS', label: 'Thêm mới hợp đồng' },
       { id: 'EDIT_CONTRACTS', label: 'Sửa thông tin hợp đồng' },
       { id: 'LIQUIDATE_CONTRACTS', label: 'Thanh lý / Lập quyết toán hợp đồng' },
@@ -96,7 +91,7 @@ const PERMISSION_GROUPS = [
   },
   {
     id: 'group_system_management',
-    title: '5. Phân hệ Tiện ích, Báo cáo & Quản trị Hệ thống',
+    title: '5. Tiện ích, Báo cáo & Quản trị Hệ thống',
     desc: 'Lịch công tác, Báo cáo, Chat nội bộ, Nhân sự, Tài khoản & Cài đặt',
     items: [
       { id: 'VIEW_SCHEDULE', label: 'Xem lịch công tác tuần' },
@@ -411,14 +406,11 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
       if (savedPerms) {
           try {
               const parsed = JSON.parse(savedPerms);
-              Object.keys(DEFAULT_ROLE_PERMISSIONS).forEach(roleKey => {
-                  const defPerms = DEFAULT_ROLE_PERMISSIONS[roleKey as UserRole] || [];
-                  const existingPerms = (parsed[roleKey] || []).filter((p: string) => p !== 'CHECK_RECORDS' && p !== 'BTN_CLOSE_BATCH');
-                  parsed[roleKey] = Array.from(new Set([...existingPerms, ...defPerms]));
-              });
-              setRolePermissions(parsed);
+              const cleanPerms: RolePermissions = { ...DEFAULT_ROLE_PERMISSIONS, ...parsed };
+              setRolePermissions(cleanPerms);
           } catch (e) {
               console.error("Failed to parse role_permissions", e);
+              setRolePermissions(DEFAULT_ROLE_PERMISSIONS);
           }
       } else {
           setRolePermissions(DEFAULT_ROLE_PERMISSIONS);
@@ -427,12 +419,7 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
       if (savedDeptPerms) {
           try {
               const parsedDept = JSON.parse(savedDeptPerms);
-              Object.keys(parsedDept).forEach(key => {
-                  if (Array.isArray(parsedDept[key])) {
-                      parsedDept[key] = parsedDept[key].filter((p: string) => p !== 'CHECK_RECORDS' && p !== 'BTN_CLOSE_BATCH');
-                  }
-              });
-              setDepartmentPermissions(parsedDept);
+              setDepartmentPermissions(parsedDept || {});
           } catch (e) {
               console.error("Failed to parse department_permissions", e);
           }

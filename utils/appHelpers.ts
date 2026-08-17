@@ -53,36 +53,33 @@ export const confirmAction = async (message: string, title: string = 'Xác nhậ
 };
 
 // --- ĐỊNH NGHĨA CÁC CỘT HIỂN THỊ ---
-// Updated: Căn giữa tiêu đề và điều chỉnh độ rộng theo yêu cầu
-// Updated: Gộp cột Đợt vào cột Hoàn thành
+// Updated: Thứ tự chuẩn theo quy định (MÃ HỒ SƠ, CHỦ SỬ DỤNG, LOẠI HỒ SƠ, THỜI HẠN XỬ LÝ, XÃ PHƯỜNG, TỜ, THỬA, GIAO NHÂN VIÊN, HOÀN THÀNH ĐỢT, TRẠNG THÁI)
 export const COLUMN_DEFS = [
   { key: 'code', label: 'MÃ HỒ SƠ', sortKey: 'code', className: 'w-[110px] text-center' },
   { key: 'customer', label: 'THÔNG TIN CHỦ SỬ DỤNG', sortKey: 'customerName', className: 'w-64 text-center' }, 
   { key: 'type', label: 'LOẠI HỒ SƠ', sortKey: 'recordType', className: 'w-[115px] text-center' },
-  { key: 'ward', label: 'XÃ PHƯỜNG', sortKey: 'ward', className: 'w-32 text-center' },
   { key: 'deadline', label: 'THỜI HẠN XỬ LÝ', sortKey: 'deadline', className: 'w-48 text-center' },
+  { key: 'ward', label: 'XÃ PHƯỜNG', sortKey: 'ward', className: 'w-32 text-center' },
   { key: 'mapSheet', label: 'TỜ', sortKey: 'mapSheet', className: 'w-16 text-center' }, 
   { key: 'landPlot', label: 'THỬA', sortKey: 'landPlot', className: 'w-16 text-center' }, 
   { key: 'assigned', label: 'GIAO NHÂN VIÊN', sortKey: 'assignedDate', className: 'w-48 text-center' },
-  { key: 'completed', label: 'HOÀN THÀNH / ĐỢT', sortKey: 'completedDate', className: 'w-32 text-center' },
-  { key: 'tech', label: 'TĐ / TL', sortKey: 'measurementNumber', className: 'w-20 text-center' },
-  { key: 'receipt', label: 'BIÊN LAI', sortKey: 'receiptNumber', className: 'w-20 text-center' },
+  { key: 'completed', label: 'HOÀN THÀNH ĐỢT', sortKey: 'completedDate', className: 'w-32 text-center' },
   { key: 'status', label: 'TRẠNG THÁI', sortKey: 'status', className: 'w-32 text-center' },
 ];
 
 export const DEFAULT_VISIBLE_COLUMNS = {
     code: true, 
     customer: true, 
+    type: true,
     deadline: true,
     ward: true, 
     mapSheet: true, 
     landPlot: true, 
     assigned: true, 
-    completed: true, // Mặc định hiện cột gộp này
-    type: true, 
+    completed: true, 
+    status: true,
     tech: false, 
-    receipt: true, 
-    status: true
+    receipt: false
 };
 
 // --- CÁC HÀM CHECK LOGIC ---
@@ -178,15 +175,15 @@ export const calculateDeadlineHelper = (type: string, receivedDateStr: string, h
     let daysToAdd = 30; 
     const lowerType = (type || '').toLowerCase();
 
-    if (lowerType.includes('1.1') || lowerType.includes('cung cấp tài liệu đất đai') || lowerType.includes('cung cấp dữ liệu') ||
+    if (lowerType.includes('2.3') || lowerType.includes('duyệt đơn & cung cấp số thửa') || lowerType.includes('dđ & cc số thửa') || lowerType.includes('dd & cc số thửa') || lowerType.includes('duyệt đơn-số thửa') || lowerType.includes('duyệt đơn') || lowerType.includes('cung cấp số thửa') || lowerType.includes('cập nhật số thửa') || lowerType.includes('cập nhập số thửa') || lowerType.includes('2.6')) {
+        daysToAdd = 12;
+    } else if (lowerType.includes('1.1') || lowerType.includes('sao lục') || lowerType.includes('cung cấp tài liệu đất đai') || lowerType.includes('cung cấp dữ liệu') ||
         lowerType.includes('2.1') || lowerType.includes('trích lục') || 
-        lowerType.includes('2.3 cập nhật') || lowerType.includes('2.3 cập nhập') || lowerType.includes('2.3 số thửa') || lowerType.includes('2.3 duyệt') || lowerType.includes('duyệt đơn-số thửa') ||
-        lowerType.includes('2.6') || lowerType.includes('số thửa') || lowerType.includes('cập nhật số thửa') || lowerType.includes('cập nhập số thửa') || lowerType.includes('duyệt đơn') ||
         lowerType.includes('quy hoạch')) {
         daysToAdd = 10;
     } else if (lowerType.includes('trích đo chỉnh lý') || lowerType.includes('chỉnh lý bản đồ')) {
         daysToAdd = 15;
-    } else if (lowerType.includes('2.2') || lowerType.includes('2.3') || lowerType.includes('trích đo') || 
+    } else if (lowerType.includes('2.2') || lowerType.includes('trích đo') || 
                lowerType.includes('2.4') || lowerType.includes('cắm mốc') || 
                lowerType.includes('2.5') || lowerType.includes('tách') || lowerType.includes('hợp') ||
                lowerType.includes('đo đạc') || lowerType.includes('tách thửa')) {
@@ -581,6 +578,30 @@ export function getBatchDisplayParts(batch: number | string | null | undefined, 
         batchName: parts[0] || 'Đợt lẻ',
         dateName: parts[1] ? `Ngày ${parts[1]}` : ''
     };
+}
+
+export function extractBatchOnly(batch: number | string | null | undefined): string {
+    if (!batch && batch !== 0) return '';
+    const bStr = String(batch).trim();
+    if (!bStr) return '';
+    
+    const numMatch = bStr.match(/Đợt\s*0*(\d+)/i) || bStr.match(/^(\d+)$/);
+    if (numMatch && numMatch[1]) {
+        return `${parseInt(numMatch[1], 10)}`;
+    }
+    const cleanStr = bStr.split(/\s*-\s*Ngày/i)[0].replace(/^Đợt\s*/i, '').trim();
+    return cleanStr;
+}
+
+export function extractBatchNumber(batch: number | string | null | undefined): number | string {
+    if (!batch && batch !== 0) return '';
+    const bStr = String(batch).trim();
+    if (!bStr) return '';
+    const numMatch = bStr.match(/Đợt\s*0*(\d+)/i) || bStr.match(/^(\d+)$/);
+    if (numMatch && numMatch[1]) {
+        return parseInt(numMatch[1], 10);
+    }
+    return bStr.split(/\s*-\s*Ngày/i)[0].replace(/^Đợt\s*/i, '').trim();
 }
 
 /**

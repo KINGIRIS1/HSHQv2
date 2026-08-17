@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, CalendarClock, AlertCircle, Calendar, MessageSquare, Clock } from 'lucide-react';
+import { X, CalendarClock, AlertCircle, Clock, Calendar } from 'lucide-react';
 import { RecordFile, User, Employee } from '../types';
 
 interface ExtendDeadlineModalProps {
@@ -16,9 +16,6 @@ export const ExtendDeadlineModal: React.FC<ExtendDeadlineModalProps> = ({
   isOpen,
   onClose,
   records,
-  currentUser,
-  employees,
-  users = [],
   onConfirm
 }) => {
   const [newDeadline, setNewDeadline] = useState(() => {
@@ -29,13 +26,13 @@ export const ExtendDeadlineModal: React.FC<ExtendDeadlineModalProps> = ({
     d.setDate(d.getDate() + 7);
     return d.toISOString().split('T')[0];
   });
-  const [reason, setReason] = useState('');
   const [executionDate, setExecutionDate] = useState(() => new Date().toISOString().split('T')[0]);
-  const [isAgreed, setIsAgreed] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
   if (!isOpen || records.length === 0) return null;
+
+  const target = records[0];
 
   const formatDateVN = (dStr?: string | null) => {
     if (!dStr) return 'Chưa có';
@@ -50,26 +47,22 @@ export const ExtendDeadlineModal: React.FC<ExtendDeadlineModalProps> = ({
     }
   };
 
+  const handleQuickAddDays = (days: number) => {
+    const baseDate = target.deadline ? new Date(target.deadline) : new Date();
+    baseDate.setDate(baseDate.getDate() + days);
+    setNewDeadline(baseDate.toISOString().split('T')[0]);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newDeadline) {
       setErrorMsg('Vui lòng chọn ngày hẹn trả mới!');
       return;
     }
-    if (!reason.trim()) {
-      setErrorMsg('Vui lòng nhập lý do gia hạn!');
-      return;
-    }
-    if (!isAgreed) {
-      setErrorMsg('Vui lòng tích chọn đồng ý trước khi thực hiện!');
-      return;
-    }
     setErrorMsg('');
     setIsSubmitting(true);
     try {
-      await onConfirm(newDeadline, reason.trim(), executionDate);
-      setReason('');
-      setIsAgreed(false);
+      await onConfirm(newDeadline, '', executionDate);
       onClose();
     } catch (err) {
       console.error(err);
@@ -80,25 +73,25 @@ export const ExtendDeadlineModal: React.FC<ExtendDeadlineModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[70] p-4 animate-fade-in">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl overflow-hidden flex flex-col border border-amber-100 animate-fade-in-up">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-[70] p-4 animate-fade-in">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col border border-amber-100 animate-fade-in-up">
         {/* Header */}
-        <div className="bg-amber-600 px-5 py-3.5 text-white flex justify-between items-center shadow-sm">
-          <div className="flex items-center gap-2.5 font-bold text-lg">
-            <CalendarClock size={22} className="shrink-0" />
-            <span>Thao Tác Gia Hạn Hẹn Trả</span>
+        <div className="bg-gradient-to-r from-amber-600 to-amber-700 px-5 py-3.5 text-white flex justify-between items-center shadow-sm">
+          <div className="flex items-center gap-2.5 font-bold text-base md:text-lg">
+            <CalendarClock size={22} className="shrink-0 text-amber-200" />
+            <span>Gia Hạn Hẹn Trả Kết Quả</span>
           </div>
           <button 
             type="button"
             onClick={onClose} 
-            className="text-amber-100 hover:text-white p-1 rounded-lg hover:bg-amber-700 transition-colors"
+            className="text-amber-100 hover:text-white p-1 rounded-lg hover:bg-amber-800 transition-colors"
           >
             <X size={20} />
           </button>
         </div>
 
         {/* Content Form */}
-        <form onSubmit={handleSubmit} className="p-5 space-y-4 max-h-[85vh] overflow-y-auto">
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
           {errorMsg && (
             <div className="p-3 bg-red-50 border border-red-200 text-red-600 text-xs font-bold rounded-xl flex items-center gap-2">
               <AlertCircle size={16} className="shrink-0" />
@@ -106,107 +99,91 @@ export const ExtendDeadlineModal: React.FC<ExtendDeadlineModalProps> = ({
             </div>
           )}
 
-          {/* Section 1: Target Records */}
-          <div className="bg-amber-50/60 border border-amber-100 p-3.5 rounded-xl">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold text-amber-900">
-                Hồ sơ thực hiện gia hạn ({records.length}):
+          {/* Target Record Info Card */}
+          <div className="bg-amber-50/70 border border-amber-200/80 p-3.5 rounded-xl space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-amber-950 font-mono tracking-tight text-sm">
+                {target.code}
               </span>
-              <span className="bg-amber-200/80 text-amber-900 text-[11px] px-2 py-0.5 rounded-full font-bold">
-                {records.length} hồ sơ
+              <span className="text-xs font-bold text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-md border border-amber-300">
+                Hạn cũ: {formatDateVN(target.deadline)}
               </span>
             </div>
-            <div className="max-h-28 overflow-y-auto space-y-1.5 text-xs pr-1">
-              {records.map(r => (
-                <div key={r.id} className="flex items-center justify-between bg-white p-2 rounded-lg border border-amber-100/80 font-medium shadow-xs">
-                  <span className="font-bold text-slate-800 font-mono tracking-tight">{r.code}</span>
-                  <span className="text-slate-700 font-semibold truncate max-w-[160px] uppercase">{r.customerName}</span>
-                  <span className="text-amber-800 font-bold text-[11px] bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-                    Hạn cũ: {formatDateVN(r.deadline)}
-                  </span>
-                </div>
+            <div className="text-xs text-slate-700 font-semibold uppercase">
+              {target.customerName}
+            </div>
+            {target.address && (
+              <div className="text-[11px] text-slate-500 truncate">
+                {target.address}
+              </div>
+            )}
+          </div>
+
+          {/* New Deadline Selection */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                <Clock size={15} className="text-amber-600" />
+                <span>Ngày hẹn trả mới (Hạn giao mới)</span>
+                <span className="text-red-500">*</span>
+              </label>
+            </div>
+
+            <input
+              type="date"
+              required
+              className="w-full border-2 border-amber-300 rounded-xl px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-600 outline-none font-bold text-amber-900 bg-amber-50/30 shadow-xs"
+              value={newDeadline}
+              onChange={(e) => setNewDeadline(e.target.value)}
+            />
+
+            {/* Quick Add Days Pills */}
+            <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+              <span className="text-[11px] text-slate-500 font-medium mr-1">Tăng nhanh:</span>
+              {[3, 5, 7, 10, 15].map(days => (
+                <button
+                  key={days}
+                  type="button"
+                  onClick={() => handleQuickAddDays(days)}
+                  className="px-2.5 py-1 text-xs font-bold bg-amber-100/80 hover:bg-amber-200 text-amber-800 rounded-lg transition-colors border border-amber-300/80 active:scale-95"
+                >
+                  +{days} ngày
+                </button>
               ))}
             </div>
           </div>
 
-          {/* Section 2: New Deadline Date */}
+          {/* Execution Date */}
           <div>
-            <label className="block text-xs font-bold text-slate-800 mb-1.5 flex items-center gap-1.5">
-              <Clock size={15} className="text-amber-600" />
-              <span>Ngày hẹn trả mới (Hạn giao mới)</span>
-              <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="date"
-              required
-              className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none font-bold text-amber-900 bg-amber-50/40"
-              value={newDeadline}
-              onChange={(e) => setNewDeadline(e.target.value)}
-            />
-          </div>
-
-          {/* Section 3: Extension Reason */}
-          <div>
-            <label className="block text-xs font-bold text-slate-800 mb-1.5 flex items-center gap-1.5">
-              <MessageSquare size={15} className="text-amber-600" />
-              <span>Lý do gia hạn hẹn trả</span>
-              <span className="text-red-500">*</span>
-            </label>
-            <textarea
-              rows={3}
-              required
-              className="w-full border border-slate-300 rounded-xl p-3 text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none font-medium text-slate-800 placeholder:text-slate-400 resize-none"
-              placeholder="Nhập chi tiết lý do gia hạn ngày hẹn..."
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-            />
-          </div>
-
-          {/* Section 4: Execution Date */}
-          <div>
-            <label className="block text-xs font-bold text-slate-800 mb-1.5 flex items-center gap-1.5">
-              <Calendar size={15} className="text-indigo-600" />
+            <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center gap-1.5">
+              <Calendar size={15} className="text-slate-500" />
               <span>Ngày thực hiện gia hạn</span>
             </label>
             <input
               type="date"
-              className="w-full border border-slate-300 rounded-xl px-3.5 py-2 text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none font-semibold text-slate-700 bg-slate-50"
+              className="w-full border border-slate-300 rounded-xl px-3.5 py-2 text-xs font-semibold text-slate-700 bg-slate-50"
               value={executionDate}
               onChange={(e) => setExecutionDate(e.target.value)}
             />
           </div>
 
-          {/* Section 5: Agreement Checkbox */}
-          <div className="bg-amber-50/80 border border-amber-200/80 p-3.5 rounded-xl flex items-start gap-2.5">
-            <input
-              type="checkbox"
-              id="agree-extend-checkbox"
-              checked={isAgreed}
-              onChange={(e) => setIsAgreed(e.target.checked)}
-              className="mt-0.5 w-4 h-4 text-amber-600 rounded focus:ring-amber-500 cursor-pointer"
-            />
-            <label htmlFor="agree-extend-checkbox" className="text-xs font-semibold text-amber-950 cursor-pointer select-none leading-relaxed">
-              Tôi đã xác nhận nội dung trên và <span className="font-bold underline text-amber-700">ĐỒNG Ý</span> thực hiện gia hạn hẹn trả cho hồ sơ này.
-            </label>
-          </div>
-
-          {/* Section 6: Footer Actions */}
-          <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
+          {/* Footer Actions */}
+          <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100">
             <button
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-sm transition-colors active:scale-95"
+              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs md:text-sm transition-colors active:scale-95 cursor-pointer"
             >
               Hủy
             </button>
             <button
               type="submit"
-              disabled={isSubmitting || !newDeadline || !reason.trim() || !isAgreed}
-              className="flex items-center gap-2 px-6 py-2.5 bg-amber-600 hover:bg-amber-700 disabled:opacity-40 text-white rounded-xl font-bold text-sm shadow-md transition-all active:scale-95"
+              disabled={isSubmitting || !newDeadline}
+              className="flex items-center gap-2 px-5 py-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white rounded-xl font-bold text-xs md:text-sm shadow-md transition-all active:scale-95 cursor-pointer"
             >
               <CalendarClock size={16} />
-              {isSubmitting ? 'Đang xử lý...' : 'Đồng Ý & Thực Hiện'}
+              {isSubmitting ? 'Đang lưu...' : 'Xác nhận gia hạn'}
             </button>
           </div>
         </form>
