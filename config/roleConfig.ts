@@ -32,7 +32,7 @@ export const ROLE_VIEWS_CONFIG: Record<UserRole, RoleConfig> = {
   [UserRole.EMPLOYEE]: {
     role: UserRole.EMPLOYEE,
     allowedViews: [
-      'dashboard', 'personal_profile', 'work_schedule', 'utilities', 
+      'dashboard', 'personal_profile', 'work_schedule', 'utilities', 'tools_group',
       'reports', 'account_settings'
     ]
   },
@@ -40,7 +40,7 @@ export const ROLE_VIEWS_CONFIG: Record<UserRole, RoleConfig> = {
     role: UserRole.TEAM_LEADER,
     // Thừa hưởng toàn bộ quyền cơ bản của Employee
     allowedViews: [
-      'dashboard', 'personal_profile', 'work_schedule', 'utilities', 
+      'dashboard', 'personal_profile', 'work_schedule', 'utilities', 'tools_group',
       'reports', 'account_settings'
     ],
     // Mở rộng quyền Chuyên môn dựa trên Tổ chuyên môn đang quản lý
@@ -92,7 +92,7 @@ export function isViewAllowedForUser(
   if (user.role === UserRole.ADMIN) return true;
 
   // Views that are always accessible to any logged in user
-  if (['dashboard', 'personal_profile', 'account_settings'].includes(viewId)) {
+  if (['dashboard', 'personal_profile', 'account_settings', 'utilities', 'tools_group'].includes(viewId)) {
     return true;
   }
 

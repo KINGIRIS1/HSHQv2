@@ -133,7 +133,6 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
       isDropdown: false,
       isTabGroup: true,
       subItems: [
-        { id: 'excerpt_management', label: 'Số TL/TĐ', icon: BookOpen, visible: true },
         { id: 'utilities', label: 'Tiện ích', icon: PenTool, visible: true },
         { id: 'reports', label: 'Báo cáo', icon: BarChart3, visible: true },
       ]
