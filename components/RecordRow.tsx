@@ -73,10 +73,13 @@ const RecordRow: React.FC<RecordRowProps> = ({
       if (r.resultReturnedDate) {
           return RecordStatus.RETURNED;
       }
+      if (r.status) {
+          return r.status;
+      }
       if ((r.exportBatch || r.exportDate) && r.status !== RecordStatus.WITHDRAWN && r.status !== RecordStatus.RETURNED && r.status !== RecordStatus.REJECTED) {
           return RecordStatus.HANDOVER;
       }
-      return r.status;
+      return r.status || RecordStatus.RECEIVED;
   };
   
   const displayStatus = getDisplayStatus(record);

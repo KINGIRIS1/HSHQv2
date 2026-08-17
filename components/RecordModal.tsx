@@ -383,6 +383,8 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
             finalData.approvalDate = undefined;
             finalData.completedDate = undefined;
             finalData.resultReturnedDate = undefined;
+            finalData.exportBatch = undefined;
+            finalData.exportDate = undefined;
         }
         else if (finalData.status === RecordStatus.PENDING_CHECK) {
             finalData.checkedDate = undefined;
@@ -390,23 +392,31 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
             finalData.approvalDate = undefined;
             finalData.completedDate = undefined;
             finalData.resultReturnedDate = undefined;
+            finalData.exportBatch = undefined;
+            finalData.exportDate = undefined;
         }
         else if (finalData.status === RecordStatus.CHECKED) {
             finalData.submissionDate = undefined;
             finalData.approvalDate = undefined;
             finalData.completedDate = undefined;
             finalData.resultReturnedDate = undefined;
+            finalData.exportBatch = undefined;
+            finalData.exportDate = undefined;
         }
         // 3. Nếu quay về PENDING_SIGN (Chờ ký) -> Xóa bước Xong, Trả
         else if (finalData.status === RecordStatus.PENDING_SIGN) {
             finalData.approvalDate = undefined;
             finalData.completedDate = undefined;
             finalData.resultReturnedDate = undefined;
+            finalData.exportBatch = undefined;
+            finalData.exportDate = undefined;
         }
         // 4. Nếu quay về SIGNED (Đã ký) -> Xóa bước Hoàn thành/Trả
         else if (finalData.status === RecordStatus.SIGNED) {
             finalData.completedDate = undefined;
             finalData.resultReturnedDate = undefined;
+            finalData.exportBatch = undefined;
+            finalData.exportDate = undefined;
         }
     }
 
@@ -418,12 +428,17 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
         if (!finalData.completedDate) finalData.completedDate = finalData.resultReturnedDate;
     }
     
-    // LOGIC QUAN TRỌNG: Nếu có Đợt xuất hoặc Ngày xuất thì phải là HANDOVER (trừ khi Đã rút, Đã trả hoặc Bị từ chối)
-    if ((finalData.exportBatch || finalData.exportDate) && finalData.status !== RecordStatus.WITHDRAWN && finalData.status !== RecordStatus.RETURNED && finalData.status !== RecordStatus.REJECTED) {
-        finalData.status = RecordStatus.HANDOVER;
-        // Nếu chưa có completedDate, lấy luôn ngày xuất (nếu có) hoặc hôm nay
+    // Nếu trạng thái là HANDOVER (Đã giao 1 cửa), bổ sung completedDate nếu chưa có
+    if (finalData.status === RecordStatus.HANDOVER) {
         if (!finalData.completedDate) {
             finalData.completedDate = finalData.exportDate ? finalData.exportDate : new Date().toISOString();
+        }
+    } else if (finalData.status !== RecordStatus.WITHDRAWN && finalData.status !== RecordStatus.RETURNED && finalData.status !== RecordStatus.REJECTED) {
+        // Nếu người dùng chọn trạng thái khác (Đã ký, Chờ ký, Đã kiểm tra...), tôn trọng trạng thái đã chọn
+        // Nếu trước đó là HANDOVER và người dùng đã xóa thông tin xuất, làm sạch exportBatch và exportDate
+        if (initialData?.status === RecordStatus.HANDOVER && !formData.exportBatch && !formData.exportDate) {
+            finalData.exportBatch = undefined;
+            finalData.exportDate = undefined;
         }
     }
 
@@ -445,7 +460,19 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
     }
 
     // Để đảm bảo gửi null thay vì undefined cho API nếu cần xóa
-    const cleanData = JSON.parse(JSON.stringify(finalData));
+    const cleanData: any = { ...finalData };
+    const nullableFields: (keyof RecordFile)[] = [
+        'assignedDate', 'completedWorkDate', 'pendingCheckDate', 'checkedDate',
+        'submissionDate', 'approvalDate', 'completedDate', 'resultReturnedDate',
+        'exportDate', 'exportBatch', 'handoverWard', 'receiptNumber', 'returnedPrice',
+        'advancePayment', 'price', 'issueDate', 'reminderDate', 'archiveHandoverDate'
+    ];
+    nullableFields.forEach(f => {
+        if (cleanData[f] === undefined || cleanData[f] === '') {
+            cleanData[f] = null;
+        }
+    });
+
     if(finalData.status === RecordStatus.RECEIVED) {
         cleanData.assignedDate = null;
         cleanData.submissionDate = null;
@@ -826,7 +853,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                                 </div>
                                 <div>
                                     <label className="block text-[10px] font-bold text-indigo-800 uppercase mb-1">Ngày xuất</label>
-                                    <input type="date" className="w-full border border-indigo-200 rounded-md px-2.5 py-1.5 text-sm bg-white" value={val(formData.exportDate ? formData.exportDate.split('T')[0] : '')} onChange={(e) => handleChange('exportDate', new Date(e.target.value).toISOString())} />
+                                    <input type="date" className="w-full border border-indigo-200 rounded-md px-2.5 py-1.5 text-sm bg-white" value={dateVal(formData.exportDate)} onChange={(e) => handleChange('exportDate', e.target.value ? e.target.value : null)} />
                                 </div>
                                 <div>
                                     <label className="block text-[10px] font-bold text-purple-900 uppercase mb-1">Phi địa giới</label>
