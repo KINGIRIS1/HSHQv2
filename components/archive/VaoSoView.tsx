@@ -73,7 +73,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
     const [employees, setEmployees] = useState<any[]>([]);
 
     const hasBatchPermission = () => {
-        if (currentUser.role === 'ADMIN') return true;
+        if (currentUser.role === 'ADMIN' || currentUser.role === 'SUBADMIN') return true;
         
         // Default permissions if not loaded yet
         if (!rolePermissions) {

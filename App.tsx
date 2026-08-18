@@ -982,7 +982,10 @@ function App() {
 
           return {
               ...r,
+              originalDeadline: r.originalDeadline || r.deadline,
               deadline: newDeadlineISO,
+              extendedBy: currentUser?.employeeId || currentUser?.name || currentUser?.username || 'Hệ thống',
+              extendedAt: executionDateISO,
               privateNotes: updatedPrivateNotes
           };
       });

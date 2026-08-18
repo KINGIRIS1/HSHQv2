@@ -32,7 +32,6 @@ interface RecordLookupViewProps {
     onReturnRecord?: (record: RecordFile) => void;
     onExtendDeadline?: (record: RecordFile) => void;
     onSupplementRecord?: (record: RecordFile) => void;
-    onExportReturnBatch?: () => void;
 }
 
 const formatDate = (dateStr?: string | null) => {
@@ -50,8 +49,7 @@ export const RecordLookupView: React.FC<RecordLookupViewProps> = ({
     onEditRecord,
     onReturnRecord,
     onExtendDeadline,
-    onSupplementRecord,
-    onExportReturnBatch
+    onSupplementRecord
 }) => {
     // Search Term State
     const [searchTerm, setSearchTerm] = useState('');
@@ -189,18 +187,6 @@ export const RecordLookupView: React.FC<RecordLookupViewProps> = ({
                             <FileSpreadsheet size={15} className="text-emerald-600" />
                             <span>Xuất Excel</span>
                         </button>
-
-                        {onExportReturnBatch && (
-                            <button
-                                type="button"
-                                onClick={onExportReturnBatch}
-                                className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 hover:border-indigo-300 rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer whitespace-nowrap"
-                                title="Xuất danh sách đợt xuất và ngày xuất lưu trữ"
-                            >
-                                <FileCheck size={15} className="text-indigo-600" />
-                                <span>Xuất DS lưu</span>
-                            </button>
-                        )}
                     </div>
                 </div>
             </div>

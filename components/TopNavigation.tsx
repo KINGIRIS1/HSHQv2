@@ -45,7 +45,7 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
   const isEmployee = currentUser.role === UserRole.EMPLOYEE;
 
   const hasPermission = (permissionId: string) => {
-    if (isAdmin) return true;
+    if (isAdmin || isSubadmin) return true;
 
     if (currentUser.employeeId && employees) {
         const emp = employees.find(e => e.id === currentUser.employeeId);

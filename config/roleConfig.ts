@@ -86,8 +86,8 @@ export function isViewAllowedForUser(
 ): boolean {
   if (!user) return false;
 
-  // Admin always allowed
-  if (user.role === UserRole.ADMIN) return true;
+  // Admin and Subadmin always allowed full access without department restrictions
+  if (user.role === UserRole.ADMIN || user.role === UserRole.SUBADMIN) return true;
 
   // Views that are always accessible to any logged in user
   if (['dashboard', 'personal_profile', 'account_settings', 'utilities', 'tools_group'].includes(viewId)) {

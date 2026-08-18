@@ -189,6 +189,17 @@ export interface RecordFile {
   price?: number | null;
   advancePayment?: number | null;
 
+  // Gia hạn hồ sơ
+  originalDeadline?: string | null;  // Hạn gốc ban đầu
+  extendedBy?: string | null;        // Người thực hiện gia hạn
+  extendedAt?: string | null;        // Thời gian thực hiện gia hạn
+
+  // Bàn giao kho lưu / Danh sách trả kết quả
+  archiveBatchName?: string | null;  // Tên đợt lưu kho (ví dụ: Đợt 1)
+  archiveExportDate?: string | null; // Ngày xuất danh sách lưu kho
+  archiveBatchDate?: string | null;  // Ngày chốt đợt lưu kho
+  updatedAt?: string | null;
+
   // Lịch sử trạng thái và Bàn giao kho lưu
   statusLogs?: RecordStatusLog[];
   archiveHandoverDate?: string | null;

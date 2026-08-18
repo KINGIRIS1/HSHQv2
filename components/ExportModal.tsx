@@ -11,7 +11,7 @@ interface ExportModalProps {
   onClose: () => void;
   records: RecordFile[];
   wards: string[];
-  type: 'handover' | 'check_list' | 'return_handover'; // Phân loại danh sách
+  type: 'handover' | 'check_list'; // Phân loại danh sách
   onPreview: (workbook: XLSX.WorkBook, fileName: string) => void; // Callback để mở Preview
   currentView?: string;
 }
@@ -66,29 +66,6 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
               } else if (r.status === RecordStatus.HANDOVER) {
                   // Fallback cho những hồ sơ thiếu exportBatch (Chưa chốt đợt hoặc nhập từ Excel)
                   const dateStr = (r.completedDate || r.receivedDate || new Date().toISOString()).split('T')[0];
-                  const key = `${dateStr}_NOT_BATCHED`;
-                  if (!batches[key]) {
-                      batches[key] = { date: dateStr, batch: 'Lẻ (Chưa tạo đợt)', count: 0 };
-                  }
-                  batches[key].count++;
-              }
-          }
-      } else if (type === 'return_handover') {
-          // Logic cho Danh sách bàn giao tổ lưu trữ
-          if (r.returnBatch || r.status === RecordStatus.RETURNED) {
-              if (r.returnBatch) {
-                  let dateStr = r.returnBatchDate ? r.returnBatchDate.split('T')[0] : '';
-                  if (!dateStr) {
-                      dateStr = (r.resultReturnedDate || r.completedDate || r.receivedDate || new Date().toISOString()).split('T')[0];
-                  }
-                  const key = `${dateStr}_${r.returnBatch}`;
-                  if (!batches[key]) {
-                      batches[key] = { date: dateStr, batch: r.returnBatch, count: 0 };
-                  }
-                  batches[key].count++;
-              } else if (r.status === RecordStatus.RETURNED) {
-                  // Fallback cho những hồ sơ đã trả kết quả nhưng chưa chốt đợt lưu
-                  const dateStr = (r.resultReturnedDate || r.completedDate || r.receivedDate || new Date().toISOString()).split('T')[0];
                   const key = `${dateStr}_NOT_BATCHED`;
                   if (!batches[key]) {
                       batches[key] = { date: dateStr, batch: 'Lẻ (Chưa tạo đợt)', count: 0 };
@@ -214,37 +191,6 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
             : (/^đợt/i.test(batchStr) ? batchStr : `Dot_${batchStr}`).replace(/[\/\s\-]+/g, '_');
         fileName = `Giao_1_Cua_${catPrefix}${cleanBatchNameForFile}_${safeDate}`;
 
-    } else if (type === 'return_handover') {
-        const parts = selectedBatchKey.split('_');
-        const dateStr = parts[0];
-        const batchStr = parts.slice(1).join('_');
-        
-        recordsToExport = categoryRecords.filter(r => {
-            const targetWard = r.handoverWard || r.ward;
-            const matchWard = selectedWard === 'all' || targetWard === selectedWard;
-            
-            if (batchStr === 'NOT_BATCHED') {
-                const rDateObj = (r.resultReturnedDate || r.completedDate || r.receivedDate || new Date().toISOString()).split('T')[0];
-                return (r.status === RecordStatus.RETURNED || r.resultReturnedDate) && !r.returnBatch && rDateObj === dateStr && matchWard;
-            } else {
-                const rDateObj = r.returnBatchDate ? r.returnBatchDate.split('T')[0] : '';
-                const matchDate = !dateStr || rDateObj === dateStr;
-                const matchBatch = String(r.returnBatch ?? '').trim() === String(batchStr ?? '').trim();
-                return matchDate && matchBatch && matchWard;
-            }
-        });
-
-        title = `DANH SÁCH BÀN GIAO TỔ LƯU TRỮ${wardTitle}`;
-        const displayBatch = batchStr === 'NOT_BATCHED' 
-            ? 'CHƯA TẠO ĐỢT' 
-            : (/^đợt/i.test(batchStr) ? batchStr.toUpperCase() : `ĐỢT ${batchStr}`.toUpperCase());
-        subTitle = `${displayBatch}  -  TỔNG SỐ HỒ SƠ: ${recordsToExport.length}`;
-        const safeDate = dateStr.replace(/-/g, '');
-        const cleanBatchNameForFile = batchStr === 'NOT_BATCHED' 
-            ? 'Le' 
-            : (/^đợt/i.test(batchStr) ? batchStr : `Dot_${batchStr}`).replace(/[\/\s\-]+/g, '_');
-        fileName = `Ban_Giao_To_Luu_Tru_${cleanBatchNameForFile}_${safeDate}`;
-
     } else {
         // Check List
         const dateStr = selectedBatchKey.replace('date_', '');
@@ -274,14 +220,14 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
 
     // --- TẠO EXCEL ---
     // Tiêu đề ngày tháng (dùng ngày hiện tại hoặc ngày của đợt)
-    const exportDateParts = (type === 'handover' || type === 'return_handover')
+    const exportDateParts = type === 'handover' 
         ? selectedBatchKey.split('_')[0].split('-') 
         : selectedBatchKey.replace('date_', '').split('-');
         
     const displayDate = `Ngày ${exportDateParts[2]} tháng ${exportDateParts[1]} năm ${exportDateParts[0]}`;
 
     // --- CẤU HÌNH CỘT ĐỘNG ---
-    const isHandover = type === 'handover' || type === 'return_handover';
+    const isHandover = type === 'handover';
     const isSpecificWard = selectedWard !== 'all';
 
     // 1. Header Array
@@ -563,7 +509,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
         <div className="flex justify-between items-center p-5 border-b">
           <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
             <Printer className="text-blue-600" />
-            {type === 'handover' ? 'Xuất DS Giao 1 Cửa' : type === 'return_handover' ? 'Xuất DS Bàn Giao Tổ Lưu Trữ' : 'Xuất DS Trình Ký'}
+            {type === 'handover' ? 'Xuất DS Giao 1 Cửa' : 'Xuất DS Trình Ký'}
           </h2>
           <button onClick={onClose} className="text-gray-500 hover:text-red-600 transition-colors">
             <X size={24} />
@@ -582,7 +528,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
                         >
                             {batchOptions.map(opt => (
                                 <option key={opt.key} value={opt.key}>
-                                    {type === 'handover' || type === 'return_handover'
+                                    {type === 'handover' 
                                       ? (opt.batch === 'Lẻ (Chưa tạo đợt)' 
                                           ? `Lẻ (Chưa tạo đợt) - Ngày ${formatDate(opt.date)} (${opt.count} HS)`
                                           : `${formatBatchName(opt.batch, '', opt.date)} (${opt.count} HS)`)
@@ -597,8 +543,6 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
                     <div className="text-center p-4 bg-gray-50 rounded-lg text-gray-500 border border-gray-200 text-sm">
                         {type === 'handover' 
                             ? 'Chưa có đợt giao nào. Hãy thực hiện "Chốt danh sách" trước.'
-                            : type === 'return_handover'
-                            ? 'Chưa có đợt lưu nào. Hãy thực hiện "Chốt DS" chuyển lưu trước.'
                             : 'Không có hồ sơ nào đang chờ ký.'}
                     </div>
                 )}
