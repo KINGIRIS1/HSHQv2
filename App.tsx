@@ -1034,14 +1034,13 @@ function App() {
 
           if (optionType === 'pause_supplement') {
               newStatus = RecordStatus.PENDING_SUPPLEMENT;
-              internalLogNote = `[TRẢ DỪNG QUY TRÌNH (CHỜ BỔ SUNG) - ${formattedReturnDate}] Lý do: ${reason} (Người trả: ${userLabel})`;
+              internalLogNote = `Trả bổ sung: ${reason || 'Không có lý do'} (Người trả: ${userLabel})`;
           } else if (optionType === 'cancel_reject') {
               newStatus = RecordStatus.REJECTED;
-              internalLogNote = `[TRẢ HỦY HỒ SƠ (TẠM DỪNG / TỪ CHỐI 1 CỬA) - ${formattedReturnDate}] Lý do: ${reason} (Người trả: ${userLabel})`;
+              internalLogNote = `Trả hủy hồ sơ: ${reason || 'Không có lý do'} (Người trả: ${userLabel})`;
           } else {
               newStatus = RecordStatus.IN_PROGRESS;
-              const prevStatusLabel = STATUS_LABELS[r.status] || r.status;
-              internalLogNote = `[TRẢ VỀ CÁN BỘ THỤ LÝ - ${formattedReturnDate}] Trả từ bước "${prevStatusLabel}" về Đang thực hiện. Lý do: ${reason} (Người trả: ${userLabel})`;
+              internalLogNote = `Trả về cán bộ thụ lý: ${reason || 'Không có lý do'} (Người trả: ${userLabel})`;
           }
 
           const existingNotes = r.privateNotes || '';
