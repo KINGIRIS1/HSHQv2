@@ -35,7 +35,7 @@ export const ReturnedResultListView: React.FC<ReturnedResultListViewProps> = ({
 
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [currentPage, setCurrentPage] = useState(1);
-    const [pageSize, setPageSize] = useState(10);
+    const [pageSize, setPageSize] = useState(20);
 
     // Ngày hiện tại
     const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
@@ -501,8 +501,9 @@ export const ReturnedResultListView: React.FC<ReturnedResultListViewProps> = ({
                                         <th className="p-3 w-16 text-center">THỬA</th>
                                         <th className="p-3 w-32 text-center">XÃ PHƯỜNG</th>
                                         <th className="p-3 w-28 text-center">NGÀY TRẢ DÂN</th>
-                                        <th className="p-3 w-44 text-center">NGƯỜI NHẬN KQ</th>
-                                        <th className="p-3 w-36 text-center">ĐỢT LƯU</th>
+                                        <th className="p-3 w-40 text-center">NGƯỜI NHẬN KQ</th>
+                                        <th className="p-3 w-48 text-center">GHI CHÚ</th>
+                                        <th className="p-3 w-32 text-center">ĐỢT LƯU</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100 font-medium">
@@ -543,6 +544,9 @@ export const ReturnedResultListView: React.FC<ReturnedResultListViewProps> = ({
                                                 </td>
                                                 <td className={`${cellClass} text-center text-slate-800 font-semibold`}>
                                                     {record.receiverName || record.customerName || '--'}
+                                                </td>
+                                                <td className={`${cellClass} text-left text-slate-700 text-xs px-3`}>
+                                                    {record.notes || (record.receiverName ? `Trả hồ sơ: Đã trả kết quả cho ${record.receiverName}` : 'Trả hồ sơ: Đã trả kết quả')}
                                                 </td>
                                                 {/* Cột Đợt lưu */}
                                                 <td className={`${cellClass} text-center`}>

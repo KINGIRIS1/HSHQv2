@@ -86,29 +86,48 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
     const userDept = userEmployee?.department || '';
     const userRole = currentUser?.role;
 
-    // Quản trị viên (Admin/Subadmin) hoặc người thuộc Tổ Hành chính có quyền xem tất cả các tổ
-    const isHanhChinhOrAdmin = useMemo(() => {
+    // Quản trị viên (Admin/Subadmin) có quyền xem tất cả các tổ và doanh thu
+    const canSeeAllDepts = useMemo(() => {
         if (!currentUser) return true;
-        if (userRole === 'ADMIN' || userRole === 'SUBADMIN') return true;
-        const deptLower = userDept.toLowerCase();
-        return deptLower.includes('hành chính') || deptLower.includes('một cửa');
-    }, [currentUser, userDept, userRole]);
+        return currentUser.role === 'ADMIN' || currentUser.role === 'SUBADMIN';
+    }, [currentUser]);
+
+    const isAdminOrSubadmin = useMemo(() => {
+        if (!currentUser) return true;
+        return currentUser.role === 'ADMIN' || currentUser.role === 'SUBADMIN';
+    }, [currentUser]);
 
     const [mainTab, setMainTab] = useState<'measurement' | 'archive'>('measurement');
     const [archiveRecords, setArchiveRecords] = useState<RecordFile[]>([]);
     const [isArchiveLoading, setIsArchiveLoading] = useState<boolean>(false);
 
-    // Tự động chuyển tab chính nếu người dùng bị giới hạn quyền theo tổ
+    // Tự động chuyển tab chính nếu người dùng bị giới hạn quyền theo tổ (Chỉ Admin/Subadmin xem được tất cả tổ)
     useEffect(() => {
-        if (!isHanhChinhOrAdmin && userDept) {
+        if (!canSeeAllDepts && userDept) {
             const deptLower = userDept.toLowerCase();
-            if ((deptLower.includes('đo đạc') || deptLower.includes('kỹ thuật')) && mainTab !== 'measurement') {
-                setMainTab('measurement');
-            } else if (deptLower.includes('lưu trữ') && mainTab !== 'archive') {
-                setMainTab('archive');
+            if (deptLower.includes('lưu trữ') && !deptLower.includes('đo đạc')) {
+                if (mainTab !== 'archive') setMainTab('archive');
+            } else {
+                if (mainTab !== 'measurement') setMainTab('measurement');
             }
         }
-    }, [isHanhChinhOrAdmin, userDept, mainTab]);
+    }, [canSeeAllDepts, userDept, mainTab]);
+
+    // Giới hạn nhân viên thường (EMPLOYEE, ONEDOOR) chỉ xem báo cáo cá nhân
+    useEffect(() => {
+        if (currentUser && (currentUser.role === 'EMPLOYEE' || currentUser.role === 'ONEDOOR')) {
+            if (currentUser.employeeId && selectedEmpId !== currentUser.employeeId) {
+                setSelectedEmpId(currentUser.employeeId);
+            }
+        }
+    }, [currentUser, selectedEmpId]);
+
+    // Ẩn/chuyển hướng tab doanh thu đối với nhân viên không phải Admin/Subadmin
+    useEffect(() => {
+        if (!isAdminOrSubadmin && activeTab === 'revenue') {
+            setActiveTab('list');
+        }
+    }, [isAdminOrSubadmin, activeTab]);
 
     // Reset date filters and search states to "Tất cả" when switching report tabs or main tabs
     useEffect(() => {
@@ -116,10 +135,14 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
         setToDate(new Date().toISOString().split('T')[0]);
         setReportType('custom');
         setSelectedWard('all');
-        setSelectedEmpId('');
+        if (currentUser && (currentUser.role === 'EMPLOYEE' || currentUser.role === 'ONEDOOR') && currentUser.employeeId) {
+            setSelectedEmpId(currentUser.employeeId);
+        } else {
+            setSelectedEmpId('');
+        }
         setCardFilter(null);
         setCurrentPage(1);
-    }, [activeTab, mainTab]);
+    }, [activeTab, mainTab, currentUser]);
 
     useEffect(() => {
         if (mainTab === 'archive') {
@@ -183,13 +206,30 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
     }, [mainTab, records]);
 
     const activeRecords = useMemo(() => {
-        return mainTab === 'measurement' 
+        const base = mainTab === 'measurement' 
             ? records.filter(r => {
                 const shortType = getShortRecordType(r.recordType);
                 return !isArchiveRecordType(r.recordType) && !['CMD', 'Tòa án', 'Thi hành án'].includes(shortType);
             }) 
             : archiveRecords;
-    }, [records, mainTab, archiveRecords]);
+
+        const isRegularEmployee = currentUser && (currentUser.role === 'EMPLOYEE' || currentUser.role === 'ONEDOOR');
+        const empId = currentUser?.employeeId;
+        const empObj = employees.find(e => e.id === empId);
+        const empName = empObj?.name;
+
+        if (isRegularEmployee && empId) {
+            return base.filter(r => {
+                const matchAssigned = r.assignedTo === empId || 
+                                      r.submittedTo === empId || 
+                                      r.checkedBy === empId ||
+                                      (empName && r.assignedTo && r.assignedTo.toLowerCase() === empName.toLowerCase());
+                return matchAssigned;
+            });
+        }
+
+        return base;
+    }, [records, mainTab, archiveRecords, currentUser, employees]);
 
     const activeEmployees = useMemo(() => {
         if (mainTab === 'measurement') {
@@ -484,7 +524,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
         <div className="flex flex-col h-full overflow-y-auto md:overflow-hidden relative bg-slate-50">
             {/* MAIN TAB SWITCHER */}
             <div className="bg-white border-b border-gray-200 flex px-4 pt-2 gap-1 shrink-0">
-                {(isHanhChinhOrAdmin || (userDept && (userDept.toLowerCase().includes('đo đạc') || userDept.toLowerCase().includes('kỹ thuật')))) && (
+                {(canSeeAllDepts || (userDept && !userDept.toLowerCase().includes('lưu trữ'))) && (
                     <button 
                         onClick={() => setMainTab('measurement')}
                         className={`px-6 py-3 text-sm font-bold rounded-t-lg border-t border-l border-r transition-all flex items-center gap-2 ${mainTab === 'measurement' ? 'bg-blue-50 border-gray-200 text-blue-700 border-b-transparent relative top-[1px]' : 'bg-gray-50 border-transparent text-gray-500 hover:bg-gray-100'}`}
@@ -492,7 +532,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                         <Ruler size={18} /> Báo cáo Đo đạc
                     </button>
                 )}
-                {(isHanhChinhOrAdmin || (userDept && userDept.toLowerCase().includes('lưu trữ'))) && (
+                {(canSeeAllDepts || (userDept && userDept.toLowerCase().includes('lưu trữ'))) && (
                     <button 
                         onClick={() => setMainTab('archive')}
                         className={`px-6 py-3 text-sm font-bold rounded-t-lg border-t border-l border-r transition-all flex items-center gap-2 ${mainTab === 'archive' ? 'bg-orange-50 border-gray-200 text-orange-700 border-b-transparent relative top-[1px]' : 'bg-gray-50 border-transparent text-gray-500 hover:bg-gray-100'}`}
@@ -520,14 +560,16 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                     <PieChart size={18}/> 
                     <span className="hidden sm:inline">Thống kê theo Xã</span>
                 </button>
-                <button 
-                    onClick={() => setActiveTab('revenue')}
-                    className={`px-3 md:px-5 py-2.5 md:py-3 text-xs md:text-sm font-bold border-b-2 transition-all flex items-center justify-center gap-1.5 shrink-0 ${activeTab === 'revenue' ? 'border-emerald-600 text-emerald-600 bg-emerald-50/60 md:bg-transparent rounded-t-lg md:rounded-none' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-                    title="Báo cáo Doanh thu"
-                >
-                    <DollarSign size={18}/> 
-                    <span className="hidden sm:inline">Báo cáo Doanh thu</span>
-                </button>
+                {isAdminOrSubadmin && (
+                    <button 
+                        onClick={() => setActiveTab('revenue')}
+                        className={`px-3 md:px-5 py-2.5 md:py-3 text-xs md:text-sm font-bold border-b-2 transition-all flex items-center justify-center gap-1.5 shrink-0 ${activeTab === 'revenue' ? 'border-emerald-600 text-emerald-600 bg-emerald-50/60 md:bg-transparent rounded-t-lg md:rounded-none' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                        title="Báo cáo Doanh thu"
+                    >
+                        <DollarSign size={18}/> 
+                        <span className="hidden sm:inline">Báo cáo Doanh thu</span>
+                    </button>
+                )}
                 <button 
                     onClick={() => setActiveTab('employee')}
                     className={`px-3 md:px-5 py-2.5 md:py-3 text-xs md:text-sm font-bold border-b-2 transition-all flex items-center justify-center gap-1.5 shrink-0 ${activeTab === 'employee' ? 'border-orange-600 text-orange-600 bg-orange-50/60 md:bg-transparent rounded-t-lg md:rounded-none' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
@@ -929,6 +971,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                         selectedEmpId={selectedEmpId}
                         setSelectedEmpId={setSelectedEmpId}
                         defaultDeptFilter={mainTab === 'archive' ? 'archive' : mainTab === 'measurement' ? 'measurement' : 'all'}
+                        currentUser={currentUser}
                     />
                 )}
 
@@ -982,6 +1025,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                         selectedWard={selectedWard}
                         fromDate={fromDate}
                         toDate={toDate}
+                        currentUser={currentUser}
                         onFilteredRecordsChange={setDailyStatsRecords}
                         onResetDates={() => {
                             setFromDate('1970-01-01');
@@ -995,6 +1039,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                     <OverdueStatsView 
                         records={filteredData}
                         employees={activeEmployees}
+                        currentUser={currentUser}
                     />
                 )}
 

@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { RecordFile } from '../types';
-import { X, CheckCircle2, FileCheck, User, Receipt, DollarSign, Loader2 } from 'lucide-react';
+import { X, CheckCircle2, FileCheck, User, Receipt, DollarSign, Loader2, FileText } from 'lucide-react';
 import { fetchContracts } from '../services/api';
 
 interface ReturnResultModalProps {
   isOpen: boolean;
   onClose: () => void;
   record: RecordFile | null;
-  onConfirm: (receiptNumber: string, receiverName: string, returnedPrice: number, receiptType?: 'Biên Lai' | 'Hóa Đơn') => void;
+  onConfirm: (receiptNumber: string, receiverName: string, returnedPrice: number, receiptType?: 'Biên Lai' | 'Hóa Đơn', returnReason?: string) => void;
 }
 
 const ReturnResultModal: React.FC<ReturnResultModalProps> = ({ 
@@ -17,6 +17,7 @@ const ReturnResultModal: React.FC<ReturnResultModalProps> = ({
   const [receiptNumber, setReceiptNumber] = useState('');
   const [receiverName, setReceiverName] = useState('');
   const [returnedPrice, setReturnedPrice] = useState<string>('');
+  const [returnReason, setReturnReason] = useState<string>('');
   const [isLoadingPrice, setIsLoadingPrice] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   
@@ -28,6 +29,7 @@ const ReturnResultModal: React.FC<ReturnResultModalProps> = ({
         setReceiptType((record.receiptType as 'Biên Lai' | 'Hóa Đơn') || 'Biên Lai');
         setReceiptNumber(record.receiptNumber || '');
         setReceiverName(record.receiverName || record.customerName || '');
+        setReturnReason('');
         setErrorMsg('');
         
         if (isFreeProcedure) {
@@ -120,7 +122,7 @@ const ReturnResultModal: React.FC<ReturnResultModalProps> = ({
       }
 
       if (isFreeProcedure) {
-          onConfirm('', receiverName.trim(), 0, undefined);
+          onConfirm('', receiverName.trim(), 0, undefined, returnReason.trim());
           onClose();
           return;
       }
@@ -141,7 +143,7 @@ const ReturnResultModal: React.FC<ReturnResultModalProps> = ({
           return;
       }
 
-      onConfirm(receiptNumber.trim(), receiverName.trim(), priceNum, receiptType);
+      onConfirm(receiptNumber.trim(), receiverName.trim(), priceNum, receiptType, returnReason.trim());
       onClose();
   };
 
@@ -263,6 +265,21 @@ const ReturnResultModal: React.FC<ReturnResultModalProps> = ({
                         placeholder="Họ tên người đến nhận..."
                         value={receiverName}
                         onChange={(e) => setReceiverName(e.target.value)}
+                    />
+                </div>
+
+                {/* Field 4: Lý do / Nội dung trả kết quả */}
+                <div>
+                    <label className="block text-sm font-bold text-gray-800 mb-2 flex items-center gap-2">
+                        <FileText size={18} className="text-blue-600"/> 
+                        <span>Nội dung / Lý do trả kết quả (Ghi chú)</span> 
+                    </label>
+                    <input 
+                        type="text"
+                        className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none font-medium text-gray-800 placeholder:text-gray-400"
+                        placeholder="Ví dụ: Đã nhận GCN, Đã bàn giao kết quả..."
+                        value={returnReason}
+                        onChange={(e) => setReturnReason(e.target.value)}
                     />
                 </div>
             </div>

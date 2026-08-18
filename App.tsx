@@ -709,10 +709,14 @@ function App() {
       setIsReturnModalOpen(true);
   }, []);
 
-  const handleConfirmReturnResult = useCallback(async (receiptNumber: string, receiverName: string, returnedPrice: number, receiptType?: 'Biên Lai' | 'Hóa Đơn') => {
+  const handleConfirmReturnResult = useCallback(async (receiptNumber: string, receiverName: string, returnedPrice: number, receiptType?: 'Biên Lai' | 'Hóa Đơn', customReason?: string) => {
       if (!returnRecord) return;
       const nowStr = new Date().toISOString();
       const typeLabel = receiptType || 'Biên Lai';
+      const performer = currentUser?.fullName || currentUser?.name || 'Cán bộ trả';
+      const reasonText = customReason?.trim() || `Đã trả kết quả cho ${receiverName}`;
+      const formattedNote = `Trả hồ sơ: ${reasonText} (${performer})`;
+
       const statusLogs = createStatusLog(returnRecord, RecordStatus.RETURNED, `Trả kết quả cho người dân: ${receiverName} (${typeLabel} số: ${receiptNumber}, Số tiền: ${returnedPrice.toLocaleString('vi-VN')}đ)`);
       const updates = { 
           resultReturnedDate: nowStr, 
@@ -722,13 +726,14 @@ function App() {
           receiverName: receiverName,
           returnedPrice: returnedPrice,
           price: returnedPrice,
+          notes: formattedNote,
           statusLogs
       }; 
       setRecords(prev => prev.map(r => r.id === returnRecord.id ? { ...r, ...updates } : r));
       await updateRecordApi({ ...returnRecord, ...updates });
       setToast({ type: 'success', message: `Đã ghi nhận trả kết quả hồ sơ ${returnRecord.code} cho ${receiverName}.` });
       setReturnRecord(null);
-  }, [returnRecord, createStatusLog]);
+  }, [returnRecord, createStatusLog, currentUser]);
 
   const handleMapCorrectionRequest = useCallback(async (record: RecordFile) => {
       const isArchive = isArchiveRecordType(record.recordType || '') || record.sourceTable === 'luutru_records';

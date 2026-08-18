@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { RecordFile, Employee, RecordStatus } from '../../types';
+import { RecordFile, Employee, RecordStatus, User } from '../../types';
 import { 
     Download, 
     Search, 
@@ -24,6 +24,7 @@ interface DailyStatsViewProps {
     selectedWard?: string;
     fromDate?: string;
     toDate?: string;
+    currentUser?: User;
     onFilteredRecordsChange?: (records: RecordFile[]) => void;
     onResetDates?: () => void;
 }
@@ -35,6 +36,7 @@ const DailyStatsView: React.FC<DailyStatsViewProps> = ({
     selectedWard = 'all',
     fromDate,
     toDate,
+    currentUser,
     onFilteredRecordsChange,
     onResetDates
 }) => {

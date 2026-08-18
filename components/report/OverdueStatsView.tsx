@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { RecordFile, RecordStatus, Employee } from '../../types';
+import React, { useMemo, useState, useEffect } from 'react';
+import { RecordFile, RecordStatus, Employee, User } from '../../types';
 import { getNormalizedWard, STATUS_LABELS } from '../../constants';
 import { isRecordOverdue } from '../../utils/appHelpers';
 import { exportOverdueStatsToExcel } from '../../utils/excelExport';
@@ -8,9 +8,10 @@ import { AlertTriangle, CheckCircle2, Clock, MapPin, ChevronLeft, ChevronRight, 
 interface OverdueStatsViewProps {
     records: RecordFile[];
     employees: Employee[];
+    currentUser?: User;
 }
 
-const OverdueStatsView: React.FC<OverdueStatsViewProps> = ({ records, employees }) => {
+const OverdueStatsView: React.FC<OverdueStatsViewProps> = ({ records, employees, currentUser }) => {
     const [filterType, setFilterType] = useState<'all' | 'completed' | 'pending'>('all');
     const [selectedEmployee, setSelectedEmployee] = useState<string>('all');
     const [currentPage, setCurrentPage] = useState(1);
