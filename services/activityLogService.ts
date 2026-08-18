@@ -221,14 +221,69 @@ export const exportActivityLogsToExcel = (logs: SystemActivityLog[]) => {
         ];
     });
 
-    const worksheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    const worksheet = XLSX.utils.aoa_to_sheet([
+        ['CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM'],
+        ['Độc lập - Tự do - Hạnh phúc'],
+        [''],
+        ['LỊCH SỬ THAO TÁC HỆ THỐNG'],
+        [`Ngày xuất báo cáo: ${new Date().toLocaleDateString('vi-VN')}`],
+        [''],
+        headers,
+        ...rows
+    ]);
+
+    const totalCols = headers.length - 1;
+    worksheet['!merges'] = [
+        { s: { r: 0, c: 0 }, e: { r: 0, c: totalCols } },
+        { s: { r: 1, c: 0 }, e: { r: 1, c: totalCols } },
+        { s: { r: 3, c: 0 }, e: { r: 3, c: totalCols } },
+        { s: { r: 4, c: 0 }, e: { r: 4, c: totalCols } }
+    ];
+
+    if(worksheet['A1']) worksheet['A1'].s = { font: { name: "Times New Roman", sz: 14, bold: true }, alignment: { horizontal: "center" } };
+    if(worksheet['A2']) worksheet['A2'].s = { font: { name: "Times New Roman", sz: 12, bold: true, underline: true }, alignment: { horizontal: "center" } };
+    if(worksheet['A4']) worksheet['A4'].s = { font: { name: "Times New Roman", sz: 16, bold: true, color: { rgb: "0000FF" } }, alignment: { horizontal: "center" } };
+    if(worksheet['A5']) worksheet['A5'].s = { font: { name: "Times New Roman", sz: 12, italic: true }, alignment: { horizontal: "center" } };
+
+    const borderStyle = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
+    const headerStyle = {
+        font: { name: "Times New Roman", sz: 11, bold: true },
+        fill: { fgColor: { rgb: "E0E0E0" } },
+        border: borderStyle,
+        alignment: { horizontal: "center", vertical: "center", wrapText: true }
+    };
+    const cellStyle = {
+        font: { name: "Times New Roman", sz: 11 },
+        border: borderStyle,
+        alignment: { vertical: "center", wrapText: true }
+    };
+    const centerStyle = { ...cellStyle, alignment: { horizontal: "center", vertical: "center" } };
+
+    const headerRowIdx = 6;
+    const dataStartIdx = 7;
+
+    for (let c = 0; c <= totalCols; c++) {
+        const headerRef = XLSX.utils.encode_cell({ r: headerRowIdx, c });
+        if (!worksheet[headerRef]) worksheet[headerRef] = { v: "", t: "s" };
+        worksheet[headerRef].s = headerStyle;
+
+        for (let r = dataStartIdx; r < dataStartIdx + rows.length; r++) {
+            const cellRef = XLSX.utils.encode_cell({ r, c });
+            if (!worksheet[cellRef]) worksheet[cellRef] = { v: "", t: "s" };
+
+            // Center STT(0), Time(1), Role(3), Action(4), Type(5), Code(6)
+            if ([0, 1, 3, 4, 5, 6].includes(c)) worksheet[cellRef].s = centerStyle;
+            else worksheet[cellRef].s = cellStyle;
+        }
+    }
+
     worksheet['!cols'] = [
         { wch: 6 },
         { wch: 20 },
         { wch: 22 },
         { wch: 15 },
+        { wch: 18 },
         { wch: 15 },
-        { wch: 12 },
         { wch: 18 },
         { wch: 65 }
     ];

@@ -163,6 +163,20 @@ const TemplateConfigModal: React.FC<TemplateConfigModalProps> = ({ isOpen, onClo
           { s: {r:0, c:0}, e: {r:0, c:6} }, { s: {r:1, c:0}, e: {r:1, c:6} },
           { s: {r:3, c:0}, e: {r:3, c:6} }, { s: {r:4, c:0}, e: {r:4, c:6} },
       ];
+
+      if (ws['A1']) ws['A1'].s = { font: { name: "Times New Roman", sz: 14, bold: true }, alignment: { horizontal: "center" } };
+      if (ws['A2']) ws['A2'].s = { font: { name: "Times New Roman", sz: 12, bold: true, underline: true }, alignment: { horizontal: "center" } };
+      if (ws['A4']) ws['A4'].s = { font: { name: "Times New Roman", sz: 16, bold: true, color: { rgb: "0000FF" } }, alignment: { horizontal: "center" } };
+      if (ws['A5']) ws['A5'].s = { font: { name: "Times New Roman", sz: 12, italic: true }, alignment: { horizontal: "center" } };
+
+      const borderStyle = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
+      const headerStyle = { font: { name: "Times New Roman", sz: 11, bold: true }, fill: { fgColor: { rgb: "E0E0E0" } }, border: borderStyle, alignment: { horizontal: "center", vertical: "center" } };
+
+      for (let c = 0; c < 7; c++) {
+          const headerRef = XLSX.utils.encode_cell({ r: 6, c });
+          if (ws[headerRef]) ws[headerRef].s = headerStyle;
+      }
+
       XLSX.utils.book_append_sheet(wb, ws, "Mau_DS");
       XLSX.writeFile(wb, "Mau_Danh_Sach_Ho_So.xlsx");
   };

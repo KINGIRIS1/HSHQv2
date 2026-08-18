@@ -408,7 +408,6 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
         { s: { r: 1, c: 0 }, e: { r: 1, c: totalCols - 1 } },
         { s: { r: 3, c: 0 }, e: { r: 3, c: totalCols - 1 } },
         { s: { r: 4, c: 0 }, e: { r: 4, c: totalCols - 1 } },
-        { s: { r: 5, c: 0 }, e: { r: 5, c: totalCols - 1 } },
     ];
 
     if (handoverNoteRowIndex !== null) {
@@ -429,9 +428,9 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
     // Styles
     const borderStyle = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
     const styles = {
-        nationalTitle: { font: { name: "Times New Roman", sz: 12, bold: true }, alignment: { horizontal: "center", vertical: "center" } },
+        nationalTitle: { font: { name: "Times New Roman", sz: 14, bold: true }, alignment: { horizontal: "center", vertical: "center" } },
         nationalSlogan: { font: { name: "Times New Roman", sz: 12, bold: true, underline: true }, alignment: { horizontal: "center", vertical: "center" } },
-        reportTitle: { font: { name: "Times New Roman", sz: 14, bold: true }, alignment: { horizontal: "center", vertical: "center" } },
+        reportTitle: { font: { name: "Times New Roman", sz: 16, bold: true }, alignment: { horizontal: "center", vertical: "center" } },
         reportSubTitle: { font: { name: "Times New Roman", sz: 12, italic: true }, alignment: { horizontal: "center", vertical: "center" } },
         tableHeader: { font: { name: "Times New Roman", sz: 11, bold: true }, alignment: { horizontal: "center", vertical: "center", wrapText: true }, border: borderStyle, fill: { fgColor: { rgb: "E0E0E0" } } },
         tableData: { font: { name: "Times New Roman", sz: 11 }, border: borderStyle, alignment: { vertical: "center", wrapText: true } },

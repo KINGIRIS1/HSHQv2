@@ -117,27 +117,114 @@ export const RecordLookupView: React.FC<RecordLookupViewProps> = ({
     const handleExportExcel = () => {
         if (filteredRecords.length === 0) return;
 
-        const dataToExport = filteredRecords.map((r, idx) => {
+        const headers = [
+            'STT',
+            'MÃ HỒ SƠ',
+            'THÔNG TIN CHỦ SỬ DỤNG',
+            'SỐ ĐIỆN THOẠI',
+            'LOẠI HỒ SƠ',
+            'NGÀY NHẬN',
+            'HẠN TRẢ',
+            'XÃ PHƯỜNG',
+            'TỜ',
+            'THỬA',
+            'GIAO NHÂN VIÊN',
+            'HOÀN THÀNH / ĐỢT',
+            'TRẠNG THÁI'
+        ];
+
+        const dataRows = filteredRecords.map((r, idx) => {
             const emp = employees.find(e => e.id === r.assignedTo);
             const displayStatus = getDisplayStatus(r);
-            return {
-                'STT': idx + 1,
-                'MÃ HỒ SƠ': r.code,
-                'THÔNG TIN CHỦ SỬ DỤNG': r.customerName || '',
-                'SỐ ĐIỆN THOẠI': r.phoneNumber || '',
-                'LOẠI HỒ SƠ': getShortRecordType(r.recordType),
-                'NGÀY NHẬN': formatDate(r.receivedDate),
-                'HẠN TRẢ': formatDate(r.deadline),
-                'XÃ PHƯỜNG': getWardLabel(r.ward),
-                'TỜ': r.mapSheet || '',
-                'THỬA': r.landPlot || '',
-                'GIAO NHÂN VIÊN': emp?.name || '',
-                'HOÀN THÀNH / ĐỢT': r.exportBatch || formatDate(r.completedDate) || '',
-                'TRẠNG THÁI': displayStatus
-            };
+            return [
+                idx + 1,
+                r.code || '',
+                r.customerName || '',
+                r.phoneNumber || '',
+                getShortRecordType(r.recordType) || '',
+                formatDate(r.receivedDate),
+                formatDate(r.deadline),
+                getWardLabel(r.ward),
+                r.mapSheet || '',
+                r.landPlot || '',
+                emp?.name || '',
+                r.exportBatch || formatDate(r.completedDate) || '',
+                displayStatus
+            ];
         });
 
-        const ws = XLSX.utils.json_to_sheet(dataToExport);
+        const ws = XLSX.utils.aoa_to_sheet([
+            ['CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM'],
+            ['Độc lập - Tự do - Hạnh phúc'],
+            [''],
+            ['KẾT QUẢ TRA CỨU HỒ SƠ'],
+            [`Ngày xuất: ${new Date().toLocaleDateString('vi-VN')} | Tổng số hồ sơ: ${filteredRecords.length}`],
+            [''],
+            headers,
+            ...dataRows
+        ]);
+
+        const totalCols = headers.length - 1;
+        ws['!merges'] = [
+            { s: { r: 0, c: 0 }, e: { r: 0, c: totalCols } },
+            { s: { r: 1, c: 0 }, e: { r: 1, c: totalCols } },
+            { s: { r: 3, c: 0 }, e: { r: 3, c: totalCols } },
+            { s: { r: 4, c: 0 }, e: { r: 4, c: totalCols } }
+        ];
+
+        if(ws['A1']) ws['A1'].s = { font: { name: "Times New Roman", sz: 14, bold: true }, alignment: { horizontal: "center" } };
+        if(ws['A2']) ws['A2'].s = { font: { name: "Times New Roman", sz: 12, bold: true, underline: true }, alignment: { horizontal: "center" } };
+        if(ws['A4']) ws['A4'].s = { font: { name: "Times New Roman", sz: 16, bold: true, color: { rgb: "0000FF" } }, alignment: { horizontal: "center" } };
+        if(ws['A5']) ws['A5'].s = { font: { name: "Times New Roman", sz: 12, italic: true }, alignment: { horizontal: "center" } };
+
+        const borderStyle = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
+        const headerStyle = {
+            font: { name: "Times New Roman", sz: 11, bold: true },
+            fill: { fgColor: { rgb: "E0E0E0" } },
+            border: borderStyle,
+            alignment: { horizontal: "center", vertical: "center", wrapText: true }
+        };
+        const cellStyle = {
+            font: { name: "Times New Roman", sz: 11 },
+            border: borderStyle,
+            alignment: { vertical: "center", wrapText: true }
+        };
+        const centerStyle = { ...cellStyle, alignment: { horizontal: "center", vertical: "center" } };
+
+        const headerRowIdx = 6;
+        const dataStartIdx = 7;
+
+        for (let c = 0; c <= totalCols; c++) {
+            const headerRef = XLSX.utils.encode_cell({ r: headerRowIdx, c });
+            if (!ws[headerRef]) ws[headerRef] = { v: "", t: "s" };
+            ws[headerRef].s = headerStyle;
+
+            for (let r = dataStartIdx; r < dataStartIdx + dataRows.length; r++) {
+                const cellRef = XLSX.utils.encode_cell({ r, c });
+                if (!ws[cellRef]) ws[cellRef] = { v: "", t: "s" };
+
+                // Căn giữa: STT(0), Mã HS(1), SĐT(3), Ngày nhận(5), Hạn trả(6), Tờ(8), Thửa(9), Đợt/HT(11), Trạng thái(12)
+                if ([0, 1, 3, 5, 6, 8, 9, 11, 12].includes(c)) ws[cellRef].s = centerStyle;
+                else ws[cellRef].s = cellStyle;
+            }
+        }
+
+        ws['!cols'] = [
+            { wch: 5 },  // STT
+            { wch: 16 }, // Mã HS
+            { wch: 25 }, // Chủ SD
+            { wch: 14 }, // SĐT
+            { wch: 16 }, // Loại HS
+            { wch: 12 }, // Ngày nhận
+            { wch: 12 }, // Hạn trả
+            { wch: 16 }, // Xã phường
+            { wch: 7 },  // Tờ
+            { wch: 7 },  // Thửa
+            { wch: 20 }, // NV
+            { wch: 15 }, // Đợt/HT
+            { wch: 18 }  // Trạng thái
+        ];
+
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, 'TraCuuHoSo');
         XLSX.writeFile(wb, `Tra_Cuu_Ho_So_${new Date().toISOString().split('T')[0]}.xlsx`);

@@ -32,6 +32,24 @@ const PriceConfigModal: React.FC<PriceConfigModalProps> = ({ isOpen, onClose, cu
           ["Cắm mốc", "Đất nông thôn", "Cắm mốc ranh giới", 0, 99999, "Mốc", 300000, 8, "FALSE"]
       ];
       const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
+
+      const borderStyle = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
+      const headerStyle = { font: { name: "Times New Roman", sz: 11, bold: true }, fill: { fgColor: { rgb: "E0E0E0" } }, border: borderStyle, alignment: { horizontal: "center", vertical: "center" } };
+      const cellStyle = { font: { name: "Times New Roman", sz: 11 }, border: borderStyle, alignment: { vertical: "center" } };
+
+      headers.forEach((_, c) => {
+          const headerRef = XLSX.utils.encode_cell({ r: 0, c });
+          if (ws[headerRef]) ws[headerRef].s = headerStyle;
+          data.forEach((_, r) => {
+              const cellRef = XLSX.utils.encode_cell({ r: r + 1, c });
+              if (ws[cellRef]) ws[cellRef].s = cellStyle;
+          });
+      });
+
+      ws['!cols'] = [
+          { wch: 12 }, { wch: 15 }, { wch: 30 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 15 }, { wch: 8 }, { wch: 15 }
+      ];
+
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Bang_Gia_Mau");
       XLSX.writeFile(wb, "Bang_Gia_Mau.xlsx");

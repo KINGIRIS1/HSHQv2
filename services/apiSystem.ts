@@ -126,7 +126,7 @@ export const fetchHolidays = async (): Promise<Holiday[]> => {
         saveToCache(CACHE_KEYS.HOLIDAYS, mapped);
         return mapped;
     } catch (error) {
-        logError("fetchHolidays", error);
+        logError("fetchHolidays", error, true);
         return getFromCache(CACHE_KEYS.HOLIDAYS, []);
     }
 };

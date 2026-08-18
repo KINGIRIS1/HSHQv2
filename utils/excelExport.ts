@@ -284,11 +284,16 @@ export const exportReportToExcel = async (
     );
     
     const footerStyle = { font: { name: "Times New Roman", sz: 12, bold: true }, alignment: { horizontal: "center" } };
+    const footerSubStyle = { font: { name: "Times New Roman", sz: 11, italic: true }, alignment: { horizontal: "center" } };
     
     const leftTitle = XLSX.utils.encode_cell({r: lastRow - 1, c: 0});
+    const leftSubTitle = XLSX.utils.encode_cell({r: lastRow, c: 0});
     const rightTitle = XLSX.utils.encode_cell({r: lastRow - 1, c: rightColStart});
+    const rightSubTitle = XLSX.utils.encode_cell({r: lastRow, c: rightColStart});
     if(ws[leftTitle]) ws[leftTitle].s = footerStyle;
+    if(ws[leftSubTitle]) ws[leftSubTitle].s = footerSubStyle;
     if(ws[rightTitle]) ws[rightTitle].s = footerStyle;
+    if(ws[rightSubTitle]) ws[rightSubTitle].s = footerSubStyle;
 
     XLSX.utils.book_append_sheet(wb, ws, "Bao Cao");
     const safeWardName = ward === 'all' ? 'Tong_Hop' : ward.replace(/\s/g, '_');
@@ -534,7 +539,7 @@ export const exportReturnedListToExcel = (records: RecordFile[], fromDateStr?: s
 
     if(ws['A1']) ws['A1'].s = titleStyle;
     if(ws['A2']) ws['A2'].s = { font: { name: "Times New Roman", sz: 12, bold: true, underline: true }, alignment: { horizontal: "center" } };
-    if(ws['A4']) ws['A4'].s = { font: { name: "Times New Roman", sz: 14, bold: true, color: { rgb: "0000FF" } }, alignment: { horizontal: "center" } };
+    if(ws['A4']) ws['A4'].s = { font: { name: "Times New Roman", sz: 16, bold: true, color: { rgb: "0000FF" } }, alignment: { horizontal: "center" } };
     if(ws['A5']) ws['A5'].s = { font: { name: "Times New Roman", sz: 12, italic: true }, alignment: { horizontal: "center" } };
 
     const headerRow = 6;
@@ -557,7 +562,7 @@ export const exportReturnedListToExcel = (records: RecordFile[], fromDateStr?: s
     const footerStart = dataStart + dataRows.length + 2;
     XLSX.utils.sheet_add_aoa(ws, [
         ["NGƯỜI LẬP BIỂU", "", "", "", "", "THỦ TRƯỞNG ĐƠN VỊ", "", "", "", ""],
-        ["(Ký, họ tên)", "", "", "", "", "(Ký, họ tên)", "", "", "", ""]
+        ["(Ký, họ tên)", "", "", "", "", "(Ký, họ tên, đóng dấu)", "", "", "", ""]
     ], { origin: { r: footerStart, c: 0 } });
 
     ws['!merges'].push(
@@ -568,10 +573,15 @@ export const exportReturnedListToExcel = (records: RecordFile[], fromDateStr?: s
     );
 
     const footerTitleStyle = { font: { name: "Times New Roman", sz: 12, bold: true }, alignment: { horizontal: "center" } };
+    const footerSubStyle = { font: { name: "Times New Roman", sz: 11, italic: true }, alignment: { horizontal: "center" } };
     const leftTitle = XLSX.utils.encode_cell({r: footerStart, c: 0});
+    const leftSub = XLSX.utils.encode_cell({r: footerStart + 1, c: 0});
     const rightTitle = XLSX.utils.encode_cell({r: footerStart, c: 7});
+    const rightSub = XLSX.utils.encode_cell({r: footerStart + 1, c: 7});
     if(ws[leftTitle]) ws[leftTitle].s = footerTitleStyle;
+    if(ws[leftSub]) ws[leftSub].s = footerSubStyle;
     if(ws[rightTitle]) ws[rightTitle].s = footerTitleStyle;
+    if(ws[rightSub]) ws[rightSub].s = footerSubStyle;
 
     XLSX.utils.book_append_sheet(wb, ws, "DS_Tra_KQ");
     

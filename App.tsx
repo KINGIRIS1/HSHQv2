@@ -632,6 +632,10 @@ function App() {
               recordUpdates.handover_date = formattedDate;
           } else if (field === 'exportBatch') {
               recordUpdates.exportBatch = value;
+          } else if (field === 'archiveBatchName') {
+              recordUpdates.archiveBatchName = value;
+              recordUpdates.archiveBatchDate = extraData?.customDate || customDateStr || targetDateStr;
+              recordUpdates.archiveExportDate = extraData?.customDate || customDateStr || targetDateStr;
           } else if (field === 'deadline' || field === 'receivedDate' || field === 'resultReturnedDate' || field === 'checkedDate' || field === 'approvalDate') {
               const formattedDate = value ? (value.includes('T') ? value : new Date(value + 'T12:00:00').toISOString()) : targetDateStr;
               recordUpdates[field] = formattedDate;

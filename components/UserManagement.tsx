@@ -93,6 +93,19 @@ const UserManagement: React.FC<UserManagementProps> = ({
       
       const wb = XLSX.utils.book_new();
       const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
+
+      const borderStyle = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
+      const headerStyle = { font: { name: "Times New Roman", sz: 11, bold: true }, fill: { fgColor: { rgb: "E0E0E0" } }, border: borderStyle, alignment: { horizontal: "center", vertical: "center" } };
+      const cellStyle = { font: { name: "Times New Roman", sz: 11 }, border: borderStyle, alignment: { vertical: "center" } };
+
+      headers.forEach((_, c) => {
+          const headerRef = XLSX.utils.encode_cell({ r: 0, c });
+          if (ws[headerRef]) ws[headerRef].s = headerStyle;
+          data.forEach((_, r) => {
+              const cellRef = XLSX.utils.encode_cell({ r: r + 1, c });
+              if (ws[cellRef]) ws[cellRef].s = cellStyle;
+          });
+      });
       
       // Định dạng độ rộng cột
       ws['!cols'] = [{ wch: 15 }, { wch: 15 }, { wch: 25 }, { wch: 15 }, { wch: 15 }];

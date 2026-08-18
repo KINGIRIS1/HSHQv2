@@ -452,36 +452,93 @@ export const BatchErrorDiagnosticModal: React.FC<BatchErrorDiagnosticModalProps>
       return;
     }
 
-    const exportRows: any[] = [];
-    diagnosticResults.forEach((item, index) => {
-      item.errors.forEach((err) => {
-        exportRows.push({
-          'STT': index + 1,
-          'Mã Hồ Sơ': item.record.code || 'N/A',
-          'Tên Khách Hàng / Chủ Đất': item.record.customerName || 'N/A',
-          'Xã / Phường': item.record.ward || 'N/A',
-          'Trạng Thái Hiện Tại': item.record.status || 'N/A',
-          'Mảng Lỗi': err.categoryLabel,
-          'Mức Độ': err.severity === 'high' ? 'Cao (Cần xử lý gấp)' : err.severity === 'medium' ? 'Trung bình' : 'Thấp',
-          'Chi Tiết Lỗi Phát Hiện': err.message,
-          'Hướng Sửa Lỗi Đề Xuất': err.suggestion,
-          'Có Thể Sửa Tự Động': err.canAutoFix ? 'Có' : 'Cần sửa thủ công',
-        });
+    const headers = [
+      'STT',
+      'Mã Hồ Sơ',
+      'Tên Khách Hàng / Chủ Đất',
+      'Xã / Phường',
+      'Trạng Thái Hiện Tại',
+      'Mảng Lỗi',
+      'Mức Độ',
+      'Chi Tiết Lỗi Phát Hiện',
+      'Hướng Sửa Lỗi Đề Xuất',
+      'Có Thể Sửa Tự Động'
+    ];
+
+    const dataRows: any[][] = [];
+    let stt = 1;
+
+    diagnosticResults.forEach(item => {
+      item.errors.forEach(err => {
+        dataRows.push([
+          stt++,
+          item.record.code || 'N/A',
+          item.record.customerName || 'N/A',
+          item.record.ward || 'N/A',
+          item.record.status || 'N/A',
+          err.categoryLabel,
+          err.severity === 'high' ? 'Cao (Cần xử lý gấp)' : err.severity === 'medium' ? 'Trung bình' : 'Thấp',
+          err.message,
+          err.suggestion,
+          err.canAutoFix ? 'Có' : 'Cần sửa thủ công'
+        ]);
       });
     });
 
-    const worksheet = XLSX.utils.json_to_sheet(exportRows);
+    const worksheet = XLSX.utils.aoa_to_sheet([
+      ['CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM'],
+      ['Độc lập - Tự do - Hạnh phúc'],
+      [''],
+      ['BÁO CÁO CHẨN ĐOÁN VÀ PHÁT HIỆN LỖI HỒ SƠ'],
+      [`Ngày kiểm tra: ${new Date().toLocaleDateString('vi-VN')} | Tổng số lỗi phát hiện: ${dataRows.length}`],
+      [''],
+      headers,
+      ...dataRows
+    ]);
 
-    // Styling worksheet header
-    const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
-    for (let C = range.s.c; C <= range.e.c; ++C) {
-      const address = XLSX.utils.encode_cell({ r: 0, c: C });
-      if (!worksheet[address]) continue;
-      worksheet[address].s = {
-        font: { bold: true, color: { rgb: "FFFFFF" } },
-        fill: { fgColor: { rgb: "1E40AF" } }, // Dark blue
-        alignment: { horizontal: "center", vertical: "center" },
-      };
+    const totalCols = headers.length - 1;
+    worksheet['!merges'] = [
+      { s: { r: 0, c: 0 }, e: { r: 0, c: totalCols } },
+      { s: { r: 1, c: 0 }, e: { r: 1, c: totalCols } },
+      { s: { r: 3, c: 0 }, e: { r: 3, c: totalCols } },
+      { s: { r: 4, c: 0 }, e: { r: 4, c: totalCols } }
+    ];
+
+    if (worksheet['A1']) worksheet['A1'].s = { font: { name: "Times New Roman", sz: 14, bold: true }, alignment: { horizontal: "center" } };
+    if (worksheet['A2']) worksheet['A2'].s = { font: { name: "Times New Roman", sz: 12, bold: true, underline: true }, alignment: { horizontal: "center" } };
+    if (worksheet['A4']) worksheet['A4'].s = { font: { name: "Times New Roman", sz: 16, bold: true, color: { rgb: "0000FF" } }, alignment: { horizontal: "center" } };
+    if (worksheet['A5']) worksheet['A5'].s = { font: { name: "Times New Roman", sz: 12, italic: true }, alignment: { horizontal: "center" } };
+
+    const borderStyle = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
+    const headerStyle = {
+      font: { name: "Times New Roman", sz: 11, bold: true },
+      fill: { fgColor: { rgb: "E0E0E0" } },
+      border: borderStyle,
+      alignment: { horizontal: "center", vertical: "center", wrapText: true }
+    };
+    const cellStyle = {
+      font: { name: "Times New Roman", sz: 11 },
+      border: borderStyle,
+      alignment: { vertical: "center", wrapText: true }
+    };
+    const centerStyle = { ...cellStyle, alignment: { horizontal: "center", vertical: "center" } };
+
+    const headerRowIdx = 6;
+    const dataStartIdx = 7;
+
+    for (let c = 0; c <= totalCols; c++) {
+      const headerRef = XLSX.utils.encode_cell({ r: headerRowIdx, c });
+      if (!worksheet[headerRef]) worksheet[headerRef] = { v: "", t: "s" };
+      worksheet[headerRef].s = headerStyle;
+
+      for (let r = dataStartIdx; r < dataStartIdx + dataRows.length; r++) {
+        const cellRef = XLSX.utils.encode_cell({ r, c });
+        if (!worksheet[cellRef]) worksheet[cellRef] = { v: "", t: "s" };
+
+        // Center STT(0), Mã HS(1), Ward(3), Status(4), Severity(6), AutoFix(9)
+        if ([0, 1, 3, 4, 6, 9].includes(c)) worksheet[cellRef].s = centerStyle;
+        else worksheet[cellRef].s = cellStyle;
+      }
     }
 
     worksheet['!cols'] = [

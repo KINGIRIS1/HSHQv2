@@ -32,6 +32,7 @@ export const ReturnedResultListView: React.FC<ReturnedResultListViewProps> = ({
     const [selectedWard, setSelectedWard] = useState('all');
     const [fromDate, setFromDate] = useState('');
     const [toDate, setToDate] = useState('');
+    const [selectedBatchFilter, setSelectedBatchFilter] = useState('all');
 
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [currentPage, setCurrentPage] = useState(1);
@@ -58,9 +59,12 @@ export const ReturnedResultListView: React.FC<ReturnedResultListViewProps> = ({
     const historyBatches = useMemo(() => {
         const batchesMap: Record<string, { label: string; date: string; count: number }> = {};
         returnedRecords.forEach(r => {
-            if (r.archiveBatchName) {
-                const label = r.archiveBatchName;
-                const dateStr = r.archiveBatchDate ? r.archiveBatchDate.split('T')[0] : (r.exportDate ? r.exportDate.split('T')[0] : todayStr);
+            const batchName = r.archiveBatchName;
+            if (batchName) {
+                const label = batchName;
+                const dateStr = r.archiveBatchDate 
+                    ? r.archiveBatchDate.split('T')[0] 
+                    : (r.resultReturnedDate ? r.resultReturnedDate.split('T')[0] : todayStr);
                 
                 if (!batchesMap[label]) {
                     batchesMap[label] = {
@@ -82,6 +86,11 @@ export const ReturnedResultListView: React.FC<ReturnedResultListViewProps> = ({
             return getNum(b.label) - getNum(a.label);
         });
     }, [returnedRecords, todayStr]);
+
+    // Count records without batch
+    const unbatchedCount = useMemo(() => {
+        return returnedRecords.filter(r => !r.archiveBatchName).length;
+    }, [returnedRecords]);
 
     // Calculate default next batch info
     const nextBatchInfo = useMemo(() => {
@@ -186,9 +195,17 @@ export const ReturnedResultListView: React.FC<ReturnedResultListViewProps> = ({
                 if (rDate > tDate) return false;
             }
 
+            // Batch filter
+            if (selectedBatchFilter === 'unbatched') {
+                if (r.archiveBatchName) return false;
+            } else if (selectedBatchFilter !== 'all') {
+                const rBatch = r.archiveBatchName || '';
+                if (rBatch !== selectedBatchFilter) return false;
+            }
+
             return true;
         });
-    }, [returnedRecords, searchTerm, selectedWard, fromDate, toDate]);
+    }, [returnedRecords, searchTerm, selectedWard, fromDate, toDate, selectedBatchFilter]);
 
     const totalPages = Math.ceil(filteredRecords.length / pageSize) || 1;
     const paginatedRecords = useMemo(() => {
@@ -250,7 +267,7 @@ export const ReturnedResultListView: React.FC<ReturnedResultListViewProps> = ({
         return list;
     }, [returnedRecords, selectedExportBatch]);
 
-    // Generate Excel Workbook matching image.png 100%
+    // Generate Excel Workbook matching styling standards
     const generateWorkbook = (): { wb: XLSX.WorkBook, fileName: string } | null => {
         if (exportTargetRecords.length === 0) {
             alert('Không có hồ sơ nào thỏa mãn điều kiện xuất!');
@@ -262,8 +279,8 @@ export const ReturnedResultListView: React.FC<ReturnedResultListViewProps> = ({
             batchNameStr = `ĐỢT ${batchNameStr}`;
         }
 
-        const firstBatchRecord = exportTargetRecords.find(r => r.archiveBatchDate || r.exportDate || r.completedDate);
-        const batchRawDate = firstBatchRecord?.archiveBatchDate || firstBatchRecord?.exportDate || firstBatchRecord?.completedDate || todayStr;
+        const firstBatchRecord = exportTargetRecords.find(r => r.archiveBatchDate || r.completedDate || r.resultReturnedDate);
+        const batchRawDate = firstBatchRecord?.archiveBatchDate || firstBatchRecord?.completedDate || firstBatchRecord?.resultReturnedDate || todayStr;
         const batchDateStr = formatDate(batchRawDate);
 
         let subTitle = "";
@@ -311,24 +328,38 @@ export const ReturnedResultListView: React.FC<ReturnedResultListViewProps> = ({
         const wb = XLSX.utils.book_new();
         const ws = XLSX.utils.aoa_to_sheet(headerRows);
 
-        // Add Data Rows
-        const dataOriginRow = headerRows.length + 1;
-        XLSX.utils.sheet_add_aoa(ws, dataRows, { origin: `A${dataOriginRow}` });
+        // Add Data Rows starting at Row 9 (A9)
+        const dataStartRowIdx = headerRows.length; // 8 (0-indexed -> Row 9)
+        XLSX.utils.sheet_add_aoa(ws, dataRows, { origin: `A${dataStartRowIdx + 1}` });
 
         // Add Signature Footer Rows
-        const lastDataRow = (dataOriginRow - 1) + dataRows.length;
-        const footerStartRow = lastDataRow + 2;
+        const totalDataRows = dataRows.length;
+        const footerStartRowIdx = dataStartRowIdx + totalDataRows + 2;
 
-        const totalCols = tableHeader.length;
+        const totalCols = tableHeader.length; // 8
         const footerRow1 = new Array(totalCols).fill("");
         footerRow1[1] = "BÊN GIAO HỒ SƠ";
-        footerRow1[6] = "BÊN NHẬN HỒ SƠ";
+        footerRow1[5] = "BÊN NHẬN HỒ SƠ";
 
         const footerRow2 = new Array(totalCols).fill("");
         footerRow2[1] = "(Ký và ghi rõ họ tên)";
-        footerRow2[6] = "(Ký và ghi rõ họ tên)";
+        footerRow2[5] = "(Ký và ghi rõ họ tên)";
 
-        XLSX.utils.sheet_add_aoa(ws, [footerRow1, footerRow2], { origin: `A${footerStartRow}` });
+        XLSX.utils.sheet_add_aoa(ws, [footerRow1, footerRow2], { origin: `A${footerStartRowIdx + 1}` });
+
+        // Merges Config
+        const lastColIdx = totalCols - 1; // 7 (A through H)
+        ws['!merges'] = [
+            { s: { r: 0, c: 0 }, e: { r: 0, c: lastColIdx } },
+            { s: { r: 1, c: 0 }, e: { r: 1, c: lastColIdx } },
+            { s: { r: 3, c: 0 }, e: { r: 3, c: lastColIdx } },
+            { s: { r: 4, c: 0 }, e: { r: 4, c: lastColIdx } },
+            { s: { r: 5, c: 0 }, e: { r: 5, c: lastColIdx } },
+            { s: { r: footerStartRowIdx, c: 1 }, e: { r: footerStartRowIdx, c: 2 } },
+            { s: { r: footerStartRowIdx + 1, c: 1 }, e: { r: footerStartRowIdx + 1, c: 2 } },
+            { s: { r: footerStartRowIdx, c: 5 }, e: { r: footerStartRowIdx, c: 7 } },
+            { s: { r: footerStartRowIdx + 1, c: 5 }, e: { r: footerStartRowIdx + 1, c: 7 } }
+        ];
 
         // Column Widths
         ws['!cols'] = [
@@ -338,10 +369,76 @@ export const ReturnedResultListView: React.FC<ReturnedResultListViewProps> = ({
             { wch: 18 }, // Địa Chỉ (Xã)
             { wch: 8 },  // Thửa
             { wch: 8 },  // Tờ
-            { wch: 30 }, // Loại HS
-            { wch: 14 }, // Hẹn Trả
-            { wch: 25 }  // Ghi chú
+            { wch: 28 }, // Loại HS
+            { wch: 14 }  // Hẹn Trả
         ];
+
+        // Typography and Styling
+        const fontName = "Times New Roman";
+        const thinBorder = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
+
+        const titleMainStyle = { font: { name: fontName, sz: 14, bold: true }, alignment: { horizontal: "center", vertical: "center" } };
+        const titleSubStyle = { font: { name: fontName, sz: 12, bold: true, underline: true }, alignment: { horizontal: "center", vertical: "center" } };
+        const reportTitleStyle = { font: { name: fontName, sz: 16, bold: true, color: { rgb: "0000FF" } }, alignment: { horizontal: "center", vertical: "center" } };
+        const reportSubTitleStyle = { font: { name: fontName, sz: 12, italic: true }, alignment: { horizontal: "center", vertical: "center" } };
+        const handoverNoteStyle = { font: { name: fontName, sz: 11, italic: true }, alignment: { horizontal: "center", vertical: "center" } };
+
+        const headerStyle = {
+            font: { name: fontName, sz: 11, bold: true },
+            border: thinBorder,
+            fill: { fgColor: { rgb: "E0E0E0" } },
+            alignment: { horizontal: "center", vertical: "center", wrapText: true }
+        };
+
+        const cellLeftStyle = {
+            font: { name: fontName, sz: 11 },
+            border: thinBorder,
+            alignment: { vertical: "center", wrapText: true }
+        };
+        const cellCenterStyle = { ...cellLeftStyle, alignment: { horizontal: "center", vertical: "center" } };
+
+        if (ws['A1']) ws['A1'].s = titleMainStyle;
+        if (ws['A2']) ws['A2'].s = titleSubStyle;
+        if (ws['A4']) ws['A4'].s = reportTitleStyle;
+        if (ws['A5']) ws['A5'].s = reportSubTitleStyle;
+        if (ws['A6']) ws['A6'].s = handoverNoteStyle;
+
+        // Header Styling
+        const tableHeaderRowIdx = 7;
+        for (let c = 0; c <= lastColIdx; c++) {
+            const ref = XLSX.utils.encode_cell({ r: tableHeaderRowIdx, c });
+            if (!ws[ref]) ws[ref] = { v: "", t: "s" };
+            ws[ref].s = headerStyle;
+        }
+
+        // Data Row Styling
+        for (let r = dataStartRowIdx; r < dataStartRowIdx + totalDataRows; r++) {
+            for (let c = 0; c <= lastColIdx; c++) {
+                const ref = XLSX.utils.encode_cell({ r, c });
+                if (!ws[ref]) ws[ref] = { v: "", t: "s" };
+
+                // Center STT (0), Thửa (4), Tờ (5), Hẹn Trả (7)
+                if ([0, 4, 5, 7].includes(c)) {
+                    ws[ref].s = cellCenterStyle;
+                } else {
+                    ws[ref].s = cellLeftStyle;
+                }
+            }
+        }
+
+        // Footer Styling
+        const footerTitleStyle = { font: { name: fontName, sz: 12, bold: true }, alignment: { horizontal: "center", vertical: "center" } };
+        const footerSubTitleStyle = { font: { name: fontName, sz: 11, italic: true }, alignment: { horizontal: "center", vertical: "center" } };
+
+        const leftFooterRef = XLSX.utils.encode_cell({ r: footerStartRowIdx, c: 1 });
+        const leftFooterSubRef = XLSX.utils.encode_cell({ r: footerStartRowIdx + 1, c: 1 });
+        const rightFooterRef = XLSX.utils.encode_cell({ r: footerStartRowIdx, c: 5 });
+        const rightFooterSubRef = XLSX.utils.encode_cell({ r: footerStartRowIdx + 1, c: 5 });
+
+        if (ws[leftFooterRef]) ws[leftFooterRef].s = footerTitleStyle;
+        if (ws[leftFooterSubRef]) ws[leftFooterSubRef].s = footerSubTitleStyle;
+        if (ws[rightFooterRef]) ws[rightFooterRef].s = footerTitleStyle;
+        if (ws[rightFooterSubRef]) ws[rightFooterSubRef].s = footerSubTitleStyle;
 
         const cleanBatch = selectedExportBatch === 'all' ? 'Tat_Ca_Dot' : removeVietnameseTones(batchNameStr.replace(/\s+/g, '_'));
         const dateFormattedForFile = batchDateStr.replace(/\//g, '_');
@@ -413,6 +510,24 @@ export const ReturnedResultListView: React.FC<ReturnedResultListViewProps> = ({
                             <option value="all">Toàn bộ địa bàn</option>
                             {wards.map(w => (
                                 <option key={w} value={w}>{getWardLabel(w)}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {/* Batch Dropdown Filter */}
+                    <div className="flex items-center gap-1.5 bg-white border border-slate-300 rounded-lg px-2.5 py-1 text-xs shrink-0">
+                        <Layers size={14} className="text-slate-400 shrink-0" />
+                        <select
+                            value={selectedBatchFilter}
+                            onChange={(e) => { setSelectedBatchFilter(e.target.value); setCurrentPage(1); }}
+                            className="bg-transparent font-medium text-slate-800 outline-none cursor-pointer"
+                        >
+                            <option value="all">Tất cả đợt lưu ({returnedRecords.length})</option>
+                            <option value="unbatched">Chưa chốt đợt ({unbatchedCount})</option>
+                            {historyBatches.map(b => (
+                                <option key={b.label} value={b.label}>
+                                    {b.label} - {formatDate(b.date)} ({b.count} hồ sơ)
+                                </option>
                             ))}
                         </select>
                     </div>
@@ -858,7 +973,7 @@ export const ReturnedResultListView: React.FC<ReturnedResultListViewProps> = ({
                                     <h2 className="text-base font-bold uppercase text-slate-900">DANH SÁCH BÀN GIAO HỒ SƠ LƯU TRỮ 1 CỬA</h2>
                                     <p className="text-xs font-bold text-slate-700">
                                         {selectedExportBatch === 'all' ? 'TẤT CẢ CÁC ĐỢT LƯU' : (selectedExportBatch.toUpperCase().startsWith('ĐỢT') ? selectedExportBatch.toUpperCase() : `ĐỢT ${selectedExportBatch.toUpperCase()}`)}
-                                        {selectedExportBatch !== 'all' && ` - NGÀY ${formatDate(exportTargetRecords.find(r => r.archiveBatchDate || r.exportDate || r.completedDate)?.archiveBatchDate || todayStr)}`} - TỔNG SỐ HỒ SƠ: {exportTargetRecords.length}
+                                        {selectedExportBatch !== 'all' && ` - NGÀY ${formatDate(exportTargetRecords.find(r => r.archiveBatchDate || r.completedDate || r.resultReturnedDate)?.archiveBatchDate || todayStr)}`} - TỔNG SỐ HỒ SƠ: {exportTargetRecords.length}
                                     </p>
                                     <p className="text-xs italic text-slate-600">Kèm theo đầy đủ hồ sơ gốc</p>
                                 </div>

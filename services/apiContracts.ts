@@ -86,7 +86,7 @@ export const fetchContracts = async (): Promise<Contract[]> => {
             return merged;
         }
     } catch (error) {
-        logError("fetchContracts", error);
+        logError("fetchContracts", error, true);
     }
 
     return localContracts;
@@ -203,7 +203,7 @@ export const fetchPriceList = async (): Promise<PriceItem[]> => {
         if (error) throw error;
         return (data || []).map(mapPriceFromDb);
     } catch (error) {
-        logError("fetchPriceList", error);
+        logError("fetchPriceList", error, true);
         return [];
     }
 };

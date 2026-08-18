@@ -456,42 +456,134 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
   };
 
   const handleExportExcel = () => {
-    const dataToExport = displayRecords.map((r, idx) => ({
-      STT: idx + 1,
-      "Mã hồ sơ": r.code,
-      "Chủ sử dụng": r.customerName,
-      "Số điện thoại": r.phoneNumber || "",
-      CCCD: r.cccd || "",
-      "Loại hồ sơ": r.recordType,
-      "Ngày nhận": r.receivedDate ? r.receivedDate.split("T")[0] : "",
-      "Hẹn trả": r.deadline ? r.deadline.split("T")[0] : "",
-      "Trạng thái": r.status,
-      "Xã/Phường": r.ward || "",
-      "Số tờ": r.mapSheet || "",
-      "Số thửa": r.landPlot || "",
-      "Diện tích": r.area || "",
-      "Địa chỉ": r.address || "",
-      "Nội dung": cleanSyncNotes(r.content) || "",
-      "Ngày giao việc": r.assignedDate ? r.assignedDate.split("T")[0] : "",
-      "Ngày trình ký": r.submissionDate ? r.submissionDate.split("T")[0] : "",
-      "Ngày duyệt": r.approvalDate ? r.approvalDate.split("T")[0] : "",
-      "Ngày hoàn thành": r.completedDate ? r.completedDate.split("T")[0] : "",
-      "Đợt xuất": r.exportBatch ? extractBatchNumber(r.exportBatch) : "",
-      "Ngày trả kết quả": r.resultReturnedDate
-        ? r.resultReturnedDate.split("T")[0]
-        : "",
-      "Ghi chú": cleanSyncNotes(r.notes) || "",
-      "Ghi chú cá nhân": r.personalNotes || "",
-      "Số trích đo": r.measurementNumber || "",
-      "Số trích lục": r.excerptNumber || "",
-    }));
+    const headers = [
+      "STT",
+      "Mã hồ sơ",
+      "Chủ sử dụng",
+      "Số điện thoại",
+      "CCCD",
+      "Loại hồ sơ",
+      "Ngày nhận",
+      "Hẹn trả",
+      "Trạng thái",
+      "Xã/Phường",
+      "Số tờ",
+      "Số thửa",
+      "Diện tích",
+      "Địa chỉ",
+      "Nội dung",
+      "Ngày giao việc",
+      "Ngày trình ký",
+      "Ngày duyệt",
+      "Ngày hoàn thành",
+      "Đợt xuất",
+      "Ngày trả kết quả",
+      "Ghi chú",
+      "Ghi chú cá nhân",
+      "Số trích đo",
+      "Số trích lục",
+    ];
 
-    const ws = XLSX.utils.json_to_sheet(dataToExport);
+    const dataRows = displayRecords.map((r, idx) => [
+      idx + 1,
+      r.code || "",
+      r.customerName || "",
+      r.phoneNumber || "",
+      r.cccd || "",
+      r.recordType || "",
+      r.receivedDate ? r.receivedDate.split("T")[0] : "",
+      r.deadline ? r.deadline.split("T")[0] : "",
+      r.status || "",
+      r.ward || "",
+      r.mapSheet || "",
+      r.landPlot || "",
+      r.area || "",
+      r.address || "",
+      cleanSyncNotes(r.content) || "",
+      r.assignedDate ? r.assignedDate.split("T")[0] : "",
+      r.submissionDate ? r.submissionDate.split("T")[0] : "",
+      r.approvalDate ? r.approvalDate.split("T")[0] : "",
+      r.completedDate ? r.completedDate.split("T")[0] : "",
+      r.exportBatch ? extractBatchNumber(r.exportBatch) : "",
+      r.resultReturnedDate ? r.resultReturnedDate.split("T")[0] : "",
+      cleanSyncNotes(r.notes) || "",
+      r.personalNotes || "",
+      r.measurementNumber || "",
+      r.excerptNumber || "",
+    ]);
+
+    const ws = XLSX.utils.aoa_to_sheet([
+      ["CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM"],
+      ["Độc lập - Tự do - Hạnh phúc"],
+      [""],
+      [`DANH SÁCH HỒ SƠ CÁ NHÂN - ${user.name.toUpperCase()}`],
+      [`Ngày xuất: ${new Date().toLocaleDateString("vi-VN")} | Tổng số: ${displayRecords.length}`],
+      [""],
+      headers,
+      ...dataRows,
+    ]);
+
+    const totalCols = headers.length - 1;
+    ws["!merges"] = [
+      { s: { r: 0, c: 0 }, e: { r: 0, c: totalCols } },
+      { s: { r: 1, c: 0 }, e: { r: 1, c: totalCols } },
+      { s: { r: 3, c: 0 }, e: { r: 3, c: totalCols } },
+      { s: { r: 4, c: 0 }, e: { r: 4, c: totalCols } },
+    ];
+
+    if (ws["A1"]) ws["A1"].s = { font: { name: "Times New Roman", sz: 14, bold: true }, alignment: { horizontal: "center" } };
+    if (ws["A2"]) ws["A2"].s = { font: { name: "Times New Roman", sz: 12, bold: true, underline: true }, alignment: { horizontal: "center" } };
+    if (ws["A4"]) ws["A4"].s = { font: { name: "Times New Roman", sz: 16, bold: true, color: { rgb: "0000FF" } }, alignment: { horizontal: "center" } };
+    if (ws["A5"]) ws["A5"].s = { font: { name: "Times New Roman", sz: 12, italic: true }, alignment: { horizontal: "center" } };
+
+    const borderStyle = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
+    const headerStyle = {
+      font: { name: "Times New Roman", sz: 11, bold: true },
+      fill: { fgColor: { rgb: "E0E0E0" } },
+      border: borderStyle,
+      alignment: { horizontal: "center", vertical: "center", wrapText: true },
+    };
+    const cellStyle = {
+      font: { name: "Times New Roman", sz: 11 },
+      border: borderStyle,
+      alignment: { vertical: "center", wrapText: true },
+    };
+    const centerStyle = { ...cellStyle, alignment: { horizontal: "center", vertical: "center" } };
+
+    const headerRowIdx = 6;
+    const dataStartIdx = 7;
+
+    for (let c = 0; c <= totalCols; c++) {
+      const headerRef = XLSX.utils.encode_cell({ r: headerRowIdx, c });
+      if (!ws[headerRef]) ws[headerRef] = { v: "", t: "s" };
+      ws[headerRef].s = headerStyle;
+
+      for (let r = dataStartIdx; r < dataStartIdx + dataRows.length; r++) {
+        const cellRef = XLSX.utils.encode_cell({ r, c });
+        if (!ws[cellRef]) ws[cellRef] = { v: "", t: "s" };
+
+        // Center STT(0), Code(1), Phone(3), CCCD(4), Dates(6,7,15,16,17,18,20), Plot/Sheet(10,11), Batch(19), Numbers(23,24)
+        if ([0, 1, 3, 4, 6, 7, 8, 10, 11, 15, 16, 17, 18, 19, 20, 23, 24].includes(c)) {
+          ws[cellRef].s = centerStyle;
+        } else {
+          ws[cellRef].s = cellStyle;
+        }
+      }
+    }
+
+    ws["!cols"] = [
+      { wch: 5 }, { wch: 15 }, { wch: 25 }, { wch: 14 }, { wch: 14 },
+      { wch: 16 }, { wch: 12 }, { wch: 12 }, { wch: 15 }, { wch: 16 },
+      { wch: 7 }, { wch: 7 }, { wch: 10 }, { wch: 25 }, { wch: 25 },
+      { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 10 },
+      { wch: 12 }, { wch: 20 }, { wch: 20 }, { wch: 12 }, { wch: 12 },
+    ];
+
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "HoSoCaNhan");
     XLSX.writeFile(
       wb,
-      `HoSoCaNhan_${user.name}_${new Date().toISOString().split("T")[0]}.xlsx`,
+      `HoSoCaNhan_${user.name.replace(/\s+/g, "_")}_${new Date().toISOString().split("T")[0]}.xlsx`,
     );
   };
 

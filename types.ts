@@ -93,6 +93,7 @@ export interface User {
   username: string;
   password?: string;
   name: string;
+  fullName?: string;
   role: UserRole;
   employeeId?: string;
 }
@@ -195,10 +196,13 @@ export interface RecordFile {
   price?: number | null;
   advancePayment?: number | null;
 
-  // Gia hạn hồ sơ
+  // Gia hạn hồ sơ & Nhắc nhở
   originalDeadline?: string | null;  // Hạn gốc ban đầu
   extendedBy?: string | null;        // Người thực hiện gia hạn
   extendedAt?: string | null;        // Thời gian thực hiện gia hạn
+  reminderDate?: string | null;      // Ngày hẹn nhắc nhở
+  lastRemindedAt?: string | null;    // Lần nhắc nhở cuối
+  deadlineReminded?: boolean | null;
 
   // Bàn giao kho lưu / Danh sách trả kết quả
   archiveBatchName?: string | null;  // Tên đợt lưu kho (ví dụ: Đợt 1)

@@ -20,7 +20,7 @@ export const fetchWorkSchedules = async (): Promise<WorkSchedule[]> => {
         saveToCache(WORK_SCHEDULE_CACHE_KEY, data);
         return data as WorkSchedule[];
     } catch (error) {
-        logError("fetchWorkSchedules", error);
+        logError("fetchWorkSchedules", error, true);
         return getFromCache(WORK_SCHEDULE_CACHE_KEY, []);
     }
 };

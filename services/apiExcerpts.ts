@@ -10,7 +10,7 @@ export const fetchExcerptHistory = async (): Promise<any[]> => {
         saveToCache(CACHE_KEYS.EXCERPT_HISTORY, data);
         return data;
     } catch (error) {
-        logError("fetchExcerptHistory", error);
+        logError("fetchExcerptHistory", error, true);
         return getFromCache(CACHE_KEYS.EXCERPT_HISTORY, []);
     }
 };
@@ -46,7 +46,7 @@ export const fetchExcerptCounters = async (): Promise<Record<string, number>> =>
         saveToCache(CACHE_KEYS.EXCERPT_COUNTERS, counters);
         return counters;
     } catch (error) {
-        logError("fetchExcerptCounters", error);
+        logError("fetchExcerptCounters", error, true);
         return getFromCache(CACHE_KEYS.EXCERPT_COUNTERS, {});
     }
 };
@@ -72,7 +72,7 @@ export const fetchTrichDoHistory = async (): Promise<any[]> => {
         saveToCache(CACHE_KEYS.TRICHDO_HISTORY, data);
         return data;
     } catch (error) {
-        logError("fetchTrichDoHistory", error);
+        logError("fetchTrichDoHistory", error, true);
         return getFromCache(CACHE_KEYS.TRICHDO_HISTORY, []);
     }
 };
@@ -108,7 +108,7 @@ export const fetchTrichDoCounters = async (): Promise<Record<string, number>> =>
         saveToCache(CACHE_KEYS.TRICHDO_COUNTERS, counters);
         return counters;
     } catch (error) {
-        logError("fetchTrichDoCounters", error);
+        logError("fetchTrichDoCounters", error, true);
         return getFromCache(CACHE_KEYS.TRICHDO_COUNTERS, {});
     }
 };

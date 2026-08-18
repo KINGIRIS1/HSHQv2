@@ -349,7 +349,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
         
         // Style headers
         const headerStyle = {
-            font: { bold: true, color: { rgb: "FFFFFF" } },
+            font: { name: "Times New Roman", sz: 11, bold: true, color: { rgb: "FFFFFF" } },
             fill: { fgColor: { rgb: "008080" } }, // Teal
             alignment: { horizontal: "center", vertical: "center" },
             border: {
