@@ -120,10 +120,13 @@ export interface RecordFile {
   address?: string | null;       
   group?: string | null;         
   
-  issueNumber?: string | null;   // Số phát hành
-  entryNumber?: string | null;   // Số vào sổ
-  issueDate?: string | null;     // Ngày cấp
-  residentialArea?: number | null; // Đất ở
+  issueNumber?: string | null;   // Số phát hành (certificate_code)
+  certificateCode?: string | null;
+  entryNumber?: string | null;   // Số vào sổ (book_number)
+  bookNumber?: string | null;
+  issueDate?: string | null;     // Ngày cấp (issue_date)
+  residentialArea?: number | null; // Đất ở (residential_area)
+  totalArea?: number | null;     // Tổng diện tích (total_area)
 
   content?: string | null;        
   recordType?: string | null;    
@@ -134,42 +137,45 @@ export interface RecordFile {
   assignedDate?: string | null;  
   
   submissionDate?: string | null; // Ngày trình ký
-  submittedTo?: string | null;    // Người được trình ký (ID của giám đốc)
+  submittedTo?: string | null;    // Người được trình ký
   pendingCheckDate?: string | null; // Ngày trình kiểm tra
-  checkedBy?: string | null;      // Người kiểm tra (ID của tổ trưởng/tổ phó)
+  checkedBy?: string | null;      // Người kiểm tra
   checkedDate?: string | null;    // Ngày đã kiểm tra
+  pendingSignDate?: string | null; // Ngày Trình ký
   completedWorkDate?: string | null; // Ngày đã thực hiện
   approvalDate?: string | null;   // Ngày ký duyệt
   completedDate?: string | null; 
   
   status: RecordStatus;   
-  assignedTo?: string | null;    
+  assignedTo?: string | null; 
+  employeeName?: string | null;  // NV Xử lý   
   notes?: string | null;         
   privateNotes?: string | null;  
   personalNotes?: string | null; // Ghi chú cá nhân của nhân viên
   
+  // Người ủy quyền (authorized_person)
   authorizedBy?: string | null;  
+  authorizedPersonName?: string | null; // Họ và tên người ủy quyền
+  authorizedPersonId?: string | null;   // CCCD người ủy quyền
+  authorizedPersonAddress?: string | null; // Địa chỉ người ủy quyền
   authDocType?: string | null;   
   otherDocs?: string | null;     
 
   exportBatch?: number | string | null;   
   exportDate?: string | null;    
-  handoverWard?: string | null; // Nơi giao trả kết quả (nếu khác địa chỉ thửa đất)
+  handoverWard?: string | null; // Nơi giao trả kết quả
   
   measurementNumber?: string | null; 
   excerptNumber?: string | null;
   
-  // Tính năng nhắc nhở
-  reminderDate?: string | null;      // Thời gian đặt lịch nhắc
-  lastRemindedAt?: string | null;    // Thời gian đã thông báo lần cuối
-  deadlineReminded?: boolean | null; // Đã nhắc nhở hết hạn giải quyết (nhắc 1 lần)
-
-  // Tính năng trả kết quả
-  receiptNumber?: string | null;     // Số biên lai/hóa đơn
-  receiptType?: 'Biên Lai' | 'Hóa Đơn' | string | null; // Loại chứng từ (Biên lai hay Hóa đơn)
-  receiverName?: string | null;      // Người nhận kết quả (Mới)
+  // Tính năng trả kết quả & Chứng từ
+  receiptNumber?: string | null;     // Số biên lai
+  invoiceNumber?: string | null;     // Số hóa đơn
+  receiptType?: 'Biên Lai' | 'Hóa Đơn' | string | null; 
+  receiverName?: string | null;      // Người nhận kết quả
   resultReturnedDate?: string | null; // Ngày trả kết quả cho dân
-  returnedPrice?: number | null;     // Số tiền thực tế khi trả kết quả (Mới)
+  feeAmount?: number | null;         // Số tiền thu
+  returnedPrice?: number | null;     // Số tiền thực tế khi trả kết quả
 
   // Tính năng Chốt danh sách bàn giao về phòng chuyên môn (Dành cho hồ sơ đã trả kết quả)
   returnBatch?: number | null;
@@ -248,6 +254,7 @@ export interface Contract {
   code: string;           
   customerName: string;
   phoneNumber?: string | null;
+  cccd?: string | null;            // Số CCCD/CMND chủ sử dụng
   customerAddress?: string | null;
   ward?: string | null;
   address?: string | null;
@@ -259,27 +266,32 @@ export interface Contract {
   contractType: 'Đo đạc' | 'Tách thửa' | 'Cắm mốc' | 'Trích lục'; // Đã bổ sung Trích lục
   serviceType: string;    // Tên dịch vụ chi tiết (VD: Đo đạc tòa án)
   areaType: string;       // Khu vực (Đất đô thị / Nông thôn)
+  recordType?: string | null; // Loại hồ sơ liên kết
+
+  // Cán bộ & Ghi chú
+  assignedTo?: string | null; // Cán bộ phụ trách
+  notes?: string | null;      // Ghi chú hợp đồng / thanh lý
 
   // Số lượng đặc thù
   plotCount?: number | null;     // Số thửa (cho Đo đạc)
   markerCount?: number | null;   // Số mốc (cho Cắm mốc)
   splitItems?: SplitItem[]; // Danh sách tách thửa (lưu JSON)
 
-  // Tài chính
+  // Tài chính (Thu tiền 1 lần khi hoàn tất)
   quantity: number;       // Số lượng chung (để tính tiền cơ bản)
   unitPrice: number;      
   vatRate: number;        // % Thuế
   vatAmount: number;      // Tiền thuế
   totalAmount: number;    
-  deposit: number;        
+  deposit: number;        // Luôn = 0 (Thu 1 lần)
   content?: string | null;       
   
   createdDate: string;    
   status: 'PENDING' | 'COMPLETED';
 
-  // Thanh lý
+  // Thanh lý (Liên kết theo Mã HĐ / Hồ sơ)
   liquidationArea?: number | null; // Diện tích thanh lý thực tế
-  liquidationAmount?: number | null; // MỚI: Giá trị thanh lý thực tế (tiền)
+  liquidationAmount?: number | null; // Giá trị thanh lý thực tế (tiền)
   liquidationDate?: string | null; // Ngày thanh lý hợp đồng thực tế
 }
 

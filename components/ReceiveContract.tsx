@@ -546,6 +546,13 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
           DIA_CHI_CHI_TIET: val(dataToPrint.address),
           MA_HS: val(dataToPrint.code),
           SO_HD: val(dataToPrint.code),
+          MA_BN: val(dataToPrint.customerAddress || dataToPrint.code),
+          MA_BIEN_NHAN: val(dataToPrint.customerAddress || dataToPrint.code),
+          MA_HO_SO: val(dataToPrint.customerAddress || dataToPrint.code),
+          CCCD: val(dataToPrint.cccd),
+          SO_CCCD: val(dataToPrint.cccd),
+          CAN_BO: val(dataToPrint.assignedTo),
+          CAN_BO_THU_LY: val(dataToPrint.assignedTo),
           
           NGAY: dateTL.day,
           THANG: dateTL.month,

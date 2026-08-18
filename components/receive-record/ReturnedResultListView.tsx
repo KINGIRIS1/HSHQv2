@@ -283,8 +283,7 @@ export const ReturnedResultListView: React.FC<ReturnedResultListViewProps> = ({
             "Thửa", 
             "Tờ", 
             "Loại Hồ Sơ", 
-            "Hẹn Trả", 
-            "Ghi chú"
+            "Hẹn Trả"
         ];
 
         const dataRows = exportTargetRecords.map((r, idx) => [
@@ -295,8 +294,7 @@ export const ReturnedResultListView: React.FC<ReturnedResultListViewProps> = ({
             r.landPlot || '',
             r.mapSheet || '',
             r.recordType || getShortRecordType(r.recordType) || '',
-            formatDate(r.deadline) || '',
-            r.notes || r.explanationPlan || ''
+            formatDate(r.deadline) || ''
         ]);
 
         const headerRows = [
@@ -502,7 +500,6 @@ export const ReturnedResultListView: React.FC<ReturnedResultListViewProps> = ({
                                         <th className="p-3 w-32 text-center">XÃ PHƯỜNG</th>
                                         <th className="p-3 w-28 text-center">NGÀY TRẢ DÂN</th>
                                         <th className="p-3 w-40 text-center">NGƯỜI NHẬN KQ</th>
-                                        <th className="p-3 w-48 text-center">GHI CHÚ</th>
                                         <th className="p-3 w-32 text-center">ĐỢT LƯU</th>
                                     </tr>
                                 </thead>
@@ -544,9 +541,6 @@ export const ReturnedResultListView: React.FC<ReturnedResultListViewProps> = ({
                                                 </td>
                                                 <td className={`${cellClass} text-center text-slate-800 font-semibold`}>
                                                     {record.receiverName || record.customerName || '--'}
-                                                </td>
-                                                <td className={`${cellClass} text-left text-slate-700 text-xs px-3`}>
-                                                    {record.notes || (record.receiverName ? `Trả hồ sơ: Đã trả kết quả cho ${record.receiverName}` : 'Trả hồ sơ: Đã trả kết quả')}
                                                 </td>
                                                 {/* Cột Đợt lưu */}
                                                 <td className={`${cellClass} text-center`}>
@@ -880,7 +874,6 @@ export const ReturnedResultListView: React.FC<ReturnedResultListViewProps> = ({
                                             <th className="border border-slate-300 p-2 w-12">Tờ</th>
                                             <th className="border border-slate-300 p-2">Loại Hồ Sơ</th>
                                             <th className="border border-slate-300 p-2">Hẹn Trả</th>
-                                            <th className="border border-slate-300 p-2">Ghi chú</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -894,7 +887,6 @@ export const ReturnedResultListView: React.FC<ReturnedResultListViewProps> = ({
                                                 <td className="border border-slate-300 p-2 text-center font-mono">{r.mapSheet || '-'}</td>
                                                 <td className="border border-slate-300 p-2 text-center">{r.recordType || getShortRecordType(r.recordType)}</td>
                                                 <td className="border border-slate-300 p-2 text-center">{formatDate(r.deadline)}</td>
-                                                <td className="border border-slate-300 p-2 text-center">{r.notes || r.explanationPlan || '-'}</td>
                                             </tr>
                                         ))}
                                     </tbody>

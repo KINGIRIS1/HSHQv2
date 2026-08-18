@@ -499,11 +499,15 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
               customerAddress: found.code,
               customerName: found.customerName, 
               phoneNumber: found.phoneNumber, 
+              cccd: found.cccd || '',
               ward: found.ward, 
               address: found.address || '', 
               landPlot: found.landPlot, 
               mapSheet: found.mapSheet, 
               area: found.area || 0,
+              recordType: found.recordType || '',
+              assignedTo: found.assignedTo || '',
+              notes: found.notes || '',
               serviceType: suggestedService || prev.serviceType
               // TUYỆT ĐỐI không ghi đè code (Mã hợp đồng tự nhảy), giữ nguyên prev.code đang nạp sẵn trên form
           }));
@@ -733,6 +737,10 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
 
                 <div className="space-y-2.5">
                     <div><label className={labelClass}>Khách hàng</label><input className={inputClass} value={formData.customerName ?? ''} onChange={e => handleChange('customerName', e.target.value)} /></div>
+                    <div className="grid grid-cols-2 gap-2">
+                        <div><label className={labelClass}>Số CCCD/CMND</label><input className={inputClass} value={formData.cccd ?? ''} onChange={e => handleChange('cccd', e.target.value)} placeholder="CCCD/CMND..." /></div>
+                        <div><label className={labelClass}>Số điện thoại</label><input className={inputClass} value={formData.phoneNumber ?? ''} onChange={e => handleChange('phoneNumber', e.target.value)} placeholder="Số ĐT..." /></div>
+                    </div>
                     <div>
                         <label className={labelClass}>Xã phường</label>
                         <select 
