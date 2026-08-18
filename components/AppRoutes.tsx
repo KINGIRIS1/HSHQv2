@@ -1668,6 +1668,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
           currentUser={currentUser}
           users={users}
           employees={employees}
+          records={records}
           onAddUser={(u) => props.handleUpdateUser(u, false)}
           onUpdateUser={(u) => props.handleUpdateUser(u, true)}
           onDeleteUser={props.handleDeleteUser}
@@ -1677,6 +1678,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
           onDeleteAllData={props.handleDeleteAllData}
           onHolidaysChanged={props.onRefreshData}
           onOpenCloudInspector={props.onOpenCloudInspector}
+          onViewRecord={props.handleViewRecord}
         />
       );
     case "reports":

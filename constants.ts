@@ -22,7 +22,7 @@ export const STATUS_LABELS: Record<RecordStatus, string> = {
   [RecordStatus.HANDOVER]: 'Đã giao 1 cửa',
   [RecordStatus.RETURNED]: 'Đã trả kết quả',
   [RecordStatus.WITHDRAWN]: 'CSD rút hồ sơ',
-  [RecordStatus.REJECTED]: 'Trả hồ sơ',
+  [RecordStatus.REJECTED]: 'Trả hủy hồ sơ',
 };
 
 export const SELECTABLE_STATUSES: { key: RecordStatus; label: string }[] = [
@@ -35,7 +35,7 @@ export const SELECTABLE_STATUSES: { key: RecordStatus; label: string }[] = [
   { key: RecordStatus.HANDOVER, label: 'Đã giao 1 cửa' },
   { key: RecordStatus.RETURNED, label: 'Đã trả kết quả' },
   { key: RecordStatus.WITHDRAWN, label: 'CSD rút hồ sơ' },
-  { key: RecordStatus.REJECTED, label: 'Trả hồ sơ' },
+  { key: RecordStatus.REJECTED, label: 'Trả hủy hồ sơ' },
 ];
 
 export const STATUS_COLORS: Record<RecordStatus, string> = {

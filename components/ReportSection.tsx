@@ -576,11 +576,11 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                         >
                             <CalendarRange size={13} /> Tất cả
                         </button>
-                        <button onClick={() => handleQuickReport('week')} className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all flex items-center gap-1 ${reportType === 'week' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-600 hover:text-blue-600'}`}>
-                            <CalendarDays size={13} /> Tuần này
-                        </button>
                         <button onClick={() => handleQuickReport('month')} className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all flex items-center gap-1 ${reportType === 'month' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-600 hover:text-blue-600'}`}>
                             <Layout size={13} /> Tháng này
+                        </button>
+                        <button onClick={() => handleQuickReport('week')} className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all flex items-center gap-1 ${reportType === 'week' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-600 hover:text-blue-600'}`}>
+                            <CalendarDays size={13} /> Tuần này
                         </button>
                         <button onClick={() => handleQuickReport('today')} className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all flex items-center gap-1 ${reportType === 'today' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-600 hover:text-blue-600'}`}>
                             <Clock size={13} /> Hôm nay

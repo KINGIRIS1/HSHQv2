@@ -5,6 +5,7 @@ import { GROUPS, EXTENDED_RECORD_TYPES, STATUS_LABELS, SELECTABLE_STATUSES, getS
 import { X, Save, Lock, User as UserIcon, MapPin, FileText, Calendar, FileCheck, ChevronDown, ChevronUp, History } from 'lucide-react';
 import { calculateDeadlineHelper, getDepartmentForRecord, extractBatchOnly } from '../utils/appHelpers';
 import { fetchContracts } from '../services/api';
+import { addActivityLog } from '../services/activityLogService';
 
 interface AttachedDocItem {
   id: string;
@@ -478,6 +479,19 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
             note: initialData ? 'Cập nhật từ biểu mẫu hồ sơ' : 'Tạo mới hồ sơ'
         };
         finalData.statusLogs = [newLog, ...existingLogs];
+
+        addActivityLog({
+            performerName: currentUser.name || currentUser.username || 'Hệ thống',
+            performerRole: currentUser.role || 'ONEDOOR',
+            actionType: initialData ? 'UPDATE' : 'CREATE',
+            actionLabel: initialData ? 'Cập nhật' : 'Thêm mới',
+            targetType: 'Hồ sơ',
+            referenceCode: finalData.code || initialData?.code || '-',
+            details: initialData 
+                ? `Cập nhật hồ sơ ${finalData.code} - Khách hàng: ${finalData.customerName} (Trạng thái: ${STATUS_LABELS[newStatus] || newStatus})`
+                : `Thêm mới hồ sơ ${finalData.code} - Khách hàng: ${finalData.customerName}`,
+            recordId: initialData?.id
+        });
     }
 
     // Để đảm bảo gửi null thay vì undefined cho API nếu cần xóa

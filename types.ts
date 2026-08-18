@@ -219,6 +219,19 @@ export interface RecordStatusLog {
   note?: string | null;
 }
 
+export interface SystemActivityLog {
+  id: string;
+  timestamp: string;
+  performerName: string;
+  performerRole?: string;
+  actionType: 'CREATE' | 'UPDATE' | 'DELETE' | 'RETURN_RESULT' | 'APPROVE' | 'ASSIGN' | 'HANDOVER' | string;
+  actionLabel: string;
+  targetType: string;
+  referenceCode?: string;
+  details: string;
+  recordId?: string;
+}
+
 // Interface cho Item tách thửa
 export interface SplitItem {
   serviceName: string; // Loại sản phẩm (VD: Tách thửa < 100m2)

@@ -204,8 +204,8 @@ export const RecordLookupView: React.FC<RecordLookupViewProps> = ({
                         </p>
                     </div>
                 ) : (
-                    <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
-                        <div className="overflow-x-auto">
+                    <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden flex flex-col h-full">
+                        <div className="overflow-auto max-h-[calc(100vh-220px)] min-h-[350px]">
                             <table className="w-full text-left border-collapse text-xs">
                                 <thead>
                                     <tr className="bg-slate-50 text-slate-600 border-b border-slate-200 font-bold uppercase text-[11px] select-none sticky top-0 z-10 shadow-xs">
@@ -220,7 +220,7 @@ export const RecordLookupView: React.FC<RecordLookupViewProps> = ({
                                         <th className="p-3 w-48 text-center">GIAO NHÂN VIÊN</th>
                                         <th className="p-3 w-32 text-center">HOÀN THÀNH ĐỢT</th>
                                         <th className="p-3 w-32 text-center">TRẠNG THÁI</th>
-                                        <th className="p-3 w-28 text-center sticky right-0 bg-slate-50 z-20 shadow-l">THAO TÁC</th>
+                                        <th className="p-3 w-28 text-center sticky top-0 right-0 bg-slate-50 z-30 border-b border-l border-slate-200 shadow-xs">THAO TÁC</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100 font-medium">

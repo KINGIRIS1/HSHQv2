@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { User } from '../types';
+import { addActivityLog } from '../services/activityLogService';
 import { ShieldCheck, LogIn, User as UserIcon, Lock, CheckCircle2 } from 'lucide-react';
 
 import { APP_VERSION } from '../constants';
@@ -50,6 +51,16 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
               localStorage.removeItem('saved_username');
           }
           
+          addActivityLog({
+              performerName: user.name || user.username,
+              performerRole: user.role || 'ONEDOOR',
+              actionType: 'LOGIN',
+              actionLabel: 'Đăng nhập',
+              targetType: 'Tài khoản',
+              referenceCode: user.username,
+              details: `Người dùng ${user.name || user.username} (${user.username}) đăng nhập hệ thống`
+          });
+
           onLogin(user);
         } else {
           setError('Tên đăng nhập hoặc mật khẩu không chính xác.');

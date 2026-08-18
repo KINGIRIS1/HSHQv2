@@ -14,6 +14,7 @@ import { syncTemplatesFromCloud } from './services/docxService';
 import { updateRecordApi, saveEmployeeApi, saveUserApi, forceUpdateRecordsBatchApi, updateRecordsBatchById } from './services/api';
 import { migrateArchiveRecordsFromLandRecords } from './services/apiArchive';
 import { ReturnOptionType } from './components/RejectReturnStepModal';
+import { addActivityLog } from './services/activityLogService';
 import * as XLSX from 'xlsx-js-style';
 import { CheckCircle, AlertTriangle } from 'lucide-react';
 
@@ -1051,6 +1052,17 @@ function App() {
               note: `Trả hồ sơ (${optionType}). Lý do: ${reason}`
           };
 
+          addActivityLog({
+              performerName: userLabel,
+              performerRole: currentUser?.role || 'ONEDOOR',
+              actionType: optionType === 'cancel_reject' ? 'DELETE' : 'UPDATE',
+              actionLabel: optionType === 'pause_supplement' ? 'Chờ bổ sung' : optionType === 'cancel_reject' ? 'Trả hủy hồ sơ' : 'Trả cán bộ',
+              targetType: 'Hồ sơ',
+              referenceCode: r.code || r.id,
+              details: `Trả hồ sơ ${r.code} (${optionType === 'pause_supplement' ? 'Trả chờ bổ sung' : optionType === 'cancel_reject' ? 'Trả hủy hồ sơ' : 'Trả về cán bộ thụ lý'}). Lý do: ${reason}`,
+              recordId: r.id
+          });
+
           return {
               ...r,
               status: newStatus,
@@ -1066,12 +1078,28 @@ function App() {
           return found ? found : r;
       }));
 
+      if (viewingRecord) {
+          const updatedViewing = updatedTargets.find(u => u.id === viewingRecord.id);
+          if (updatedViewing) {
+              setViewingRecord(updatedViewing);
+          }
+      }
+
       await Promise.all(updatedTargets.map(u => updateRecordApi(u)));
       setIsRejectReturnStepModalOpen(false);
       setRejectReturnTargetRecords([]);
       setSelectedRecordIds(new Set());
-      setToast({ type: 'success', message: `Đã thực hiện trả ${updatedTargets.length} hồ sơ thành công!` });
-  }, [rejectReturnTargetRecords, currentUser]);
+
+      let toastMsg = `Đã thực hiện trả ${updatedTargets.length} hồ sơ thành công!`;
+      if (optionType === 'cancel_reject') {
+          toastMsg = `Đã trả hủy ${updatedTargets.length} hồ sơ thành công! Hồ sơ đã chuyển sang danh sách Chờ bàn giao 1 cửa.`;
+      } else if (optionType === 'pause_supplement') {
+          toastMsg = `Đã chuyển ${updatedTargets.length} hồ sơ sang trạng thái Chờ bổ sung!`;
+      } else if (optionType === 'return_handler') {
+          toastMsg = `Đã trả ${updatedTargets.length} hồ sơ về cho Cán bộ thụ lý!`;
+      }
+      setToast({ type: 'success', message: toastMsg });
+  }, [rejectReturnTargetRecords, currentUser, viewingRecord]);
 
   if (!currentUser) return (
     <>

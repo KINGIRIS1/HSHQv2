@@ -40,7 +40,8 @@ export const RejectReturnStepModal: React.FC<RejectReturnStepModalProps> = ({
     setErrorMsg('');
     setIsSubmitting(true);
     try {
-      await onConfirm(returnOption, reason.trim(), returnDate);
+      const currentActionDate = new Date().toISOString();
+      await onConfirm(returnOption, reason.trim(), currentActionDate);
       setReason('');
       onClose();
     } catch (err) {
@@ -66,7 +67,7 @@ export const RejectReturnStepModal: React.FC<RejectReturnStepModalProps> = ({
         <div className="bg-rose-600 px-5 py-3.5 text-white flex justify-between items-center shadow-sm">
           <div className="flex items-center gap-2.5 font-bold text-lg">
             <Undo2 size={22} className="shrink-0" />
-            <span>Thao Tác Trả Hồ Sơ</span>
+            <span>Trả Hồ Sơ</span>
           </div>
           <button 
             type="button"
@@ -133,7 +134,7 @@ export const RejectReturnStepModal: React.FC<RejectReturnStepModalProps> = ({
                 />
                 <PauseCircle size={18} className="text-amber-600 shrink-0" />
                 <span className="text-xs sm:text-sm">
-                  <strong>1. Trả dừng quy trình (Chờ người dân bổ sung)</strong>
+                  <strong>1. Trả chờ bổ sung</strong>
                 </span>
               </label>
 
@@ -155,7 +156,7 @@ export const RejectReturnStepModal: React.FC<RejectReturnStepModalProps> = ({
                 />
                 <Ban size={18} className="text-rose-600 shrink-0" />
                 <span className="text-xs sm:text-sm">
-                  <strong>2. Trả hủy hồ sơ (Tạm dừng / Từ chối hoàn trả 1 cửa)</strong>
+                  <strong>2. Trả hủy hồ sơ</strong>
                 </span>
               </label>
 
@@ -177,7 +178,7 @@ export const RejectReturnStepModal: React.FC<RejectReturnStepModalProps> = ({
                 />
                 <RefreshCw size={18} className="text-blue-600 shrink-0" />
                 <span className="text-xs sm:text-sm">
-                  <strong>3. Trả về cán bộ thụ lý (Yêu cầu sửa chữa / hoàn thiện)</strong>
+                  <strong>3. Trả về cán bộ thụ lý</strong>
                 </span>
               </label>
             </div>
@@ -197,20 +198,6 @@ export const RejectReturnStepModal: React.FC<RejectReturnStepModalProps> = ({
               placeholder="Nhập chi tiết ghi chú lý do..."
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-            />
-          </div>
-
-          {/* Section 4: Execution Date */}
-          <div>
-            <label className="block text-xs font-bold text-slate-800 mb-1.5 flex items-center gap-1.5">
-              <Calendar size={15} className="text-indigo-600" />
-              <span>Ngày thực hiện</span>
-            </label>
-            <input
-              type="date"
-              className="w-full border border-slate-300 rounded-xl px-3.5 py-2 text-sm focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none font-semibold text-slate-700 bg-slate-50"
-              value={returnDate}
-              onChange={(e) => setReturnDate(e.target.value)}
             />
           </div>
 

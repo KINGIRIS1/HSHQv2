@@ -201,7 +201,7 @@ const RecordRow: React.FC<RecordRowProps> = ({
                </div>
             ) : record.status === RecordStatus.REJECTED ? (
                <div className="flex flex-col items-center">
-                  <span className="text-xs font-bold bg-red-100 text-red-700 border border-red-200 px-2 py-0.5 rounded mb-1">Trả hồ sơ</span>
+                  <span className="text-xs font-bold bg-red-100 text-red-700 border border-red-200 px-2 py-0.5 rounded mb-1">Trả hủy HS</span>
                   <span className="text-sm font-bold text-red-700">{formatDate(record.completedDate)}</span>
                </div>
             ) : (

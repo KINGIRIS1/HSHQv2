@@ -496,6 +496,7 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({
                 wards={wards}
                 onUpdateBulk={onBulkUpdate}
                 onViewRecord={onViewRecord}
+                onPreviewExcel={handlePreviewExcel}
             />
         )}
       </div>

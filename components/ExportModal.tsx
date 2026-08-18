@@ -301,7 +301,6 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
         ["Độc lập - Tự do - Hạnh phúc"],
         [""],
         [title],
-        [displayDate.toUpperCase()],
         [subTitle],
     ];
 

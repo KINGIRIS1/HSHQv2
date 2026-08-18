@@ -153,38 +153,6 @@ export const ExtendedRecordsView: React.FC<ExtendedRecordsViewProps> = ({
                         )}
                     </div>
 
-                    {/* Quick Date Preset Pills matching image */}
-                    <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/80 shrink-0">
-                        <button
-                            type="button"
-                            onClick={() => { setDatePreset('all'); setFromDate(''); setToDate(''); }}
-                            className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${datePreset === 'all' && !fromDate && !toDate ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
-                        >
-                            <Calendar size={13} /> Tất cả
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => { setDatePreset('week'); setFromDate(''); setToDate(''); }}
-                            className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${datePreset === 'week' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
-                        >
-                            <CalendarRange size={13} /> Tuần này
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => { setDatePreset('month'); setFromDate(''); setToDate(''); }}
-                            className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${datePreset === 'month' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
-                        >
-                            <CalendarDays size={13} /> Tháng này
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => { setDatePreset('today'); setFromDate(''); setToDate(''); }}
-                            className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${datePreset === 'today' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
-                        >
-                            <Clock size={13} /> Hôm nay
-                        </button>
-                    </div>
-
                     {/* Ward Dropdown Filter */}
                     <div className="flex items-center gap-1.5 bg-white border border-slate-300 rounded-lg px-2.5 py-1 text-xs shrink-0">
                         <MapPin size={14} className="text-slate-400 shrink-0" />
@@ -207,14 +175,14 @@ export const ExtendedRecordsView: React.FC<ExtendedRecordsViewProps> = ({
                         <input
                             type="date"
                             value={fromDate}
-                            onChange={(e) => { setFromDate(e.target.value); setDatePreset('all'); setCurrentPage(1); }}
+                            onChange={(e) => { setFromDate(e.target.value); setCurrentPage(1); }}
                             className="bg-transparent font-medium text-slate-800 outline-none w-28 cursor-pointer"
                         />
                         <span className="text-slate-400">-</span>
                         <input
                             type="date"
                             value={toDate}
-                            onChange={(e) => { setToDate(e.target.value); setDatePreset('all'); setCurrentPage(1); }}
+                            onChange={(e) => { setToDate(e.target.value); setCurrentPage(1); }}
                             className="bg-transparent font-medium text-slate-800 outline-none w-28 cursor-pointer"
                         />
                     </div>
@@ -234,11 +202,11 @@ export const ExtendedRecordsView: React.FC<ExtendedRecordsViewProps> = ({
                         </p>
                     </div>
                 ) : (
-                    <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
-                        <div className="overflow-x-auto">
+                    <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden flex flex-col h-full">
+                        <div className="overflow-auto max-h-[calc(100vh-220px)] min-h-[350px]">
                             <table className="w-full text-left border-collapse text-xs">
                                 <thead>
-                                    <tr className="bg-slate-50 text-slate-600 border-b border-slate-200 font-bold uppercase text-[11px] sticky top-0 z-10">
+                                    <tr className="bg-slate-50 text-slate-600 border-b border-slate-200 font-bold uppercase text-[11px] sticky top-0 z-10 shadow-xs">
                                         <th className="p-3 w-12 text-center">STT</th>
                                         <th className="p-3 w-[120px] text-center">MÃ HỒ SƠ</th>
                                         <th className="p-3 w-60 text-center">CHỦ SỬ DỤNG</th>

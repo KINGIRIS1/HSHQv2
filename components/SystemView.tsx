@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
-import { User, Employee, UserRole } from '../types';
+import { User, Employee, UserRole, RecordFile } from '../types';
 import UserManagement from './UserManagement';
 import EmployeeManagement from './EmployeeManagement';
 import SystemSettingsView from './SystemSettingsView';
-import { Shield, Users, Settings2 } from 'lucide-react';
+import ActivityLogView from './ActivityLogView';
+import { Shield, Users, Settings2, History } from 'lucide-react';
 
 interface SystemViewProps {
     currentUser: User;
     users: User[];
     employees: Employee[];
+    records?: RecordFile[];
     onAddUser: (user: Omit<User, 'id'>) => void;
     onUpdateUser: (user: User) => void;
     onDeleteUser: (username: string) => void;
@@ -18,12 +20,14 @@ interface SystemViewProps {
     onDeleteAllData: () => Promise<boolean>;
     onHolidaysChanged: () => void;
     onOpenCloudInspector?: () => void;
+    onViewRecord?: (record: RecordFile) => void;
 }
 
 const SystemView: React.FC<SystemViewProps> = ({
     currentUser,
     users,
     employees,
+    records = [],
     onAddUser,
     onUpdateUser,
     onDeleteUser,
@@ -32,10 +36,11 @@ const SystemView: React.FC<SystemViewProps> = ({
     wards,
     onDeleteAllData,
     onHolidaysChanged,
-    onOpenCloudInspector
+    onOpenCloudInspector,
+    onViewRecord
 }) => {
     const isAdmin = currentUser.role === UserRole.ADMIN;
-    const [activeTab, setActiveTab] = useState<'users' | 'employees' | 'settings'>('employees');
+    const [activeTab, setActiveTab] = useState<'users' | 'employees' | 'logs' | 'settings'>('logs');
 
     return (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col flex-1 h-full animate-fade-in-up">
@@ -54,6 +59,12 @@ const SystemView: React.FC<SystemViewProps> = ({
                     className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'employees' ? 'border-teal-600 text-teal-700 bg-white' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
                 >
                     <Users size={16}/> DS Nhân sự
+                </button>
+                <button 
+                    onClick={() => setActiveTab('logs')}
+                    className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'logs' ? 'border-indigo-600 text-indigo-700 bg-white' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                >
+                    <History size={16}/> Lịch sử thao tác
                 </button>
                 {isAdmin && (
                     <button 
@@ -83,6 +94,15 @@ const SystemView: React.FC<SystemViewProps> = ({
                         onDeleteEmployee={onDeleteEmployee} 
                         wards={wards} 
                         currentUser={currentUser} 
+                    />
+                )}
+                {activeTab === 'logs' && (
+                    <ActivityLogView
+                        records={records}
+                        users={users}
+                        employees={employees}
+                        currentUser={currentUser}
+                        onViewRecord={onViewRecord}
                     />
                 )}
                 {activeTab === 'settings' && isAdmin && (
