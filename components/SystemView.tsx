@@ -1,16 +1,18 @@
-import React, { useState } from 'react';
-import { User, Employee, UserRole, RecordFile } from '../types';
+import React, { useState, useEffect } from 'react';
+import { User, Employee, UserRole, RecordFile, DangKyRecord } from '../types';
 import UserManagement from './UserManagement';
 import EmployeeManagement from './EmployeeManagement';
 import SystemSettingsView from './SystemSettingsView';
 import ActivityLogView from './ActivityLogView';
 import { Shield, Users, Settings2, History } from 'lucide-react';
+import { fetchDangKyRecords } from '../services/apiDangKy';
 
 interface SystemViewProps {
     currentUser: User;
     users: User[];
     employees: Employee[];
     records?: RecordFile[];
+    dangKyRecords?: DangKyRecord[];
     onAddUser: (user: Omit<User, 'id'>) => void;
     onUpdateUser: (user: User) => void;
     onDeleteUser: (username: string) => void;
@@ -28,6 +30,7 @@ const SystemView: React.FC<SystemViewProps> = ({
     users,
     employees,
     records = [],
+    dangKyRecords = [],
     onAddUser,
     onUpdateUser,
     onDeleteUser,
@@ -41,6 +44,21 @@ const SystemView: React.FC<SystemViewProps> = ({
 }) => {
     const isAdmin = currentUser.role === UserRole.ADMIN;
     const [activeTab, setActiveTab] = useState<'users' | 'employees' | 'logs' | 'settings'>('logs');
+    const [loadedDangKyRecords, setLoadedDangKyRecords] = useState<DangKyRecord[]>(dangKyRecords);
+
+    useEffect(() => {
+        if (dangKyRecords && dangKyRecords.length > 0) {
+            setLoadedDangKyRecords(dangKyRecords);
+        } else {
+            fetchDangKyRecords().then(data => {
+                if (data && Array.isArray(data)) {
+                    setLoadedDangKyRecords(data);
+                }
+            }).catch(err => {
+                console.error('Failed to fetch DangKy records in SystemView:', err);
+            });
+        }
+    }, [dangKyRecords]);
 
     return (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col flex-1 h-full animate-fade-in-up">
@@ -99,6 +117,7 @@ const SystemView: React.FC<SystemViewProps> = ({
                 {activeTab === 'logs' && (
                     <ActivityLogView
                         records={records}
+                        dangKyRecords={loadedDangKyRecords}
                         users={users}
                         employees={employees}
                         currentUser={currentUser}

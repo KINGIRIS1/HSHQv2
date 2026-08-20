@@ -1,4 +1,4 @@
-import { SystemActivityLog, RecordFile, User, Employee } from '../types';
+import { SystemActivityLog, RecordFile, User, Employee, DangKyRecord } from '../types';
 import * as XLSX from 'xlsx-js-style';
 
 const LOGS_STORAGE_KEY = 'system_activity_logs_v1';
@@ -51,7 +51,12 @@ export const clearStoredActivityLogs = (): void => {
 /**
  * Synthesizes all system activity logs by merging stored logs + statusLogs from records.
  */
-export const getAllSystemActivityLogs = (records: RecordFile[] = [], users: User[] = [], employees: Employee[] = []): SystemActivityLog[] => {
+export const getAllSystemActivityLogs = (
+    records: RecordFile[] = [],
+    users: User[] = [],
+    employees: Employee[] = [],
+    dangKyRecords: DangKyRecord[] = []
+): SystemActivityLog[] => {
     const stored = getStoredActivityLogs();
     const recordSynthesizedLogs: SystemActivityLog[] = [];
 
@@ -175,6 +180,131 @@ export const getAllSystemActivityLogs = (records: RecordFile[] = [], users: User
                     details: slog.note ? slog.note : `Chuyển trạng thái hồ sơ ${r.code} từ ${slog.previousStatus || 'Mới'} sang ${slog.newStatus}`,
                     recordId: r.id
                 });
+            });
+        }
+    });
+
+    // Synthesize DangKyRecords logs
+    dangKyRecords.forEach(r => {
+        const ownerNames = r.owners?.map(o => o.name).filter(Boolean).join(', ') || r.owners?.[0]?.name || 'Chủ sử dụng';
+
+        if (r.receivedDate) {
+            recordSynthesizedLogs.push({
+                id: `SYN_DK_REC_${r.id}`,
+                timestamp: r.receivedDate,
+                performerName: r.receivedBy ? (users.find(u => u.employeeId === r.receivedBy)?.name || r.receivedBy) : 'Cán bộ Đăng ký',
+                performerRole: 'DANGKY',
+                actionType: 'CREATE',
+                actionLabel: 'Thêm mới',
+                targetType: 'Đăng ký',
+                referenceCode: r.code || r.id,
+                details: `Tạo mới hồ sơ Đăng ký ${r.code} - ${ownerNames} (Loại: ${r.recordType || 'Đăng ký đất đai'})`,
+                recordId: r.id
+            });
+        }
+
+        if (r.taxFormDate) {
+            recordSynthesizedLogs.push({
+                id: `SYN_DK_TAXF_${r.id}`,
+                timestamp: r.taxFormDate,
+                performerName: r.taxFormStaff ? (users.find(u => u.employeeId === r.taxFormStaff)?.name || employees.find(e => e.id === r.taxFormStaff)?.name || r.taxFormStaff) : 'Cán bộ thuế',
+                performerRole: 'DANGKY',
+                actionType: 'UPDATE',
+                actionLabel: 'Phiếu chuyển thuế',
+                targetType: 'Đăng ký',
+                referenceCode: r.code || r.id,
+                details: `Phiếu chuyển thuế hồ sơ Đăng ký ${r.code} - ${ownerNames}${r.taxFormNumber ? ` (Số phiếu: ${r.taxFormNumber})` : ''}`,
+                recordId: r.id
+            });
+        }
+
+        if (r.taxKV7TransferDate) {
+            recordSynthesizedLogs.push({
+                id: `SYN_DK_KV7_${r.id}`,
+                timestamp: r.taxKV7TransferDate,
+                performerName: r.taxKV7Staff ? (users.find(u => u.employeeId === r.taxKV7Staff)?.name || employees.find(e => e.id === r.taxKV7Staff)?.name || r.taxKV7Staff) : 'Cán bộ KV7',
+                performerRole: 'DANGKY',
+                actionType: 'UPDATE',
+                actionLabel: 'Chuyển Thuế KV7',
+                targetType: 'Đăng ký',
+                referenceCode: r.code || r.id,
+                details: `Chuyển Thuế KV7 hồ sơ Đăng ký ${r.code} - ${ownerNames}`,
+                recordId: r.id
+            });
+        }
+
+        if (r.taxNoticeDate) {
+            recordSynthesizedLogs.push({
+                id: `SYN_DK_TBT_${r.id}`,
+                timestamp: r.taxNoticeDate,
+                performerName: r.taxNoticeStaff ? (users.find(u => u.employeeId === r.taxNoticeStaff)?.name || employees.find(e => e.id === r.taxNoticeStaff)?.name || r.taxNoticeStaff) : 'Cán bộ thuế',
+                performerRole: 'DANGKY',
+                actionType: 'UPDATE',
+                actionLabel: 'Thông báo thuế',
+                targetType: 'Đăng ký',
+                referenceCode: r.code || r.id,
+                details: `Đã có Thông báo thuế hồ sơ Đăng ký ${r.code} - ${ownerNames}`,
+                recordId: r.id
+            });
+        }
+
+        if (r.printDate) {
+            recordSynthesizedLogs.push({
+                id: `SYN_DK_PRT_${r.id}`,
+                timestamp: r.printDate,
+                performerName: r.printStaff ? (users.find(u => u.employeeId === r.printStaff)?.name || employees.find(e => e.id === r.printStaff)?.name || r.printStaff) : 'Cán bộ in GCN',
+                performerRole: 'DANGKY',
+                actionType: 'UPDATE',
+                actionLabel: 'In GCN',
+                targetType: 'Đăng ký',
+                referenceCode: r.code || r.id,
+                details: `In Giấy chứng nhận hồ sơ Đăng ký ${r.code} - ${ownerNames}`,
+                recordId: r.id
+            });
+        }
+
+        if (r.pendingCheckDate) {
+            recordSynthesizedLogs.push({
+                id: `SYN_DK_CHK_${r.id}`,
+                timestamp: r.pendingCheckDate,
+                performerName: r.checkedBy ? (users.find(u => u.employeeId === r.checkedBy)?.name || employees.find(e => e.id === r.checkedBy)?.name || r.checkedBy) : 'Cán bộ kiểm tra',
+                performerRole: 'DANGKY',
+                actionType: 'SUBMIT_CHECK',
+                actionLabel: 'Trình kiểm tra',
+                targetType: 'Đăng ký',
+                referenceCode: r.code || r.id,
+                details: `Trình kiểm tra hồ sơ Đăng ký ${r.code} - ${ownerNames}`,
+                recordId: r.id
+            });
+        }
+
+        if (r.submissionDate) {
+            recordSynthesizedLogs.push({
+                id: `SYN_DK_SUB_${r.id}`,
+                timestamp: r.submissionDate,
+                performerName: r.submittedTo ? (users.find(u => u.employeeId === r.submittedTo)?.name || employees.find(e => e.id === r.submittedTo)?.name || r.submittedTo) : 'Lãnh đạo ký duyệt',
+                performerRole: 'DANGKY',
+                actionType: 'SUBMIT_SIGN',
+                actionLabel: 'Trình ký',
+                targetType: 'Đăng ký',
+                referenceCode: r.code || r.id,
+                details: `Trình ký duyệt hồ sơ Đăng ký ${r.code} - ${ownerNames}`,
+                recordId: r.id
+            });
+        }
+
+        if (r.resultReturnedDate) {
+            recordSynthesizedLogs.push({
+                id: `SYN_DK_RET_${r.id}`,
+                timestamp: r.resultReturnedDate,
+                performerName: r.receiverName || 'Cán bộ trả KQ',
+                performerRole: 'DANGKY',
+                actionType: 'RETURN_RESULT',
+                actionLabel: 'Trả kết quả',
+                targetType: 'Đăng ký',
+                referenceCode: r.code || r.id,
+                details: `Trả kết quả hồ sơ Đăng ký ${r.code} - ${ownerNames}${r.receiptNumber ? ` (Số BL: ${r.receiptNumber})` : ''}`,
+                recordId: r.id
             });
         }
     });

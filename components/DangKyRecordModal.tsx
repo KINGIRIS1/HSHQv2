@@ -54,6 +54,7 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
     appraisalDate: '',
     appraisalStaff: '',
     taxFormDate: '',
+    taxFormNumber: '',
     taxFormStaff: '',
     taxKV7TransferDate: '',
     taxKV7Staff: '',
@@ -722,7 +723,17 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
                 {/* 2. Phiếu chuyển thuế */}
                 <div className="p-3 bg-slate-50 border rounded-lg space-y-2">
                   <span className="font-bold text-slate-800 block">2. Phiếu chuyển thuế</span>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <label className="text-[11px] text-gray-600 block mb-0.5">Số Phiếu Chuyển</label>
+                      <input
+                        type="text"
+                        value={formData.taxFormNumber || ''}
+                        onChange={e => setFormData({ ...formData, taxFormNumber: e.target.value })}
+                        className="w-full p-1.5 border rounded text-xs font-mono"
+                        placeholder="Số phiếu..."
+                      />
+                    </div>
                     <div>
                       <label className="text-[11px] text-gray-600 block mb-0.5">Ngày Chuyển thuế</label>
                       <input

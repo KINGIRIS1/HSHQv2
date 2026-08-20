@@ -1,12 +1,13 @@
 import React, { useState, useMemo } from 'react';
 import { History, RotateCcw, FileSpreadsheet, Trash2, Search, Eye, CheckCircle2, PlusCircle, Activity, FileSignature, AlertCircle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Clock, LogIn, UserCheck, Settings, FileCheck, Send } from 'lucide-react';
-import { RecordFile, User, Employee, SystemActivityLog } from '../types';
+import { RecordFile, User, Employee, SystemActivityLog, DangKyRecord } from '../types';
 import { getAllSystemActivityLogs, clearStoredActivityLogs, exportActivityLogsToExcel } from '../services/activityLogService';
 
 interface ActivityLogViewProps {
     records: RecordFile[];
     users: User[];
     employees: Employee[];
+    dangKyRecords?: DangKyRecord[];
     currentUser?: User;
     onViewRecord?: (record: RecordFile) => void;
 }
@@ -15,6 +16,7 @@ export const ActivityLogView: React.FC<ActivityLogViewProps> = ({
     records = [],
     users = [],
     employees = [],
+    dangKyRecords = [],
     currentUser,
     onViewRecord
 }) => {
@@ -31,8 +33,8 @@ export const ActivityLogView: React.FC<ActivityLogViewProps> = ({
 
     // Fetch and aggregate all logs
     const allLogs = useMemo(() => {
-        return getAllSystemActivityLogs(records, users, employees);
-    }, [records, users, employees, refreshKey]);
+        return getAllSystemActivityLogs(records, users, employees, dangKyRecords);
+    }, [records, users, employees, dangKyRecords, refreshKey]);
 
     // Filtering
     const filteredLogs = useMemo(() => {

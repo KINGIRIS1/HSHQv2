@@ -954,7 +954,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                                 subText={record.assignedTo ? (() => {
                                     const emp = employees.find(e => e.id === record.assignedTo);
                                     if (!emp) return undefined;
-                                    return `${emp.name} (${emp.department})`;
+                                    return emp.position ? `${emp.name} (${emp.position})` : emp.name;
                                 })() : undefined}
                             />
 

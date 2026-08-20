@@ -252,12 +252,35 @@ export const saveDangKyRecordApi = async (record: DangKyRecord): Promise<DangKyR
 
   if (isConfigured) {
     try {
-      const payload = mapDangKyToDb(updatedRecord);
-      const { error } = await supabase
+      let payload = mapDangKyToDb(updatedRecord);
+      let { error } = await supabase
         .from('dangky_records')
         .upsert(payload, { onConflict: 'code' });
 
-      if (error) {
+      if (error && (error.code === '42703' || error.message?.includes('column') || error.message?.includes('does not exist'))) {
+        console.warn('saveDangKyRecordApi: Missing column in DB schema, retrying without optional extended fields...', error.message);
+        // Strip optional columns if DB schema doesn't have them yet
+        const safePayload = { ...payload };
+        delete safePayload.authorizedPersonName;
+        delete safePayload.authorizedPersonId;
+        delete safePayload.authorizedPersonPhone;
+        delete safePayload.authorizedPersonAddress;
+        delete safePayload.transferees;
+        delete safePayload.taxFormNumber;
+        delete safePayload.tax_form_number;
+        delete safePayload.authorized_person_name;
+        delete safePayload.authorized_person_id;
+        delete safePayload.authorized_person_phone;
+        delete safePayload.authorized_person_address;
+
+        const retryRes = await supabase
+          .from('dangky_records')
+          .upsert(safePayload, { onConflict: 'code' });
+        
+        if (retryRes.error) {
+          logError('saveDangKyRecordApi retry Supabase', retryRes.error, true);
+        }
+      } else if (error) {
         logError('saveDangKyRecordApi Supabase', error, true);
       }
     } catch (e) {

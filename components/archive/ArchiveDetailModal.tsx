@@ -172,7 +172,7 @@ const ArchiveDetailModal: React.FC<ArchiveDetailModalProps> = ({ isOpen, onClose
                                                         {new Date(h.timestamp).toLocaleString('vi-VN')}
                                                     </span>
                                                 </div>
-                                                <p className="text-[11px] text-indigo-600 mt-1 italic">Bởi: {h.user || 'Hệ thống'}</p>
+                                                <p className="text-[11px] text-indigo-600 mt-1 italic">{getEmployeeName(h.user) || h.user || 'Hệ thống'}</p>
                                                 {h.note && (
                                                     <div className="text-xs text-gray-500 italic mt-1 bg-gray-50 p-2 rounded">
                                                         "{h.note}"

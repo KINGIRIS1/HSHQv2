@@ -449,6 +449,7 @@ export interface DangKyRecord {
   appraisalDate?: string;                   // Ngày Thẩm định
   appraisalStaff?: string;                  // NV Thẩm định
   taxFormDate?: string;                     // Ngày Phiếu chuyển thuế
+  taxFormNumber?: string;                   // Số phiếu chuyển thuế
   taxFormStaff?: string;                    // NV Phiếu chuyển
   taxKV7TransferDate?: string;              // Ngày Chuyển Thuế KV7
   taxKV7Staff?: string;                     // NV Thuế KV7
@@ -469,6 +470,16 @@ export interface DangKyRecord {
   feeAmount?: number | string;              // Số tiền thu (VNĐ)
   status: DangKyStatusType;                 // Trạng thái quy trình (1 trong 14 trạng thái)
   notes?: string;                           // Ghi chú
+  personalNotes?: string;                   // Ghi chú cá nhân
+  reminderDate?: string;                     // Hẹn giờ nhắc việc
+  privateNotes?: string;                    // Ghi chú nội bộ
+  otherDocs?: string;                       // Giấy tờ khác / Chi tiết
+  explanationPlan?: string;                 // Phương án giải trình
+  price?: number | null;                    // Đơn giá
+  returnedPrice?: number | null;            // Số tiền thực tế khi trả kết quả
+  receiptType?: 'Biên Lai' | 'Hóa Đơn' | string | null; // Loại chứng từ
+  exportDate?: string;                      // Ngày xuất bàn giao
+  receiverName?: string;                    // Người nhận kết quả
   createdAt?: string;
   updatedAt?: string;
 }

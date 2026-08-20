@@ -13,7 +13,7 @@ import {
   Trash2, Edit, Edit3, X, UserPlus, Users, CheckCircle2, 
   ArrowUpDown, BookOpen, Layers, Shield, FileText, DollarSign, Calendar,
   Eye, ArrowRight, Phone, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, MapPin, Send, CornerUpLeft,
-  Lock, Printer, Download, AlertCircle, FileSignature
+  Lock, Printer, Download, AlertCircle, FileSignature, AlertTriangle, Clock
 } from 'lucide-react';
 import * as XLSX from 'xlsx-js-style';
 import AssignModal from './AssignModal';
@@ -23,8 +23,11 @@ import DangKyDetailModal from './DangKyDetailModal';
 import DangKyRecordModal from './DangKyRecordModal';
 import DeleteConfirmModal from './DeleteConfirmModal';
 import { 
-  removeVietnameseTones
+  removeVietnameseTones,
+  isDangKyRecordOverdue,
+  isDangKyRecordApproaching
 } from '../utils/appHelpers';
+import { addActivityLog } from '../services/activityLogService';
 
 const NEXT_STATUS_MAP: Record<DangKyStatusType, DangKyStatusType> = {
   'Tiếp nhận mới': 'Thẩm định',
@@ -120,6 +123,7 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
     const [selectedBatchFilter, setSelectedBatchFilter] = useState<string>('all');
     const [filterFromDate, setFilterFromDate] = useState<string>('');
     const [filterToDate, setFilterToDate] = useState<string>('');
+    const [warningFilter, setWarningFilter] = useState<'all' | 'overdue' | 'approaching'>('all');
     const [isFilterPopoverOpen, setIsFilterPopoverOpen] = useState<boolean>(false);
     const [currentPage, setCurrentPage] = useState<number>(1);
     const [pageSize, setPageSize] = useState<number>(20);
@@ -244,7 +248,7 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
     // Tự động chuyển về trang 1 khi đổi bộ lọc tìm kiếm
     useEffect(() => {
         setCurrentPage(1);
-    }, [searchTerm, selectedStatusFilter, selectedWardFilter, selectedBatchFilter, filterFromDate, filterToDate, pageSize]);
+    }, [searchTerm, selectedStatusFilter, selectedWardFilter, selectedBatchFilter, filterFromDate, filterToDate, warningFilter, pageSize]);
 
     // Tab Record Counts Memo
     const counts = useMemo(() => {
@@ -268,6 +272,10 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
         const daTraKq = records.filter(r => normalizeDangKyStatus(r.status) === 'Đã trả kết quả').length;
         const giao1CuaTotal = choBanGiao + choTraKq + daTraKq;
 
+        // Overdue & Approaching counts
+        const overdueCount = records.filter(r => isDangKyRecordOverdue(r)).length;
+        const approachingCount = records.filter(r => isDangKyRecordApproaching(r)).length;
+
         return {
             all,
             unassigned,
@@ -282,7 +290,9 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
             choBanGiao,
             choTraKq,
             daTraKq,
-            giao1CuaTotal
+            giao1CuaTotal,
+            overdueCount,
+            approachingCount
         };
     }, [records]);
 
@@ -666,9 +676,17 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                 if (dateStr > filterToDate) return false;
             }
 
+            if (warningFilter === 'overdue' && !isDangKyRecordOverdue(r)) {
+                return false;
+            }
+
+            if (warningFilter === 'approaching' && !isDangKyRecordApproaching(r)) {
+                return false;
+            }
+
             return true;
         });
-    }, [records, activeMainTab, activeTbtSubTab, activeGiao1CuaSubTab, searchTerm, selectedStatusFilter, selectedWardFilter, selectedBatchFilter, filterFromDate, filterToDate]);
+    }, [records, activeMainTab, activeTbtSubTab, activeGiao1CuaSubTab, searchTerm, selectedStatusFilter, selectedWardFilter, selectedBatchFilter, filterFromDate, filterToDate, warningFilter]);
 
     // Pagination
     const totalPages = Math.ceil(filteredRecords.length / pageSize) || 1;
@@ -740,17 +758,24 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
 
         setSelectedIds(new Set([r.id]));
 
-        if (normStatus === 'Chờ Thuế KV7' || normStatus === 'Chờ giấy nộp tiền') {
-            // Direct advance without assignment modal for 2 Tax steps
+        if (normStatus === 'Phiếu chuyển thuế' || normStatus === 'Chờ Thuế KV7') {
+            // Direct advance without assignment modal for 2 Tax steps (Phiếu chuyển thuế -> Thuế KV7, Thuế KV7 -> Thông báo thuế)
             try {
                 const currentDateStr = new Date().toISOString().split('T')[0];
                 const updated: DangKyRecord = { ...r, status: nextStatus };
-                if (nextStatus === 'Phiếu chuyển thuế') updated.taxFormDate = currentDateStr;
-                else if (nextStatus === 'Chờ Thuế KV7') updated.taxKV7TransferDate = currentDateStr;
+                if (nextStatus === 'Chờ Thuế KV7') updated.taxKV7TransferDate = currentDateStr;
                 else if (nextStatus === 'Chờ giấy nộp tiền') updated.taxNoticeDate = currentDateStr;
-                else if (nextStatus === 'Chờ In GCN') updated.printDate = currentDateStr;
 
                 await saveDangKyRecordApi(updated);
+                addActivityLog({
+                    performerName: currentUser.fullName || currentUser.username,
+                    performerRole: 'DANGKY',
+                    actionType: 'UPDATE',
+                    actionLabel: 'Chuyển bước quy trình',
+                    targetType: 'Đăng ký',
+                    referenceCode: r.code || r.id,
+                    details: `Chuyển trạng thái hồ sơ Đăng ký ${r.code} từ "${r.status}" sang "${nextStatus}"`
+                });
                 loadData();
                 setSelectedIds(new Set());
             } catch (e) {
@@ -762,6 +787,15 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                 const currentDateStr = new Date().toISOString().split('T')[0];
                 const updated: DangKyRecord = { ...r, status: 'Chờ bàn giao', completedDate: currentDateStr };
                 await saveDangKyRecordApi(updated);
+                addActivityLog({
+                    performerName: currentUser.fullName || currentUser.username,
+                    performerRole: 'DANGKY',
+                    actionType: 'UPDATE',
+                    actionLabel: 'Hoàn thành ký duyệt',
+                    targetType: 'Đăng ký',
+                    referenceCode: r.code || r.id,
+                    details: `Xác nhận ký duyệt và chuyển hồ sơ Đăng ký ${r.code} sang "Chờ bàn giao"`
+                });
                 loadData();
                 setSelectedIds(new Set());
             } catch (e) {
@@ -781,6 +815,15 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                 else if (nextStatus === 'Đã trả kết quả') updated.resultReturnedDate = currentDateStr;
 
                 await saveDangKyRecordApi(updated);
+                addActivityLog({
+                    performerName: currentUser.fullName || currentUser.username,
+                    performerRole: 'DANGKY',
+                    actionType: 'UPDATE',
+                    actionLabel: 'Chuyển bước quy trình',
+                    targetType: 'Đăng ký',
+                    referenceCode: r.code || r.id,
+                    details: `Chuyển trạng thái hồ sơ Đăng ký ${r.code} từ "${r.status}" sang "${nextStatus}"`
+                });
                 loadData();
                 setSelectedIds(new Set());
             } catch (e) {
@@ -829,6 +872,15 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
 
                 await saveDangKyRecordApi({ ...rec, ...payload });
             }
+            addActivityLog({
+                performerName: currentUser.fullName || currentUser.username,
+                performerRole: 'DANGKY',
+                actionType: 'ASSIGN',
+                actionLabel: 'Phân công & Chuyển bước',
+                targetType: 'Đăng ký',
+                referenceCode: `${idsToUpdate.length} hồ sơ`,
+                details: `Phân công cán bộ "${empName}" và chuyển bước cho ${idsToUpdate.length} hồ sơ Đăng ký`
+            });
             loadData();
             setSelectedIds(new Set());
             setAssignStaffModalOpen(false);
@@ -903,6 +955,15 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
             }
 
             await bulkUpdateDangKyRecordsApi(idsToUpdate, updatePayload);
+            addActivityLog({
+                performerName: currentUser.fullName || currentUser.username,
+                performerRole: 'DANGKY',
+                actionType: 'UPDATE',
+                actionLabel: 'Cập nhật hàng loạt',
+                targetType: 'Đăng ký',
+                referenceCode: `${idsToUpdate.length} hồ sơ`,
+                details: `Cập nhật hàng loạt trường [${field}] cho ${idsToUpdate.length} hồ sơ Đăng ký`
+            });
             loadData();
             setSelectedIds(new Set());
             setIsBulkUpdateModalOpen(false);
@@ -921,6 +982,15 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                 status: 'Chờ kiểm tra',
                 checkedBy: checkerName,
                 pendingCheckDate: targetDate
+            });
+            addActivityLog({
+                performerName: currentUser.fullName || currentUser.username,
+                performerRole: 'DANGKY',
+                actionType: 'SUBMIT_CHECK',
+                actionLabel: 'Trình kiểm tra',
+                targetType: 'Đăng ký',
+                referenceCode: `${idsToUpdate.length} hồ sơ`,
+                details: `Trình cán bộ "${checkerName}" kiểm tra ${idsToUpdate.length} hồ sơ Đăng ký`
             });
             loadData();
             setSelectedIds(new Set());
@@ -941,6 +1011,15 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                 submittedTo: directorName,
                 submissionDate: targetDate
             });
+            addActivityLog({
+                performerName: currentUser.fullName || currentUser.username,
+                performerRole: 'DANGKY',
+                actionType: 'SUBMIT_SIGN',
+                actionLabel: 'Trình ký duyệt',
+                targetType: 'Đăng ký',
+                referenceCode: `${idsToUpdate.length} hồ sơ`,
+                details: `Trình lãnh đạo "${directorName}" ký duyệt ${idsToUpdate.length} hồ sơ Đăng ký`
+            });
             loadData();
             setSelectedIds(new Set());
             setIsSubmitSignModalOpen(false);
@@ -960,6 +1039,15 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                 appraisalDate: currentDateStr,
                 status: 'Thẩm định' 
             });
+            addActivityLog({
+                performerName: currentUser.fullName || currentUser.username,
+                performerRole: 'DANGKY',
+                actionType: 'ASSIGN',
+                actionLabel: 'Phân công hàng loạt',
+                targetType: 'Đăng ký',
+                referenceCode: `${idsToUpdate.length} hồ sơ`,
+                details: `Phân công cán bộ "${staffName}" phụ trách ${idsToUpdate.length} hồ sơ Đăng ký`
+            });
             loadData();
             setSelectedIds(new Set());
         } catch (e) {
@@ -977,6 +1065,15 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                 updatePayload.notes = reason;
             }
             await bulkUpdateDangKyRecordsApi(idsToUpdate, updatePayload);
+            addActivityLog({
+                performerName: currentUser.fullName || currentUser.username,
+                performerRole: 'DANGKY',
+                actionType: 'UPDATE',
+                actionLabel: 'Cập nhật trạng thái',
+                targetType: 'Đăng ký',
+                referenceCode: `${idsToUpdate.length} hồ sơ`,
+                details: `Cập nhật trạng thái sang "${targetStatus}" cho ${idsToUpdate.length} hồ sơ Đăng ký`
+            });
             loadData();
             setSelectedIds(new Set());
         } catch (e) {
@@ -1001,6 +1098,15 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
             await bulkUpdateDangKyRecordsApi(idsToUpdate, { 
                 status: targetStatus,
                 notes: reasonText || undefined
+            });
+            addActivityLog({
+                performerName: currentUser.fullName || currentUser.username,
+                performerRole: 'DANGKY',
+                actionType: 'DELETE',
+                actionLabel: 'Trả / Bổ sung hồ sơ',
+                targetType: 'Đăng ký',
+                referenceCode: `${idsToUpdate.length} hồ sơ`,
+                details: `Chuyển ${idsToUpdate.length} hồ sơ Đăng ký sang trạng thái "${targetStatus}"${reason ? ` (Lý do: ${reason})` : ''}`
             });
             loadData();
             setSelectedIds(new Set());
@@ -1042,6 +1148,15 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
 
         try {
             await deleteDangKyRecordApi(idToDelete);
+            addActivityLog({
+                performerName: currentUser.fullName || currentUser.username,
+                performerRole: 'DANGKY',
+                actionType: 'DELETE',
+                actionLabel: 'Xóa hồ sơ',
+                targetType: 'Đăng ký',
+                referenceCode: codeToDelete || idToDelete,
+                details: `Xóa hồ sơ Đăng ký mã: ${codeToDelete || idToDelete}`
+            });
             // Sync with backend
             const updated = await fetchDangKyRecords();
             setRecords(updated);
@@ -1057,7 +1172,17 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
     // Save Record from DangKyRecordModal
     const handleSaveRecord = async (recordToSave: DangKyRecord) => {
         try {
+            const isEdit = records.some(r => r.id === recordToSave.id || (recordToSave.code && r.code === recordToSave.code));
             await saveDangKyRecordApi(recordToSave);
+            addActivityLog({
+                performerName: currentUser.fullName || currentUser.username,
+                performerRole: 'DANGKY',
+                actionType: isEdit ? 'UPDATE' : 'CREATE',
+                actionLabel: isEdit ? 'Cập nhật hồ sơ' : 'Thêm mới hồ sơ',
+                targetType: 'Đăng ký',
+                referenceCode: recordToSave.code || recordToSave.id,
+                details: `${isEdit ? 'Cập nhật thông tin' : 'Tạo mới'} hồ sơ Đăng ký mã: ${recordToSave.code || recordToSave.id}`
+            });
             // Optimistic update
             setRecords(prev => {
                 const idx = prev.findIndex(r => r.id === recordToSave.id || (recordToSave.code && r.code === recordToSave.code));
@@ -1373,6 +1498,23 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                                                         </div>
                                                     </div>
                                                 </div>
+
+                                                {/* 4. Cảnh báo hạn xử lý */}
+                                                <div>
+                                                    <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 mb-1">
+                                                        <AlertTriangle size={14} className="text-gray-500" />
+                                                        <span>Cảnh báo thời hạn xử lý:</span>
+                                                    </label>
+                                                    <select
+                                                        value={warningFilter}
+                                                        onChange={(e) => setWarningFilter(e.target.value as any)}
+                                                        className="w-full text-xs border border-gray-200 rounded-lg p-2 font-medium bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                                                    >
+                                                        <option value="all">Tất cả hồ sơ</option>
+                                                        <option value="overdue">🔴 Đã quá hạn xử lý ({counts.overdueCount})</option>
+                                                        <option value="approaching">🟡 Sắp đến hạn xử lý ({counts.approachingCount})</option>
+                                                    </select>
+                                                </div>
                                             </div>
 
                                             {/* Footer inside Popover */}
@@ -1393,6 +1535,43 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                                         </div>
                                     </>
                                 )}
+                            </div>
+
+                            {/* 2 ICON CHẾ ĐỘ LỌC NHANH (QUÁ HẠN & SẮP ĐẾN HẠN) TẠI HÀNG THỨ 3 - CHỈ ĐỂ ICON + SỐ LƯỢNG */}
+                            <div className="flex items-center gap-1.5">
+                                <button
+                                    onClick={() => setWarningFilter(prev => prev === 'overdue' ? 'all' : 'overdue')}
+                                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all shadow-2xs border cursor-pointer ${
+                                        warningFilter === 'overdue'
+                                            ? 'bg-red-600 text-white border-red-600 ring-2 ring-red-200'
+                                            : 'bg-white text-red-600 border-red-200 hover:bg-red-50'
+                                    }`}
+                                    title="Lọc các hồ sơ đã quá hạn xử lý"
+                                >
+                                    <AlertTriangle size={15} className={warningFilter === 'overdue' ? 'text-white' : 'text-red-500'} />
+                                    <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${
+                                        warningFilter === 'overdue' ? 'bg-white text-red-600' : 'bg-red-100 text-red-700'
+                                    }`}>
+                                        {counts.overdueCount}
+                                    </span>
+                                </button>
+
+                                <button
+                                    onClick={() => setWarningFilter(prev => prev === 'approaching' ? 'all' : 'approaching')}
+                                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all shadow-2xs border cursor-pointer ${
+                                        warningFilter === 'approaching'
+                                            ? 'bg-orange-500 text-white border-orange-500 ring-2 ring-orange-200'
+                                            : 'bg-white text-orange-600 border-orange-200 hover:bg-orange-50'
+                                    }`}
+                                    title="Lọc các hồ sơ sắp đến hạn xử lý (còn <= 3 ngày)"
+                                >
+                                    <Clock size={15} className={warningFilter === 'approaching' ? 'text-white' : 'text-orange-500'} />
+                                    <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${
+                                        warningFilter === 'approaching' ? 'bg-white text-orange-600' : 'bg-orange-100 text-orange-800'
+                                    }`}>
+                                        {counts.approachingCount}
+                                    </span>
+                                </button>
                             </div>
 
                             {/* Nút Nhập Mới (đặt cạnh thao tác Lọc) */}
@@ -1552,9 +1731,22 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                                         paginatedRecords.map((r) => {
                                             const cust = getPrimaryCustomer(r);
                                             const isSelected = selectedIds.has(r.id);
+                                            const isOverdue = isDangKyRecordOverdue(r);
+                                            const isApproaching = isDangKyRecordApproaching(r);
 
                                             return (
-                                                <tr key={r.id} className={`transition-colors ${isSelected ? 'bg-blue-50/70' : 'hover:bg-blue-50/40'}`}>
+                                                <tr 
+                                                    key={r.id} 
+                                                    className={`transition-all duration-200 group border-l-4 ${
+                                                        isOverdue 
+                                                            ? 'bg-red-50/50 border-l-red-500 hover:bg-red-50' 
+                                                            : isApproaching 
+                                                            ? 'bg-orange-50/50 border-l-orange-500 hover:bg-orange-50' 
+                                                            : isSelected 
+                                                            ? 'bg-blue-50/50 border-l-blue-500 hover:bg-blue-50' 
+                                                            : 'border-l-transparent hover:bg-slate-50/80'
+                                                    }`}
+                                                >
                                                     <td className="p-3 text-center border-r border-gray-100">
                                                         <input 
                                                             type="checkbox" 
@@ -1585,14 +1777,21 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                                                         {r.recordType || '--'}
                                                     </td>
                                                     <td className="p-3 border-r border-gray-100">
-                                                        <div className="bg-slate-50 border border-slate-200/80 rounded-lg p-2 font-mono text-sm w-[150px] mx-auto space-y-1 shadow-2xs">
-                                                            <div className="flex items-center justify-between gap-2">
-                                                                <span className="text-[10px] font-sans font-extrabold text-gray-400 uppercase tracking-wider">NHẬN</span>
-                                                                <span className="font-semibold text-slate-700">{formatDate(r.receivedDate) || '--'}</span>
+                                                        <div className="flex flex-col w-full max-w-[155px] mx-auto bg-white/50 rounded border border-gray-200/80 overflow-hidden shadow-2xs">
+                                                            <div className="flex items-center justify-between px-2 py-1 bg-gray-50/80 border-b border-gray-200/60" title="Ngày tiếp nhận">
+                                                                <span className="text-[10px] font-sans font-extrabold text-slate-400 uppercase tracking-tight mr-2">Nhận</span>
+                                                                <span className="text-xs font-semibold text-slate-600 font-mono whitespace-nowrap">{formatDate(r.receivedDate) || '--'}</span>
                                                             </div>
-                                                            <div className="flex items-center justify-between gap-2 border-t border-slate-200/80 pt-1">
-                                                                <span className="text-[10px] font-sans font-extrabold uppercase tracking-wider text-blue-600">TRẢ</span>
-                                                                <span className="font-bold text-blue-600">{formatDate(r.deadline) || '--'}</span>
+                                                            
+                                                            <div className={`flex items-center justify-between px-2 py-1 ${isOverdue ? 'bg-red-50' : isApproaching ? 'bg-orange-50' : 'bg-white'}`} title="Hẹn trả kết quả">
+                                                                <span className={`text-[10px] font-sans font-extrabold uppercase tracking-tight mr-2 ${isOverdue ? 'text-red-500' : isApproaching ? 'text-orange-500' : 'text-blue-600'}`}>Trả</span>
+                                                                <div className="flex items-center gap-1">
+                                                                    <span className={`text-xs font-bold font-mono whitespace-nowrap ${isOverdue ? 'text-red-600' : isApproaching ? 'text-orange-600' : 'text-blue-700'}`}>
+                                                                        {formatDate(r.deadline) || '--'}
+                                                                    </span>
+                                                                    {isOverdue && <AlertCircle size={13} className="text-red-500 animate-pulse shrink-0" />}
+                                                                    {isApproaching && <Clock size={13} className="text-orange-500 shrink-0" />}
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     </td>
@@ -1609,8 +1808,7 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                                                         {r.appraisalStaff || r.checkedBy ? (
                                                             <div className="flex flex-col items-center justify-center gap-0.5">
                                                                 {r.appraisalDate && (
-                                                                    <span className="text-[10px] text-gray-500 font-mono flex items-center gap-1 font-medium whitespace-nowrap">
-                                                                        <Calendar size={10} className="text-gray-400 shrink-0" />
+                                                                    <span className="text-xs font-semibold text-slate-600 font-mono whitespace-nowrap">
                                                                         {formatDate(r.appraisalDate)}
                                                                     </span>
                                                                 )}
@@ -1643,7 +1841,7 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                                                         })()}
                                                     </td>
                                                     <td className="p-3 text-center sticky right-0 bg-white z-10 shadow-xs">
-                                                        <div className="flex items-center justify-center gap-1 w-full mx-auto">
+                                                        <div className="grid grid-cols-2 gap-1 w-[60px] mx-auto">
                                                             <button 
                                                                 onClick={() => handleOpenDetail(r)}
                                                                 className="w-7 h-7 flex items-center justify-center border border-slate-200 rounded-lg text-slate-500 hover:text-blue-600 hover:border-blue-400 bg-white transition-all shadow-2xs cursor-pointer"
@@ -2327,7 +2525,6 @@ const SubmitCheckDangKyModal: React.FC<SubmitCheckDangKyModalProps> = ({
     onConfirm
 }) => {
     const [selectedChecker, setSelectedChecker] = useState<string>('');
-    const [checkDate, setCheckDate] = useState<string>(new Date().toISOString().split('T')[0]);
 
     if (!isOpen) return null;
 
@@ -2349,7 +2546,8 @@ const SubmitCheckDangKyModal: React.FC<SubmitCheckDangKyModalProps> = ({
             alert('Vui lòng chọn cán bộ phụ trách kiểm tra.');
             return;
         }
-        onConfirm(selectedChecker, checkDate);
+        const realtimeDate = new Date().toISOString().split('T')[0];
+        onConfirm(selectedChecker, realtimeDate);
     };
 
     return (
@@ -2403,16 +2601,6 @@ const SubmitCheckDangKyModal: React.FC<SubmitCheckDangKyModalProps> = ({
                         ))}
                     </div>
 
-                    <div className="space-y-1 pt-1 border-t border-gray-100">
-                        <label className="block text-xs font-semibold text-gray-700">Ngày trình kiểm tra:</label>
-                        <input
-                            type="date"
-                            value={checkDate}
-                            onChange={(e) => setCheckDate(e.target.value)}
-                            className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-xs font-semibold bg-white focus:ring-2 focus:ring-orange-500 outline-none"
-                        />
-                    </div>
-
                     <div className="flex justify-end gap-2.5 pt-3 border-t border-gray-100">
                         <button
                             type="button"
@@ -2460,7 +2648,6 @@ const SubmitSignDangKyModal: React.FC<SubmitSignDangKyModalProps> = ({
     onConfirm
 }) => {
     const [selectedDirector, setSelectedDirector] = useState<string>('');
-    const [signDate, setSignDate] = useState<string>(new Date().toISOString().split('T')[0]);
 
     if (!isOpen) return null;
 
@@ -2476,7 +2663,8 @@ const SubmitSignDangKyModal: React.FC<SubmitSignDangKyModalProps> = ({
             alert('Vui lòng chọn người được trình ký duyệt.');
             return;
         }
-        onConfirm(selectedDirector, signDate);
+        const realtimeDate = new Date().toISOString().split('T')[0];
+        onConfirm(selectedDirector, realtimeDate);
     };
 
     return (
@@ -2528,16 +2716,6 @@ const SubmitSignDangKyModal: React.FC<SubmitSignDangKyModalProps> = ({
                                 </div>
                             </label>
                         ))}
-                    </div>
-
-                    <div className="space-y-1 pt-1 border-t border-gray-100">
-                        <label className="block text-xs font-semibold text-gray-700">Ngày trình ký:</label>
-                        <input
-                            type="date"
-                            value={signDate}
-                            onChange={(e) => setSignDate(e.target.value)}
-                            className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-xs font-semibold bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
-                        />
                     </div>
 
                     <div className="flex justify-end gap-2.5 pt-3 border-t border-gray-100">
