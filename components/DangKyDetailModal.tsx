@@ -178,6 +178,8 @@ export const DangKyDetailModal: React.FC<DangKyDetailModalProps> = ({
 
   const owners = record.owners || [];
   const transferees = record.transferees || [];
+  const hasTransferees = transferees.length > 0 && transferees.some(t => t.name && t.name.trim() !== '');
+  const primaryPeople = hasTransferees ? transferees : owners;
   const nextStatus = NEXT_STATUS_MAP[record.status] || null;
 
   return (
@@ -244,41 +246,44 @@ export const DangKyDetailModal: React.FC<DangKyDetailModalProps> = ({
             {/* COLUMN 1: THÔNG TIN CHỦ HỒ SƠ & ĐỊA CHÍNH */}
             <div className="space-y-6">
               
-              {/* CHỦ SỬ DỤNG */}
+              {/* CHỦ SỬ DỤNG / BÊN NHẬN CHUYỂN NHƯỢNG (ƯU TIÊN BÊN NHẬN CHUYỂN NHƯỢNG CỘT 1) */}
               <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
                 <h3 className="text-xs font-bold text-blue-600 uppercase mb-4 flex items-center gap-2 border-l-4 border-blue-600 pl-2">
-                  <UserIcon size={16}/> Thông tin chủ hồ sơ
+                  <UserIcon size={16}/> Thông tin chủ hồ sơ {hasTransferees ? '(Bên nhận chuyển nhượng)' : ''}
                 </h3>
                 
-                {owners.length === 0 ? (
-                  <p className="text-xs text-gray-400 italic">Chưa có thông tin chủ sử dụng</p>
+                {primaryPeople.length === 0 ? (
+                  <p className="text-xs text-gray-400 italic">Chưa có thông tin chủ hồ sơ</p>
                 ) : (
                   <div className="space-y-4 divide-y divide-gray-100">
-                    {owners.map((owner, idx) => (
+                    {primaryPeople.map((person, idx) => (
                       <div key={idx} className={idx > 0 ? 'pt-3' : ''}>
                         <label className="text-[10px] text-gray-400 uppercase font-bold block mb-1">
-                          {idx === 0 ? 'Chủ sử dụng chính' : `Đồng sử dụng ${idx + 1}`}
+                          {hasTransferees 
+                            ? (idx === 0 ? 'Bên nhận chuyển nhượng chính' : `Bên nhận chuyển nhượng ${idx + 1}`)
+                            : (idx === 0 ? 'Chủ sử dụng chính' : `Đồng sử dụng ${idx + 1}`)
+                          }
                         </label>
-                        <p className="text-base font-bold text-gray-800 uppercase">{owner.name}</p>
+                        <p className="text-base font-bold text-gray-800 uppercase">{person.name}</p>
                         
-                        {owner.phone && (
+                        {person.phone && (
                           <div className="mt-1.5">
                             <label className="text-[10px] text-gray-400 uppercase font-bold block mb-0.5">Số điện thoại</label>
-                            <p className="text-xs font-bold text-gray-800 font-mono">{owner.phone}</p>
+                            <p className="text-xs font-bold text-gray-800 font-mono">{person.phone}</p>
                           </div>
                         )}
 
-                        {owner.cccd && (
+                        {person.cccd && (
                           <div className="mt-1.5">
-                            <label className="text-[10px] text-gray-400 uppercase font-bold block mb-0.5">Số CCCD / ĐD</label>
-                            <p className="text-xs font-bold text-gray-800 font-mono">{owner.cccd}</p>
+                            <label className="text-[10px] text-gray-400 uppercase font-bold block mb-0.5">Số CCCD / CMND</label>
+                            <p className="text-xs font-bold text-gray-800 font-mono">{person.cccd}</p>
                           </div>
                         )}
 
-                        {owner.address && (
+                        {person.address && (
                           <div className="mt-1.5">
                             <label className="text-[10px] text-gray-400 uppercase font-bold block mb-0.5">Địa chỉ thường trú</label>
-                            <p className="text-xs font-semibold text-gray-700">{owner.address}</p>
+                            <p className="text-xs font-semibold text-gray-700">{person.address}</p>
                           </div>
                         )}
                       </div>
@@ -286,18 +291,18 @@ export const DangKyDetailModal: React.FC<DangKyDetailModalProps> = ({
                   </div>
                 )}
 
-                {/* BÊN NHẬN CHUYỂN QUYỀN */}
-                {transferees.length > 0 && (
+                {/* NẾU ĐÃ HIỂN THỊ BÊN NHẬN CHUYỂN NHƯỢNG LÀM CHỦ HỒ SƠ CHÍNH, HIỂN THỊ CHỦ SỬ DỤNG ĐẤT BAN ĐẦU NẾU CÓ */}
+                {hasTransferees && owners.length > 0 && (
                   <div className="border-t border-gray-100 pt-3 mt-3">
-                    <label className="text-[10px] text-emerald-600 uppercase font-bold block mb-2 flex items-center gap-1">
-                      <UserPlus size={12} /> Bên nhận chuyển nhượng ({transferees.length})
+                    <label className="text-[10px] text-gray-500 uppercase font-bold block mb-2 flex items-center gap-1">
+                      <Users size={12} /> Chủ sử dụng đất ban đầu ({owners.length})
                     </label>
-                    <div className="space-y-2 bg-emerald-50/50 p-2.5 rounded-lg border border-emerald-100">
-                      {transferees.map((tf, idx) => (
+                    <div className="space-y-2 bg-slate-50 p-2.5 rounded-lg border border-gray-200">
+                      {owners.map((owner, idx) => (
                         <div key={idx} className="text-xs">
-                          <span className="font-bold text-emerald-950 uppercase">{tf.name}</span>
-                          {tf.cccd && <span className="text-gray-600 font-mono ml-2">({tf.cccd})</span>}
-                          {tf.address && <p className="text-[11px] text-gray-600">{tf.address}</p>}
+                          <span className="font-bold text-gray-800 uppercase">{owner.name}</span>
+                          {owner.cccd && <span className="text-gray-600 font-mono ml-2">({owner.cccd})</span>}
+                          {owner.address && <p className="text-[11px] text-gray-600">{owner.address}</p>}
                         </div>
                       ))}
                     </div>
