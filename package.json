@@ -2,6 +2,7 @@
   "name": "he-thong-quan-ly-ho-so",
   "private": true,
   "version": "2.1.1",
+  "type": "module",
   "main": "dist/server.cjs",
   "author": "DonViHanhChinh",
   "description": "Phan mem quan ly ho so dia chinh",

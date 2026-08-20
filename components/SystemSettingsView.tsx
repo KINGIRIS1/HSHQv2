@@ -133,9 +133,11 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   // Form thêm mới ngày lễ
   const [tempName, setTempName] = useState('');
+  const [tempHolidayType, setTempHolidayType] = useState<'recurring' | 'specific'>('recurring');
   const [tempDay, setTempDay] = useState<number>(1);
   const [tempMonth, setTempMonth] = useState<number>(1);
   const [tempIsLunar, setTempIsLunar] = useState(false);
+  const [tempDate, setTempDate] = useState(new Date().toISOString().split('T')[0]);
   
   const [savingHolidays, setSavingHolidays] = useState(false);
 
@@ -648,16 +650,22 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
   // --- HOLIDAY HANDLERS ---
   const handleAddHoliday = () => {
       if (!tempName.trim()) { alert("Vui lòng nhập tên ngày lễ"); return; }
-      if (tempDay < 1 || tempDay > 31 || tempMonth < 1 || tempMonth > 12) { alert("Ngày tháng không hợp lệ"); return; }
 
       const newId = Math.random().toString(36).substr(2, 9);
       const newHoliday: Holiday = {
           id: newId,
           name: tempName,
-          day: tempDay,
-          month: tempMonth,
-          isLunar: tempIsLunar
       };
+
+      if (tempHolidayType === 'specific') {
+          if (!tempDate) { alert("Vui lòng chọn ngày nghỉ cụ thể"); return; }
+          newHoliday.date = tempDate;
+      } else {
+          if (tempDay < 1 || tempDay > 31 || tempMonth < 1 || tempMonth > 12) { alert("Ngày tháng không hợp lệ"); return; }
+          newHoliday.day = tempDay;
+          newHoliday.month = tempMonth;
+          newHoliday.isLunar = tempIsLunar;
+      }
 
       setHolidays(prev => [...prev, newHoliday]);
       // Reset form
@@ -792,28 +800,54 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
 
                         {/* Form thêm mới */}
                         <div className="flex flex-col gap-4 mb-8 bg-orange-50/50 p-5 rounded-2xl border border-orange-100">
-                            <p className="text-sm font-medium text-orange-800 mb-1">Thêm ngày lễ mới</p>
-                            <div className="grid grid-cols-1 sm:grid-cols-12 gap-4">
-                                <div className="sm:col-span-6">
-                                    <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Tên ngày lễ</label>
-                                    <input type="text" className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-orange-500 outline-none transition-all" placeholder="VD: Giỗ tổ" value={tempName || ''} onChange={e => setTempName(e.target.value)} />
-                                 </div>
-                                 <div className="sm:col-span-2">
-                                     <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Ngày</label>
-                                     <input type="number" min="1" max="31" className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-center font-bold text-slate-700 focus:ring-2 focus:ring-orange-500 outline-none transition-all" value={tempDay ?? 1} onChange={e => setTempDay(parseInt(e.target.value) || 1)} />
-                                 </div>
-                                 <div className="sm:col-span-2">
-                                     <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Tháng</label>
-                                     <input type="number" min="1" max="12" className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-center font-bold text-slate-700 focus:ring-2 focus:ring-orange-500 outline-none transition-all" value={tempMonth ?? 1} onChange={e => setTempMonth(parseInt(e.target.value) || 1)} />
-                                 </div>
-                                <div className="sm:col-span-2 flex items-end">
-                                    <label className="flex items-center cursor-pointer select-none bg-white border border-gray-200 rounded-xl px-3 py-2.5 w-full justify-center hover:bg-gray-50 transition-colors">
-                                        <input type="checkbox" className="mr-2 w-4 h-4 text-orange-600 rounded focus:ring-orange-500" checked={tempIsLunar} onChange={e => setTempIsLunar(e.target.checked)} />
-                                        <span className="text-xs text-gray-700 font-black uppercase tracking-wider">Âm</span>
-                                    </label>
+                            <div className="flex items-center justify-between">
+                                <p className="text-sm font-medium text-orange-800">Thêm ngày lễ mới</p>
+                                <div className="flex gap-2 bg-white p-1 rounded-xl border border-orange-200">
+                                    <button
+                                        onClick={() => setTempHolidayType('recurring')}
+                                        className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${tempHolidayType === 'recurring' ? 'bg-orange-600 text-white' : 'text-gray-600 hover:text-gray-900'}`}
+                                    >
+                                        Lặp lại hàng năm
+                                    </button>
+                                    <button
+                                        onClick={() => setTempHolidayType('specific')}
+                                        className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${tempHolidayType === 'specific' ? 'bg-orange-600 text-white' : 'text-gray-600 hover:text-gray-900'}`}
+                                    >
+                                        Ngày cụ thể (Nghỉ bù)
+                                    </button>
                                 </div>
                             </div>
-                            <button onClick={handleAddHoliday} className="w-full bg-green-600 text-white px-4 py-3 rounded-xl text-sm font-medium hover:bg-green-700 flex items-center justify-center gap-2 shadow-md transition-all active:scale-95">
+                            <div className="grid grid-cols-1 sm:grid-cols-12 gap-4">
+                                <div className="sm:col-span-6">
+                                    <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Tên ngày lễ / Nghỉ bù</label>
+                                    <input type="text" className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-orange-500 outline-none transition-all" placeholder="VD: Nghỉ bù lễ 2/9" value={tempName || ''} onChange={e => setTempName(e.target.value)} />
+                                 </div>
+
+                                 {tempHolidayType === 'specific' ? (
+                                     <div className="sm:col-span-6">
+                                         <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Chọn ngày cụ thể</label>
+                                         <input type="date" className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-orange-500 outline-none transition-all bg-white" value={tempDate} onChange={e => setTempDate(e.target.value)} />
+                                     </div>
+                                 ) : (
+                                     <>
+                                         <div className="sm:col-span-2">
+                                             <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Ngày</label>
+                                             <input type="number" min="1" max="31" className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-center font-bold text-slate-700 focus:ring-2 focus:ring-orange-500 outline-none transition-all" value={tempDay ?? 1} onChange={e => setTempDay(parseInt(e.target.value) || 1)} />
+                                         </div>
+                                         <div className="sm:col-span-2">
+                                             <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Tháng</label>
+                                             <input type="number" min="1" max="12" className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-center font-bold text-slate-700 focus:ring-2 focus:ring-orange-500 outline-none transition-all" value={tempMonth ?? 1} onChange={e => setTempMonth(parseInt(e.target.value) || 1)} />
+                                         </div>
+                                         <div className="sm:col-span-2 flex items-end">
+                                             <label className="flex items-center cursor-pointer select-none bg-white border border-gray-200 rounded-xl px-3 py-2.5 w-full justify-center hover:bg-gray-50 transition-colors">
+                                                 <input type="checkbox" className="mr-2 w-4 h-4 text-orange-600 rounded focus:ring-orange-500" checked={tempIsLunar} onChange={e => setTempIsLunar(e.target.checked)} />
+                                                 <span className="text-xs text-gray-700 font-black uppercase tracking-wider">Âm</span>
+                                             </label>
+                                         </div>
+                                     </>
+                                 )}
+                            </div>
+                            <button onClick={handleAddHoliday} className="w-full bg-green-600 text-white px-4 py-3 rounded-xl text-sm font-medium hover:bg-green-700 flex items-center justify-center gap-2 shadow-md transition-all active:scale-95 cursor-pointer">
                                 <Plus size={16} /> Thêm vào danh sách
                             </button>
                         </div>
@@ -833,10 +867,14 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                                     {holidays.map(h => (
                                         <tr key={h.id} className="hover:bg-orange-50/30 transition-colors">
                                             <td className="p-4 font-bold text-slate-700">{h.name}</td>
-                                            <td className="p-4 text-center font-black text-slate-600">{h.day}/{h.month}</td>
+                                            <td className="p-4 text-center font-black text-slate-600">
+                                                {h.date ? h.date : `${h.day}/${h.month}`}
+                                            </td>
                                             <td className="p-4 text-center">
-                                                <span className={`px-2 py-1 rounded-lg text-xs font-semibold uppercase tracking-wider border ${h.isLunar ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-green-50 text-green-700 border-green-200'}`}>
-                                                    {h.isLunar ? 'Âm lịch' : 'Dương lịch'}
+                                                <span className={`px-2 py-1 rounded-lg text-xs font-semibold uppercase tracking-wider border ${
+                                                    h.date ? 'bg-amber-50 text-amber-700 border-amber-200' : (h.isLunar ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-green-50 text-green-700 border-green-200')
+                                                }`}>
+                                                    {h.date ? 'Ngày cụ thể (Nghỉ bù)' : (h.isLunar ? 'Âm lịch' : 'Dương lịch')}
                                                 </span>
                                             </td>
                                             <td className="p-4 text-center">
@@ -858,9 +896,11 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                                     <div className="flex-1 min-w-0 pr-4">
                                         <h4 className="font-black text-slate-800 text-sm truncate tracking-tight">{h.name}</h4>
                                         <div className="flex items-center gap-3 mt-1">
-                                            <span className="text-xs font-black text-slate-500">{h.day}/{h.month}</span>
-                                            <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-wider border ${h.isLunar ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-green-50 text-green-700 border-green-200'}`}>
-                                                {h.isLunar ? 'Âm' : 'Dương'}
+                                            <span className="text-xs font-black text-slate-500">{h.date ? h.date : `${h.day}/${h.month}`}</span>
+                                            <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-wider border ${
+                                                h.date ? 'bg-amber-50 text-amber-700 border-amber-200' : (h.isLunar ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-green-50 text-green-700 border-green-200')
+                                            }`}>
+                                                {h.date ? 'Nghỉ bù' : (h.isLunar ? 'Âm' : 'Dương')}
                                             </span>
                                         </div>
                                     </div>

@@ -49,7 +49,7 @@ export const ROLE_VIEWS_CONFIG: Record<UserRole, RoleConfig> = {
       },
       {
         keyword: 'đăng ký',
-        views: ['registration_records']
+        views: ['registration_records', 'vaoso_records']
       },
       {
         keyword: 'lưu trữ',
@@ -181,6 +181,7 @@ export function isViewAllowedForUser(
       case 'archive_records':
         return activePerms.some(p => p.startsWith('luutru_'));
       case 'registration_records':
+      case 'vaoso_records':
         return activePerms.some(p => p.startsWith('dodac_'));
       case 'other_records':
         return activePerms.some(p => p.startsWith('dodac_'));

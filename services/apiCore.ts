@@ -15,7 +15,8 @@ export const CACHE_KEYS = {
     TRICHDO_COUNTERS: 'offline_trichdo_counters',
     PRICE_LIST: 'offline_price_list',
     HOLIDAYS: 'offline_holidays',
-    SYSTEM_CONFIG: 'offline_system_config'
+    SYSTEM_CONFIG: 'offline_system_config',
+    DANGKY_RECORDS: 'offline_dangky_records'
 };
 
 // --- HELPERS ---

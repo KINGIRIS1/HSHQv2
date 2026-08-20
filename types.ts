@@ -147,6 +147,13 @@ export interface RecordFile {
   approvalDate?: string | null;   // Ngày ký duyệt
   completedDate?: string | null; 
   
+  // Nhân sự phụ trách theo từng bước
+  appraisalStaff?: string | null;
+  taxFormStaff?: string | null;
+  taxKV7Staff?: string | null;
+  taxNoticeStaff?: string | null;
+  printStaff?: string | null; 
+  
   status: RecordStatus;   
   assignedTo?: string | null; 
   employeeName?: string | null;  // NV Xử lý   
@@ -353,10 +360,12 @@ export interface Message {
 // Interface cho Ngày nghỉ lễ
 export interface Holiday {
   id: string;
-  name: string;       // Tên ngày lễ (VD: Tết Nguyên Đán)
-  day: number;        // Ngày
-  month: number;      // Tháng
-  isLunar: boolean;   // true = Âm lịch, false = Dương lịch
+  name: string;       // Tên ngày lễ (VD: Tết Nguyên Đán, Nghỉ bù 2/9)
+  day?: number;        // Ngày
+  month?: number;      // Tháng
+  isLunar?: boolean;   // true = Âm lịch, false = Dương lịch
+  date?: string;      // Tùy chọn: Ngày cụ thể YYYY-MM-DD (dành cho ngày nghỉ bù / lễ một lần)
+  year?: number;      // Tùy chọn: Năm cụ thể
 }
 
 // Interface cho Lịch công tác
@@ -373,6 +382,96 @@ export interface WorkSchedule {
 // Interface Notification (Chuyển từ UtilitiesView sang đây để tránh Circular Dependency)
 export type NotifyType = 'success' | 'error' | 'info';
 export type NotifyFunction = (message: string, type?: NotifyType) => void;
+
+// Module Đăng ký Hồ sơ - 14 Trạng thái quy trình
+export type DangKyStatusType =
+  | 'Tiếp nhận mới'
+  | 'Thẩm định'
+  | 'Phiếu chuyển thuế'
+  | 'Chờ Thuế KV7'
+  | 'Chờ giấy nộp tiền'
+  | 'Chờ In GCN'
+  | 'Chờ kiểm tra'
+  | 'Chờ ký duyệt'
+  | 'Chờ bàn giao'
+  | 'Đã giao 1 cửa'
+  | 'Đã trả kết quả'
+  | 'Chờ bổ sung'
+  | 'CSD rút HS'
+  | 'Trả hủy hồ sơ';
+
+export const DANG_KY_STATUS_LIST: DangKyStatusType[] = [
+  'Tiếp nhận mới',
+  'Thẩm định',
+  'Phiếu chuyển thuế',
+  'Chờ Thuế KV7',
+  'Chờ giấy nộp tiền',
+  'Chờ In GCN',
+  'Chờ kiểm tra',
+  'Chờ ký duyệt',
+  'Chờ bàn giao',
+  'Đã giao 1 cửa',
+  'Đã trả kết quả',
+  'Chờ bổ sung',
+  'CSD rút HS',
+  'Trả hủy hồ sơ'
+];
+
+// Cấu trúc Chủ sử dụng & Người nhận chuyển nhượng
+export interface DangKyParty {
+  name: string;
+  cccd?: string;
+  phone?: string;
+  address?: string;
+}
+
+// Interface chính cho Hồ sơ Đăng ký (39 Cột dữ liệu)
+export interface DangKyRecord {
+  id: string;
+  code: string;                             // Mã hồ sơ
+  owners: DangKyParty[];                    // Chủ sử dụng (Nhiều chủ)
+  transferees: DangKyParty[];               // Người nhận chuyển quyền (Nhiều người)
+  authorizedPersonName?: string;            // Họ tên người ủy quyền
+  authorizedPersonId?: string;              // CCCD người ủy quyền
+  authorizedPersonPhone?: string;           // SĐT người ủy quyền
+  authorizedPersonAddress?: string;         // Địa chỉ người ủy quyền
+  landPlot?: string;                        // Số thửa
+  mapSheet?: string;                        // Số tờ
+  issueNumber?: string;                     // Số phát hành GCN
+  entryNumber?: string;                     // Số vào sổ
+  totalArea?: number | string;              // Tổng diện tích (m2)
+  residentialArea?: number | string;        // Diện tích ONT/ODT (m2)
+  ward?: string;                            // Xã/Phường
+  recordType?: string;                      // Loại hồ sơ
+  receivedDate?: string;                    // Ngày nhận
+  receivedBy?: string;                      // Người tiếp nhận hồ sơ
+  deadline?: string;                        // Hẹn trả
+  appraisalDate?: string;                   // Ngày Thẩm định
+  appraisalStaff?: string;                  // NV Thẩm định
+  taxFormDate?: string;                     // Ngày Phiếu chuyển thuế
+  taxFormStaff?: string;                    // NV Phiếu chuyển
+  taxKV7TransferDate?: string;              // Ngày Chuyển Thuế KV7
+  taxKV7Staff?: string;                     // NV Thuế KV7
+  taxNoticeDate?: string;                   // Ngày TBT
+  taxNoticeStaff?: string;                  // NV Thông báo thuế
+  taxPaymentReceiptDate?: string;           // Ngày GNT
+  printDate?: string;                       // Ngày In GCN
+  printStaff?: string;                      // NV In GCN
+  pendingCheckDate?: string;                // Ngày Trình KT
+  checkedBy?: string;                       // Người Kiểm tra
+  submissionDate?: string;                  // Ngày Trình ký
+  submittedTo?: string;                     // Người ký
+  completedDate?: string;                   // Hoàn thành
+  exportBatch?: string;                     // Đợt xuất
+  resultReturnedDate?: string;              // Ngày Trả kết quả
+  receiptNumber?: string;                   // Số Biên lai
+  invoiceNumber?: string;                   // Số Hóa đơn
+  feeAmount?: number | string;              // Số tiền thu (VNĐ)
+  status: DangKyStatusType;                 // Trạng thái quy trình (1 trong 14 trạng thái)
+  notes?: string;                           // Ghi chú
+  createdAt?: string;
+  updatedAt?: string;
+}
 
 declare global {
   interface Window {

@@ -27,6 +27,7 @@ import WorkScheduleView from "./WorkScheduleView";
 import SaoLucView from "./archive/SaoLucView";
 import CongVanView from "./archive/CongVanView";
 import RegistrationRecords from "./RegistrationRecords";
+import VaoSoView from "./archive/VaoSoView";
 import SystemView from "./SystemView";
 import BarcodeGeneratorView from "./BarcodeGeneratorView";
 import RecordLookupView from "./records/RecordLookupView";
@@ -1634,7 +1635,9 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
         />
       );
     case "registration_records":
-      return <RegistrationRecords currentUser={currentUser} wards={wards} />;
+      return <RegistrationRecords currentUser={currentUser} wards={wards} holidays={holidays} />;
+    case "vaoso_records":
+      return <VaoSoView currentUser={currentUser} wards={wards} />;
     case "congvan_records":
       return <CongVanView currentUser={currentUser} />;
     case "barcode_generator":

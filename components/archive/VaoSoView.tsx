@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { ArchiveRecord, fetchArchiveRecords, saveArchiveRecord, deleteArchiveRecord, importArchiveRecords, updateArchiveRecordsBatch } from '../../services/apiArchive';
 import { useArchiveRealtime } from '../../hooks/useArchiveRealtime';
 import { User } from '../../types';
-import { Loader2, Plus, Search, Trash2, Upload, FileSpreadsheet, Send, CheckCircle2, X, History, Calendar, FileOutput, Settings, Hash, Edit, FileText } from 'lucide-react';
+import { Loader2, Plus, Search, Trash2, Upload, FileSpreadsheet, Send, CheckCircle2, X, History, Calendar, FileOutput, Settings, Hash, Edit, FileText, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Zap, Filter, MapPin } from 'lucide-react';
 import * as XLSX from 'xlsx-js-style';
 import { confirmAction, matchDepartmentKey } from '../../utils/appHelpers';
 import { saveAs } from 'file-saver';
@@ -15,7 +15,7 @@ import { fetchEmployees } from '../../services/apiPeople';
 const COLUMNS = [
     // Nhóm thông tin hồ sơ (Read-only by default)
     { key: 'ma_ho_so', label: 'Mã hồ sơ', width: '120px', readOnly: true },
-    { key: 'group_chu_su_dung', label: 'Thông tin chủ sử dụng', width: '250px', readOnly: true },
+    { key: 'group_chu_su_dung', label: 'Người đứng tên GCN', width: '250px', readOnly: true },
     { key: 'group_thong_tin_ho_so', label: 'Thông tin hồ sơ', width: '200px', readOnly: true },
     { key: 'group_thua_dat', label: 'Thông tin thửa đất', width: '180px', readOnly: true },
     { key: 'dia_danh', label: 'Địa danh', width: '100px', readOnly: true },
@@ -46,7 +46,10 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
     
     // Pagination State
     const [currentPage, setCurrentPage] = useState(1);
-    const itemsPerPage = 10;
+    const [itemsPerPage, setItemsPerPage] = useState<number>(20);
+
+    // Action Menu Dropdown State
+    const [actionMenuOpen, setActionMenuOpen] = useState(false);
 
     // Batch Modal State
     const [showBatchModal, setShowBatchModal] = useState(false);
@@ -106,6 +109,24 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
     const [toDate, setToDate] = useState('');
     const [filterWard, setFilterWard] = useState('');
     const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'scanned'>('all');
+    const [isFilterPopoverOpen, setIsFilterPopoverOpen] = useState(false);
+
+    // Count Active Filters
+    const activeFilterCount = useMemo(() => {
+        let count = 0;
+        if (fromDate) count++;
+        if (toDate) count++;
+        if (filterWard) count++;
+        if (activeTab !== 'all') count++;
+        return count;
+    }, [fromDate, toDate, filterWard, activeTab]);
+
+    const handleClearFilters = () => {
+        setFromDate('');
+        setToDate('');
+        setFilterWard('');
+        setActiveTab('all');
+    };
 
     useArchiveRealtime('vaoso', setRecords);
 
@@ -209,17 +230,17 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
     }, [records, searchTerm, activeTab, fromDate, toDate, filterWard]);
 
     // Pagination
-    const totalPages = Math.ceil(filteredRecords.length / itemsPerPage);
+    const totalPages = Math.ceil(filteredRecords.length / itemsPerPage) || 1;
     const paginatedRecords = useMemo(() => {
         const start = (currentPage - 1) * itemsPerPage;
         return filteredRecords.slice(start, start + itemsPerPage);
-    }, [filteredRecords, currentPage]);
+    }, [filteredRecords, currentPage, itemsPerPage]);
 
-    // Reset page when tab or search changes
+    // Reset page when tab, search or filter changes
     useEffect(() => {
         setCurrentPage(1);
         setSelectedIds(new Set()); // Clear selection on tab change
-    }, [activeTab, searchTerm]);
+    }, [activeTab, searchTerm, fromDate, toDate, filterWard, itemsPerPage]);
 
     const handleAddNew = async () => {
         const newRecord: Partial<ArchiveRecord> = {
@@ -577,7 +598,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
 
     const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.checked) {
-            setSelectedIds(new Set(filteredRecords.map(r => r.id)));
+            setSelectedIds(new Set(paginatedRecords.map(r => r.id)));
         } else {
             setSelectedIds(new Set());
         }
@@ -845,127 +866,278 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
     return (
         <div className="flex flex-col h-full bg-white">
             {/* Header */}
-            <div className="p-4 border-b border-gray-100 flex flex-col gap-4">
-                <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-                    <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-                        Vào số GCN
-                    </h2>
-                    <div className="relative flex-1 sm:w-64 max-w-md">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+            <div className="p-4 border-b border-gray-100 flex flex-col gap-3">
+                <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".xlsx, .xls" className="hidden" />
+
+                {/* Hàng 1: Tabs điều hướng bên trái */}
+                <div className="flex flex-wrap items-center gap-3">
+                    <div className="flex bg-gray-100/80 p-1 rounded-xl border border-gray-200 shadow-2xs">
+                        <button 
+                            onClick={() => setActiveTab('all')}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all cursor-pointer ${activeTab === 'all' ? 'bg-white text-blue-700 shadow-2xs border border-gray-200/80' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/50'}`}
+                        >
+                            Danh sách
+                        </button>
+                        <button 
+                            onClick={() => setActiveTab('pending')}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all cursor-pointer ${activeTab === 'pending' ? 'bg-white text-orange-700 shadow-2xs border border-gray-200/80' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/50'}`}
+                        >
+                            Chờ chuyển Scan/1 Cửa
+                        </button>
+                        <button 
+                            onClick={() => setActiveTab('scanned')}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all cursor-pointer ${activeTab === 'scanned' ? 'bg-white text-emerald-700 shadow-2xs border border-gray-200/80' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/50'}`}
+                        >
+                            Đã chuyển Scan/1 Cửa
+                        </button>
+                    </div>
+                </div>
+
+                {/* Hàng 2: Ô Tìm kiếm mở rộng 1/3 chiều ngang căn ngoài cùng bên phải */}
+                <div className="flex justify-end items-center">
+                    <div className="relative w-1/3 min-w-[280px] max-w-md">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
                         <input 
-                            className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" 
-                            placeholder="Tìm kiếm..." 
+                            className="w-full pl-9 pr-3 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-500 shadow-2xs bg-white" 
+                            placeholder="Tìm kiếm theo tên, số phôi, mã HS..." 
                             value={searchTerm} 
                             onChange={e => setSearchTerm(e.target.value)} 
                         />
                     </div>
                 </div>
 
-                {/* Filters */}
-                <div className="flex flex-wrap gap-3 items-center bg-gray-50 p-2 rounded-lg border border-gray-100">
-                    <div className="flex items-center gap-2 bg-white px-2 py-1.5 rounded-md border border-gray-200 shadow-sm">
-                        <Calendar size={16} className="text-gray-500"/>
-                        <input type="date" className="text-sm outline-none bg-transparent text-gray-700 w-28" value={fromDate} onChange={e => setFromDate(e.target.value)} placeholder="Từ ngày" />
-                        <span className="text-gray-400">-</span>
-                        <input type="date" className="text-sm outline-none bg-transparent text-gray-700 w-28" value={toDate} onChange={e => setToDate(e.target.value)} placeholder="Đến ngày" />
-                    </div>
-
-                    <div className="flex items-center gap-2 bg-white px-2 py-1.5 rounded-md border border-gray-200 shadow-sm">
-                        <Settings size={16} className="text-gray-500"/>
-                        <select className="text-sm outline-none bg-transparent text-gray-700 font-medium cursor-pointer border-none focus:ring-0 min-w-[120px]" value={filterWard} onChange={e => setFilterWard(e.target.value)}>
-                            <option value="">Tất cả Địa danh</option>
-                            {wards.map(w => <option key={w} value={w}>{w}</option>)}
-                        </select>
-                    </div>
-
-                    <div className="flex items-center gap-2 bg-white px-2 py-1.5 rounded-md border border-gray-200 shadow-sm">
-                        <CheckCircle2 size={16} className="text-gray-500"/>
-                        <select className="text-sm outline-none bg-transparent text-gray-700 font-medium cursor-pointer border-none focus:ring-0 min-w-[120px]" value={activeTab} onChange={e => setActiveTab(e.target.value as any)}>
-                            <option value="all">Tất cả Trạng thái</option>
-                            <option value="pending">Chờ chuyển Scan</option>
-                            <option value="scanned">Đã chuyển Scan</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-3 bg-gray-50 p-2 rounded-lg relative">
-                    <div className="flex bg-white rounded-md border border-gray-200 p-1 mr-2 shadow-sm">
-                        <button 
-                            onClick={() => setActiveTab('all')}
-                            className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${activeTab === 'all' ? 'bg-blue-100 text-blue-700 shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
-                        >
-                            Danh sách
-                        </button>
-                        <button 
-                            onClick={() => setActiveTab('pending')}
-                            className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${activeTab === 'pending' ? 'bg-orange-100 text-orange-700 shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
-                        >
-                            Chờ chuyển Scan/1 Cửa
-                        </button>
-                        <button 
-                            onClick={() => setActiveTab('scanned')}
-                            className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${activeTab === 'scanned' ? 'bg-green-100 text-green-700 shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
-                        >
-                            Đã chuyển Scan/1 Cửa
-                        </button>
-                    </div>
-
-                    <div className="flex items-center gap-2 ml-auto">
-                        {activeTab === 'all' && (
-                            <>
-                                <button 
-                                    onClick={() => setShowSettingsModal(true)} 
-                                    className="flex items-center gap-2 bg-gray-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-gray-700 shadow-sm"
-                                    title="Cài đặt số vào sổ"
-                                >
-                                    <Settings size={16}/>
-                                </button>
-                                <button onClick={handleDownloadTemplate} className="flex items-center gap-2 bg-emerald-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-emerald-700 shadow-sm" title="Tải mẫu Excel">
-                                    <FileSpreadsheet size={16}/> Tải mẫu
-                                </button>
-                                <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".xlsx, .xls" className="hidden" />
-                                <button onClick={handleImportClick} className="flex items-center gap-2 bg-blue-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-blue-700 shadow-sm">
-                                    <Upload size={16}/> Import Excel
-                                </button>
-                                <button onClick={handleAddNew} className="flex items-center gap-2 bg-teal-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-teal-700 shadow-sm">
-                                    <Plus size={16}/> Thêm mới
-                                </button>
-                                {selectedIds.size > 0 && (
-                                    <button onClick={handleMoveToPending} className="flex items-center gap-2 bg-indigo-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-indigo-700 shadow-sm animate-pulse">
-                                        <Send size={16}/> Chuyển Scan ({selectedIds.size})
-                                    </button>
+                {/* Hàng 3: Bộ lọc Điều kiện (Xổ dọc) & Nút Thao tác đặt ngay bên cạnh */}
+                <div className="flex flex-wrap gap-3 items-center justify-between bg-gray-50 p-2 rounded-lg border border-gray-100">
+                    <div className="flex flex-wrap items-center gap-3">
+                        {/* Consolidated Popover Filter Button */}
+                        <div className="relative">
+                            <button
+                                onClick={() => setIsFilterPopoverOpen(!isFilterPopoverOpen)}
+                                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all border cursor-pointer ${
+                                    activeFilterCount > 0
+                                        ? "bg-teal-50 border-teal-300 text-teal-800 shadow-2xs"
+                                        : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
+                                }`}
+                            >
+                                <Filter size={14} className={activeFilterCount > 0 ? "text-teal-600" : "text-gray-500"} />
+                                <span>Bộ lọc tìm kiếm</span>
+                                {activeFilterCount > 0 && (
+                                    <span className="bg-red-500 text-white text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ml-0.5">
+                                        {activeFilterCount}
+                                    </span>
                                 )}
-                            </>
-                        )}
-
-                        {activeTab === 'pending' && selectedIds.size > 0 && hasBatchPermission() && (
-                            <button onClick={handleOpenBatchModal} className="flex items-center gap-2 bg-orange-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-orange-700 shadow-sm animate-pulse">
-                                <CheckCircle2 size={16}/> Tạo đợt ({selectedIds.size})
+                                {isFilterPopoverOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                             </button>
-                        )}
 
-                        {activeTab === 'scanned' && (
-                            <button onClick={() => setShowExportHandoverModal(true)} className="flex items-center gap-2 bg-purple-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-purple-700 shadow-sm">
-                                <FileOutput size={16}/> Xuất danh sách
+                            {/* POPOVER FILTER CARD */}
+                            {isFilterPopoverOpen && (
+                                <>
+                                    <div className="fixed inset-0 z-20" onClick={() => setIsFilterPopoverOpen(false)}></div>
+                                    <div className="absolute left-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-gray-200 p-4 z-30 animate-in fade-in zoom-in-95 duration-100 text-gray-800">
+                                        <div className="flex items-center justify-between pb-3 border-b border-gray-100 mb-3">
+                                            <div className="flex items-center gap-2 font-bold text-teal-700 text-sm">
+                                                <Filter size={16} />
+                                                <span>Bộ lọc tìm kiếm</span>
+                                            </div>
+                                            <button
+                                                onClick={() => setIsFilterPopoverOpen(false)}
+                                                className="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100 transition-colors cursor-pointer"
+                                            >
+                                                <X size={16} />
+                                            </button>
+                                        </div>
+
+                                        <div className="space-y-3 max-h-[70vh] overflow-y-auto pr-1">
+                                            {/* 1. Địa danh */}
+                                            <div>
+                                                <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 mb-1">
+                                                    <MapPin size={14} className="text-gray-500" />
+                                                    <span>Địa danh (Xã/Phường):</span>
+                                                </label>
+                                                <select
+                                                    value={filterWard}
+                                                    onChange={(e) => setFilterWard(e.target.value)}
+                                                    className="w-full text-xs border border-gray-200 rounded-lg p-2 font-medium bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 cursor-pointer"
+                                                >
+                                                    <option value="">Tất cả Địa danh</option>
+                                                    {wards.map((w) => (
+                                                        <option key={w} value={w}>{w}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+
+                                            {/* 2. Trạng thái */}
+                                            <div>
+                                                <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 mb-1">
+                                                    <CheckCircle2 size={14} className="text-gray-500" />
+                                                    <span>Trạng thái hồ sơ:</span>
+                                                </label>
+                                                <select
+                                                    value={activeTab}
+                                                    onChange={(e) => setActiveTab(e.target.value as any)}
+                                                    className="w-full text-xs border border-gray-200 rounded-lg p-2 font-medium bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 cursor-pointer"
+                                                >
+                                                    <option value="all">Tất cả Trạng thái</option>
+                                                    <option value="pending">Chờ chuyển Scan</option>
+                                                    <option value="scanned">Đã chuyển Scan</option>
+                                                </select>
+                                            </div>
+
+                                            {/* 3. Thời gian nhận */}
+                                            <div>
+                                                <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 mb-1">
+                                                    <Calendar size={14} className="text-gray-500" />
+                                                    <span>Thời gian nhận hồ sơ:</span>
+                                                </label>
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <div>
+                                                        <span className="text-[11px] text-gray-500 font-medium block mb-0.5">Từ ngày</span>
+                                                        <input
+                                                            type="date"
+                                                            value={fromDate}
+                                                            onChange={(e) => setFromDate(e.target.value)}
+                                                            className="w-full text-xs border border-gray-200 rounded-lg p-2 font-medium bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-[11px] text-gray-500 font-medium block mb-0.5">Đến ngày</span>
+                                                        <input
+                                                            type="date"
+                                                            value={toDate}
+                                                            onChange={(e) => setToDate(e.target.value)}
+                                                            className="w-full text-xs border border-gray-200 rounded-lg p-2 font-medium bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Footer inside Popover */}
+                                        <div className="flex items-center justify-between pt-3 mt-3 border-t border-gray-100">
+                                            <button
+                                                onClick={handleClearFilters}
+                                                className="text-xs text-gray-500 hover:text-red-600 font-semibold transition-colors cursor-pointer"
+                                            >
+                                                Xóa bộ lọc
+                                            </button>
+                                            <button
+                                                onClick={() => setIsFilterPopoverOpen(false)}
+                                                className="bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-all cursor-pointer"
+                                            >
+                                                Áp dụng
+                                            </button>
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+
+                        {/* Action Dropdown Menu Button (Nút sổ dọc đặt ngay bên cạnh ô Trạng thái) */}
+                        <div className="relative">
+                            <button 
+                                onClick={() => setActionMenuOpen(!actionMenuOpen)}
+                                className="flex items-center gap-2 bg-gradient-to-r from-teal-600 to-teal-700 text-white px-3.5 py-1.5 rounded-lg text-xs font-bold hover:from-teal-700 hover:to-teal-800 transition-all shadow-sm cursor-pointer"
+                            >
+                                <Zap size={14} className="fill-amber-300 text-amber-300" />
+                                <span>Thao tác</span>
+                                <ChevronDown size={14} className={`transition-transform duration-200 ${actionMenuOpen ? 'rotate-180' : ''}`} />
                             </button>
-                        )}
 
-                        <button onClick={handleExportExcel} className="hidden md:flex items-center gap-2 bg-green-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-green-700 shadow-sm">
-                            <FileSpreadsheet size={16}/> Xuất Excel
-                        </button>
-                        <button onClick={() => {
-                            if (selectedIds.size > 0) {
-                                const selectedRecords = records.filter(r => selectedIds.has(r.id));
-                                exportSoDiaChinh(selectedRecords);
-                            } else {
-                                setShowExportSoDiaChinhModal(true);
-                            }
-                        }} className="flex items-center gap-2 bg-blue-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-blue-700 shadow-sm">
-                            <FileText size={16}/> Xuất Sổ địa chính
-                        </button>
-                        <button onClick={() => setShowExportSoMucKeModal(true)} className="flex items-center gap-2 bg-indigo-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-indigo-700 shadow-sm">
-                            <FileText size={16}/> Xuất Sổ mục kê
-                        </button>
+                            {/* Dropdown Menu Popup */}
+                            {actionMenuOpen && (
+                                <>
+                                    <div className="fixed inset-0 z-20" onClick={() => setActionMenuOpen(false)}></div>
+                                    <div className="absolute left-0 sm:left-auto sm:right-0 mt-2 w-60 bg-white rounded-xl shadow-xl border border-gray-200/80 p-1.5 z-30 divide-y divide-gray-100 text-xs font-medium animate-in fade-in zoom-in-95 duration-100">
+                                        <div className="py-1 space-y-0.5">
+                                            <button 
+                                                onClick={() => { setShowSettingsModal(true); setActionMenuOpen(false); }} 
+                                                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100 hover:text-teal-700 transition-colors text-left"
+                                            >
+                                                <Settings size={14} className="text-gray-500" /> Cài đặt số vào sổ
+                                            </button>
+                                            <button 
+                                                onClick={() => { handleAddNew(); setActionMenuOpen(false); }} 
+                                                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-gray-700 hover:bg-teal-50 hover:text-teal-700 transition-colors text-left font-bold"
+                                            >
+                                                <Plus size={14} className="text-teal-600" /> Thêm mới hồ sơ
+                                            </button>
+                                            <button 
+                                                onClick={() => { handleImportClick(); setActionMenuOpen(false); }} 
+                                                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors text-left"
+                                            >
+                                                <Upload size={14} className="text-blue-600" /> Import Excel
+                                            </button>
+                                            <button 
+                                                onClick={() => { handleDownloadTemplate(); setActionMenuOpen(false); }} 
+                                                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-gray-700 hover:bg-emerald-50 hover:text-emerald-700 transition-colors text-left"
+                                            >
+                                                <FileSpreadsheet size={14} className="text-emerald-600" /> Tải mẫu Excel
+                                            </button>
+                                        </div>
+
+                                        {/* Batch Actions when Selected */}
+                                        {(selectedIds.size > 0 || activeTab === 'scanned') && (
+                                            <div className="py-1 space-y-0.5">
+                                                {activeTab === 'all' && selectedIds.size > 0 && (
+                                                    <button 
+                                                        onClick={() => { handleMoveToPending(); setActionMenuOpen(false); }} 
+                                                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-indigo-700 bg-indigo-50/80 hover:bg-indigo-100 transition-colors text-left font-bold"
+                                                    >
+                                                        <Send size={14} className="text-indigo-600" /> Chuyển Scan ({selectedIds.size})
+                                                    </button>
+                                                )}
+                                                {activeTab === 'pending' && selectedIds.size > 0 && hasBatchPermission() && (
+                                                    <button 
+                                                        onClick={() => { handleOpenBatchModal(); setActionMenuOpen(false); }} 
+                                                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-orange-700 bg-orange-50/80 hover:bg-orange-100 transition-colors text-left font-bold"
+                                                    >
+                                                        <CheckCircle2 size={14} className="text-orange-600" /> Tạo đợt ({selectedIds.size})
+                                                    </button>
+                                                )}
+                                                {activeTab === 'scanned' && (
+                                                    <button 
+                                                        onClick={() => { setShowExportHandoverModal(true); setActionMenuOpen(false); }} 
+                                                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-purple-700 hover:bg-purple-50 transition-colors text-left font-bold"
+                                                    >
+                                                        <FileOutput size={14} className="text-purple-600" /> Xuất danh sách bàn giao
+                                                    </button>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {/* Export Options */}
+                                        <div className="py-1 space-y-0.5">
+                                            <button 
+                                                onClick={() => { handleExportExcel(); setActionMenuOpen(false); }} 
+                                                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-gray-700 hover:bg-green-50 hover:text-green-700 transition-colors text-left"
+                                            >
+                                                <FileSpreadsheet size={14} className="text-green-600" /> Xuất dữ liệu Excel
+                                            </button>
+                                            <button 
+                                                onClick={() => { 
+                                                    if (selectedIds.size > 0) {
+                                                        const selectedRecords = records.filter(r => selectedIds.has(r.id));
+                                                        exportSoDiaChinh(selectedRecords);
+                                                    } else {
+                                                        setShowExportSoDiaChinhModal(true);
+                                                    }
+                                                    setActionMenuOpen(false); 
+                                                }} 
+                                                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors text-left"
+                                            >
+                                                <FileText size={14} className="text-blue-600" /> Xuất Sổ địa chính
+                                            </button>
+                                            <button 
+                                                onClick={() => { setShowExportSoMucKeModal(true); setActionMenuOpen(false); }} 
+                                                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 transition-colors text-left"
+                                            >
+                                                <FileText size={14} className="text-indigo-600" /> Xuất Sổ mục kê
+                                            </button>
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -979,33 +1151,33 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                 ) : (
                     <>
                     <div className="inline-block min-w-full align-middle flex-1 overflow-auto">
-                        <table className="min-w-full table-fixed border-collapse">
-                            <thead className="bg-gray-100 sticky top-0 z-10 shadow-sm">
+                        <table className="min-w-full table-fixed border-collapse text-sm">
+                            <thead className="bg-gray-50 sticky top-0 z-10 shadow-sm select-none">
                                 <tr>
-                                    <th className="p-2 border-b border-r border-gray-200 w-10 text-center bg-gray-100 sticky left-0 z-20">
-                                        <input type="checkbox" onChange={handleSelectAll} checked={filteredRecords.length > 0 && selectedIds.size === filteredRecords.length} />
+                                    <th className="p-3 border-b border-r border-gray-200 w-10 text-center bg-gray-50 sticky left-0 z-20">
+                                        <input type="checkbox" onChange={handleSelectAll} checked={paginatedRecords.length > 0 && selectedIds.size === paginatedRecords.length} className="rounded text-teal-600 focus:ring-teal-500 cursor-pointer w-4 h-4" />
                                     </th>
-                                    <th className="p-2 border-b border-r border-gray-200 w-12 text-center bg-gray-100 sticky left-10 z-20">#</th>
+                                    <th className="p-3 border-b border-r border-gray-200 w-12 text-center text-xs font-semibold text-gray-500 uppercase bg-gray-50 sticky left-10 z-20">#</th>
                                     {COLUMNS.map(col => (
-                                        <th key={col.key} className="p-2 border-b border-r border-gray-200 text-xs font-bold text-gray-600 uppercase text-center whitespace-nowrap" style={{ width: col.width, minWidth: col.width }}>
+                                        <th key={col.key} className="p-3 border-b border-r border-gray-200 text-xs font-semibold text-gray-500 uppercase text-center whitespace-nowrap" style={{ width: col.width, minWidth: col.width }}>
                                             {col.label}
                                         </th>
                                     ))}
                                     {activeTab === 'scanned' && (
                                         <>
-                                            <th className="p-2 border-b border-r border-gray-200 w-32 text-xs font-bold text-gray-600 uppercase">Đợt Scan</th>
+                                            <th className="p-3 border-b border-r border-gray-200 w-32 text-xs font-semibold text-gray-500 uppercase text-center">Đợt Scan</th>
                                         </>
                                     )}
-                                    <th className="p-2 border-b border-gray-200 w-24 text-center bg-gray-100 sticky right-0 z-20">Thao tác</th>
+                                    <th className="p-3 border-b border-gray-200 w-24 text-center text-xs font-semibold text-gray-500 uppercase bg-gray-50 sticky right-0 z-20">Thao tác</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
                                 {paginatedRecords.length > 0 ? paginatedRecords.map((r, idx) => (
                                     <tr key={r.id} className={`hover:bg-teal-50/30 group ${selectedIds.has(r.id) ? 'bg-blue-50' : ''}`}>
-                                        <td className="p-2 border-r border-gray-200 text-center bg-white sticky left-0 z-10 group-hover:bg-teal-50/30">
-                                            <input type="checkbox" checked={selectedIds.has(r.id)} onChange={() => handleSelectRow(r.id)} />
+                                        <td className="p-3 border-r border-gray-100 text-center bg-white sticky left-0 z-10 group-hover:bg-teal-50/30">
+                                            <input type="checkbox" checked={selectedIds.has(r.id)} onChange={() => handleSelectRow(r.id)} className="rounded text-teal-600 focus:ring-teal-500 cursor-pointer w-4 h-4" />
                                         </td>
-                                        <td className="p-2 border-r border-gray-200 text-center text-gray-500 text-xs bg-white sticky left-10 z-10 group-hover:bg-teal-50/30">
+                                        <td className="p-3 border-r border-gray-100 text-center text-gray-500 font-mono text-sm bg-white sticky left-10 z-10 group-hover:bg-teal-50/30">
                                             {(currentPage - 1) * itemsPerPage + idx + 1}
                                             {savingId === r.id && <span className="block text-[9px] text-teal-600 animate-pulse">Lưu...</span>}
                                         </td>
@@ -1013,15 +1185,23 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                                             const isEditing = editingId === r.id;
                                             const isReadOnly = col.readOnly && !isEditing;
 
+                                            if (col.key === 'ma_ho_so') {
+                                                return (
+                                                    <td key={`${r.id}-${col.key}`} className="p-3 border-r border-gray-100 text-sm font-bold font-mono text-blue-600 whitespace-nowrap">
+                                                        {r.data?.[col.key] || ''}
+                                                    </td>
+                                                );
+                                            }
+
                                             if (col.key === 'group_chu_su_dung') {
                                                 return (
-                                                    <td key={`${r.id}-${col.key}`} className="p-2 border-r border-gray-200 align-top">
+                                                    <td key={`${r.id}-${col.key}`} className="p-3 border-r border-gray-100 align-top">
                                                         <div className="flex flex-col gap-1">
-                                                            <div className="text-xs text-teal-600 font-bold mb-1">Chủ sử dụng:</div>
+                                                            <div className="text-xs text-teal-700 font-bold mb-0.5">Người đứng tên GCN:</div>
                                                             {isEditing ? (
                                                                 renderOwnerInput(r.data?.ten_chu_su_dung || '', (val) => handleCellChange(r.id, 'ten_chu_su_dung', val), () => handleBlur(r))
                                                             ) : (
-                                                                <div className="text-sm font-bold text-teal-800 whitespace-pre-wrap">{r.data?.ten_chu_su_dung}</div>
+                                                                <div className="text-sm font-medium text-gray-900 whitespace-pre-wrap">{r.data?.ten_chu_su_dung}</div>
                                                             )}
                                                         </div>
                                                     </td>
@@ -1029,7 +1209,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                                             }
                                             if (col.key === 'group_thong_tin_ho_so') {
                                                 return (
-                                                    <td key={`${r.id}-${col.key}`} className="p-2 border-r border-gray-200 align-top">
+                                                    <td key={`${r.id}-${col.key}`} className="p-3 border-r border-gray-100 align-top">
                                                         <div className="text-xs text-gray-500 mb-0.5">Loại hồ sơ:</div>
                                                         {isEditing ? (
                                                             <input
@@ -1040,20 +1220,20 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                                                                 onBlur={() => handleBlur(r)}
                                                             />
                                                         ) : (
-                                                            <div className="text-sm font-medium text-blue-700 mb-2 whitespace-pre-wrap leading-tight">{r.data?.loai_bien_dong}</div>
+                                                            <div className="text-sm text-gray-700 font-normal mb-2 whitespace-pre-wrap leading-tight">{r.data?.loai_bien_dong}</div>
                                                         )}
-                                                        <div className="text-xs text-gray-500 mb-0.5">Ngày nhận:</div>
+                                                        <div className="text-[10px] font-extrabold uppercase font-sans text-gray-400 mb-0.5">Ngày nhận:</div>
                                                         {isEditing ? (
                                                             <input
                                                                 type="date"
-                                                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-teal-500 outline-none"
+                                                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-teal-500 outline-none font-mono"
                                                                 value={r.data?.ngay_nhan || ''}
                                                                 onChange={(e) => handleCellChange(r.id, 'ngay_nhan', e.target.value)}
                                                                 onBlur={() => handleBlur(r)}
                                                             />
                                                         ) : (
-                                                            <div className="text-sm font-bold text-gray-800 flex items-center gap-1">
-                                                                <Calendar size={14} className="text-gray-400" />
+                                                            <div className="text-sm font-semibold font-mono text-slate-700 flex items-center gap-1.5">
+                                                                <Calendar size={13} className="text-gray-400" />
                                                                 {r.data?.ngay_nhan ? new Date(r.data.ngay_nhan).toLocaleDateString('vi-VN') : ''}
                                                             </div>
                                                         )}
@@ -1062,17 +1242,17 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                                             }
                                             if (col.key === 'group_thua_dat') {
                                                 return (
-                                                    <td key={`${r.id}-${col.key}`} className="p-2 border-r border-gray-200 align-top">
+                                                    <td key={`${r.id}-${col.key}`} className="p-3 border-r border-gray-100 align-top">
                                                         {isEditing ? (
                                                             <div className="flex flex-col gap-2">
                                                                 <div className="flex items-center gap-2">
                                                                     <div className="flex-1">
                                                                         <div className="text-xs text-gray-500">Tờ bản đồ:</div>
-                                                                        <input type="text" className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-teal-500 outline-none" value={r.data?.so_to || ''} onChange={(e) => handleCellChange(r.id, 'so_to', e.target.value)} onBlur={() => handleBlur(r)} />
+                                                                        <input type="text" className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-teal-500 outline-none font-mono font-bold" value={r.data?.so_to || ''} onChange={(e) => handleCellChange(r.id, 'so_to', e.target.value)} onBlur={() => handleBlur(r)} />
                                                                     </div>
                                                                     <div className="flex-1">
                                                                         <div className="text-xs text-gray-500">Số thửa:</div>
-                                                                        <input type="text" className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-teal-500 outline-none" value={r.data?.so_thua || ''} onChange={(e) => handleCellChange(r.id, 'so_thua', e.target.value)} onBlur={() => handleBlur(r)} />
+                                                                        <input type="text" className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-teal-500 outline-none font-mono font-bold" value={r.data?.so_thua || ''} onChange={(e) => handleCellChange(r.id, 'so_thua', e.target.value)} onBlur={() => handleBlur(r)} />
                                                                     </div>
                                                                 </div>
                                                                 <div className="flex items-center gap-2">
@@ -1089,8 +1269,8 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                                                         ) : (
                                                             <>
                                                                 <div className="flex items-center gap-2 mb-2">
-                                                                    <span className="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded text-xs border border-gray-200 whitespace-nowrap">Tờ: <b>{r.data?.so_to}</b></span>
-                                                                    <span className="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded text-xs border border-gray-200 whitespace-nowrap">Thửa: <b>{r.data?.so_thua}</b></span>
+                                                                    <span className="bg-slate-50 text-slate-700 px-2 py-0.5 rounded text-sm border border-slate-200 whitespace-nowrap font-mono font-bold">Tờ: <b>{r.data?.so_to}</b></span>
+                                                                    <span className="bg-slate-50 text-slate-700 px-2 py-0.5 rounded text-sm border border-slate-200 whitespace-nowrap font-mono font-bold">Thửa: <b>{r.data?.so_thua}</b></span>
                                                                 </div>
                                                                 <div className="text-xs text-gray-600 mb-1">
                                                                     DT: <b>{r.data?.tong_dien_tich ? `${r.data.tong_dien_tich} m²` : ''}</b>
@@ -1105,16 +1285,16 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                                             }
 
                                             return (
-                                                <td key={`${r.id}-${col.key}`} className="p-0 border-r border-gray-200 relative">
+                                                <td key={`${r.id}-${col.key}`} className="p-0 border-r border-gray-100 relative">
                                                     {isReadOnly ? (
-                                                        <div className="w-full h-full px-2 py-2 text-sm text-gray-700 whitespace-pre-wrap min-h-[40px] flex items-center">
+                                                        <div className="w-full h-full px-3 py-2 text-sm text-gray-700 whitespace-pre-wrap min-h-[40px] flex items-center">
                                                             {r.data?.[col.key] || ''}
                                                         </div>
                                                     ) : col.key === 'so_vao_so' ? (
                                                         <div className="flex h-full">
                                                             <input 
                                                                 type="text"
-                                                                className="flex-1 min-w-0 px-2 py-2 text-sm bg-transparent border-none focus:ring-2 focus:ring-inset focus:ring-teal-500 outline-none"
+                                                                className="flex-1 min-w-0 px-3 py-2 text-sm font-bold font-mono text-blue-600 bg-transparent border-none focus:ring-2 focus:ring-inset focus:ring-teal-500 outline-none"
                                                                 value={r.data?.[col.key] || ''}
                                                                 onChange={(e) => handleCellChange(r.id, col.key, e.target.value)}
                                                                 onBlur={() => handleBlur(r)}
@@ -1132,7 +1312,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                                                         </div>
                                                     ) : col.key === 'ten_chu_su_dung' ? (
                                                         <textarea
-                                                            className="w-full h-full px-2 py-2 text-sm bg-transparent border-none focus:ring-2 focus:ring-inset focus:ring-teal-500 outline-none resize-none whitespace-pre-wrap"
+                                                            className="w-full h-full px-3 py-2 text-sm font-medium text-gray-900 bg-transparent border-none focus:ring-2 focus:ring-inset focus:ring-teal-500 outline-none resize-none whitespace-pre-wrap"
                                                             value={r.data?.[col.key] || ''}
                                                             onChange={(e) => handleCellChange(r.id, col.key, e.target.value)}
                                                             onBlur={() => handleBlur(r)}
@@ -1142,7 +1322,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                                                         />
                                                     ) : col.key === 'loai_gcn' ? (
                                                         <select
-                                                            className="w-full h-full px-2 py-2 text-sm bg-transparent border-none focus:ring-2 focus:ring-inset focus:ring-teal-500 outline-none"
+                                                            className="w-full h-full px-3 py-2 text-sm text-gray-700 bg-transparent border-none focus:ring-2 focus:ring-inset focus:ring-teal-500 outline-none"
                                                             value={r.data?.[col.key] || 'GCN mới'}
                                                             onChange={(e) => {
                                                                 handleCellChange(r.id, col.key, e.target.value);
@@ -1159,7 +1339,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                                                                 <div key={idx} className="flex items-center gap-1 group/input">
                                                                     <input 
                                                                         type="text"
-                                                                        className="flex-1 min-w-0 px-2 py-1 text-sm bg-transparent border-b border-gray-200 focus:border-teal-500 outline-none"
+                                                                        className="flex-1 min-w-0 px-2 py-1 text-sm font-mono font-bold text-slate-700 bg-transparent border-b border-gray-200 focus:border-teal-500 outline-none"
                                                                         value={val}
                                                                         onChange={(e) => {
                                                                             const newArr = [...arr];
@@ -1197,10 +1377,19 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                                                                 <Plus size={12} /> Thêm số
                                                             </button>
                                                         </div>
+                                                    ) : col.key === 'ngay_ky_gcn' || col.key === 'ngay_ky_phieu_tk' ? (
+                                                        <input 
+                                                            type="date"
+                                                            className="w-full h-full px-3 py-2 text-sm font-mono font-semibold text-slate-700 bg-transparent border-none focus:ring-2 focus:ring-inset focus:ring-teal-500 outline-none"
+                                                            value={r.data?.[col.key] || ''}
+                                                            onChange={(e) => handleCellChange(r.id, col.key, e.target.value)}
+                                                            onBlur={() => handleBlur(r)}
+                                                            readOnly={activeTab === 'scanned'} 
+                                                        />
                                                     ) : (
                                                         <input 
                                                             type={col.type || 'text'}
-                                                            className="w-full h-full px-2 py-2 text-sm bg-transparent border-none focus:ring-2 focus:ring-inset focus:ring-teal-500 outline-none"
+                                                            className="w-full h-full px-3 py-2 text-sm text-gray-700 bg-transparent border-none focus:ring-2 focus:ring-inset focus:ring-teal-500 outline-none"
                                                             value={r.data?.[col.key] || ''}
                                                             onChange={(e) => handleCellChange(r.id, col.key, e.target.value)}
                                                             onBlur={() => handleBlur(r)}
@@ -1212,12 +1401,12 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                                         })}
                                         {activeTab === 'scanned' && (
                                             <>
-                                                <td className="p-2 border-r border-gray-200 text-xs text-gray-600">
+                                                <td className="p-3 border-r border-gray-100 text-xs font-bold text-emerald-600 text-center font-mono">
                                                     {r.data?.scan_batch_id}
                                                 </td>
                                             </>
                                         )}
-                                        <td className="p-2 text-center bg-white sticky right-0 group-hover:bg-teal-50/30 z-10 border-l border-gray-200">
+                                        <td className="p-3 text-center bg-white sticky right-0 group-hover:bg-teal-50/30 z-10 border-l border-gray-100">
                                             <div className="flex flex-col gap-2 items-center justify-center h-full w-full">
                                                 {activeTab === 'all' && (
                                                     <>
@@ -1260,26 +1449,48 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                         </table>
                     </div>
                     {/* Pagination Controls */}
-                    {totalPages > 1 && (
-                        <div className="p-2 border-t border-gray-200 bg-gray-50 flex justify-between items-center sticky bottom-0 z-20">
-                            <div className="text-xs text-gray-500">
-                                Hiển thị {(currentPage - 1) * itemsPerPage + 1} - {Math.min(currentPage * itemsPerPage, filteredRecords.length)} trong tổng số {filteredRecords.length} dòng
+                    {filteredRecords.length > 0 && (
+                        <div className="border-t border-gray-200 p-3 bg-gray-50 flex flex-col sm:flex-row justify-between items-center gap-4 shrink-0 text-xs text-gray-600 sticky bottom-0 z-20">
+                            <div className="flex items-center gap-4">
+                                <span>
+                                    Tổng số: <strong>{filteredRecords.length}</strong> bản ghi
+                                </span>
+                                <div className="flex items-center gap-2">
+                                    <span>Hiển thị</span>
+                                    <select
+                                        value={itemsPerPage}
+                                        onChange={(e) => {
+                                            setItemsPerPage(Number(e.target.value));
+                                            setCurrentPage(1);
+                                        }}
+                                        className="border border-gray-300 rounded px-2 py-1 bg-white outline-none cursor-pointer"
+                                    >
+                                        <option value={10}>10</option>
+                                        <option value={20}>20</option>
+                                        <option value={50}>50</option>
+                                        <option value={100}>100</option>
+                                    </select>
+                                </div>
                             </div>
-                            <div className="flex gap-1">
+                            <div className="flex items-center gap-2">
                                 <button 
                                     onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                                     disabled={currentPage === 1}
-                                    className="px-2 py-1 bg-white border border-gray-300 rounded text-xs disabled:opacity-50 hover:bg-gray-100"
+                                    className="p-1.5 border rounded bg-white hover:bg-gray-100 disabled:opacity-50 cursor-pointer"
+                                    title="Trang trước"
                                 >
-                                    Trước
+                                    <ChevronLeft size={16} />
                                 </button>
-                                <span className="px-2 py-1 text-xs font-medium">Trang {currentPage} / {totalPages}</span>
+                                <span className="font-medium">
+                                    Trang {currentPage} / {totalPages}
+                                </span>
                                 <button 
                                     onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                                    disabled={currentPage === totalPages}
-                                    className="px-2 py-1 bg-white border border-gray-300 rounded text-xs disabled:opacity-50 hover:bg-gray-100"
+                                    disabled={currentPage === totalPages || totalPages === 0}
+                                    className="p-1.5 border rounded bg-white hover:bg-gray-100 disabled:opacity-50 cursor-pointer"
+                                    title="Trang sau"
                                 >
-                                    Sau
+                                    <ChevronRight size={16} />
                                 </button>
                             </div>
                         </div>

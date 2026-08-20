@@ -1,5 +1,5 @@
 
-import { RecordFile, RecordStatus, Employee } from '../types';
+import { RecordFile, RecordStatus, Employee, DangKyRecord } from '../types';
 
 // --- HÀM TIỆN ÍCH XỬ LÝ CHUỖI TIẾNG VIỆT ---
 export function removeVietnameseTones(str: string): string {
@@ -137,7 +137,72 @@ export const isRecordApproaching = (record: RecordFile): boolean => {
   return diffDays >= 0 && diffDays <= 3;
 };
 
+export const isDangKyRecordOverdue = (record: DangKyRecord): boolean => {
+  const completedStatuses = [
+    'Đã giao 1 cửa',
+    'Đã trả kết quả',
+    'CSD rút HS',
+    'Trả hủy hồ sơ'
+  ];
+  if (record.status && completedStatuses.includes(record.status)) return false;
+  
+  if (record.exportBatch || record.resultReturnedDate || record.completedDate) {
+    return false;
+  }
+  
+  const deadline = parseSafeDate(record.deadline);
+  if (!deadline) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  deadline.setHours(0, 0, 0, 0);
+  return deadline < today;
+};
+
+export const isDangKyRecordApproaching = (record: DangKyRecord): boolean => {
+  const completedStatuses = [
+    'Đã giao 1 cửa',
+    'Đã trả kết quả',
+    'CSD rút HS',
+    'Trả hủy hồ sơ'
+  ];
+  if (record.status && completedStatuses.includes(record.status)) return false;
+  if (record.exportBatch || record.resultReturnedDate || record.completedDate) {
+    return false;
+  }
+  if (isDangKyRecordOverdue(record)) return false;
+  
+  const deadline = parseSafeDate(record.deadline);
+  if (!deadline) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  deadline.setHours(0, 0, 0, 0);
+  const diffTime = deadline.getTime() - today.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  return diffDays >= 0 && diffDays <= 3;
+};
+
+export const getDangKyOverdueDays = (record: DangKyRecord): number => {
+  const deadline = parseSafeDate(record.deadline);
+  if (!deadline) return 0;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  deadline.setHours(0, 0, 0, 0);
+  const diffTime = today.getTime() - deadline.getTime();
+  return Math.max(1, Math.floor(diffTime / (1000 * 60 * 60 * 24)));
+};
+
+export const getDangKyRemainingDays = (record: DangKyRecord): number => {
+  const deadline = parseSafeDate(record.deadline);
+  if (!deadline) return 0;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  deadline.setHours(0, 0, 0, 0);
+  const diffTime = deadline.getTime() - today.getTime();
+  return Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+};
+
 // Chuyển đổi Âm lịch sang Dương lịch (Cố định cho các ngày lễ chính 2024-2026)
+// Chuyển đổi Âm lịch sang Dương lịch (Cố định cho các ngày lễ chính 2024-2030)
 export const getSolarDateFromLunar = (lunarDay: number, lunarMonth: number, year: number): Date | null => {
     const lunarMapping: Record<number, Record<string, string>> = {
         2024: { 
@@ -151,12 +216,29 @@ export const getSolarDateFromLunar = (lunarDay: number, lunarMonth: number, year
         2026: { 
             "1/1": "2026-02-17", "2/1": "2026-02-18", "3/1": "2026-02-19", 
             "10/3": "2026-04-26"
+        },
+        2027: {
+            "1/1": "2027-02-06", "2/1": "2027-02-07", "3/1": "2027-02-08",
+            "10/3": "2027-04-16"
+        },
+        2028: {
+            "1/1": "2028-01-26", "2/1": "2028-01-27", "3/1": "2028-01-28",
+            "10/3": "2028-04-04"
+        },
+        2029: {
+            "1/1": "2029-02-13", "2/1": "2029-02-14", "3/1": "2029-02-15",
+            "10/3": "2029-04-22"
+        },
+        2030: {
+            "1/1": "2030-02-02", "2/1": "2030-02-03", "3/1": "2030-02-04",
+            "10/3": "2030-04-12"
         }
     };
 
     const key = `${lunarDay}/${lunarMonth}`;
     if (lunarMapping[year] && lunarMapping[year][key]) {
-        return new Date(lunarMapping[year][key]);
+        const parts = lunarMapping[year][key].split('-').map(Number);
+        return new Date(parts[0], parts[1] - 1, parts[2]);
     }
     return null;
 };
@@ -173,17 +255,34 @@ export const formatDateKey = (date: Date): string => {
 export const calculateDeadlineHelper = (type: string, receivedDateStr: string, holidays: any[]): string => {
     if (!receivedDateStr) return '';
     let daysToAdd = 30; 
-    const lowerType = (type || '').toLowerCase();
+    const lowerType = (type || '').toLowerCase().trim();
 
-    if (lowerType.includes('2.3') || lowerType.includes('duyệt đơn & cung cấp số thửa') || lowerType.includes('dđ & cc số thửa') || lowerType.includes('dd & cc số thửa') || lowerType.includes('duyệt đơn-số thửa') || lowerType.includes('duyệt đơn') || lowerType.includes('cung cấp số thửa') || lowerType.includes('cập nhật số thửa') || lowerType.includes('cập nhập số thửa') || lowerType.includes('2.6')) {
-        daysToAdd = 12;
-    } else if (lowerType.includes('1.1') || lowerType.includes('sao lục') || lowerType.includes('cung cấp tài liệu đất đai') || lowerType.includes('cung cấp dữ liệu') ||
-        lowerType.includes('2.1') || lowerType.includes('trích lục') || 
-        lowerType.includes('quy hoạch')) {
+    // 1. Nhóm Đăng ký & Cấp giấy & Thế chấp (Đăng ký đất đai)
+    if (lowerType.includes('thế chấp') || lowerType.includes('xóa thế chấp') || lowerType.includes('giao dịch bảo đảm')) {
+        daysToAdd = 3; // Đăng ký biện pháp bảo đảm
+    } else if (lowerType.includes('đính chính') || lowerType.includes('cấp đổi') || lowerType.includes('cấp lại') || lowerType.includes('trích lục')) {
         daysToAdd = 10;
-    } else if (lowerType.includes('trích đo chỉnh lý') || lowerType.includes('chỉnh lý bản đồ')) {
+    } else if (lowerType.includes('chuyển nhượng') || lowerType.includes('tặng cho') || lowerType.includes('thừa kế') || lowerType.includes('chuyển quyền') || lowerType.includes('biến động') || lowerType.includes('gia hạn')) {
+        daysToAdd = 10; // Đăng ký biến động, chuyển quyền
+    } else if (lowerType.includes('cấp mới') || lowerType.includes('cấp lần đầu') || lowerType.includes('cấp gcn lần đầu') || lowerType.includes('công nhận')) {
+        daysToAdd = 30; // Cấp GCN lần đầu
+    }
+    // 2. Nhóm Đo đạc & Cung cấp số thửa
+    else if (lowerType.includes('2.3') || lowerType.includes('duyệt đơn & cung cấp số thửa') || lowerType.includes('dđ & cc số thửa') || lowerType.includes('dd & cc số thửa') || lowerType.includes('duyệt đơn-số thửa') || lowerType.includes('duyệt đơn') || lowerType.includes('cung cấp số thửa') || lowerType.includes('cập nhật số thửa') || lowerType.includes('cập nhập số thửa') || lowerType.includes('2.6')) {
+        daysToAdd = 12;
+    }
+    // 3. Nhóm Sao lục / Cung cấp thông tin / Lưu trữ / Quy hoạch
+    else if (lowerType.includes('1.1') || lowerType.includes('sao lục') || lowerType.includes('cung cấp tài liệu đất đai') || lowerType.includes('cung cấp dữ liệu') ||
+        lowerType.includes('2.1') || lowerType.includes('trích lục') || 
+        lowerType.includes('quy hoạch') || lowerType.includes('lưu trữ') || lowerType.includes('cung cấp thông tin')) {
+        daysToAdd = 10;
+    } 
+    // 4. Nhóm Trích đo chỉnh lý / Chỉnh lý bản đồ
+    else if (lowerType.includes('trích đo chỉnh lý') || lowerType.includes('chỉnh lý bản đồ')) {
         daysToAdd = 15;
-    } else if (lowerType.includes('2.2') || lowerType.includes('trích đo') || 
+    } 
+    // 5. Nhóm Trích đo / Đo đạc địa chính / Tách thửa / Hợp thửa / Cắm mốc
+    else if (lowerType.includes('2.2') || lowerType.includes('trích đo') || 
                lowerType.includes('2.4') || lowerType.includes('cắm mốc') || 
                lowerType.includes('2.5') || lowerType.includes('tách') || lowerType.includes('hợp') ||
                lowerType.includes('đo đạc') || lowerType.includes('tách thửa')) {
@@ -208,26 +307,44 @@ export const calculateDeadlineHelper = (type: string, receivedDateStr: string, h
         daysToAdd += 1;
     }
 
-    const startDate = new Date(receivedDateStr);
+    // Phân tích ngày bắt đầu chuẩn theo local time tránh lệch timezone
+    const cleanDateStr = receivedDateStr.includes('T') ? receivedDateStr.split('T')[0] : receivedDateStr;
+    const dateParts = cleanDateStr.split('-');
+    let startDate: Date;
+    if (dateParts.length === 3) {
+        startDate = new Date(parseInt(dateParts[0], 10), parseInt(dateParts[1], 10) - 1, parseInt(dateParts[2], 10));
+    } else {
+        startDate = parseSafeDate(receivedDateStr) || new Date();
+    }
+
     let count = 0;
-    let currentDate = new Date(startDate);
+    let currentDate = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
     
     // Tạo Set chứa chuỗi ngày nghỉ (YYYY-MM-DD) để tra cứu nhanh và chính xác
     const holidaySet = new Set<string>();
     const currentYear = startDate.getFullYear();
-    const yearsToCheck = [currentYear, currentYear + 1];
+    const yearsToCheck = [currentYear - 1, currentYear, currentYear + 1, currentYear + 2];
 
     if (holidays && holidays.length > 0) {
         holidays.forEach(h => {
-            yearsToCheck.forEach(year => {
-                if (h.isLunar) {
-                    const solarDate = getSolarDateFromLunar(h.day, h.month, year);
-                    if (solarDate) holidaySet.add(formatDateKey(solarDate));
-                } else {
-                    const solarDate = new Date(year, h.month - 1, h.day);
+            if (h.date) {
+                holidaySet.add(h.date);
+            } else if (h.day !== undefined && h.month !== undefined) {
+                if (h.year) {
+                    const solarDate = new Date(h.year, h.month - 1, h.day);
                     holidaySet.add(formatDateKey(solarDate));
+                } else {
+                    yearsToCheck.forEach(year => {
+                        if (h.isLunar) {
+                            const solarDate = getSolarDateFromLunar(h.day, h.month, year);
+                            if (solarDate) holidaySet.add(formatDateKey(solarDate));
+                        } else {
+                            const solarDate = new Date(year, h.month - 1, h.day);
+                            holidaySet.add(formatDateKey(solarDate));
+                        }
+                    });
                 }
-            });
+            }
         });
     }
 

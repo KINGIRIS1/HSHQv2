@@ -5,7 +5,7 @@ import { ArchiveRecord, fetchArchiveRecords, saveArchiveRecord, deleteArchiveRec
 import { useArchiveRealtime } from '../../hooks/useArchiveRealtime';
 import { fetchEmployees, saveEmployeeApi, fetchUsers, saveUserApi } from '../../services/apiPeople';
 import { Search, Plus, ListChecks, FileCheck, Send, Trash2, Edit, Save, X, RotateCcw, MapPin, Calendar, User as UserIcon, Users, CheckCircle2, LayoutGrid, PenTool, CheckCircle, Eye, FileSpreadsheet, FileDown } from 'lucide-react';
-import { confirmAction, toTitleCase } from '../../utils/appHelpers';
+import { confirmAction, toTitleCase, calculateDeadlineHelper } from '../../utils/appHelpers';
 import AssignModal from '../AssignModal';
 import ArchiveDetailModal from './ArchiveDetailModal';
 import HandoverListModal from './HandoverListModal';
@@ -16,6 +16,7 @@ import * as XLSX from 'xlsx-js-style';
 interface SaoLucViewProps {
     currentUser: User;
     wards?: string[];
+    holidays?: any[];
 }
 
 // Định nghĩa form state riêng để dễ quản lý các trường trong JSON data
@@ -34,7 +35,7 @@ interface SaoLucFormData {
     danh_sach?: string;
 }
 
-const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Tân Quan', 'Tân Khai', 'Minh Đức', 'Tân Hưng'] }) => {
+const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Tân Quan', 'Tân Khai', 'Minh Đức', 'Tân Hưng'], holidays = [] }) => {
     const [subTab, setSubTab] = useState<'all' | 'draft' | 'assigned' | 'executed' | 'sign' | 'signed' | 'result'>('all');
     const [records, setRecords] = useState<ArchiveRecord[]>([]);
     const [employees, setEmployees] = useState<Employee[]>([]);
@@ -837,10 +838,36 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Tân Qua
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
                                     <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Ngày nhận</label>
-                                    <input type="date" className="w-full border border-gray-300 rounded-lg px-2 py-2 text-sm outline-none" value={formData.ngay_nhan} onChange={e => setFormData({...formData, ngay_nhan: e.target.value})} />
+                                    <input 
+                                        type="date" 
+                                        className="w-full border border-gray-300 rounded-lg px-2 py-2 text-sm outline-none" 
+                                        value={formData.ngay_nhan} 
+                                        onChange={e => {
+                                            const newRecDate = e.target.value;
+                                            const newDeadline = calculateDeadlineHelper('Sao lục', newRecDate, holidays || []);
+                                            setFormData(prev => ({
+                                                ...prev, 
+                                                ngay_nhan: newRecDate,
+                                                hen_tra: newDeadline || prev.hen_tra
+                                            }));
+                                        }} 
+                                    />
                                 </div>
                                 <div>
-                                    <label className="text-xs font-bold text-purple-600 uppercase mb-1 block">Hẹn trả</label>
+                                    <div className="flex justify-between items-center mb-1">
+                                        <label className="text-xs font-bold text-purple-600 uppercase block">Hẹn trả</label>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const d = calculateDeadlineHelper('Sao lục', formData.ngay_nhan, holidays || []);
+                                                if (d) setFormData(prev => ({ ...prev, hen_tra: d }));
+                                            }}
+                                            className="text-[10px] text-purple-700 hover:text-purple-900 bg-purple-100 hover:bg-purple-200 px-1.5 py-0.5 rounded cursor-pointer transition-colors"
+                                            title="Tự động tính lại hạn trả dựa trên ngày nghỉ lễ"
+                                        >
+                                            Tính lại
+                                        </button>
+                                    </div>
                                     <input type="date" className="w-full border border-purple-200 bg-purple-50 rounded-lg px-2 py-2 text-sm outline-none text-purple-700 font-medium" value={formData.hen_tra} onChange={e => setFormData({...formData, hen_tra: e.target.value})} />
                                 </div>
                             </div>
