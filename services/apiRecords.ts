@@ -9,7 +9,7 @@ const RECORD_DB_COLUMNS = [
     'assignedDate', 'submissionDate', 'approvalDate', 'completedDate', 'status', 'assignedTo', 'submittedTo', 'checkedBy',
     'pendingCheckDate', 'checkedDate', 'completedWorkDate',
     'notes', 'privateNotes', 'personalNotes', 
-    'authorizedBy', 'authDocType', 'otherDocs', 'exportBatch', 'exportDate', 'handoverWard',
+    'authorizedBy', 'authorizedPersonName', 'authorizedPersonId', 'authorizedPersonPhone', 'authorizedPersonAddress', 'authDocType', 'otherDocs', 'exportBatch', 'exportDate', 'handoverWard',
     'measurementNumber', 'excerptNumber',
     'reminderDate', 'lastRemindedAt', 'deadlineReminded',
     'receiptNumber', 'resultReturnedDate', 'receiverName',
@@ -47,7 +47,7 @@ const OPTIONAL_NEW_COLUMNS = [
     'customerAddress', 'issueNumber', 'entryNumber', 'issueDate', 'residentialArea',
     'needsMapCorrection', 'explanationPlan', 'receiptNumber', 'resultReturnedDate', 'receiverName',
     'reminderDate', 'lastRemindedAt', 'deadlineReminded', 'measurementNumber', 'excerptNumber',
-    'authorizedBy', 'authDocType', 'otherDocs',
+    'authorizedBy', 'authorizedPersonName', 'authorizedPersonId', 'authorizedPersonPhone', 'authorizedPersonAddress', 'authDocType', 'otherDocs',
     'privateNotes', 'personalNotes', 'checkedBy', 'pendingCheckDate', 'checkedDate', 'completedWorkDate',
     'price', 'advancePayment', 'isHandedOver',
     'statusLogs', 'archiveHandoverDate', 'archiveHandoverBatch'
@@ -465,18 +465,17 @@ export const updateRecordFieldsApi = async (id: string, fields: Partial<RecordFi
 };
 
 export const deleteRecordApi = async (id: string): Promise<boolean> => {
+    syncCacheOnDelete(id);
     if (!isConfigured) return true;
     try {
-        const { error: landErr } = await supabase.from('land_records').delete().eq('id', id);
-        if (landErr) {
-            await supabase.from('dangky_records').delete().eq('id', id);
-        }
-        await supabase.from('luutru_records').delete().eq('id', id);
-        syncCacheOnDelete(id);
+        await Promise.allSettled([
+            supabase.from('land_records').delete().eq('id', id),
+            supabase.from('dangky_records').delete().eq('id', id),
+            supabase.from('luutru_records').delete().eq('id', id)
+        ]);
         return true;
     } catch (error) {
         logError("deleteRecordApi", error, true);
-        syncCacheOnDelete(id);
         return true;
     }
 };

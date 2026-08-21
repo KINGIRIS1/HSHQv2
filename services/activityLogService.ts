@@ -8,7 +8,11 @@ export const getStoredActivityLogs = (): SystemActivityLog[] => {
         const raw = localStorage.getItem(LOGS_STORAGE_KEY);
         if (raw) {
             const parsed = JSON.parse(raw);
-            if (Array.isArray(parsed)) return parsed;
+            if (Array.isArray(parsed)) {
+                // Filter out any legacy synthetic fake logs (starting with SYN_)
+                const cleanLogs = parsed.filter(item => item && !String(item.id || '').startsWith('SYN_'));
+                return cleanLogs;
+            }
         }
     } catch (e) {
         console.error('Error reading system activity logs from localStorage:', e);
@@ -31,7 +35,7 @@ export const addActivityLog = (logData: Omit<SystemActivityLog, 'id' | 'timestam
         recordId: logData.recordId
     };
 
-    const updatedLogs = [newLog, ...logs].slice(0, 2000); // Max 2000 logs
+    const updatedLogs = [newLog, ...logs].slice(0, 3000); // Max 3000 logs
     try {
         localStorage.setItem(LOGS_STORAGE_KEY, JSON.stringify(updatedLogs));
     } catch (e) {
@@ -49,277 +53,16 @@ export const clearStoredActivityLogs = (): void => {
 };
 
 /**
- * Synthesizes all system activity logs by merging stored logs + statusLogs from records.
+ * Returns all real system activity logs recorded when users interact with the application.
  */
 export const getAllSystemActivityLogs = (
-    records: RecordFile[] = [],
-    users: User[] = [],
-    employees: Employee[] = [],
-    dangKyRecords: DangKyRecord[] = []
+    _records: RecordFile[] = [],
+    _users: User[] = [],
+    _employees: Employee[] = [],
+    _dangKyRecords: DangKyRecord[] = []
 ): SystemActivityLog[] => {
     const stored = getStoredActivityLogs();
-    const recordSynthesizedLogs: SystemActivityLog[] = [];
-
-    records.forEach(r => {
-        // Log tạo mới
-        if (r.receivedDate) {
-            recordSynthesizedLogs.push({
-                id: `SYN_REC_${r.id}`,
-                timestamp: r.receivedDate,
-                performerName: r.receivedBy ? (users.find(u => u.employeeId === r.receivedBy)?.name || r.receivedBy) : 'Cán bộ 1 cửa',
-                performerRole: 'ONEDOOR',
-                actionType: 'CREATE',
-                actionLabel: 'Thêm mới',
-                targetType: 'Hồ sơ',
-                referenceCode: r.code || r.id,
-                details: `Tạo mới hồ sơ ${r.code} - ${r.customerName} (Loại: ${r.recordType || 'Chưa phân loại'})`,
-                recordId: r.id
-            });
-        }
-
-        // Log trả kết quả
-        if (r.resultReturnedDate) {
-            recordSynthesizedLogs.push({
-                id: `SYN_RET_${r.id}`,
-                timestamp: r.resultReturnedDate,
-                performerName: r.receiverName || 'Cán bộ 1 cửa',
-                performerRole: 'ONEDOOR',
-                actionType: 'RETURN_RESULT',
-                actionLabel: 'Trả kết quả',
-                targetType: 'Hồ sơ',
-                referenceCode: r.code || r.id,
-                details: `Xác nhận trả kết quả hồ sơ ${r.code} cho ${r.customerName} ${r.receiptNumber ? `(Số biên lai: ${r.receiptNumber})` : ''}`,
-                recordId: r.id
-            });
-        }
-
-        // Log Trình kiểm tra
-        if (r.pendingCheckDate) {
-            const checker = r.checkedBy ? (users.find(u => u.employeeId === r.checkedBy)?.name || employees.find(e => e.id === r.checkedBy)?.name || r.checkedBy) : '';
-            recordSynthesizedLogs.push({
-                id: `SYN_CHK_${r.id}`,
-                timestamp: r.pendingCheckDate,
-                performerName: r.assignedTo ? (users.find(u => u.employeeId === r.assignedTo)?.name || employees.find(e => e.id === r.assignedTo)?.name || r.assignedTo) : 'Cán bộ thụ lý',
-                performerRole: 'EMPLOYEE',
-                actionType: 'SUBMIT_CHECK',
-                actionLabel: 'Trình kiểm tra',
-                targetType: 'Hồ sơ',
-                referenceCode: r.code || r.id,
-                details: `Trình kiểm tra hồ sơ ${r.code} - ${r.customerName} ${checker ? `(Trình cho ${checker})` : ''}`,
-                recordId: r.id
-            });
-        }
-
-        // Log Trình ký
-        if (r.submissionDate) {
-            const submitter = r.submittedTo ? (users.find(u => u.employeeId === r.submittedTo)?.name || employees.find(e => e.id === r.submittedTo)?.name || r.submittedTo) : '';
-            recordSynthesizedLogs.push({
-                id: `SYN_SUB_${r.id}`,
-                timestamp: r.submissionDate,
-                performerName: r.checkedBy ? (users.find(u => u.employeeId === r.checkedBy)?.name || employees.find(e => e.id === r.checkedBy)?.name || r.checkedBy) : 'Cán bộ thụ lý',
-                performerRole: 'TEAM_LEADER',
-                actionType: 'SUBMIT_SIGN',
-                actionLabel: 'Trình ký',
-                targetType: 'Hồ sơ',
-                referenceCode: r.code || r.id,
-                details: `Trình ký duyệt hồ sơ ${r.code} - ${r.customerName} ${submitter ? `(Trình cho ${submitter})` : ''}`,
-                recordId: r.id
-            });
-        }
-
-        // Log Ký duyệt
-        if (r.approvalDate) {
-            recordSynthesizedLogs.push({
-                id: `SYN_APP_${r.id}`,
-                timestamp: r.approvalDate,
-                performerName: r.submittedTo ? (users.find(u => u.employeeId === r.submittedTo)?.name || employees.find(e => e.id === r.submittedTo)?.name || r.submittedTo) : 'Lãnh đạo ký duyệt',
-                performerRole: 'ADMIN',
-                actionType: 'APPROVE',
-                actionLabel: 'Ký duyệt',
-                targetType: 'Hồ sơ',
-                referenceCode: r.code || r.id,
-                details: `Đã ký duyệt hồ sơ ${r.code} - ${r.customerName}`,
-                recordId: r.id
-            });
-        }
-
-        // Status Logs
-        if (Array.isArray(r.statusLogs)) {
-            r.statusLogs.forEach((slog, idx) => {
-                let actionLabel = 'Cập nhật';
-                let actionType = 'UPDATE';
-                if (slog.newStatus === 'RETURNED') {
-                    actionLabel = 'Trả kết quả';
-                    actionType = 'RETURN_RESULT';
-                } else if (slog.newStatus === 'PENDING_CHECK') {
-                    actionLabel = 'Trình kiểm tra';
-                    actionType = 'SUBMIT_CHECK';
-                } else if (slog.newStatus === 'PENDING_SIGN') {
-                    actionLabel = 'Trình ký';
-                    actionType = 'SUBMIT_SIGN';
-                } else if (slog.newStatus === 'SIGNED' || slog.newStatus === 'CHECKED') {
-                    actionLabel = 'Ký duyệt';
-                    actionType = 'APPROVE';
-                } else if (slog.newStatus === 'ASSIGNED') {
-                    actionLabel = 'Giao việc';
-                    actionType = 'ASSIGN';
-                } else if (slog.newStatus === 'REJECTED' || slog.newStatus === 'WITHDRAWN') {
-                    actionLabel = 'Trả hồ sơ';
-                    actionType = 'DELETE';
-                }
-
-                recordSynthesizedLogs.push({
-                    id: slog.id || `SYN_LOG_${r.id}_${idx}`,
-                    timestamp: slog.changedAt || r.updatedAt || new Date().toISOString(),
-                    performerName: slog.changedBy || 'Hệ thống',
-                    performerRole: 'ONEDOOR',
-                    actionType: actionType,
-                    actionLabel: actionLabel,
-                    targetType: 'Hồ sơ',
-                    referenceCode: r.code || r.id,
-                    details: slog.note ? slog.note : `Chuyển trạng thái hồ sơ ${r.code} từ ${slog.previousStatus || 'Mới'} sang ${slog.newStatus}`,
-                    recordId: r.id
-                });
-            });
-        }
-    });
-
-    // Synthesize DangKyRecords logs
-    dangKyRecords.forEach(r => {
-        const ownerNames = r.owners?.map(o => o.name).filter(Boolean).join(', ') || r.owners?.[0]?.name || 'Chủ sử dụng';
-
-        if (r.receivedDate) {
-            recordSynthesizedLogs.push({
-                id: `SYN_DK_REC_${r.id}`,
-                timestamp: r.receivedDate,
-                performerName: r.receivedBy ? (users.find(u => u.employeeId === r.receivedBy)?.name || r.receivedBy) : 'Cán bộ Đăng ký',
-                performerRole: 'DANGKY',
-                actionType: 'CREATE',
-                actionLabel: 'Thêm mới',
-                targetType: 'Đăng ký',
-                referenceCode: r.code || r.id,
-                details: `Tạo mới hồ sơ Đăng ký ${r.code} - ${ownerNames} (Loại: ${r.recordType || 'Đăng ký đất đai'})`,
-                recordId: r.id
-            });
-        }
-
-        if (r.taxFormDate) {
-            recordSynthesizedLogs.push({
-                id: `SYN_DK_TAXF_${r.id}`,
-                timestamp: r.taxFormDate,
-                performerName: r.taxFormStaff ? (users.find(u => u.employeeId === r.taxFormStaff)?.name || employees.find(e => e.id === r.taxFormStaff)?.name || r.taxFormStaff) : 'Cán bộ thuế',
-                performerRole: 'DANGKY',
-                actionType: 'UPDATE',
-                actionLabel: 'Phiếu chuyển thuế',
-                targetType: 'Đăng ký',
-                referenceCode: r.code || r.id,
-                details: `Phiếu chuyển thuế hồ sơ Đăng ký ${r.code} - ${ownerNames}${r.taxFormNumber ? ` (Số phiếu: ${r.taxFormNumber})` : ''}`,
-                recordId: r.id
-            });
-        }
-
-        if (r.taxKV7TransferDate) {
-            recordSynthesizedLogs.push({
-                id: `SYN_DK_KV7_${r.id}`,
-                timestamp: r.taxKV7TransferDate,
-                performerName: r.taxKV7Staff ? (users.find(u => u.employeeId === r.taxKV7Staff)?.name || employees.find(e => e.id === r.taxKV7Staff)?.name || r.taxKV7Staff) : 'Cán bộ KV7',
-                performerRole: 'DANGKY',
-                actionType: 'UPDATE',
-                actionLabel: 'Chuyển Thuế KV7',
-                targetType: 'Đăng ký',
-                referenceCode: r.code || r.id,
-                details: `Chuyển Thuế KV7 hồ sơ Đăng ký ${r.code} - ${ownerNames}`,
-                recordId: r.id
-            });
-        }
-
-        if (r.taxNoticeDate) {
-            recordSynthesizedLogs.push({
-                id: `SYN_DK_TBT_${r.id}`,
-                timestamp: r.taxNoticeDate,
-                performerName: r.taxNoticeStaff ? (users.find(u => u.employeeId === r.taxNoticeStaff)?.name || employees.find(e => e.id === r.taxNoticeStaff)?.name || r.taxNoticeStaff) : 'Cán bộ thuế',
-                performerRole: 'DANGKY',
-                actionType: 'UPDATE',
-                actionLabel: 'Thông báo thuế',
-                targetType: 'Đăng ký',
-                referenceCode: r.code || r.id,
-                details: `Đã có Thông báo thuế hồ sơ Đăng ký ${r.code} - ${ownerNames}`,
-                recordId: r.id
-            });
-        }
-
-        if (r.printDate) {
-            recordSynthesizedLogs.push({
-                id: `SYN_DK_PRT_${r.id}`,
-                timestamp: r.printDate,
-                performerName: r.printStaff ? (users.find(u => u.employeeId === r.printStaff)?.name || employees.find(e => e.id === r.printStaff)?.name || r.printStaff) : 'Cán bộ in GCN',
-                performerRole: 'DANGKY',
-                actionType: 'UPDATE',
-                actionLabel: 'In GCN',
-                targetType: 'Đăng ký',
-                referenceCode: r.code || r.id,
-                details: `In Giấy chứng nhận hồ sơ Đăng ký ${r.code} - ${ownerNames}`,
-                recordId: r.id
-            });
-        }
-
-        if (r.pendingCheckDate) {
-            recordSynthesizedLogs.push({
-                id: `SYN_DK_CHK_${r.id}`,
-                timestamp: r.pendingCheckDate,
-                performerName: r.checkedBy ? (users.find(u => u.employeeId === r.checkedBy)?.name || employees.find(e => e.id === r.checkedBy)?.name || r.checkedBy) : 'Cán bộ kiểm tra',
-                performerRole: 'DANGKY',
-                actionType: 'SUBMIT_CHECK',
-                actionLabel: 'Trình kiểm tra',
-                targetType: 'Đăng ký',
-                referenceCode: r.code || r.id,
-                details: `Trình kiểm tra hồ sơ Đăng ký ${r.code} - ${ownerNames}`,
-                recordId: r.id
-            });
-        }
-
-        if (r.submissionDate) {
-            recordSynthesizedLogs.push({
-                id: `SYN_DK_SUB_${r.id}`,
-                timestamp: r.submissionDate,
-                performerName: r.submittedTo ? (users.find(u => u.employeeId === r.submittedTo)?.name || employees.find(e => e.id === r.submittedTo)?.name || r.submittedTo) : 'Lãnh đạo ký duyệt',
-                performerRole: 'DANGKY',
-                actionType: 'SUBMIT_SIGN',
-                actionLabel: 'Trình ký',
-                targetType: 'Đăng ký',
-                referenceCode: r.code || r.id,
-                details: `Trình ký duyệt hồ sơ Đăng ký ${r.code} - ${ownerNames}`,
-                recordId: r.id
-            });
-        }
-
-        if (r.resultReturnedDate) {
-            recordSynthesizedLogs.push({
-                id: `SYN_DK_RET_${r.id}`,
-                timestamp: r.resultReturnedDate,
-                performerName: r.receiverName || 'Cán bộ trả KQ',
-                performerRole: 'DANGKY',
-                actionType: 'RETURN_RESULT',
-                actionLabel: 'Trả kết quả',
-                targetType: 'Đăng ký',
-                referenceCode: r.code || r.id,
-                details: `Trả kết quả hồ sơ Đăng ký ${r.code} - ${ownerNames}${r.receiptNumber ? ` (Số BL: ${r.receiptNumber})` : ''}`,
-                recordId: r.id
-            });
-        }
-    });
-
-    // Merge and deduplicate by id/timestamp+refCode+details
-    const combinedMap = new Map<string, SystemActivityLog>();
-    
-    [...stored, ...recordSynthesizedLogs].forEach(item => {
-        const key = item.id || `${item.timestamp}_${item.referenceCode}_${item.actionLabel}`;
-        if (!combinedMap.has(key)) {
-            combinedMap.set(key, item);
-        }
-    });
-
-    return Array.from(combinedMap.values()).sort((a, b) => {
+    return stored.sort((a, b) => {
         return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
     });
 };

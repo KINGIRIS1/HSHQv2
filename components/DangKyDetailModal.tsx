@@ -7,6 +7,10 @@ import {
   Receipt, Bell, StickyNote, Save, Loader2, CheckSquare, Send, Info
 } from 'lucide-react';
 import { saveDangKyRecordApi } from '../services/apiDangKy';
+import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../services/docxService';
+import DocxPreviewModal from './DocxPreviewModal';
+import SystemReceiptTemplate from './receive-record/SystemReceiptTemplate';
+import { getNormalizedWard } from '../constants';
 
 const NEXT_STATUS_MAP: Record<string, string> = {
   'Tiếp nhận mới': 'Thẩm định',
@@ -52,6 +56,13 @@ export const DangKyDetailModal: React.FC<DangKyDetailModalProps> = ({
   const [isSavingNote, setIsSavingNote] = useState<boolean>(false);
   const [reminderDate, setReminderDate] = useState<string>('');
   const [isSavingReminder, setIsSavingReminder] = useState<boolean>(false);
+
+  // States cho In biên nhận & DOCX Preview
+  const [isPreviewOpen, setIsPreviewOpen] = useState<boolean>(false);
+  const [previewBlob, setPreviewBlob] = useState<Blob | null>(null);
+  const [previewFileName, setPreviewFileName] = useState<string>('');
+  const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [systemReceiptData, setSystemReceiptData] = useState<any | null>(null);
 
   useEffect(() => {
     if (record) {
@@ -121,8 +132,135 @@ export const DangKyDetailModal: React.FC<DangKyDetailModalProps> = ({
     }
   };
 
-  const handlePrintReceipt = () => {
-    window.print();
+  const handlePrintReceipt = async () => {
+    if (!record) return;
+
+    // Chuẩn hóa thông tin người đại diện nộp / chủ sử dụng
+    const transferees = record.transferees || [];
+    const hasTransferees = transferees.length > 0 && transferees.some(t => t.name && t.name.trim() !== '');
+    const primaryPerson = hasTransferees ? transferees[0] : (record.owners && record.owners.length > 0 ? record.owners[0] : null);
+
+    const customerName = primaryPerson?.name || (record as any).customerName || '---';
+    const phoneNumber = primaryPerson?.phone || (record as any).phoneNumber || '';
+    const cccd = primaryPerson?.cccd || (record as any).cccd || '';
+    const customerAddress = primaryPerson?.address || (record as any).address || '';
+
+    const normalizedRecord = {
+      ...record,
+      customerName,
+      phoneNumber,
+      cccd,
+      customerAddress,
+      address: customerAddress || (record as any).address || record.ward,
+      area: (record as any).area || record.totalArea || '',
+      content: record.notes || record.recordType || 'Đăng ký đất đai',
+    };
+
+    if (!hasTemplate(STORAGE_KEYS.RECEIPT_TEMPLATE)) {
+      setSystemReceiptData(normalizedRecord);
+      return;
+    }
+
+    setIsProcessing(true);
+    try {
+      const rDate = record.receivedDate ? new Date(record.receivedDate) : new Date();
+      const dDate = record.deadline ? new Date(record.deadline) : new Date();
+
+      const day = rDate.getDate().toString().padStart(2, '0');
+      const month = (rDate.getMonth() + 1).toString().padStart(2, '0');
+      const year = rDate.getFullYear();
+      const dateFullString = `ngày ${day} tháng ${month} năm ${year}`;
+      const dateShortString = `${day}/${month}/${year}`;
+
+      const dayDead = dDate.getDate().toString().padStart(2, '0');
+      const monthDead = (dDate.getMonth() + 1).toString().padStart(2, '0');
+      const yearDead = dDate.getFullYear();
+      const deadlineFullString = `ngày ${dayDead} tháng ${monthDead} năm ${yearDead}`;
+      const deadlineShortString = `${dayDead}/${monthDead}/${yearDead}`;
+
+      const val = (v: any) => (v === undefined || v === null) ? '' : String(v);
+
+      const printData = {
+        code: val(record.code),
+        customerName: val(customerName),
+        landPlot: val(record.landPlot),
+        mapSheet: val(record.mapSheet),
+        XAPHUONG: val(getNormalizedWard(record.ward)),
+        NGAYNHAN: dateFullString,
+        NGAY_NHAN: dateShortString,
+        LOAI_GIAY_TO_UY_QUYEN: '',
+        DIA_CHI_CHI_TIET: val(customerAddress),
+        MA: val(record.code),
+        SO_HS: val(record.code),
+        MA_HO_SO: val(record.code),
+        CODE: val(record.code),
+        TEN: val(customerName).toUpperCase(),
+        HO_TEN: val(customerName).toUpperCase(),
+        CHU_SU_DUNG: val(customerName).toUpperCase(),
+        KHACH_HANG: val(customerName).toUpperCase(),
+        ONG_BA: val(customerName).toUpperCase(),
+        SDT: val(phoneNumber),
+        DIEN_THOAI: val(phoneNumber),
+        PHONE: val(phoneNumber),
+        CCCD: val(cccd),
+        CMND: val(cccd),
+        DIA_CHI_CHU_SU_DUNG: val(customerAddress),
+        DIA_CHI: val(customerAddress || record.ward),
+        DC: val(customerAddress || record.ward),
+        ADDRESS: val(customerAddress || record.ward),
+        XA: val(getNormalizedWard(record.ward)),
+        PHUONG: val(getNormalizedWard(record.ward)),
+        WARD: val(getNormalizedWard(record.ward)),
+        TO: val(record.mapSheet),
+        SO_TO: val(record.mapSheet),
+        THUA: val(record.landPlot),
+        SO_THUA: val(record.landPlot),
+        DT: val(record.totalArea || (record as any).area),
+        DIEN_TICH: val(record.totalArea || (record as any).area),
+        NGAY_NHAN_FULL: dateFullString,
+        NGAY: day,
+        THANG: month,
+        NAM: year,
+        RECEIVED_DATE: dateShortString,
+        HEN_TRA: deadlineShortString,
+        NGAY_HEN: deadlineShortString,
+        DEADLINE: deadlineShortString,
+        HEN_TRA_FULL: deadlineFullString,
+        NGAY_HEN_FULL: deadlineFullString,
+        NGUOI_NHAN: val(currentUser?.name),
+        CAN_BO: val(currentUser?.name),
+        USER: val(currentUser?.name),
+        NOI_DUNG: val(record.notes || record.recordType),
+        CONTENT: val(record.notes || record.recordType),
+        LOAI_HS: val(record.recordType),
+        RECORD_TYPE: val(record.recordType),
+        GIAY_TO_KHAC: '',
+        NGUOI_UY_QUYEN: '',
+        UY_QUYEN: '',
+        LOAI_UY_QUYEN: '',
+        TGTRA: '13',
+        SO_NGAY: '13',
+        TP1: `Phiếu tiếp nhận Đăng ký đất đai tại ${getNormalizedWard(record.ward)}`,
+        TIEU_DE: `Phiếu tiếp nhận Đăng ký đất đai tại ${getNormalizedWard(record.ward)}`,
+        SDTLH: '',
+        TINH: 'Bình Phước',
+        HUYEN: 'huyện Hớn Quản'
+      };
+
+      const blob = await generateDocxBlobAsync(STORAGE_KEYS.RECEIPT_TEMPLATE, printData);
+      if (blob) {
+        setPreviewBlob(blob);
+        setPreviewFileName(`BienNhan_${record.code}`);
+        setIsPreviewOpen(true);
+      } else {
+        setSystemReceiptData(normalizedRecord);
+      }
+    } catch (e) {
+      console.error('Error printing receipt:', e);
+      setSystemReceiptData(normalizedRecord);
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const formatStaffInfo = (staffNameOrId?: string | null) => {
@@ -179,7 +317,14 @@ export const DangKyDetailModal: React.FC<DangKyDetailModalProps> = ({
   const owners = record.owners || [];
   const transferees = record.transferees || [];
   const hasTransferees = transferees.length > 0 && transferees.some(t => t.name && t.name.trim() !== '');
-  const primaryPeople = hasTransferees ? transferees : owners;
+  const primaryPerson = record.applicantName 
+    ? {
+        name: record.applicantName,
+        phone: record.applicantPhone || '',
+        cccd: record.applicantCccd || '',
+        address: record.applicantAddress || ''
+      }
+    : (hasTransferees ? transferees[0] : (owners.length > 0 ? owners[0] : null));
   const nextStatus = NEXT_STATUS_MAP[record.status] || null;
 
   return (
@@ -246,72 +391,49 @@ export const DangKyDetailModal: React.FC<DangKyDetailModalProps> = ({
             {/* COLUMN 1: THÔNG TIN CHỦ HỒ SƠ & ĐỊA CHÍNH */}
             <div className="space-y-6">
               
-              {/* CHỦ SỬ DỤNG / BÊN NHẬN CHUYỂN NHƯỢNG (ƯU TIÊN BÊN NHẬN CHUYỂN NHƯỢNG CỘT 1) */}
+              {/* THÔNG TIN NGƯỜI NỘP HỒ SƠ */}
               <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
                 <h3 className="text-xs font-bold text-blue-600 uppercase mb-4 flex items-center gap-2 border-l-4 border-blue-600 pl-2">
-                  <UserIcon size={16}/> Thông tin chủ hồ sơ {hasTransferees ? '(Bên nhận chuyển nhượng)' : ''}
+                  <UserIcon size={16}/> Người nộp hồ sơ
                 </h3>
                 
-                {primaryPeople.length === 0 ? (
-                  <p className="text-xs text-gray-400 italic">Chưa có thông tin chủ hồ sơ</p>
+                {!primaryPerson || !primaryPerson.name ? (
+                  <p className="text-xs text-gray-400 italic">Chưa có thông tin người nộp hồ sơ</p>
                 ) : (
-                  <div className="space-y-4 divide-y divide-gray-100">
-                    {primaryPeople.map((person, idx) => (
-                      <div key={idx} className={idx > 0 ? 'pt-3' : ''}>
-                        <label className="text-[10px] text-gray-400 uppercase font-bold block mb-1">
-                          {hasTransferees 
-                            ? (idx === 0 ? 'Bên nhận chuyển nhượng chính' : `Bên nhận chuyển nhượng ${idx + 1}`)
-                            : (idx === 0 ? 'Chủ sử dụng chính' : `Đồng sử dụng ${idx + 1}`)
-                          }
-                        </label>
-                        <p className="text-base font-bold text-gray-800 uppercase">{person.name}</p>
-                        
-                        {person.phone && (
-                          <div className="mt-1.5">
-                            <label className="text-[10px] text-gray-400 uppercase font-bold block mb-0.5">Số điện thoại</label>
-                            <p className="text-xs font-bold text-gray-800 font-mono">{person.phone}</p>
-                          </div>
-                        )}
-
-                        {person.cccd && (
-                          <div className="mt-1.5">
-                            <label className="text-[10px] text-gray-400 uppercase font-bold block mb-0.5">Số CCCD / CMND</label>
-                            <p className="text-xs font-bold text-gray-800 font-mono">{person.cccd}</p>
-                          </div>
-                        )}
-
-                        {person.address && (
-                          <div className="mt-1.5">
-                            <label className="text-[10px] text-gray-400 uppercase font-bold block mb-0.5">Địa chỉ thường trú</label>
-                            <p className="text-xs font-semibold text-gray-700">{person.address}</p>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* NẾU ĐÃ HIỂN THỊ BÊN NHẬN CHUYỂN NHƯỢNG LÀM CHỦ HỒ SƠ CHÍNH, HIỂN THỊ CHỦ SỬ DỤNG ĐẤT BAN ĐẦU NẾU CÓ */}
-                {hasTransferees && owners.length > 0 && (
-                  <div className="border-t border-gray-100 pt-3 mt-3">
-                    <label className="text-[10px] text-gray-500 uppercase font-bold block mb-2 flex items-center gap-1">
-                      <Users size={12} /> Chủ sử dụng đất ban đầu ({owners.length})
-                    </label>
-                    <div className="space-y-2 bg-slate-50 p-2.5 rounded-lg border border-gray-200">
-                      {owners.map((owner, idx) => (
-                        <div key={idx} className="text-xs">
-                          <span className="font-bold text-gray-800 uppercase">{owner.name}</span>
-                          {owner.cccd && <span className="text-gray-600 font-mono ml-2">({owner.cccd})</span>}
-                          {owner.address && <p className="text-[11px] text-gray-600">{owner.address}</p>}
-                        </div>
-                      ))}
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-[10px] text-gray-400 uppercase font-bold block mb-1">
+                        Họ và tên người nộp
+                      </label>
+                      <p className="text-base font-bold text-gray-800 uppercase">{primaryPerson.name}</p>
                     </div>
+                    
+                    {primaryPerson.phone && (
+                      <div>
+                        <label className="text-[10px] text-gray-400 uppercase font-bold block mb-0.5">Số điện thoại</label>
+                        <p className="text-xs font-bold text-emerald-700 font-mono">{primaryPerson.phone}</p>
+                      </div>
+                    )}
+
+                    {primaryPerson.cccd && (
+                      <div>
+                        <label className="text-[10px] text-gray-400 uppercase font-bold block mb-0.5">Số CCCD / CMND</label>
+                        <p className="text-xs font-bold text-gray-800 font-mono">{primaryPerson.cccd}</p>
+                      </div>
+                    )}
+
+                    {primaryPerson.address && (
+                      <div>
+                        <label className="text-[10px] text-gray-400 uppercase font-bold block mb-0.5">Địa chỉ thường trú</label>
+                        <p className="text-xs font-semibold text-gray-700">{primaryPerson.address}</p>
+                      </div>
+                    )}
                   </div>
                 )}
 
-                {/* NGƯỜI ĐƯỢC ỦY QUYỀN */}
+                {/* NGƯỜI ĐƯỢC ỦY QUYỀN (NẾU CÓ) */}
                 {record.authorizedPersonName && (
-                  <div className="border-t border-gray-100 pt-3 mt-3">
+                  <div className="border-t border-gray-100 pt-3 mt-4">
                     <label className="text-[10px] text-indigo-500 uppercase font-bold block mb-2 flex items-center gap-1">
                       <Shield size={12} /> Người được ủy quyền
                     </label>
@@ -329,7 +451,7 @@ export const DangKyDetailModal: React.FC<DangKyDetailModalProps> = ({
                       {record.authorizedPersonPhone && (
                         <div className="flex justify-between text-xs">
                           <span className="text-gray-500">SĐT:</span>
-                          <span className="font-semibold text-gray-800 font-mono">{record.authorizedPersonPhone}</span>
+                          <span className="font-semibold text-emerald-700 font-mono">{record.authorizedPersonPhone}</span>
                         </div>
                       )}
                       {record.authorizedPersonAddress && (
@@ -466,8 +588,53 @@ export const DangKyDetailModal: React.FC<DangKyDetailModalProps> = ({
                   <FileText size={16}/> Nội dung chi tiết
                 </h3>
                 
-                <div className="bg-gray-50 p-4 rounded-lg border border-gray-100 text-gray-800 text-sm font-medium min-h-[80px]">
-                  {record.notes || record.otherDocs || 'Không có nội dung chi tiết bổ sung.'}
+                <div className="bg-gray-50 p-4 rounded-lg border border-gray-100 text-gray-800 text-sm font-medium min-h-[60px]">
+                  {record.notes || 'Không có nội dung chi tiết bổ sung.'}
+                </div>
+
+                {/* GIẤY TỜ KÈM THEO */}
+                <div>
+                  <label className="text-[10px] text-teal-600 uppercase font-bold block mb-2 flex items-center gap-1">
+                    <FileText size={12} /> Giấy tờ kèm theo
+                  </label>
+                  {record.attachedDocs && record.attachedDocs.length > 0 ? (
+                    <div className="overflow-x-auto border border-gray-200 rounded-lg bg-white">
+                      <table className="w-full text-left border-collapse text-xs">
+                        <thead>
+                          <tr className="bg-slate-50 border-b border-gray-200 text-[10px] font-bold text-gray-500 uppercase">
+                            <th className="py-1.5 px-2 text-center w-8">#</th>
+                            <th className="py-1.5 px-2">Tên giấy tờ</th>
+                            <th className="py-1.5 px-2 w-28 text-center">Hình thức</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {record.attachedDocs.map((doc, idx) => (
+                            <tr key={idx} className="hover:bg-slate-50/50">
+                              <td className="py-1.5 px-2 text-center font-bold text-gray-400">{idx + 1}</td>
+                              <td className="py-1.5 px-2 font-medium text-gray-800">{doc.name}</td>
+                              <td className="py-1.5 px-2 text-center">
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                  doc.type === 'Bản chính' || doc.type === 'Chính'
+                                    ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                                    : 'bg-amber-50 text-amber-700 border border-amber-200'
+                                }`}>
+                                  {doc.type === 'Bản chính' ? 'Chính' : doc.type === 'Bản sao' ? 'Sao' : doc.type}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : record.otherDocs ? (
+                    <div className="bg-slate-50 p-2.5 rounded-lg border border-gray-200 text-xs text-gray-700 font-medium">
+                      {record.otherDocs}
+                    </div>
+                  ) : (
+                    <div className="text-xs text-gray-400 italic bg-slate-50/50 p-2.5 rounded-lg border border-dashed border-gray-200">
+                      Chưa có giấy tờ kèm theo.
+                    </div>
+                  )}
                 </div>
 
                 {record.explanationPlan && (
@@ -649,6 +816,22 @@ export const DangKyDetailModal: React.FC<DangKyDetailModalProps> = ({
           </div>
         </div>
       </div>
+
+      {systemReceiptData && (
+        <SystemReceiptTemplate 
+          data={systemReceiptData} 
+          receivingWard={record.ward || ''} 
+          currentUser={currentUser} 
+          onClose={() => setSystemReceiptData(null)} 
+        />
+      )}
+
+      <DocxPreviewModal 
+        isOpen={isPreviewOpen} 
+        onClose={() => setIsPreviewOpen(false)} 
+        docxBlob={previewBlob} 
+        fileName={previewFileName} 
+      />
     </div>
   );
 };

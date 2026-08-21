@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { RecordFile, Employee, RecordStatus } from '../types';
+import { RecordFile, Employee, RecordStatus, DANG_KY_RECORD_TYPES } from '../types';
 import { STATUS_LABELS, SELECTABLE_STATUSES } from '../constants';
 import { X, CheckCircle2, Layers, ArrowRight, UserCheck, Calendar } from 'lucide-react';
 import { getDepartmentForRecord, calculateEmployeeWorkload, extractBatchOnly } from '../utils/appHelpers';
@@ -208,6 +208,7 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
                             <option value="receiptNumber">Số BL/HĐ</option>
                             <option value="returnedPrice">Số tiền (VNĐ)</option>
                             <option value="ward">Xã / Phường (Địa bàn)</option>
+                            <option value="recordType">Loại hồ sơ</option>
                         </select>
                     </div>
 
@@ -267,6 +268,19 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
                                 <option value="">-- Chọn Xã / Phường --</option>
                                 {wards.map(w => (
                                     <option key={w} value={w}>{w}</option>
+                                ))}
+                            </select>
+                        )}
+
+                        {targetField === 'recordType' && (
+                            <select 
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-orange-500 outline-none bg-white font-medium"
+                                value={targetValue}
+                                onChange={(e) => setTargetValue(e.target.value)}
+                            >
+                                <option value="">-- Chọn Loại hồ sơ --</option>
+                                {DANG_KY_RECORD_TYPES.map(type => (
+                                    <option key={type} value={type}>{type}</option>
                                 ))}
                             </select>
                         )}

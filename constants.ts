@@ -73,7 +73,22 @@ export const RECORD_TYPES = [
   '2.2 Trích đo',
   '2.3 Duyệt đơn & Cung cấp số thửa',
   '2.4 Trích đo Cắm mốc',
-  '2.5 Trích đo Tách - Hợp thửa'
+  '2.5 Trích đo Tách - Hợp thửa',
+  '3.1.1 Chuyển nhượng',
+  '3.1.2 Tặng cho',
+  '3.1.3 Thừa kế',
+  '3.1.4 Thỏa thuận',
+  '3.2.1 Cấp đổi',
+  '3.2.2 Cấp đổi (có thuế)',
+  '3.3.1 Cấp lại',
+  '3.3.2 Cấp lại (có thuế)',
+  '3.4.1 Tách - hợp thửa',
+  '3.5.1 Gia hạn',
+  '3.6.1 Chuyển mục đích không xin phép',
+  '3.7.1 Đính chính GCN',
+  '3.8.1 Đăng ký GDBD',
+  '3.8.2 Xóa ĐK GDBD',
+  '3.9.9 Khác'
 ];
 
 // Danh sách loại hồ sơ MỞ RỘNG (Dùng cho form Thêm mới trong "Tất cả hồ sơ" - Admin/Nội bộ)

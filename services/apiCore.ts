@@ -352,6 +352,10 @@ export const mapRecordFromDb = (item: any): any => {
     r.completedDate = keepOnlyDate(val(r.completedDate, r.completeddate, r.completed_date));
     
     r.authorizedBy = val(r.authorizedBy, r.authorizedby, r.authorized_by);
+    r.authorizedPersonName = val(r.authorizedPersonName, r.authorizedpersonname, r.authorized_person_name);
+    r.authorizedPersonId = val(r.authorizedPersonId, r.authorizedpersonid, r.authorized_person_id);
+    r.authorizedPersonPhone = val(r.authorizedPersonPhone, r.authorizedpersonphone, r.authorized_person_phone);
+    r.authorizedPersonAddress = val(r.authorizedPersonAddress, r.authorizedpersonaddress, r.authorized_person_address);
     r.authDocType = val(r.authDocType, r.authdoctype, r.auth_doc_type);
     r.otherDocs = val(r.otherDocs, r.otherdocs, r.other_docs);
     
@@ -380,6 +384,25 @@ export const mapRecordFromDb = (item: any): any => {
     r.statusLogs = Array.isArray(rawLogs) ? rawLogs : [];
     r.archiveHandoverDate = keepOnlyDate(val(r.archiveHandoverDate, r.archivehandoverdate, r.archive_handover_date));
     r.archiveHandoverBatch = val(r.archiveHandoverBatch, r.archivehandoverbatch, r.archive_handover_batch);
+
+    // Xử lý các trường của hồ sơ Đăng ký (3.x.x)
+    let rawOwners = val(r.owners, r.owners, r.owners);
+    if (typeof rawOwners === 'string') {
+        try { rawOwners = JSON.parse(rawOwners); } catch (e) { rawOwners = []; }
+    }
+    r.owners = Array.isArray(rawOwners) ? rawOwners : (r.owners || []);
+
+    let rawTransferees = val(r.transferees, r.transferees, r.transferees);
+    if (typeof rawTransferees === 'string') {
+        try { rawTransferees = JSON.parse(rawTransferees); } catch (e) { rawTransferees = []; }
+    }
+    r.transferees = Array.isArray(rawTransferees) ? rawTransferees : (r.transferees || []);
+
+    r.applicantIsOwner = val(r.applicantIsOwner, r.applicantisowner, r.applicant_is_owner);
+    r.applicantName = val(r.applicantName, r.applicantname, r.applicant_name);
+    r.applicantCccd = val(r.applicantCccd, r.applicantcccd, r.applicant_cccd);
+    r.applicantPhone = val(r.applicantPhone, r.applicantphone, r.applicant_phone);
+    r.applicantAddress = val(r.applicantAddress, r.applicantaddress, r.applicant_address);
 
     return r;
 };

@@ -106,6 +106,13 @@ export interface Employee {
   managedWards: string[];
 }
 
+export interface AttachedDoc {
+  id?: string;
+  name: string;
+  type: string;
+  note?: string;
+}
+
 export interface RecordFile {
   id: string;
   code: string;           
@@ -165,6 +172,7 @@ export interface RecordFile {
   authorizedBy?: string | null;  
   authorizedPersonName?: string | null; // Họ và tên người ủy quyền
   authorizedPersonId?: string | null;   // CCCD người ủy quyền
+  authorizedPersonPhone?: string | null; // SĐT người ủy quyền
   authorizedPersonAddress?: string | null; // Địa chỉ người ủy quyền
   authDocType?: string | null;   
   otherDocs?: string | null;     
@@ -193,6 +201,16 @@ export interface RecordFile {
   // Tính năng Chỉnh lý bản đồ (Mới)
   needsMapCorrection?: boolean; // True nếu cần lập danh sách chỉnh lý
   explanationPlan?: string | null; // Phương án giải trình (Mới)
+
+  // Trường dành riêng cho Hồ sơ Đăng ký (3.x.x)
+  owners?: DangKyParty[] | null;
+  transferees?: DangKyParty[] | null;
+  attachedDocs?: AttachedDoc[] | null;
+  applicantIsOwner?: boolean | null;
+  applicantName?: string | null;
+  applicantCccd?: string | null;
+  applicantPhone?: string | null;
+  applicantAddress?: string | null;
 
   // Đã xuất danh sách giao (Hồ sơ tiếp nhận trong ngày)
   isHandedOver?: boolean;
@@ -462,8 +480,10 @@ export interface DangKyRecord {
   checkedBy?: string;                       // Người Kiểm tra
   submissionDate?: string;                  // Ngày Trình ký
   submittedTo?: string;                     // Người ký
+  approvalDate?: string;                    // Ngày Ký duyệt
   completedDate?: string;                   // Hoàn thành
   exportBatch?: string;                     // Đợt xuất
+  handoverWard?: string;                    // Nơi giao trả kết quả
   resultReturnedDate?: string;              // Ngày Trả kết quả
   receiptNumber?: string;                   // Số Biên lai
   invoiceNumber?: string;                   // Số Hóa đơn
@@ -480,9 +500,70 @@ export interface DangKyRecord {
   receiptType?: 'Biên Lai' | 'Hóa Đơn' | string | null; // Loại chứng từ
   exportDate?: string;                      // Ngày xuất bàn giao
   receiverName?: string;                    // Người nhận kết quả
+  applicantIsOwner?: boolean;               // Người nộp hồ sơ là chủ hồ sơ
+  applicantName?: string;                   // Họ tên người nộp
+  applicantCccd?: string;                   // CCCD/Số Giấy người nộp
+  applicantPhone?: string;                  // SĐT người nộp
+  applicantAddress?: string;                // Địa chỉ thường trú người nộp
+  assignedDate?: string;                    // Ngày giao NV
+  issueDate?: string;                       // Ngày cấp GCN
+  attachedDocs?: AttachedDoc[];             // Giấy tờ kèm theo
+  attachedDocuments?: { name: string; type: string }[]; // Giấy tờ kèm theo khác
   createdAt?: string;
   updatedAt?: string;
 }
+
+export const DANG_KY_RECORD_TYPES = [
+  '3.1.1 Chuyển nhượng',
+  '3.1.2 Tặng cho',
+  '3.1.3 Thừa kế',
+  '3.1.4 Thỏa thuận',
+  '3.2.1 Cấp đổi',
+  '3.2.2 Cấp đổi (có thuế)',
+  '3.3.1 Cấp lại',
+  '3.3.2 Cấp lại (có thuế)',
+  '3.4.1 Tách - hợp thửa',
+  '3.5.1 Gia hạn',
+  '3.6.1 Chuyển mục đích không xin phép',
+  '3.7.1 Đính chính GCN',
+  '3.8.1 Đăng ký GDBD',
+  '3.8.2 Xóa ĐK GDBD',
+  '3.9.9 Khác'
+];
+
+export const DANG_KY_DEADLINE_MAP: Record<string, number> = {
+  '3.1.1 Chuyển nhượng': 13,
+  '3.1.2 Tặng cho': 13,
+  '3.1.3 Thừa kế': 13,
+  '3.1.4 Thỏa thuận': 13,
+  '3.2.1 Cấp đổi': 10,
+  '3.2.2 Cấp đổi (có thuế)': 15,
+  '3.3.1 Cấp lại': 10,
+  '3.3.2 Cấp lại (có thuế)': 15,
+  '3.4.1 Tách - hợp thửa': 17,
+  '3.5.1 Gia hạn': 7,
+  '3.6.1 Chuyển mục đích không xin phép': 10,
+  '3.7.1 Đính chính GCN': 7,
+  '3.8.1 Đăng ký GDBD': 3,
+  '3.8.2 Xóa ĐK GDBD': 3,
+  '3.9.9 Khác': 10,
+  // Backward compatibility keys
+  'Chuyển nhượng': 13,
+  'Tặng cho': 13,
+  'Thừa kế': 13,
+  'Thỏa thuận': 13,
+  'Cấp đổi': 10,
+  'Cấp đổi (có thuế)': 15,
+  'Cấp lại': 10,
+  'Cấp lại (có thuế)': 15,
+  'Tách - hợp thửa': 17,
+  'Gia hạn': 7,
+  'Chuyển mục đích không xin phép': 10,
+  'Đính chính GCN': 7,
+  'Đăng ký GDBD': 3,
+  'Xóa ĐK GDBD': 3,
+  'Khác': 10
+};
 
 declare global {
   interface Window {

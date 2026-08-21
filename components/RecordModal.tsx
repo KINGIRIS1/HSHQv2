@@ -38,10 +38,11 @@ const parseAttachedDocs = (otherDocsStr: string | null | undefined): AttachedDoc
 };
 
 const parseAuthDocType = (str: string | null | undefined) => {
-    if (!str) return { cccd: '', address: '' };
+    if (!str) return { cccd: '', address: '', phone: '' };
     const parts = str.split('|');
     const firstPart = parts[0] || '';
     const secondPart = parts[1] || '';
+    const thirdPart = parts[2] || '';
     
     // Check if first part is an old document type
     const knownDocTypes = ['Hợp đồng ủy quyền', 'Giấy ủy quyền', 'Văn bản ủy quyền', 'Hợp đồng uỷ quyền', 'Giấy uỷ quyền', 'Văn bản uỷ quyền', 'Khác'];
@@ -49,15 +50,16 @@ const parseAuthDocType = (str: string | null | undefined) => {
     
     if (isDocType) {
         if (parts.length >= 4) {
-            // Old format proposal: Loại|Hình thức|CCCD|SĐT
-            return { cccd: parts[2] || '', address: parts[3] || '' };
+            // Old format: Loại|Hình thức|CCCD|Địa chỉ/SĐT
+            return { cccd: parts[2] || '', address: parts[3] || '', phone: parts[4] || '' };
         }
-        return { cccd: '', address: '' };
+        return { cccd: '', address: '', phone: '' };
     } else {
-        // New format: CCCD|Address
+        // New format: CCCD|Address|Phone
         return {
             cccd: firstPart,
-            address: secondPart
+            address: secondPart,
+            phone: thirdPart
         };
     }
 };
@@ -88,6 +90,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
   const [attachedDocs, setAttachedDocs] = useState<AttachedDocItem[]>([]);
   const [authCccd, setAuthCccd] = useState('');
   const [authAddress, setAuthAddress] = useState('');
+  const [authPhone, setAuthPhone] = useState('');
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   
   const isEdit = !!initialData && !!initialData.id;
@@ -188,9 +191,10 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
             setFormData(dataToSet);
             setAttachedDocs(parseAttachedDocs(initialData.otherDocs));
             const parsed = parseAuthDocType(initialData.authDocType);
-            setAuthCccd(parsed.cccd);
-            setAuthAddress(parsed.address);
-            setIsAuthOpen(!!(initialData.authorizedBy || parsed.cccd || parsed.address));
+            setAuthCccd(parsed.cccd || initialData.authorizedPersonId || '');
+            setAuthAddress(parsed.address || initialData.authorizedPersonAddress || '');
+            setAuthPhone(parsed.phone || initialData.authorizedPersonPhone || '');
+            setIsAuthOpen(!!(initialData.authorizedBy || initialData.authorizedPersonName || parsed.cccd || parsed.address || parsed.phone || initialData.authorizedPersonId || initialData.authorizedPersonPhone));
 
             // Tự động đồng bộ số tiền (returnedPrice) nếu chưa có giống như màn hình Chi tiết và Trả kết quả
             const determinePrice = async () => {
@@ -269,6 +273,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
             setAttachedDocs([]);
             setAuthCccd('');
             setAuthAddress('');
+            setAuthPhone('');
             setIsAuthOpen(false);
         }
     }
@@ -464,6 +469,12 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
         finalData.exportBatch = extractBatchOnly(finalData.exportBatch);
     }
 
+    finalData.authorizedPersonName = formData.authorizedBy || formData.authorizedPersonName || undefined;
+    finalData.authorizedPersonId = authCccd || formData.authorizedPersonId || undefined;
+    finalData.authorizedPersonPhone = authPhone || formData.authorizedPersonPhone || undefined;
+    finalData.authorizedPersonAddress = authAddress || formData.authorizedPersonAddress || undefined;
+    finalData.authDocType = `${authCccd}|${authAddress}|${authPhone}`;
+
     // Tự động ghi Log lịch sử thay đổi trạng thái
     const prevStatus = initialData ? initialData.status : null;
     const newStatus = finalData.status || RecordStatus.RECEIVED;
@@ -645,10 +656,10 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div className="md:col-span-2"><label className="block text-xs font-bold text-gray-700 mb-1">Tên chủ sử dụng <span className="text-red-500">*</span></label><input type="text" required className="w-full border border-gray-300 rounded-md px-3 py-2 font-medium" value={val(formData.customerName)} onChange={(e) => handleChange('customerName', e.target.value)} /></div>
+                            <div><label className="block text-xs font-bold text-gray-700 mb-1">Tên chủ sử dụng <span className="text-red-500">*</span></label><input type="text" required className="w-full border border-gray-300 rounded-md px-3 py-2 font-medium" value={val(formData.customerName)} onChange={(e) => handleChange('customerName', e.target.value)} /></div>
+                            <div><label className="block text-xs font-bold text-gray-700 mb-1">CCCD / Số Giấy</label><input type="text" className="w-full border border-gray-300 rounded-md px-3 py-2 font-mono" value={val(formData.cccd)} onChange={(e) => handleChange('cccd', e.target.value)} /></div>
                             <div><label className="block text-xs font-bold text-gray-700 mb-1">Số điện thoại</label><input type="text" className="w-full border border-gray-300 rounded-md px-3 py-2" value={val(formData.phoneNumber)} onChange={(e) => handleChange('phoneNumber', e.target.value)} /></div>
-                            <div className="md:col-span-2"><label className="block text-xs font-bold text-gray-700 mb-1">Địa chỉ chủ sử dụng</label><input type="text" className="w-full border border-gray-300 rounded-md px-3 py-2" value={val(formData.customerAddress)} onChange={(e) => handleChange('customerAddress', e.target.value)} /></div>
-                            <div><label className="block text-xs font-bold text-gray-700 mb-1">CCCD</label><input type="text" className="w-full border border-gray-300 rounded-md px-3 py-2" value={val(formData.cccd)} onChange={(e) => handleChange('cccd', e.target.value)} /></div>
+                            <div className="md:col-span-3"><label className="block text-xs font-bold text-gray-700 mb-1">Địa chỉ thường trú / Nơi ở hiện nay</label><input type="text" className="w-full border border-gray-300 rounded-md px-3 py-2" value={val(formData.customerAddress)} onChange={(e) => handleChange('customerAddress', e.target.value)} /></div>
                         </div>
                     )}
                 </div>
@@ -677,23 +688,24 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                             </div>
                         </div>
                     ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="md:col-span-2">
-                                <label className="block text-xs font-bold text-gray-700 mb-1">Xã / Phường</label>
-                                <select className="w-full border border-gray-300 rounded-md px-3 py-2 bg-white" value={val(formData.ward)} onChange={(e) => handleChange('ward', e.target.value)}>
-                                    <option value="">-- Chọn Xã/Phường --</option>
-                                    {wards.map(w => <option key={w} value={w}>{getWardLabel(w)}</option>)}
-                                </select>
-                            </div>
-                            <div className="grid grid-cols-3 gap-2 md:col-span-2">
-                                <div><label className="block text-xs font-bold text-gray-700 mb-1">Tờ bản đồ</label><input type="text" className="w-full border border-gray-300 rounded-md px-3 py-2 text-center font-mono" value={val(formData.mapSheet)} onChange={(e) => handleChange('mapSheet', e.target.value)} /></div>
-                                <div><label className="block text-xs font-bold text-gray-700 mb-1">Thửa đất</label><input type="text" className="w-full border border-gray-300 rounded-md px-3 py-2 text-center font-mono" value={val(formData.landPlot)} onChange={(e) => handleChange('landPlot', e.target.value)} /></div>
-                                <div><label className="block text-xs font-bold text-gray-700 mb-1">Diện tích (m2)</label><input type="number" className="w-full border border-gray-300 rounded-md px-3 py-2 text-right" value={formData.area || 0} onChange={(e) => handleChange('area', parseFloat(e.target.value))} /></div>
-                            </div>
-                            <div className="grid grid-cols-3 gap-2 md:col-span-2">
+                        <div className="space-y-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-700 mb-1">Xã / Phường <span className="text-red-500">*</span></label>
+                                    <select className="w-full border border-gray-300 rounded-md px-3 py-2 bg-white" value={val(formData.ward)} onChange={(e) => handleChange('ward', e.target.value)}>
+                                        <option value="">-- Chọn Xã/Phường --</option>
+                                        {wards.map(w => <option key={w} value={w}>{getWardLabel(w)}</option>)}
+                                    </select>
+                                </div>
                                 <div><label className="block text-xs font-bold text-gray-700 mb-1">Số phát hành</label><input type="text" className="w-full border border-gray-300 rounded-md px-3 py-2" placeholder="VD: CD 123456" value={val(formData.issueNumber)} onChange={(e) => handleChange('issueNumber', e.target.value)} /></div>
                                 <div><label className="block text-xs font-bold text-gray-700 mb-1">Số vào sổ</label><input type="text" className="w-full border border-gray-300 rounded-md px-3 py-2" placeholder="VD: CH 01234" value={val(formData.entryNumber)} onChange={(e) => handleChange('entryNumber', e.target.value)} /></div>
                                 <div><label className="block text-xs font-bold text-gray-700 mb-1">Ngày cấp</label><input type="date" className="w-full border border-gray-300 rounded-md px-3 py-2" value={dateVal(formData.issueDate)} onChange={(e) => handleChange('issueDate', e.target.value)} /></div>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                                <div><label className="block text-xs font-bold text-gray-700 mb-1">Tờ bản đồ</label><input type="text" className="w-full border border-gray-300 rounded-md px-3 py-2 text-center font-mono" value={val(formData.mapSheet)} onChange={(e) => handleChange('mapSheet', e.target.value)} /></div>
+                                <div><label className="block text-xs font-bold text-gray-700 mb-1">Thửa đất</label><input type="text" className="w-full border border-gray-300 rounded-md px-3 py-2 text-center font-mono" value={val(formData.landPlot)} onChange={(e) => handleChange('landPlot', e.target.value)} /></div>
+                                <div><label className="block text-xs font-bold text-gray-700 mb-1">Tổng diện tích (m²)</label><input type="number" className="w-full border border-gray-300 rounded-md px-3 py-2 text-right font-medium" value={formData.area || 0} onChange={(e) => handleChange('area', parseFloat(e.target.value))} /></div>
+                                <div><label className="block text-xs font-bold text-gray-700 mb-1">ONT/ODT (m²)</label><input type="number" className="w-full border border-gray-300 rounded-md px-3 py-2 text-right font-medium" value={formData.residentialArea || 0} onChange={(e) => handleChange('residentialArea', parseFloat(e.target.value))} /></div>
                             </div>
                         </div>
                     )}
@@ -811,15 +823,32 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                                 </div>
 
                                 {isAuthOpen && (
-                                    <div className="p-4 bg-white grid grid-cols-1 md:grid-cols-3 gap-4 border-t border-gray-100">
+                                    <div className="p-4 bg-white grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 border-t border-gray-100">
                                         <div>
                                             <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Họ và tên</label>
                                             <input
                                                 type="text"
                                                 className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm"
-                                                placeholder="Họ tên..."
+                                                placeholder="Họ tên người UQ..."
                                                 value={formData.authorizedBy || ''}
-                                                onChange={(e) => handleChange('authorizedBy', e.target.value)}
+                                                onChange={(e) => {
+                                                    handleChange('authorizedBy', e.target.value);
+                                                    handleChange('authorizedPersonName', e.target.value);
+                                                }}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Số điện thoại</label>
+                                            <input
+                                                type="text"
+                                                className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm"
+                                                placeholder="Số điện thoại..."
+                                                value={authPhone}
+                                                onChange={(e) => {
+                                                    setAuthPhone(e.target.value);
+                                                    handleChange('authorizedPersonPhone', e.target.value);
+                                                    setFormData(prev => ({ ...prev, authDocType: `${authCccd}|${authAddress}|${e.target.value}` }));
+                                                }}
                                             />
                                         </div>
                                         <div>
@@ -831,12 +860,13 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                                                 value={authCccd}
                                                 onChange={(e) => {
                                                     setAuthCccd(e.target.value);
-                                                    setFormData(prev => ({ ...prev, authDocType: `${e.target.value}|${authAddress}` }));
+                                                    handleChange('authorizedPersonId', e.target.value);
+                                                    setFormData(prev => ({ ...prev, authDocType: `${e.target.value}|${authAddress}|${authPhone}` }));
                                                 }}
                                             />
                                         </div>
                                         <div>
-                                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Địa chỉ</label>
+                                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Địa chỉ thường trú</label>
                                             <input
                                                 type="text"
                                                 className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm"
@@ -844,7 +874,8 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                                                 value={authAddress}
                                                 onChange={(e) => {
                                                     setAuthAddress(e.target.value);
-                                                    setFormData(prev => ({ ...prev, authDocType: `${authCccd}|${e.target.value}` }));
+                                                    handleChange('authorizedPersonAddress', e.target.value);
+                                                    setFormData(prev => ({ ...prev, authDocType: `${authCccd}|${e.target.value}|${authPhone}` }));
                                                 }}
                                             />
                                         </div>

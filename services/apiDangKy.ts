@@ -122,10 +122,12 @@ export const mapDangKyFromDb = (item: any): DangKyRecord => {
     ward: item.ward || '',
     recordType: item.recordType || item.record_type || '',
     receivedDate: item.receivedDate || item.received_date || '',
+    receivedBy: item.receivedBy || item.received_by || '',
     deadline: item.deadline || '',
     appraisalDate: item.appraisalDate || item.appraisal_date || '',
     appraisalStaff: item.appraisalStaff || item.appraisal_staff || '',
     taxFormDate: item.taxFormDate || item.tax_form_date || '',
+    taxFormNumber: item.taxFormNumber || item.tax_form_number || '',
     taxFormStaff: item.taxFormStaff || item.tax_form_staff || '',
     taxKV7TransferDate: item.taxKV7TransferDate || item.tax_kv7_transfer_date || '',
     taxKV7Staff: item.taxKV7Staff || item.tax_kv7_staff || '',
@@ -140,12 +142,22 @@ export const mapDangKyFromDb = (item: any): DangKyRecord => {
     submittedTo: item.submittedTo || item.submitted_to || '',
     completedDate: item.completedDate || item.completed_date || '',
     exportBatch: item.exportBatch || item.export_batch || '',
+    exportDate: item.exportDate || item.export_date || '',
     resultReturnedDate: item.resultReturnedDate || item.result_returned_date || '',
     receiptNumber: item.receiptNumber || item.receipt_number || '',
     invoiceNumber: item.invoiceNumber || item.invoice_number || '',
+    receiptType: item.receiptType || item.receipt_type || null,
+    receiverName: item.receiverName || item.receiver_name || '',
     feeAmount: item.feeAmount ?? item.fee_amount ?? 0,
+    price: item.price ?? null,
+    returnedPrice: item.returnedPrice ?? item.returned_price ?? null,
     status: normalizeDangKyStatus(item.status),
     notes: item.notes || '',
+    personalNotes: item.personalNotes || item.personal_notes || '',
+    privateNotes: item.privateNotes || item.private_notes || '',
+    reminderDate: item.reminderDate || item.reminder_date || '',
+    otherDocs: item.otherDocs || item.other_docs || '',
+    explanationPlan: item.explanationPlan || item.explanation_plan || '',
     createdAt: item.createdAt || item.created_at || new Date().toISOString(),
     updatedAt: item.updatedAt || item.updated_at || new Date().toISOString()
   };
@@ -171,10 +183,12 @@ export const mapDangKyToDb = (record: DangKyRecord): any => {
     ward: record.ward || null,
     recordType: record.recordType || null,
     receivedDate: record.receivedDate || null,
+    receivedBy: record.receivedBy || null,
     deadline: record.deadline || null,
     appraisalDate: record.appraisalDate || null,
     appraisalStaff: record.appraisalStaff || null,
     taxFormDate: record.taxFormDate || null,
+    taxFormNumber: record.taxFormNumber || null,
     taxFormStaff: record.taxFormStaff || null,
     taxKV7TransferDate: record.taxKV7TransferDate || null,
     taxKV7Staff: record.taxKV7Staff || null,
@@ -189,12 +203,22 @@ export const mapDangKyToDb = (record: DangKyRecord): any => {
     submittedTo: record.submittedTo || null,
     completedDate: record.completedDate || null,
     exportBatch: record.exportBatch || null,
+    exportDate: record.exportDate || null,
     resultReturnedDate: record.resultReturnedDate || null,
     receiptNumber: record.receiptNumber || null,
     invoiceNumber: record.invoiceNumber || null,
+    receiptType: record.receiptType || null,
+    receiverName: record.receiverName || null,
     feeAmount: record.feeAmount ? Number(record.feeAmount) : 0,
+    price: record.price ? Number(record.price) : null,
+    returnedPrice: record.returnedPrice ? Number(record.returnedPrice) : null,
     status: record.status || 'Tiếp nhận mới',
     notes: record.notes || null,
+    personalNotes: record.personalNotes || null,
+    privateNotes: record.privateNotes || null,
+    reminderDate: record.reminderDate || null,
+    otherDocs: record.otherDocs || null,
+    explanationPlan: record.explanationPlan || null,
     updatedAt: new Date().toISOString()
   };
 };
@@ -209,9 +233,8 @@ export const fetchDangKyRecords = async (): Promise<DangKyRecord[]> => {
         .order('createdAt', { ascending: false });
 
       if (error) {
-        // Nếu lỗi do cột camelCase không tồn tại, thử query lại
         logError('fetchDangKyRecords Supabase', error, true);
-      } else if (data && data.length > 0) {
+      } else if (data) {
         const mapped = data.map(mapDangKyFromDb);
         saveToCache(CACHE_KEYS.DANGKY_RECORDS, mapped);
         return mapped;
@@ -222,12 +245,12 @@ export const fetchDangKyRecords = async (): Promise<DangKyRecord[]> => {
   }
 
   // Fallback to cache or mock
-  const cached = getFromCache<DangKyRecord[]>(CACHE_KEYS.DANGKY_RECORDS, []);
-  if (cached && cached.length > 0) {
+  const cached = getFromCache<DangKyRecord[] | null>(CACHE_KEYS.DANGKY_RECORDS, null);
+  if (cached !== null && Array.isArray(cached)) {
     return cached;
   }
 
-  // Khởi tạo mock nếu chưa có dữ liệu
+  // Khởi tạo mock lần đầu nếu chưa từng có dữ liệu trong cache
   saveToCache(CACHE_KEYS.DANGKY_RECORDS, MOCK_DANGKY_RECORDS);
   return MOCK_DANGKY_RECORDS;
 };
@@ -293,26 +316,62 @@ export const saveDangKyRecordApi = async (record: DangKyRecord): Promise<DangKyR
 
 // Delete DangKy Record
 export const deleteDangKyRecordApi = async (idOrCode: string): Promise<boolean> => {
+  if (!idOrCode) return true;
   const allRecords = await fetchDangKyRecords();
-  const updatedList = allRecords.filter(r => r.id !== idOrCode && r.code !== idOrCode);
+  const cleanTarget = String(idOrCode).trim();
+  const targetLower = cleanTarget.toLowerCase();
+
+  const updatedList = allRecords.filter(r => {
+    const rId = String(r.id || '').trim();
+    const rCode = String(r.code || '').trim();
+    return rId !== cleanTarget && 
+           rCode !== cleanTarget && 
+           rId.toLowerCase() !== targetLower && 
+           rCode.toLowerCase() !== targetLower;
+  });
+
   saveToCache(CACHE_KEYS.DANGKY_RECORDS, updatedList);
 
   if (isConfigured) {
     try {
-      // Thử xóa theo id hoặc code
-      const { error: err1 } = await supabase
-        .from('dangky_records')
-        .delete()
-        .or(`id.eq.${idOrCode},code.eq.${idOrCode}`);
-
-      if (err1) {
-        logError('deleteDangKyRecordApi Supabase or-clause', err1, true);
-        // Fallback xóa đơn lẻ
-        await supabase.from('dangky_records').delete().eq('id', idOrCode);
-        await supabase.from('dangky_records').delete().eq('code', idOrCode);
-      }
+      await Promise.allSettled([
+        supabase.from('dangky_records').delete().eq('id', cleanTarget),
+        supabase.from('dangky_records').delete().eq('code', cleanTarget),
+        supabase.from('land_records').delete().eq('id', cleanTarget),
+        supabase.from('land_records').delete().eq('code', cleanTarget)
+      ]);
     } catch (e) {
       logError('deleteDangKyRecordApi catch', e, true);
+    }
+  }
+
+  return true;
+};
+
+// Bulk Delete DangKy Records
+export const bulkDeleteDangKyRecordsApi = async (idsOrCodes: string[]): Promise<boolean> => {
+  if (!idsOrCodes || idsOrCodes.length === 0) return true;
+  const allRecords = await fetchDangKyRecords();
+  const cleanSet = new Set(idsOrCodes.map(x => String(x).trim().toLowerCase()));
+
+  const updatedList = allRecords.filter(r => {
+    const rId = String(r.id || '').trim().toLowerCase();
+    const rCode = String(r.code || '').trim().toLowerCase();
+    return !cleanSet.has(rId) && !cleanSet.has(rCode);
+  });
+
+  saveToCache(CACHE_KEYS.DANGKY_RECORDS, updatedList);
+
+  if (isConfigured) {
+    try {
+      await Promise.allSettled([
+        supabase.from('dangky_records').delete().in('id', idsOrCodes),
+        supabase.from('dangky_records').delete().in('code', idsOrCodes),
+        supabase.from('land_records').delete().in('id', idsOrCodes),
+        supabase.from('land_records').delete().in('code', idsOrCodes)
+      ]);
+    } catch (e) {
+      logError('bulkDeleteDangKyRecordsApi catch', e, true);
     }
   }
 

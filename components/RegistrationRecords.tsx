@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { User, DangKyRecord, DangKyParty, DangKyStatusType, DANG_KY_STATUS_LIST, Employee, RecordFile } from '../types';
+import { User, DangKyRecord, DangKyParty, DangKyStatusType, DANG_KY_STATUS_LIST, Employee, RecordFile, DANG_KY_RECORD_TYPES, DANG_KY_DEADLINE_MAP } from '../types';
 import { fetchEmployees } from '../services/apiPeople';
 import { 
   fetchDangKyRecords, 
   saveDangKyRecordApi, 
   deleteDangKyRecordApi, 
+  bulkDeleteDangKyRecordsApi,
   bulkUpdateDangKyRecordsApi,
   normalizeDangKyStatus
 } from '../services/apiDangKy';
@@ -120,6 +121,7 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
     const [searchTerm, setSearchTerm] = useState<string>('');
     const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>('all');
     const [selectedWardFilter, setSelectedWardFilter] = useState<string>('all');
+    const [selectedRecordTypeFilter, setSelectedRecordTypeFilter] = useState<string>('all');
     const [selectedBatchFilter, setSelectedBatchFilter] = useState<string>('all');
     const [filterFromDate, setFilterFromDate] = useState<string>('');
     const [filterToDate, setFilterToDate] = useState<string>('');
@@ -130,6 +132,7 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
 
     // Selected Rows for Bulk Action & Modals
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const [isAddMenuOpen, setIsAddMenuOpen] = useState<boolean>(false);
     const [assignStaffModalOpen, setAssignStaffModalOpen] = useState<boolean>(false);
     const [assignStaffInput, setAssignStaffInput] = useState<string>('');
     const [returnModalOpen, setReturnModalOpen] = useState<boolean>(false);
@@ -197,15 +200,17 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
         let count = 0;
         if (selectedStatusFilter !== 'all') count++;
         if (selectedWardFilter !== 'all') count++;
+        if (selectedRecordTypeFilter !== 'all') count++;
         if (selectedBatchFilter !== 'all') count++;
         if (filterFromDate) count++;
         if (filterToDate) count++;
         return count;
-    }, [selectedStatusFilter, selectedWardFilter, selectedBatchFilter, filterFromDate, filterToDate]);
+    }, [selectedStatusFilter, selectedWardFilter, selectedRecordTypeFilter, selectedBatchFilter, filterFromDate, filterToDate]);
 
     const handleClearFilters = () => {
         setSelectedStatusFilter('all');
         setSelectedWardFilter('all');
+        setSelectedRecordTypeFilter('all');
         setSelectedBatchFilter('all');
         setFilterFromDate('');
         setFilterToDate('');
@@ -219,6 +224,7 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
     const [selectedRecordForEdit, setSelectedRecordForEdit] = useState<DangKyRecord | null>(null);
 
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState<boolean>(false);
+    const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState<boolean>(false);
     const [recordToDelete, setRecordToDelete] = useState<DangKyRecord | null>(null);
 
     // Load data
@@ -666,6 +672,10 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                 return false;
             }
 
+            if (selectedRecordTypeFilter !== 'all' && (r.recordType || '') !== selectedRecordTypeFilter) {
+                return false;
+            }
+
             if (filterFromDate && r.receivedDate) {
                 const dateStr = r.receivedDate.includes('T') ? r.receivedDate.split('T')[0] : r.receivedDate;
                 if (dateStr < filterFromDate) return false;
@@ -686,7 +696,7 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
 
             return true;
         });
-    }, [records, activeMainTab, activeTbtSubTab, activeGiao1CuaSubTab, searchTerm, selectedStatusFilter, selectedWardFilter, selectedBatchFilter, filterFromDate, filterToDate, warningFilter]);
+    }, [records, activeMainTab, activeTbtSubTab, activeGiao1CuaSubTab, searchTerm, selectedStatusFilter, selectedWardFilter, selectedRecordTypeFilter, selectedBatchFilter, filterFromDate, filterToDate, warningFilter]);
 
     // Pagination
     const totalPages = Math.ceil(filteredRecords.length / pageSize) || 1;
@@ -896,9 +906,12 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
         customDate?: string,
         extraData?: { assignedTo?: string }
     ) => {
-        if (selectedIds.size === 0) return;
+        const idsToUpdate = selectedIds.size > 0 ? Array.from(selectedIds) : filteredRecords.map(r => r.id);
+        if (idsToUpdate.length === 0) {
+            alert('Không có hồ sơ nào để cập nhật.');
+            return;
+        }
         try {
-            const idsToUpdate = Array.from(selectedIds);
             const updatePayload: Partial<DangKyRecord> = {};
 
             if (field === 'status') {
@@ -1148,6 +1161,9 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
 
         try {
             await deleteDangKyRecordApi(idToDelete);
+            if (codeToDelete && codeToDelete !== idToDelete) {
+                await deleteDangKyRecordApi(codeToDelete);
+            }
             addActivityLog({
                 performerName: currentUser.fullName || currentUser.username,
                 performerRole: 'DANGKY',
@@ -1166,6 +1182,36 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
             loadData();
         } finally {
             setRecordToDelete(null);
+        }
+    };
+
+    const handleConfirmBulkDelete = async () => {
+        if (selectedIds.size === 0) return;
+        const targetIds = Array.from(selectedIds);
+        const idSet = new Set(targetIds);
+
+        // Optimistic UI update
+        setRecords(prev => prev.filter(r => !idSet.has(r.id) && !idSet.has(r.code)));
+        setIsBulkDeleteModalOpen(false);
+
+        try {
+            await bulkDeleteDangKyRecordsApi(targetIds);
+            addActivityLog({
+                performerName: currentUser.fullName || currentUser.username,
+                performerRole: 'DANGKY',
+                actionType: 'DELETE',
+                actionLabel: 'Xóa hàng loạt',
+                targetType: 'Đăng ký',
+                referenceCode: `${targetIds.length} hồ sơ`,
+                details: `Xóa hàng loạt ${targetIds.length} hồ sơ Đăng ký`
+            });
+            const updated = await fetchDangKyRecords();
+            setRecords(updated);
+            setSelectedIds(new Set());
+        } catch (err) {
+            console.error('Delete error:', err);
+            alert('Lỗi khi xóa hồ sơ!');
+            loadData();
         }
     };
 
@@ -1194,11 +1240,11 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                     return [recordToSave, ...prev];
                 }
             });
-            setIsRecordModalOpen(false);
             loadData();
         } catch (err) {
             console.error('Save error:', err);
             alert('Có lỗi xảy ra khi lưu dữ liệu!');
+            throw err;
         }
     };
 
@@ -1471,6 +1517,26 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                                                     </select>
                                                 </div>
 
+                                                {/* 3. Loại hồ sơ */}
+                                                <div>
+                                                    <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 mb-1">
+                                                        <FileText size={14} className="text-gray-500" />
+                                                        <span>Loại hồ sơ:</span>
+                                                    </label>
+                                                    <select
+                                                        value={selectedRecordTypeFilter}
+                                                        onChange={(e) => setSelectedRecordTypeFilter(e.target.value)}
+                                                        className="w-full text-xs border border-gray-200 rounded-lg p-2 font-medium bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                                                    >
+                                                        <option value="all">Tất cả loại hồ sơ</option>
+                                                        {DANG_KY_RECORD_TYPES.map((type) => (
+                                                            <option key={type} value={type}>
+                                                                {type} ({DANG_KY_DEADLINE_MAP[type] || 10} ngày)
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+
                                                 {/* 3. Thời gian nhận */}
                                                 <div>
                                                     <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 mb-1">
@@ -1574,13 +1640,60 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                                 </button>
                             </div>
 
-                            {/* Nút Nhập Mới (đặt cạnh thao tác Lọc) */}
-                            <button 
-                                onClick={handleOpenAdd}
-                                className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all shadow-2xs active:scale-95 whitespace-nowrap cursor-pointer"
-                            >
-                                <Plus size={14} /> Nhập mới
-                            </button>
+                            {/* Nút Nhập Mới / Cập nhật thông tin (đặt cạnh thao tác Lọc) */}
+                            <div className="relative">
+                                <div className="flex rounded-lg shadow-2xs overflow-hidden border border-blue-600">
+                                    <button 
+                                        onClick={handleOpenAdd}
+                                        className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-1.5 flex items-center gap-1.5 transition-all active:scale-95 whitespace-nowrap cursor-pointer"
+                                    >
+                                        <Plus size={14} /> Nhập mới
+                                    </button>
+                                    <button
+                                        onClick={() => setIsAddMenuOpen(!isAddMenuOpen)}
+                                        className="bg-blue-700 hover:bg-blue-800 text-white px-1.5 py-1.5 border-l border-blue-500 flex items-center justify-center transition-all cursor-pointer"
+                                        title="Thao tác tiếp nhận & Cập nhật"
+                                    >
+                                        <ChevronDown size={14} />
+                                    </button>
+                                </div>
+
+                                {isAddMenuOpen && (
+                                    <div className="absolute left-0 mt-1 w-56 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 py-1.5 animate-in fade-in zoom-in-95 duration-100 divide-y divide-slate-100">
+                                        <button
+                                            onClick={() => {
+                                                setIsAddMenuOpen(false);
+                                                handleOpenAdd();
+                                            }}
+                                            className="w-full text-left px-3.5 py-2.5 text-xs font-medium text-slate-700 hover:bg-blue-50 hover:text-blue-600 flex items-center gap-2.5 transition-colors"
+                                        >
+                                            <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                                                <Plus size={16} />
+                                            </div>
+                                            <div>
+                                                <div className="font-bold text-slate-800 text-xs">Nhập hồ sơ mới</div>
+                                                <div className="text-[10px] text-slate-500">Tạo mới thủ công một hồ sơ Đăng ký</div>
+                                            </div>
+                                        </button>
+
+                                        <button
+                                            onClick={() => {
+                                                setIsAddMenuOpen(false);
+                                                setIsBulkUpdateModalOpen(true);
+                                            }}
+                                            className="w-full text-left px-3.5 py-2.5 text-xs font-medium text-slate-700 hover:bg-amber-50 hover:text-amber-600 flex items-center gap-2.5 transition-colors"
+                                        >
+                                            <div className="w-7 h-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                                                <RefreshCw size={16} />
+                                            </div>
+                                            <div>
+                                                <div className="font-bold text-slate-800 text-xs">Cập nhật thông tin</div>
+                                                <div className="text-[10px] text-slate-500">Đổi trạng thái, cán bộ, hạn trả...</div>
+                                            </div>
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
 
                             {/* Xuất DS Bàn Giao 1 Cửa (hiển thị tại Tab Giao 1 Cửa) */}
                             {activeMainTab === 'giao_1_cua' && (
@@ -1665,7 +1778,7 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                             )}
                         </div>
 
-                        {/* Right Side: Trả hồ sơ & Xử lý All Buttons placed on the far right */}
+                        {/* Right Side: Trả hồ sơ, Xóa & Xử lý All Buttons placed on the far right */}
                         {selectedIds.size > 0 && (
                             <div className="flex items-center gap-2 ml-auto">
                                 <button 
@@ -1674,6 +1787,13 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                                     title="Trả hồ sơ / Yêu cầu bổ sung"
                                 >
                                     <CornerUpLeft size={14} /> Trả hồ sơ ({selectedIds.size})
+                                </button>
+                                <button 
+                                    onClick={() => setIsBulkDeleteModalOpen(true)}
+                                    className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all shadow-2xs active:scale-95 cursor-pointer"
+                                    title="Xóa các hồ sơ đã chọn"
+                                >
+                                    <Trash2 size={14} /> Xóa ({selectedIds.size})
                                 </button>
                                 <button 
                                     onClick={() => setIsBulkUpdateModalOpen(true)}
@@ -1978,6 +2098,15 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                 } : null}
             />
 
+            {/* BULK DELETE CONFIRM MODAL */}
+            <DeleteConfirmModal
+                isOpen={isBulkDeleteModalOpen}
+                onClose={() => setIsBulkDeleteModalOpen(false)}
+                onConfirm={handleConfirmBulkDelete}
+                title="Xác nhận xóa các hồ sơ đã chọn"
+                message={`Bạn có chắc chắn muốn xóa vĩnh viễn ${selectedIds.size} hồ sơ đăng ký đã chọn? Hành động này không thể hoàn tác.`}
+            />
+
             {/* ASSIGN STAFF MODAL (From Measurement Module Design) */}
             <AssignModal 
                 isOpen={assignStaffModalOpen}
@@ -2004,7 +2133,7 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                 <BulkUpdateDangKyModal
                     isOpen={isBulkUpdateModalOpen}
                     onClose={() => setIsBulkUpdateModalOpen(false)}
-                    selectedCount={selectedIds.size}
+                    selectedCount={selectedIds.size > 0 ? selectedIds.size : filteredRecords.length}
                     employees={employeesList}
                     wards={wards}
                     onConfirm={handleBulkUpdateAll}

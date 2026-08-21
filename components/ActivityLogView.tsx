@@ -23,6 +23,7 @@ export const ActivityLogView: React.FC<ActivityLogViewProps> = ({
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedAction, setSelectedAction] = useState('all');
     const [selectedTarget, setSelectedTarget] = useState('all');
+    const [selectedPerformer, setSelectedPerformer] = useState('all');
     const [fromDate, setFromDate] = useState('');
     const [toDate, setToDate] = useState('');
     const [refreshKey, setRefreshKey] = useState(0);
@@ -36,9 +37,29 @@ export const ActivityLogView: React.FC<ActivityLogViewProps> = ({
         return getAllSystemActivityLogs(records, users, employees, dangKyRecords);
     }, [records, users, employees, dangKyRecords, refreshKey]);
 
+    // Extract list of unique performers from logs and active users
+    const uniquePerformers = useMemo(() => {
+        const set = new Set<string>();
+        allLogs.forEach(l => {
+            if (l.performerName && l.performerName.trim()) {
+                set.add(l.performerName.trim());
+            }
+        });
+        users.forEach(u => {
+            if (u.name) set.add(u.name.trim());
+            if (u.fullName) set.add(u.fullName.trim());
+        });
+        return Array.from(set).sort((a, b) => a.localeCompare(b, 'vi'));
+    }, [allLogs, users]);
+
     // Filtering
     const filteredLogs = useMemo(() => {
         return allLogs.filter(log => {
+            // Performer filter
+            if (selectedPerformer !== 'all') {
+                if (log.performerName !== selectedPerformer) return false;
+            }
+
             // Search filter
             if (searchTerm.trim()) {
                 const term = searchTerm.toLowerCase().trim();
@@ -295,6 +316,18 @@ export const ActivityLogView: React.FC<ActivityLogViewProps> = ({
                         className="w-full pl-10 pr-3 py-2 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
                     />
                 </div>
+
+                {/* Dropdown Performer */}
+                <select
+                    value={selectedPerformer}
+                    onChange={(e) => { setSelectedPerformer(e.target.value); setCurrentPage(1); }}
+                    className="px-3 py-2 text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none text-slate-700 cursor-pointer min-w-[160px]"
+                >
+                    <option value="all">Tất cả người thực hiện</option>
+                    {uniquePerformers.map(name => (
+                        <option key={name} value={name}>{name}</option>
+                    ))}
+                </select>
 
                 {/* Dropdown Action */}
                 <select

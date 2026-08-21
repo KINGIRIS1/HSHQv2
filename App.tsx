@@ -656,6 +656,16 @@ function App() {
       setIsBulkUpdateModalOpen(false);
       setSelectedRecordIds(new Set()); 
 
+      addActivityLog({
+          performerName: currentUser?.fullName || currentUser?.name || currentUser?.username || 'Cán bộ',
+          performerRole: currentUser?.role || 'ONEDOOR',
+          actionType: 'UPDATE',
+          actionLabel: 'Cập nhật hàng loạt',
+          targetType: 'Hồ sơ',
+          referenceCode: `${updatedTargets.length} hồ sơ`,
+          details: `Cập nhật trường "${String(field)}" cho ${updatedTargets.length} hồ sơ`
+      });
+
       try {
           const res = await updateRecordsBatchById(updatedTargets);
           if (!res.success) {
@@ -735,6 +745,16 @@ function App() {
       }; 
       setRecords(prev => prev.map(r => r.id === returnRecord.id ? { ...r, ...updates } : r));
       await updateRecordApi({ ...returnRecord, ...updates });
+      addActivityLog({
+          performerName: performer,
+          performerRole: currentUser?.role || 'ONEDOOR',
+          actionType: 'RETURN_RESULT',
+          actionLabel: 'Trả kết quả',
+          targetType: 'Hồ sơ',
+          referenceCode: returnRecord.code,
+          details: `Xác nhận trả kết quả hồ sơ ${returnRecord.code} cho ${receiverName} (${typeLabel} số: ${receiptNumber}, Số tiền: ${returnedPrice.toLocaleString('vi-VN')}đ)`,
+          recordId: returnRecord.id
+      });
       setToast({ type: 'success', message: `Đã ghi nhận trả kết quả hồ sơ ${returnRecord.code} cho ${receiverName}.` });
       setReturnRecord(null);
   }, [returnRecord, createStatusLog, currentUser]);
@@ -831,6 +851,15 @@ function App() {
           return;
       }
       setSelectedRecordIds(new Set()); 
+      addActivityLog({
+          performerName: currentUser?.fullName || currentUser?.name || currentUser?.username || 'Cán bộ 1 cửa',
+          performerRole: currentUser?.role || 'ONEDOOR',
+          actionType: 'EXPORT',
+          actionLabel: 'Chốt xuất giao',
+          targetType: 'Hồ sơ',
+          referenceCode: `Đợt ${batchNumber}`,
+          details: `Chốt danh sách xuất giao 1 cửa - Đợt ${batchNumber} (${updatesToApply.length} hồ sơ)`
+      });
       setToast({ type: 'success', message: `Đã chốt danh sách ${batchNumber} thành công.` });
   };
 
@@ -861,6 +890,15 @@ function App() {
           return;
       }
       setSelectedRecordIds(new Set());
+      addActivityLog({
+          performerName: currentUser?.fullName || currentUser?.name || currentUser?.username || 'Cán bộ 1 cửa',
+          performerRole: currentUser?.role || 'ONEDOOR',
+          actionType: 'EXPORT',
+          actionLabel: 'Bàn giao phòng CM',
+          targetType: 'Hồ sơ',
+          referenceCode: `Đợt ${batchNumber}`,
+          details: `Chốt danh sách bàn giao ĐỢT ${batchNumber} về ${deptName} (${recordsToHandover.length} hồ sơ)`
+      });
       setToast({ type: 'success', message: `Đã chốt danh sách bàn giao ĐỢT ${batchNumber} về ${deptName} thành công.` });
   };
 
@@ -883,6 +921,15 @@ function App() {
               return updated ? updated : r;
           }));
           setSelectedRecordIds(new Set());
+          addActivityLog({
+              performerName: currentUser?.fullName || currentUser?.name || currentUser?.username || 'Lãnh đạo ký duyệt',
+              performerRole: currentUser?.role || 'ADMIN',
+              actionType: 'APPROVE',
+              actionLabel: 'Ký duyệt đợt',
+              targetType: 'Hồ sơ',
+              referenceCode: `${pendingSign.length} hồ sơ`,
+              details: `Ký duyệt đợt cho ${pendingSign.length} hồ sơ (${pendingSign.map(p => p.code).slice(0, 3).join(', ')}${pendingSign.length > 3 ? '...' : ''})`
+          });
           setToast({ type: 'success', message: `Đã chuyển ${pendingSign.length} hồ sơ sang "Đã ký".` });
 
           try {

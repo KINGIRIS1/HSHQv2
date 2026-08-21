@@ -12,6 +12,58 @@ import SystemAnnexTemplate from './receive-record/SystemAnnexTemplate';
 import { getEmployeeName as getEmpNameHelper, extractBatchOnly } from '../utils/appHelpers';
 
 
+const parseAuthDocType = (str: string | null | undefined) => {
+    if (!str) return { cccd: '', address: '', phone: '' };
+    const parts = str.split('|');
+    const firstPart = parts[0] || '';
+    const secondPart = parts[1] || '';
+    const thirdPart = parts[2] || '';
+    
+    const knownDocTypes = ['Hợp đồng ủy quyền', 'Giấy ủy quyền', 'Văn bản ủy quyền', 'Hợp đồng uỷ quyền', 'Giấy uỷ quyền', 'Văn bản uỷ quyền', 'Khác'];
+    const isDocType = knownDocTypes.some(type => firstPart.toLowerCase().includes(type.toLowerCase()));
+    
+    if (isDocType) {
+        if (parts.length >= 4) {
+            return { cccd: parts[2] || '', address: parts[3] || '', phone: parts[4] || '' };
+        }
+        return { cccd: '', address: '', phone: '' };
+    } else {
+        return {
+            cccd: firstPart,
+            address: secondPart,
+            phone: thirdPart
+        };
+    }
+};
+
+const parseAttachedDocs = (otherDocsStr: string | null | undefined, attachedDocs?: any[] | null): { name: string; type: string }[] => {
+    if (attachedDocs && Array.isArray(attachedDocs) && attachedDocs.length > 0) {
+        return attachedDocs.map(d => ({
+            name: d.name || '',
+            type: d.type || 'Bản chính'
+        }));
+    }
+    if (!otherDocsStr) return [];
+    try {
+        const parsed = JSON.parse(otherDocsStr);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+            return parsed.map((item: any) => ({
+                name: item.name || '',
+                type: item.type === 'Bản sao' ? 'Bản sao' : 'Bản chính'
+            }));
+        }
+    } catch (e) {
+        const parts = otherDocsStr.split('|');
+        if (parts[0] && !parts[0].startsWith('{') && !parts[0].startsWith('[')) {
+            return [{
+                name: parts[0],
+                type: parts[1] === 'Bản sao' ? 'Bản sao' : 'Bản chính'
+            }];
+        }
+    }
+    return [];
+};
+
 interface DetailModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -633,29 +685,47 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                                     <p className="text-sm font-bold text-gray-800">{record.customerAddress}</p>
                                 </div>
                             )}
-                            {record.authorizedBy && (
-                                <div className="border-t border-gray-100 pt-3 mt-1">
-                                    <label className="text-[10px] text-indigo-500 uppercase font-bold block mb-2">Người được ủy quyền</label>
-                                    <div className="space-y-1.5 bg-indigo-50/50 p-2.5 rounded-lg border border-indigo-100">
-                                        <div className="flex justify-between text-xs">
-                                            <span className="text-gray-500">Họ tên:</span>
-                                            <span className="font-bold text-indigo-900">{record.authorizedBy}</span>
+                            {(() => {
+                                const authParsed = parseAuthDocType(record.authDocType);
+                                const authName = record.authorizedPersonName || record.authorizedBy;
+                                const authCccd = record.authorizedPersonId || authParsed.cccd;
+                                const authPhone = record.authorizedPersonPhone || authParsed.phone;
+                                const authAddress = record.authorizedPersonAddress || authParsed.address;
+
+                                if (!authName && !authCccd && !authPhone && !authAddress) return null;
+
+                                return (
+                                    <div className="border-t border-gray-100 pt-3 mt-1">
+                                        <label className="text-[10px] text-indigo-500 uppercase font-bold block mb-2">Người được ủy quyền</label>
+                                        <div className="space-y-1.5 bg-indigo-50/50 p-2.5 rounded-lg border border-indigo-100">
+                                            {authName && (
+                                                <div className="flex justify-between text-xs">
+                                                    <span className="text-gray-500">Họ tên:</span>
+                                                    <span className="font-bold text-indigo-900">{authName}</span>
+                                                </div>
+                                            )}
+                                            {authPhone && (
+                                                <div className="flex justify-between text-xs">
+                                                    <span className="text-gray-500">Số điện thoại:</span>
+                                                    <span className="font-bold text-emerald-700 font-mono">{authPhone}</span>
+                                                </div>
+                                            )}
+                                            {authCccd && (
+                                                <div className="flex justify-between text-xs">
+                                                    <span className="text-gray-500">CCCD:</span>
+                                                    <span className="font-semibold text-gray-800 font-mono">{authCccd}</span>
+                                                </div>
+                                            )}
+                                            {authAddress && (
+                                                <div className="text-xs">
+                                                    <span className="text-gray-500 block mb-0.5">Địa chỉ thường trú:</span>
+                                                    <span className="font-semibold text-gray-800 block">{authAddress}</span>
+                                                </div>
+                                            )}
                                         </div>
-                                        {parsedAuth.cccd && (
-                                            <div className="flex justify-between text-xs">
-                                                <span className="text-gray-500">CCCD:</span>
-                                                <span className="font-semibold text-gray-800">{parsedAuth.cccd}</span>
-                                            </div>
-                                        )}
-                                        {parsedAuth.address && (
-                                            <div className="text-xs">
-                                                <span className="text-gray-500 block mb-0.5">Địa chỉ thường trú:</span>
-                                                <span className="font-semibold text-gray-800 block">{parsedAuth.address}</span>
-                                            </div>
-                                        )}
                                     </div>
-                                </div>
-                            )}
+                                );
+                            })()}
                         </div>
                     </div>
 
@@ -829,6 +899,60 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                         
                         <div className="bg-gray-50 p-4 rounded-lg border border-gray-100 text-gray-800 text-sm font-medium mb-4 min-h-[80px]">
                             {record.content || 'Không có nội dung chi tiết.'}
+                        </div>
+
+                        {/* GIẤY TỜ KÈM THEO */}
+                        <div className="mb-4">
+                            <label className="text-[10px] text-teal-600 uppercase font-bold block mb-2 flex items-center gap-1">
+                                <FileText size={12} /> Giấy tờ kèm theo
+                            </label>
+                            {(() => {
+                                const attachedDocsList = parseAttachedDocs(record.otherDocs, record.attachedDocs);
+                                if (attachedDocsList.length > 0) {
+                                    return (
+                                        <div className="overflow-x-auto border border-gray-200 rounded-lg bg-white">
+                                            <table className="w-full text-left border-collapse text-xs">
+                                                <thead>
+                                                    <tr className="bg-slate-50 border-b border-gray-200 text-[10px] font-bold text-gray-500 uppercase">
+                                                        <th className="py-1.5 px-2 text-center w-8">#</th>
+                                                        <th className="py-1.5 px-2">Tên giấy tờ</th>
+                                                        <th className="py-1.5 px-2 w-28 text-center">Hình thức</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-gray-100">
+                                                    {attachedDocsList.map((doc, idx) => (
+                                                        <tr key={idx} className="hover:bg-slate-50/50">
+                                                            <td className="py-1.5 px-2 text-center font-bold text-gray-400">{idx + 1}</td>
+                                                            <td className="py-1.5 px-2 font-medium text-gray-800">{doc.name}</td>
+                                                            <td className="py-1.5 px-2 text-center">
+                                                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                                                    doc.type === 'Bản chính' || doc.type === 'Chính'
+                                                                        ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                                                                        : 'bg-amber-50 text-amber-700 border border-amber-200'
+                                                                }`}>
+                                                                    {doc.type === 'Bản chính' ? 'Chính' : doc.type === 'Bản sao' ? 'Sao' : (doc.type || 'Chính')}
+                                                                </span>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    );
+                                }
+                                if (record.otherDocs && typeof record.otherDocs === 'string' && !record.otherDocs.startsWith('[') && !record.otherDocs.startsWith('{')) {
+                                    return (
+                                        <div className="bg-slate-50 p-2.5 rounded-lg border border-gray-200 text-xs text-gray-700 font-medium">
+                                            {record.otherDocs}
+                                        </div>
+                                    );
+                                }
+                                return (
+                                    <div className="text-xs text-gray-400 italic bg-slate-50/50 p-2.5 rounded-lg border border-dashed border-gray-200">
+                                        Chưa có giấy tờ kèm theo.
+                                    </div>
+                                );
+                            })()}
                         </div>
 
                         {record.explanationPlan && (
