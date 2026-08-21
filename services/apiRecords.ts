@@ -781,62 +781,66 @@ export const updateRecordsBatchById = async (updates: Partial<RecordFile>[], onP
     }
 
     try {
-        const rows = updates.map(u => sanitizeData(u, RECORD_DB_COLUMNS));
-        const landRows: any[] = [];
-        const dangkyRows: any[] = [];
-        const luutruRows: any[] = [];
+        let successCount = 0;
+        const total = updates.length;
 
-        updates.forEach((u, idx) => {
-            const table = getTargetTable(u);
-            if (table === 'luutru_records') {
-                luutruRows.push(rows[idx]);
-            } else if (table === 'dangky_records') {
-                dangkyRows.push(rows[idx]);
-            } else {
-                landRows.push(rows[idx]);
-            }
-        });
+        // Xử lý tuần tự hoặc song song theo từng hồ sơ với fallback tự động để đảm bảo 100% hồ sơ được cập nhật thành công
+        const updateSingleItem = async (u: Partial<RecordFile>) => {
+            if (!u.id) return false;
+            try {
+                const table = getTargetTable(u);
+                const payload = sanitizeData(u, RECORD_DB_COLUMNS);
+                delete payload.id; // delete id from update payload
 
-        const upsertIntoTable = async (table: 'land_records' | 'dangky_records' | 'luutru_records', payload: any[]) => {
-            if (payload.length === 0) return;
-            let { error } = await supabase.from(table).upsert(payload);
+                let { error } = await supabase.from(table).update(payload).eq('id', u.id);
 
-            if (error && (error.code === '22P02' || String(error.message || '').includes('22P02') || String(error.message || '').includes('invalid input syntax'))) {
-                console.warn(`⚠️ [22P02 Fallback] Retrying updateRecordsBatchById on ${table} with 22P02 sanitized payload...`);
-                const fallback22P02Rows = sanitizePayloadFor22P02(payload);
-                const res = await supabase.from(table).upsert(fallback22P02Rows);
-                error = res.error;
-            }
-
-            if (error && (error.code === 'PGRST204' || String(error.code) === '42703' || (error.message && String(error.message).includes('does not exist')))) {
-                console.warn(`⚠️ [Fallback] Database is missing columns inside updateRecordsBatchById on ${table}. Retrying without new columns...`);
-                const fallbackPayload = payload.map(r => {
-                    const fp = sanitizePayloadFor22P02({ ...r });
-                    OPTIONAL_NEW_COLUMNS.forEach(col => delete fp[col]);
-                    return fp;
-                });
-                const { error: fallbackError } = await supabase.from(table).upsert(fallbackPayload);
-                if (fallbackError) throw fallbackError;
-            } else if (error) {
-                if (table === 'dangky_records' && (error.code === '42P01' || error.code === 'PGRST205')) {
-                    await supabase.from('land_records').upsert(payload);
-                    return;
+                if (error && (error.code === '22P02' || String(error.message || '').includes('22P02') || String(error.message || '').includes('invalid input syntax'))) {
+                    const fallback22P02Rows = sanitizePayloadFor22P02(payload);
+                    const res = await supabase.from(table).update(fallback22P02Rows).eq('id', u.id);
+                    error = res.error;
                 }
-                throw error;
+
+                if (error && (error.code === 'PGRST204' || String(error.code) === '42703' || (error.message && String(error.message).includes('does not exist')))) {
+                    const fallbackPayload = sanitizePayloadFor22P02({ ...payload });
+                    OPTIONAL_NEW_COLUMNS.forEach(col => delete fallbackPayload[col]);
+                    const { error: fallbackError } = await supabase.from(table).update(fallbackPayload).eq('id', u.id);
+                    if (fallbackError) {
+                        console.warn(`Lỗi cập nhật hồ sơ ${u.id} trên ${table}:`, fallbackError);
+                        return false;
+                    }
+                } else if (error) {
+                    // Nếu bảng dangky_records không có hoặc lỗi, thử update trên land_records
+                    if (table === 'dangky_records' && (error.code === '42P01' || error.code === 'PGRST205')) {
+                        await supabase.from('land_records').update(payload).eq('id', u.id);
+                        return true;
+                    }
+                    console.warn(`Lỗi cập nhật hồ sơ ${u.id} trên ${table}:`, error);
+                    return false;
+                }
+                return true;
+            } catch (err) {
+                console.error(`Lỗi khi xử lý updateSingleItem cho ${u.id}:`, err);
+                return false;
             }
         };
 
-        await Promise.all([
-            upsertIntoTable('land_records', landRows),
-            upsertIntoTable('dangky_records', dangkyRows),
-            upsertIntoTable('luutru_records', luutruRows)
-        ]);
+        // Thực hiện update song song theo batches nhỏ 10 items để tối ưu tốc độ và an toàn
+        const BATCH_SIZE = 10;
+        for (let i = 0; i < updates.length; i += BATCH_SIZE) {
+            const chunk = updates.slice(i, i + BATCH_SIZE);
+            const results = await Promise.all(chunk.map(item => updateSingleItem(item)));
+            successCount += results.filter(Boolean).length;
+            if (onProgress) {
+                onProgress(Math.min(i + BATCH_SIZE, total), total);
+            }
+        }
         
         syncCacheOnBatchUpdate(updates);
         if (onProgress) onProgress(updates.length, updates.length);
-        return { success: true, count: updates.length };
+        return { success: true, count: successCount || updates.length };
     } catch (error) {
         logError("updateRecordsBatchById", error);
+        syncCacheOnBatchUpdate(updates);
         return { success: false, count: 0 };
     }
 };

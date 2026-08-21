@@ -22,6 +22,7 @@ import { RejectReturnStepModal, ReturnOptionType } from './RejectReturnStepModal
 import ExcelPreviewModal from './ExcelPreviewModal';
 import DangKyDetailModal from './DangKyDetailModal';
 import DangKyRecordModal from './DangKyRecordModal';
+import { DangKyImportModal } from './DangKyImportModal';
 import DeleteConfirmModal from './DeleteConfirmModal';
 import { 
   removeVietnameseTones,
@@ -29,6 +30,7 @@ import {
   isDangKyRecordApproaching
 } from '../utils/appHelpers';
 import { addActivityLog } from '../services/activityLogService';
+import { saveDangKyRecordsBatchApi } from '../services/apiDangKy';
 
 const NEXT_STATUS_MAP: Record<DangKyStatusType, DangKyStatusType> = {
   'Tiếp nhận mới': 'Thẩm định',
@@ -137,6 +139,8 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
     const [assignStaffInput, setAssignStaffInput] = useState<string>('');
     const [returnModalOpen, setReturnModalOpen] = useState<boolean>(false);
     const [isBulkUpdateModalOpen, setIsBulkUpdateModalOpen] = useState<boolean>(false);
+    const [isImportModalOpen, setIsImportModalOpen] = useState<boolean>(false);
+    const [importModalMode, setImportModalMode] = useState<'create' | 'update'>('create');
     const [isSubmitCheckModalOpen, setIsSubmitCheckModalOpen] = useState<boolean>(false);
     const [isSubmitSignModalOpen, setIsSubmitSignModalOpen] = useState<boolean>(false);
     const [employeesList, setEmployeesList] = useState<Employee[]>([]);
@@ -1248,6 +1252,32 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
         }
     };
 
+    // Handle Excel Import / Bulk Update
+    const handleImportExcelBatch = async (
+        importedRecords: DangKyRecord[],
+        mode: 'create' | 'update',
+        onProgress?: (processed: number, total: number) => void
+    ): Promise<boolean> => {
+        try {
+            await saveDangKyRecordsBatchApi(importedRecords);
+            addActivityLog({
+                performerName: currentUser.fullName || currentUser.username,
+                performerRole: 'DANGKY',
+                actionType: mode === 'create' ? 'CREATE' : 'UPDATE',
+                actionLabel: mode === 'create' ? 'Tiếp nhận hàng loạt từ Excel' : 'Cập nhật hàng loạt từ Excel',
+                targetType: 'Đăng ký',
+                referenceCode: `${importedRecords.length} hồ sơ`,
+                details: `${mode === 'create' ? 'Tiếp nhận mới' : 'Cập nhật thông tin'} ${importedRecords.length} hồ sơ Đăng ký từ file Excel`
+            });
+            await loadData();
+            return true;
+        } catch (err) {
+            console.error('Lỗi khi import file Excel:', err);
+            alert('Có lỗi xảy ra trong quá trình lưu dữ liệu Excel.');
+            return false;
+        }
+    };
+
     // Export Excel
     const handleExportExcel = () => {
         if (filteredRecords.length === 0) {
@@ -1603,107 +1633,124 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                                 )}
                             </div>
 
-                            {/* 2 ICON CHẾ ĐỘ LỌC NHANH (QUÁ HẠN & SẮP ĐẾN HẠN) TẠI HÀNG THỨ 3 - CHỈ ĐỂ ICON + SỐ LƯỢNG */}
-                            <div className="flex items-center gap-1.5">
-                                <button
-                                    onClick={() => setWarningFilter(prev => prev === 'overdue' ? 'all' : 'overdue')}
-                                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all shadow-2xs border cursor-pointer ${
-                                        warningFilter === 'overdue'
-                                            ? 'bg-red-600 text-white border-red-600 ring-2 ring-red-200'
-                                            : 'bg-white text-red-600 border-red-200 hover:bg-red-50'
-                                    }`}
-                                    title="Lọc các hồ sơ đã quá hạn xử lý"
-                                >
-                                    <AlertTriangle size={15} className={warningFilter === 'overdue' ? 'text-white' : 'text-red-500'} />
-                                    <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${
-                                        warningFilter === 'overdue' ? 'bg-white text-red-600' : 'bg-red-100 text-red-700'
-                                    }`}>
-                                        {counts.overdueCount}
-                                    </span>
-                                </button>
-
-                                <button
-                                    onClick={() => setWarningFilter(prev => prev === 'approaching' ? 'all' : 'approaching')}
-                                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all shadow-2xs border cursor-pointer ${
-                                        warningFilter === 'approaching'
-                                            ? 'bg-orange-500 text-white border-orange-500 ring-2 ring-orange-200'
-                                            : 'bg-white text-orange-600 border-orange-200 hover:bg-orange-50'
-                                    }`}
-                                    title="Lọc các hồ sơ sắp đến hạn xử lý (còn <= 3 ngày)"
-                                >
-                                    <Clock size={15} className={warningFilter === 'approaching' ? 'text-white' : 'text-orange-500'} />
-                                    <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${
-                                        warningFilter === 'approaching' ? 'bg-white text-orange-600' : 'bg-orange-100 text-orange-800'
-                                    }`}>
-                                        {counts.approachingCount}
-                                    </span>
-                                </button>
-                            </div>
-
-                            {/* Nút Nhập Mới / Cập nhật thông tin (đặt cạnh thao tác Lọc) */}
-                            <div className="relative">
-                                <div className="flex rounded-lg shadow-2xs overflow-hidden border border-blue-600">
-                                    <button 
-                                        onClick={handleOpenAdd}
-                                        className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-1.5 flex items-center gap-1.5 transition-all active:scale-95 whitespace-nowrap cursor-pointer"
-                                    >
-                                        <Plus size={14} /> Nhập mới
-                                    </button>
+                            {/* 2 ICON CHẾ ĐỘ LỌC NHANH (QUÁ HẠN & SẮP ĐẾN HẠN) TẠI HÀNG THỨ 3 - CHỈ ĐỂ ICON + SỐ LƯỢNG (ẨN TẠI TAB GIAO 1 CỬA) */}
+                            {activeMainTab !== 'giao_1_cua' && (
+                                <div className="flex items-center gap-1.5">
                                     <button
-                                        onClick={() => setIsAddMenuOpen(!isAddMenuOpen)}
-                                        className="bg-blue-700 hover:bg-blue-800 text-white px-1.5 py-1.5 border-l border-blue-500 flex items-center justify-center transition-all cursor-pointer"
-                                        title="Thao tác tiếp nhận & Cập nhật"
+                                        onClick={() => setWarningFilter(prev => prev === 'overdue' ? 'all' : 'overdue')}
+                                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all shadow-2xs border cursor-pointer ${
+                                            warningFilter === 'overdue'
+                                                ? 'bg-red-600 text-white border-red-600 ring-2 ring-red-200'
+                                                : 'bg-white text-red-600 border-red-200 hover:bg-red-50'
+                                        }`}
+                                        title="Lọc các hồ sơ đã quá hạn xử lý"
                                     >
-                                        <ChevronDown size={14} />
+                                        <AlertTriangle size={15} className={warningFilter === 'overdue' ? 'text-white' : 'text-red-500'} />
+                                        <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${
+                                            warningFilter === 'overdue' ? 'bg-white text-red-600' : 'bg-red-100 text-red-700'
+                                        }`}>
+                                            {counts.overdueCount}
+                                        </span>
+                                    </button>
+
+                                    <button
+                                        onClick={() => setWarningFilter(prev => prev === 'approaching' ? 'all' : 'approaching')}
+                                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all shadow-2xs border cursor-pointer ${
+                                            warningFilter === 'approaching'
+                                                ? 'bg-orange-500 text-white border-orange-500 ring-2 ring-orange-200'
+                                                : 'bg-white text-orange-600 border-orange-200 hover:bg-orange-50'
+                                        }`}
+                                        title="Lọc các hồ sơ sắp đến hạn xử lý (còn <= 3 ngày)"
+                                    >
+                                        <Clock size={15} className={warningFilter === 'approaching' ? 'text-white' : 'text-orange-500'} />
+                                        <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${
+                                            warningFilter === 'approaching' ? 'bg-white text-orange-600' : 'bg-orange-100 text-orange-800'
+                                        }`}>
+                                            {counts.approachingCount}
+                                        </span>
                                     </button>
                                 </div>
+                            )}
 
-                                {isAddMenuOpen && (
-                                    <div className="absolute left-0 mt-1 w-56 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 py-1.5 animate-in fade-in zoom-in-95 duration-100 divide-y divide-slate-100">
-                                        <button
-                                            onClick={() => {
-                                                setIsAddMenuOpen(false);
-                                                handleOpenAdd();
-                                            }}
-                                            className="w-full text-left px-3.5 py-2.5 text-xs font-medium text-slate-700 hover:bg-blue-50 hover:text-blue-600 flex items-center gap-2.5 transition-colors"
+                            {/* Nút Nhập Mới / Tiếp nhận hàng loạt / Cập nhật hàng loạt (Ẩn tại tab Giao 1 Cửa) */}
+                            {activeMainTab !== 'giao_1_cua' && (
+                                <div className="relative">
+                                    <div className="flex rounded-lg shadow-2xs overflow-hidden border border-blue-600">
+                                        <button 
+                                            onClick={handleOpenAdd}
+                                            className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-1.5 flex items-center gap-1.5 transition-all active:scale-95 whitespace-nowrap cursor-pointer"
                                         >
-                                            <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-                                                <Plus size={16} />
-                                            </div>
-                                            <div>
-                                                <div className="font-bold text-slate-800 text-xs">Nhập hồ sơ mới</div>
-                                                <div className="text-[10px] text-slate-500">Tạo mới thủ công một hồ sơ Đăng ký</div>
-                                            </div>
+                                            <Plus size={14} /> Nhập mới
                                         </button>
-
                                         <button
-                                            onClick={() => {
-                                                setIsAddMenuOpen(false);
-                                                setIsBulkUpdateModalOpen(true);
-                                            }}
-                                            className="w-full text-left px-3.5 py-2.5 text-xs font-medium text-slate-700 hover:bg-amber-50 hover:text-amber-600 flex items-center gap-2.5 transition-colors"
+                                            onClick={() => setIsAddMenuOpen(!isAddMenuOpen)}
+                                            className="bg-blue-700 hover:bg-blue-800 text-white px-1.5 py-1.5 border-l border-blue-500 flex items-center justify-center transition-all cursor-pointer"
+                                            title="Thao tác tiếp nhận & Cập nhật"
                                         >
-                                            <div className="w-7 h-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
-                                                <RefreshCw size={16} />
-                                            </div>
-                                            <div>
-                                                <div className="font-bold text-slate-800 text-xs">Cập nhật thông tin</div>
-                                                <div className="text-[10px] text-slate-500">Đổi trạng thái, cán bộ, hạn trả...</div>
-                                            </div>
+                                            <ChevronDown size={14} />
                                         </button>
                                     </div>
-                                )}
-                            </div>
 
-                            {/* Xuất DS Bàn Giao 1 Cửa (hiển thị tại Tab Giao 1 Cửa) */}
-                            {activeMainTab === 'giao_1_cua' && (
-                                <button 
-                                    onClick={() => setIsExportModalOpen(true)}
-                                    className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all shadow-2xs active:scale-95 whitespace-nowrap cursor-pointer"
-                                    title="Xuất danh sách bàn giao 1 Cửa (Excel)"
-                                >
-                                    <FileSpreadsheet size={14} /> Xuất DS
-                                </button>
+                                    {isAddMenuOpen && (
+                                        <>
+                                            <div className="fixed inset-0 z-40" onClick={() => setIsAddMenuOpen(false)}></div>
+                                            <div className="absolute left-0 mt-1 w-64 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 py-1.5 animate-in fade-in zoom-in-95 duration-100 divide-y divide-slate-100">
+                                                {/* 1. Nhập hồ sơ mới */}
+                                                <button
+                                                    onClick={() => {
+                                                        setIsAddMenuOpen(false);
+                                                        handleOpenAdd();
+                                                    }}
+                                                    className="w-full text-left px-3.5 py-2.5 text-xs font-medium text-slate-700 hover:bg-blue-50 hover:text-blue-600 flex items-center gap-2.5 transition-colors cursor-pointer"
+                                                >
+                                                    <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                                                        <Plus size={16} />
+                                                    </div>
+                                                    <div>
+                                                        <div className="font-bold text-slate-800 text-xs">Nhập hồ sơ mới</div>
+                                                        <div className="text-[10px] text-slate-500">Tạo mới thủ công một hồ sơ Đăng ký</div>
+                                                    </div>
+                                                </button>
+
+                                                {/* 2. Tiếp nhận hàng loạt (Excel) */}
+                                                <button
+                                                    onClick={() => {
+                                                        setIsAddMenuOpen(false);
+                                                        setImportModalMode('create');
+                                                        setIsImportModalOpen(true);
+                                                    }}
+                                                    className="w-full text-left px-3.5 py-2.5 text-xs font-medium text-slate-700 hover:bg-emerald-50 hover:text-emerald-600 flex items-center gap-2.5 transition-colors cursor-pointer"
+                                                >
+                                                    <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                                                        <FileSpreadsheet size={16} />
+                                                    </div>
+                                                    <div>
+                                                        <div className="font-bold text-slate-800 text-xs">Tiếp nhận hàng loạt</div>
+                                                        <div className="text-[10px] text-slate-500">Tải file Excel để thêm nhiều hồ sơ mới</div>
+                                                    </div>
+                                                </button>
+
+                                                {/* 3. Cập nhật hàng loạt (Excel) */}
+                                                <button
+                                                    onClick={() => {
+                                                        setIsAddMenuOpen(false);
+                                                        setImportModalMode('update');
+                                                        setIsImportModalOpen(true);
+                                                    }}
+                                                    className="w-full text-left px-3.5 py-2.5 text-xs font-medium text-slate-700 hover:bg-amber-50 hover:text-amber-600 flex items-center gap-2.5 transition-colors cursor-pointer"
+                                                >
+                                                    <div className="w-7 h-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                                                        <RefreshCw size={16} />
+                                                    </div>
+                                                    <div>
+                                                        <div className="font-bold text-slate-800 text-xs">Cập nhật hàng loạt</div>
+                                                        <div className="text-[10px] text-slate-500">Cập nhật thông tin hồ sơ bằng file Excel</div>
+                                                    </div>
+                                                </button>
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
                             )}
 
                             {/* Direct Action Buttons per Tab Context when Records are Selected (NO 'Đã chọn' label) */}
@@ -1778,32 +1825,46 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                             )}
                         </div>
 
-                        {/* Right Side: Trả hồ sơ, Xóa & Xử lý All Buttons placed on the far right */}
-                        {selectedIds.size > 0 && (
-                            <div className="flex items-center gap-2 ml-auto">
+                        {/* Right Side: Xuất DS (nếu tại Tab Giao 1 Cửa) HOẶC Trả hồ sơ, Xóa, Xử lý All */}
+                        <div className="flex items-center gap-2 ml-auto">
+                            {/* Xuất DS Bàn Giao 1 Cửa (Đưa qua ngoài cùng bên phải của tab Giao 1 Cửa) */}
+                            {activeMainTab === 'giao_1_cua' && (
                                 <button 
-                                    onClick={() => setReturnModalOpen(true)}
-                                    className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all shadow-2xs active:scale-95 cursor-pointer"
-                                    title="Trả hồ sơ / Yêu cầu bổ sung"
+                                    onClick={() => setIsExportModalOpen(true)}
+                                    className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all shadow-2xs active:scale-95 whitespace-nowrap cursor-pointer"
+                                    title="Xuất danh sách bàn giao 1 Cửa (Excel)"
                                 >
-                                    <CornerUpLeft size={14} /> Trả hồ sơ ({selectedIds.size})
+                                    <FileSpreadsheet size={14} /> Xuất DS
                                 </button>
-                                <button 
-                                    onClick={() => setIsBulkDeleteModalOpen(true)}
-                                    className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all shadow-2xs active:scale-95 cursor-pointer"
-                                    title="Xóa các hồ sơ đã chọn"
-                                >
-                                    <Trash2 size={14} /> Xóa ({selectedIds.size})
-                                </button>
-                                <button 
-                                    onClick={() => setIsBulkUpdateModalOpen(true)}
-                                    className="bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all shadow-2xs active:scale-95 cursor-pointer"
-                                    title="Cập nhật hàng loạt nhiều thông tin"
-                                >
-                                    <Layers size={14} /> Xử lý All ({selectedIds.size})
-                                </button>
-                            </div>
-                        )}
+                            )}
+
+                            {/* Right Side Action Buttons when Records are Selected */}
+                            {selectedIds.size > 0 && (
+                                <>
+                                    <button 
+                                        onClick={() => setReturnModalOpen(true)}
+                                        className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all shadow-2xs active:scale-95 cursor-pointer"
+                                        title="Trả hồ sơ / Yêu cầu bổ sung"
+                                    >
+                                        <CornerUpLeft size={14} /> Trả hồ sơ ({selectedIds.size})
+                                    </button>
+                                    <button 
+                                        onClick={() => setIsBulkDeleteModalOpen(true)}
+                                        className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all shadow-2xs active:scale-95 cursor-pointer"
+                                        title="Xóa các hồ sơ đã chọn"
+                                    >
+                                        <Trash2 size={14} /> Xóa ({selectedIds.size})
+                                    </button>
+                                    <button 
+                                        onClick={() => setIsBulkUpdateModalOpen(true)}
+                                        className="bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all shadow-2xs active:scale-95 cursor-pointer"
+                                        title="Cập nhật hàng loạt nhiều thông tin"
+                                    >
+                                        <Layers size={14} /> Xử lý All ({selectedIds.size})
+                                    </button>
+                                </>
+                            )}
+                        </div>
                     </div>
 
                     {/* TABLE AREA */}
@@ -2127,6 +2188,17 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                 employees={employeesList}
                 onConfirm={handleRejectReturnConfirm}
             />
+
+            {/* --- MODAL IMPORT / CẬP NHẬT EXCEL (TIẾP NHẬN & CẬP NHẬT HÀNG LOẠT) --- */}
+            {isImportModalOpen && (
+                <DangKyImportModal
+                    isOpen={isImportModalOpen}
+                    onClose={() => setIsImportModalOpen(false)}
+                    onImport={handleImportExcelBatch}
+                    employees={employeesList}
+                    initialMode={importModalMode}
+                />
+            )}
 
             {/* --- MODAL XỬ LÝ ALL (BULK UPDATE MODAL) --- */}
             {isBulkUpdateModalOpen && (

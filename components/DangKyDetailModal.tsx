@@ -4,7 +4,8 @@ import {
   X, MapPin, FileText, User as UserIcon, Users, UserPlus, Shield, 
   DollarSign, CheckCircle2, Circle, Calendar, Printer, Pencil, 
   Trash2, ArrowRight, Building2, FileCheck, Layers, CalendarClock,
-  Receipt, Bell, StickyNote, Save, Loader2, CheckSquare, Send, Info
+  Receipt, Bell, StickyNote, Save, Loader2, CheckSquare, Send, Info,
+  Award
 } from 'lucide-react';
 import { saveDangKyRecordApi } from '../services/apiDangKy';
 import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../services/docxService';
@@ -472,7 +473,7 @@ export const DangKyDetailModal: React.FC<DangKyDetailModalProps> = ({
                   <MapPin size={16}/> Thông tin địa chính
                 </h3>
                 
-                <div className="grid grid-cols-3 gap-3 mb-4">
+                <div className="grid grid-cols-3 gap-3">
                   <div className="col-span-1">
                     <label className="text-[10px] text-gray-400 uppercase font-bold block mb-1">Xã / Phường</label>
                     <p className="font-bold text-gray-800 text-sm truncate">{record.ward || '---'}</p>
@@ -484,36 +485,6 @@ export const DangKyDetailModal: React.FC<DangKyDetailModalProps> = ({
                   <div>
                     <label className="text-[10px] text-gray-400 uppercase font-bold block mb-1">Thửa đất</label>
                     <p className="font-bold text-gray-800 bg-gray-50 px-2 py-1 rounded border border-gray-200 text-center font-mono text-sm">{record.landPlot || '-'}</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 mb-3">
-                  <div>
-                    <label className="text-[10px] text-gray-400 uppercase font-bold block mb-0.5">Diện tích tổng</label>
-                    <p className="text-xs font-bold text-gray-800 font-mono bg-slate-50 p-1.5 rounded border border-gray-200 text-center">
-                      {record.totalArea ? `${record.totalArea} m²` : '---'}
-                    </p>
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-gray-400 uppercase font-bold block mb-0.5">Đất ở</label>
-                    <p className="text-xs font-bold text-gray-800 font-mono bg-slate-50 p-1.5 rounded border border-gray-200 text-center">
-                      {record.residentialArea ? `${record.residentialArea} m²` : '---'}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-[10px] text-gray-400 uppercase font-bold block mb-0.5">Số phát hành GCN</label>
-                    <p className="text-xs font-bold text-gray-800 font-mono bg-slate-50 p-1.5 rounded border border-gray-200 text-center">
-                      {record.issueNumber || '---'}
-                    </p>
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-gray-400 uppercase font-bold block mb-0.5">Số vào sổ</label>
-                    <p className="text-xs font-bold text-gray-800 font-mono bg-slate-50 p-1.5 rounded border border-gray-200 text-center">
-                      {record.entryNumber || '---'}
-                    </p>
                   </div>
                 </div>
               </div>
@@ -569,22 +540,38 @@ export const DangKyDetailModal: React.FC<DangKyDetailModalProps> = ({
             {/* COLUMN 2: CHI TIẾT & TÀI CHÍNH */}
             <div className="space-y-6">
               
-              {/* SỐ PHIẾU CHUYỂN THUẾ */}
-              <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
-                <h3 className="text-xs font-bold text-amber-600 uppercase mb-3 flex items-center gap-2 border-l-4 border-amber-600 pl-2">
-                  <FileText size={16}/> Thông tin chuyển thuế
-                </h3>
-                <div className="bg-amber-50/70 p-3.5 rounded-lg border border-amber-200/80 flex items-center justify-between">
-                  <span className="text-xs font-bold text-amber-950 uppercase">Số phiếu chuyển thuế:</span>
-                  <span className="text-sm font-black text-amber-900 font-mono bg-white px-3 py-1 rounded-lg border border-amber-300 shadow-2xs">
-                    {record.taxFormNumber || 'Chưa có số phiếu'}
-                  </span>
-                </div>
-              </div>
-
-              {/* NỘI DUNG CHI TIẾT */}
+              {/* NỘI DUNG CHI TIẾT & PHIẾU CHUYỂN THUẾ / SỐ PHÁT HÀNH GCN */}
               <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm space-y-4">
                 
+                {/* 2 HÀNG BÁO SỐ PHIẾU CHUYỂN THUẾ & SỐ SERI GCN (ĐẶT SONG SONG TRÊN CÙNG HÀNG NGANG) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Cột 1: Số phiếu chuyển */}
+                  <div className="bg-amber-50/80 border border-amber-200/80 rounded-xl p-3 flex items-center gap-2.5 min-w-0">
+                    <div className="bg-amber-200 text-amber-800 p-2 rounded-lg shrink-0">
+                      <FileText size={16} />
+                    </div>
+                    <div className="text-left truncate min-w-0">
+                      <span className="text-[10px] text-amber-700 uppercase font-bold block truncate">Số phiếu chuyển :</span>
+                      <p className="text-xs font-bold text-amber-950 font-mono truncate">
+                        {record.taxFormNumber || '...'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Cột 2: Số seri GCN (Song song) */}
+                  <div className="bg-purple-50/80 border border-purple-200/80 rounded-xl p-3 flex items-center gap-2.5 min-w-0">
+                    <div className="bg-purple-200 text-purple-800 p-2 rounded-lg shrink-0">
+                      <Award size={16} />
+                    </div>
+                    <div className="text-left truncate min-w-0">
+                      <span className="text-[10px] text-purple-700 uppercase font-bold block truncate">Số seri GCN :</span>
+                      <p className="text-xs font-bold text-purple-950 font-mono truncate">
+                        {record.issueNumber || '...'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
                 <h3 className="text-xs font-bold text-purple-600 uppercase flex items-center gap-2 border-l-4 border-purple-600 pl-2">
                   <FileText size={16}/> Nội dung chi tiết
                 </h3>

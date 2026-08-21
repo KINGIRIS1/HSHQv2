@@ -433,21 +433,21 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
       <div className="bg-slate-100 rounded-2xl shadow-2xl w-full max-w-5xl max-h-[95vh] flex flex-col overflow-hidden border border-slate-200">
         
         {/* Modal Header */}
-        <div className="px-5 sm:px-6 py-3.5 bg-slate-900 text-white flex justify-between items-center shrink-0 border-b border-slate-800">
+        <div className="px-5 sm:px-6 py-3.5 bg-white text-slate-900 flex justify-between items-center shrink-0 border-b border-slate-200">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-blue-600/30 text-blue-400 flex items-center justify-center font-bold">
+            <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
               <ClipboardList size={18} />
             </div>
             <div>
-              <h3 className="font-bold text-sm sm:text-base text-white tracking-wide">
+              <h3 className="font-bold text-sm sm:text-base text-slate-900 tracking-wide">
                 {initialData ? `CẬP NHẬT HỒ SƠ: ${initialData.code}` : 'TIẾP NHẬN HỒ SƠ MỚI (ĐĂNG KÝ)'}
               </h3>
-              <p className="text-[11px] sm:text-xs text-slate-400 font-medium">Nhập đầy đủ các thông tin bên dưới để lưu hồ sơ vào hệ thống</p>
+              <p className="text-[11px] sm:text-xs text-slate-500 font-medium">Nhập đầy đủ các thông tin bên dưới để lưu hồ sơ vào hệ thống</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-white hover:bg-slate-800 p-1.5 sm:p-2 rounded-xl transition-all cursor-pointer"
+            className="text-slate-400 hover:text-slate-700 hover:bg-slate-100 p-1.5 sm:p-2 rounded-xl transition-all cursor-pointer"
             title="Đóng cửa sổ"
           >
             <X size={20} />
@@ -466,85 +466,79 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
               THÔNG TIN CHUNG
             </h3>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
-              <div>
-                <label className={labelClass}>
-                  Mã hồ sơ <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={formData.code || ''}
-                  onChange={e => handleFieldChange('code', e.target.value)}
-                  className={`${inputClass} font-mono font-bold text-blue-700 bg-blue-50/20`}
-                  placeholder="HS-2026-985"
-                />
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 items-end">
+                <div>
+                  <label className={labelClass}>
+                    Mã hồ sơ <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.code || ''}
+                    onChange={e => handleFieldChange('code', e.target.value)}
+                    className={`${inputClass} font-mono font-bold text-blue-700 bg-blue-50/20`}
+                    placeholder="HS-2026-985"
+                  />
+                </div>
+
+                <div className="lg:col-span-3">
+                  <label className={`${labelClass} flex items-center gap-1`}>
+                    Loại hồ sơ <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={formData.recordType || ''}
+                    onChange={e => handleFieldChange('recordType', e.target.value)}
+                    className={`${inputClass} font-semibold`}
+                  >
+                    <option value="">-- Chọn loại hồ sơ --</option>
+                    {DANG_KY_RECORD_TYPES.map(type => (
+                      <option key={type} value={type}>
+                        {type}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
-              <div className="lg:col-span-3">
-                <label className={`${labelClass} flex items-center gap-1`}>
-                  Loại hồ sơ <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={formData.recordType || ''}
-                  onChange={e => handleFieldChange('recordType', e.target.value)}
-                  className={`${inputClass} font-semibold`}
-                >
-                  <option value="">-- Chọn loại hồ sơ --</option>
-                  {DANG_KY_RECORD_TYPES.map(type => (
-                    <option key={type} value={type}>
-                      {type}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+                <div>
+                  <label className={labelClass}>Trạng thái</label>
+                  <select
+                    value={formData.status || 'Tiếp nhận mới'}
+                    onChange={e => handleFieldChange('status', e.target.value as DangKyStatusType)}
+                    className={`${inputClass} font-bold bg-amber-50/80 border-amber-300 text-amber-900`}
+                  >
+                    {DANG_KY_STATUS_LIST.map(st => (
+                      <option key={st} value={st}>
+                        {st}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-              <div>
-                <label className={labelClass}>Ngày nhận</label>
-                <input
-                  type="date"
-                  value={formData.receivedDate ? formData.receivedDate.split('T')[0] : ''}
-                  onChange={e => handleFieldChange('receivedDate', e.target.value)}
-                  className={inputClass}
-                />
-              </div>
+                <div>
+                  <label className={labelClass}>Ngày nhận</label>
+                  <input
+                    type="date"
+                    value={formData.receivedDate ? formData.receivedDate.split('T')[0] : ''}
+                    onChange={e => handleFieldChange('receivedDate', e.target.value)}
+                    className={inputClass}
+                  />
+                </div>
 
-              <div>
-                <label className={`${labelClass} text-red-600 font-bold`}>
-                  Hẹn trả <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="date"
-                  required
-                  value={formData.deadline ? formData.deadline.split('T')[0] : ''}
-                  onChange={e => handleFieldChange('deadline', e.target.value)}
-                  className={`${inputClass} bg-pink-50/90 border-pink-200 text-red-600 font-bold`}
-                />
-              </div>
-
-              <div>
-                <label className={labelClass}>Ngày giao NV</label>
-                <input
-                  type="date"
-                  value={formData.assignedDate ? formData.assignedDate.split('T')[0] : ''}
-                  onChange={e => handleFieldChange('assignedDate', e.target.value)}
-                  className={inputClass}
-                />
-              </div>
-
-              <div className="lg:col-span-1">
-                <label className={labelClass}>Trạng thái</label>
-                <select
-                  value={formData.status || 'Tiếp nhận mới'}
-                  onChange={e => handleFieldChange('status', e.target.value as DangKyStatusType)}
-                  className={`${inputClass} font-bold bg-amber-50/80 border-amber-300 text-amber-900`}
-                >
-                  {DANG_KY_STATUS_LIST.map(st => (
-                    <option key={st} value={st}>
-                      {st}
-                    </option>
-                  ))}
-                </select>
+                <div>
+                  <label className={`${labelClass} text-red-600 font-bold`}>
+                    Hẹn trả <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={formData.deadline ? formData.deadline.split('T')[0] : ''}
+                    onChange={e => handleFieldChange('deadline', e.target.value)}
+                    className={`${inputClass} bg-pink-50/90 border-pink-200 text-red-600 font-bold`}
+                  />
+                </div>
               </div>
             </div>
 
@@ -656,7 +650,7 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
                         <label className="block text-xs font-bold text-indigo-800 mb-1">Ngày ký duyệt</label>
                         <input
                           type="date"
-                          value={formData.approvalDate ? formData.approvalDate.split('T')[0] : (formData.completedDate ? formData.completedDate.split('T')[0] : '')}
+                          value={formData.approvalDate ? formData.approvalDate.split('T')[0] : ''}
                           onChange={e => handleFieldChange('approvalDate', e.target.value)}
                           className="w-full border border-indigo-300 bg-indigo-50/80 text-indigo-800 font-medium rounded-lg px-3 py-1.5 text-xs sm:text-sm outline-none shadow-2xs"
                         />
@@ -867,13 +861,13 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
                 </div>
 
                 <div>
-                  <label className={labelClass}>Số phát hành</label>
+                  <label className={`${labelClass} text-purple-700`}>Số seri GCN</label>
                   <input
                     type="text"
                     value={formData.issueNumber || ''}
                     onChange={e => handleFieldChange('issueNumber', e.target.value)}
-                    className={inputClass}
-                    placeholder="VD: CD 123456"
+                    className={`${inputClass} font-mono font-bold text-purple-900 bg-purple-50/30`}
+                    placeholder="VD: CP 123456"
                   />
                 </div>
 
@@ -1284,98 +1278,172 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
             )}
           </div>
 
-          {/* GHI CHÚ NỘI BỘ (Đưa xuống dưới thông tin người được ủy quyền) */}
-          <div className="bg-amber-50/60 p-3.5 sm:p-4 rounded-xl border border-amber-200/80 shadow-2xs">
-            <label className="text-xs sm:text-sm font-bold text-amber-900 uppercase mb-2 flex items-center gap-1.5">
-              <span>🔓</span> GHI CHÚ NỘI BỘ
-            </label>
-            <AutoResizeTextarea
-              value={formData.privateNotes || ''}
-              onChange={e => {
-                handleFieldChange('privateNotes', e.target.value);
-              }}
-              className="w-full p-2.5 border border-amber-300/80 rounded-lg text-xs sm:text-sm outline-none focus:border-amber-500 font-medium text-slate-800 bg-white leading-relaxed"
-              minRows={1}
-              placeholder="Nhập ghi chú nội bộ..."
-            />
-          </div>
+          {/* THÔNG TIN XỬ LÝ & TRẢ KẾT QUẢ THEO GIAO DIỆN MỚI */}
+          <div className="space-y-3.5 pt-2">
+            {/* HÀNG 2 CỘT: GIAO NHÂN VIÊN XỬ LÝ & SỐ PHIẾU BÁO */}
+            <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200 shadow-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-bold text-slate-700 uppercase mb-1.5 block">
+                    GIAO NHÂN VIÊN XỬ LÝ (TỔ CẤP GIẤY)
+                  </label>
+                  <select
+                    value={formData.assignedTo || ''}
+                    onChange={e => handleFieldChange('assignedTo', e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs sm:text-sm font-medium text-slate-800 focus:border-blue-500 outline-none shadow-2xs"
+                  >
+                    <option value="">-- Chưa giao --</option>
+                    {(
+                      employees.filter(e => !e.department || e.department.toLowerCase().includes('cấp giấy') || e.department.toLowerCase().includes('cap giay') || e.department.toLowerCase().includes('đăng ký') || e.department.toLowerCase().includes('dang ky')).length > 0
+                        ? employees.filter(e => !e.department || e.department.toLowerCase().includes('cấp giấy') || e.department.toLowerCase().includes('cap giay') || e.department.toLowerCase().includes('đăng ký') || e.department.toLowerCase().includes('dang ky'))
+                        : employees
+                    ).map(e => (
+                      <option key={e.id} value={e.name}>{e.name} {e.department ? `(${e.department})` : ''}</option>
+                    ))}
+                  </select>
+                </div>
 
-          {/* 8. MỞ RỘNG: TIẾN ĐỘ QUY TRÌNH & TÀI CHÍNH (NẾU CHỈNH SỬA) */}
-          {initialData && (
-            <div className="bg-white rounded-xl border border-slate-200 shadow-xs">
-              <div className="p-3.5 sm:p-4 flex items-center justify-between gap-2 bg-white rounded-xl">
-                <h3 className="text-xs sm:text-sm font-bold text-slate-800 uppercase flex items-center gap-1.5">
-                  <span className="p-1 bg-amber-100 text-amber-600 rounded-md">
-                    <RefreshCw size={14} />
-                  </span>
-                  TIẾN ĐỘ QUY TRÌNH THỦ TỤC & THU PHÍ (CẬP NHẬT MỞ RỘNG)
-                </h3>
-                <button
-                  type="button"
-                  onClick={() => setShowWorkflowSection(!showWorkflowSection)}
-                  className="text-xs font-bold uppercase rounded-md border border-slate-200 hover:bg-slate-50 px-2.5 py-1 text-slate-600 bg-white shadow-xs cursor-pointer"
-                >
-                  {showWorkflowSection ? '▲ ẨN' : '▼ HIỆN'}
-                </button>
+                <div>
+                  <label className="text-xs font-bold text-amber-900 uppercase mb-1.5 block">
+                    SỐ PHIẾU BÁO
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.taxFormNumber || ''}
+                    onChange={e => handleFieldChange('taxFormNumber', e.target.value)}
+                    className="w-full px-3 py-2 bg-amber-50/30 border border-amber-300 rounded-lg text-xs sm:text-sm font-mono font-bold text-amber-950 focus:border-amber-500 outline-none"
+                    placeholder="VD: 123/PCTT"
+                  />
+                </div>
               </div>
+            </div>
 
-              {showWorkflowSection && (
-                <div className="p-3.5 sm:p-4 bg-slate-50/50 space-y-3 animate-fade-in border-t border-slate-100 rounded-b-xl">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {/* CHỈ HIỂN THỊ CÁC KHỐI THÔNG TIN MỞ RỘNG KHI CẬP NHẬT HỒ SƠ (KHÔNG HIỆN Ở TIẾP NHẬN MỚI) */}
+            {initialData && (
+              <>
+                {/* GHI CHÚ NỘI BỘ (Khung viền vàng nổi bật) */}
+                <div className="bg-amber-50/40 p-3.5 sm:p-4 rounded-xl border border-amber-200 shadow-2xs">
+                  <label className="text-xs sm:text-sm font-bold text-amber-900 uppercase mb-2 flex items-center gap-1.5">
+                    <span className="text-amber-600">🔒</span> GHI CHÚ NỘI BỘ
+                  </label>
+                  <AutoResizeTextarea
+                    value={formData.privateNotes || ''}
+                    onChange={e => {
+                      handleFieldChange('privateNotes', e.target.value);
+                    }}
+                    className="w-full p-2.5 border border-amber-300/80 rounded-lg text-xs sm:text-sm outline-none focus:border-amber-500 font-medium text-slate-800 bg-white leading-relaxed"
+                    minRows={1}
+                    placeholder="Nhập ghi chú nội bộ..."
+                  />
+                </div>
+
+                {/* HÀNG 3 CỘT: ĐỢT XUẤT, NGÀY XUẤT, PHI ĐỊA GIỚI */}
+                <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-blue-100/80 shadow-xs">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div>
-                      <label className={labelClass}>Cán bộ thụ lý / Thẩm định</label>
-                      <select
-                        value={formData.appraisalStaff || ''}
-                        onChange={e => handleFieldChange('appraisalStaff', e.target.value)}
-                        className={inputClass}
-                      >
-                        <option value="">-- Chọn cán bộ --</option>
-                        {employees.map(e => (
-                          <option key={e.id} value={e.name}>{e.name}</option>
-                        ))}
-                      </select>
+                      <label className="text-[11px] sm:text-xs font-bold text-blue-900 uppercase mb-1.5 block">
+                        ĐỢT XUẤT (BATCH)
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.exportBatch || ''}
+                        onChange={e => handleFieldChange('exportBatch', e.target.value)}
+                        className="w-full px-3 py-2 bg-white border border-blue-200 rounded-lg text-xs sm:text-sm font-semibold text-blue-900 focus:border-blue-500 outline-none"
+                        placeholder="VD: 1, 2, 3..."
+                      />
                     </div>
 
                     <div>
-                      <label className={labelClass}>Cán bộ kiểm tra</label>
-                      <select
-                        value={formData.checkedBy || ''}
-                        onChange={e => handleFieldChange('checkedBy', e.target.value)}
-                        className={inputClass}
-                      >
-                        <option value="">-- Chọn cán bộ --</option>
-                        {employees.map(e => (
-                          <option key={e.id} value={e.name}>{e.name}</option>
-                        ))}
-                      </select>
+                      <label className="text-[11px] sm:text-xs font-bold text-blue-900 uppercase mb-1.5 block">
+                        NGÀY XUẤT
+                      </label>
+                      <input
+                        type="date"
+                        value={formData.exportDate ? formData.exportDate.split('T')[0] : ''}
+                        onChange={e => handleFieldChange('exportDate', e.target.value)}
+                        className="w-full px-3 py-2 bg-white border border-blue-200 rounded-lg text-xs sm:text-sm font-medium text-slate-800 focus:border-blue-500 outline-none"
+                      />
                     </div>
 
                     <div>
-                      <label className={labelClass}>Số tiền lệ phí (VNĐ)</label>
+                      <label className="text-[11px] sm:text-xs font-bold text-blue-900 uppercase mb-1.5 block">
+                        PHI ĐỊA GIỚI
+                      </label>
+                      <select
+                        value={formData.handoverWard || formData.nonBoundaryWard || ''}
+                        onChange={e => {
+                          const val = e.target.value;
+                          if (!val) {
+                            handleFieldChange('isNonBoundary', false);
+                            handleFieldChange('nonBoundaryWard', '');
+                            handleFieldChange('handoverWard', '');
+                          } else {
+                            handleFieldChange('isNonBoundary', true);
+                            handleFieldChange('nonBoundaryWard', val);
+                            handleFieldChange('handoverWard', val);
+                          }
+                        }}
+                        className="w-full px-3 py-2 bg-white border border-blue-200 rounded-lg text-xs sm:text-sm font-semibold text-blue-900 focus:border-blue-500 outline-none"
+                      >
+                        <option value="">-- Không (Theo địa chỉ thửa đất) --</option>
+                        {wards.map(w => (
+                          <option key={w} value={w}>
+                            {w.startsWith('Xã ') || w.startsWith('Phường ') ? w : `Xã ${w}`}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* TRẢ KẾT QUẢ CHO DÂN (Khung xanh lá) */}
+                <div className="bg-emerald-50/40 p-3.5 sm:p-4 rounded-xl border border-emerald-200 shadow-2xs">
+                  <label className="text-xs sm:text-sm font-bold text-emerald-900 uppercase mb-3 flex items-center gap-1.5">
+                    <span className="text-emerald-600">📄</span> TRẢ KẾT QUẢ CHO DÂN
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="text-[11px] sm:text-xs font-bold text-emerald-800 mb-1.5 block">
+                        Ngày trả kết quả
+                      </label>
+                      <input
+                        type="date"
+                        value={formData.deliveryDate ? formData.deliveryDate.split('T')[0] : ''}
+                        onChange={e => handleFieldChange('deliveryDate', e.target.value)}
+                        className="w-full px-3 py-2 bg-white border border-emerald-300 rounded-lg text-xs sm:text-sm font-medium text-slate-800 focus:border-emerald-500 outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] sm:text-xs font-bold text-emerald-800 mb-1.5 block">
+                        Số Biên lai / Hóa đơn
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.receiptNumber || ''}
+                        onChange={e => handleFieldChange('receiptNumber', e.target.value)}
+                        className="w-full px-3 py-2 bg-white border border-emerald-300 rounded-lg text-xs sm:text-sm font-medium text-slate-800 focus:border-emerald-500 outline-none"
+                        placeholder="Nhập số biên lai/hóa đơn..."
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] sm:text-xs font-bold text-emerald-800 mb-1.5 block">
+                        Số tiền (VNĐ)
+                      </label>
                       <input
                         type="number"
-                        value={formData.feeAmount || 0}
+                        value={formData.feeAmount ?? 310000}
                         onChange={e => handleFieldChange('feeAmount', e.target.value ? Number(e.target.value) : 0)}
-                        className={`${inputClass} font-mono`}
-                        placeholder="0"
+                        className="w-full px-3 py-2 bg-white border border-emerald-300 rounded-lg text-xs sm:text-sm font-mono font-bold text-emerald-950 focus:border-emerald-500 outline-none"
+                        placeholder="310000"
                       />
                     </div>
                   </div>
-
-                  <div>
-                    <label className={labelClass}>Ghi chú bổ sung</label>
-                    <AutoResizeTextarea
-                      value={formData.notes || ''}
-                      onChange={e => handleFieldChange('notes', e.target.value)}
-                      className={`${inputClass} leading-relaxed`}
-                      minRows={1}
-                      placeholder="Ghi chú thêm..."
-                    />
-                  </div>
                 </div>
-              )}
-            </div>
-          )}
+              </>
+            )}
+          </div>
 
         </div>
 

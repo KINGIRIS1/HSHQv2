@@ -378,6 +378,66 @@ export const bulkDeleteDangKyRecordsApi = async (idsOrCodes: string[]): Promise<
   return true;
 };
 
+// Batch Import or Bulk Save DangKy Records
+export const saveDangKyRecordsBatchApi = async (
+  recordsToSave: DangKyRecord[]
+): Promise<boolean> => {
+  if (!recordsToSave || recordsToSave.length === 0) return true;
+  const allRecords = await fetchDangKyRecords();
+  const existingMap = new Map<string, number>();
+  
+  allRecords.forEach((r, idx) => {
+    if (r.id) existingMap.set(String(r.id).trim().toLowerCase(), idx);
+    if (r.code) existingMap.set(String(r.code).trim().toLowerCase(), idx);
+  });
+
+  const now = new Date().toISOString();
+  const updatedList = [...allRecords];
+
+  for (const item of recordsToSave) {
+    const keyId = item.id ? String(item.id).trim().toLowerCase() : '';
+    const keyCode = item.code ? String(item.code).trim().toLowerCase() : '';
+    const matchIdx = (keyId && existingMap.has(keyId)) ? existingMap.get(keyId)! : ((keyCode && existingMap.has(keyCode)) ? existingMap.get(keyCode)! : -1);
+
+    const recordWithTimestamp = {
+      ...item,
+      updatedAt: now,
+      createdAt: item.createdAt || now
+    };
+
+    if (matchIdx >= 0) {
+      updatedList[matchIdx] = { ...updatedList[matchIdx], ...recordWithTimestamp };
+    } else {
+      updatedList.unshift(recordWithTimestamp);
+      if (keyId) existingMap.set(keyId, 0);
+      if (keyCode) existingMap.set(keyCode, 0);
+    }
+  }
+
+  saveToCache(CACHE_KEYS.DANGKY_RECORDS, updatedList);
+
+  if (isConfigured) {
+    try {
+      const dbPayloads = recordsToSave.map(mapDangKyToDb);
+      // Batch upsert in chunks of 50
+      const chunkSize = 50;
+      for (let i = 0; i < dbPayloads.length; i += chunkSize) {
+        const chunk = dbPayloads.slice(i, i + chunkSize);
+        const { error } = await supabase
+          .from('dangky_records')
+          .upsert(chunk, { onConflict: 'code' });
+        if (error) {
+          logError('saveDangKyRecordsBatchApi Supabase', error, true);
+        }
+      }
+    } catch (e) {
+      logError('saveDangKyRecordsBatchApi catch', e, true);
+    }
+  }
+
+  return true;
+};
+
 // Batch update status or field
 export const bulkUpdateDangKyRecordsApi = async (
   ids: string[],
@@ -395,13 +455,7 @@ export const bulkUpdateDangKyRecordsApi = async (
 
   if (isConfigured) {
     try {
-      const dbUpdates: any = {};
-      if (updates.status) dbUpdates.status = updates.status;
-      if (updates.ward) dbUpdates.ward = updates.ward;
-      if (updates.exportBatch) dbUpdates.exportBatch = updates.exportBatch;
-      if (updates.appraisalStaff) dbUpdates.appraisalStaff = updates.appraisalStaff;
-      if (updates.checkedBy) dbUpdates.checkedBy = updates.checkedBy;
-      if (updates.submittedTo) dbUpdates.submittedTo = updates.submittedTo;
+      const dbUpdates: any = { ...updates };
       dbUpdates.updatedAt = new Date().toISOString();
 
       const { error } = await supabase
@@ -419,3 +473,4 @@ export const bulkUpdateDangKyRecordsApi = async (
 
   return true;
 };
+

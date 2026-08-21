@@ -566,26 +566,26 @@ export const BatchErrorDiagnosticModal: React.FC<BatchErrorDiagnosticModalProps>
       <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-6xl max-h-[90vh] flex flex-col overflow-hidden my-auto">
         
         {/* Header */}
-        <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between shrink-0 border-b border-slate-800">
+        <div className="bg-white text-slate-900 px-6 py-4 flex items-center justify-between shrink-0 border-b border-slate-200">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-red-600 flex items-center justify-center text-white shadow-lg shrink-0">
+            <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center shadow-2xs shrink-0">
               <AlertTriangle size={22} />
             </div>
             <div>
-              <h3 className="text-lg font-extrabold tracking-tight text-white flex items-center gap-2">
+              <h3 className="text-base sm:text-lg font-extrabold tracking-tight text-slate-900 flex items-center gap-2">
                 Công Cụ Kiểm Tra & Khắc Phục Lỗi Hồ Sơ
-                <span className="bg-red-500/30 text-red-300 text-xs px-2.5 py-0.5 rounded-full border border-red-400/30 font-bold">
+                <span className="bg-red-50 text-red-600 text-xs px-2.5 py-0.5 rounded-full border border-red-200 font-bold">
                   {categoryCounts.all} hồ sơ có vấn đề
                 </span>
               </h3>
-              <p className="text-xs text-slate-300 mt-0.5">
+              <p className="text-xs text-slate-500 mt-0.5 font-medium">
                 Phân mảng chi tiết các loại lỗi, đề xuất hướng xử lý và hỗ trợ sửa nhanh / tự động hàng loạt
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-white p-2 rounded-xl hover:bg-slate-800 transition-colors"
+            className="text-slate-400 hover:text-slate-700 p-2 rounded-xl hover:bg-slate-100 transition-colors"
           >
             <X size={20} />
           </button>

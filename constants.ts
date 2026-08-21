@@ -169,6 +169,43 @@ export const getShortRecordType = (type: string | null | undefined): string => {
   return type; // Trả về nguyên bản nếu không khớp quy tắc rút gọn
 };
 
+export const getCanonicalRecordType = (type: string | null | undefined): string => {
+  if (!type) return '';
+  const t = type.toLowerCase().trim();
+  
+  if (t.startsWith('1.1') || t.includes('sao lục') || t.includes('cung cấp tài liệu') || t.includes('cung cấp dữ liệu') || t.includes('cc dl đđ')) return '1.1 Sao lục hồ sơ';
+  if (t.startsWith('1.2') || t.includes('công văn')) return '1.2 Công văn';
+  if (t.startsWith('2.1') || t.includes('trích lục')) return '2.1 Trích lục';
+  if (t.startsWith('2.2') || (t.includes('trích đo') && !t.includes('cắm mốc') && !t.includes('tách') && !t.includes('hợp'))) return '2.2 Trích đo';
+  if (t.startsWith('2.3') || t.startsWith('2.6') || t.includes('duyệt đơn') || t.includes('cung cấp số thửa') || t.includes('dđ & cc') || t.includes('số thửa')) return '2.3 Duyệt đơn & Cung cấp số thửa';
+  if (t.startsWith('2.4') || t.includes('cắm mốc') || (t.includes('trích đo') && t.includes('cắm mốc'))) return '2.4 Trích đo Cắm mốc';
+  if (t.startsWith('2.5') || t.includes('tách - hợp thửa') || t.includes('tách thửa') || t.includes('hợp thửa') || (t.includes('trích đo') && (t.includes('tách') || t.includes('hợp')))) return '2.5 Trích đo Tách - Hợp thửa';
+
+  if (t.includes('chuyển nhượng')) return '3.1.1 Chuyển nhượng';
+  if (t.includes('tặng cho')) return '3.1.2 Tặng cho';
+  if (t.includes('thừa kế')) return '3.1.3 Thừa kế';
+  if (t.includes('thỏa thuận')) return '3.1.4 Thỏa thuận';
+  if (t.includes('cấp đổi (có thuế)')) return '3.2.2 Cấp đổi (có thuế)';
+  if (t.includes('cấp đổi')) return '3.2.1 Cấp đổi';
+  if (t.includes('cấp lại (có thuế)')) return '3.3.2 Cấp lại (có thuế)';
+  if (t.includes('cấp lại')) return '3.3.1 Cấp lại';
+  if (t.includes('3.4.1') || (t.includes('tách') && t.includes('hợp'))) return '3.4.1 Tách - hợp thửa';
+  if (t.includes('gia hạn')) return '3.5.1 Gia hạn';
+  if (t.includes('chuyển mục đích')) return '3.6.1 Chuyển mục đích không xin phép';
+  if (t.includes('đính chính')) return '3.7.1 Đính chính GCN';
+  if (t.includes('xóa') && t.includes('gdbd')) return '3.8.2 Xóa ĐK GDBD';
+  if (t.includes('gdbd') || t.includes('giao dịch bảo đảm')) return '3.8.1 Đăng ký GDBD';
+
+  if (t.includes('thi hành án')) return 'Thi hành án';
+  if (t.includes('tòa án')) return 'Tòa án';
+  if (t.includes('cmd')) return 'CMD';
+
+  const found = RECORD_TYPES.find(rt => rt.toLowerCase() === t);
+  if (found) return found;
+
+  return type;
+};
+
 export const isArchiveRecordType = (type: string | null | undefined): boolean => {
   const short = getShortRecordType(type);
   return short === '1.1 Sao lục' || short === '1.2 Công văn';

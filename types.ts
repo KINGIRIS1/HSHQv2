@@ -507,6 +507,10 @@ export interface DangKyRecord {
   applicantAddress?: string;                // Địa chỉ thường trú người nộp
   assignedDate?: string;                    // Ngày giao NV
   issueDate?: string;                       // Ngày cấp GCN
+  assignedTo?: string;                      // NV xử lý
+  nonBoundaryWard?: string;                 // Phi địa giới xã
+  isNonBoundary?: boolean;                  // Có phải phi địa giới không
+  deliveryDate?: string;                    // Ngày giao trả kết quả
   attachedDocs?: AttachedDoc[];             // Giấy tờ kèm theo
   attachedDocuments?: { name: string; type: string }[]; // Giấy tờ kèm theo khác
   createdAt?: string;
