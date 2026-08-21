@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { calculateDeadlineHelper } from '../utils/appHelpers';
 import { addActivityLog } from '../services/activityLogService';
+import { AutoResizeTextarea } from './AutoResizeTextarea';
 
 interface DangKyRecordModalProps {
   isOpen: boolean;
@@ -1117,11 +1118,11 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
               </span>
               NỘI DUNG YÊU CẦU CHI TIẾT
             </h3>
-            <textarea
+            <AutoResizeTextarea
               value={formData.notes || ''}
               onChange={e => handleFieldChange('notes', e.target.value)}
-              className={`${inputClass} resize-y font-medium`}
-              rows={3}
+              className={`${inputClass} font-medium leading-relaxed`}
+              minRows={1}
               placeholder="Nhập nội dung yêu cầu chi tiết của hồ sơ..."
             />
           </div>
@@ -1288,13 +1289,13 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
             <label className="text-xs sm:text-sm font-bold text-amber-900 uppercase mb-2 flex items-center gap-1.5">
               <span>🔓</span> GHI CHÚ NỘI BỘ
             </label>
-            <textarea
+            <AutoResizeTextarea
               value={formData.privateNotes || ''}
               onChange={e => {
                 handleFieldChange('privateNotes', e.target.value);
               }}
-              className="w-full p-2.5 border border-amber-300/80 rounded-lg text-xs sm:text-sm outline-none focus:border-amber-500 font-medium text-slate-800 bg-white"
-              rows={2}
+              className="w-full p-2.5 border border-amber-300/80 rounded-lg text-xs sm:text-sm outline-none focus:border-amber-500 font-medium text-slate-800 bg-white leading-relaxed"
+              minRows={1}
               placeholder="Nhập ghi chú nội bộ..."
             />
           </div>
@@ -1363,11 +1364,11 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
 
                   <div>
                     <label className={labelClass}>Ghi chú bổ sung</label>
-                    <textarea
+                    <AutoResizeTextarea
                       value={formData.notes || ''}
                       onChange={e => handleFieldChange('notes', e.target.value)}
-                      className={inputClass}
-                      rows={2}
+                      className={`${inputClass} leading-relaxed`}
+                      minRows={1}
                       placeholder="Ghi chú thêm..."
                     />
                   </div>

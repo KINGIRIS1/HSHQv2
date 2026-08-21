@@ -6,6 +6,7 @@ import { useArchiveRealtime } from '../../hooks/useArchiveRealtime';
 import { fetchEmployees, saveEmployeeApi, fetchUsers, saveUserApi } from '../../services/apiPeople';
 import { Search, Plus, ListChecks, FileCheck, Send, Trash2, Edit, Save, X, RotateCcw, MapPin, Calendar, User as UserIcon, Users, CheckCircle2, LayoutGrid, PenTool, CheckCircle, Eye, FileSpreadsheet, FileDown } from 'lucide-react';
 import { confirmAction, toTitleCase, calculateDeadlineHelper } from '../../utils/appHelpers';
+import { AutoResizeTextarea } from '../AutoResizeTextarea';
 import AssignModal from '../AssignModal';
 import ArchiveDetailModal from './ArchiveDetailModal';
 import HandoverListModal from './HandoverListModal';
@@ -887,7 +888,13 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Tân Qua
 
                             <div>
                                 <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Nội dung yêu cầu</label>
-                                <textarea rows={4} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none resize-none" value={formData.noi_dung} onChange={e => setFormData({...formData, noi_dung: e.target.value})} placeholder="Nhập nội dung..." />
+                                <AutoResizeTextarea
+                                    minRows={1}
+                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none leading-relaxed"
+                                    value={formData.noi_dung}
+                                    onChange={e => setFormData({...formData, noi_dung: e.target.value})}
+                                    placeholder="Nhập nội dung..."
+                                />
                             </div>
                             
                             <div className="pt-2 flex gap-2 justify-end border-t border-gray-100">

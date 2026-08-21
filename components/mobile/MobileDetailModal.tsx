@@ -825,8 +825,8 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
               <h3 className="text-xs font-bold text-purple-600 uppercase flex items-center gap-2">
                 <FileText size={16} /> Nội dung chi tiết (Trích yếu)
               </h3>
-              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-slate-800 text-sm font-semibold leading-relaxed whitespace-pre-line">
-                {cleanSyncNotes(record.content) || 'Không có nội dung chi tiết.'}
+              <div className="bg-slate-50 px-3 py-2 rounded-xl border border-slate-200/80 text-slate-800 text-sm font-medium leading-relaxed whitespace-pre-line">
+                {cleanSyncNotes(record.content) ? cleanSyncNotes(record.content) : <span className="text-slate-400 italic">Không có nội dung chi tiết.</span>}
               </div>
             </div>
 

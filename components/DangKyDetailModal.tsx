@@ -11,6 +11,7 @@ import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../services/do
 import DocxPreviewModal from './DocxPreviewModal';
 import SystemReceiptTemplate from './receive-record/SystemReceiptTemplate';
 import { getNormalizedWard } from '../constants';
+import { AutoResizeTextarea } from './AutoResizeTextarea';
 
 const NEXT_STATUS_MAP: Record<string, string> = {
   'Tiếp nhận mới': 'Thẩm định',
@@ -555,9 +556,9 @@ export const DangKyDetailModal: React.FC<DangKyDetailModalProps> = ({
                     Lưu
                   </button>
                 </div>
-                <textarea
-                  rows={3}
-                  className="w-full bg-white border border-gray-200 rounded-lg p-3 text-sm text-gray-800 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                <AutoResizeTextarea
+                  minRows={1}
+                  className="w-full bg-white border border-gray-200 rounded-lg p-3 text-sm text-gray-800 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 leading-relaxed"
                   placeholder="Nhập ghi chú riêng của bạn..."
                   value={personalNote}
                   onChange={(e) => setPersonalNote(e.target.value)}
@@ -588,8 +589,8 @@ export const DangKyDetailModal: React.FC<DangKyDetailModalProps> = ({
                   <FileText size={16}/> Nội dung chi tiết
                 </h3>
                 
-                <div className="bg-gray-50 p-4 rounded-lg border border-gray-100 text-gray-800 text-sm font-medium min-h-[60px]">
-                  {record.notes || 'Không có nội dung chi tiết bổ sung.'}
+                <div className="bg-gray-50 px-3 py-2 rounded-lg border border-gray-200/80 text-gray-800 text-sm font-medium leading-relaxed whitespace-pre-line">
+                  {record.notes ? record.notes : <span className="text-gray-400 italic">Không có nội dung chi tiết bổ sung.</span>}
                 </div>
 
                 {/* GIẤY TỜ KÈM THEO */}

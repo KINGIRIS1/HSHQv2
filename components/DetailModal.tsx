@@ -10,6 +10,7 @@ import { updateRecordApi, fetchContracts } from '../services/api';
 import SystemReceiptTemplate from './receive-record/SystemReceiptTemplate';
 import SystemAnnexTemplate from './receive-record/SystemAnnexTemplate';
 import { getEmployeeName as getEmpNameHelper, extractBatchOnly } from '../utils/appHelpers';
+import { AutoResizeTextarea } from './AutoResizeTextarea';
 
 
 const parseAuthDocType = (str: string | null | undefined) => {
@@ -817,9 +818,9 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                                 Lưu
                             </button>
                         </div>
-                        <textarea
-                            rows={3}
-                            className="w-full bg-white border border-gray-200 rounded-lg p-3 text-sm text-gray-800 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                        <AutoResizeTextarea
+                            minRows={1}
+                            className="w-full bg-white border border-gray-200 rounded-lg p-3 text-sm text-gray-800 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 leading-relaxed"
                             placeholder="Nhập ghi chú riêng của bạn..."
                             value={personalNote}
                             onChange={(e) => setPersonalNote(e.target.value)}
@@ -893,12 +894,12 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                             );
                         })()}
 
-                        <h3 className="text-xs font-bold text-purple-600 uppercase mb-4 flex items-center gap-2 border-l-4 border-purple-600 pl-2">
+                        <h3 className="text-xs font-bold text-purple-600 uppercase mb-2 flex items-center gap-2 border-l-4 border-purple-600 pl-2">
                             <FileText size={16}/> Nội dung chi tiết
                         </h3>
                         
-                        <div className="bg-gray-50 p-4 rounded-lg border border-gray-100 text-gray-800 text-sm font-medium mb-4 min-h-[80px]">
-                            {record.content || 'Không có nội dung chi tiết.'}
+                        <div className="bg-gray-50 px-3 py-2 rounded-lg border border-gray-200/80 text-gray-800 text-sm font-medium mb-4 leading-relaxed whitespace-pre-line">
+                            {record.content ? record.content : <span className="text-gray-400 italic">Không có nội dung chi tiết.</span>}
                         </div>
 
                         {/* GIẤY TỜ KÈM THEO */}

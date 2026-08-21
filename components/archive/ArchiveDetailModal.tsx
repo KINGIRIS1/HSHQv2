@@ -128,12 +128,12 @@ const ArchiveDetailModal: React.FC<ArchiveDetailModalProps> = ({ isOpen, onClose
                         <div className="space-y-6">
                             {/* NỘI DUNG */}
                             <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm h-full flex flex-col">
-                                <h3 className="text-xs font-bold text-purple-600 uppercase mb-4 flex items-center gap-2 border-l-4 border-purple-600 pl-2">
+                                <h3 className="text-xs font-bold text-purple-600 uppercase mb-2 flex items-center gap-2 border-l-4 border-purple-600 pl-2">
                                     <FileText size={16}/> Nội dung chi tiết
                                 </h3>
                                 
-                                <div className="bg-gray-50 p-4 rounded-lg border border-gray-100 text-gray-800 text-sm font-medium mb-6 min-h-[80px]">
-                                    {record.trich_yeu || 'Không có nội dung chi tiết.'}
+                                <div className="bg-gray-50 px-3 py-2 rounded-lg border border-gray-200/80 text-gray-800 text-sm font-medium mb-4 leading-relaxed whitespace-pre-line">
+                                    {record.trich_yeu ? record.trich_yeu : <span className="text-gray-400 italic">Không có nội dung chi tiết.</span>}
                                 </div>
                             </div>
                         </div>

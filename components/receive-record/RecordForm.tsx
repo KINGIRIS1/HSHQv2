@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { RecordFile, Holiday, RecordStatus, User, Employee, DangKyParty } from '../../types';
 import { RECORD_TYPES, EXTENDED_RECORD_TYPES, getShortRecordType, getWardLabel } from '../../constants';
 import { addActivityLog } from '../../services/activityLogService';
+import { AutoResizeTextarea } from '../AutoResizeTextarea';
 import { Save, User as UserIcon, Calendar, MapPin, FileCheck, Loader2, Printer, RotateCcw, XCircle, CheckCircle, AlertCircle, X, Phone, FileText, BookOpen, Clock, Hash, Map, ChevronDown, ChevronUp, Users, UserPlus, Plus, Shield } from 'lucide-react';
 
 interface AttachedDocItem {
@@ -944,14 +945,14 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
                         </span>
                         NỘI DUNG YÊU CẦU CHI TIẾT
                     </h3>
-                    <textarea
+                    <AutoResizeTextarea
                         value={formData.content || formData.notes || ''}
                         onChange={e => {
                             handleChange('content', e.target.value);
                             handleChange('notes', e.target.value);
                         }}
-                        className={`${inputClass} resize-y font-medium`}
-                        rows={3}
+                        className={`${inputClass} font-medium leading-relaxed`}
+                        minRows={1}
                         placeholder="Nhập nội dung yêu cầu chi tiết của hồ sơ..."
                     />
                 </div>
@@ -1251,7 +1252,13 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
                     </h3>
                     
                     <div>
-                        <textarea rows={2} className="w-full p-2.5 border border-gray-300 rounded-lg text-xs sm:text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 transition-all font-medium text-slate-700 bg-white resize-y" value={formData.content || ''} onChange={(e) => handleChange('content', e.target.value)} placeholder={isCongVan ? "Nhập trích yếu nội dung công văn hành chính..." : "Nhập nội dung yêu cầu trích lục, đo đạc, cung cấp dữ liệu, ghi chú hồ sơ..."} />
+                        <AutoResizeTextarea
+                            minRows={1}
+                            className="w-full p-2.5 border border-gray-300 rounded-lg text-xs sm:text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 transition-all font-medium text-slate-700 bg-white leading-relaxed"
+                            value={formData.content || ''}
+                            onChange={(e) => handleChange('content', e.target.value)}
+                            placeholder={isCongVan ? "Nhập trích yếu nội dung công văn hành chính..." : "Nhập nội dung yêu cầu trích lục, đo đạc, cung cấp dữ liệu, ghi chú hồ sơ..."}
+                        />
                     </div>
                 </div>
 

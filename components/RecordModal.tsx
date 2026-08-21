@@ -6,6 +6,7 @@ import { X, Save, Lock, User as UserIcon, MapPin, FileText, Calendar, FileCheck,
 import { calculateDeadlineHelper, getDepartmentForRecord, extractBatchOnly } from '../utils/appHelpers';
 import { fetchContracts } from '../services/api';
 import { addActivityLog } from '../services/activityLogService';
+import { AutoResizeTextarea } from './AutoResizeTextarea';
 
 interface AttachedDocItem {
   id: string;
@@ -720,7 +721,13 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                         <div className="flex flex-col gap-6">
                             <div>
                                 <label className="block text-xs font-bold text-gray-700 mb-1.5">{isCongVan ? 'Trích yếu nội dung công văn' : 'Nội dung yêu cầu'}</label>
-                                <textarea rows={1} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none" value={val(formData.content)} onChange={(e) => handleChange('content', e.target.value)} placeholder={isCongVan ? 'Nhập trích yếu nội dung công văn...' : ''} />
+                                <AutoResizeTextarea
+                                    minRows={1}
+                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none leading-relaxed"
+                                    value={val(formData.content)}
+                                    onChange={(e) => handleChange('content', e.target.value)}
+                                    placeholder={isCongVan ? 'Nhập trích yếu nội dung công văn...' : 'Nhập nội dung yêu cầu...'}
+                                />
                             </div>
                             
                             {/* Dynamic Attached Documents List */}
@@ -907,7 +914,13 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                         {hasAdminRights && isEdit && (
                             <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
                                 <div className="flex items-center gap-2 mb-1"><Lock size={14} className="text-yellow-600" /><label className="text-xs font-bold text-yellow-800 uppercase">Ghi chú nội bộ</label></div>
-                                <textarea rows={2} className="w-full border border-yellow-300 rounded-md px-3 py-2 bg-white text-sm" value={val(formData.privateNotes)} onChange={(e) => handleChange('privateNotes', e.target.value)} placeholder="Nhập ghi chú nội bộ..." />
+                                <AutoResizeTextarea
+                                    minRows={1}
+                                    className="w-full border border-yellow-300 rounded-md px-3 py-2 bg-white text-sm leading-relaxed"
+                                    value={val(formData.privateNotes)}
+                                    onChange={(e) => handleChange('privateNotes', e.target.value)}
+                                    placeholder="Nhập ghi chú nội bộ..."
+                                />
                             </div>
                         )}
 
