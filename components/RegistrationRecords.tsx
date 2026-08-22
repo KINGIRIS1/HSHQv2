@@ -1109,9 +1109,11 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                 targetStatus = 'Trả hủy hồ sơ';
             } else if (optionType === 'return_handler') {
                 targetStatus = 'Tiếp nhận mới';
+            } else if (optionType === 'csd_withdraw') {
+                targetStatus = 'CSD rút HS';
             }
             const idsToUpdate = Array.from(selectedIds);
-            const reasonText = reason.trim() ? `[Trả/Bổ sung]: ${reason.trim()}` : '';
+            const reasonText = reason.trim() ? `[Trả/Rút hồ sơ]: ${reason.trim()}` : '';
             await bulkUpdateDangKyRecordsApi(idsToUpdate, { 
                 status: targetStatus,
                 notes: reasonText || undefined
@@ -1119,8 +1121,8 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
             addActivityLog({
                 performerName: currentUser.fullName || currentUser.username,
                 performerRole: 'DANGKY',
-                actionType: 'DELETE',
-                actionLabel: 'Trả / Bổ sung hồ sơ',
+                actionType: optionType === 'csd_withdraw' ? 'DELETE' : 'UPDATE',
+                actionLabel: optionType === 'pause_supplement' ? 'Chờ bổ sung' : optionType === 'cancel_reject' ? 'Trả hủy hồ sơ' : optionType === 'csd_withdraw' ? 'CSD rút hồ sơ' : 'Trả cán bộ',
                 targetType: 'Đăng ký',
                 referenceCode: `${idsToUpdate.length} hồ sơ`,
                 details: `Chuyển ${idsToUpdate.length} hồ sơ Đăng ký sang trạng thái "${targetStatus}"${reason ? ` (Lý do: ${reason})` : ''}`

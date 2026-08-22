@@ -16,6 +16,8 @@ import ReturnResultModal from './ReturnResultModal';
 import BatchErrorDiagnosticModal from './BatchErrorDiagnosticModal';
 import RejectReturnStepModal, { ReturnOptionType } from './RejectReturnStepModal';
 import ExtendDeadlineModal from './ExtendDeadlineModal';
+import DocxPreviewModal from './DocxPreviewModal';
+import SystemReceiptTemplate from './receive-record/SystemReceiptTemplate';
 import * as XLSX from 'xlsx-js-style';
 
 interface AppModalsProps {
@@ -35,6 +37,7 @@ interface AppModalsProps {
     isDiagnosticModalOpen?: boolean;
     isRejectReturnStepModalOpen?: boolean;
     isExtendModalOpen?: boolean;
+    isPreviewOpen?: boolean;
     
     // Data States
     editingRecord: RecordFile | null;
@@ -49,6 +52,9 @@ interface AppModalsProps {
     // Preview Data
     previewWorkbook: XLSX.WorkBook | null;
     previewExcelName: string;
+    previewBlob?: Blob | null;
+    previewFileName?: string;
+    systemReceiptData?: RecordFile | null;
 
     // Setters
     setIsModalOpen: (v: boolean) => void;
@@ -65,6 +71,8 @@ interface AppModalsProps {
     setIsDiagnosticModalOpen?: (v: boolean) => void;
     setIsRejectReturnStepModalOpen?: (v: boolean) => void;
     setIsExtendModalOpen?: (v: boolean) => void;
+    setIsPreviewOpen?: (v: boolean) => void;
+    setSystemReceiptData?: (r: RecordFile | null) => void;
     
     setEditingRecord: (r: RecordFile | null) => void;
     setViewingRecord: (r: RecordFile | null) => void;
@@ -282,6 +290,22 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
                 users={props.users}
                 onConfirm={props.onConfirmExtendDeadline || (async () => {})}
             />
+
+            <DocxPreviewModal
+                isOpen={!!props.isPreviewOpen}
+                onClose={() => props.setIsPreviewOpen && props.setIsPreviewOpen(false)}
+                docxBlob={props.previewBlob || null}
+                fileName={props.previewFileName || ''}
+            />
+
+            {props.systemReceiptData && (
+                <SystemReceiptTemplate
+                    data={props.systemReceiptData}
+                    receivingWard={props.systemReceiptData.ward || ''}
+                    onClose={() => props.setSystemReceiptData && props.setSystemReceiptData(null)}
+                    currentUser={props.currentUser}
+                />
+            )}
         </>
     );
 };

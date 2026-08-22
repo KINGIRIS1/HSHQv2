@@ -14,7 +14,6 @@ import BulkImport from './receive-record/BulkImport';
 import DailyList from './receive-record/DailyList';
 import RecordLookupView from './records/RecordLookupView';
 import ExtendedRecordsView from './receive-record/ExtendedRecordsView';
-import ReturnedResultListView from './receive-record/ReturnedResultListView';
 import TemplateConfigModal from './TemplateConfigModal';
 import DocxPreviewModal from './DocxPreviewModal';
 import ExcelPreviewModal from './ExcelPreviewModal';
@@ -403,13 +402,6 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({
             >
                 <CalendarClock size={16} /> Hồ sơ gia hạn
             </button>
-
-            <button 
-                onClick={() => setViewMode('returned_list')} 
-                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-md text-sm font-semibold transition-all whitespace-nowrap cursor-pointer ${viewMode === 'returned_list' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
-            >
-                <Layers size={16} /> Danh sách trả kết quả
-            </button>
         </div>
         
         {viewMode === 'create' && (
@@ -486,17 +478,6 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({
                     handlePreviewDocx(record);
                 }}
                 onViewRecord={onViewRecord}
-            />
-        )}
-
-        {viewMode === 'returned_list' && (
-            <ReturnedResultListView 
-                records={combinedRecords}
-                currentUser={currentUser}
-                wards={wards}
-                onUpdateBulk={onBulkUpdate}
-                onViewRecord={onViewRecord}
-                onPreviewExcel={handlePreviewExcel}
             />
         )}
       </div>

@@ -14,7 +14,11 @@ import {
     Bell,
     FileSpreadsheet,
     FileCheck,
-    FilePlus2
+    FilePlus2,
+    Filter,
+    ChevronDown,
+    ChevronUp,
+    MapPin
 } from 'lucide-react';
 import { RecordFile, Employee, User, RecordStatus, UserRole } from '../../types';
 import { getShortRecordType, getWardLabel } from '../../constants';
@@ -51,8 +55,18 @@ export const RecordLookupView: React.FC<RecordLookupViewProps> = ({
     onExtendDeadline,
     onSupplementRecord
 }) => {
-    // Search Term State
+    // Search Term State, Status Filter State & Checkbox Selection
     const [searchTerm, setSearchTerm] = useState('');
+    const [selectedRecordIds, setSelectedRecordIds] = useState<Set<string>>(new Set());
+
+    // Filter Popover States (Giống tab Tất cả hồ sơ module đo đạc)
+    const [isFilterPopoverOpen, setIsFilterPopoverOpen] = useState(false);
+    const [selectedWardFilter, setSelectedWardFilter] = useState<string>('all');
+    const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>('all');
+    const [selectedRecordTypeFilter, setSelectedRecordTypeFilter] = useState<string>('all');
+    const [selectedBatchFilter, setSelectedBatchFilter] = useState<string>('all');
+    const [filterFromDate, setFilterFromDate] = useState<string>('');
+    const [filterToDate, setFilterToDate] = useState<string>('');
 
     // Pagination State: Mặc định 10 dòng/trang theo yêu cầu
     const [currentPage, setCurrentPage] = useState(1);
@@ -68,12 +82,72 @@ export const RecordLookupView: React.FC<RecordLookupViewProps> = ({
         return RecordStatus.RECEIVED;
     };
 
-    // Filter records by search keyword
+    // All available unique record types and batches
+    const availableRecordTypes = useMemo(() => {
+        const types = new Set<string>();
+        records.forEach(r => { if (r.recordType) types.add(r.recordType); });
+        return Array.from(types);
+    }, [records]);
+
+    const availableBatches = useMemo(() => {
+        const batches = new Set<string>();
+        records.forEach(r => { if (r.exportBatch) batches.add(String(r.exportBatch)); });
+        return Array.from(batches);
+    }, [records]);
+
+    // Active filter count for badge
+    const activeFilterCount = useMemo(() => {
+        let count = 0;
+        if (selectedWardFilter !== 'all') count++;
+        if (selectedStatusFilter !== 'all') count++;
+        if (selectedRecordTypeFilter !== 'all') count++;
+        if (selectedBatchFilter !== 'all') count++;
+        if (filterFromDate) count++;
+        if (filterToDate) count++;
+        return count;
+    }, [selectedWardFilter, selectedStatusFilter, selectedRecordTypeFilter, selectedBatchFilter, filterFromDate, filterToDate]);
+
+    // Filter records by comprehensive filters and search keyword
     const filteredRecords = useMemo(() => {
-        if (!searchTerm.trim()) return records;
+        let result = records;
+
+        // 1. Ward Filter
+        if (selectedWardFilter !== 'all') {
+            result = result.filter(r => (r.ward || '') === selectedWardFilter);
+        }
+
+        // 2. Status Filter
+        if (selectedStatusFilter !== 'all') {
+            result = result.filter(r => getDisplayStatus(r) === selectedStatusFilter);
+        }
+
+        // 3. Record Type Filter
+        if (selectedRecordTypeFilter !== 'all') {
+            result = result.filter(r => (r.recordType || '') === selectedRecordTypeFilter);
+        }
+
+        // 4. Batch Filter
+        if (selectedBatchFilter !== 'all') {
+            result = result.filter(r => String(r.exportBatch || '') === selectedBatchFilter);
+        }
+
+        // 5. Date Range Filter (receivedDate)
+        if (filterFromDate) {
+            const from = new Date(filterFromDate);
+            from.setHours(0, 0, 0, 0);
+            result = result.filter(r => r.receivedDate && new Date(r.receivedDate) >= from);
+        }
+        if (filterToDate) {
+            const to = new Date(filterToDate);
+            to.setHours(23, 59, 59, 999);
+            result = result.filter(r => r.receivedDate && new Date(r.receivedDate) <= to);
+        }
+
+        // 6. Search keyword
+        if (!searchTerm.trim()) return result;
 
         const term = removeVietnameseTones(searchTerm.toLowerCase().trim());
-        return records.filter(r => {
+        return result.filter(r => {
             const code = removeVietnameseTones(r.code || '').toLowerCase();
             const name = removeVietnameseTones(r.customerName || '').toLowerCase();
             const phone = (r.phoneNumber || '').toLowerCase();
@@ -104,7 +178,7 @@ export const RecordLookupView: React.FC<RecordLookupViewProps> = ({
                 empName.includes(term)
             );
         });
-    }, [records, searchTerm, employees]);
+    }, [records, searchTerm, employees, selectedWardFilter, selectedStatusFilter, selectedRecordTypeFilter, selectedBatchFilter, filterFromDate, filterToDate]);
 
     // Pagination calculations
     const totalPages = Math.ceil(filteredRecords.length / pageSize) || 1;
@@ -113,9 +187,32 @@ export const RecordLookupView: React.FC<RecordLookupViewProps> = ({
         return filteredRecords.slice(start, start + pageSize);
     }, [filteredRecords, currentPage, pageSize]);
 
+    // Checkbox selection handlers
+    const handleSelectAll = () => {
+        if (selectedRecordIds.size === filteredRecords.length) {
+            setSelectedRecordIds(new Set());
+        } else {
+            setSelectedRecordIds(new Set(filteredRecords.map(r => r.id)));
+        }
+    };
+
+    const handleSelectOne = (id: string) => {
+        const next = new Set(selectedRecordIds);
+        if (next.has(id)) {
+            next.delete(id);
+        } else {
+            next.add(id);
+        }
+        setSelectedRecordIds(next);
+    };
+
     // Export to Excel helper
     const handleExportExcel = () => {
-        if (filteredRecords.length === 0) return;
+        const recordsToExport = selectedRecordIds.size > 0
+            ? filteredRecords.filter(r => selectedRecordIds.has(r.id))
+            : filteredRecords;
+
+        if (recordsToExport.length === 0) return;
 
         const headers = [
             'STT',
@@ -133,7 +230,7 @@ export const RecordLookupView: React.FC<RecordLookupViewProps> = ({
             'TRẠNG THÁI'
         ];
 
-        const dataRows = filteredRecords.map((r, idx) => {
+        const dataRows = recordsToExport.map((r, idx) => {
             const emp = employees.find(e => e.id === r.assignedTo);
             const displayStatus = getDisplayStatus(r);
             return [
@@ -158,7 +255,7 @@ export const RecordLookupView: React.FC<RecordLookupViewProps> = ({
             ['Độc lập - Tự do - Hạnh phúc'],
             [''],
             ['KẾT QUẢ TRA CỨU HỒ SƠ'],
-            [`Ngày xuất: ${new Date().toLocaleDateString('vi-VN')} | Tổng số hồ sơ: ${filteredRecords.length}`],
+            [`Ngày xuất: ${new Date().toLocaleDateString('vi-VN')} | Tổng số hồ sơ xuất: ${recordsToExport.length}`],
             [''],
             headers,
             ...dataRows
@@ -203,7 +300,6 @@ export const RecordLookupView: React.FC<RecordLookupViewProps> = ({
                 const cellRef = XLSX.utils.encode_cell({ r, c });
                 if (!ws[cellRef]) ws[cellRef] = { v: "", t: "s" };
 
-                // Căn giữa: STT(0), Mã HS(1), SĐT(3), Ngày nhận(5), Hạn trả(6), Tờ(8), Thửa(9), Đợt/HT(11), Trạng thái(12)
                 if ([0, 1, 3, 5, 6, 8, 9, 11, 12].includes(c)) ws[cellRef].s = centerStyle;
                 else ws[cellRef].s = cellStyle;
             }
@@ -234,47 +330,218 @@ export const RecordLookupView: React.FC<RecordLookupViewProps> = ({
 
     return (
         <div className="flex flex-col h-full bg-slate-50/50 rounded-xl overflow-hidden animate-fade-in">
-            {/* 1. Single Clean Search Input Bar */}
-            <div className="p-3.5 bg-white border-b border-slate-200 shrink-0">
-                <div className="flex flex-col sm:flex-row items-center gap-3">
-                    <div className="relative flex-1 w-full">
-                        <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                        <input
-                            type="text"
-                            value={searchTerm}
-                            onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-                            placeholder="Nhập Mã hồ sơ, Tên chủ sử dụng, CCCD, SĐT, Số tờ, Số thửa, Địa chỉ để tra cứu nhanh..."
-                            className="w-full pl-10 pr-24 py-2 text-sm bg-slate-50 hover:bg-slate-100/70 focus:bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all font-medium text-slate-800"
-                            autoFocus
-                        />
-                        {searchTerm && (
-                            <button
-                                type="button"
-                                onClick={() => { setSearchTerm(''); setCurrentPage(1); }}
-                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 hover:bg-slate-200 rounded-full transition-colors cursor-pointer"
-                                title="Xóa từ khóa"
-                            >
-                                <X size={15} />
-                            </button>
+            {/* ROW 2: SEARCH BAR (Đặt ngoài cùng phía tay phải bằng 1/3 khung) */}
+            <div className="flex justify-end px-4 py-2 bg-slate-50 border-b border-slate-200 shrink-0">
+                <div className="relative w-full sm:w-1/3 min-w-[280px]">
+                    <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                    <input
+                        type="text"
+                        value={searchTerm}
+                        onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+                        placeholder="Nhập Mã hồ sơ, Tên chủ sử dụng, CCCD, SĐT, Tờ, Thửa..."
+                        className="w-full pl-9 pr-8 py-1.5 text-xs bg-white hover:bg-slate-50 focus:bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all font-medium text-slate-800 shadow-2xs"
+                        autoFocus
+                    />
+                    {searchTerm && (
+                        <button
+                            type="button"
+                            onClick={() => { setSearchTerm(''); setCurrentPage(1); }}
+                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 hover:bg-slate-100 rounded-full transition-colors cursor-pointer"
+                            title="Xóa từ khóa"
+                        >
+                            <X size={14} />
+                        </button>
+                    )}
+                </div>
+            </div>
+
+            {/* ROW 3: TOOLBAR, POPUP FILTER & EXCEL */}
+            <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 bg-white border-b border-slate-200 shrink-0 shadow-2xs">
+                <div className="flex flex-wrap items-center gap-2.5">
+                    {/* Popover Filter Button (Sao chép chuẩn từ tab Tất cả hồ sơ module đo đạc) */}
+                    <div className="relative">
+                        <button
+                            type="button"
+                            onClick={() => setIsFilterPopoverOpen(!isFilterPopoverOpen)}
+                            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all border cursor-pointer ${
+                                activeFilterCount > 0
+                                    ? "bg-blue-50 border-blue-300 text-blue-700 shadow-2xs"
+                                    : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100"
+                            }`}
+                        >
+                            <Filter size={14} className={activeFilterCount > 0 ? "text-blue-600" : "text-slate-500"} />
+                            <span>Bộ lọc tìm kiếm</span>
+                            {activeFilterCount > 0 && (
+                                <span className="bg-red-500 text-white text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ml-0.5">
+                                    {activeFilterCount}
+                                </span>
+                            )}
+                            {isFilterPopoverOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                        </button>
+
+                        {/* POPOVER FILTER CARD */}
+                        {isFilterPopoverOpen && (
+                            <>
+                                <div className="fixed inset-0 z-40" onClick={() => setIsFilterPopoverOpen(false)}></div>
+                                <div className="absolute left-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 p-4 z-50 animate-in fade-in zoom-in-95 duration-100 text-slate-800">
+                                    <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
+                                        <div className="flex items-center gap-2 font-bold text-blue-700 text-sm">
+                                            <Filter size={16} />
+                                            <span>Bộ lọc tìm kiếm nâng cao</span>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsFilterPopoverOpen(false)}
+                                            className="text-slate-400 hover:text-slate-600 p-1 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
+                                        >
+                                            <X size={16} />
+                                        </button>
+                                    </div>
+
+                                    <div className="space-y-3 max-h-[70vh] overflow-y-auto pr-1">
+                                        {/* 1. Xã / Phường */}
+                                        <div>
+                                            <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 mb-1">
+                                                <MapPin size={14} className="text-slate-500" />
+                                                <span>Địa danh (Xã/Phường):</span>
+                                            </label>
+                                            <select
+                                                value={selectedWardFilter}
+                                                onChange={(e) => setSelectedWardFilter(e.target.value)}
+                                                className="w-full text-xs border border-slate-200 rounded-lg p-2 font-medium bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                                            >
+                                                <option value="all">Tất cả Xã/Phường</option>
+                                                {wards.map((w) => (
+                                                    <option key={w} value={w}>{w}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+
+                                        {/* 2. Trạng thái hồ sơ */}
+                                        <div>
+                                            <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 mb-1">
+                                                <CheckCircle2 size={14} className="text-slate-500" />
+                                                <span>Trạng thái hồ sơ:</span>
+                                            </label>
+                                            <select
+                                                value={selectedStatusFilter}
+                                                onChange={(e) => setSelectedStatusFilter(e.target.value)}
+                                                className="w-full text-xs border border-slate-200 rounded-lg p-2 font-medium bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                                            >
+                                                <option value="all">Tất cả trạng thái</option>
+                                                <option value={RecordStatus.RECEIVED}>Đang xử lý / Tiếp nhận</option>
+                                                <option value={RecordStatus.HANDOVER}>Đã bàn giao / Ký</option>
+                                                <option value={RecordStatus.RETURNED}>Đã trả kết quả</option>
+                                                <option value={RecordStatus.WITHDRAWN}>Rút hồ sơ</option>
+                                                <option value={RecordStatus.REJECTED}>Từ chối</option>
+                                            </select>
+                                        </div>
+
+                                        {/* 3. Loại hồ sơ */}
+                                        <div>
+                                            <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 mb-1">
+                                                <span className="font-bold text-slate-500">📁</span>
+                                                <span>Loại hồ sơ:</span>
+                                            </label>
+                                            <select
+                                                value={selectedRecordTypeFilter}
+                                                onChange={(e) => setSelectedRecordTypeFilter(e.target.value)}
+                                                className="w-full text-xs border border-slate-200 rounded-lg p-2 font-medium bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                                            >
+                                                <option value="all">Tất cả loại hồ sơ</option>
+                                                {availableRecordTypes.map((t) => (
+                                                    <option key={t} value={t}>{t}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+
+                                        {/* 4. Khoảng thời gian tiếp nhận */}
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <div>
+                                                <label className="block text-[11px] font-bold text-slate-600 mb-1">Từ ngày:</label>
+                                                <input
+                                                    type="date"
+                                                    value={filterFromDate}
+                                                    onChange={(e) => setFilterFromDate(e.target.value)}
+                                                    className="w-full text-xs border border-slate-200 rounded-lg p-1.5 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[11px] font-bold text-slate-600 mb-1">Đến ngày:</label>
+                                                <input
+                                                    type="date"
+                                                    value={filterToDate}
+                                                    onChange={(e) => setFilterToDate(e.target.value)}
+                                                    className="w-full text-xs border border-slate-200 rounded-lg p-1.5 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Footer Actions */}
+                                    <div className="flex items-center justify-between pt-3 mt-3 border-t border-slate-100">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setSelectedWardFilter('all');
+                                                setSelectedStatusFilter('all');
+                                                setSelectedRecordTypeFilter('all');
+                                                setSelectedBatchFilter('all');
+                                                setFilterFromDate('');
+                                                setFilterToDate('');
+                                            }}
+                                            className="text-xs font-bold text-slate-500 hover:text-slate-800 underline cursor-pointer"
+                                        >
+                                            Đặt lại bộ lọc
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsFilterPopoverOpen(false)}
+                                            className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer shadow-xs"
+                                        >
+                                            Áp dụng ({filteredRecords.length})
+                                        </button>
+                                    </div>
+                                </div>
+                            </>
                         )}
                     </div>
 
-                    <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
-                        <span className="text-xs font-semibold text-slate-500 whitespace-nowrap bg-slate-100 px-2.5 py-1.5 rounded-lg border border-slate-200">
-                            Tìm thấy <strong className="text-blue-600 font-bold">{filteredRecords.length}</strong> hồ sơ
-                        </span>
-
+                    {/* Quick status badges */}
+                    {activeFilterCount > 0 && (
                         <button
                             type="button"
-                            onClick={handleExportExcel}
-                            disabled={filteredRecords.length === 0}
-                            className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-emerald-50 text-slate-700 hover:text-emerald-700 border border-slate-300 hover:border-emerald-300 rounded-lg text-xs font-bold transition-all shadow-xs disabled:opacity-40 cursor-pointer whitespace-nowrap"
-                            title="Xuất kết quả tìm kiếm ra Excel"
+                            onClick={() => {
+                                setSelectedWardFilter('all');
+                                setSelectedStatusFilter('all');
+                                setSelectedRecordTypeFilter('all');
+                                setSelectedBatchFilter('all');
+                                setFilterFromDate('');
+                                setFilterToDate('');
+                            }}
+                            className="flex items-center gap-1 px-2.5 py-1 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg text-xs font-semibold hover:bg-amber-100 transition-colors cursor-pointer"
                         >
-                            <FileSpreadsheet size={15} className="text-emerald-600" />
-                            <span>Xuất Excel</span>
+                            <span>Đang lọc ({activeFilterCount})</span>
+                            <X size={12} />
                         </button>
-                    </div>
+                    )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold text-slate-600">
+                        Đã chọn <strong className="text-indigo-600 font-bold">{selectedRecordIds.size}</strong> / <strong className="text-blue-600 font-bold">{filteredRecords.length}</strong> hồ sơ
+                    </span>
+
+                    <button
+                        type="button"
+                        onClick={handleExportExcel}
+                        disabled={filteredRecords.length === 0}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-emerald-50 text-slate-700 hover:text-emerald-700 border border-slate-300 hover:border-emerald-300 rounded-lg text-xs font-bold transition-all shadow-2xs disabled:opacity-40 cursor-pointer whitespace-nowrap"
+                        title="Xuất Excel các hồ sơ đã tích chọn (hoặc toàn bộ nếu chưa tích)"
+                    >
+                        <FileSpreadsheet size={15} className="text-emerald-600" />
+                        <span>Xuất Excel {selectedRecordIds.size > 0 ? `(${selectedRecordIds.size})` : ''}</span>
+                    </button>
                 </div>
             </div>
 
@@ -296,7 +563,15 @@ export const RecordLookupView: React.FC<RecordLookupViewProps> = ({
                             <table className="w-full text-left border-collapse text-xs">
                                 <thead>
                                     <tr className="bg-slate-50 text-slate-600 border-b border-slate-200 font-bold uppercase text-[11px] select-none sticky top-0 z-10 shadow-xs">
-                                        <th className="p-3 w-12 text-center">STT</th>
+                                        <th className="p-3 w-12 text-center">
+                                            <input
+                                                type="checkbox"
+                                                checked={filteredRecords.length > 0 && selectedRecordIds.size === filteredRecords.length}
+                                                onChange={handleSelectAll}
+                                                className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
+                                                title="Chọn tất cả hồ sơ"
+                                            />
+                                        </th>
                                         <th className="p-3 w-[110px] text-center">MÃ HỒ SƠ</th>
                                         <th className="p-3 w-64 text-center">THÔNG TIN CHỦ SỬ DỤNG</th>
                                         <th className="p-3 w-[115px] text-center">LOẠI HỒ SƠ</th>
@@ -312,7 +587,7 @@ export const RecordLookupView: React.FC<RecordLookupViewProps> = ({
                                 </thead>
                                 <tbody className="divide-y divide-slate-100 font-medium">
                                     {paginatedRecords.map((record, index) => {
-                                        const globalIndex = (currentPage - 1) * pageSize + index + 1;
+                                        const isSelected = selectedRecordIds.has(record.id);
                                         const assignedEmp = employees.find(e => e.id === record.assignedTo);
                                         const overdue = isRecordOverdue(record);
                                         const approaching = isRecordApproaching(record);
@@ -329,7 +604,9 @@ export const RecordLookupView: React.FC<RecordLookupViewProps> = ({
                                             <tr 
                                                 key={record.id}
                                                 className={`transition-all duration-200 group border-l-4 ${
-                                                    overdue 
+                                                    isSelected
+                                                        ? 'bg-blue-50/70 border-l-blue-600'
+                                                        : overdue 
                                                         ? 'bg-red-50/50 border-l-red-500 hover:bg-red-50' 
                                                         : approaching 
                                                         ? 'bg-orange-50/50 border-l-orange-500 hover:bg-orange-50' 
@@ -337,9 +614,14 @@ export const RecordLookupView: React.FC<RecordLookupViewProps> = ({
                                                 }`}
                                                 onDoubleClick={() => onViewRecord(record)}
                                             >
-                                                {/* STT */}
-                                                <td className={`${cellClass} text-center text-slate-500 font-mono`}>
-                                                    {globalIndex}
+                                                {/* Checkbox */}
+                                                <td className={`${cellClass} text-center`}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={isSelected}
+                                                        onChange={() => handleSelectOne(record.id)}
+                                                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
+                                                    />
                                                 </td>
 
                                                 {/* 1. MÃ HỒ SƠ */}

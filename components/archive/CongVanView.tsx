@@ -4,7 +4,7 @@ import { User, RecordFile, RecordStatus, Employee } from '../../types';
 import { ArchiveRecord, fetchArchiveRecords, saveArchiveRecord, deleteArchiveRecord, updateArchiveRecordsBatch, importArchiveRecords } from '../../services/apiArchive';
 import { useArchiveRealtime } from '../../hooks/useArchiveRealtime';
 import { fetchEmployees, saveEmployeeApi, fetchUsers, saveUserApi } from '../../services/apiPeople';
-import { Search, Plus, ListChecks, FileCheck, Send, Trash2, Edit, Save, X, RotateCcw, Users, User as UserIcon, LayoutGrid, CheckCircle, PenTool, Eye, Calendar, FileDown, FileSpreadsheet } from 'lucide-react';
+import { Search, Plus, ListChecks, FileCheck, Send, Trash2, Edit, Save, X, RotateCcw, Users, User as UserIcon, LayoutGrid, CheckCircle, PenTool, Eye, Calendar, FileDown, FileSpreadsheet, UserX } from 'lucide-react';
 import { confirmAction, toTitleCase } from '../../utils/appHelpers';
 import { AutoResizeTextarea } from '../AutoResizeTextarea';
 import AssignModal from '../AssignModal';
@@ -383,6 +383,9 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
             case 'executed': confirmMsg = 'Xác nhận đã thực hiện xong?'; actionName = 'Thực hiện xong'; break;
             case 'pending_sign': confirmMsg = 'Trình ký công văn này?'; actionName = 'Trình ký'; break;
             case 'signed': confirmMsg = 'Xác nhận đã ký duyệt?'; actionName = 'Ký duyệt'; break;
+            case 'withdrawn': confirmMsg = 'Xác nhận CSD rút hồ sơ?'; actionName = 'CSD rút hồ sơ'; break;
+            case 'pending_supplement': confirmMsg = 'Xác nhận trả chờ bổ sung?'; actionName = 'Trả chờ bổ sung'; break;
+            case 'rejected': confirmMsg = 'Xác nhận trả hủy hồ sơ?'; actionName = 'Trả hủy hồ sơ'; break;
             default: confirmMsg = 'Chuyển trạng thái?'; actionName = 'Chuyển trạng thái';
         }
 

@@ -141,16 +141,6 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
       }
   }, [notification]);
 
-  useEffect(() => {
-    if (!initialData) {
-        const newCode = generateCode(processingWard, formData.receivedDate || '');
-        setFormData(prev => {
-            if (prev.code === newCode) return prev;
-            return { ...prev, code: newCode };
-        });
-    }
-  }, [processingWard, formData.receivedDate, records, initialData]);
-
   // Kiểm tra loại hồ sơ 3.x.x Đăng ký
   const isDangKy = formData.recordType ? (
       formData.recordType.startsWith('3.') || 
@@ -161,6 +151,21 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
       formData.recordType.toLowerCase().includes('cấp lại') ||
       formData.recordType.toLowerCase().includes('đăng ký')
   ) : false;
+
+  useEffect(() => {
+    if (!initialData) {
+        if (!isDangKy) {
+            const newCode = generateCode(processingWard, formData.receivedDate || '');
+            setFormData(prev => {
+                if (prev.code === newCode) return prev;
+                return { ...prev, code: newCode };
+            });
+        } else if (!formData.code) {
+            const newCode = generateCode(processingWard, formData.receivedDate || '');
+            setFormData(prev => ({ ...prev, code: newCode }));
+        }
+    }
+  }, [processingWard, formData.receivedDate, records, initialData, isDangKy]);
 
   const handleChange = (field: keyof RecordFile, value: any) => {
     setFormData(prev => {
@@ -567,7 +572,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
 
                 <div>
                     <label className={labelClass}>Mã hồ sơ</label>
-                    <input type="text" readOnly={!initialData} className={`${inputClass} font-mono ${initialData ? 'bg-white font-bold text-blue-700' : 'bg-slate-100 text-slate-500 cursor-not-allowed'}`} value={formData.code || ''} onChange={(e) => initialData && handleChange('code', e.target.value)} />
+                    <input type="text" readOnly={!initialData && !isDangKy} className={`${inputClass} font-mono ${(!initialData && isDangKy) || initialData ? 'bg-white font-bold text-blue-700' : 'bg-slate-100 text-slate-500 cursor-not-allowed'}`} value={formData.code || ''} onChange={(e) => (initialData || isDangKy) && handleChange('code', e.target.value)} />
                 </div>
 
                 <div>
