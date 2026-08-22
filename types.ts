@@ -138,6 +138,7 @@ export interface RecordFile {
 
   content?: string | null;        
   recordType?: string | null;    
+  procedureId?: string | null;    
   
   receivedDate?: string | null;   
   receivedBy?: string | null; // Người nhận hồ sơ (ID của user)
@@ -517,57 +518,8 @@ export interface DangKyRecord {
   updatedAt?: string;
 }
 
-export const DANG_KY_RECORD_TYPES = [
-  '3.1.1 Chuyển nhượng',
-  '3.1.2 Tặng cho',
-  '3.1.3 Thừa kế',
-  '3.1.4 Thỏa thuận',
-  '3.2.1 Cấp đổi',
-  '3.2.2 Cấp đổi (có thuế)',
-  '3.3.1 Cấp lại',
-  '3.3.2 Cấp lại (có thuế)',
-  '3.4.1 Tách - hợp thửa',
-  '3.5.1 Gia hạn',
-  '3.6.1 Chuyển mục đích không xin phép',
-  '3.7.1 Đính chính GCN',
-  '3.8.1 Đăng ký GDBD',
-  '3.8.2 Xóa ĐK GDBD',
-  '3.9.9 Khác'
-];
-
-export const DANG_KY_DEADLINE_MAP: Record<string, number> = {
-  '3.1.1 Chuyển nhượng': 13,
-  '3.1.2 Tặng cho': 13,
-  '3.1.3 Thừa kế': 13,
-  '3.1.4 Thỏa thuận': 13,
-  '3.2.1 Cấp đổi': 10,
-  '3.2.2 Cấp đổi (có thuế)': 15,
-  '3.3.1 Cấp lại': 10,
-  '3.3.2 Cấp lại (có thuế)': 15,
-  '3.4.1 Tách - hợp thửa': 17,
-  '3.5.1 Gia hạn': 7,
-  '3.6.1 Chuyển mục đích không xin phép': 10,
-  '3.7.1 Đính chính GCN': 7,
-  '3.8.1 Đăng ký GDBD': 3,
-  '3.8.2 Xóa ĐK GDBD': 3,
-  '3.9.9 Khác': 10,
-  // Backward compatibility keys
-  'Chuyển nhượng': 13,
-  'Tặng cho': 13,
-  'Thừa kế': 13,
-  'Thỏa thuận': 13,
-  'Cấp đổi': 10,
-  'Cấp đổi (có thuế)': 15,
-  'Cấp lại': 10,
-  'Cấp lại (có thuế)': 15,
-  'Tách - hợp thửa': 17,
-  'Gia hạn': 7,
-  'Chuyển mục đích không xin phép': 10,
-  'Đính chính GCN': 7,
-  'Đăng ký GDBD': 3,
-  'Xóa ĐK GDBD': 3,
-  'Khác': 10
-};
+import { DANG_KY_RECORD_TYPES, DANG_KY_DEADLINE_MAP } from './constants/procedures';
+export { DANG_KY_RECORD_TYPES, DANG_KY_DEADLINE_MAP };
 
 declare global {
   interface Window {

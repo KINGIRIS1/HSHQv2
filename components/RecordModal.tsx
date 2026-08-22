@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { RecordFile, RecordStatus, Employee, User, UserRole } from '../types';
-import { GROUPS, EXTENDED_RECORD_TYPES, STATUS_LABELS, SELECTABLE_STATUSES, getShortRecordType, getWardLabel, getNormalizedWard, isArchiveRecordType, getCanonicalRecordType } from '../constants';
+import { GROUPS, EXTENDED_RECORD_TYPES, STATUS_LABELS, SELECTABLE_STATUSES, getShortRecordType, getWardLabel, getNormalizedWard, isArchiveRecordType, getCanonicalRecordType, detectProcedureId } from '../constants';
 import { X, Save, Lock, User as UserIcon, MapPin, FileText, Calendar, FileCheck, ChevronDown, ChevronUp, XCircle, ClipboardList } from 'lucide-react';
 import { calculateDeadlineHelper, getDepartmentForRecord, extractBatchOnly } from '../utils/appHelpers';
 import { fetchContracts } from '../services/api';
@@ -182,6 +182,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
     if (isOpen) {
         if (initialData) {
             const dataToSet = { ...initialData };
+            dataToSet.procedureId = dataToSet.procedureId || detectProcedureId(dataToSet.code, dataToSet.recordType);
             const rLower = String(dataToSet.recordType || '').toLowerCase();
             if ((rLower.includes('1.2') || rLower.includes('công văn') || rLower.includes('cong van') || rLower.includes('sao lục') || dataToSet.recordType === '1.1 Sao lục' || dataToSet.recordType === '1.1 CC DL ĐĐ' || dataToSet.recordType === '1.1 Sao lục hồ sơ' || dataToSet.recordType === '1.1 Cung cấp dữ liệu đất đai') && !dataToSet.price) {
                 dataToSet.price = 310000;
@@ -557,15 +558,20 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
           updated.group = norm;
         }
       }
-      if (field === 'recordType' || field === 'receivedDate') {
+      if (field === 'recordType' || field === 'code' || field === 'receivedDate') {
+        const rCode = field === 'code' ? value : prev.code;
         const rType = field === 'recordType' ? value : prev.recordType;
         const rDate = field === 'receivedDate' ? value : prev.receivedDate;
+        
+        const procId = detectProcedureId(rCode, rType);
+        updated.procedureId = procId;
+
         if (rType && rDate) {
-          updated.deadline = calculateDeadlineHelper(rType, String(rDate).split('T')[0], holidays || []);
+          updated.deadline = calculateDeadlineHelper(rType, String(rDate).split('T')[0], holidays || [], rCode, procId);
         }
-        if (field === 'recordType') {
-          const rLower = String(value || '').toLowerCase();
-          if (rLower.includes('1.2') || rLower.includes('công văn') || rLower.includes('cong van') || rLower.includes('sao lục') || value === '1.1 Sao lục' || value === '1.1 CC DL ĐĐ' || value === '1.1 Sao lục hồ sơ' || value === '1.1 Cung cấp dữ liệu đất đai') {
+        if (field === 'recordType' || field === 'code') {
+          const rLower = String(rType || '').toLowerCase();
+          if (rLower.includes('1.2') || rLower.includes('công văn') || rLower.includes('cong van') || rLower.includes('sao lục') || rType === '1.1 Sao lục' || rType === '1.1 CC DL ĐĐ' || rType === '1.1 Sao lục hồ sơ' || rType === '1.1 Cung cấp dữ liệu đất đai') {
             updated.price = 310000;
           }
         }

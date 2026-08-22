@@ -830,17 +830,6 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
               </div>
             </div>
 
-            {/* Ghi chú hồ sơ */}
-            {cleanSyncNotes(record.notes) && (
-              <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 space-y-3">
-                <h3 className="text-xs font-bold text-blue-600 uppercase flex items-center gap-2">
-                  <StickyNote size={16} /> Ghi chú hồ sơ
-                </h3>
-                <div className="bg-blue-50/40 p-4 rounded-xl border border-blue-100 text-slate-800 text-sm font-medium leading-relaxed whitespace-pre-line">
-                  {cleanSyncNotes(record.notes)}
-                </div>
-              </div>
-            )}
 
             {/* Giấy tờ kèm theo */}
             {record.otherDocs && (() => {

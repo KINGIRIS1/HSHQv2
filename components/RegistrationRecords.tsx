@@ -1849,13 +1849,6 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                                         <CornerUpLeft size={14} /> Trả hồ sơ ({selectedIds.size})
                                     </button>
                                     <button 
-                                        onClick={() => setIsBulkDeleteModalOpen(true)}
-                                        className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all shadow-2xs active:scale-95 cursor-pointer"
-                                        title="Xóa các hồ sơ đã chọn"
-                                    >
-                                        <Trash2 size={14} /> Xóa ({selectedIds.size})
-                                    </button>
-                                    <button 
                                         onClick={() => setIsBulkUpdateModalOpen(true)}
                                         className="bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all shadow-2xs active:scale-95 cursor-pointer"
                                         title="Cập nhật hàng loạt nhiều thông tin"
@@ -2159,14 +2152,7 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                 } : null}
             />
 
-            {/* BULK DELETE CONFIRM MODAL */}
-            <DeleteConfirmModal
-                isOpen={isBulkDeleteModalOpen}
-                onClose={() => setIsBulkDeleteModalOpen(false)}
-                onConfirm={handleConfirmBulkDelete}
-                title="Xác nhận xóa các hồ sơ đã chọn"
-                message={`Bạn có chắc chắn muốn xóa vĩnh viễn ${selectedIds.size} hồ sơ đăng ký đã chọn? Hành động này không thể hoàn tác.`}
-            />
+
 
             {/* ASSIGN STAFF MODAL (From Measurement Module Design) */}
             <AssignModal 

@@ -1,5 +1,6 @@
 
-import { RecordFile, RecordStatus, Employee, DangKyRecord, DANG_KY_DEADLINE_MAP } from '../types';
+import { RecordFile, RecordStatus, Employee, DangKyRecord } from '../types';
+import { detectProcedureId, getProcedureById, DANG_KY_DEADLINE_MAP } from '../constants/procedures';
 
 // --- HÀM TIỆN ÍCH XỬ LÝ CHUỖI TIẾNG VIỆT ---
 export function removeVietnameseTones(str: string): string {
@@ -252,65 +253,73 @@ export const formatDateKey = (date: Date): string => {
 };
 
 // Tính hạn trả (deadline) dựa trên loại hồ sơ, ngày nhận, danh sách ngày nghỉ lễ
-export const calculateDeadlineHelper = (type: string, receivedDateStr: string, holidays: any[]): string => {
+export const calculateDeadlineHelper = (type: string, receivedDateStr: string, holidays: any[], code?: string, procedureId?: string): string => {
     if (!receivedDateStr) return '';
     let daysToAdd = 30; 
-    const cleanType = (type || '').trim();
-    const lowerType = cleanType.toLowerCase();
+    
+    const targetProcId = procedureId || detectProcedureId(code, type);
+    const procDef = getProcedureById(targetProcId);
 
-    // 1. Kiểm tra mã định danh 3.4.1 (Tách - hợp thửa đăng ký) -> 17 ngày chuẩn
-    if (lowerType.includes('3.4.1')) {
-        daysToAdd = 17;
-    }
-    // 2. Kiểm tra mã định danh 2.5 (Trích đo tách - hợp thửa đo đạc) -> 30 ngày chuẩn
-    else if (lowerType.includes('2.5') || lowerType.includes('trích đo tách')) {
-        daysToAdd = 30;
-    }
-    // 3. Khớp chính xác với DANG_KY_DEADLINE_MAP
-    else if (DANG_KY_DEADLINE_MAP[cleanType]) {
-        daysToAdd = DANG_KY_DEADLINE_MAP[cleanType];
-    }
-    // 4. Tra cứu cụ thể cho các loại hồ sơ Đăng ký (3.x.x)
-    else if (lowerType.includes('cấp đổi (có thuế)')) {
-        daysToAdd = 15;
-    } else if (lowerType.includes('cấp lại (có thuế)')) {
-        daysToAdd = 15;
-    } else if (lowerType.includes('chuyển nhượng') || lowerType.includes('tặng cho') || lowerType.includes('thừa kế') || lowerType.includes('thỏa thuận')) {
-        daysToAdd = 13;
-    } else if (lowerType.includes('cấp đổi')) {
-        daysToAdd = 10;
-    } else if (lowerType.includes('cấp lại')) {
-        daysToAdd = 10;
-    } else if (lowerType.includes('chuyển mục đích')) {
-        daysToAdd = 10;
-    } else if (lowerType.includes('gia hạn') || lowerType.includes('đính chính')) {
-        daysToAdd = 7;
-    } else if (lowerType.includes('thế chấp') || lowerType.includes('xóa thế chấp') || lowerType.includes('giao dịch bảo đảm') || lowerType.includes('gdbd')) {
-        daysToAdd = 3;
-    } else if (lowerType.includes('cấp mới') || lowerType.includes('cấp lần đầu') || lowerType.includes('cấp gcn lần đầu') || lowerType.includes('công nhận')) {
-        daysToAdd = 30;
-    } else if (lowerType.includes('tách - hợp thửa') || lowerType.includes('tách thửa') || lowerType.includes('hợp thửa')) {
-        daysToAdd = 17;
-    }
-    // 5. Nhóm Đo đạc & Cung cấp số thửa
-    else if (lowerType.includes('2.3') || lowerType.includes('duyệt đơn & cung cấp số thửa') || lowerType.includes('dđ & cc số thửa') || lowerType.includes('dd & cc số thửa') || lowerType.includes('duyệt đơn-số thửa') || lowerType.includes('duyệt đơn') || lowerType.includes('cung cấp số thửa') || lowerType.includes('cập nhật số thửa') || lowerType.includes('cập nhập số thửa') || lowerType.includes('2.6')) {
-        daysToAdd = 12;
-    }
-    // 6. Nhóm Sao lục / Cung cấp thông tin / Lưu trữ / Quy hoạch
-    else if (lowerType.includes('1.1') || lowerType.includes('sao lục') || lowerType.includes('cung cấp tài liệu đất đai') || lowerType.includes('cung cấp dữ liệu') ||
-        lowerType.includes('2.1') || lowerType.includes('trích lục') || 
-        lowerType.includes('quy hoạch') || lowerType.includes('lưu trữ') || lowerType.includes('cung cấp thông tin')) {
-        daysToAdd = 10;
-    } 
-    // 7. Nhóm Trích đo chỉnh lý / Chỉnh lý bản đồ
-    else if (lowerType.includes('trích đo chỉnh lý') || lowerType.includes('chỉnh lý bản đồ')) {
-        daysToAdd = 15;
-    } 
-    // 8. Nhóm Trích đo / Đo đạc địa chính / Cắm mốc (bao gồm 2.5)
-    else if (lowerType.includes('2.2') || lowerType.includes('trích đo') || 
-               lowerType.includes('2.4') || lowerType.includes('cắm mốc') || 
-               lowerType.includes('2.5') || lowerType.includes('đo đạc')) {
-        daysToAdd = 30;
+    if (procDef) {
+        daysToAdd = procDef.defaultDeadline;
+    } else {
+        const cleanType = (type || '').trim();
+        const lowerType = cleanType.toLowerCase();
+
+        // 1. Kiểm tra mã định danh 3.4.1 (Tách - hợp thửa đăng ký) -> 17 ngày chuẩn
+        if (lowerType.includes('3.4.1')) {
+            daysToAdd = 17;
+        }
+        // 2. Kiểm tra mã định danh 2.5 (Trích đo tách - hợp thửa đo đạc) -> 30 ngày chuẩn
+        else if (lowerType.includes('2.5') || lowerType.includes('trích đo tách')) {
+            daysToAdd = 30;
+        }
+        // 3. Khớp chính xác với DANG_KY_DEADLINE_MAP
+        else if (DANG_KY_DEADLINE_MAP[cleanType]) {
+            daysToAdd = DANG_KY_DEADLINE_MAP[cleanType];
+        }
+        // 4. Tra cứu cụ thể cho các loại hồ sơ Đăng ký (3.x.x)
+        else if (lowerType.includes('cấp đổi (có thuế)')) {
+            daysToAdd = 15;
+        } else if (lowerType.includes('cấp lại (có thuế)')) {
+            daysToAdd = 15;
+        } else if (lowerType.includes('chuyển nhượng') || lowerType.includes('tặng cho') || lowerType.includes('thừa kế') || lowerType.includes('thỏa thuận')) {
+            daysToAdd = 13;
+        } else if (lowerType.includes('cấp đổi')) {
+            daysToAdd = 10;
+        } else if (lowerType.includes('cấp lại')) {
+            daysToAdd = 10;
+        } else if (lowerType.includes('chuyển mục đích')) {
+            daysToAdd = 10;
+        } else if (lowerType.includes('gia hạn') || lowerType.includes('đính chính')) {
+            daysToAdd = 7;
+        } else if (lowerType.includes('thế chấp') || lowerType.includes('xóa thế chấp') || lowerType.includes('giao dịch bảo đảm') || lowerType.includes('gdbd')) {
+            daysToAdd = 3;
+        } else if (lowerType.includes('cấp mới') || lowerType.includes('cấp lần đầu') || lowerType.includes('cấp gcn lần đầu') || lowerType.includes('công nhận')) {
+            daysToAdd = 30;
+        } else if (lowerType.includes('tách - hợp thửa') || lowerType.includes('tách thửa') || lowerType.includes('hợp thửa')) {
+            daysToAdd = 17;
+        }
+        // 5. Nhóm Đo đạc & Cung cấp số thửa
+        else if (lowerType.includes('2.3') || lowerType.includes('duyệt đơn & cung cấp số thửa') || lowerType.includes('dđ & cc số thửa') || lowerType.includes('dd & cc số thửa') || lowerType.includes('duyệt đơn-số thửa') || lowerType.includes('duyệt đơn') || lowerType.includes('cung cấp số thửa') || lowerType.includes('cập nhật số thửa') || lowerType.includes('cập nhập số thửa') || lowerType.includes('2.6')) {
+            daysToAdd = 12;
+        }
+        // 6. Nhóm Sao lục / Cung cấp thông tin / Lưu trữ / Quy hoạch
+        else if (lowerType.includes('1.1') || lowerType.includes('sao lục') || lowerType.includes('cung cấp tài liệu đất đai') || lowerType.includes('cung cấp dữ liệu') ||
+            lowerType.includes('2.1') || lowerType.includes('trích lục') || 
+            lowerType.includes('quy hoạch') || lowerType.includes('lưu trữ') || lowerType.includes('cung cấp thông tin')) {
+            daysToAdd = 10;
+        } 
+        // 7. Nhóm Trích đo chỉnh lý / Chỉnh lý bản đồ
+        else if (lowerType.includes('trích đo chỉnh lý') || lowerType.includes('chỉnh lý bản đồ')) {
+            daysToAdd = 15;
+        } 
+        // 8. Nhóm Trích đo / Đo đạc địa chính / Cắm mốc (bao gồm 2.5)
+        else if (lowerType.includes('2.2') || lowerType.includes('trích đo') || 
+                   lowerType.includes('2.4') || lowerType.includes('cắm mốc') || 
+                   lowerType.includes('2.5') || lowerType.includes('đo đạc')) {
+            daysToAdd = 30;
+        }
     }
     
     // Áp dụng quy ước thời gian: nếu nhận sau 15h dời ngày trả qua sáng hôm sau (tức là cộng thêm 1 ngày làm việc)

@@ -6,6 +6,7 @@ import {
   ClipboardList, User as UserIcon, ChevronUp, ChevronDown, RefreshCw, XCircle
 } from 'lucide-react';
 import { calculateDeadlineHelper } from '../utils/appHelpers';
+import { detectProcedureId } from '../constants';
 import { addActivityLog } from '../services/activityLogService';
 import { AutoResizeTextarea } from './AutoResizeTextarea';
 
@@ -153,11 +154,16 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
   const handleFieldChange = (field: keyof DangKyRecord, value: any) => {
     setFormData(prev => {
       const updated = { ...prev, [field]: value };
-      if (field === 'recordType' || field === 'receivedDate') {
+      if (field === 'recordType' || field === 'code' || field === 'receivedDate') {
+        const rCode = field === 'code' ? value : prev.code;
         const rType = field === 'recordType' ? value : prev.recordType;
         const rDate = field === 'receivedDate' ? value : prev.receivedDate;
+        
+        const procId = detectProcedureId(rCode, rType);
+        (updated as any).procedureId = procId;
+
         if (rType && rDate) {
-          updated.deadline = calculateDeadlineHelper(rType, String(rDate).split('T')[0], holidays || []);
+          updated.deadline = calculateDeadlineHelper(rType, String(rDate).split('T')[0], holidays || [], rCode, procId);
         }
       }
 
