@@ -193,6 +193,7 @@ export interface RecordFile {
   receiptType?: 'Biên Lai' | 'Hóa Đơn' | string | null; 
   receiverName?: string | null;      // Người nhận kết quả
   resultReturnedDate?: string | null; // Ngày trả kết quả cho dân
+  returnedBy?: string | null;        // Người thực hiện trả kết quả / thu tiền
   feeAmount?: number | null;         // Số tiền thu
   returnedPrice?: number | null;     // Số tiền thực tế khi trả kết quả
 

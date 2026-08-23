@@ -54,17 +54,17 @@ export const confirmAction = async (message: string, title: string = 'Xác nhậ
 };
 
 // --- ĐỊNH NGHĨA CÁC CỘT HIỂN THỊ ---
-// Updated: Thứ tự chuẩn theo quy định (MÃ HỒ SƠ, CHỦ SỬ DỤNG, LOẠI HỒ SƠ, THỜI HẠN XỬ LÝ, XÃ PHƯỜNG, TỜ, THỬA, GIAO NHÂN VIÊN, HOÀN THÀNH ĐỢT, TRẠNG THÁI)
+// Updated: Thứ tự chuẩn mới (MÃ HỒ SƠ, THÔNG TIN KHÁCH HÀNG, LOẠI HỒ SƠ, HẠN XỬ LÝ, TỜ, THỬA, XÃ PHƯỜNG, GIAO NHÂN VIÊN, HOÀN THÀNH, TRẠNG THÁI)
 export const COLUMN_DEFS = [
   { key: 'code', label: 'MÃ HỒ SƠ', sortKey: 'code', className: 'w-[110px] text-center' },
-  { key: 'customer', label: 'THÔNG TIN CHỦ SỬ DỤNG', sortKey: 'customerName', className: 'w-64 text-center' }, 
+  { key: 'customer', label: 'THÔNG TIN KHÁCH HÀNG', sortKey: 'customerName', className: 'w-64 text-center' }, 
   { key: 'type', label: 'LOẠI HỒ SƠ', sortKey: 'recordType', className: 'w-[115px] text-center' },
-  { key: 'deadline', label: 'THỜI HẠN XỬ LÝ', sortKey: 'deadline', className: 'w-48 text-center' },
-  { key: 'ward', label: 'XÃ PHƯỜNG', sortKey: 'ward', className: 'w-32 text-center' },
+  { key: 'deadline', label: 'HẠN XỬ LÝ', sortKey: 'deadline', className: 'w-48 text-center' },
   { key: 'mapSheet', label: 'TỜ', sortKey: 'mapSheet', className: 'w-16 text-center' }, 
   { key: 'landPlot', label: 'THỬA', sortKey: 'landPlot', className: 'w-16 text-center' }, 
+  { key: 'ward', label: 'XÃ PHƯỜNG', sortKey: 'ward', className: 'w-32 text-center' },
   { key: 'assigned', label: 'GIAO NHÂN VIÊN', sortKey: 'assignedDate', className: 'w-48 text-center' },
-  { key: 'completed', label: 'HOÀN THÀNH ĐỢT', sortKey: 'completedDate', className: 'w-32 text-center' },
+  { key: 'completed', label: 'HOÀN THÀNH', sortKey: 'completedDate', className: 'w-32 text-center' },
   { key: 'status', label: 'TRẠNG THÁI', sortKey: 'status', className: 'w-32 text-center' },
 ];
 
@@ -73,9 +73,9 @@ export const DEFAULT_VISIBLE_COLUMNS = {
     customer: true, 
     type: true,
     deadline: true,
-    ward: true, 
     mapSheet: true, 
     landPlot: true, 
+    ward: true, 
     assigned: true, 
     completed: true, 
     status: true,
@@ -279,25 +279,28 @@ export const calculateDeadlineHelper = (type: string, receivedDateStr: string, h
             daysToAdd = DANG_KY_DEADLINE_MAP[cleanType];
         }
         // 4. Tra cứu cụ thể cho các loại hồ sơ Đăng ký (3.x.x)
-        else if (lowerType.includes('cấp đổi (có thuế)')) {
+        else if (lowerType.includes('cấp đổi (có thuế)') || lowerType.includes('3.2.2')) {
             daysToAdd = 15;
-        } else if (lowerType.includes('cấp lại (có thuế)')) {
+        } else if (lowerType.includes('cấp lại (có thuế)') || lowerType.includes('3.3.2')) {
             daysToAdd = 15;
-        } else if (lowerType.includes('chuyển nhượng') || lowerType.includes('tặng cho') || lowerType.includes('thừa kế') || lowerType.includes('thỏa thuận')) {
+        } else if (lowerType.includes('3.1.1') || lowerType.includes('3.1.2') || lowerType.includes('3.1.3') ||
+                   lowerType.includes('chuyển nhượng') || lowerType.includes('tặng cho') || lowerType.includes('thừa kế') || lowerType.includes('thỏa thuận') || lowerType.includes('phân chia')) {
             daysToAdd = 13;
-        } else if (lowerType.includes('cấp đổi')) {
+        } else if (lowerType.includes('cấp đổi') || lowerType.includes('3.2.1')) {
             daysToAdd = 10;
-        } else if (lowerType.includes('cấp lại')) {
+        } else if (lowerType.includes('cấp lại') || lowerType.includes('3.3.1')) {
             daysToAdd = 10;
-        } else if (lowerType.includes('chuyển mục đích')) {
-            daysToAdd = 10;
-        } else if (lowerType.includes('gia hạn') || lowerType.includes('đính chính')) {
+        } else if (lowerType.includes('chuyển mục đích') || lowerType.includes('3.6.1')) {
             daysToAdd = 7;
-        } else if (lowerType.includes('thế chấp') || lowerType.includes('xóa thế chấp') || lowerType.includes('giao dịch bảo đảm') || lowerType.includes('gdbd')) {
+        } else if (lowerType.includes('gia hạn') || lowerType.includes('3.5.1') || lowerType.includes('đính chính') || lowerType.includes('3.7.1') || lowerType.includes('3.7.2') || lowerType.includes('thay đổi thông tin')) {
+            daysToAdd = 7;
+        } else if (lowerType.includes('xóa thế chấp') || lowerType.includes('xóa đk gdbd') || lowerType.includes('xóa gdbd') || lowerType.includes('3.8.2')) {
+            daysToAdd = 1;
+        } else if (lowerType.includes('thế chấp') || lowerType.includes('giao dịch bảo đảm') || lowerType.includes('gdbd') || lowerType.includes('3.8.1')) {
             daysToAdd = 3;
-        } else if (lowerType.includes('cấp mới') || lowerType.includes('cấp lần đầu') || lowerType.includes('cấp gcn lần đầu') || lowerType.includes('công nhận')) {
+        } else if (lowerType.includes('cấp mới') || lowerType.includes('cấp lần đầu') || lowerType.includes('cấp gcn lần đầu') || lowerType.includes('công nhận') || lowerType.includes('3.9.1')) {
             daysToAdd = 30;
-        } else if (lowerType.includes('tách - hợp thửa') || lowerType.includes('tách thửa') || lowerType.includes('hợp thửa')) {
+        } else if (lowerType.includes('tách - hợp thửa') || lowerType.includes('tách thửa') || lowerType.includes('hợp thửa') || lowerType.includes('3.4.1') || lowerType.includes('3.4.2')) {
             daysToAdd = 17;
         }
         // 5. Nhóm Đo đạc & Cung cấp số thửa

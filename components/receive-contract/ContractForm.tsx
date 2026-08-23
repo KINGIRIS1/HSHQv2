@@ -4,6 +4,7 @@ import { Contract, PriceItem, SplitItem, RecordFile } from '../../types';
 import { Save, Calculator, Search, Plus, Trash2, Printer, FileCheck, FileSignature, CheckCircle, AlertCircle, AlertTriangle, X, RotateCcw, MapPin, Ruler, Grid, Banknote, User, FileText, Calendar, Wand2, ChevronDown, ChevronUp, Copy, ExternalLink, RefreshCw } from 'lucide-react';
 import { confirmAction } from '../../utils/appHelpers';
 import { checkContractDateErrors, getTodayDateString } from '../../utils/contractDateUtils';
+import AutoResizeTextarea from '../AutoResizeTextarea';
 
 interface ContractFormProps {
   initialData?: Contract;
@@ -136,24 +137,22 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
       if (activeTab === 'tt' && tachThuaItems.length === 0) setTachThuaItems([{ serviceName: '', quantity: 1, price: 0, area: undefined }]); // Initialize area as undefined
   }, [activeTab]);
 
-  // Unified automatic code preview generation based on tab & date
+  // Unified automatic code preview generation based on date
   useEffect(() => {
       if (mode === 'liquidation') return; // Không tự lấy số mới ở tab thanh lý hợp đồng
       const isExistingContract = initialData && contracts && contracts.some(c => c.id === initialData.id);
       if (isExistingContract || isManual) return;
-      const typeMap: Record<string, any> = { 'dd': 'Đo đạc', 'tt': 'Tách thửa', 'cm': 'Cắm mốc', 'tl': 'Trích lục' };
-      const currentType = typeMap[activeTab] || 'Đo đạc';
       
       const fetchCode = async () => {
           const dateYear = formData.createdDate ? new Date(formData.createdDate).getFullYear() : new Date().getFullYear();
-          const code = await generateCode(currentType, dateYear);
+          const code = await generateCode(undefined, dateYear);
           setFormData(prev => {
               if (prev.code === code) return prev;
               return { ...prev, code };
           });
       };
       fetchCode();
-  }, [activeTab, formData.createdDate, isManual, initialData, contracts, generateCode, mode]);
+  }, [formData.createdDate, isManual, initialData, contracts, generateCode, mode]);
 
   // Init Liquidation Data if missing (Fallback logic)
   useEffect(() => {
@@ -525,7 +524,7 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
       setNotification(null);
 
       if (!formData.code || !formData.customerName) { 
-          setNotification({ type: 'error', message: "Vui lòng điền đầy đủ Mã hợp đồng và Tên khách hàng." }); 
+          setNotification({ type: 'error', message: "Vui lòng điền đầy đủ Số hợp đồng và Tên khách hàng." }); 
           return; 
       }
 
@@ -598,7 +597,7 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
 
       if (savedCode) {
           const msg = initialData ? 'Cập nhật thành công!' : 'Đã tạo mới thành công!';
-          setNotification({ type: 'success', message: `${msg} Mã hợp đồng: ${savedCode}` });
+          setNotification({ type: 'success', message: `${msg} Số hợp đồng: ${savedCode}` });
           
           // Cập nhật lại code mới chốt chính thức vào form
           setFormData(prev => ({ 
@@ -837,9 +836,9 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide">
                     {mode === 'liquidation' ? 'GHI CHÚ THANH LÝ HỢP ĐỒNG' : 'GHI CHÚ HỢP ĐỒNG'}
                 </label>
-                <textarea 
-                    rows={3} 
-                    className="w-full text-xs p-2.5 border border-slate-200 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200 focus:outline-none transition-all resize-none font-medium text-slate-800 placeholder:text-slate-400" 
+                <AutoResizeTextarea 
+                    minRows={2} 
+                    className="w-full text-xs p-2.5 border border-slate-200 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200 focus:outline-none transition-all font-medium text-slate-800 placeholder:text-slate-400 leading-relaxed" 
                     value={formData.content ?? ''} 
                     onChange={e => handleChange('content', e.target.value)} 
                     placeholder="Nội dung chi tiết..." 
@@ -856,7 +855,7 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
                         {mode !== 'liquidation' && (
                             <div>
                                 <div className="flex justify-between items-center mb-1">
-                                    <label className={labelClass}>Mã Hợp Đồng</label>
+                                    <label className={labelClass}>Số Hợp Đồng</label>
                                     <div className="flex items-center gap-1.5">
                                         {(!initialData || (contracts && !contracts.some(c => c.id === initialData.id))) && (
                                             <button 
@@ -876,7 +875,7 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
                                         className={`${inputClass} font-mono font-bold text-purple-700 ${isManual ? 'bg-amber-50/50 border-amber-300 focus:border-amber-500 focus:ring-amber-200' : 'bg-slate-50'}`} 
                                         value={formData.code ?? ''} 
                                         onChange={e => isManual && handleChange('code', e.target.value)}
-                                        placeholder={isManual ? "Nhập mã hợp đồng..." : "Đang lấy số tự động..."}
+                                        placeholder={isManual ? "Nhập số hợp đồng..." : "Đang lấy số tự động..."}
                                     />
                                 </div>
                             </div>
@@ -898,21 +897,6 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
                                     <input type="date" className={inputClass} value={dateVal(formData.liquidationDate)} onChange={e => handleChange('liquidationDate', e.target.value)} />
                                     <button type="button" onClick={() => handleChange('liquidationDate', todayStr)} className="px-2 py-1.5 bg-orange-100 hover:bg-orange-200 text-orange-800 rounded-lg text-xs font-bold whitespace-nowrap transition-colors" title="Đặt lại ngày hôm nay">Hôm nay</button>
                                 </div>
-                            </div>
-                        )}
-
-                        {/* CẢNH BÁO KIỂM TRA NGÀY BẤT THƯỜNG / SAI SO VỚI THỜI GIAN HIỆN TẠI */}
-                        {mode !== 'liquidation' && dateCheck.messages.length > 0 && (
-                            <div className={`col-span-full p-3 rounded-xl border text-xs space-y-1 animate-fade-in ${dateCheck.hasError ? 'bg-red-50 border-red-200 text-red-800' : 'bg-amber-50 border-amber-200 text-amber-800'}`}>
-                                <div className="flex items-center gap-1.5 font-bold text-sm">
-                                    <AlertTriangle size={16} className={dateCheck.hasError ? 'text-red-600' : 'text-amber-600'} />
-                                    <span>Cảnh báo ngày bất thường (So với thời gian hiện tại: {getTodayDateString()}):</span>
-                                </div>
-                                <ul className="list-disc list-inside pl-1 space-y-1 font-medium">
-                                    {dateCheck.messages.map((m, idx) => (
-                                        <li key={idx}>{m}</li>
-                                    ))}
-                                </ul>
                             </div>
                         )}
                     </div>

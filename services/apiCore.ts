@@ -192,7 +192,7 @@ export const sanitizeData = (data: any, allowedColumns: string[]) => {
     const numberFields = [
         'area', 'unitPrice', 'vatRate', 'vatAmount', 'totalAmount', 
         'deposit', 'quantity', 'plotCount', 'markerCount', 
-        'minArea', 'maxArea', 'price',
+        'minArea', 'maxArea', 'price', 'returnedPrice',
         'liquidationArea', 'liquidationAmount', 'residentialArea'
     ];
     numberFields.forEach(field => {
@@ -277,7 +277,7 @@ export const sanitizePayloadFor22P02 = (payload: any): any => {
     const numericKeys = [
         'area', 'unitPrice', 'vatRate', 'vatAmount', 'totalAmount', 
         'deposit', 'quantity', 'plotCount', 'markerCount', 
-        'minArea', 'maxArea', 'price', 'advancePayment',
+        'minArea', 'maxArea', 'price', 'advancePayment', 'returnedPrice',
         'liquidationArea', 'liquidationAmount', 'residentialArea',
         'excerptNumber', 'measurementNumber', 'sheetNumber', 'plotNumber',
         'issueNumber', 'receiptNumber', 'entryNumber'
@@ -360,6 +360,8 @@ export const mapRecordFromDb = (item: any): any => {
     r.otherDocs = val(r.otherDocs, r.otherdocs, r.other_docs);
     
     r.resultReturnedDate = keepOnlyDate(val(r.resultReturnedDate, r.resultreturneddate, r.result_returned_date));
+    r.returnedBy = val(r.returnedBy, r.returnedby, r.returned_by);
+    r.returnedPrice = val(r.returnedPrice, r.returnedprice, r.returned_price);
     
     r.exportBatch = val(r.exportBatch, r.exportbatch, r.export_batch);
     r.exportDate = keepOnlyDate(val(r.exportDate, r.exportdate, r.export_date));

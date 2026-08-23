@@ -88,143 +88,143 @@ export const PROCEDURE_CATALOG: ProcedureDefinition[] = [
   // ==========================================
   {
     id: '3.1.1',
-    name: '3.1.1 Chuyển nhượng',
-    shortName: '3.1.1 Chuyển nhượng',
+    name: '3.1.1 ĐKBĐ Chuyển nhượng, Tặng cho, Thừa kế QSDĐ, QSH tài sản',
+    shortName: '3.1.1 Chuyển quyền',
     module: 'dangky',
     defaultDeadline: 13,
-    prefixes: ['3.1.1', 'CN'],
-    keywords: ['chuyển nhượng']
+    prefixes: ['3.1.1', 'CN', 'TA', 'TK', 'CQ'],
+    keywords: ['chuyển nhượng', 'tặng cho', 'thừa kế', 'chuyển quyền', 'qsdđ', 'qsh tài sản']
   },
   {
     id: '3.1.2',
-    name: '3.1.2 Tặng cho',
-    shortName: '3.1.2 Tặng cho',
+    name: '3.1.2 ĐKBĐ theo thỏa thuận vợ chồng, thỏa thuận phân chia của hộ gia đình',
+    shortName: '3.1.2 Phân chia quyền',
     module: 'dangky',
     defaultDeadline: 13,
-    prefixes: ['3.1.2', 'TC'],
-    keywords: ['tặng cho']
+    prefixes: ['3.1.2', 'TT', 'PCQ'],
+    keywords: ['thỏa thuận', 'thỏa thuận vợ chồng', 'phân chia', 'hộ gia đình', 'phân chia quyền']
   },
   {
     id: '3.1.3',
-    name: '3.1.3 Thừa kế',
-    shortName: '3.1.3 Thừa kế',
+    name: '3.1.3 ĐKBĐ theo Bản án Tòa án, Quyết định Thi hành án dân sự',
+    shortName: '3.1.3 Chuyển quyền theo B/A/QĐ',
     module: 'dangky',
     defaultDeadline: 13,
-    prefixes: ['3.1.3', 'TK'],
-    keywords: ['thừa kế']
-  },
-  {
-    id: '3.1.4',
-    name: '3.1.4 Thỏa thuận',
-    shortName: '3.1.4 Thỏa thuận',
-    module: 'dangky',
-    defaultDeadline: 13,
-    prefixes: ['3.1.4', 'TT'],
-    keywords: ['thỏa thuận']
+    prefixes: ['3.1.3', 'QĐ-TA-THA', 'BẢN ÁN', 'THI HÀNH ÁN'],
+    keywords: ['bản án', 'tòa án', 'thi hành án', 'quyết định thi hành án']
   },
   {
     id: '3.2.1',
-    name: '3.2.1 Cấp đổi',
+    name: '3.2.1 Cấp đổi GCN (ố nhòe, rách nát, thêm tên vợ/chồng, không đổi diện tích)',
     shortName: '3.2.1 Cấp đổi',
     module: 'dangky',
     defaultDeadline: 10,
     prefixes: ['3.2.1', 'CD'],
-    keywords: ['cấp đổi']
+    keywords: ['cấp đổi', 'ố nhòe', 'rách nát', 'thêm tên', 'không đổi diện tích']
   },
   {
     id: '3.2.2',
-    name: '3.2.2 Cấp đổi (có thuế)',
+    name: '3.2.2 Cấp đổi GCN do đo đạc lập bản đồ chính quy (có thay đổi kích thước/diện tích)',
     shortName: '3.2.2 Cấp đổi (có thuế)',
     module: 'dangky',
     defaultDeadline: 15,
     prefixes: ['3.2.2', 'CDT'],
-    keywords: ['cấp đổi (có thuế)', 'cấp đổi có thuế']
+    keywords: ['cấp đổi (có thuế)', 'cấp đổi có thuế', 'bản đồ chính quy', 'thay đổi kích thước', 'thay đổi diện tích']
   },
   {
     id: '3.3.1',
-    name: '3.3.1 Cấp lại',
+    name: '3.3.1 Cấp lại Giấy chứng nhận do bị mất',
     shortName: '3.3.1 Cấp lại',
     module: 'dangky',
     defaultDeadline: 10,
     prefixes: ['3.3.1', 'CL'],
-    keywords: ['cấp lại']
+    keywords: ['cấp lại', 'bị mất', 'mất gcn', 'mất sổ']
   },
   {
     id: '3.3.2',
-    name: '3.3.2 Cấp lại (có thuế)',
+    name: '3.3.2 Cấp lại Giấy chứng nhận do bị mất (có thay đổi kích thước/diện tích hoặc đồng thời...)',
     shortName: '3.3.2 Cấp lại (có thuế)',
     module: 'dangky',
     defaultDeadline: 15,
     prefixes: ['3.3.2', 'CLT'],
-    keywords: ['cấp lại (có thuế)', 'cấp lại có thuế']
+    keywords: ['cấp lại (có thuế)', 'cấp lại có thuế', 'cấp lại thay đổi diện tích']
   },
   {
     id: '3.4.1',
-    name: '3.4.1 Tách - hợp thửa',
+    name: '3.4.1 Tách thửa đất hoặc Hợp thửa đất không đổi người sử dụng đất',
     shortName: '3.4.1 Tách - hợp thửa',
     module: 'dangky',
     defaultDeadline: 17,
-    prefixes: ['3.4.1', 'DK-TT', 'DK-HT', 'TÁCH-HỢP'],
-    keywords: ['tách - hợp thửa', 'tách thửa', 'hợp thửa']
+    prefixes: ['3.4.1', 'DK-TT-HT', 'DK-TT', 'DK-HT', 'TÁCH-HỢP'],
+    keywords: ['tách thửa', 'hợp thửa', 'tách - hợp thửa', 'không đổi người sử dụng đất']
+  },
+  {
+    id: '3.4.2',
+    name: '3.4.2 Tách thửa đất đồng thời thực hiện thủ tục Chuyển quyền',
+    shortName: '3.4.2 Tách thửa chuyển quyền',
+    module: 'dangky',
+    defaultDeadline: 17,
+    prefixes: ['3.4.2', 'TT-CQ', 'DK-TTCQ'],
+    keywords: ['tách thửa đồng thời chuyển quyền', 'tách thửa chuyển quyền', 'tách chuyển quyền']
   },
   {
     id: '3.5.1',
-    name: '3.5.1 Gia hạn',
+    name: '3.5.1 Xác nhận tiếp tục sử dụng đất nông nghiệp khi hết hạn',
     shortName: '3.5.1 Gia hạn',
     module: 'dangky',
     defaultDeadline: 7,
     prefixes: ['3.5.1', 'GH'],
-    keywords: ['gia hạn']
+    keywords: ['gia hạn', 'tiếp tục sử dụng đất', 'hết hạn', 'đất nông nghiệp']
   },
   {
     id: '3.6.1',
-    name: '3.6.1 Chuyển mục đích không xin phép',
+    name: '3.6.1 ĐKBĐ chuyển mục đích sử dụng đất không phải xin phép',
     shortName: '3.6.1 Chuyển mục đích',
     module: 'dangky',
-    defaultDeadline: 10,
+    defaultDeadline: 7,
     prefixes: ['3.6.1', 'CMD'],
-    keywords: ['chuyển mục đích']
+    keywords: ['chuyển mục đích', 'không phải xin phép']
   },
   {
     id: '3.7.1',
-    name: '3.7.1 Đính chính GCN',
+    name: '3.7.1 Đính chính Giấy chứng nhận đã cấp có sai sót (trong giai đoạn ĐKBĐ)',
     shortName: '3.7.1 Đính chính',
     module: 'dangky',
     defaultDeadline: 7,
     prefixes: ['3.7.1', 'DC'],
-    keywords: ['đính chính']
+    keywords: ['đính chính', 'sai sót']
+  },
+  {
+    id: '3.7.2',
+    name: '3.7.2 ĐKBĐ thay đổi thông tin cá nhân (CCCD, Họ tên), thay đổi số hiệu/địa chỉ thửa',
+    shortName: '3.7.2 ĐKBĐ đổi thông tin',
+    module: 'dangky',
+    defaultDeadline: 7,
+    prefixes: ['3.7.2', 'ĐKBĐ', 'DKBD', 'DOI-TT'],
+    keywords: ['thay đổi thông tin cá nhân', 'thay đổi số hiệu', 'thay đổi địa chỉ thửa', 'đổi cccd', 'đổi họ tên', 'đổi số nhà']
   },
   {
     id: '3.8.1',
-    name: '3.8.1 Đăng ký GDBD',
+    name: '3.8.1 Đăng ký GDBD (Giao dịch bảo đảm / Thế chấp)',
     shortName: '3.8.1 Đăng ký GDBD',
     module: 'dangky',
     defaultDeadline: 3,
     prefixes: ['3.8.1', 'GDBD'],
-    keywords: ['đăng ký gdbd', 'thế chấp', 'giao dịch bảo đảm']
+    keywords: ['đăng ký gdbd', 'thế chấp', 'giao dịch bảo đảm', 'đăng ký thế chấp']
   },
   {
     id: '3.8.2',
-    name: '3.8.2 Xóa ĐK GDBD',
+    name: '3.8.2 Xóa ĐK GDBD (Xóa thế chấp)',
     shortName: '3.8.2 Xóa ĐK GDBD',
     module: 'dangky',
-    defaultDeadline: 3,
+    defaultDeadline: 1,
     prefixes: ['3.8.2', 'XGDBD', 'XTC'],
     keywords: ['xóa đk gdbd', 'xóa thế chấp', 'xóa gdbd']
   },
   {
-    id: '3.9.1',
-    name: '3.9.1 Cấp mới / Cấp lần đầu',
-    shortName: '3.9.1 Cấp mới',
-    module: 'dangky',
-    defaultDeadline: 30,
-    prefixes: ['3.9.1', 'CLD'],
-    keywords: ['cấp mới', 'cấp lần đầu', 'công nhận']
-  },
-  {
     id: '3.9.9',
     name: '3.9.9 Khác',
-    shortName: 'Khác',
+    shortName: '3.9.9 Khác',
     module: 'dangky',
     defaultDeadline: 10,
     prefixes: ['3.9.9'],
@@ -299,6 +299,7 @@ export const DANG_KY_DEADLINE_MAP: Record<string, number> = PROCEDURE_CATALOG
   .reduce((acc, p) => {
     acc[p.name] = p.defaultDeadline;
     acc[p.shortName] = p.defaultDeadline;
+    acc[p.id] = p.defaultDeadline;
     return acc;
   }, {
     'Chuyển nhượng': 13,
@@ -310,11 +311,21 @@ export const DANG_KY_DEADLINE_MAP: Record<string, number> = PROCEDURE_CATALOG
     'Cấp lại': 10,
     'Cấp lại (có thuế)': 15,
     'Tách - hợp thửa': 17,
+    'Tách thửa': 17,
+    'Hợp thửa': 17,
+    'Tách thửa chuyển quyền': 17,
     'Gia hạn': 7,
-    'Chuyển mục đích không xin phép': 10,
+    'Chuyển mục đích không xin phép': 7,
+    'Chuyển mục đích': 7,
     'Đính chính GCN': 7,
+    'Đính chính': 7,
+    'ĐKBĐ': 7,
     'Đăng ký GDBD': 3,
-    'Xóa ĐK GDBD': 3,
+    'Thế chấp': 3,
+    'Xóa ĐK GDBD': 1,
+    'Xóa thế chấp': 1,
+    'Cấp mới': 30,
+    'Cấp lần đầu': 30,
     'Khác': 10
   } as Record<string, number>);
 

@@ -160,7 +160,12 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
   const todayFmt = formatDateDDMMYYYY(todayStr);
 
   const handleConfirm = () => {
-      const handoverWard = selectedHandoverWard || 'SAME_AS_WARD';
+      if (!selectedHandoverWard) {
+          alert('Vui lòng chọn cụ thể Địa giới / Xã bàn giao trước khi chốt danh sách bàn giao!');
+          return;
+      }
+
+      const handoverWard = selectedHandoverWard;
 
       if (mode === 'new') {
           onConfirm(nextBatchInfo.batchName, nextBatchInfo.date, handoverWard);
@@ -266,17 +271,22 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
                 </div>
             </div>
 
-            {/* Giao khác địa bàn */}
+            {/* Địa giới bàn giao (Bắt buộc) */}
             <div className="space-y-1.5 pt-2">
-                <label className="block text-xs font-bold text-gray-800">
-                    Giao khác địa bàn (Xã/phường nhận kết quả)
+                <label className="block text-xs font-bold text-gray-800 flex items-center justify-between">
+                    <span>Chọn địa giới bàn giao (Xã/Phường) <span className="text-red-500">*</span></span>
+                    {!selectedHandoverWard && (
+                        <span className="text-red-500 text-[11px] font-medium">Bắt buộc chọn</span>
+                    )}
                 </label>
                 <select 
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-blue-500 outline-none font-medium bg-white text-gray-800"
+                    className={`w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none font-semibold bg-white cursor-pointer ${
+                        !selectedHandoverWard ? 'border-amber-400 bg-amber-50/40 text-amber-900' : 'border-gray-300 text-gray-800'
+                    }`}
                     value={selectedHandoverWard}
                     onChange={(e) => setSelectedHandoverWard(e.target.value)}
                 >
-                    <option value="">-- Mặc định (Theo địa bàn từng hồ sơ) --</option>
+                    <option value="">-- Chọn Địa giới / Xã bàn giao (Bắt buộc) --</option>
                     {wards.map(w => (
                         <option key={w} value={w}>{getWardLabel(w)}</option>
                     ))}

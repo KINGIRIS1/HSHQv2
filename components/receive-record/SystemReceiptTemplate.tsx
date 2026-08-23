@@ -267,9 +267,9 @@ const SystemReceiptTemplate: React.FC<SystemReceiptTemplateProps> = ({ data, rec
                 <div className="flex justify-between items-center p-4 border-b">
                     <h2 className="text-xl font-bold">In Biên Nhận & Phiếu Kiểm Soát</h2>
                     <div className="flex space-x-2">
-                        {onCreateContract && data && data.recordType && (getShortRecordType(data.recordType).startsWith('2.2') || getShortRecordType(data.recordType).startsWith('2.4')) && (
-                            <button onClick={() => { onCreateContract(data); onClose(); }} className="flex items-center px-4 py-2 bg-amber-600 text-white rounded hover:bg-amber-700">
-                                <FileSignature className="w-4 h-4 mr-2" /> Lập Hợp Đồng
+                        {onCreateContract && data && data.recordType && (getShortRecordType(data.recordType).startsWith('2.1') || getShortRecordType(data.recordType).startsWith('2.2') || getShortRecordType(data.recordType).startsWith('2.4') || getShortRecordType(data.recordType).startsWith('2.5')) && !getShortRecordType(data.recordType).startsWith('2.3') && (
+                            <button onClick={() => { onCreateContract(data); onClose(); }} className="flex items-center px-4 py-2 bg-amber-600 text-white rounded hover:bg-amber-700 font-bold text-xs sm:text-sm">
+                                <FileSignature className="w-4 h-4 mr-2" /> Lập HĐ
                             </button>
                         )}
                         <button onClick={handlePrintReceipt} className="flex items-center px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">

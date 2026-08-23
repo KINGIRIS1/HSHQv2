@@ -29,7 +29,7 @@ interface RecordRowProps {
 const formatDate = (dateStr?: string | null) => {
     if (!dateStr) return '';
     const d = new Date(dateStr);
-    return isNaN(d.getTime()) ? '' : `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getFullYear()).slice(-2)}`;
+    return isNaN(d.getTime()) ? '' : `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
 };
 
 const RecordRow: React.FC<RecordRowProps> = ({
@@ -88,7 +88,7 @@ const RecordRow: React.FC<RecordRowProps> = ({
   const cellClass = "p-3 md:p-3.5 align-middle text-slate-700 border-b border-slate-100/80 transition-colors duration-200";
 
   const orderedKeys = React.useMemo(() => {
-    const defaultOrder = ['code', 'customer', 'type', 'deadline', 'ward', 'mapSheet', 'landPlot', 'assigned', 'completed', 'status'];
+    const defaultOrder = ['code', 'customer', 'type', 'deadline', 'mapSheet', 'landPlot', 'ward', 'assigned', 'completed', 'status'];
     if (columnOrder && columnOrder.length > 0) {
       return columnOrder;
     }

@@ -21,7 +21,7 @@ import {
     MapPin
 } from 'lucide-react';
 import { RecordFile, Employee, User, RecordStatus, UserRole } from '../../types';
-import { getShortRecordType, getWardLabel } from '../../constants';
+import { getShortRecordType, getWardLabel, PROCEDURE_CATALOG, detectProcedureId, PROCEDURE_MAP_BY_ID } from '../../constants';
 import { removeVietnameseTones, toTitleCase, getBatchDisplayParts, isRecordOverdue, isRecordApproaching } from '../../utils/appHelpers';
 import StatusBadge from '../StatusBadge';
 import * as XLSX from 'xlsx-js-style';
@@ -41,7 +41,7 @@ interface RecordLookupViewProps {
 const formatDate = (dateStr?: string | null) => {
     if (!dateStr) return '';
     const d = new Date(dateStr);
-    return isNaN(d.getTime()) ? '' : `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getFullYear()).slice(-2)}`;
+    return isNaN(d.getTime()) ? '' : `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
 };
 
 export const RecordLookupView: React.FC<RecordLookupViewProps> = ({
@@ -82,10 +82,22 @@ export const RecordLookupView: React.FC<RecordLookupViewProps> = ({
         return RecordStatus.RECEIVED;
     };
 
-    // All available unique record types and batches
-    const availableRecordTypes = useMemo(() => {
+    // All available unique extra record types in database that might not be in canonical catalog
+    const extraRecordTypes = useMemo(() => {
         const types = new Set<string>();
-        records.forEach(r => { if (r.recordType) types.add(r.recordType); });
+        records.forEach(r => { 
+            if (!r.recordType) return;
+            const detId = detectProcedureId(r.code, r.recordType);
+            const isKnown = PROCEDURE_CATALOG.some(p => p.id === detId && (
+                r.recordType === p.name || 
+                r.recordType === p.shortName || 
+                r.recordType === p.id ||
+                p.keywords.some(kw => (r.recordType || '').toLowerCase().includes(kw))
+            ));
+            if (!isKnown && r.recordType && r.recordType !== 'Khác' && r.recordType !== '3.9.9 Khác') {
+                types.add(r.recordType);
+            }
+        });
         return Array.from(types);
     }, [records]);
 
@@ -121,9 +133,21 @@ export const RecordLookupView: React.FC<RecordLookupViewProps> = ({
             result = result.filter(r => getDisplayStatus(r) === selectedStatusFilter);
         }
 
-        // 3. Record Type Filter
+        // 3. Record Type Filter (Thống nhất nhận diện chuẩn theo catalog mã thủ tục và từ khóa)
         if (selectedRecordTypeFilter !== 'all') {
-            result = result.filter(r => (r.recordType || '') === selectedRecordTypeFilter);
+            result = result.filter(r => {
+                const detectedId = detectProcedureId(r.code, r.recordType);
+                if (detectedId === selectedRecordTypeFilter) return true;
+                if (r.recordType === selectedRecordTypeFilter) return true;
+                const proc = PROCEDURE_MAP_BY_ID[selectedRecordTypeFilter];
+                if (proc) {
+                    if (r.recordType === proc.name || r.recordType === proc.shortName || r.recordType === proc.id) return true;
+                    const rLower = (r.recordType || '').toLowerCase();
+                    if (proc.keywords.some(kw => rLower.includes(kw))) return true;
+                    if (proc.prefixes.some(p => (r.code || '').toUpperCase().includes(p))) return true;
+                }
+                return false;
+            });
         }
 
         // 4. Batch Filter
@@ -217,14 +241,14 @@ export const RecordLookupView: React.FC<RecordLookupViewProps> = ({
         const headers = [
             'STT',
             'MÃ HỒ SƠ',
-            'THÔNG TIN CHỦ SỬ DỤNG',
+            'THÔNG TIN KHÁCH HÀNG',
             'SỐ ĐIỆN THOẠI',
             'LOẠI HỒ SƠ',
             'NGÀY NHẬN',
             'HẠN TRẢ',
-            'XÃ PHƯỜNG',
             'TỜ',
             'THỬA',
+            'XÃ PHƯỜNG',
             'GIAO NHÂN VIÊN',
             'HOÀN THÀNH / ĐỢT',
             'TRẠNG THÁI'
@@ -241,9 +265,9 @@ export const RecordLookupView: React.FC<RecordLookupViewProps> = ({
                 getShortRecordType(r.recordType) || '',
                 formatDate(r.receivedDate),
                 formatDate(r.deadline),
-                getWardLabel(r.ward),
                 r.mapSheet || '',
                 r.landPlot || '',
+                getWardLabel(r.ward),
                 emp?.name || '',
                 r.exportBatch || formatDate(r.completedDate) || '',
                 displayStatus
@@ -448,10 +472,39 @@ export const RecordLookupView: React.FC<RecordLookupViewProps> = ({
                                                 onChange={(e) => setSelectedRecordTypeFilter(e.target.value)}
                                                 className="w-full text-xs border border-slate-200 rounded-lg p-2 font-medium bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
                                             >
-                                                <option value="all">Tất cả loại hồ sơ</option>
-                                                {availableRecordTypes.map((t) => (
-                                                    <option key={t} value={t}>{t}</option>
-                                                ))}
+                                                <option value="all">-- Tất cả loại hồ sơ --</option>
+
+                                                <optgroup label="── 1. TỔ LƯU TRỮ ──">
+                                                    {PROCEDURE_CATALOG.filter(p => p.module === 'luutru').map(p => (
+                                                        <option key={p.id} value={p.id}>{p.name}</option>
+                                                    ))}
+                                                </optgroup>
+
+                                                <optgroup label="── 2. TỔ ĐO ĐẠC ──">
+                                                    {PROCEDURE_CATALOG.filter(p => p.module === 'dodac').map(p => (
+                                                        <option key={p.id} value={p.id}>{p.name}</option>
+                                                    ))}
+                                                </optgroup>
+
+                                                <optgroup label="── 3. TỔ ĐĂNG KÝ ĐẤT ĐAI ──">
+                                                    {PROCEDURE_CATALOG.filter(p => p.module === 'dangky').map(p => (
+                                                        <option key={p.id} value={p.id}>{p.name}</option>
+                                                    ))}
+                                                </optgroup>
+
+                                                <optgroup label="── 4. THỦ TỤC KHÁC ──">
+                                                    {PROCEDURE_CATALOG.filter(p => p.module === 'khac').map(p => (
+                                                        <option key={p.id} value={p.id}>{p.name}</option>
+                                                    ))}
+                                                </optgroup>
+
+                                                {extraRecordTypes.length > 0 && (
+                                                    <optgroup label="── LOẠI HỒ SƠ KHÁC (DỮ LIỆU CŨ) ──">
+                                                        {extraRecordTypes.map(t => (
+                                                            <option key={t} value={t}>{t}</option>
+                                                        ))}
+                                                    </optgroup>
+                                                )}
                                             </select>
                                         </div>
 
@@ -561,9 +614,9 @@ export const RecordLookupView: React.FC<RecordLookupViewProps> = ({
                     <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden flex flex-col h-full">
                         <div className="overflow-auto max-h-[calc(100vh-220px)] min-h-[350px]">
                             <table className="w-full text-left border-collapse text-xs">
-                                <thead>
-                                    <tr className="bg-slate-50 text-slate-600 border-b border-slate-200 font-bold uppercase text-[11px] select-none sticky top-0 z-10 shadow-xs">
-                                        <th className="p-3 w-12 text-center">
+                                <thead className="bg-slate-50 sticky top-0 z-20 shadow-xs select-none">
+                                    <tr className="text-slate-600 border-b border-slate-200 font-bold uppercase text-[11px]">
+                                        <th className="p-3 w-12 text-center bg-slate-50">
                                             <input
                                                 type="checkbox"
                                                 checked={filteredRecords.length > 0 && selectedRecordIds.size === filteredRecords.length}
@@ -572,16 +625,16 @@ export const RecordLookupView: React.FC<RecordLookupViewProps> = ({
                                                 title="Chọn tất cả hồ sơ"
                                             />
                                         </th>
-                                        <th className="p-3 w-[110px] text-center">MÃ HỒ SƠ</th>
-                                        <th className="p-3 w-64 text-center">THÔNG TIN CHỦ SỬ DỤNG</th>
-                                        <th className="p-3 w-[115px] text-center">LOẠI HỒ SƠ</th>
-                                        <th className="p-3 w-48 text-center">THỜI HẠN XỬ LÝ</th>
-                                        <th className="p-3 w-32 text-center">XÃ PHƯỜNG</th>
-                                        <th className="p-3 w-16 text-center">TỜ</th>
-                                        <th className="p-3 w-16 text-center">THỬA</th>
-                                        <th className="p-3 w-48 text-center">GIAO NHÂN VIÊN</th>
-                                        <th className="p-3 w-32 text-center">HOÀN THÀNH ĐỢT</th>
-                                        <th className="p-3 w-32 text-center">TRẠNG THÁI</th>
+                                        <th className="p-3 w-[110px] text-center bg-slate-50">MÃ HỒ SƠ</th>
+                                        <th className="p-3 w-64 text-center bg-slate-50">THÔNG TIN KHÁCH HÀNG</th>
+                                        <th className="p-3 w-[115px] text-center bg-slate-50">LOẠI HỒ SƠ</th>
+                                        <th className="p-3 w-48 text-center bg-slate-50">HẠN XỬ LÝ</th>
+                                        <th className="p-3 w-16 text-center bg-slate-50">TỜ</th>
+                                        <th className="p-3 w-16 text-center bg-slate-50">THỬA</th>
+                                        <th className="p-3 w-32 text-center bg-slate-50">XÃ PHƯỜNG</th>
+                                        <th className="p-3 w-48 text-center bg-slate-50">GIAO NHÂN VIÊN</th>
+                                        <th className="p-3 w-32 text-center bg-slate-50">HOÀN THÀNH</th>
+                                        <th className="p-3 w-32 text-center bg-slate-50">TRẠNG THÁI</th>
                                         <th className="p-3 w-28 text-center sticky top-0 right-0 bg-slate-50 z-30 border-b border-l border-slate-200 shadow-xs">THAO TÁC</th>
                                     </tr>
                                 </thead>
@@ -686,7 +739,17 @@ export const RecordLookupView: React.FC<RecordLookupViewProps> = ({
                                                     </div>
                                                 </td>
 
-                                                {/* 5. XÃ PHƯỜNG */}
+                                                {/* 5. TỜ */}
+                                                <td className={`${cellClass} text-center font-mono text-sm font-bold text-slate-700`}>
+                                                    {record.mapSheet || '-'}
+                                                </td>
+
+                                                {/* 6. THỬA */}
+                                                <td className={`${cellClass} text-center font-mono text-sm font-bold text-slate-700`}>
+                                                    {record.landPlot || '-'}
+                                                </td>
+
+                                                {/* 7. XÃ PHƯỜNG */}
                                                 <td className={`${cellClass} text-center text-gray-700`}>
                                                     <div className="break-words leading-normal text-sm" title={getWardLabel(record.ward)}> 
                                                         {getWardLabel(record.ward) || '--'}
@@ -696,16 +759,6 @@ export const RecordLookupView: React.FC<RecordLookupViewProps> = ({
                                                             </div>
                                                         )}
                                                     </div>
-                                                </td>
-
-                                                {/* 6. TỜ */}
-                                                <td className={`${cellClass} text-center font-mono text-sm font-bold text-slate-700`}>
-                                                    {record.mapSheet || '-'}
-                                                </td>
-
-                                                {/* 7. THỬA */}
-                                                <td className={`${cellClass} text-center font-mono text-sm font-bold text-slate-700`}>
-                                                    {record.landPlot || '-'}
                                                 </td>
 
                                                 {/* 8. GIAO NHÂN VIÊN */}

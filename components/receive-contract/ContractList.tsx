@@ -127,7 +127,7 @@ const ContractList: React.FC<ContractListProps> = ({ contracts: propContracts, o
                 <thead className={`text-xs uppercase font-semibold sticky top-0 shadow-sm ${isLiquidationMode ? 'bg-orange-100 text-orange-700' : 'bg-gray-50 text-gray-500'}`}>
                     <tr> 
                         <th className="p-4 w-12 text-center">STT</th> 
-                        <th className="p-4 w-[120px]">Mã HĐ</th> 
+                        <th className="p-4 w-[120px]">Số HĐ</th> 
                         <th className="p-4 w-[200px]">Khách hàng</th> 
                         <th className="p-4 w-[150px]">Loại HĐ</th> 
                         <th className="p-4 w-[120px]">Ngày lập</th> 

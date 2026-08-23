@@ -913,18 +913,17 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Tân Qua
                                     <th className="p-3 w-10 text-center">
                                         <input type="checkbox" onChange={handleSelectAll} checked={filteredRecords.length > 0 && selectedIds.size === filteredRecords.length} />
                                     </th>
-                                    <th className="p-3 w-10 text-center">#</th>
-                                    <th className="p-3 w-32 text-center">Mã HS</th>
-                                    <th className="p-3 w-48 text-center">Chủ sử dụng</th>
-                                    <th className="p-3 w-32 text-center">Xã/Phường</th>
-                                    <th className="p-3 w-20 text-center">Tờ / Thửa</th>
-                                    <th className="p-3 w-24 text-center">Ngày nhận</th>
-                                    {(subTab === 'all') && <th className="p-3 w-32 text-center">Trạng thái</th>}
-                                    {(subTab !== 'draft') && <th className="p-3 w-48 text-center">Người thực hiện</th>}
-                                    <th className="p-3 w-24 text-center">Hẹn trả</th>
-                                    {(subTab === 'all') && <th className="p-3 w-32 text-center">Ngày giao</th>}
-                                    <th className="p-3 w-64 text-center">Nội dung</th>
-                                    <th className="p-3 w-28 text-center">Thao tác</th>
+                                    <th className="p-3 w-28 text-center">MÃ HỒ SƠ</th>
+                                    <th className="p-3 w-44 text-center">THÔNG TIN KHÁCH HÀNG</th>
+                                    <th className="p-3 w-48 text-center">LOẠI HỒ SƠ</th>
+                                    <th className="p-3 w-40 text-center">HẠN XỬ LÝ</th>
+                                    <th className="p-3 w-16 text-center">TỜ</th>
+                                    <th className="p-3 w-16 text-center">THỬA</th>
+                                    <th className="p-3 w-32 text-center">XÃ PHƯỜNG</th>
+                                    <th className="p-3 w-40 text-center">GIAO NHÂN VIÊN</th>
+                                    <th className="p-3 w-32 text-center">HOÀN THÀNH</th>
+                                    <th className="p-3 w-32 text-center">TRẠNG THÁI</th>
+                                    <th className="p-3 w-28 text-center">THAO TÁC</th>
                                 </tr>
                             </thead>
                             <tbody className="text-sm divide-y divide-gray-100">
@@ -933,36 +932,45 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Tân Qua
                                         <td className="p-3 text-center">
                                             <input type="checkbox" checked={selectedIds.has(r.id)} onChange={() => handleSelectRow(r.id)} />
                                         </td>
-                                        <td className="p-3 text-center text-gray-500">{(currentPage - 1) * itemsPerPage + idx + 1}</td>
-                                        <td className="p-3 font-bold text-blue-600 cursor-pointer hover:underline" onClick={() => setDetailRecord(r)}>{r.so_hieu}</td>
+                                        <td className="p-3 font-bold text-blue-600 cursor-pointer hover:underline text-center whitespace-nowrap font-mono" onClick={() => setDetailRecord(r)}>{r.so_hieu}</td>
                                         <td className="p-3 font-medium text-gray-800">{toTitleCase(r.noi_nhan_gui)}</td>
-                                        <td className="p-3 text-gray-600">{r.data?.xa_phuong}</td>
-                                        <td className="p-3 text-center font-mono text-xs">{r.data?.to_ban_do || '-'} / {r.data?.thua_dat || '-'}</td>
-                                        <td className="p-3 text-gray-600">{formatDate(r.ngay_thang)}</td>
-                                        {(subTab === 'all') && (
-                                            <td className="p-3 text-center">
-                                                <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${STATUS_COLORS[mapStatusToEnum(r.status)]}`}>
-                                                    {STATUS_LABELS[mapStatusToEnum(r.status)]}
-                                                </span>
-                                            </td>
-                                        )}
-                                        {(subTab !== 'draft') && (
-                                            <td className="p-3 text-indigo-600 font-medium">
-                                                {r.data?.assigned_to ? (
-                                                    <div className="flex items-center gap-1">
-                                                        <UserIcon size={14}/> {getEmployeeName(r.data?.assigned_to)}
-                                                    </div>
-                                                ) : null}
-                                            </td>
-                                        )}
-                                        <td className="p-3 text-purple-600 font-medium">{formatDate(r.data?.hen_tra)}</td>
-                                        {(subTab === 'all') && (
-                                            <td className="p-3 text-center">
-                                                {r.data?.danh_sach && <div className="text-xs font-bold text-gray-700">{r.data.danh_sach}</div>}
-                                                <div className="text-gray-600 font-medium">{formatDate(r.data?.ngay_hoan_thanh)}</div>
-                                            </td>
-                                        )}
-                                        <td className="p-3 text-gray-500 italic truncate max-w-xs">{r.trich_yeu}</td>
+                                        <td className="p-3 text-gray-700 max-w-xs">{r.trich_yeu || '--'}</td>
+                                        <td className="p-3">
+                                            <div className="flex flex-col w-full max-w-[140px] mx-auto bg-white rounded border border-gray-200 overflow-hidden shadow-2xs">
+                                                <div className="flex items-center justify-between px-2 py-1 bg-gray-50 border-b border-gray-200" title="Ngày tiếp nhận">
+                                                    <span className="text-[10px] font-extrabold text-slate-400 uppercase">Nhận</span>
+                                                    <span className="text-xs font-semibold text-slate-600 font-mono">{formatDate(r.ngay_thang) || '--'}</span>
+                                                </div>
+                                                <div className="flex items-center justify-between px-2 py-1 bg-white" title="Hẹn trả kết quả">
+                                                    <span className="text-[10px] font-extrabold text-blue-600 uppercase">Trả</span>
+                                                    <span className="text-xs font-bold font-mono text-blue-700">{formatDate(r.data?.hen_tra) || '--'}</span>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="p-3 text-center font-mono text-sm font-bold text-slate-700">{r.data?.to_ban_do || '-'}</td>
+                                        <td className="p-3 text-center font-mono text-sm font-bold text-slate-700">{r.data?.thua_dat || '-'}</td>
+                                        <td className="p-3 text-gray-600 text-center text-sm">{r.data?.xa_phuong || '--'}</td>
+                                        <td className="p-3 text-indigo-600 font-medium text-center">
+                                            {r.data?.assigned_to ? (
+                                                <div className="flex items-center justify-center gap-1">
+                                                    <UserIcon size={14}/> <span>{getEmployeeName(r.data?.assigned_to)}</span>
+                                                </div>
+                                            ) : <span className="text-gray-400">--</span>}
+                                        </td>
+                                        <td className="p-3 text-center">
+                                            {r.data?.danh_sach ? (
+                                                <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">{r.data.danh_sach}</span>
+                                            ) : r.data?.ngay_hoan_thanh ? (
+                                                <span className="text-gray-600 text-xs font-mono">{formatDate(r.data?.ngay_hoan_thanh)}</span>
+                                            ) : (
+                                                <span className="text-gray-400 text-xs">--</span>
+                                            )}
+                                        </td>
+                                        <td className="p-3 text-center">
+                                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${STATUS_COLORS[mapStatusToEnum(r.status)]}`}>
+                                                {STATUS_LABELS[mapStatusToEnum(r.status)]}
+                                            </span>
+                                        </td>
                                         <td className="p-3 text-center">
                                             <div className="flex justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                                 <button onClick={() => setDetailRecord(r)} className="p-1.5 text-gray-600 hover:bg-gray-100 rounded" title="Xem chi tiết"><Eye size={14}/></button>

@@ -258,7 +258,7 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
                   contractType = 'Cắm mốc';
                   const match = priceList.find(p => p.serviceName.toLowerCase().includes('cắm mốc'));
                   serviceType = match ? match.serviceName : 'Cắm mốc ranh giới';
-              } else if (recType.includes('tách thửa')) {
+              } else if (recType.includes('tách thửa') || recType.includes('tách - hợp') || recType.includes('tach - hop') || recType.includes('2.5') || recType.startsWith('tt')) {
                   contractType = 'Tách thửa';
                   serviceType = 'Đo đạc tách thửa';
               } else {
@@ -318,20 +318,19 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
 
   const generateContractCode = async (contractType?: string, customYear?: number): Promise<string> => {
     const year = customYear || new Date().getFullYear();
-    let code = (contractType === 'Đo đạc' || contractType === 'Cắm mốc')
-      ? await getPreviewHDKTCode(year)
-      : await getPreviewContractCode(year);
+    // Lấy số hợp đồng thống nhất từ kho số HĐKT tập trung cho toàn bộ thủ tục (Đo đạc, Cắm mốc, Tách thửa, Trích lục)
+    let code = await getPreviewHDKTCode(year);
     
     // Kiểm tra tránh trùng với danh sách HĐ hiện có
     let attempts = 0;
     while (contracts.some(c => c.code && c.code.trim().toLowerCase() === code.trim().toLowerCase()) && attempts < 50) {
       attempts++;
-      const match = code.match(/(\d+)/);
+      const match = code.match(/^(\d+)\/HĐKT/);
       if (match) {
-        const numLen = match[0].length;
-        const nextNum = parseInt(match[0], 10) + 1;
+        const numLen = match[1].length;
+        const nextNum = parseInt(match[1], 10) + 1;
         const newNumStr = nextNum.toString().padStart(numLen, '0');
-        code = code.replace(match[0], newNumStr);
+        code = code.replace(match[1], newNumStr);
       } else {
         break;
       }
@@ -376,15 +375,12 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
               } else {
                   const year = contract.createdDate ? new Date(contract.createdDate).getFullYear() : new Date().getFullYear();
                   const userName = currentUser.name || currentUser.username || "Nhân viên";
-                  const note = `${contract.customerName || ''} - ${contract.contractType}`;
+                  const note = `${contract.customerName || ''} - ${contract.contractType || ''}`;
                   let checkCount = 0;
                   do {
                       checkCount++;
-                      if (contract.contractType === 'Đo đạc' || contract.contractType === 'Cắm mốc') {
-                          finalCode = await consumeNextHDKTCode(year, userName, note);
-                      } else {
-                          finalCode = await consumeNextContractCode(userName, note, year);
-                      }
+                      // Thống nhất toàn bộ hợp đồng lấy từ kho số chung HĐKT (không phân biệt loại thủ tục)
+                      finalCode = await consumeNextHDKTCode(year, userName, note);
                   } while (
                       contracts.some(c => c.code && c.code.trim().toLowerCase() === finalCode.trim().toLowerCase() && c.id !== contract.id) &&
                       checkCount < 30
