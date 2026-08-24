@@ -161,10 +161,9 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
 
   const handleConfirm = () => {
       if (!selectedHandoverWard) {
-          alert('Vui lòng chọn cụ thể Địa giới / Xã bàn giao trước khi chốt danh sách bàn giao!');
+          alert('Vui lòng chọn địa giới hành chính trước khi chốt danh sách bàn giao!');
           return;
       }
-
       const handoverWard = selectedHandoverWard;
 
       if (mode === 'new') {
@@ -271,22 +270,17 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
                 </div>
             </div>
 
-            {/* Địa giới bàn giao (Bắt buộc) */}
+            {/* Giao khác địa bàn */}
             <div className="space-y-1.5 pt-2">
-                <label className="block text-xs font-bold text-gray-800 flex items-center justify-between">
-                    <span>Chọn địa giới bàn giao (Xã/Phường) <span className="text-red-500">*</span></span>
-                    {!selectedHandoverWard && (
-                        <span className="text-red-500 text-[11px] font-medium">Bắt buộc chọn</span>
-                    )}
+                <label className="block text-xs font-bold text-gray-800">
+                    Chọn địa giới bàn giao <span className="text-red-500">*</span>
                 </label>
                 <select 
-                    className={`w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none font-semibold bg-white cursor-pointer ${
-                        !selectedHandoverWard ? 'border-amber-400 bg-amber-50/40 text-amber-900' : 'border-gray-300 text-gray-800'
-                    }`}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-blue-500 outline-none font-medium bg-white text-gray-800"
                     value={selectedHandoverWard}
                     onChange={(e) => setSelectedHandoverWard(e.target.value)}
                 >
-                    <option value="">-- Chọn Địa giới / Xã bàn giao (Bắt buộc) --</option>
+                    <option value="">-- Chọn địa giới (Bắt buộc) --</option>
                     {wards.map(w => (
                         <option key={w} value={w}>{getWardLabel(w)}</option>
                     ))}
@@ -305,6 +299,7 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
             </button>
             <button 
                 onClick={handleConfirm} 
+                disabled={!selectedHandoverWard}
                 className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold text-sm shadow-sm transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
             >
                 Xác nhận chốt

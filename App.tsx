@@ -67,18 +67,12 @@ function App() {
   // Modal & UI States
   const [selectedRecordIds, setSelectedRecordIds] = useState<Set<string>>(new Set());
   const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>(() => {
-      try { 
-          const saved = localStorage.getItem('visible_columns_v2');
-          if (saved) return JSON.parse(saved);
-          return DEFAULT_VISIBLE_COLUMNS;
-      } catch { 
-          return DEFAULT_VISIBLE_COLUMNS; 
-      }
+      try { return JSON.parse(localStorage.getItem('visible_columns') || '') || DEFAULT_VISIBLE_COLUMNS; } catch { return DEFAULT_VISIBLE_COLUMNS; }
   });
   
   const [columnOrder, setColumnOrder] = useState<string[]>(() => {
       try {
-          const saved = localStorage.getItem('column_order_v2');
+          const saved = localStorage.getItem('column_order');
           if (saved) {
               const parsed = JSON.parse(saved);
               if (Array.isArray(parsed) && parsed.length > 0) {
@@ -95,12 +89,8 @@ function App() {
   });
 
   useEffect(() => {
-      localStorage.setItem('column_order_v2', JSON.stringify(columnOrder));
+      localStorage.setItem('column_order', JSON.stringify(columnOrder));
   }, [columnOrder]);
-
-  useEffect(() => {
-      localStorage.setItem('visible_columns_v2', JSON.stringify(visibleColumns));
-  }, [visibleColumns]);
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<RecordFile | null>(null);
@@ -176,6 +166,9 @@ function App() {
           migrateArchiveRecordsFromLandRecords();
       }
   }, [currentUser]);
+
+  // Save visible columns
+  useEffect(() => { localStorage.setItem('visible_columns', JSON.stringify(visibleColumns)); }, [visibleColumns]);
 
   // --- CUSTOM HOOKS ---
   const { 
@@ -750,7 +743,6 @@ function App() {
           receiptNumber: receiptNumber, 
           receiptType: typeLabel,
           receiverName: receiverName,
-          returnedBy: performer,
           returnedPrice: returnedPrice,
           price: returnedPrice,
           notes: formattedNote,

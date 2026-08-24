@@ -54,17 +54,17 @@ export const confirmAction = async (message: string, title: string = 'Xác nhậ
 };
 
 // --- ĐỊNH NGHĨA CÁC CỘT HIỂN THỊ ---
-// Updated: Thứ tự chuẩn mới (MÃ HỒ SƠ, THÔNG TIN KHÁCH HÀNG, LOẠI HỒ SƠ, HẠN XỬ LÝ, TỜ, THỬA, XÃ PHƯỜNG, GIAO NHÂN VIÊN, HOÀN THÀNH, TRẠNG THÁI)
+// Updated: Thứ tự chuẩn theo quy định (MÃ HỒ SƠ, CHỦ SỬ DỤNG, LOẠI HỒ SƠ, THỜI HẠN XỬ LÝ, XÃ PHƯỜNG, TỜ, THỬA, GIAO NHÂN VIÊN, HOÀN THÀNH ĐỢT, TRẠNG THÁI)
 export const COLUMN_DEFS = [
   { key: 'code', label: 'MÃ HỒ SƠ', sortKey: 'code', className: 'w-[110px] text-center' },
-  { key: 'customer', label: 'THÔNG TIN KHÁCH HÀNG', sortKey: 'customerName', className: 'w-64 text-center' }, 
+  { key: 'customer', label: 'THÔNG TIN CHỦ SỬ DỤNG', sortKey: 'customerName', className: 'w-64 text-center' }, 
   { key: 'type', label: 'LOẠI HỒ SƠ', sortKey: 'recordType', className: 'w-[115px] text-center' },
-  { key: 'deadline', label: 'HẠN XỬ LÝ', sortKey: 'deadline', className: 'w-48 text-center' },
+  { key: 'deadline', label: 'THỜI HẠN XỬ LÝ', sortKey: 'deadline', className: 'w-48 text-center' },
+  { key: 'ward', label: 'XÃ PHƯỜNG', sortKey: 'ward', className: 'w-32 text-center' },
   { key: 'mapSheet', label: 'TỜ', sortKey: 'mapSheet', className: 'w-16 text-center' }, 
   { key: 'landPlot', label: 'THỬA', sortKey: 'landPlot', className: 'w-16 text-center' }, 
-  { key: 'ward', label: 'XÃ PHƯỜNG', sortKey: 'ward', className: 'w-32 text-center' },
   { key: 'assigned', label: 'GIAO NHÂN VIÊN', sortKey: 'assignedDate', className: 'w-48 text-center' },
-  { key: 'completed', label: 'HOÀN THÀNH', sortKey: 'completedDate', className: 'w-32 text-center' },
+  { key: 'completed', label: 'HOÀN THÀNH ĐỢT', sortKey: 'completedDate', className: 'w-32 text-center' },
   { key: 'status', label: 'TRẠNG THÁI', sortKey: 'status', className: 'w-32 text-center' },
 ];
 
@@ -73,9 +73,9 @@ export const DEFAULT_VISIBLE_COLUMNS = {
     customer: true, 
     type: true,
     deadline: true,
+    ward: true, 
     mapSheet: true, 
     landPlot: true, 
-    ward: true, 
     assigned: true, 
     completed: true, 
     status: true,

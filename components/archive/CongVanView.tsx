@@ -742,14 +742,15 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
                                 <th className="p-3 w-10 text-center">
                                     <input type="checkbox" onChange={handleSelectAll} checked={filteredRecords.length > 0 && selectedIds.size === filteredRecords.length} />
                                 </th>
-                                <th className="p-3 w-32 text-center">MÃ HỒ SƠ</th>
-                                <th className="p-3 w-48 text-center">THÔNG TIN KHÁCH HÀNG</th>
-                                <th className="p-3 w-64 text-center">LOẠI HỒ SƠ</th>
-                                <th className="p-3 w-28 text-center">HẠN XỬ LÝ</th>
-                                <th className="p-3 w-44 text-center">GIAO NHÂN VIÊN</th>
-                                <th className="p-3 w-32 text-center">HOÀN THÀNH</th>
-                                <th className="p-3 w-32 text-center">TRẠNG THÁI</th>
-                                <th className="p-3 w-28 text-center">THAO TÁC</th>
+                                <th className="p-3 w-10 text-center">#</th>
+                                <th className="p-3 w-32 text-center">Số hiệu</th>
+                                <th className="p-3 w-28 text-center">Ngày</th>
+                                <th className="p-3 w-64 text-center">Trích yếu</th>
+                                <th className="p-3 w-40 text-center">Cơ quan phát hành</th>
+                                {(subTab === 'all') && <th className="p-3 w-32 text-center">Trạng thái</th>}
+                                {(subTab !== 'draft') && <th className="p-3 w-48 text-center">Người thực hiện</th>}
+                                {(subTab === 'all') && <th className="p-3 w-32 text-center">Ngày giao</th>}
+                                <th className="p-3 w-32 text-center">Thao tác</th>
                             </tr>
                         </thead>
                         <tbody className="text-sm divide-y divide-gray-100">
@@ -758,31 +759,32 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
                                     <td className="p-3 text-center">
                                         <input type="checkbox" checked={selectedIds.has(r.id)} onChange={() => handleSelectRow(r.id)} />
                                     </td>
-                                    <td className="p-3 font-bold text-orange-600 cursor-pointer hover:underline text-center font-mono" onClick={() => setDetailRecord(r)}>{r.so_hieu}</td>
-                                    <td className="p-3 text-gray-800 font-medium">{toTitleCase(r.noi_nhan_gui)}</td>
-                                    <td className="p-3 text-gray-800 max-w-sm">{r.trich_yeu}</td>
-                                    <td className="p-3 text-gray-600 text-center font-mono text-xs">{r.ngay_thang?.split('-').reverse().join('/') || '--'}</td>
-                                    <td className="p-3 text-indigo-600 font-medium text-center">
-                                        {r.data?.assigned_to ? (
-                                            <div className="flex items-center justify-center gap-1">
-                                                <UserIcon size={14}/> <span>{getEmployeeName(r.data?.assigned_to)}</span>
-                                            </div>
-                                        ) : <span className="text-gray-400">--</span>}
-                                    </td>
-                                    <td className="p-3 text-center">
-                                        {r.data?.danh_sach ? (
-                                            <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">{r.data.danh_sach}</span>
-                                        ) : r.data?.ngay_hoan_thanh ? (
-                                            <span className="text-gray-600 font-mono text-xs">{r.data.ngay_hoan_thanh.split('-').reverse().join('/')}</span>
-                                        ) : (
-                                            <span className="text-gray-400 text-xs">--</span>
-                                        )}
-                                    </td>
-                                    <td className="p-3 text-center">
-                                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${STATUS_COLORS[mapStatusToEnum(r.status)]}`}>
-                                            {STATUS_LABELS[mapStatusToEnum(r.status)]}
-                                        </span>
-                                    </td>
+                                    <td className="p-3 text-center text-gray-500">{(currentPage - 1) * itemsPerPage + idx + 1}</td>
+                                    <td className="p-3 font-bold text-orange-600 cursor-pointer hover:underline" onClick={() => setDetailRecord(r)}>{r.so_hieu}</td>
+                                    <td className="p-3 text-gray-600">{r.ngay_thang?.split('-').reverse().join('/')}</td>
+                                    <td className="p-3 text-gray-800">{r.trich_yeu}</td>
+                                    <td className="p-3 text-gray-600">{toTitleCase(r.noi_nhan_gui)}</td>
+                                    {(subTab === 'all') && (
+                                        <td className="p-3 text-center">
+                                            <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${STATUS_COLORS[mapStatusToEnum(r.status)]}`}>
+                                                {STATUS_LABELS[mapStatusToEnum(r.status)]}
+                                            </span>
+                                        </td>
+                                    )}
+                                    {(subTab !== 'draft') && (
+                                        <td className="p-3 text-indigo-600 font-medium">
+                                            {r.data?.assigned_to ? (
+                                                <div className="flex items-center gap-1">
+                                                    <UserIcon size={14}/> {getEmployeeName(r.data?.assigned_to)}
+                                                </div>
+                                            ) : null}
+                                        </td>
+                                    )}
+                                    {(subTab === 'all') && (
+                                        <td className="p-3 text-center">
+                                            <div className="text-gray-600 font-medium">{r.data?.ngay_hoan_thanh ? r.data.ngay_hoan_thanh.split('-').reverse().join('/') : ''}</div>
+                                        </td>
+                                    )}
                                     <td className="p-3 text-center">
                                         <div className="flex justify-center gap-1">
                                             <button onClick={() => setDetailRecord(r)} className="p-1.5 text-gray-600 hover:bg-gray-100 rounded" title="Xem chi tiết"><Eye size={14}/></button>

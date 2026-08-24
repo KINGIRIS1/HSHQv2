@@ -6,7 +6,7 @@ import {
   ClipboardList, User as UserIcon, ChevronUp, ChevronDown, RefreshCw, XCircle
 } from 'lucide-react';
 import { calculateDeadlineHelper } from '../utils/appHelpers';
-import { detectProcedureId, getWardLabel } from '../constants';
+import { detectProcedureId } from '../constants';
 import { addActivityLog } from '../services/activityLogService';
 import { AutoResizeTextarea } from './AutoResizeTextarea';
 
@@ -746,7 +746,7 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
                   >
                     <option value="">-- Chọn Phi địa giới --</option>
                     {wards.map(w => (
-                      <option key={w} value={w}>{getWardLabel(w)}</option>
+                      <option key={w} value={w}>{w.replace(/^Xã\s+/i, '')}</option>
                     ))}
                   </select>
                 </div>
@@ -895,7 +895,7 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
                     <option value="">-- Chọn Xã/Phường --</option>
                     {wards.map(w => (
                       <option key={w} value={w}>
-                        {getWardLabel(w)}
+                        {w}
                       </option>
                     ))}
                   </select>
@@ -1431,7 +1431,7 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
                         <option value="">-- Không (Theo địa chỉ thửa đất) --</option>
                         {wards.map(w => (
                           <option key={w} value={w}>
-                            {getWardLabel(w)}
+                            {w.replace(/^Xã\s+/i, '')}
                           </option>
                         ))}
                       </select>

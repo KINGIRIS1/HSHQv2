@@ -4,10 +4,7 @@ import RecordModal from './RecordModal';
 import ImportModal from './ImportModal';
 import AssignModal from './AssignModal';
 import { DetailModal } from './DetailModal';
-import { DoDacDetailModal } from './DoDacDetailModal';
-import { LuuTruDetailModal } from './LuuTruDetailModal';
 import { MobileDetailModal } from './mobile/MobileDetailModal';
-import { isArchiveRecordType } from '../constants/procedures';
 import { useIsMobile } from '../hooks/useIsMobile';
 import DeleteConfirmModal from './DeleteConfirmModal';
 import ExportModal from './ExportModal';
@@ -167,88 +164,37 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
                 })()}
             />
             
-            {/* DETAIL MODAL ROUTING */}
-            {(() => {
-                if (!props.viewingRecord) return null;
-
-                const isArchiveRecord = (r: RecordFile | null, currentView?: string): boolean => {
-                    if (!r) return false;
-                    if (r.sourceTable === 'archive_records') return true;
-                    if (currentView && currentView.startsWith('archive_')) return true;
-                    if (isArchiveRecordType(r.recordType)) return true;
-                    
-                    const lowerType = (r.recordType || '').toLowerCase();
-                    if (
-                        lowerType.startsWith('1.1') || 
-                        lowerType.startsWith('1.2') || 
-                        lowerType.includes('sao lục') || 
-                        lowerType.includes('công văn') || 
-                        lowerType.includes('cung cấp tài liệu') || 
-                        lowerType.includes('cung cấp dữ liệu') ||
-                        lowerType.includes('cung cấp thông tin') ||
-                        lowerType.includes('ccdl')
-                    ) {
-                        return true;
-                    }
-                    return false;
-                };
-
-                const isArchive = isArchiveRecord(props.viewingRecord, props.currentView);
-
-                if (isMobile) {
-                    return (
-                        <MobileDetailModal 
-                            isOpen={!!props.viewingRecord} 
-                            onClose={() => props.setViewingRecord(null)} 
-                            record={props.viewingRecord} 
-                            employees={props.employees} 
-                            users={props.users}
-                            currentUser={props.currentUser} 
-                            onEdit={props.canPerformAction ? (r) => { props.setEditingRecord(r); props.setIsModalOpen(true); } : undefined}
-                            onDelete={props.canPerformAction ? props.confirmDelete : undefined}
-                            onCreateLiquidation={props.onCreateLiquidation}
-                            onCreateContract={props.onCreateContract}
-                            onRefreshData={props.onRefreshData}
-                        />
-                    );
-                }
-
-                if (isArchive) {
-                    return (
-                        <LuuTruDetailModal
-                            isOpen={!!props.viewingRecord}
-                            onClose={() => props.setViewingRecord(null)}
-                            record={props.viewingRecord}
-                            employees={props.employees}
-                            users={props.users}
-                            currentUser={props.currentUser}
-                            onEdit={props.canPerformAction ? (r) => { props.setEditingRecord(r); props.setIsModalOpen(true); } : undefined}
-                            onDelete={props.canPerformAction ? props.confirmDelete : undefined}
-                            onRefreshData={props.onRefreshData}
-                            onOpenRejectReturnModal={props.onOpenRejectReturnModal}
-                            onOpenExtendModal={props.onOpenExtendModal}
-                        />
-                    );
-                }
-
-                return (
-                    <DoDacDetailModal 
-                        isOpen={!!props.viewingRecord} 
-                        onClose={() => props.setViewingRecord(null)} 
-                        record={props.viewingRecord} 
-                        employees={props.employees} 
-                        users={props.users}
-                        currentUser={props.currentUser} 
-                        onEdit={props.canPerformAction ? (r) => { props.setEditingRecord(r); props.setIsModalOpen(true); } : undefined}
-                        onDelete={props.canPerformAction ? props.confirmDelete : undefined}
-                        onCreateLiquidation={props.onCreateLiquidation}
-                        onCreateContract={props.onCreateContract}
-                        onRefreshData={props.onRefreshData}
-                        onOpenRejectReturnModal={props.onOpenRejectReturnModal}
-                        onOpenExtendModal={props.onOpenExtendModal}
-                    />
-                );
-            })()}
+            {isMobile ? (
+                <MobileDetailModal 
+                    isOpen={!!props.viewingRecord} 
+                    onClose={() => props.setViewingRecord(null)} 
+                    record={props.viewingRecord} 
+                    employees={props.employees} 
+                    users={props.users}
+                    currentUser={props.currentUser} 
+                    onEdit={props.canPerformAction ? (r) => { props.setEditingRecord(r); props.setIsModalOpen(true); } : undefined}
+                    onDelete={props.canPerformAction ? props.confirmDelete : undefined}
+                    onCreateLiquidation={props.onCreateLiquidation}
+                    onCreateContract={props.onCreateContract}
+                    onRefreshData={props.onRefreshData}
+                />
+            ) : (
+                <DetailModal 
+                    isOpen={!!props.viewingRecord} 
+                    onClose={() => props.setViewingRecord(null)} 
+                    record={props.viewingRecord} 
+                    employees={props.employees} 
+                    users={props.users}
+                    currentUser={props.currentUser} 
+                    onEdit={props.canPerformAction ? (r) => { props.setEditingRecord(r); props.setIsModalOpen(true); } : undefined}
+                    onDelete={props.canPerformAction ? props.confirmDelete : undefined}
+                    onCreateLiquidation={props.onCreateLiquidation}
+                    onCreateContract={props.onCreateContract}
+                    onRefreshData={props.onRefreshData}
+                    onOpenRejectReturnModal={props.onOpenRejectReturnModal}
+                    onOpenExtendModal={props.onOpenExtendModal}
+                />
+            )}
             
             <DeleteConfirmModal 
                 isOpen={props.isDeleteModalOpen} 

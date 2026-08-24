@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { RecordFile } from '../types';
-import { X, CheckCircle2, FileCheck, User, Receipt, DollarSign, FileText } from 'lucide-react';
+import { X, CheckCircle2, FileCheck, User, Receipt, DollarSign, Loader2, FileText } from 'lucide-react';
+import { fetchContracts } from '../services/api';
 
 interface ReturnResultModalProps {
   isOpen: boolean;
@@ -17,6 +18,7 @@ const ReturnResultModal: React.FC<ReturnResultModalProps> = ({
   const [receiverName, setReceiverName] = useState('');
   const [returnedPrice, setReturnedPrice] = useState<string>('');
   const [returnReason, setReturnReason] = useState<string>('');
+  const [isLoadingPrice, setIsLoadingPrice] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   
   const recTypeLower = (record?.recordType || '').toLowerCase();
@@ -32,12 +34,79 @@ const ReturnResultModal: React.FC<ReturnResultModalProps> = ({
         
         if (isFreeProcedure) {
             setReturnedPrice('0');
-        } else if (record.returnedPrice !== undefined && record.returnedPrice !== null && record.returnedPrice > 0) {
-            setReturnedPrice(record.returnedPrice.toString());
-        } else {
-            // Bỏ số tiền mặc định, bắt buộc người trả kết quả tự nhập
-            setReturnedPrice('');
+            return;
         }
+
+        const determinePrice = async () => {
+            setIsLoadingPrice(true);
+            try {
+                // 1. Nếu hồ sơ đã có returnedPrice hoặc price được lưu
+                if (record.returnedPrice !== undefined && record.returnedPrice !== null) {
+                    setReturnedPrice(record.returnedPrice.toString());
+                    return;
+                }
+                if (record.price && record.price > 0) {
+                    setReturnedPrice(record.price.toString());
+                    return;
+                }
+
+                // 2. Nếu là Cung cấp tài liệu đất đai hoặc 1.2 Công văn
+                const type = (record.recordType || '').toLowerCase();
+                if (type.includes('cung cấp tài liệu') || type.includes('cung cấp tldđ') || type.includes('cung cấp tlđđ') || type.includes('1.2') || type.includes('công văn') || type.includes('cong van')) {
+                    setReturnedPrice('310000');
+                    return;
+                }
+
+                // 3. Tra cứu hợp đồng
+                const fetchedContracts = await fetchContracts();
+                const match = fetchedContracts.find(c => {
+                    if (!c || !record) return false;
+                    const cAddr = (c.customerAddress || '').trim().toLowerCase();
+                    const cCode = (c.code || '').trim().toLowerCase();
+                    const rCode = (record.code || '').trim().toLowerCase();
+                    const cName = (c.customerName || '').trim().toLowerCase();
+                    const rName = (record.customerName || '').trim().toLowerCase();
+                    const cPlot = (c.landPlot || '').trim().toLowerCase();
+                    const rPlot = (record.landPlot || '').trim().toLowerCase();
+                    const cMap = (c.mapSheet || '').trim().toLowerCase();
+                    const rMap = (record.mapSheet || '').trim().toLowerCase();
+
+                    const clean = (str: string) => str.replace(/[^a-z0-9]/gi, '').toLowerCase();
+
+                    if (rCode && (cAddr === rCode || cCode === rCode)) return true;
+                    if (rCode && cCode && clean(rCode).length >= 3 && clean(rCode) === clean(cCode)) return true;
+                    if (rCode && cAddr && clean(rCode).length >= 3 && clean(rCode) === clean(cAddr)) return true;
+                    if (rName && cName && rName === cName) {
+                        if (rPlot && cPlot && rPlot === cPlot) return true;
+                        if (rMap && cMap && rMap === cMap) return true;
+                    }
+                    return false;
+                });
+                
+                if (match) {
+                    const priceVal = match.liquidationAmount !== null && match.liquidationAmount !== undefined
+                        ? match.liquidationAmount
+                        : (match.totalAmount ?? 0);
+                    setReturnedPrice(priceVal.toString());
+                    return;
+                }
+
+                // 4. Nếu là Trích lục bản đồ địa chính
+                if (type.includes('trích lục')) {
+                    setReturnedPrice('53163');
+                    return;
+                }
+
+                setReturnedPrice('0');
+            } catch (err) {
+                console.error("Error loading default price:", err);
+                setReturnedPrice('0');
+            } finally {
+                setIsLoadingPrice(false);
+            }
+        };
+
+        determinePrice();
     }
   }, [isOpen, record, isFreeProcedure]);
 
@@ -59,18 +128,18 @@ const ReturnResultModal: React.FC<ReturnResultModalProps> = ({
       }
 
       if (!receiptNumber.trim()) {
-          setErrorMsg(`Vui lòng nhập số ${receiptType.toLowerCase()} / hợp đồng!`);
+          setErrorMsg(`Vui lòng nhập số ${receiptType.toLowerCase()}!`);
           return;
       }
 
       if (!returnedPrice.trim()) {
-          setErrorMsg('Vui lòng nhập số tiền thu thực tế trước khi trả kết quả!');
+          setErrorMsg('Vui lòng nhập số tiền thực tế trước khi trả kết quả!');
           return;
       }
 
       const priceNum = parseFloat(returnedPrice);
-      if (isNaN(priceNum) || priceNum <= 0) {
-          setErrorMsg('Vui lòng nhập số tiền hợp lệ lớn hơn 0!');
+      if (isNaN(priceNum) || priceNum < 0) {
+          setErrorMsg('Vui lòng nhập số tiền hợp lệ!');
           return;
       }
 
@@ -168,9 +237,10 @@ const ReturnResultModal: React.FC<ReturnResultModalProps> = ({
                                 placeholder="Nhập số tiền..."
                                 value={returnedPrice}
                                 onChange={(e) => setReturnedPrice(e.target.value)}
+                                disabled={isLoadingPrice}
                             />
                             <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">
-                                đ
+                                {isLoadingPrice ? <Loader2 size={16} className="animate-spin text-emerald-500" /> : 'đ'}
                             </div>
                         </div>
                         {returnedPrice.trim() && !isNaN(parseFloat(returnedPrice)) && (

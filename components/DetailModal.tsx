@@ -598,7 +598,11 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                     </button>
                 )}
 
-                {onCreateLiquidation && record && record.recordType && (getShortRecordType(record.recordType).startsWith('2.1') || getShortRecordType(record.recordType).startsWith('2.2') || getShortRecordType(record.recordType).startsWith('2.4') || getShortRecordType(record.recordType).startsWith('2.5')) && !getShortRecordType(record.recordType).startsWith('2.3') && (
+                {onCreateLiquidation && record && record.recordType && (() => {
+                    const st = getShortRecordType(record.recordType);
+                    const rt = (record.recordType || '').toLowerCase();
+                    return st.startsWith('2.1') || st.startsWith('2.2') || st.startsWith('2.4') || st.startsWith('2.5') || rt.includes('2.1') || rt.includes('2.2') || rt.includes('2.4') || rt.includes('2.5') || rt.includes('trích lục') || rt.includes('trích đo') || rt.includes('cắm mốc') || rt.includes('tách thửa');
+                })() && (
                     <button
                         onClick={() => { onClose(); onCreateLiquidation(record); }}
                         className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-200 text-gray-600 rounded hover:bg-gray-50 transition-colors text-sm font-medium"
@@ -608,7 +612,11 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                     </button>
                 )}
 
-                {record && record.recordType && (getShortRecordType(record.recordType).startsWith('2.1') || getShortRecordType(record.recordType).startsWith('2.2') || getShortRecordType(record.recordType).startsWith('2.4') || getShortRecordType(record.recordType).startsWith('2.5')) && !getShortRecordType(record.recordType).startsWith('2.3') && (
+                {record && record.recordType && (() => {
+                    const st = getShortRecordType(record.recordType);
+                    const rt = (record.recordType || '').toLowerCase();
+                    return st.startsWith('2.1') || st.startsWith('2.2') || st.startsWith('2.4') || st.startsWith('2.5') || rt.includes('2.1') || rt.includes('2.2') || rt.includes('2.4') || rt.includes('2.5') || rt.includes('trích lục') || rt.includes('trích đo') || rt.includes('cắm mốc') || rt.includes('tách thửa');
+                })() && (
                     <button
                         onClick={() => {
                             const hasAnnexTemplate = hasTemplate(STORAGE_KEYS.CONTRACT_TEMPLATE_ANNEX);
@@ -832,18 +840,18 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                 <div className="space-y-6">
                     {/* NỘI DUNG */}
                     <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm h-full flex flex-col">
-                        {/* HÀNG BÁO HỢP ĐỒNG (CHỈ ÁP DỤNG CHO 2.2, 2.4, 2.5) & SỐ TRÍCH ĐO / TRÍCH LỤC */}
+                        {/* HÀNG BÁO HỢP ĐỒNG (CHỈ ÁP DỤNG CHO 2.2 VÀ 2.4) & SỐ TRÍCH ĐO / TRÍCH LỤC */}
                         {(() => {
                             const isArchive = isArchiveRecordType(record?.recordType || '');
-                            const is23Procedure = (record?.recordType || '').toLowerCase().includes('2.3') || (record?.recordType || '').toLowerCase().includes('dđ & cc số thửa') || (record?.recordType || '').toLowerCase().includes('dd & cc so thua') || getShortRecordType(record?.recordType || '').startsWith('2.3');
-                            const isContractProcedure = !!(record?.recordType && (getShortRecordType(record.recordType).startsWith('2.1') || getShortRecordType(record.recordType).startsWith('2.2') || getShortRecordType(record.recordType).startsWith('2.4') || getShortRecordType(record.recordType).startsWith('2.5'))) && !is23Procedure;
+                            const is23Procedure = (record?.recordType || '').toLowerCase().includes('2.3') || (record?.recordType || '').toLowerCase().includes('dđ & cc số thửa') || (record?.recordType || '').toLowerCase().includes('dd & cc so thua');
+                            const isContractProcedure = !!(record?.recordType && (getShortRecordType(record.recordType).startsWith('2.1') || getShortRecordType(record.recordType).startsWith('2.2') || getShortRecordType(record.recordType).startsWith('2.4') || getShortRecordType(record.recordType).startsWith('2.5') || (record.recordType || '').toLowerCase().includes('2.1') || (record.recordType || '').toLowerCase().includes('2.5')));
                             const hasExcerptOrMeasurement = !isArchive && !is23Procedure && !!(recordTypeLower.includes('trích đo') || recordTypeLower.includes('trích lục') || record?.measurementNumber || record?.excerptNumber);
 
                             if (!isContractProcedure && !hasExcerptOrMeasurement) return null;
 
                             return (
                                 <div className={`grid grid-cols-1 ${isContractProcedure && hasExcerptOrMeasurement ? 'sm:grid-cols-2' : ''} gap-3 mb-4`}>
-                                    {/* CỘT HỢP ĐỒNG LIÊN KẾT */}
+                                    {/* CỘT HỢP ĐỒNG LIÊN KẾT - CHỈ XUẤT HIỆN CHO THỦ TỤC 2.2 & 2.4 */}
                                     {isContractProcedure && (
                                         <div className="bg-indigo-50/80 border border-indigo-100 rounded-xl p-3 flex items-center justify-between gap-2">
                                             <div className="flex items-center gap-2.5 min-w-0">
@@ -866,7 +874,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                                                     }}
                                                     className="inline-flex items-center gap-1 text-[11px] font-bold bg-indigo-600 text-white hover:bg-indigo-700 px-2.5 py-1.5 rounded-lg transition-colors shadow-sm whitespace-nowrap shrink-0"
                                                 >
-                                                    Lập HĐ
+                                                    Lập HĐ mới
                                                 </button>
                                             )}
                                         </div>

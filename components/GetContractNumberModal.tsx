@@ -3,7 +3,11 @@ import {
   getPreviewHDKTCode, 
   consumeNextHDKTCode, 
   getHDKTHistory, 
-  updateHDKTSequence 
+  updateHDKTSequence, 
+  getPreviewContractCode, 
+  consumeNextContractCode, 
+  getContractHistory, 
+  updateContractSequence 
 } from '../services/api';
 import { X, Hash, Calendar, Copy, User, Check, ListFilter, RefreshCw, Pencil } from 'lucide-react';
 import { User as UserType } from '../types';
@@ -18,6 +22,7 @@ interface GetContractNumberModalProps {
 const GetContractNumberModal: React.FC<GetContractNumberModalProps> = ({ isOpen, onClose, currentUser, onSelectCode }) => {
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState<number>(currentYear);
+  const [numberType, setNumberType] = useState<'HĐKT' | 'HĐ'>('HĐKT');
   const [previewNumber, setPreviewNumber] = useState<string>('');
   const [note, setNote] = useState<string>('');
   const [history, setHistory] = useState<any[]>([]);
@@ -36,14 +41,21 @@ const GetContractNumberModal: React.FC<GetContractNumberModalProps> = ({ isOpen,
       setAllocatedNumber(null);
       setIsEditingSeq(false);
     }
-  }, [isOpen, selectedYear]);
+  }, [isOpen, selectedYear, numberType]);
 
   const loadData = async () => {
     try {
-      const preview = await getPreviewHDKTCode(selectedYear);
-      setPreviewNumber(preview);
-      const hist = await getHDKTHistory(selectedYear);
-      setHistory(hist);
+      if (numberType === 'HĐKT') {
+        const preview = await getPreviewHDKTCode(selectedYear);
+        setPreviewNumber(preview);
+        const hist = await getHDKTHistory(selectedYear);
+        setHistory(hist);
+      } else {
+        const preview = await getPreviewContractCode(selectedYear);
+        setPreviewNumber(preview);
+        const hist = await getContractHistory(selectedYear);
+        setHistory(hist);
+      }
     } catch (e) {
       console.error(e);
     }
@@ -56,7 +68,12 @@ const GetContractNumberModal: React.FC<GetContractNumberModalProps> = ({ isOpen,
     setAllocatedNumber(null);
     try {
       const userName = currentUser.name || currentUser.username || "Nhân viên";
-      const code = await consumeNextHDKTCode(selectedYear, userName, note);
+      let code = '';
+      if (numberType === 'HĐKT') {
+        code = await consumeNextHDKTCode(selectedYear, userName, note);
+      } else {
+        code = await consumeNextContractCode(userName, note, selectedYear);
+      }
       setAllocatedNumber(code);
       setNote('');
       await loadData(); // Reload preview and history
@@ -68,8 +85,15 @@ const GetContractNumberModal: React.FC<GetContractNumberModalProps> = ({ isOpen,
   };
 
   const getSequenceNumber = (code: string): string => {
-    const match = code.match(/^(\d+)\/HĐKT/);
-    return match ? parseInt(match[1], 10).toString() : '1';
+    if (numberType === 'HĐKT') {
+      const match = code.match(/^(\d+)\/HĐKT/);
+      return match ? parseInt(match[1], 10).toString() : '1';
+    } else {
+      const parts = code.split('-');
+      const lastPart = parts[parts.length - 1];
+      const match = lastPart ? lastPart.match(/^(\d+)/) : null;
+      return match ? parseInt(match[1], 10).toString() : '1';
+    }
   };
 
   const handleSaveSeq = async () => {
@@ -78,13 +102,17 @@ const GetContractNumberModal: React.FC<GetContractNumberModalProps> = ({ isOpen,
       alert("Số thứ tự phải là số nguyên dương lớn hơn hoặc bằng 1!");
       return;
     }
-    if (selectedYear === 2026 && seqNum < 610) {
+    if (numberType === 'HĐKT' && selectedYear === 2026 && seqNum < 610) {
       alert("Năm 2026 đã có hợp đồng lớn nhất là 0609/HĐKT/2026. Số thứ tự mới phải từ 610 trở lên để tránh trùng mã!");
       return;
     }
     setLoading(true);
     try {
-      await updateHDKTSequence(selectedYear, seqNum);
+      if (numberType === 'HĐKT') {
+        await updateHDKTSequence(selectedYear, seqNum);
+      } else {
+        await updateContractSequence(selectedYear, seqNum);
+      }
       setIsEditingSeq(false);
       await loadData();
     } catch (e) {
@@ -113,21 +141,28 @@ const GetContractNumberModal: React.FC<GetContractNumberModalProps> = ({ isOpen,
             <div>
               <h3 className="text-lg font-bold text-slate-800">Cấp Số Hợp Đồng Tự Động</h3>
               <p className="text-xs text-slate-500">
-                Kho số hợp đồng thống nhất cho toàn bộ thủ tục (Đo đạc, Cắm mốc, Tách thửa, Trích lục)
+                Mã HĐKT dùng chung cho tất cả các hợp đồng (Đo đạc, Tách thửa, Cắm mốc, Trích lục)
               </p>
             </div>
           </div>
           <button 
             onClick={onClose} 
-            className="p-1.5 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-lg transition-colors cursor-pointer"
+            className="p-1.5 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-lg transition-colors"
           >
             <X size={20} />
           </button>
         </div>
 
         {/* BODY */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-5">
+        <div className="flex-1 overflow-y-auto p-6 space-y-6">
           
+          {/* NUMBER TYPE SELECTOR (BADGE) */}
+          <div className="bg-purple-50 border border-purple-100 p-3 rounded-xl text-center">
+            <span className="text-xs font-bold text-purple-700 uppercase tracking-wide">
+              Mã HĐKT (Đo đạc / Tách thửa / Cắm mốc / Trích lục)
+            </span>
+          </div>
+
           {/* YEAR SELECTOR */}
           <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100">
             <div className="flex items-center gap-2">
@@ -137,7 +172,7 @@ const GetContractNumberModal: React.FC<GetContractNumberModalProps> = ({ isOpen,
             <select 
               value={selectedYear} 
               onChange={(e) => setSelectedYear(Number(e.target.value))}
-              className="bg-white border border-slate-200 text-slate-800 font-bold px-4 py-1.5 rounded-lg text-sm shadow-xs focus:ring-2 focus:ring-purple-200 outline-hidden cursor-pointer"
+              className="bg-white border border-slate-200 text-slate-800 font-bold px-4 py-1.5 rounded-lg text-sm shadow-xs focus:ring-2 focus:ring-purple-200 outline-hidden"
             >
               {Array.from({ length: 6 }, (_, i) => currentYear - 3 + i).map(year => (
                 <option key={year} value={year}>{year}</option>
@@ -162,13 +197,13 @@ const GetContractNumberModal: React.FC<GetContractNumberModalProps> = ({ isOpen,
                     />
                     <button 
                       onClick={handleSaveSeq}
-                      className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer"
+                      className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold transition-all shadow-xs"
                     >
                       Lưu
                     </button>
                     <button 
                       onClick={() => setIsEditingSeq(false)}
-                      className="px-2 py-1 border border-slate-200 hover:bg-slate-100 text-slate-600 rounded-lg text-xs font-medium transition-all cursor-pointer"
+                      className="px-2 py-1 border border-slate-200 hover:bg-slate-100 text-slate-600 rounded-lg text-xs font-medium transition-all"
                     >
                       Hủy
                     </button>
@@ -181,7 +216,7 @@ const GetContractNumberModal: React.FC<GetContractNumberModalProps> = ({ isOpen,
                         setNewSeqValue(getSequenceNumber(previewNumber));
                         setIsEditingSeq(true);
                       }}
-                      className="p-1 hover:bg-purple-100 text-purple-600 rounded-md transition-colors cursor-pointer"
+                      className="p-1 hover:bg-purple-100 text-purple-600 rounded-md transition-colors"
                       title="Chỉnh sửa số tiếp theo"
                     >
                       <Pencil size={14} />
@@ -191,7 +226,7 @@ const GetContractNumberModal: React.FC<GetContractNumberModalProps> = ({ isOpen,
               </div>
               <button 
                 onClick={loadData} 
-                className="p-1.5 hover:bg-purple-100 text-purple-600 rounded-lg transition-colors cursor-pointer" 
+                className="p-1.5 hover:bg-purple-100 text-purple-600 rounded-lg transition-colors" 
                 title="Làm mới"
               >
                 <RefreshCw size={16} />
@@ -199,12 +234,12 @@ const GetContractNumberModal: React.FC<GetContractNumberModalProps> = ({ isOpen,
             </div>
 
             <div className="space-y-2.5">
-              <label className="block text-xs font-bold text-slate-500 uppercase">Ghi chú (Tên khách hàng / Loại thủ tục / Thửa đất)</label>
+              <label className="block text-xs font-bold text-slate-500 uppercase">Ghi chú (Tên khách hàng / Nội dung hợp đồng)</label>
               <input 
                 type="text" 
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
-                placeholder="VD: Nguyễn Văn A - Đo đạc tách thửa / trích lục..."
+                placeholder="VD: Nguyễn Văn A - Đo đạc tách thửa"
                 className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:border-purple-400 focus:ring-2 focus:ring-purple-100 outline-hidden transition-all text-slate-800"
               />
             </div>
@@ -212,7 +247,7 @@ const GetContractNumberModal: React.FC<GetContractNumberModalProps> = ({ isOpen,
             <button 
               onClick={handleAllocate}
               disabled={loading}
-              className="w-full bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white font-bold py-3 px-4 rounded-xl shadow-md shadow-purple-200 transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+              className="w-full bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white font-bold py-3 px-4 rounded-xl shadow-md shadow-purple-200 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
             >
               {loading ? (
                 <>
@@ -229,13 +264,13 @@ const GetContractNumberModal: React.FC<GetContractNumberModalProps> = ({ isOpen,
 
           {/* ALLOCATED SUCCESS RESULT */}
           {allocatedNumber && (
-            <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 flex flex-col items-center text-center space-y-3 animate-fade-in">
+            <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 flex flex-col items-center text-center space-y-3 animate-bounce-once">
               <span className="text-xs font-bold text-emerald-600 uppercase tracking-wider">Cấp Số Thành Công!</span>
               <div className="flex items-center gap-3">
                 <span className="text-2xl font-black text-emerald-800 font-mono">{allocatedNumber}</span>
                 <button 
                   onClick={() => copyToClipboard(allocatedNumber, 'allocated')}
-                  className="p-2 bg-white hover:bg-emerald-100 text-emerald-700 rounded-lg border border-emerald-200 transition-colors cursor-pointer"
+                  className="p-2 bg-white hover:bg-emerald-100 text-emerald-700 rounded-lg border border-emerald-200 transition-colors"
                   title="Sao chép"
                 >
                   {copiedId === 'allocated' ? <Check size={16} className="text-emerald-600" /> : <Copy size={16} />}
@@ -243,7 +278,7 @@ const GetContractNumberModal: React.FC<GetContractNumberModalProps> = ({ isOpen,
                 {onSelectCode && (
                   <button 
                     onClick={() => onSelectCode(allocatedNumber)}
-                    className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-xs transition-colors shadow-xs cursor-pointer"
+                    className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-xs transition-colors shadow-xs"
                   >
                     Sử dụng cho Form HĐ
                   </button>
@@ -284,7 +319,7 @@ const GetContractNumberModal: React.FC<GetContractNumberModalProps> = ({ isOpen,
                       <td className="py-2.5 px-4 text-center">
                         <button 
                           onClick={() => copyToClipboard(item.code, `hist-${idx}`)}
-                          className={`p-1.5 hover:bg-slate-100 rounded-lg transition-colors mx-auto block cursor-pointer ${copiedId === `hist-${idx}` ? 'text-emerald-600 bg-emerald-50' : 'text-slate-500'}`}
+                          className={`p-1.5 hover:bg-slate-100 rounded-lg transition-colors mx-auto block ${copiedId === `hist-${idx}` ? 'text-emerald-600 bg-emerald-50' : 'text-slate-500'}`}
                         >
                           {copiedId === `hist-${idx}` ? <Check size={14} /> : <Copy size={14} />}
                         </button>
@@ -309,7 +344,7 @@ const GetContractNumberModal: React.FC<GetContractNumberModalProps> = ({ isOpen,
         <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex justify-end gap-3 rounded-b-2xl">
           <button 
             onClick={onClose} 
-            className="px-4 py-2 border border-slate-200 text-slate-700 font-semibold rounded-xl hover:bg-slate-100 hover:text-slate-800 text-sm transition-all shadow-xs cursor-pointer"
+            className="px-4 py-2 border border-slate-200 text-slate-700 font-semibold rounded-xl hover:bg-slate-100 hover:text-slate-800 text-sm transition-all shadow-xs"
           >
             Đóng
           </button>

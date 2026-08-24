@@ -4,7 +4,6 @@ import { Contract, PriceItem, SplitItem, RecordFile } from '../../types';
 import { Save, Calculator, Search, Plus, Trash2, Printer, FileCheck, FileSignature, CheckCircle, AlertCircle, AlertTriangle, X, RotateCcw, MapPin, Ruler, Grid, Banknote, User, FileText, Calendar, Wand2, ChevronDown, ChevronUp, Copy, ExternalLink, RefreshCw } from 'lucide-react';
 import { confirmAction } from '../../utils/appHelpers';
 import { checkContractDateErrors, getTodayDateString } from '../../utils/contractDateUtils';
-import AutoResizeTextarea from '../AutoResizeTextarea';
 
 interface ContractFormProps {
   initialData?: Contract;
@@ -22,6 +21,16 @@ interface ContractFormProps {
 function _nd(s: string | undefined | null): string {
     return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim();
 }
+
+const getRecordCccd = (r: any): string => {
+    if (!r) return '';
+    if (r.cccd) return String(r.cccd).trim();
+    if (r.applicantCccd) return String(r.applicantCccd).trim();
+    if (Array.isArray(r.owners) && r.owners.length > 0 && r.owners[0]?.cccd) {
+        return String(r.owners[0].cccd).trim();
+    }
+    return '';
+};
 
 const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrint, priceList, wards, records, generateCode, mode, contracts, onOpenGetNumberModal }) => {
   const [activeTab, setActiveTab] = useState<'dd' | 'tt' | 'cm' | 'tl'>('dd');
@@ -58,15 +67,27 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
 
   useEffect(() => {
       if (initialData) {
+          const linkedRecord = initialData.customerAddress
+              ? records?.find(r => r.code.trim().toLowerCase() === initialData.customerAddress?.trim().toLowerCase())
+              : undefined;
+          const cccdVal = initialData.cccd || getRecordCccd(linkedRecord) || '';
+
           setFormData({
               ...initialData,
+              cccd: cccdVal,
               liquidationArea: (mode === 'liquidation' && !initialData.liquidationArea) ? initialData.area : initialData.liquidationArea,
               liquidationAmount: (mode === 'liquidation' && !initialData.liquidationAmount) ? initialData.totalAmount : initialData.liquidationAmount,
               liquidationDate: initialData.liquidationDate || todayStr
           });
           
           const items = initialData.splitItems || [];
-          if (initialData.contractType === 'Đo đạc') {
+          const isTachThua = (initialData.contractType === 'Tách thửa') || 
+                             (initialData.serviceType || '').toLowerCase().includes('tách thửa') ||
+                             (initialData.serviceType || '').toLowerCase().includes('2.5');
+          if (isTachThua) {
+              setTachThuaItems(items);
+              setDoDacItems([]);
+          } else if (initialData.contractType === 'Đo đạc') {
               setDoDacItems(items);
               setTachThuaItems([]);
           } else {
@@ -74,7 +95,7 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
               setDoDacItems([]);
           }
 
-          const targetTab = initialData.contractType === 'Tách thửa' ? 'tt' : 
+          const targetTab = isTachThua ? 'tt' : 
                             initialData.contractType === 'Cắm mốc' ? 'cm' : 
                             initialData.contractType === 'Trích lục' ? 'tl' : 'dd';
           setActiveTab(targetTab);
@@ -137,22 +158,24 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
       if (activeTab === 'tt' && tachThuaItems.length === 0) setTachThuaItems([{ serviceName: '', quantity: 1, price: 0, area: undefined }]); // Initialize area as undefined
   }, [activeTab]);
 
-  // Unified automatic code preview generation based on date
+  // Unified automatic code preview generation based on tab & date
   useEffect(() => {
       if (mode === 'liquidation') return; // Không tự lấy số mới ở tab thanh lý hợp đồng
       const isExistingContract = initialData && contracts && contracts.some(c => c.id === initialData.id);
       if (isExistingContract || isManual) return;
+      const typeMap: Record<string, any> = { 'dd': 'Đo đạc', 'tt': 'Tách thửa', 'cm': 'Cắm mốc', 'tl': 'Trích lục' };
+      const currentType = typeMap[activeTab] || 'Đo đạc';
       
       const fetchCode = async () => {
           const dateYear = formData.createdDate ? new Date(formData.createdDate).getFullYear() : new Date().getFullYear();
-          const code = await generateCode(undefined, dateYear);
+          const code = await generateCode(currentType, dateYear);
           setFormData(prev => {
               if (prev.code === code) return prev;
               return { ...prev, code };
           });
       };
       fetchCode();
-  }, [formData.createdDate, isManual, initialData, contracts, generateCode, mode]);
+  }, [activeTab, formData.createdDate, isManual, initialData, contracts, generateCode, mode]);
 
   // Init Liquidation Data if missing (Fallback logic)
   useEffect(() => {
@@ -395,10 +418,16 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
           );
 
           if (foundContract) {
+              const linkedRecord = foundContract.customerAddress
+                  ? records?.find(r => r.code.trim().toLowerCase() === foundContract.customerAddress?.trim().toLowerCase())
+                  : undefined;
+              const cccdVal = foundContract.cccd || getRecordCccd(linkedRecord) || '';
+
               // Nạp dữ liệu hợp đồng đã lưu
               setFormData(prev => ({
                   ...prev,
                   ...foundContract,
+                  cccd: cccdVal,
                   // Đồng bộ diện tích & số tiền thanh lý dựa vào mode
                   liquidationArea: (mode === 'liquidation' && !foundContract.liquidationArea) ? foundContract.area : foundContract.liquidationArea,
                   liquidationAmount: (mode === 'liquidation' && !foundContract.liquidationAmount) ? foundContract.totalAmount : foundContract.liquidationAmount
@@ -442,17 +471,17 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
               c.customerAddress.trim().toLowerCase() === found.code.trim().toLowerCase()
           );
 
-          if (recType.includes('trích lục')) {
+          if (recType.includes('2.5') || recType.includes('tách thửa')) {
+              setActiveTab('tt');
+              suggestedService = 'Đo đạc tách thửa';
+          } else if (recType.includes('2.1') || recType.includes('trích lục')) {
               setActiveTab('tl');
               const match = priceList.find(p => p.serviceName.toLowerCase().includes('trích lục'));
               suggestedService = match ? match.serviceName : 'Trích lục bản đồ địa chính';
-          } else if (recType.includes('cắm mốc')) {
+          } else if (recType.includes('2.4') || recType.includes('cắm mốc')) {
               setActiveTab('cm');
               const match = priceList.find(p => p.serviceName.toLowerCase().includes('cắm mốc'));
               suggestedService = match ? match.serviceName : 'Cắm mốc ranh giới';
-          } else if (recType.includes('tách thửa')) {
-              setActiveTab('tt');
-              suggestedService = 'Đo đạc tách thửa';
           } else {
               setActiveTab('dd');
               const area = found.area || 0;
@@ -498,7 +527,7 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
               customerAddress: found.code,
               customerName: found.customerName, 
               phoneNumber: found.phoneNumber, 
-              cccd: found.cccd || '',
+              cccd: getRecordCccd(found),
               ward: found.ward, 
               address: found.address || '', 
               landPlot: found.landPlot, 
@@ -524,7 +553,7 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
       setNotification(null);
 
       if (!formData.code || !formData.customerName) { 
-          setNotification({ type: 'error', message: "Vui lòng điền đầy đủ Số hợp đồng và Tên khách hàng." }); 
+          setNotification({ type: 'error', message: "Vui lòng điền đầy đủ Mã hợp đồng và Tên khách hàng." }); 
           return; 
       }
 
@@ -597,7 +626,7 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
 
       if (savedCode) {
           const msg = initialData ? 'Cập nhật thành công!' : 'Đã tạo mới thành công!';
-          setNotification({ type: 'success', message: `${msg} Số hợp đồng: ${savedCode}` });
+          setNotification({ type: 'success', message: `${msg} Mã hợp đồng: ${savedCode}` });
           
           // Cập nhật lại code mới chốt chính thức vào form
           setFormData(prev => ({ 
@@ -735,7 +764,10 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
                 </h3>
 
                 <div className="space-y-2.5">
-                    <div><label className={labelClass}>Khách hàng</label><input className={inputClass} value={formData.customerName ?? ''} onChange={e => handleChange('customerName', e.target.value)} /></div>
+                    <div>
+                        <label className={labelClass}>Khách hàng</label>
+                        <input className={inputClass} value={formData.customerName ?? ''} onChange={e => handleChange('customerName', e.target.value)} placeholder="Họ tên khách hàng..." />
+                    </div>
                     <div className="grid grid-cols-2 gap-2">
                         <div><label className={labelClass}>Số CCCD/CMND</label><input className={inputClass} value={formData.cccd ?? ''} onChange={e => handleChange('cccd', e.target.value)} placeholder="CCCD/CMND..." /></div>
                         <div><label className={labelClass}>Số điện thoại</label><input className={inputClass} value={formData.phoneNumber ?? ''} onChange={e => handleChange('phoneNumber', e.target.value)} placeholder="Số ĐT..." /></div>
@@ -797,37 +829,6 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
                             <p className="text-[10px] text-green-600 mt-1 italic">* Tự động quyết toán lại theo diện tích thực tế.</p>
                         </div>
                     )}
-
-                    {/* DYNAMIC TRANSITION BUTTON TO MULTI-PLOT MODE */}
-                    {activeTab === 'dd' && doDacItems.length === 0 && (
-                        <div className="mt-2">
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    const firstItem: SplitItem = {
-                                        serviceName: formData.serviceType || '',
-                                        quantity: 1,
-                                        price: formData.unitPrice || 0,
-                                        area: formData.area || undefined,
-                                        landPlot: formData.landPlot || '',
-                                        mapSheet: formData.mapSheet || ''
-                                    };
-                                    const secondItem: SplitItem = {
-                                        serviceName: '',
-                                        quantity: 1,
-                                        price: 0,
-                                        area: undefined,
-                                        landPlot: '',
-                                        mapSheet: ''
-                                    };
-                                    setDoDacItems([firstItem, secondItem]);
-                                }}
-                                className="w-full py-1.5 bg-purple-50 text-purple-700 hover:bg-purple-100 border border-dashed border-purple-300 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-sm active:scale-95"
-                            >
-                                <Plus size={13} /> Thêm thửa đất khác
-                            </button>
-                        </div>
-                    )}
                 </div>
             </div>
 
@@ -836,9 +837,9 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide">
                     {mode === 'liquidation' ? 'GHI CHÚ THANH LÝ HỢP ĐỒNG' : 'GHI CHÚ HỢP ĐỒNG'}
                 </label>
-                <AutoResizeTextarea 
-                    minRows={2} 
-                    className="w-full text-xs p-2.5 border border-slate-200 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200 focus:outline-none transition-all font-medium text-slate-800 placeholder:text-slate-400 leading-relaxed" 
+                <textarea 
+                    rows={3} 
+                    className="w-full text-xs p-2.5 border border-slate-200 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200 focus:outline-none transition-all resize-none font-medium text-slate-800 placeholder:text-slate-400" 
                     value={formData.content ?? ''} 
                     onChange={e => handleChange('content', e.target.value)} 
                     placeholder="Nội dung chi tiết..." 
@@ -855,7 +856,7 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
                         {mode !== 'liquidation' && (
                             <div>
                                 <div className="flex justify-between items-center mb-1">
-                                    <label className={labelClass}>Số Hợp Đồng</label>
+                                    <label className={labelClass}>Mã Hợp Đồng</label>
                                     <div className="flex items-center gap-1.5">
                                         {(!initialData || (contracts && !contracts.some(c => c.id === initialData.id))) && (
                                             <button 
@@ -875,7 +876,7 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
                                         className={`${inputClass} font-mono font-bold text-purple-700 ${isManual ? 'bg-amber-50/50 border-amber-300 focus:border-amber-500 focus:ring-amber-200' : 'bg-slate-50'}`} 
                                         value={formData.code ?? ''} 
                                         onChange={e => isManual && handleChange('code', e.target.value)}
-                                        placeholder={isManual ? "Nhập số hợp đồng..." : "Đang lấy số tự động..."}
+                                        placeholder={isManual ? "Nhập mã hợp đồng..." : "Đang lấy số tự động..."}
                                     />
                                 </div>
                             </div>
@@ -899,6 +900,8 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
                                 </div>
                             </div>
                         )}
+
+
                     </div>
 
                     {/* Pricing Box */}
@@ -978,6 +981,38 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
                                             value={formData.unitPrice || derivedPricing.unitPrice || ''} 
                                         />
                                     </div>
+
+                                    {/* DYNAMIC TRANSITION BUTTON TO MULTI-PLOT MODE (Chiều rộng bằng 2 khung, đặt dưới Số thửa và Đơn giá) */}
+                                    {(activeTab === 'dd' || activeTab === 'cm') && doDacItems.length === 0 && (
+                                        <div className="col-span-2 pt-1">
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    if (activeTab !== 'dd') setActiveTab('dd');
+                                                    const firstItem: SplitItem = {
+                                                        serviceName: formData.serviceType || '',
+                                                        quantity: 1,
+                                                        price: formData.unitPrice || 0,
+                                                        area: formData.area || undefined,
+                                                        landPlot: formData.landPlot || '',
+                                                        mapSheet: formData.mapSheet || ''
+                                                    };
+                                                    const secondItem: SplitItem = {
+                                                        serviceName: '',
+                                                        quantity: 1,
+                                                        price: 0,
+                                                        area: undefined,
+                                                        landPlot: '',
+                                                        mapSheet: ''
+                                                    };
+                                                    setDoDacItems([firstItem, secondItem]);
+                                                }}
+                                                className="w-full py-2.5 bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold rounded-xl border border-dashed border-purple-300 transition-all flex items-center justify-center gap-2 text-xs shadow-xs active:scale-98 cursor-pointer"
+                                            >
+                                                <Plus size={15} /> Thêm thửa đất khác
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         )}

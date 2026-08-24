@@ -62,6 +62,16 @@ function _nd(s: string): string {
     return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim();
 }
 
+const getRecordCccd = (r: any): string => {
+    if (!r) return '';
+    if (r.cccd) return String(r.cccd).trim();
+    if (r.applicantCccd) return String(r.applicantCccd).trim();
+    if (Array.isArray(r.owners) && r.owners.length > 0 && r.owners[0]?.cccd) {
+        return String(r.owners[0].cccd).trim();
+    }
+    return '';
+};
+
 const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, currentUser, employees, records, recordToLiquidate, onClearRecordToLiquidate, recordToCreateContract, onClearRecordToCreateContract }) => {
   // activeModule bao gồm 'contract', 'liquidation', 'list', 'liquidation_list'
   const [activeModule, setActiveModule] = useState<'contract' | 'liquidation' | 'list' | 'liquidation_list'>('list'); 
@@ -110,18 +120,19 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
               // NẾU CÓ HỢP ĐỒNG: Load toàn bộ dữ liệu hợp đồng đó (bao gồm splitItems, serviceType...)
               const recType = (record.recordType || '').toLowerCase();
               let targetContractType = existingContract.contractType;
-              if (recType.includes('2.4') || recType.includes('cắm mốc')) {
+              if (recType.includes('2.5') || recType.includes('tách thửa')) {
+                  targetContractType = 'Tách thửa';
+              } else if (recType.includes('2.4') || recType.includes('cắm mốc')) {
                   targetContractType = 'Cắm mốc';
-              } else if (recType.includes('2.2') || recType.includes('đo đạc') || recType.includes('trích đo')) {
-                  targetContractType = 'Đo đạc';
               } else if (recType.includes('2.1') || recType.includes('trích lục')) {
                   targetContractType = 'Trích lục';
-              } else if (recType.includes('2.5') || recType.includes('tách thửa')) {
-                  targetContractType = 'Tách thửa';
+              } else if (recType.includes('2.2') || recType.includes('đo đạc') || recType.includes('trích đo')) {
+                  targetContractType = 'Đo đạc';
               }
 
               setEditingContract({
                   ...existingContract,
+                  cccd: existingContract.cccd || getRecordCccd(record),
                   contractType: targetContractType,
                   // Cập nhật lại diện tích thanh lý mới nhất từ hồ sơ (diện tích thực tế sau khi đo)
                   // Ưu tiên: record.area > liquidationArea cũ > area hợp đồng
@@ -147,18 +158,17 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
                   let serviceType = '';
                   let contractType: 'Đo đạc' | 'Tách thửa' | 'Cắm mốc' | 'Trích lục' = 'Đo đạc';
 
-                  if (recType.includes('2.4') || recType.includes('cắm mốc')) {
+                  if (recType.includes('2.5') || recType.includes('tách thửa')) {
+                      contractType = 'Tách thửa';
+                      serviceType = 'Đo đạc tách thửa';
+                  } else if (recType.includes('2.4') || recType.includes('cắm mốc')) {
                       contractType = 'Cắm mốc';
-                      // Cố gắng map chính xác tên dịch vụ trong bảng giá
                       const match = priceList.find(p => p.serviceName.toLowerCase().includes('cắm mốc'));
                       serviceType = match ? match.serviceName : 'Cắm mốc ranh giới';
                   } else if (recType.includes('2.1') || recType.includes('trích lục')) {
                       contractType = 'Trích lục';
                       const match = priceList.find(p => p.serviceName.toLowerCase().includes('trích lục'));
                       serviceType = match ? match.serviceName : 'Trích lục bản đồ địa chính';
-                  } else if (recType.includes('2.5') || recType.includes('tách thửa')) {
-                      contractType = 'Tách thửa';
-                      serviceType = 'Đo đạc tách thửa';
                   } else {
                       contractType = 'Đo đạc';
                       const area = record.area || 0;
@@ -182,6 +192,7 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
                       customerAddress: record.code, // Lưu mã số biên nhận vào customerAddress để liên kết!
                       customerName: record.customerName,
                       phoneNumber: record.phoneNumber,
+                      cccd: getRecordCccd(record),
                       address: record.address,
                       ward: record.ward,
                       landPlot: record.landPlot,
@@ -223,7 +234,10 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
               c.customerAddress && c.customerAddress.trim().toLowerCase() === record.code.trim().toLowerCase()
           );
           if (existingContract) {
-              setEditingContract(existingContract);
+              setEditingContract({
+                  ...existingContract,
+                  cccd: existingContract.cccd || getRecordCccd(record)
+              });
               setActiveModule('contract');
               return;
           }
@@ -250,17 +264,17 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
               let serviceType = '';
               let contractType: 'Đo đạc' | 'Tách thửa' | 'Cắm mốc' | 'Trích lục' = 'Đo đạc';
 
-              if (recType.includes('trích lục')) {
+              if (recType.includes('2.5') || recType.includes('tách thửa')) {
+                  contractType = 'Tách thửa';
+                  serviceType = 'Đo đạc tách thửa';
+              } else if (recType.includes('2.1') || recType.includes('trích lục')) {
                   contractType = 'Trích lục';
                   const match = priceList.find(p => p.serviceName.toLowerCase().includes('trích lục'));
                   serviceType = match ? match.serviceName : 'Trích lục bản đồ địa chính';
-              } else if (recType.includes('cắm mốc')) {
+              } else if (recType.includes('2.4') || recType.includes('cắm mốc')) {
                   contractType = 'Cắm mốc';
                   const match = priceList.find(p => p.serviceName.toLowerCase().includes('cắm mốc'));
                   serviceType = match ? match.serviceName : 'Cắm mốc ranh giới';
-              } else if (recType.includes('tách thửa') || recType.includes('tách - hợp') || recType.includes('tach - hop') || recType.includes('2.5') || recType.startsWith('tt')) {
-                  contractType = 'Tách thửa';
-                  serviceType = 'Đo đạc tách thửa';
               } else {
                   contractType = 'Đo đạc';
                   const area = record.area || 0;
@@ -289,6 +303,7 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
                   customerAddress: record.code, 
                   customerName: record.customerName,
                   phoneNumber: record.phoneNumber,
+                  cccd: getRecordCccd(record),
                   address: record.address,
                   ward: record.ward,
                   landPlot: record.landPlot,
@@ -318,19 +333,19 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
 
   const generateContractCode = async (contractType?: string, customYear?: number): Promise<string> => {
     const year = customYear || new Date().getFullYear();
-    // Lấy số hợp đồng thống nhất từ kho số HĐKT tập trung cho toàn bộ thủ tục (Đo đạc, Cắm mốc, Tách thửa, Trích lục)
+    // Tất cả các loại hợp đồng (Đo đạc, Tách thửa, Cắm mốc, Trích lục) dùng chung 1 hệ mã HĐKT
     let code = await getPreviewHDKTCode(year);
     
     // Kiểm tra tránh trùng với danh sách HĐ hiện có
     let attempts = 0;
     while (contracts.some(c => c.code && c.code.trim().toLowerCase() === code.trim().toLowerCase()) && attempts < 50) {
       attempts++;
-      const match = code.match(/^(\d+)\/HĐKT/);
+      const match = code.match(/(\d+)/);
       if (match) {
-        const numLen = match[1].length;
-        const nextNum = parseInt(match[1], 10) + 1;
+        const numLen = match[0].length;
+        const nextNum = parseInt(match[0], 10) + 1;
         const newNumStr = nextNum.toString().padStart(numLen, '0');
-        code = code.replace(match[1], newNumStr);
+        code = code.replace(match[0], newNumStr);
       } else {
         break;
       }
@@ -375,11 +390,10 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
               } else {
                   const year = contract.createdDate ? new Date(contract.createdDate).getFullYear() : new Date().getFullYear();
                   const userName = currentUser.name || currentUser.username || "Nhân viên";
-                  const note = `${contract.customerName || ''} - ${contract.contractType || ''}`;
+                  const note = `${contract.customerName || ''} - ${contract.contractType}`;
                   let checkCount = 0;
                   do {
                       checkCount++;
-                      // Thống nhất toàn bộ hợp đồng lấy từ kho số chung HĐKT (không phân biệt loại thủ tục)
                       finalCode = await consumeNextHDKTCode(year, userName, note);
                   } while (
                       contracts.some(c => c.code && c.code.trim().toLowerCase() === finalCode.trim().toLowerCase() && c.id !== contract.id) &&
@@ -785,20 +799,42 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
           onClose={() => setIsGetContractNumberOpen(false)}
           currentUser={currentUser}
           onSelectCode={(selectedCode) => {
-              if (editingContract) {
-                  setEditingContract({ ...editingContract, code: selectedCode });
+              let detectedType: 'Đo đạc' | 'Tách thửa' | 'Cắm mốc' | 'Trích lục' = 'Đo đạc';
+              if (selectedCode.includes('HĐKT')) {
+                  const recType = (recordToCreateContract?.recordType || editingContract?.serviceType || '').toLowerCase();
+                  if (recType.includes('2.1') || recType.includes('trích lục')) {
+                      detectedType = 'Trích lục';
+                  } else if (recType.includes('2.4') || recType.includes('cắm mốc')) {
+                      detectedType = 'Cắm mốc';
+                  } else {
+                      detectedType = 'Đo đạc';
+                  }
               } else {
+                  detectedType = 'Tách thửa';
+              }
+
+              if (editingContract) {
+                  setEditingContract({
+                      ...editingContract,
+                      code: selectedCode,
+                      contractType: detectedType,
+                      cccd: editingContract.cccd || getRecordCccd(recordToCreateContract)
+                  });
+              } else {
+                  const rec = recordToCreateContract;
                   setEditingContract({
                       id: Math.random().toString(36).substr(2, 9),
                       code: selectedCode,
-                      customerName: '',
-                      phoneNumber: '',
-                      address: '',
-                      ward: '',
-                      landPlot: '',
-                      mapSheet: '',
-                      area: 0,
-                      contractType: selectedCode.includes('HĐKT') ? 'Đo đạc' : 'Tách thửa',
+                      customerAddress: rec?.code || '',
+                      customerName: rec?.customerName || '',
+                      phoneNumber: rec?.phoneNumber || '',
+                      cccd: getRecordCccd(rec),
+                      address: rec?.address || '',
+                      ward: rec?.ward || '',
+                      landPlot: rec?.landPlot || '',
+                      mapSheet: rec?.mapSheet || '',
+                      area: rec?.area || 0,
+                      contractType: detectedType,
                       serviceType: '',
                       areaType: '',
                       plotCount: 1,

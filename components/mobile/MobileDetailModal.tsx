@@ -635,7 +635,11 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                 )}
 
                 {/* LIÊN KẾT HỢP ĐỒNG */}
-                {record && record.recordType && (getShortRecordType(record.recordType).startsWith('2.1') || getShortRecordType(record.recordType).startsWith('2.2') || getShortRecordType(record.recordType).startsWith('2.4') || getShortRecordType(record.recordType).startsWith('2.5')) && !getShortRecordType(record.recordType).startsWith('2.3') && (
+                {record && record.recordType && (() => {
+                  const st = getShortRecordType(record.recordType);
+                  const rt = (record.recordType || '').toLowerCase();
+                  return st.startsWith('2.1') || st.startsWith('2.2') || st.startsWith('2.4') || st.startsWith('2.5') || rt.includes('2.1') || rt.includes('2.2') || rt.includes('2.4') || rt.includes('2.5') || rt.includes('trích lục') || rt.includes('trích đo') || rt.includes('cắm mốc') || rt.includes('tách thửa');
+                })() && (
                   <div className="pt-3 border-t border-dashed border-slate-100">
                     {matchedContract ? (
                       <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3 flex flex-col gap-2.5">
@@ -683,7 +687,7 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                               }}
                               className="w-full text-center text-xs font-bold bg-blue-600 text-white hover:bg-blue-700 py-2 rounded-lg transition-colors duration-200 shadow-sm"
                             >
-                              Lập HĐ
+                              Lập HĐ mới
                             </button>
                           )}
                           {onCreateLiquidation && (

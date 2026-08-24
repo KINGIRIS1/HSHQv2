@@ -30,7 +30,6 @@ import {
   isDangKyRecordApproaching
 } from '../utils/appHelpers';
 import { detectProcedureId } from '../constants/procedures';
-import { getWardLabel } from '../constants';
 import { addActivityLog } from '../services/activityLogService';
 import { saveDangKyRecordsBatchApi } from '../services/apiDangKy';
 
@@ -151,7 +150,6 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
     const [isLockModalOpen, setIsLockModalOpen] = useState<boolean>(false);
     const [lockMode, setLockMode] = useState<'new' | 'existing'>('new');
     const [selectedExistingBatch, setSelectedExistingBatch] = useState<string>('');
-    const [selectedLockWard, setSelectedLockWard] = useState<string>('');
 
     // --- State Xuất DS Bàn Giao 1 Cửa ---
     const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
@@ -365,13 +363,8 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
             } else {
                 setSelectedExistingBatch('');
             }
-            if (selectedWardFilter && selectedWardFilter !== 'all') {
-                setSelectedLockWard(selectedWardFilter);
-            } else {
-                setSelectedLockWard('');
-            }
         }
-    }, [isLockModalOpen, historyBatches, selectedWardFilter]);
+    }, [isLockModalOpen, historyBatches]);
 
     useEffect(() => {
         if (isExportModalOpen) {
@@ -386,11 +379,6 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
     // Confirm "Chốt DS Bàn Giao"
     const handleConfirmLockBatch = async () => {
         if (selectedIds.size === 0) return;
-
-        if (!selectedLockWard) {
-            alert('Vui lòng chọn cụ thể Địa giới / Xã bàn giao trước khi chốt danh sách bàn giao!');
-            return;
-        }
 
         let finalBatchName = '';
         if (lockMode === 'new') {
@@ -408,13 +396,11 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
             await bulkUpdateDangKyRecordsApi(targetArray, {
                 exportBatch: finalBatchName,
                 status: 'Đã giao 1 cửa',
-                completedDate: todayStr,
-                handoverWard: selectedLockWard
+                completedDate: todayStr
             });
             await loadData();
             alert(`Đã chốt danh sách bàn giao [${finalBatchName}] thành công cho ${selectedIds.size} hồ sơ sang "Đã giao 1 cửa"!`);
             setSelectedIds(new Set());
-            setSelectedLockWard('');
             setIsLockModalOpen(false);
         } catch (err) {
             console.error('Error locking batch:', err);
@@ -1898,29 +1884,30 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                                                 className="rounded text-blue-600 focus:ring-blue-500 cursor-pointer w-4 h-4"
                                             />
                                         </th>
-                                        <th className="p-3 border-r border-gray-200/60 min-w-[120px] text-center">MÃ HỒ SƠ</th>
-                                        <th className="p-3 border-r border-gray-200/60 min-w-[210px] text-center">THÔNG TIN KHÁCH HÀNG</th>
-                                        <th className="p-3 border-r border-gray-200/60 min-w-[130px] text-center">LOẠI HỒ SƠ</th>
-                                        <th className="p-3 border-r border-gray-200/60 text-center min-w-[145px]">HẠN XỬ LÝ</th>
+                                        <th className="p-3 border-r border-gray-200/60 min-w-[120px]">MÃ HỒ SƠ</th>
+                                        <th className="p-3 border-r border-gray-200/60 min-w-[210px]">THÔNG TIN CHỦ SỬ DỤNG</th>
+                                        <th className="p-3 border-r border-gray-200/60 min-w-[130px]">LOẠI HỒ SƠ</th>
+                                        <th className="p-3 border-r border-gray-200/60 text-center min-w-[145px]">THỜI HẠN XỬ LÝ</th>
+                                        <th className="p-3 border-r border-gray-200/60 text-center min-w-[110px]">XÃ PHƯỜNG</th>
                                         <th className="p-3 border-r border-gray-200/60 text-center w-16">TỜ</th>
                                         <th className="p-3 border-r border-gray-200/60 text-center w-16">THỬA</th>
-                                        <th className="p-3 border-r border-gray-200/60 text-center min-w-[110px]">XÃ PHƯỜNG</th>
                                         <th className="p-3 border-r border-gray-200/60 text-center min-w-[130px]">GIAO NHÂN VIÊN</th>
-                                        <th className="p-3 border-r border-gray-200/60 text-center min-w-[120px]">HOÀN THÀNH</th>
-                                        <th className="p-3 border-r border-gray-200/60 text-center min-w-[135px]">TRẠNG THÁI</th>
+
+                                        <th className="p-3 border-r border-gray-200/60 text-center min-w-[120px]">HOÀN THÀNH ĐỢT</th>
+                                        <th className="p-3 border-r border-gray-200/60 text-center min-w-[140px]">TRẠNG THÁI</th>
                                         <th className="p-3 text-center w-[90px] sticky right-0 bg-gray-50 z-20 shadow-xs">THAO TÁC</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100">
                                     {loading ? (
                                         <tr>
-                                            <td colSpan={12} className="p-8 text-center text-gray-500 font-medium">
+                                            <td colSpan={11} className="p-8 text-center text-gray-500 font-medium">
                                                 Đang tải danh sách hồ sơ đăng ký...
                                             </td>
                                         </tr>
                                     ) : paginatedRecords.length === 0 ? (
                                         <tr>
-                                            <td colSpan={12} className="p-8 text-center text-gray-500 font-medium">
+                                            <td colSpan={11} className="p-8 text-center text-gray-500 font-medium">
                                                 Không tìm thấy hồ sơ nào thỏa mãn điều kiện!
                                             </td>
                                         </tr>
@@ -1952,7 +1939,7 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                                                             className="rounded text-blue-600 focus:ring-blue-500 cursor-pointer w-4 h-4"
                                                         />
                                                     </td>
-                                                    <td className="p-3 border-r border-gray-100 font-bold font-mono text-blue-600 text-sm text-center whitespace-nowrap">
+                                                    <td className="p-3 border-r border-gray-100 font-bold font-mono text-blue-600 text-sm whitespace-nowrap">
                                                         <span>{r.code}</span>
                                                     </td>
                                                     <td className="p-3 border-r border-gray-100">
@@ -1970,7 +1957,7 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                                                             )}
                                                         </div>
                                                     </td>
-                                                    <td className="p-3 border-r border-gray-100 text-gray-700 text-sm text-center">
+                                                    <td className="p-3 border-r border-gray-100 text-gray-700 text-sm">
                                                         {r.recordType || '--'}
                                                     </td>
                                                     <td className="p-3 border-r border-gray-100">
@@ -1992,14 +1979,14 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                                                             </div>
                                                         </div>
                                                     </td>
+                                                    <td className="p-3 border-r border-gray-100 text-sm text-gray-700 text-center">
+                                                        {r.ward || '--'}
+                                                    </td>
                                                     <td className="p-3 border-r border-gray-100 text-sm text-slate-700 text-center font-bold font-mono">
                                                         {r.mapSheet || '--'}
                                                     </td>
                                                     <td className="p-3 border-r border-gray-100 text-sm text-slate-700 text-center font-bold font-mono">
                                                         {r.landPlot || '--'}
-                                                    </td>
-                                                    <td className="p-3 border-r border-gray-100 text-sm text-gray-700 text-center">
-                                                        {r.ward || '--'}
                                                     </td>
                                                     <td className="p-3 border-r border-gray-100 text-center">
                                                         {r.appraisalStaff || r.checkedBy ? (
@@ -2339,28 +2326,6 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                                     )}
                                 </div>
                             </label>
-
-                            {/* Bắt buộc chọn Địa giới / Xã bàn giao */}
-                            <div className="space-y-1.5 pt-1">
-                                <label className="block font-semibold text-gray-700 flex items-center justify-between">
-                                    <span>Địa giới bàn giao (Xã/Phường): <span className="text-red-500">*</span></span>
-                                    {!selectedLockWard && (
-                                        <span className="text-red-500 text-[11px] font-medium">Bắt buộc chọn</span>
-                                    )}
-                                </label>
-                                <select 
-                                    value={selectedLockWard}
-                                    onChange={(e) => setSelectedLockWard(e.target.value)}
-                                    className={`w-full border rounded-xl px-3 py-2 text-xs font-semibold bg-white cursor-pointer outline-none focus:ring-2 focus:ring-amber-500 ${
-                                        !selectedLockWard ? 'border-amber-400 bg-amber-50/40 text-amber-950 ring-1 ring-amber-400' : 'border-gray-300 text-gray-800'
-                                    }`}
-                                >
-                                    <option value="">-- Chọn Địa giới / Xã bàn giao (Bắt buộc) --</option>
-                                    {wards.map(w => (
-                                        <option key={w} value={w}>{getWardLabel(w)}</option>
-                                    ))}
-                                </select>
-                            </div>
                         </div>
 
                         <div className="flex items-center justify-end gap-2 pt-4 border-t border-gray-100">

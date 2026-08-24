@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { RecordFile, RecordStatus, Employee, User, UserRole } from '../types';
-import { GROUPS, EXTENDED_RECORD_TYPES, STATUS_LABELS, SELECTABLE_STATUSES, getShortRecordType, getWardLabel, getNormalizedWard, isArchiveRecordType, getCanonicalRecordType, detectProcedureId } from '../constants';
+import { GROUPS, EXTENDED_RECORD_TYPES, STATUS_LABELS, SELECTABLE_STATUSES, getShortRecordType, getWardLabel, getNormalizedWard, isArchiveRecordType, getCanonicalRecordType, detectProcedureId, RECORD_TYPES_LuuTru, RECORD_TYPES_DoDac } from '../constants';
 import { X, Save, Lock, User as UserIcon, MapPin, FileText, Calendar, FileCheck, ChevronDown, ChevronUp, XCircle, ClipboardList } from 'lucide-react';
 import { calculateDeadlineHelper, getDepartmentForRecord, extractBatchOnly } from '../utils/appHelpers';
 import { fetchContracts } from '../services/api';
@@ -125,31 +125,24 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
   if (isOtherView) {
     allowedRecordTypes = ['CMD', 'Thi hành án', 'Tòa án'];
   } else if (isArchiveView) {
-    allowedRecordTypes = [
-      '1.1 Sao lục hồ sơ',
-      '1.2 Công văn'
-    ];
+    allowedRecordTypes = [...RECORD_TYPES_LuuTru];
   } else if (isMeasurementView) {
-    allowedRecordTypes = [
-      '2.1 Trích lục',
-      '2.2 Trích đo',
-      '2.3 Duyệt đơn & Cung cấp số thửa',
-      '2.4 Trích đo Cắm mốc',
-      '2.5 Trích đo Tách - Hợp thửa'
-    ];
+    allowedRecordTypes = [...RECORD_TYPES_DoDac];
   } else {
     allowedRecordTypes = [
-      '1.1 Sao lục hồ sơ',
-      '1.2 Công văn',
-      '2.1 Trích lục',
-      '2.2 Trích đo',
-      '2.3 Duyệt đơn & Cung cấp số thửa',
-      '2.4 Trích đo Cắm mốc',
-      '2.5 Trích đo Tách - Hợp thửa',
+      ...RECORD_TYPES_LuuTru,
+      ...RECORD_TYPES_DoDac,
       'CMD',
       'Thi hành án',
       'Tòa án'
     ];
+  }
+
+  if (formData.recordType) {
+    const currentCanonical = getCanonicalRecordType(formData.recordType, formData.code);
+    if (currentCanonical && !allowedRecordTypes.includes(currentCanonical)) {
+      allowedRecordTypes = [currentCanonical, ...allowedRecordTypes];
+    }
   }
 
   const filteredEmployees = useMemo(() => {
@@ -183,6 +176,10 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
         if (initialData) {
             const dataToSet = { ...initialData };
             dataToSet.procedureId = dataToSet.procedureId || detectProcedureId(dataToSet.code, dataToSet.recordType);
+            const rLower = String(dataToSet.recordType || '').toLowerCase();
+            if ((rLower.includes('1.2') || rLower.includes('công văn') || rLower.includes('cong van') || rLower.includes('sao lục') || dataToSet.recordType === '1.1 Sao lục' || dataToSet.recordType === '1.1 CC DL ĐĐ' || dataToSet.recordType === '1.1 Sao lục hồ sơ' || dataToSet.recordType === '1.1 Cung cấp dữ liệu đất đai') && !dataToSet.price) {
+                dataToSet.price = 310000;
+            }
             if (dataToSet.exportBatch) {
                 dataToSet.exportBatch = extractBatchOnly(dataToSet.exportBatch);
             }
@@ -193,6 +190,70 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
             setAuthAddress(parsed.address || initialData.authorizedPersonAddress || '');
             setAuthPhone(parsed.phone || initialData.authorizedPersonPhone || '');
             setIsAuthOpen(!!(initialData.authorizedBy || initialData.authorizedPersonName || parsed.cccd || parsed.address || parsed.phone || initialData.authorizedPersonId || initialData.authorizedPersonPhone));
+
+            // Tự động đồng bộ số tiền (returnedPrice) nếu chưa có giống như màn hình Chi tiết và Trả kết quả
+            const determinePrice = async () => {
+                if (dataToSet.returnedPrice !== undefined && dataToSet.returnedPrice !== null) {
+                    return;
+                }
+                
+                // 1. Kiểm tra price lưu sẵn
+                if (dataToSet.price && dataToSet.price > 0) {
+                    setFormData(prev => ({ ...prev, returnedPrice: dataToSet.price }));
+                    return;
+                }
+
+                // 2. Cung cấp tài liệu đất đai hoặc 1.2 Công văn
+                if (rLower.includes('cung cấp tài liệu') || rLower.includes('cung cấp tldđ') || rLower.includes('cung cấp tlđđ') || rLower.includes('1.2') || rLower.includes('công văn') || rLower.includes('cong van')) {
+                    setFormData(prev => ({ ...prev, returnedPrice: 310000 }));
+                    return;
+                }
+
+                // 3. Tra cứu hợp đồng giống DetailModal
+                try {
+                    const fetchedContracts = await fetchContracts();
+                    const match = fetchedContracts.find(c => {
+                        if (!c) return false;
+                        const cAddr = (c.customerAddress || '').trim().toLowerCase();
+                        const cCode = (c.code || '').trim().toLowerCase();
+                        const rCode = (dataToSet.code || '').trim().toLowerCase();
+                        const cName = (c.customerName || '').trim().toLowerCase();
+                        const rName = (dataToSet.customerName || '').trim().toLowerCase();
+                        const cPlot = (c.landPlot || '').trim().toLowerCase();
+                        const rPlot = (dataToSet.landPlot || '').trim().toLowerCase();
+                        const cMap = (c.mapSheet || '').trim().toLowerCase();
+                        const rMap = (dataToSet.mapSheet || '').trim().toLowerCase();
+
+                        const clean = (str: string) => str.replace(/[^a-z0-9]/gi, '').toLowerCase();
+
+                        if (rCode && (cAddr === rCode || cCode === rCode)) return true;
+                        if (rCode && cCode && clean(rCode).length >= 3 && clean(rCode) === clean(cCode)) return true;
+                        if (rCode && cAddr && clean(rCode).length >= 3 && clean(rCode) === clean(cAddr)) return true;
+                        if (rName && cName && rName === cName) {
+                            if (rPlot && cPlot && rPlot === cPlot) return true;
+                            if (rMap && cMap && rMap === cMap) return true;
+                        }
+                        return false;
+                    });
+                    
+                    if (match) {
+                        const priceVal = match.liquidationAmount !== null && match.liquidationAmount !== undefined
+                            ? match.liquidationAmount
+                            : (match.totalAmount ?? 0);
+                        setFormData(prev => ({ ...prev, returnedPrice: priceVal }));
+                        return;
+                    }
+                } catch (err) {
+                    console.error("Error loading contract price in RecordModal:", err);
+                }
+
+                // 4. Trích lục bản đồ địa chính
+                if (rLower.includes('trích lục')) {
+                    setFormData(prev => ({ ...prev, returnedPrice: 53163 }));
+                    return;
+                }
+            };
+            determinePrice();
         } else {
             const recDate = new Date().toISOString();
 

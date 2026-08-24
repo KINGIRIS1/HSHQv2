@@ -332,7 +332,7 @@ export const DANG_KY_DEADLINE_MAP: Record<string, number> = PROCEDURE_CATALOG
 // Master lookup function by ID
 export const getProcedureById = (id?: string | null): ProcedureDefinition | undefined => {
   if (!id) return undefined;
-  return PROCEDURE_MAP_BY_ID[id] || PROCEDURE_CATALOG.find(p => p.id === id);
+  return PROCEDURE_MAP_BY_ID[id] || PROCEDURE_CATALOG.find(p => p.id === id || p.name === id || p.shortName === id);
 };
 
 // Automatic detection logic
@@ -407,6 +407,9 @@ export const getCanonicalRecordType = (type?: string | null, code?: string | nul
 
 // Check if a record type belongs to Archive module (Lưu trữ)
 export const isArchiveRecordType = (type?: string | null): boolean => {
+  if (!type) return false;
   const short = getShortRecordType(type);
-  return short === '1.1 Sao lục' || short === '1.2 Công văn';
+  if (short === '1.1 Sao lục' || short === '1.2 Công văn') return true;
+  const tLower = type.toLowerCase();
+  return tLower.includes('1.1') || tLower.includes('sao lục') || tLower.includes('1.2') || tLower.includes('công văn') || tLower.includes('cc dl đđ') || tLower.includes('cung cấp dữ liệu');
 };
