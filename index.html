@@ -41,14 +41,16 @@
         background: url('./bg-airport.jpg') no-repeat center center / cover;
         z-index: 9999;
         transition: opacity 0.5s ease-out, visibility 0.5s;
+        padding: 16px;
+        box-sizing: border-box;
       }
       #initial-loader::before {
         content: '';
         position: absolute;
         inset: 0;
         background: rgba(15, 23, 42, 0.25);
-        backdrop-filter: blur(3px);
-        -webkit-backdrop-filter: blur(3px);
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
         z-index: 0;
       }
       .loader-content {
@@ -57,10 +59,17 @@
         align-items: center;
         position: relative;
         z-index: 1;
-        background: transparent;
-        padding: 20px;
-        border: none;
-        box-shadow: none;
+        background: rgba(255, 255, 255, 0.25);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        padding: 32px 28px;
+        border-radius: 24px;
+        border: 1px solid rgba(255, 255, 255, 0.4);
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+        max-width: 360px;
+        width: 100%;
+        text-align: center;
+        box-sizing: border-box;
       }
       .logo-wrapper {
         position: relative;
@@ -69,19 +78,21 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        margin-bottom: 24px;
+        margin-bottom: 20px;
+        margin-top: 4px;
+        flex-shrink: 0;
       }
       .logo-img {
         width: 76px;
         height: 76px;
         border-radius: 50%;
         object-fit: cover;
-        box-shadow: 0 0 30px rgba(255, 255, 255, 0.7);
+        box-shadow: 0 0 25px rgba(255, 255, 255, 0.8);
         animation: pulseLogo 2.5s ease-in-out infinite;
         position: relative;
         z-index: 2;
-        background: transparent;
-        padding: 0;
+        background: #ffffff;
+        padding: 2px;
       }
       .spinner-ring {
         position: absolute;
@@ -91,8 +102,8 @@
         height: 100%;
         border-radius: 50%;
         border: 3px solid transparent;
-        border-top-color: #38bdf8;
-        border-right-color: #3b82f6;
+        border-top-color: #0284c7;
+        border-right-color: #2563eb;
         animation: spin 1.4s cubic-bezier(0.68, -0.55, 0.27, 1.55) infinite;
         z-index: 1;
       }
@@ -103,27 +114,54 @@
         width: calc(100% + 12px);
         height: calc(100% + 12px);
         border-radius: 50%;
-        border: 1px dashed rgba(148, 163, 184, 0.25);
+        border: 1px dashed rgba(255, 255, 255, 0.6);
         animation: spinReverse 12s linear infinite;
       }
       .loader-title {
         color: #0f172a;
-        font-size: 16px;
+        font-size: 17px;
         font-weight: 800;
         letter-spacing: 0.5px;
         text-transform: uppercase;
-        margin-bottom: 6px;
+        margin-bottom: 8px;
         text-align: center;
+        line-height: 1.35;
         text-shadow: 0 0 10px #ffffff, 0 0 16px #ffffff, 0 1px 3px rgba(255,255,255,0.95);
+        word-break: break-word;
       }
       .loader-subtitle {
-        color: #0f172a;
+        color: #1e293b;
         font-size: 13px;
         font-weight: 700;
         display: flex;
         align-items: center;
+        justify-content: center;
         gap: 2px;
+        line-height: 1.35;
         text-shadow: 0 0 8px #ffffff, 0 0 12px #ffffff, 0 1px 2px rgba(255,255,255,0.95);
+      }
+      @media (max-width: 480px) {
+        .loader-content {
+          padding: 24px 20px;
+          border-radius: 20px;
+          max-width: 300px;
+        }
+        .logo-wrapper {
+          width: 84px;
+          height: 84px;
+          margin-bottom: 16px;
+        }
+        .logo-img {
+          width: 66px;
+          height: 66px;
+        }
+        .loader-title {
+          font-size: 15px;
+          margin-bottom: 6px;
+        }
+        .loader-subtitle {
+          font-size: 12px;
+        }
       }
       .dot-pulse {
         display: inline-block;
