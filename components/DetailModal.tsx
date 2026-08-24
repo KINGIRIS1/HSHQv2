@@ -992,9 +992,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                                                 ? record.returnedPrice.toLocaleString('vi-VN') + ' đ'
                                                 : (record.price !== undefined && record.price !== null && record.price > 0
                                                     ? record.price.toLocaleString('vi-VN') + ' đ'
-                                                    : (record.recordType === 'Cung cấp tài liệu đất đai' 
-                                                        ? '310.000 đ' 
-                                                        : (contractPrice !== null && contractPrice !== undefined ? contractPrice.toLocaleString('vi-VN') + ' đ' : '---')))}
+                                                    : (contractPrice !== null && contractPrice !== undefined ? contractPrice.toLocaleString('vi-VN') + ' đ' : '---'))}
                                         </p>
                                     </div>
 

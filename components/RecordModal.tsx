@@ -177,9 +177,6 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
             const dataToSet = { ...initialData };
             dataToSet.procedureId = dataToSet.procedureId || detectProcedureId(dataToSet.code, dataToSet.recordType);
             const rLower = String(dataToSet.recordType || '').toLowerCase();
-            if ((rLower.includes('1.2') || rLower.includes('công văn') || rLower.includes('cong van') || rLower.includes('sao lục') || dataToSet.recordType === '1.1 Sao lục' || dataToSet.recordType === '1.1 CC DL ĐĐ' || dataToSet.recordType === '1.1 Sao lục hồ sơ' || dataToSet.recordType === '1.1 Cung cấp dữ liệu đất đai') && !dataToSet.price) {
-                dataToSet.price = 310000;
-            }
             if (dataToSet.exportBatch) {
                 dataToSet.exportBatch = extractBatchOnly(dataToSet.exportBatch);
             }
@@ -200,12 +197,6 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                 // 1. Kiểm tra price lưu sẵn
                 if (dataToSet.price && dataToSet.price > 0) {
                     setFormData(prev => ({ ...prev, returnedPrice: dataToSet.price }));
-                    return;
-                }
-
-                // 2. Cung cấp tài liệu đất đai hoặc 1.2 Công văn
-                if (rLower.includes('cung cấp tài liệu') || rLower.includes('cung cấp tldđ') || rLower.includes('cung cấp tlđđ') || rLower.includes('1.2') || rLower.includes('công văn') || rLower.includes('cong van')) {
-                    setFormData(prev => ({ ...prev, returnedPrice: 310000 }));
                     return;
                 }
 
@@ -561,12 +552,6 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
 
         if (rType && rDate) {
           updated.deadline = calculateDeadlineHelper(rType, String(rDate).split('T')[0], holidays || [], rCode, procId);
-        }
-        if (field === 'recordType' || field === 'code') {
-          const rLower = String(rType || '').toLowerCase();
-          if (rLower.includes('1.2') || rLower.includes('công văn') || rLower.includes('cong van') || rLower.includes('sao lục') || rType === '1.1 Sao lục' || rType === '1.1 CC DL ĐĐ' || rType === '1.1 Sao lục hồ sơ' || rType === '1.1 Cung cấp dữ liệu đất đai') {
-            updated.price = 310000;
-          }
         }
       }
       return updated;

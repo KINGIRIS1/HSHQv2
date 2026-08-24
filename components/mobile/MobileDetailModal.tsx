@@ -619,9 +619,7 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                       ? record.returnedPrice.toLocaleString('vi-VN') + ' đ'
                       : (record.price !== undefined && record.price !== null && record.price > 0
                           ? record.price.toLocaleString('vi-VN') + ' đ'
-                          : (record.recordType === 'Cung cấp tài liệu đất đai'
-                              ? '310.000 đ'
-                              : (contractPrice !== null ? contractPrice.toLocaleString('vi-VN') + ' đ' : '---')))}
+                          : (contractPrice !== null ? contractPrice.toLocaleString('vi-VN') + ' đ' : '---'))}
                   </span>
                 </div>
                 {liquidationInfo && (

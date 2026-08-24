@@ -50,14 +50,7 @@ const ReturnResultModal: React.FC<ReturnResultModalProps> = ({
                     return;
                 }
 
-                // 2. Nếu là Cung cấp tài liệu đất đai hoặc 1.2 Công văn
-                const type = (record.recordType || '').toLowerCase();
-                if (type.includes('cung cấp tài liệu') || type.includes('cung cấp tldđ') || type.includes('cung cấp tlđđ') || type.includes('1.2') || type.includes('công văn') || type.includes('cong van')) {
-                    setReturnedPrice('310000');
-                    return;
-                }
-
-                // 3. Tra cứu hợp đồng
+                // 2. Tra cứu hợp đồng
                 const fetchedContracts = await fetchContracts();
                 const match = fetchedContracts.find(c => {
                     if (!c || !record) return false;

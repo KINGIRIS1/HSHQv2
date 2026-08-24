@@ -1476,10 +1476,10 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
                       </label>
                       <input
                         type="number"
-                        value={formData.feeAmount ?? 310000}
+                        value={formData.feeAmount ?? ''}
                         onChange={e => handleFieldChange('feeAmount', e.target.value ? Number(e.target.value) : 0)}
                         className="w-full px-3 py-2 bg-white border border-emerald-300 rounded-lg text-xs sm:text-sm font-mono font-bold text-emerald-950 focus:border-emerald-500 outline-none"
-                        placeholder="310000"
+                        placeholder="Số tiền..."
                       />
                     </div>
                   </div>
