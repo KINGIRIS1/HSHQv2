@@ -84,11 +84,11 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
         <div className="w-12 h-12 md:w-16 md:h-16 rounded-full shadow-xl flex items-center justify-center shrink-0">
           <img src="./Logo_Dong_Nai.ico" alt="Logo Đồng Nai" className="w-full h-full object-contain rounded-full drop-shadow-md" />
         </div>
-        <div className="text-white drop-shadow-lg flex flex-col">
-          <h1 className="text-base sm:text-lg md:text-2xl font-black uppercase tracking-wide leading-tight text-white text-center md:text-left drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)]">
+        <div className="text-white drop-shadow-lg flex flex-col items-start text-left">
+          <h1 className="text-base sm:text-lg md:text-2xl font-black uppercase tracking-wide leading-tight text-white text-left drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)]">
             VĂN PHÒNG ĐĂNG KÝ THÀNH PHỐ ĐỒNG NAI
           </h1>
-          <p className="text-xs sm:text-sm md:text-base font-bold uppercase tracking-wider text-amber-300 text-center drop-shadow-[0_2px_6px_rgba(0,0,0,0.95)]">
+          <p className="text-base sm:text-lg md:text-2xl font-black uppercase tracking-wide leading-tight text-amber-300 text-left drop-shadow-[0_2px_8px_rgba(0,0,0,0.95)]">
             CHI NHÁNH HỚN QUẢN
           </p>
         </div>

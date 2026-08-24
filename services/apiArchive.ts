@@ -1,5 +1,5 @@
 import { supabase, isConfigured } from './supabaseClient';
-import { logError, getFromCache, saveToCache, sanitizeData, sanitizePayloadFor22P02 } from './apiCore';
+import { logError, getFromCache, saveToCache, sanitizeData, sanitizePayloadFor22P02, executeSupabaseOperationWithAutoClean } from './apiCore';
 import { RecordFile, RecordStatus } from '../types';
 import { isArchiveRecordType, getShortRecordType } from '../constants';
 
@@ -272,16 +272,11 @@ export const migrateArchiveRecordsFromLandRecords = async () => {
             return sanitizeData(r, ARCHIVE_DB_COLUMNS);
         });
 
-        // Upsert vào luutru_records
-        let { error: insertError } = await supabase
-            .from('luutru_records')
-            .upsert(luutruPayloads);
-            
-        if (insertError && (insertError.code === '22P02' || String(insertError.message || '').includes('22P02'))) {
-            const clean = sanitizePayloadFor22P02(luutruPayloads);
-            const res = await supabase.from('luutru_records').upsert(clean);
-            insertError = res.error;
-        }
+        // Upsert vào luutru_records với cơ chế tự động lọc các cột chưa có trên DB
+        const { error: insertError } = await executeSupabaseOperationWithAutoClean(
+            (p) => supabase.from('luutru_records').upsert(p),
+            luutruPayloads
+        );
 
         if (insertError) {
             console.error('Lỗi khi upsert vào luutru_records trong migration:', insertError);
@@ -376,27 +371,17 @@ export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise
         const payload = mapArchiveRecordToLuutruDb(record);
 
         if (record.id) {
-            let { data, error } = await supabase.from('luutru_records').update(payload).eq('id', record.id).select();
-            
-            if (error && (error.code === '22P02' || String(error.message || '').includes('22P02'))) {
-                const cleanPayload = sanitizePayloadFor22P02(payload);
-                const res = await supabase.from('luutru_records').update(cleanPayload).eq('id', record.id).select();
-                data = res.data;
-                error = res.error;
-            }
-
+            const { data, error } = await executeSupabaseOperationWithAutoClean(
+                (p) => supabase.from('luutru_records').update(p).eq('id', record.id!).select(),
+                payload
+            );
             if (error) throw error;
             return data && data.length > 0 ? mapLuutruDbToArchiveRecord(data[0]) : null;
         } else {
-            let { data, error } = await supabase.from('luutru_records').insert([payload]).select();
-            
-            if (error && (error.code === '22P02' || String(error.message || '').includes('22P02'))) {
-                const cleanPayload = sanitizePayloadFor22P02(payload);
-                const res = await supabase.from('luutru_records').insert([cleanPayload]).select();
-                data = res.data;
-                error = res.error;
-            }
-
+            const { data, error } = await executeSupabaseOperationWithAutoClean(
+                (p) => supabase.from('luutru_records').insert([p]).select(),
+                payload
+            );
             if (error) throw error;
             return data && data.length > 0 ? mapLuutruDbToArchiveRecord(data[0]) : null;
         }
@@ -442,12 +427,10 @@ export const importArchiveRecords = async (records: Partial<ArchiveRecord>[]): P
     try {
         const payload = records.map(r => mapArchiveRecordToLuutruDb(r));
 
-        let { error } = await supabase.from('luutru_records').insert(payload);
-        if (error && (error.code === '22P02' || String(error.message || '').includes('22P02'))) {
-            const cleanPayload = sanitizePayloadFor22P02(payload);
-            const res = await supabase.from('luutru_records').insert(cleanPayload);
-            error = res.error;
-        }
+        const { error } = await executeSupabaseOperationWithAutoClean(
+            (p) => supabase.from('luutru_records').insert(p),
+            payload
+        );
         if (error) throw error;
         return true;
     } catch (error) {
@@ -492,12 +475,10 @@ export const updateArchiveRecordsBatch = async (ids: string[], updates: Partial<
             return mapArchiveRecordToLuutruDb(mergedArch);
         });
 
-        let { error: upsertError } = await supabase.from('luutru_records').upsert(updatedPayloads);
-        if (upsertError && (upsertError.code === '22P02' || String(upsertError.message || '').includes('22P02'))) {
-            const cleanPayload = sanitizePayloadFor22P02(updatedPayloads);
-            const res = await supabase.from('luutru_records').upsert(cleanPayload);
-            upsertError = res.error;
-        }
+        const { error: upsertError } = await executeSupabaseOperationWithAutoClean(
+            (p) => supabase.from('luutru_records').upsert(p),
+            updatedPayloads
+        );
 
         if (upsertError) throw upsertError;
         return true;

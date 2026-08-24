@@ -59,6 +59,20 @@ ALTER TABLE luutru_records ADD COLUMN IF NOT EXISTS return_note TEXT;
 ALTER TABLE luutru_records ADD COLUMN IF NOT EXISTS is_archived BOOLEAN DEFAULT FALSE;
 ALTER TABLE luutru_records ADD COLUMN IF NOT EXISTS archived_at TIMESTAMP;
 
+-- Thông tin ủy quyền
+ALTER TABLE luutru_records ADD COLUMN IF NOT EXISTS "authorizedPersonAddress" TEXT;
+ALTER TABLE luutru_records ADD COLUMN IF NOT EXISTS "authorizedPersonName" TEXT;
+ALTER TABLE luutru_records ADD COLUMN IF NOT EXISTS "authorizedPersonId" TEXT;
+ALTER TABLE luutru_records ADD COLUMN IF NOT EXISTS "authorizedPersonPhone" TEXT;
+ALTER TABLE luutru_records ADD COLUMN IF NOT EXISTS "authorizedBy" TEXT;
+ALTER TABLE luutru_records ADD COLUMN IF NOT EXISTS "authDocType" TEXT;
+ALTER TABLE luutru_records ADD COLUMN IF NOT EXISTS "otherDocs" TEXT;
+ALTER TABLE luutru_records ADD COLUMN IF NOT EXISTS authorized_person_address TEXT;
+ALTER TABLE luutru_records ADD COLUMN IF NOT EXISTS authorized_person_name TEXT;
+ALTER TABLE luutru_records ADD COLUMN IF NOT EXISTS authorized_person_id TEXT;
+ALTER TABLE luutru_records ADD COLUMN IF NOT EXISTS authorized_person_phone TEXT;
+ALTER TABLE luutru_records ADD COLUMN IF NOT EXISTS authorized_by TEXT;
+
 
 -- ------------------------------------------------------------
 -- 3. BẢNG HỒ SƠ ĐĂNG KÝ ĐẤT ĐAI (dang_ky_records)
