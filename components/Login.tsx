@@ -96,13 +96,13 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
 
       {/* Center Login Card (Maximal Translucent Glassmorphism) */}
       <div className="relative z-10 w-full max-w-3xl my-auto bg-white/10 backdrop-blur-sm border border-white/30 shadow-2xl rounded-3xl p-6 md:p-10 animate-fade-in-up">
-        <h2 className="text-xl md:text-2xl font-black text-slate-900 text-center uppercase tracking-wider mb-6 md:mb-8 pb-3 border-b border-white/30 drop-shadow-sm">
-          ĐĂNG NHẬP HỆ THỐNG
-        </h2>
-
         <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-center">
           {/* Left Column: Form Inputs */}
           <div className="md:col-span-7 space-y-5">
+            <h2 className="text-xl md:text-2xl font-black text-slate-900 text-center uppercase tracking-wider mb-6 drop-shadow-sm">
+              ĐĂNG NHẬP HỆ THỐNG
+            </h2>
+
             {error && (
               <div className="bg-red-500/90 backdrop-blur-sm text-white text-sm p-3.5 rounded-xl font-medium flex items-center gap-3 animate-fade-in shadow-md">
                 <ShieldAlert size={18} className="shrink-0" />
@@ -189,18 +189,12 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
           </div>
 
           {/* Right Column: Prominent Pure Circular Logo Display */}
-          <div className="md:col-span-5 flex flex-col items-center justify-center border-t md:border-t-0 md:border-l border-white/30 pt-6 md:pt-0 md:pl-8 text-center">
+          <div className="md:col-span-5 flex flex-col items-center justify-center pt-6 md:pt-0 text-center">
             <img 
               src="./icon.png?v=4" 
               alt="Logo Văn Phòng Đăng Ký Đất Đai" 
-              className="w-36 h-36 md:w-44 md:h-44 object-contain rounded-full drop-shadow-2xl mb-3 hover:scale-105 transition-transform duration-300"
+              className="w-36 h-36 md:w-44 md:h-44 object-contain rounded-full drop-shadow-2xl hover:scale-105 transition-transform duration-300"
             />
-            <p className="text-slate-900 font-extrabold text-sm md:text-base tracking-wide drop-shadow-sm">
-              VĂN PHÒNG ĐĂNG KÝ
-            </p>
-            <p className="text-blue-900 font-bold text-xs md:text-sm drop-shadow-sm">
-              CHI NHÁNH HỚN QUẢN
-            </p>
           </div>
         </div>
       </div>
