@@ -23,13 +23,14 @@ import ExcelPreviewModal from './ExcelPreviewModal';
 import DangKyDetailModal from './DangKyDetailModal';
 import DangKyRecordModal from './DangKyRecordModal';
 import { DangKyImportModal } from './DangKyImportModal';
+import { getRecordDateForStatus } from '../hooks/useRecordFilter';
 import DeleteConfirmModal from './DeleteConfirmModal';
 import { 
   removeVietnameseTones,
   isDangKyRecordOverdue,
   isDangKyRecordApproaching
 } from '../utils/appHelpers';
-import { detectProcedureId } from '../constants/procedures';
+import { detectProcedureId, getShortRecordType } from '../constants/procedures';
 import { addActivityLog } from '../services/activityLogService';
 import { saveDangKyRecordsBatchApi } from '../services/apiDangKy';
 
@@ -123,6 +124,7 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
     // Filters & Pagination
     const [searchTerm, setSearchTerm] = useState<string>('');
     const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>('all');
+    const [selectedEmployeeFilter, setSelectedEmployeeFilter] = useState<string>('all');
     const [selectedWardFilter, setSelectedWardFilter] = useState<string>('all');
     const [selectedRecordTypeFilter, setSelectedRecordTypeFilter] = useState<string>('all');
     const [selectedBatchFilter, setSelectedBatchFilter] = useState<string>('all');
@@ -204,16 +206,18 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
     const activeFilterCount = useMemo(() => {
         let count = 0;
         if (selectedStatusFilter !== 'all') count++;
+        if (selectedEmployeeFilter !== 'all') count++;
         if (selectedWardFilter !== 'all') count++;
         if (selectedRecordTypeFilter !== 'all') count++;
         if (selectedBatchFilter !== 'all') count++;
         if (filterFromDate) count++;
         if (filterToDate) count++;
         return count;
-    }, [selectedStatusFilter, selectedWardFilter, selectedRecordTypeFilter, selectedBatchFilter, filterFromDate, filterToDate]);
+    }, [selectedStatusFilter, selectedEmployeeFilter, selectedWardFilter, selectedRecordTypeFilter, selectedBatchFilter, filterFromDate, filterToDate]);
 
     const handleClearFilters = () => {
         setSelectedStatusFilter('all');
+        setSelectedEmployeeFilter('all');
         setSelectedWardFilter('all');
         setSelectedRecordTypeFilter('all');
         setSelectedBatchFilter('all');
@@ -673,6 +677,29 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                 return false;
             }
 
+            if (selectedEmployeeFilter !== 'all') {
+                if (selectedEmployeeFilter === 'unassigned') {
+                    if (r.appraisalStaff || r.checkedBy || r.assignedTo) return false;
+                } else {
+                    const empObj = employeesList.find(e => e.id === selectedEmployeeFilter || e.name === selectedEmployeeFilter);
+                    const empName = empObj?.name?.toLowerCase() || '';
+                    const empId = selectedEmployeeFilter.toLowerCase();
+
+                    const aTo = r.assignedTo ? r.assignedTo.toLowerCase() : '';
+                    const appSt = r.appraisalStaff ? r.appraisalStaff.toLowerCase() : '';
+                    const chkBy = r.checkedBy ? r.checkedBy.toLowerCase() : '';
+                    const subTo = (r as any).submittedTo ? (r as any).submittedTo.toLowerCase() : '';
+
+                    const match = 
+                        aTo === empId || (empName && aTo === empName) ||
+                        appSt === empId || (empName && appSt === empName) ||
+                        chkBy === empId || (empName && chkBy === empName) ||
+                        subTo === empId || (empName && subTo === empName);
+
+                    if (!match) return false;
+                }
+            }
+
             if (selectedWardFilter !== 'all' && r.ward !== selectedWardFilter) {
                 return false;
             }
@@ -688,14 +715,11 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                 }
             }
 
-            if (filterFromDate && r.receivedDate) {
-                const dateStr = r.receivedDate.includes('T') ? r.receivedDate.split('T')[0] : r.receivedDate;
-                if (dateStr < filterFromDate) return false;
-            }
-
-            if (filterToDate && r.receivedDate) {
-                const dateStr = r.receivedDate.includes('T') ? r.receivedDate.split('T')[0] : r.receivedDate;
-                if (dateStr > filterToDate) return false;
+            if (filterFromDate || filterToDate) {
+                const targetDateStr = getRecordDateForStatus(r, selectedStatusFilter);
+                if (!targetDateStr) return false;
+                if (filterFromDate && targetDateStr < filterFromDate) return false;
+                if (filterToDate && targetDateStr > filterToDate) return false;
             }
 
             if (warningFilter === 'overdue' && !isDangKyRecordOverdue(r)) {
@@ -708,7 +732,7 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
 
             return true;
         });
-    }, [records, activeMainTab, activeTbtSubTab, activeGiao1CuaSubTab, searchTerm, selectedStatusFilter, selectedWardFilter, selectedRecordTypeFilter, selectedBatchFilter, filterFromDate, filterToDate, warningFilter]);
+    }, [records, activeMainTab, activeTbtSubTab, activeGiao1CuaSubTab, searchTerm, selectedStatusFilter, selectedEmployeeFilter, selectedWardFilter, selectedRecordTypeFilter, selectedBatchFilter, filterFromDate, filterToDate, warningFilter]);
 
     // Pagination
     const totalPages = Math.ceil(filteredRecords.length / pageSize) || 1;
@@ -1298,7 +1322,7 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
         const excelData = filteredRecords.map((r, idx) => ({
             'STT': idx + 1,
             'Mã hồ sơ': r.code,
-            'Chủ sử dụng': (r.owners || []).map(o => o.name).join('\n'),
+            'Thông tin khách hàng': (r.owners || []).map(o => o.name).join('\n'),
             'CCCD chủ': (r.owners || []).map(o => o.cccd || '').join('\n'),
             'Địa chỉ chủ': (r.owners || []).map(o => o.address || '').join('\n'),
             'Người nhận chuyển quyền': (r.transferees || []).map(t => t.name).join('\n'),
@@ -1577,11 +1601,11 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                                                     </select>
                                                 </div>
 
-                                                {/* 3. Thời gian nhận */}
+                                                {/* 3. Thời gian */}
                                                 <div>
                                                     <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 mb-1">
                                                         <Calendar size={14} className="text-gray-500" />
-                                                        <span>Thời gian nhận hồ sơ:</span>
+                                                        <span>Thời gian (Từ ngày - Đến ngày):</span>
                                                     </label>
                                                     <div className="grid grid-cols-2 gap-2">
                                                         <div>
@@ -1603,6 +1627,27 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                                                             />
                                                         </div>
                                                     </div>
+                                                </div>
+
+                                                {/* Cán bộ xử lý */}
+                                                <div>
+                                                    <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 mb-1">
+                                                        <Users size={14} className="text-gray-500" />
+                                                        <span>Cán bộ xử lý:</span>
+                                                    </label>
+                                                    <select
+                                                        value={selectedEmployeeFilter}
+                                                        onChange={(e) => setSelectedEmployeeFilter(e.target.value)}
+                                                        className="w-full text-xs border border-gray-200 rounded-lg p-2 font-medium bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                                                    >
+                                                        <option value="all">Tất cả cán bộ</option>
+                                                        <option value="unassigned">Chưa giao cán bộ</option>
+                                                        {employeesList.map((emp) => (
+                                                            <option key={emp.id} value={emp.id}>
+                                                                {emp.name} {emp.position ? `(${emp.position})` : ''}
+                                                            </option>
+                                                        ))}
+                                                    </select>
                                                 </div>
 
                                                 {/* 4. Cảnh báo hạn xử lý */}
@@ -1885,7 +1930,7 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                                             />
                                         </th>
                                         <th className="p-3 border-r border-gray-200/60 min-w-[120px]">MÃ HỒ SƠ</th>
-                                        <th className="p-3 border-r border-gray-200/60 min-w-[210px]">THÔNG TIN CHỦ SỬ DỤNG</th>
+                                        <th className="p-3 border-r border-gray-200/60 min-w-[210px]">THÔNG TIN KHÁCH HÀNG</th>
                                         <th className="p-3 border-r border-gray-200/60 min-w-[130px]">LOẠI HỒ SƠ</th>
                                         <th className="p-3 border-r border-gray-200/60 text-center min-w-[145px]">THỜI HẠN XỬ LÝ</th>
                                         <th className="p-3 border-r border-gray-200/60 text-center min-w-[110px]">XÃ PHƯỜNG</th>
@@ -1957,8 +2002,8 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                                                             )}
                                                         </div>
                                                     </td>
-                                                    <td className="p-3 border-r border-gray-100 text-gray-700 text-sm">
-                                                        {r.recordType || '--'}
+                                                    <td className="p-3 border-r border-gray-100 text-gray-700 text-sm font-medium" title={r.recordType || ''}>
+                                                        {getShortRecordType(r.recordType, r.code)}
                                                     </td>
                                                     <td className="p-3 border-r border-gray-100">
                                                         <div className="flex flex-col w-full max-w-[155px] mx-auto bg-white/50 rounded border border-gray-200/80 overflow-hidden shadow-2xs">

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { RecordFile, RecordStatus, Employee, User, UserRole } from '../../types';
 import { STATUS_LABELS } from '../../constants';
+import { getShortRecordType } from '../../constants/procedures';
 import StatusBadge from '../StatusBadge';
 import { 
   Search, 
@@ -156,7 +157,7 @@ const MobileRecordList: React.FC<MobileRecordListProps> = ({
                         {record.recordType && (
                           <div className="flex items-center gap-1.5 col-span-2">
                             <span className="text-slate-400 font-bold" title="Loại hồ sơ">📄</span>
-                            <span className="truncate text-slate-700">{record.recordType}</span>
+                            <span className="truncate text-slate-700" title={record.recordType || ''}>{getShortRecordType(record.recordType, record.code)}</span>
                           </div>
                         )}
 

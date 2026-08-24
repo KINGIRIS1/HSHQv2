@@ -38,15 +38,32 @@
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%);
+        background: url('./bg-airport.jpg') no-repeat center center / cover;
         z-index: 9999;
         transition: opacity 0.5s ease-out, visibility 0.5s;
+      }
+      #initial-loader::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.65);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        z-index: 0;
       }
       .loader-content {
         display: flex;
         flex-direction: column;
         align-items: center;
         position: relative;
+        z-index: 1;
+        background: rgba(15, 23, 42, 0.65);
+        padding: 36px 52px;
+        border-radius: 24px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
       }
       .logo-wrapper {
         position: relative;

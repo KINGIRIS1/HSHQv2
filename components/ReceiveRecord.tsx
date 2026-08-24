@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { RecordFile, Employee, User, Holiday, RecordStatus, RolePermissions, DepartmentPermissions } from '../types';
-import { getNormalizedWard } from '../constants';
+import { getNormalizedWard, getCanonicalRecordType } from '../constants';
 import { PlusCircle, FileSpreadsheet, LayoutList, Search, Settings, RotateCcw, RefreshCw, CalendarClock, Layers } from 'lucide-react';
 import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../services/docxService';
 import * as XLSX from 'xlsx-js-style';
@@ -323,8 +323,8 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({
         
         NOI_DUNG: val(dataToUse.content),
         CONTENT: val(dataToUse.content),
-        LOAI_HS: val(dataToUse.recordType), 
-        RECORD_TYPE: val(dataToUse.recordType),
+        LOAI_HS: val(getCanonicalRecordType(dataToUse.recordType, dataToUse.code)), 
+        RECORD_TYPE: val(getCanonicalRecordType(dataToUse.recordType, dataToUse.code)),
         GIAY_TO_KHAC: val(dataToUse.otherDocs),
         GIA: dataToUse.price ? dataToUse.price.toLocaleString('vi-VN') + ' đ' : '',
         PRICE: dataToUse.price ? dataToUse.price.toLocaleString('vi-VN') + ' đ' : '',

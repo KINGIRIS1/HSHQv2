@@ -6,7 +6,7 @@ import {
   ClipboardList, User as UserIcon, ChevronUp, ChevronDown, RefreshCw, XCircle
 } from 'lucide-react';
 import { calculateDeadlineHelper } from '../utils/appHelpers';
-import { detectProcedureId } from '../constants';
+import { detectProcedureId, getShortRecordType } from '../constants';
 import { addActivityLog } from '../services/activityLogService';
 import { AutoResizeTextarea } from './AutoResizeTextarea';
 
@@ -56,7 +56,7 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
 
   const createFreshRecord = (): DangKyRecord => {
     const todayStr = new Date().toISOString().split('T')[0];
-    const defaultType = '3.1.1 Chuyển nhượng';
+    const defaultType = '3.1.1 Chuyển quyền';
     const initialDeadline = calculateDeadlineHelper(defaultType, todayStr, holidays || []);
     
     return {
@@ -526,7 +526,7 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
                     Loại hồ sơ <span className="text-red-500">*</span>
                   </label>
                   <select
-                    value={formData.recordType || ''}
+                    value={getShortRecordType(formData.recordType, formData.code) || ''}
                     onChange={e => handleFieldChange('recordType', e.target.value)}
                     className={`${inputClass} font-semibold`}
                   >
@@ -788,7 +788,7 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
                     value={formData.feeAmount || 0}
                     onChange={e => handleFieldChange('feeAmount', e.target.value ? Number(e.target.value) : 0)}
                     className="w-full border border-emerald-300 rounded-lg px-3 py-1.5 text-xs sm:text-sm font-bold text-emerald-900 bg-white font-mono"
-                    placeholder="53163"
+                    placeholder="0"
                   />
                 </div>
               </div>

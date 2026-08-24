@@ -2161,7 +2161,7 @@ const ExportHandoverModal: React.FC<ExportHandoverModalProps> = ({ isOpen, onClo
 
         if (selectedGcnType === 'GCN trang 4') {
             headers = [
-                "STT", "Tên Chủ sử dụng", "Địa danh", "Số phát hành", "Ngày ký GCN", 
+                "STT", "Thông tin khách hàng", "Địa danh", "Số phát hành", "Ngày ký GCN", 
                 "Mã hồ sơ giao dịch", "Loại hồ sơ", "Ngày chủ SD nhận GCN", 
                 "Người nhận GCN ký, ghi họ tên", "Ghi chú"
             ];

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { RecordFile, RecordStatus, Employee, User, UserRole, Message, RecordStatusLog } from './types';
-import { DEFAULT_WARDS as STATIC_WARDS, isArchiveRecordType, STATUS_LABELS, APP_VERSION, getNormalizedWard } from './constants';
+import { DEFAULT_WARDS as STATIC_WARDS, isArchiveRecordType, STATUS_LABELS, APP_VERSION, getNormalizedWard, getCanonicalRecordType } from './constants';
 import { isUserAdminOrSubadmin, isUserTeamLeader, isUserOneDoor, isUserEmployee, canUserPerformGeneralAction } from './constants/permissions';
 import Login from './components/Login'; 
 import MainLayout from './components/layout/MainLayout';
@@ -1164,8 +1164,8 @@ function App() {
               USER: val(currentUser?.name),
               NOI_DUNG: val(targetRecord.content),
               CONTENT: val(targetRecord.content),
-              LOAI_HS: val(targetRecord.recordType), 
-              RECORD_TYPE: val(targetRecord.recordType),
+              LOAI_HS: val(getCanonicalRecordType(targetRecord.recordType, targetRecord.code)), 
+              RECORD_TYPE: val(getCanonicalRecordType(targetRecord.recordType, targetRecord.code)),
               GIAY_TO_KHAC: val(targetRecord.otherDocs),
               GIA: targetRecord.price ? targetRecord.price.toLocaleString('vi-VN') + ' đ' : '',
               PRICE: targetRecord.price ? targetRecord.price.toLocaleString('vi-VN') + ' đ' : '',

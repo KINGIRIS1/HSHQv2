@@ -786,7 +786,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                                     <tr>
                                         <th className="p-3 w-10 text-center">#</th>
                                         <th className="p-3 w-32">Mã HS</th>
-                                        <th className="p-3 w-48">Chủ sử dụng</th>
+                                        <th className="p-3 w-48">Thông tin khách hàng</th>
                                         <th className="p-3 w-32">Xã/Phường</th>
                                         <th className="p-3 w-16 text-center">Tờ</th>
                                         <th className="p-3 w-16 text-center">Thửa</th>

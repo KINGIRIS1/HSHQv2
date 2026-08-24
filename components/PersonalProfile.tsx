@@ -459,7 +459,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
     const headers = [
       "STT",
       "Mã hồ sơ",
-      "Chủ sử dụng",
+      "Thông tin khách hàng",
       "Số điện thoại",
       "CCCD",
       "Loại hồ sơ",
@@ -1232,7 +1232,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                         {renderSortHeader("Mã HS", "code")}
                       </th>
                       <th className="p-3 w-[180px]">
-                        {renderSortHeader("Chủ sử dụng", "customerName")}
+                        {renderSortHeader("Thông tin khách hàng", "customerName")}
                       </th>
                       <th className="p-3 w-[115px]">
                         {renderSortHeader("Loại hồ sơ", "recordType")}

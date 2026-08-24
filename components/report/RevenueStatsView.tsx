@@ -245,7 +245,7 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
         const rows = filteredRecords.map((r, index) => ({
             STT: index + 1,
             'Mã hồ sơ': r.code || '',
-            'Thông tin chủ sử dụng': r.customerName || '',
+            'Thông tin khách hàng': r.customerName || '',
             'Loại hồ sơ': getShortRecordType(r.recordType) || '',
             'Ngày thu tiền': r.resultReturnedDate ? new Date(r.resultReturnedDate).toLocaleDateString('vi-VN') : '—',
             'Loại chứng từ': r.computedReceiptType,

@@ -915,7 +915,7 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Tân Qua
                                     </th>
                                     <th className="p-3 w-10 text-center">#</th>
                                     <th className="p-3 w-32 text-center">Mã HS</th>
-                                    <th className="p-3 w-48 text-center">Chủ sử dụng</th>
+                                    <th className="p-3 w-48 text-center">Thông tin khách hàng</th>
                                     <th className="p-3 w-32 text-center">Xã/Phường</th>
                                     <th className="p-3 w-20 text-center">Tờ / Thửa</th>
                                     <th className="p-3 w-24 text-center">Ngày nhận</th>

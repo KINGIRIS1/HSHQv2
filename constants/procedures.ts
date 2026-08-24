@@ -19,7 +19,6 @@ export const PROCEDURE_CATALOG: ProcedureDefinition[] = [
     shortName: '1.1 Sao lục',
     module: 'luutru',
     defaultDeadline: 10,
-    price: 310000,
     prefixes: ['1.1', 'SL', 'SAOLUC', 'CCDL'],
     keywords: ['sao lục', 'cung cấp tài liệu', 'cung cấp dữ liệu', 'cc dl đđ']
   },
@@ -29,7 +28,6 @@ export const PROCEDURE_CATALOG: ProcedureDefinition[] = [
     shortName: '1.2 Công văn',
     module: 'luutru',
     defaultDeadline: 10,
-    price: 310000,
     prefixes: ['1.2', 'CV', 'CONGVAN'],
     keywords: ['công văn']
   },
@@ -275,23 +273,23 @@ export const PROCEDURE_MAP_BY_ID: Record<string, ProcedureDefinition> = PROCEDUR
 // Derived list of basic procedure names
 export const RECORD_TYPES: string[] = PROCEDURE_CATALOG
   .filter(p => p.module !== 'khac')
-  .map(p => p.name);
+  .map(p => p.shortName);
 
 // Derived extended record types list
-export const EXTENDED_RECORD_TYPES: string[] = PROCEDURE_CATALOG.map(p => p.name);
+export const EXTENDED_RECORD_TYPES: string[] = PROCEDURE_CATALOG.map(p => p.shortName);
 
 // Derived per-module procedure lists
 export const RECORD_TYPES_LuuTru = PROCEDURE_CATALOG
   .filter(p => p.module === 'luutru')
-  .map(p => p.name);
+  .map(p => p.shortName);
 
 export const RECORD_TYPES_DoDac = PROCEDURE_CATALOG
   .filter(p => p.module === 'dodac')
-  .map(p => p.name);
+  .map(p => p.shortName);
 
 export const DANG_KY_RECORD_TYPES = PROCEDURE_CATALOG
   .filter(p => p.module === 'dangky')
-  .map(p => p.name);
+  .map(p => p.shortName);
 
 // Derived Deadline Map for Registration (Đăng ký)
 export const DANG_KY_DEADLINE_MAP: Record<string, number> = PROCEDURE_CATALOG

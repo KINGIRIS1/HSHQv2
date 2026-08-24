@@ -70,17 +70,20 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
   };
 
   return (
-    <div className="fixed inset-0 w-full h-full flex items-center justify-center bg-[#0f172a] font-sans overflow-hidden">
-      {/* Background Decor - Giữ nguyên hiệu ứng cho giống App */}
-      <div className="absolute inset-0 z-0 pointer-events-none">
-        <div className="absolute -top-[20%] -left-[10%] w-[60%] h-[60%] rounded-full bg-blue-600/10 blur-[150px]"></div>
-        <div className="absolute -bottom-[20%] -right-[10%] w-[60%] h-[60%] rounded-full bg-indigo-600/10 blur-[150px]"></div>
+    <div 
+      className="fixed inset-0 w-full h-full flex items-center justify-center font-sans overflow-hidden bg-cover bg-center bg-no-repeat relative"
+      style={{ backgroundImage: 'url("./bg-airport.jpg")' }}
+    >
+      {/* Background Decor & Overlay */}
+      <div className="absolute inset-0 z-0 bg-slate-950/60 backdrop-blur-sm pointer-events-none">
+        <div className="absolute -top-[20%] -left-[10%] w-[60%] h-[60%] rounded-full bg-blue-600/20 blur-[150px]"></div>
+        <div className="absolute -bottom-[20%] -right-[10%] w-[60%] h-[60%] rounded-full bg-indigo-600/20 blur-[150px]"></div>
       </div>
 
-      <div className="w-full max-w-[1100px] h-[80vh] min-h-[600px] bg-white rounded-3xl shadow-2xl overflow-hidden flex z-10 animate-fade-in-up m-4 border border-slate-800/50">
+      <div className="w-full max-w-[1100px] h-[80vh] min-h-[600px] bg-white/95 backdrop-blur-md rounded-3xl shadow-2xl overflow-hidden flex z-10 animate-fade-in-up m-4 border border-white/30">
         
-        {/* Left Side: Brand & Info (Dark Theme) */}
-        <div className="hidden md:flex w-5/12 bg-gradient-to-br from-[#0f172a] via-[#1e293b] to-[#0f172a] text-white p-12 flex-col justify-between relative overflow-hidden">
+        {/* Left Side: Brand & Info (Dark Glass Theme) */}
+        <div className="hidden md:flex w-5/12 bg-slate-900/85 backdrop-blur-md text-white p-12 flex-col justify-between relative overflow-hidden border-r border-white/10">
             {/* Texture Overlay */}
             <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'radial-gradient(#ffffff 1px, transparent 1px)', backgroundSize: '24px 24px' }}></div>
             

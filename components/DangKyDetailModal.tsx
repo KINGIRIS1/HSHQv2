@@ -12,6 +12,7 @@ import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../services/do
 import DocxPreviewModal from './DocxPreviewModal';
 import SystemReceiptTemplate from './receive-record/SystemReceiptTemplate';
 import { getNormalizedWard } from '../constants';
+import { getShortRecordType, getCanonicalRecordType } from '../constants/procedures';
 import { AutoResizeTextarea } from './AutoResizeTextarea';
 
 const NEXT_STATUS_MAP: Record<string, string> = {
@@ -41,6 +42,7 @@ interface DangKyDetailModalProps {
   onDelete?: (record: DangKyRecord) => void;
   onStatusAdvance?: (record: DangKyRecord) => void;
   onRefreshData?: () => void;
+  onOpenExtendModal?: (record: DangKyRecord) => void;
 }
 
 export const DangKyDetailModal: React.FC<DangKyDetailModalProps> = ({
@@ -52,12 +54,18 @@ export const DangKyDetailModal: React.FC<DangKyDetailModalProps> = ({
   onEdit,
   onDelete,
   onStatusAdvance,
-  onRefreshData
+  onRefreshData,
+  onOpenExtendModal
 }) => {
   const [personalNote, setPersonalNote] = useState<string>('');
   const [isSavingNote, setIsSavingNote] = useState<boolean>(false);
   const [reminderDate, setReminderDate] = useState<string>('');
   const [isSavingReminder, setIsSavingReminder] = useState<boolean>(false);
+
+  // States cho Gia hạn ngày hẹn
+  const [showExtendForm, setShowExtendForm] = useState<boolean>(false);
+  const [extendDate, setExtendDate] = useState<string>('');
+  const [isExtending, setIsExtending] = useState<boolean>(false);
 
   // States cho In biên nhận & DOCX Preview
   const [isPreviewOpen, setIsPreviewOpen] = useState<boolean>(false);
@@ -73,6 +81,11 @@ export const DangKyDetailModal: React.FC<DangKyDetailModalProps> = ({
         setReminderDate(record.reminderDate.split('T')[0]);
       } else {
         setReminderDate('');
+      }
+      if (record.deadline) {
+        setExtendDate(record.deadline.split('T')[0]);
+      } else {
+        setExtendDate(new Date().toISOString().split('T')[0]);
       }
     }
   }, [record, isOpen]);
@@ -234,8 +247,8 @@ export const DangKyDetailModal: React.FC<DangKyDetailModalProps> = ({
         USER: val(currentUser?.name),
         NOI_DUNG: val(record.notes || record.recordType),
         CONTENT: val(record.notes || record.recordType),
-        LOAI_HS: val(record.recordType),
-        RECORD_TYPE: val(record.recordType),
+        LOAI_HS: val(getCanonicalRecordType(record.recordType, record.code)),
+        RECORD_TYPE: val(getCanonicalRecordType(record.recordType, record.code)),
         GIAY_TO_KHAC: '',
         NGUOI_UY_QUYEN: '',
         UY_QUYEN: '',
@@ -262,6 +275,50 @@ export const DangKyDetailModal: React.FC<DangKyDetailModalProps> = ({
       setSystemReceiptData(normalizedRecord);
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  const handleSaveExtension = async () => {
+    if (!record) return;
+    if (!extendDate) {
+      alert('Vui lòng chọn ngày hẹn mới.');
+      return;
+    }
+
+    setIsExtending(true);
+    
+    const nowStr = new Date().toLocaleString('vi-VN');
+    const userLabel = currentUser ? `${currentUser.name} (${currentUser.role === UserRole.ONEDOOR ? 'Một cửa' : 'Quản trị'})` : 'Hệ thống';
+    const extensionNote = `[Gia hạn ngày hẹn] Hạn cũ: ${formatDate(record.deadline)} -> Hạn mới: ${formatDate(extendDate)} (Bởi: ${userLabel} lúc ${nowStr})`;
+    
+    const newPrivateNotes = record.privateNotes 
+      ? `${record.privateNotes}\n${extensionNote}` 
+      : extensionNote;
+
+    const updatedRecord: DangKyRecord = {
+      ...record,
+      deadline: extendDate,
+      privateNotes: newPrivateNotes
+    };
+
+    try {
+      const result = await saveDangKyRecordApi(updatedRecord);
+      if (result) {
+        alert('Đã gia hạn ngày hẹn thành công!');
+        setShowExtendForm(false);
+        record.deadline = extendDate;
+        record.privateNotes = newPrivateNotes;
+        if (onRefreshData) {
+          onRefreshData();
+        }
+      } else {
+        alert('Lỗi khi cập nhật ngày gia hạn.');
+      }
+    } catch (err) {
+      console.error("Lỗi gia hạn:", err);
+      alert('Có lỗi xảy ra khi thực hiện gia hạn.');
+    } finally {
+      setIsExtending(false);
     }
   };
 
@@ -339,9 +396,9 @@ export const DangKyDetailModal: React.FC<DangKyDetailModalProps> = ({
             <span className="bg-blue-100 text-blue-700 font-bold font-mono px-3 py-1 rounded text-sm border border-blue-200">
               {record.code}
             </span>
-            <h2 className="text-lg font-bold text-gray-800 uppercase flex items-center gap-2">
+            <h2 className="text-lg font-bold text-gray-800 uppercase flex items-center gap-2" title={record.recordType || 'Hồ sơ Đăng ký cấp GCN'}>
               <Layers size={18} className="text-blue-600" />
-              {record.recordType || 'Hồ sơ Đăng ký cấp GCN'}
+              {getShortRecordType(record.recordType, record.code) || 'Hồ sơ Đăng ký cấp GCN'}
             </h2>
             <span className="bg-emerald-100 text-emerald-800 text-xs font-bold px-3 py-1 rounded-full border border-emerald-200 flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -350,6 +407,22 @@ export const DangKyDetailModal: React.FC<DangKyDetailModalProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
+            <button 
+              onClick={() => {
+                if (onOpenExtendModal) {
+                  onClose();
+                  onOpenExtendModal(record);
+                } else {
+                  setShowExtendForm(true);
+                }
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg hover:bg-amber-100 transition-colors text-xs font-bold shadow-2xs cursor-pointer"
+              title="Gia hạn ngày hẹn trả"
+            >
+              <CalendarClock size={15} />
+              Gia hạn
+            </button>
+
             <button 
               onClick={handlePrintReceipt}
               className="flex items-center gap-2 px-3 py-1.5 bg-white border border-blue-200 text-blue-600 rounded-lg hover:bg-blue-50 transition-colors text-xs font-bold shadow-2xs cursor-pointer"
@@ -699,9 +772,25 @@ export const DangKyDetailModal: React.FC<DangKyDetailModalProps> = ({
                 <div className="p-6 text-center border-b border-gray-100">
                   <label className="text-[10px] text-gray-400 uppercase font-bold block mb-1">Hạn trả kết quả</label>
                   <p className="text-2xl font-black text-gray-800 font-mono">{formatDate(record.deadline)}</p>
-                  <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded mt-2 inline-block font-mono">
-                    Ngày nhận: {formatDate(record.receivedDate)}
-                  </span>
+                  <div className="flex items-center justify-center gap-2 mt-2">
+                    <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded inline-block font-mono">
+                      Ngày nhận: {formatDate(record.receivedDate)}
+                    </span>
+                    <button
+                      onClick={() => {
+                        if (onOpenExtendModal) {
+                          onClose();
+                          onOpenExtendModal(record);
+                        } else {
+                          setShowExtendForm(true);
+                        }
+                      }}
+                      className="text-[10px] bg-amber-50 border border-amber-200 text-amber-800 px-2 py-0.5 rounded font-bold hover:bg-amber-100 transition-colors flex items-center gap-1 cursor-pointer"
+                      title="Gia hạn thời gian hẹn trả"
+                    >
+                      <CalendarClock size={11} /> Gia hạn
+                    </button>
+                  </div>
                 </div>
 
                 <div className="p-6 space-y-0">
@@ -820,6 +909,64 @@ export const DangKyDetailModal: React.FC<DangKyDetailModalProps> = ({
         docxBlob={previewBlob} 
         fileName={previewFileName} 
       />
+
+      {/* EXTENSION MODAL OVERLAY */}
+      {showExtendForm && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-60 p-4 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden border border-gray-200">
+            <div className="bg-amber-500 px-5 py-3.5 flex justify-between items-center text-white">
+              <h3 className="font-bold flex items-center gap-2 text-base">
+                <CalendarClock size={18} />
+                Gia hạn ngày hẹn trả
+              </h3>
+              <button 
+                onClick={() => setShowExtendForm(false)}
+                className="text-white/80 hover:text-white transition-colors cursor-pointer"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-900 space-y-1">
+                <p><span className="font-bold">Mã hồ sơ:</span> <span className="font-mono font-bold text-blue-700">{record.code}</span></p>
+                <p><span className="font-bold">Hạn trả hiện tại:</span> {formatDate(record.deadline)}</p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">
+                  Ngày hẹn trả mới <span className="text-red-500">*</span>
+                </label>
+                <input 
+                  type="date" 
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-100 font-mono"
+                  value={extendDate}
+                  onChange={(e) => setExtendDate(e.target.value)}
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => setShowExtendForm(false)}
+                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium text-xs rounded-lg transition-colors cursor-pointer"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveExtension}
+                  disabled={isExtending}
+                  className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  {isExtending ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                  Xác nhận gia hạn
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

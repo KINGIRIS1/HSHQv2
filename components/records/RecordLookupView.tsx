@@ -1,9 +1,11 @@
 import React, { useState, useMemo } from 'react';
+import { getRecordDateForStatus } from '../../hooks/useRecordFilter';
 import { 
     Search, 
     X,
     Eye, 
     CalendarClock, 
+    Calendar,
     CheckCircle2, 
     Pencil, 
     Clock, 
@@ -16,11 +18,12 @@ import {
     FileCheck,
     FilePlus2,
     Filter,
+    User as UserIcon,
     ChevronDown,
     ChevronUp,
     MapPin
 } from 'lucide-react';
-import { RecordFile, Employee, User, RecordStatus, UserRole } from '../../types';
+import { RecordFile, Employee, User, RecordStatus, UserRole, DANG_KY_STATUS_LIST } from '../../types';
 import { getShortRecordType, getWardLabel, getCanonicalRecordType, EXTENDED_RECORD_TYPES } from '../../constants';
 import { removeVietnameseTones, toTitleCase, getBatchDisplayParts, isRecordOverdue, isRecordApproaching } from '../../utils/appHelpers';
 import StatusBadge from '../StatusBadge';
@@ -63,6 +66,7 @@ export const RecordLookupView: React.FC<RecordLookupViewProps> = ({
     const [isFilterPopoverOpen, setIsFilterPopoverOpen] = useState(false);
     const [selectedWardFilter, setSelectedWardFilter] = useState<string>('all');
     const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>('all');
+    const [selectedEmployeeFilter, setSelectedEmployeeFilter] = useState<string>('all');
     const [selectedRecordTypeFilter, setSelectedRecordTypeFilter] = useState<string>('all');
     const [selectedBatchFilter, setSelectedBatchFilter] = useState<string>('all');
     const [filterFromDate, setFilterFromDate] = useState<string>('');
@@ -124,7 +128,25 @@ export const RecordLookupView: React.FC<RecordLookupViewProps> = ({
 
         // 2. Status Filter
         if (selectedStatusFilter !== 'all') {
-            result = result.filter(r => getDisplayStatus(r) === selectedStatusFilter);
+            result = result.filter(r => {
+                const st = getDisplayStatus(r);
+                if (selectedStatusFilter === RecordStatus.RECEIVED || selectedStatusFilter === 'Tiếp nhận mới') {
+                    return st === RecordStatus.RECEIVED || st === RecordStatus.ASSIGNED || st === RecordStatus.IN_PROGRESS || st === 'Tiếp nhận mới';
+                }
+                if (selectedStatusFilter === RecordStatus.HANDOVER || selectedStatusFilter === 'Chờ bàn giao') {
+                    return st === RecordStatus.HANDOVER || st === RecordStatus.SUBMITTED || st === RecordStatus.APPROVED || st === 'Chờ bàn giao';
+                }
+                if (selectedStatusFilter === RecordStatus.RETURNED || selectedStatusFilter === 'Đã trả kết quả') {
+                    return st === RecordStatus.RETURNED || st === 'Đã trả kết quả';
+                }
+                if (selectedStatusFilter === RecordStatus.WITHDRAWN || selectedStatusFilter === 'CSD rút HS') {
+                    return st === RecordStatus.WITHDRAWN || st === 'CSD rút HS';
+                }
+                if (selectedStatusFilter === RecordStatus.REJECTED || selectedStatusFilter === 'Trả hủy hồ sơ') {
+                    return st === RecordStatus.REJECTED || st === 'Trả hủy hồ sơ';
+                }
+                return st === selectedStatusFilter;
+            });
         }
 
         // 3. Record Type Filter
@@ -140,16 +162,40 @@ export const RecordLookupView: React.FC<RecordLookupViewProps> = ({
             result = result.filter(r => String(r.exportBatch || '') === selectedBatchFilter);
         }
 
-        // 5. Date Range Filter (receivedDate)
-        if (filterFromDate) {
-            const from = new Date(filterFromDate);
-            from.setHours(0, 0, 0, 0);
-            result = result.filter(r => r.receivedDate && new Date(r.receivedDate) >= from);
+        // 4.5. Employee Filter
+        if (selectedEmployeeFilter !== 'all') {
+            if (selectedEmployeeFilter === 'unassigned') {
+                result = result.filter(r => !r.assignedTo && !(r as any).appraisalStaff && !(r as any).checkedBy);
+            } else {
+                const empObj = employees.find(e => e.id === selectedEmployeeFilter || e.name === selectedEmployeeFilter);
+                const empName = empObj?.name?.toLowerCase();
+                const empId = selectedEmployeeFilter.toLowerCase();
+
+                result = result.filter(r => {
+                    const aTo = r.assignedTo ? r.assignedTo.toLowerCase() : '';
+                    const appSt = (r as any).appraisalStaff ? (r as any).appraisalStaff.toLowerCase() : '';
+                    const chkBy = (r as any).checkedBy ? (r as any).checkedBy.toLowerCase() : '';
+                    const subTo = (r as any).submittedTo ? (r as any).submittedTo.toLowerCase() : '';
+
+                    return (
+                        aTo === empId || (empName && aTo === empName) ||
+                        appSt === empId || (empName && appSt === empName) ||
+                        chkBy === empId || (empName && chkBy === empName) ||
+                        subTo === empId || (empName && subTo === empName)
+                    );
+                });
+            }
         }
-        if (filterToDate) {
-            const to = new Date(filterToDate);
-            to.setHours(23, 59, 59, 999);
-            result = result.filter(r => r.receivedDate && new Date(r.receivedDate) <= to);
+
+        // 5. Date Range Filter (by Status or receivedDate)
+        if (filterFromDate || filterToDate) {
+            result = result.filter(r => {
+                const targetDateStr = getRecordDateForStatus(r, selectedStatusFilter);
+                if (!targetDateStr) return false;
+                if (filterFromDate && targetDateStr < filterFromDate) return false;
+                if (filterToDate && targetDateStr > filterToDate) return false;
+                return true;
+            });
         }
 
         // 6. Search keyword
@@ -160,6 +206,7 @@ export const RecordLookupView: React.FC<RecordLookupViewProps> = ({
             const code = removeVietnameseTones(r.code || '').toLowerCase();
             const name = removeVietnameseTones(r.customerName || '').toLowerCase();
             const phone = (r.phoneNumber || '').toLowerCase();
+            const cccd = (r.cccd || '').toLowerCase();
             const plot = (r.landPlot || '').toLowerCase();
             const sheet = (r.mapSheet || '').toLowerCase();
             const ward = removeVietnameseTones(r.ward || '').toLowerCase();
@@ -168,6 +215,13 @@ export const RecordLookupView: React.FC<RecordLookupViewProps> = ({
             const receipt = removeVietnameseTones(r.receiptNumber || '').toLowerCase();
             const batch = removeVietnameseTones(String(r.exportBatch || '')).toLowerCase();
 
+            const ownerNames = (r.owners || []).map(o => removeVietnameseTones(o.name || '').toLowerCase()).join(' ');
+            const ownerCccd = (r.owners || []).map(o => (o.cccd || '').toLowerCase()).join(' ');
+            const ownerPhone = (r.owners || []).map(o => (o.phone || '').toLowerCase()).join(' ');
+            const transfereeNames = (r.transferees || []).map(t => removeVietnameseTones(t.name || '').toLowerCase()).join(' ');
+            const transfereeCccd = (r.transferees || []).map(t => (t.cccd || '').toLowerCase()).join(' ');
+            const transfereePhone = (r.transferees || []).map(t => (t.phone || '').toLowerCase()).join(' ');
+
             const assignedEmp = employees.find(e => e.id === r.assignedTo);
             const empName = assignedEmp ? removeVietnameseTones(assignedEmp.name || '').toLowerCase() : '';
 
@@ -175,6 +229,13 @@ export const RecordLookupView: React.FC<RecordLookupViewProps> = ({
                 code.includes(term) ||
                 name.includes(term) ||
                 phone.includes(term) ||
+                cccd.includes(term) ||
+                ownerNames.includes(term) ||
+                ownerCccd.includes(term) ||
+                ownerPhone.includes(term) ||
+                transfereeNames.includes(term) ||
+                transfereeCccd.includes(term) ||
+                transfereePhone.includes(term) ||
                 plot === term ||
                 sheet === term ||
                 `thua ${plot}`.includes(term) ||
@@ -438,11 +499,20 @@ export const RecordLookupView: React.FC<RecordLookupViewProps> = ({
                                                 className="w-full text-xs border border-slate-200 rounded-lg p-2 font-medium bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
                                             >
                                                 <option value="all">Tất cả trạng thái</option>
-                                                <option value={RecordStatus.RECEIVED}>Đang xử lý / Tiếp nhận</option>
-                                                <option value={RecordStatus.HANDOVER}>Đã bàn giao / Ký</option>
-                                                <option value={RecordStatus.RETURNED}>Đã trả kết quả</option>
-                                                <option value={RecordStatus.WITHDRAWN}>Rút hồ sơ</option>
-                                                <option value={RecordStatus.REJECTED}>Từ chối</option>
+                                                <option value="Tiếp nhận mới">Tiếp nhận mới / Đang xử lý</option>
+                                                <option value="Thẩm định">Thẩm định</option>
+                                                <option value="Phiếu chuyển thuế">Phiếu chuyển thuế</option>
+                                                <option value="Chờ Thuế KV7">Chờ Thuế KV7</option>
+                                                <option value="Chờ giấy nộp tiền">Chờ giấy nộp tiền</option>
+                                                <option value="Chờ In GCN">Chờ In GCN</option>
+                                                <option value="Chờ kiểm tra">Chờ kiểm tra</option>
+                                                <option value="Chờ ký duyệt">Chờ ký duyệt</option>
+                                                <option value="Chờ bàn giao">Chờ bàn giao / Đã bàn giao</option>
+                                                <option value="Đã giao 1 cửa">Đã giao 1 cửa</option>
+                                                <option value="Đã trả kết quả">Đã trả kết quả</option>
+                                                <option value="Chờ bổ sung">Chờ bổ sung</option>
+                                                <option value="CSD rút HS">Rút hồ sơ</option>
+                                                <option value="Trả hủy hồ sơ">Trả hủy / Từ chối</option>
                                             </select>
                                         </div>
 
@@ -464,25 +534,52 @@ export const RecordLookupView: React.FC<RecordLookupViewProps> = ({
                                             </select>
                                         </div>
 
-                                        {/* 4. Khoảng thời gian tiếp nhận */}
-                                        <div className="grid grid-cols-2 gap-2">
-                                            <div>
-                                                <label className="block text-[11px] font-bold text-slate-600 mb-1">Từ ngày:</label>
-                                                <input
-                                                    type="date"
-                                                    value={filterFromDate}
-                                                    onChange={(e) => setFilterFromDate(e.target.value)}
-                                                    className="w-full text-xs border border-slate-200 rounded-lg p-1.5 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-[11px] font-bold text-slate-600 mb-1">Đến ngày:</label>
-                                                <input
-                                                    type="date"
-                                                    value={filterToDate}
-                                                    onChange={(e) => setFilterToDate(e.target.value)}
-                                                    className="w-full text-xs border border-slate-200 rounded-lg p-1.5 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                />
+                                        {/* 3.5. Cán bộ xử lý */}
+                                        <div>
+                                            <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 mb-1">
+                                                <UserIcon size={14} className="text-slate-500" />
+                                                <span>Cán bộ xử lý:</span>
+                                            </label>
+                                            <select
+                                                value={selectedEmployeeFilter}
+                                                onChange={(e) => setSelectedEmployeeFilter(e.target.value)}
+                                                className="w-full text-xs border border-slate-200 rounded-lg p-2 font-medium bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                                            >
+                                                <option value="all">Tất cả cán bộ</option>
+                                                <option value="unassigned">Chưa giao cán bộ</option>
+                                                {employees.map((emp) => (
+                                                    <option key={emp.id} value={emp.id}>
+                                                        {emp.name} {emp.position ? `(${emp.position})` : ''}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+
+                                        {/* 4. Khoảng thời gian lọc theo trạng thái */}
+                                        <div>
+                                            <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 mb-1.5">
+                                                <Calendar size={14} className="text-slate-500" />
+                                                <span>Thời gian (Từ ngày - Đến ngày):</span>
+                                            </label>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <div>
+                                                    <label className="block text-[11px] font-medium text-slate-500 mb-0.5">Từ ngày:</label>
+                                                    <input
+                                                        type="date"
+                                                        value={filterFromDate}
+                                                        onChange={(e) => setFilterFromDate(e.target.value)}
+                                                        className="w-full text-xs border border-slate-200 rounded-lg p-1.5 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-[11px] font-medium text-slate-500 mb-0.5">Đến ngày:</label>
+                                                    <input
+                                                        type="date"
+                                                        value={filterToDate}
+                                                        onChange={(e) => setFilterToDate(e.target.value)}
+                                                        className="w-full text-xs border border-slate-200 rounded-lg p-1.5 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                    />
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -494,6 +591,7 @@ export const RecordLookupView: React.FC<RecordLookupViewProps> = ({
                                             onClick={() => {
                                                 setSelectedWardFilter('all');
                                                 setSelectedStatusFilter('all');
+                                                setSelectedEmployeeFilter('all');
                                                 setSelectedRecordTypeFilter('all');
                                                 setSelectedBatchFilter('all');
                                                 setFilterFromDate('');
@@ -563,7 +661,7 @@ export const RecordLookupView: React.FC<RecordLookupViewProps> = ({
                         </div>
                         <h3 className="text-sm font-bold text-slate-700 mb-1">Không tìm thấy hồ sơ phù hợp</h3>
                         <p className="text-xs text-slate-500 max-w-sm">
-                            Vui lòng kiểm tra lại từ khóa tìm kiếm (Mã hồ sơ, Tên chủ sử dụng, SĐT, Số tờ, Số thửa,...).
+                            Vui lòng kiểm tra lại từ khóa tìm kiếm (Mã hồ sơ, Tên khách hàng, SĐT, Số tờ, Số thửa,...).
                         </p>
                     </div>
                 ) : (
@@ -582,7 +680,7 @@ export const RecordLookupView: React.FC<RecordLookupViewProps> = ({
                                             />
                                         </th>
                                         <th className="p-3 w-[110px] text-center bg-slate-50">MÃ HỒ SƠ</th>
-                                        <th className="p-3 w-64 text-center bg-slate-50">THÔNG TIN CHỦ SỬ DỤNG</th>
+                                        <th className="p-3 w-64 text-center bg-slate-50">THÔNG TIN KHÁCH HÀNG</th>
                                         <th className="p-3 w-[115px] text-center bg-slate-50">LOẠI HỒ SƠ</th>
                                         <th className="p-3 w-48 text-center bg-slate-50">THỜI HẠN XỬ LÝ</th>
                                         <th className="p-3 w-32 text-center bg-slate-50">XÃ PHƯỜNG</th>

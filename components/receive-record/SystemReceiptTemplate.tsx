@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
 import Barcode from 'react-barcode';
 import { RecordFile } from '../../types';
-import { getNormalizedWard, getShortRecordType, getWardFullLabel } from '../../constants';
+import { getNormalizedWard, getShortRecordType, getWardFullLabel, getCanonicalRecordType } from '../../constants';
 import { Printer, FileSignature } from 'lucide-react';
 
 interface SystemReceiptTemplateProps {
@@ -329,7 +329,7 @@ const SystemReceiptTemplate: React.FC<SystemReceiptTemplateProps> = ({ data, rec
                                     <div>Thửa: {data.landPlot}</div>
                                 </div>
                                 <div>Địa chỉ thửa đất: <span className="font-bold">{getDisplayLandAddress()}</span></div>
-                                <div>Thủ tục hành chính cần giải quyết: <span className="font-bold">{data.recordType}</span></div>
+                                <div>Thủ tục hành chính cần giải quyết: <span className="font-bold">{getCanonicalRecordType(data.recordType, data.code)}</span></div>
                                 
                                 <div>1. Thành phần hồ sơ, yêu cầu và số lượng mỗi loại giấy tờ gồm:</div>
                                 <table className="w-full border-collapse border border-black mt-1 mb-2">

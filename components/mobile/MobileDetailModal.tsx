@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { RecordFile, Employee, User, UserRole, SplitItem, RecordStatus } from '../../types';
-import { getNormalizedWard, getShortRecordType } from '../../constants';
+import { getNormalizedWard, getShortRecordType, getCanonicalRecordType } from '../../constants';
 import StatusBadge from '../StatusBadge';
 import { 
   X, MapPin, FileText, User as UserIcon, Receipt, DollarSign, 
@@ -168,9 +168,7 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
           }
         } else {
           setMatchedContract(null);
-          const type = (record.recordType || '').toLowerCase();
-          if (type.includes('trích lục')) setContractPrice(53163);
-          else setContractPrice(null);
+          setContractPrice(null);
           setContractSplitItems(null);
           setLiquidationInfo(null);
         }
@@ -360,8 +358,8 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
         USER: val(currentUser?.name),
         NOI_DUNG: val(record.content),
         CONTENT: val(record.content),
-        LOAI_HS: val(record.recordType), 
-        RECORD_TYPE: val(record.recordType),
+        LOAI_HS: val(getCanonicalRecordType(record.recordType, record.code)), 
+        RECORD_TYPE: val(getCanonicalRecordType(record.recordType, record.code)),
         GIAY_TO_KHAC: val(record.otherDocs),
         NGUOI_UY_QUYEN: "",
         UY_QUYEN: "",
@@ -505,7 +503,7 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                 </div>
                 <div>
                   <p className="text-[10px] text-slate-400 font-bold uppercase">Loại hồ sơ</p>
-                  <p className="text-sm font-bold text-slate-800">{record.recordType}</p>
+                  <p className="text-sm font-bold text-slate-800">{getShortRecordType(record.recordType, record.code)}</p>
                 </div>
               </div>
             </div>

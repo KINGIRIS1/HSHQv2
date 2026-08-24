@@ -84,16 +84,10 @@ const ReturnResultModal: React.FC<ReturnResultModalProps> = ({
                     return;
                 }
 
-                // 4. Nếu là Trích lục bản đồ địa chính
-                if (type.includes('trích lục')) {
-                    setReturnedPrice('53163');
-                    return;
-                }
-
-                setReturnedPrice('0');
+                setReturnedPrice('');
             } catch (err) {
                 console.error("Error loading default price:", err);
-                setReturnedPrice('0');
+                setReturnedPrice('');
             } finally {
                 setIsLoadingPrice(false);
             }
@@ -125,12 +119,7 @@ const ReturnResultModal: React.FC<ReturnResultModalProps> = ({
           return;
       }
 
-      if (!returnedPrice.trim()) {
-          setErrorMsg('Vui lòng nhập số tiền thực tế trước khi trả kết quả!');
-          return;
-      }
-
-      const priceNum = parseFloat(returnedPrice);
+      const priceNum = returnedPrice.trim() ? parseFloat(returnedPrice) : 0;
       if (isNaN(priceNum) || priceNum < 0) {
           setErrorMsg('Vui lòng nhập số tiền hợp lệ!');
           return;

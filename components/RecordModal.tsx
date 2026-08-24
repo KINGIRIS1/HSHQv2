@@ -237,12 +237,6 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                 } catch (err) {
                     console.error("Error loading contract price in RecordModal:", err);
                 }
-
-                // 4. Trích lục bản đồ địa chính
-                if (rLower.includes('trích lục')) {
-                    setFormData(prev => ({ ...prev, returnedPrice: 53163 }));
-                    return;
-                }
             };
             determinePrice();
         } else {
@@ -642,7 +636,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                 {/* 2. CHỦ SỬ DỤNG HOẶC THÔNG TIN GỬI NHẬN */}
                 <div className="bg-white p-3.5 sm:p-5 rounded-2xl border border-slate-200 shadow-2xs">
                     <h3 className="text-xs sm:text-sm font-bold text-slate-800 uppercase mb-3 sm:mb-4 flex items-center gap-2 border-b border-slate-100 pb-2.5">
-                        <UserIcon size={16} className="text-blue-600" /> {isCongVan ? 'Thông tin gửi / nhận' : 'Chủ sử dụng'}
+                        <UserIcon size={16} className="text-blue-600" /> {isCongVan ? 'Thông tin gửi / nhận' : 'Thông tin khách hàng'}
                     </h3>
                     {isCongVan ? (
                         <div className="grid grid-cols-1 gap-3.5">
