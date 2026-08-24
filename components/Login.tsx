@@ -94,18 +94,18 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
         </div>
       </div>
 
-      {/* Center Login Card (Maximal Translucent Glassmorphism) */}
-      <div className="relative z-10 w-full max-w-3xl my-auto bg-white/10 backdrop-blur-sm border border-white/30 shadow-2xl rounded-3xl p-6 md:p-10 animate-fade-in-up">
+      {/* Center Login Card (Completely Transparent) */}
+      <div className="relative z-10 w-full max-w-3xl my-auto bg-transparent border-0 shadow-none p-6 md:p-10 animate-fade-in-up">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-center">
           {/* Left Column: Form Inputs */}
           <div className="md:col-span-7 space-y-5">
-            <h2 className="text-xl md:text-2xl font-black text-slate-900 text-center uppercase tracking-wider mb-6 drop-shadow-sm">
+            <h2 className="text-xl md:text-2xl font-black text-white text-center uppercase tracking-wider mb-6 drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)]">
               ĐĂNG NHẬP HỆ THỐNG
             </h2>
 
             {error && (
-              <div className="bg-red-500/90 backdrop-blur-sm text-white text-sm p-3.5 rounded-xl font-medium flex items-center gap-3 animate-fade-in shadow-md">
-                <ShieldAlert size={18} className="shrink-0" />
+              <div className="bg-red-600/90 backdrop-blur-md text-white text-sm p-3.5 rounded-xl font-bold flex items-center gap-3 animate-fade-in shadow-lg border border-red-400/30">
+                <ShieldAlert size={18} className="shrink-0 text-white" />
                 <span>{error}</span>
               </div>
             )}
@@ -113,7 +113,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* Username Input */}
               <div className="relative group">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-800">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-white drop-shadow">
                   <UserIcon size={18} />
                 </div>
                 <input
@@ -121,7 +121,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
                   name="username"
                   autoComplete="username"
                   required
-                  className="w-full pl-10 pr-4 py-3 bg-white/30 border border-white/50 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-slate-900 font-bold placeholder-slate-700 shadow-sm backdrop-blur-sm"
+                  className="w-full pl-10 pr-4 py-3 bg-white/20 hover:bg-white/25 focus:bg-white/30 border border-white/60 focus:border-white rounded-xl focus:ring-2 focus:ring-blue-400 outline-none transition-all text-white font-bold placeholder-white/80 shadow-md backdrop-blur-md"
                   placeholder="Tài khoản đăng nhập"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
@@ -130,7 +130,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
 
               {/* Password Input */}
               <div className="relative group">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-800">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-white drop-shadow">
                   <Lock size={18} />
                 </div>
                 <input
@@ -138,7 +138,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
                   name="password"
                   autoComplete="current-password"
                   required
-                  className="w-full pl-10 pr-4 py-3 bg-white/30 border border-white/50 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-slate-900 font-bold placeholder-slate-700 shadow-sm backdrop-blur-sm"
+                  className="w-full pl-10 pr-4 py-3 bg-white/20 hover:bg-white/25 focus:bg-white/30 border border-white/60 focus:border-white rounded-xl focus:ring-2 focus:ring-blue-400 outline-none transition-all text-white font-bold placeholder-white/80 shadow-md backdrop-blur-md"
                   placeholder="Mật khẩu"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -146,7 +146,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-600 hover:text-slate-900 transition-colors"
+                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-white/80 hover:text-white transition-colors"
                 >
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
@@ -158,13 +158,13 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
                   <div className="relative flex items-center justify-center">
                     <input
                       type="checkbox"
-                      className="peer h-5 w-5 cursor-pointer appearance-none rounded-md border-2 border-slate-700/60 bg-white/80 checked:border-blue-600 checked:bg-blue-600 focus:ring-2 focus:ring-blue-500/30 transition-all"
+                      className="peer h-5 w-5 cursor-pointer appearance-none rounded-md border-2 border-white/80 bg-white/30 checked:border-blue-500 checked:bg-blue-600 focus:ring-2 focus:ring-blue-400 transition-all"
                       checked={rememberMe}
                       onChange={(e) => setRememberMe(e.target.checked)}
                     />
                     <CheckCircle2 size={16} className="absolute text-white opacity-0 peer-checked:opacity-100 pointer-events-none transition-opacity stroke-[3]" />
                   </div>
-                  <span className="text-sm font-bold text-slate-900 group-hover:text-blue-800 transition-colors drop-shadow-sm">
+                  <span className="text-sm font-bold text-white group-hover:text-amber-300 transition-colors drop-shadow-[0_2px_6px_rgba(0,0,0,0.95)]">
                     Ghi nhớ đăng nhập
                   </span>
                 </label>
