@@ -6,7 +6,7 @@ import {
   ClipboardList, User as UserIcon, ChevronUp, ChevronDown, RefreshCw, XCircle
 } from 'lucide-react';
 import { calculateDeadlineHelper } from '../utils/appHelpers';
-import { detectProcedureId, getShortRecordType } from '../constants';
+import { detectProcedureId, getShortRecordType, getDefaultDocsForProcedure } from '../constants/procedures';
 import { addActivityLog } from '../services/activityLogService';
 import { AutoResizeTextarea } from './AutoResizeTextarea';
 
@@ -135,8 +135,10 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
         setShowAuthorizedSection(true);
       }
     } else {
-      setFormData(createFreshRecord());
-      setAttachedDocs([]);
+      const fresh = createFreshRecord();
+      setFormData(fresh);
+      const defDocs = getDefaultDocsForProcedure(fresh.recordType, fresh.code);
+      setAttachedDocs(defDocs.map(d => ({ name: d.name, type: d.type })));
     }
   }, [initialData, isOpen]);
 
@@ -182,6 +184,13 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
           if (firstOwner.cccd) updated.applicantCccd = firstOwner.cccd;
           if (firstOwner.phone) updated.applicantPhone = firstOwner.phone;
           if (firstOwner.address) updated.applicantAddress = firstOwner.address;
+        }
+
+        if (field === 'recordType' && !initialData) {
+          const defDocs = getDefaultDocsForProcedure(rType, rCode);
+          if (defDocs.length > 0) {
+            setAttachedDocs(defDocs.map(d => ({ name: d.name, type: d.type })));
+          }
         }
 
         if (rType && rDate) {

@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { RecordFile, RecordStatus, Employee, User, UserRole } from '../types';
 import { GROUPS, EXTENDED_RECORD_TYPES, STATUS_LABELS, SELECTABLE_STATUSES, getShortRecordType, getWardLabel, getNormalizedWard, isArchiveRecordType, getCanonicalRecordType, detectProcedureId, RECORD_TYPES_LuuTru, RECORD_TYPES_DoDac } from '../constants';
+import { getDefaultDocsForProcedure } from '../constants/procedures';
 import { X, Save, Lock, User as UserIcon, MapPin, FileText, Calendar, FileCheck, ChevronDown, ChevronUp, XCircle, ClipboardList } from 'lucide-react';
 import { calculateDeadlineHelper, getDepartmentForRecord, extractBatchOnly } from '../utils/appHelpers';
 import { fetchContracts } from '../services/api';
@@ -541,6 +542,14 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
         
         const procId = detectProcedureId(rCode, rType);
         updated.procedureId = procId;
+
+        if (field === 'recordType' && !initialData) {
+          const defDocs = getDefaultDocsForProcedure(rType, rCode);
+          if (defDocs.length > 0) {
+            setAttachedDocs(defDocs);
+            updated.otherDocs = JSON.stringify(defDocs);
+          }
+        }
 
         if (rType && rDate) {
           updated.deadline = calculateDeadlineHelper(rType, String(rDate).split('T')[0], holidays || [], rCode, procId);

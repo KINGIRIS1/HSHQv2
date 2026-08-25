@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { RecordFile, Holiday, RecordStatus, User, Employee, DangKyParty } from '../../types';
 import { RECORD_TYPES, EXTENDED_RECORD_TYPES, getShortRecordType, getWardLabel } from '../../constants';
-import { detectProcedureId } from '../../constants/procedures';
+import { detectProcedureId, getDefaultDocsForProcedure } from '../../constants/procedures';
 import { addActivityLog } from '../../services/activityLogService';
 import { AutoResizeTextarea } from '../AutoResizeTextarea';
 import { Save, User as UserIcon, Calendar, MapPin, FileCheck, Loader2, Printer, RotateCcw, XCircle, CheckCircle, AlertCircle, X, Phone, FileText, BookOpen, Clock, Hash, Map, ChevronDown, ChevronUp, Users, UserPlus, Plus, Shield } from 'lucide-react';
@@ -201,23 +201,17 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
                 newData.price = null;
             }
 
-            // Auto-populate default documents for "1.1 Sao lục hồ sơ" and "Hồ sơ đo đạc" (starts with 2.)
-            if (value === '1.1 Sao lục hồ sơ' || value === '1.1 Sao lục' || value === '1.1 Cung cấp dữ liệu đất đai' || value === '1.1 CC DL ĐĐ' || value.startsWith('2.')) {
-                const defaultDocs: AttachedDocItem[] = [
-                    { id: '1', name: 'Phiếu yêu cầu lập hợp đồng đo đạc dịch vụ, Cắm mốc, trích lục, Cung cấp thông tin', type: 'Bản chính' },
-                    { id: '2', name: 'Giấy chứng nhận đã cấp', type: 'Bản sao' }
-                ];
-                setAttachedDocs(defaultDocs);
-                newData.otherDocs = JSON.stringify(defaultDocs);
-            } else if (value.startsWith('3.')) {
-                // Đăng ký hồ sơ - mặc định giấy tờ
-                const defaultDkDocs: AttachedDocItem[] = [
-                    { id: '1', name: 'Giấy chứng nhận QSD đất', type: 'Bản chính' },
-                    { id: '2', name: 'Đơn đăng ký biến động', type: 'Bản chính' }
-                ];
-                setAttachedDocs(defaultDkDocs);
-                newData.otherDocs = JSON.stringify(defaultDkDocs);
+            // Auto-populate default documents according to procedure definition
+            const procDocs = getDefaultDocsForProcedure(value, prev.code);
+            if (procDocs.length > 0) {
+                setAttachedDocs(procDocs);
+                newData.otherDocs = JSON.stringify(procDocs);
+            } else {
+                setAttachedDocs([]);
+                newData.otherDocs = '';
+            }
 
+            if (value.startsWith('3.')) {
                 // Nếu là thủ tục đơn phương / không có bên nhận:
                 if (isNoTransfereeProcedure(value, prev.code)) {
                     newData.applicantIsOwner = false;
@@ -228,9 +222,6 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
                     if (firstOwner.phone) newData.applicantPhone = firstOwner.phone;
                     if (firstOwner.address) newData.applicantAddress = firstOwner.address;
                 }
-            } else {
-                setAttachedDocs([]);
-                newData.otherDocs = '';
             }
         }
         return newData;

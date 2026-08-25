@@ -7,6 +7,7 @@ export interface ProcedureDefinition {
   price?: number;
   prefixes: string[];
   keywords: string[];
+  defaultDocs?: { name: string; type: 'Bản chính' | 'Bản sao'; note?: string }[];
 }
 
 export const PROCEDURE_CATALOG: ProcedureDefinition[] = [
@@ -91,7 +92,14 @@ export const PROCEDURE_CATALOG: ProcedureDefinition[] = [
     module: 'dangky',
     defaultDeadline: 13,
     prefixes: ['3.1.1', 'CN', 'TA', 'TK', 'CQ'],
-    keywords: ['chuyển nhượng', 'tặng cho', 'thừa kế', 'chuyển quyền', 'qsdđ', 'qsh tài sản']
+    keywords: ['chuyển nhượng', 'tặng cho', 'thừa kế', 'chuyển quyền', 'qsdđ', 'qsh tài sản'],
+    defaultDocs: [
+      { name: 'Mẫu số 28. Đơn đăng ký biến động đất đai, tài sản gắn liền với đất theo quy định.', type: 'Bản chính' },
+      { name: 'Giấy chứng nhận đã cấp (bản gốc).', type: 'Bản chính' },
+      { name: 'Hợp đồng hoặc văn bản về việc chuyển quyền sử dụng đất, quyền sở hữu tài sản gắn liền với đất đối với trường hợp chuyển đổi, chuyển nhượng, thừa kế, góp vốn bằng quyền sử dụng đất, quyền sở hữu tài sản gắn liền với đất.', type: 'Bản chính' },
+      { name: 'Quyết định xử phạt vi phạm hành chính trong lĩnh vực đất đai đối với trường hợp có vi phạm hành chính trong lĩnh vực đất đai và giấy tờ chứng minh đã thực hiện quyết định xử phạt (nếu có)', type: 'Bản chính' },
+      { name: 'Tờ khai thuế theo quy định của pháp luật thuế hiện hành', type: 'Bản chính' }
+    ]
   },
   {
     id: '3.1.2',
@@ -100,7 +108,14 @@ export const PROCEDURE_CATALOG: ProcedureDefinition[] = [
     module: 'dangky',
     defaultDeadline: 13,
     prefixes: ['3.1.2', 'TT', 'PCQ'],
-    keywords: ['thỏa thuận', 'thỏa thuận vợ chồng', 'phân chia', 'hộ gia đình', 'phân chia quyền']
+    keywords: ['thỏa thuận', 'thỏa thuận vợ chồng', 'phân chia', 'hộ gia đình', 'phân chia quyền'],
+    defaultDocs: [
+      { name: 'Mẫu số 28. Đơn đăng ký biến động đất đai, tài sản gắn liền với đất theo quy định.', type: 'Bản chính' },
+      { name: 'Giấy chứng nhận đã cấp (bản gốc).', type: 'Bản chính' },
+      { name: 'Hợp đồng hoặc văn bản về việc chuyển quyền sử dụng đất, quyền sở hữu tài sản gắn liền với đất đối với trường hợp chuyển đổi, chuyển nhượng, thừa kế, góp vốn bằng quyền sử dụng đất, quyền sở hữu tài sản gắn liền với đất.', type: 'Bản chính' },
+      { name: 'Quyết định xử phạt vi phạm hành chính trong lĩnh vực đất đai đối với trường hợp có vi phạm hành chính trong lĩnh vực đất đai và giấy tờ chứng minh đã thực hiện quyết định xử phạt (nếu có)', type: 'Bản chính' },
+      { name: 'Tờ khai thuế theo quy định của pháp luật thuế hiện hành', type: 'Bản chính' }
+    ]
   },
   {
     id: '3.1.3',
@@ -109,7 +124,14 @@ export const PROCEDURE_CATALOG: ProcedureDefinition[] = [
     module: 'dangky',
     defaultDeadline: 13,
     prefixes: ['3.1.3', 'QĐ-TA-THA', 'BẢN ÁN', 'THI HÀNH ÁN'],
-    keywords: ['bản án', 'tòa án', 'thi hành án', 'quyết định thi hành án']
+    keywords: ['bản án', 'tòa án', 'thi hành án', 'quyết định thi hành án'],
+    defaultDocs: [
+      { name: 'Mẫu số 28. Đơn đăng ký biến động đất đai, tài sản gắn liền với đất theo quy định.', type: 'Bản chính' },
+      { name: 'Giấy chứng nhận đã cấp (bản gốc).', type: 'Bản chính' },
+      { name: 'Hợp đồng hoặc văn bản về việc chuyển quyền sử dụng đất, quyền sở hữu tài sản gắn liền với đất đối với trường hợp chuyển đổi, chuyển nhượng, thừa kế, góp vốn bằng quyền sử dụng đất, quyền sở hữu tài sản gắn liền với đất.', type: 'Bản chính' },
+      { name: 'Quyết định xử phạt vi phạm hành chính trong lĩnh vực đất đai đối với trường hợp có vi phạm hành chính trong lĩnh vực đất đai và giấy tờ chứng minh đã thực hiện quyết định xử phạt (nếu có)', type: 'Bản chính' },
+      { name: 'Tờ khai thuế theo quy định của pháp luật thuế hiện hành', type: 'Bản chính' }
+    ]
   },
   {
     id: '3.2.1',
@@ -118,7 +140,12 @@ export const PROCEDURE_CATALOG: ProcedureDefinition[] = [
     module: 'dangky',
     defaultDeadline: 10,
     prefixes: ['3.2.1', 'CD'],
-    keywords: ['cấp đổi', 'ố nhòe', 'rách nát', 'thêm tên', 'không đổi diện tích']
+    keywords: ['cấp đổi', 'ố nhòe', 'rách nát', 'thêm tên', 'không đổi diện tích'],
+    defaultDocs: [
+      { name: 'Mẫu số 28. Đơn đăng ký biến động đất đai, tài sản gắn liền với đất theo quy định.', type: 'Bản chính' },
+      { name: 'Giấy chứng nhận đã cấp (bản gốc).', type: 'Bản chính' },
+      { name: 'Mảnh trích đo bản đồ địa chính thửa đất (nếu có).', type: 'Bản chính' }
+    ]
   },
   {
     id: '3.2.2',
@@ -127,7 +154,13 @@ export const PROCEDURE_CATALOG: ProcedureDefinition[] = [
     module: 'dangky',
     defaultDeadline: 15,
     prefixes: ['3.2.2', 'CDT'],
-    keywords: ['cấp đổi (có thuế)', 'cấp đổi có thuế', 'bản đồ chính quy', 'thay đổi kích thước', 'thay đổi diện tích']
+    keywords: ['cấp đổi (có thuế)', 'cấp đổi có thuế', 'bản đồ chính quy', 'thay đổi kích thước', 'thay đổi diện tích'],
+    defaultDocs: [
+      { name: 'Mẫu số 28. Đơn đăng ký biến động đất đai, tài sản gắn liền với đất theo quy định.', type: 'Bản chính' },
+      { name: 'Giấy chứng nhận đã cấp (bản gốc).', type: 'Bản chính' },
+      { name: 'Mảnh trích đo bản đồ địa chính thửa đất (nếu có).', type: 'Bản chính' },
+      { name: 'Tờ khai thuế theo quy định hiện hành', type: 'Bản chính' }
+    ]
   },
   {
     id: '3.3.1',
@@ -411,3 +444,36 @@ export const isArchiveRecordType = (type?: string | null): boolean => {
   const tLower = type.toLowerCase();
   return tLower.includes('1.1') || tLower.includes('sao lục') || tLower.includes('1.2') || tLower.includes('công văn') || tLower.includes('cc dl đđ') || tLower.includes('cung cấp dữ liệu');
 };
+
+// Get default attached documents for a procedure
+export const getDefaultDocsForProcedure = (type?: string | null, code?: string | null): { id: string; name: string; type: 'Bản chính' | 'Bản sao' }[] => {
+  if (!type && !code) return [];
+  const detectedId = detectProcedureId(code, type);
+  const proc = getProcedureById(detectedId);
+  if (proc?.defaultDocs && proc.defaultDocs.length > 0) {
+    return proc.defaultDocs.map((d, idx) => ({
+      id: String(idx + 1),
+      name: d.name,
+      type: d.type
+    }));
+  }
+
+  // Generic fallback if not specifically defined in procedure definition
+  const tLower = (type || '').toLowerCase();
+  if (tLower.includes('1.1') || tLower.includes('sao lục') || tLower.includes('cc dl đđ') || (type && type.startsWith('2.'))) {
+    return [
+      { id: '1', name: 'Phiếu yêu cầu lập hợp đồng đo đạc dịch vụ, Cắm mốc, trích lục, Cung cấp thông tin', type: 'Bản chính' },
+      { id: '2', name: 'Giấy chứng nhận đã cấp', type: 'Bản sao' }
+    ];
+  }
+
+  if (type && type.startsWith('3.')) {
+    return [
+      { id: '1', name: 'Giấy chứng nhận QSD đất', type: 'Bản chính' },
+      { id: '2', name: 'Đơn đăng ký biến động', type: 'Bản chính' }
+    ];
+  }
+
+  return [];
+};
+

@@ -805,13 +805,17 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
         setSelectedIds(new Set([r.id]));
 
         if (normStatus === 'Phiếu chuyển thuế' || normStatus === 'Chờ Thuế KV7') {
-            // Direct advance without assignment modal for 2 Tax steps (Phiếu chuyển thuế -> Thuế KV7, Thuế KV7 -> Thông báo thuế)
-            try {
-                const currentDateStr = new Date().toISOString().split('T')[0];
-                const updated: DangKyRecord = { ...r, status: nextStatus };
-                if (nextStatus === 'Chờ Thuế KV7') updated.taxKV7TransferDate = currentDateStr;
-                else if (nextStatus === 'Chờ giấy nộp tiền') updated.taxNoticeDate = currentDateStr;
+            // Direct advance without assignment modal for 2 Tax steps
+            const currentDateStr = new Date().toISOString().split('T')[0];
+            const updated: DangKyRecord = { ...r, status: nextStatus };
+            if (nextStatus === 'Chờ Thuế KV7') updated.taxKV7TransferDate = currentDateStr;
+            else if (nextStatus === 'Chờ giấy nộp tiền') updated.taxNoticeDate = currentDateStr;
 
+            // Optimistic update immediately (0ms delay)
+            setRecords(prev => prev.map(rec => rec.id === r.id ? updated : rec));
+            setSelectedIds(new Set());
+
+            try {
                 await saveDangKyRecordApi(updated);
                 addActivityLog({
                     performerName: currentUser.fullName || currentUser.username,
@@ -822,16 +826,20 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                     referenceCode: r.code || r.id,
                     details: `Chuyển trạng thái hồ sơ Đăng ký ${r.code} từ "${r.status}" sang "${nextStatus}"`
                 });
-                loadData();
-                setSelectedIds(new Set());
             } catch (e) {
                 console.error('Lỗi khi chuyển bước:', e);
+                loadData();
             }
         } else if (normStatus === 'Chờ ký duyệt') {
             // Direct advance from Chờ ký duyệt to Chờ bàn giao without sign modal
+            const currentDateStr = new Date().toISOString().split('T')[0];
+            const updated: DangKyRecord = { ...r, status: 'Chờ bàn giao', completedDate: currentDateStr };
+            
+            // Optimistic update immediately (0ms delay)
+            setRecords(prev => prev.map(rec => rec.id === r.id ? updated : rec));
+            setSelectedIds(new Set());
+
             try {
-                const currentDateStr = new Date().toISOString().split('T')[0];
-                const updated: DangKyRecord = { ...r, status: 'Chờ bàn giao', completedDate: currentDateStr };
                 await saveDangKyRecordApi(updated);
                 addActivityLog({
                     performerName: currentUser.fullName || currentUser.username,
@@ -842,10 +850,9 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                     referenceCode: r.code || r.id,
                     details: `Xác nhận ký duyệt và chuyển hồ sơ Đăng ký ${r.code} sang "Chờ bàn giao"`
                 });
-                loadData();
-                setSelectedIds(new Set());
             } catch (e) {
                 console.error('Lỗi khi chuyển bước:', e);
+                loadData();
             }
         } else if (normStatus === 'Chờ kiểm tra' || nextStatus === 'Chờ ký duyệt') {
             setIsSubmitSignModalOpen(true);
@@ -854,12 +861,16 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
         } else if (['Thẩm định', 'Phiếu chuyển thuế', 'Chờ In GCN'].includes(normStatus) || ['Thẩm định', 'Phiếu chuyển thuế', 'Chờ In GCN'].includes(nextStatus)) {
             setAssignStaffModalOpen(true);
         } else {
-            try {
-                const currentDateStr = new Date().toISOString().split('T')[0];
-                const updated: DangKyRecord = { ...r, status: nextStatus };
-                if (nextStatus === 'Chờ bàn giao') updated.completedDate = currentDateStr;
-                else if (nextStatus === 'Đã trả kết quả') updated.resultReturnedDate = currentDateStr;
+            const currentDateStr = new Date().toISOString().split('T')[0];
+            const updated: DangKyRecord = { ...r, status: nextStatus };
+            if (nextStatus === 'Chờ bàn giao') updated.completedDate = currentDateStr;
+            else if (nextStatus === 'Đã trả kết quả') updated.resultReturnedDate = currentDateStr;
 
+            // Optimistic update immediately (0ms delay)
+            setRecords(prev => prev.map(rec => rec.id === r.id ? updated : rec));
+            setSelectedIds(new Set());
+
+            try {
                 await saveDangKyRecordApi(updated);
                 addActivityLog({
                     performerName: currentUser.fullName || currentUser.username,
@@ -870,10 +881,9 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                     referenceCode: r.code || r.id,
                     details: `Chuyển trạng thái hồ sơ Đăng ký ${r.code} từ "${r.status}" sang "${nextStatus}"`
                 });
-                loadData();
-                setSelectedIds(new Set());
             } catch (e) {
                 console.error('Lỗi khi chuyển bước:', e);
+                loadData();
             }
         }
     };
@@ -885,11 +895,11 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
         try {
             const idsToUpdate = Array.from(selectedIds);
             const currentDateStr = new Date().toISOString().split('T')[0];
+            const updatedRecordsMap = new Map<string, DangKyRecord>();
 
             for (const id of idsToUpdate) {
                 const rec = records.find(r => r.id === id);
                 if (!rec) continue;
-                const normSt = normalizeDangKyStatus(rec.status);
                 const nextSt = NEXT_STATUS_MAP[rec.status] || rec.status;
                 const nextNormSt = normalizeDangKyStatus(nextSt);
                 const payload: Partial<DangKyRecord> = {
@@ -916,8 +926,17 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                     payload.appraisalDate = currentDateStr;
                 }
 
-                await saveDangKyRecordApi({ ...rec, ...payload });
+                updatedRecordsMap.set(rec.id, { ...rec, ...payload });
             }
+
+            // Optimistic UI update immediately (0ms delay)
+            setRecords(prev => prev.map(r => updatedRecordsMap.has(r.id) ? updatedRecordsMap.get(r.id)! : r));
+            setAssignStaffModalOpen(false);
+            setSelectedIds(new Set());
+
+            // Run async saves in parallel
+            await Promise.all(Array.from(updatedRecordsMap.values()).map(rec => saveDangKyRecordApi(rec)));
+
             addActivityLog({
                 performerName: currentUser.fullName || currentUser.username,
                 performerRole: 'DANGKY',
@@ -927,11 +946,9 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                 referenceCode: `${idsToUpdate.length} hồ sơ`,
                 details: `Phân công cán bộ "${empName}" và chuyển bước cho ${idsToUpdate.length} hồ sơ Đăng ký`
             });
-            loadData();
-            setSelectedIds(new Set());
-            setAssignStaffModalOpen(false);
         } catch (e) {
             console.error('Error in handleAssignAndAdvance:', e);
+            loadData();
         }
     };
 
@@ -1003,6 +1020,11 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                 updatePayload.notes = value;
             }
 
+            // Optimistic UI update immediately (0ms delay)
+            setRecords(prev => prev.map(r => idsToUpdate.includes(r.id) ? { ...r, ...updatePayload } : r));
+            setIsBulkUpdateModalOpen(false);
+            setSelectedIds(new Set());
+
             await bulkUpdateDangKyRecordsApi(idsToUpdate, updatePayload);
             addActivityLog({
                 performerName: currentUser.fullName || currentUser.username,
@@ -1013,11 +1035,9 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                 referenceCode: `${idsToUpdate.length} hồ sơ`,
                 details: `Cập nhật hàng loạt trường [${field}] cho ${idsToUpdate.length} hồ sơ Đăng ký`
             });
-            loadData();
-            setSelectedIds(new Set());
-            setIsBulkUpdateModalOpen(false);
         } catch (e) {
             console.error('Error during bulk update:', e);
+            loadData();
         }
     };
 
@@ -1027,11 +1047,18 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
         try {
             const idsToUpdate = Array.from(selectedIds);
             const targetDate = dateStr || new Date().toISOString().split('T')[0];
-            await bulkUpdateDangKyRecordsApi(idsToUpdate, {
+            const updatePayload: Partial<DangKyRecord> = {
                 status: 'Chờ kiểm tra',
                 checkedBy: checkerName,
                 pendingCheckDate: targetDate
-            });
+            };
+
+            // Optimistic UI update immediately
+            setRecords(prev => prev.map(r => idsToUpdate.includes(r.id) ? { ...r, ...updatePayload } : r));
+            setIsSubmitCheckModalOpen(false);
+            setSelectedIds(new Set());
+
+            await bulkUpdateDangKyRecordsApi(idsToUpdate, updatePayload);
             addActivityLog({
                 performerName: currentUser.fullName || currentUser.username,
                 performerRole: 'DANGKY',
@@ -1041,11 +1068,9 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                 referenceCode: `${idsToUpdate.length} hồ sơ`,
                 details: `Trình cán bộ "${checkerName}" kiểm tra ${idsToUpdate.length} hồ sơ Đăng ký`
             });
-            loadData();
-            setSelectedIds(new Set());
-            setIsSubmitCheckModalOpen(false);
         } catch (e) {
             console.error('Lỗi khi trình kiểm tra:', e);
+            loadData();
         }
     };
 
@@ -1055,11 +1080,18 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
         try {
             const idsToUpdate = Array.from(selectedIds);
             const targetDate = dateStr || new Date().toISOString().split('T')[0];
-            await bulkUpdateDangKyRecordsApi(idsToUpdate, {
+            const updatePayload: Partial<DangKyRecord> = {
                 status: 'Chờ ký duyệt',
                 submittedTo: directorName,
                 submissionDate: targetDate
-            });
+            };
+
+            // Optimistic UI update immediately
+            setRecords(prev => prev.map(r => idsToUpdate.includes(r.id) ? { ...r, ...updatePayload } : r));
+            setIsSubmitSignModalOpen(false);
+            setSelectedIds(new Set());
+
+            await bulkUpdateDangKyRecordsApi(idsToUpdate, updatePayload);
             addActivityLog({
                 performerName: currentUser.fullName || currentUser.username,
                 performerRole: 'DANGKY',
@@ -1069,11 +1101,9 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                 referenceCode: `${idsToUpdate.length} hồ sơ`,
                 details: `Trình lãnh đạo "${directorName}" ký duyệt ${idsToUpdate.length} hồ sơ Đăng ký`
             });
-            loadData();
-            setSelectedIds(new Set());
-            setIsSubmitSignModalOpen(false);
         } catch (e) {
             console.error('Lỗi khi trình ký duyệt:', e);
+            loadData();
         }
     };
 
@@ -1083,11 +1113,17 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
         try {
             const idsToUpdate = Array.from(selectedIds);
             const currentDateStr = new Date().toISOString().split('T')[0];
-            await bulkUpdateDangKyRecordsApi(idsToUpdate, { 
+            const updatePayload: Partial<DangKyRecord> = { 
                 appraisalStaff: staffName, 
                 appraisalDate: currentDateStr,
                 status: 'Thẩm định' 
-            });
+            };
+
+            // Optimistic UI update immediately
+            setRecords(prev => prev.map(r => idsToUpdate.includes(r.id) ? { ...r, ...updatePayload } : r));
+            setSelectedIds(new Set());
+
+            await bulkUpdateDangKyRecordsApi(idsToUpdate, updatePayload);
             addActivityLog({
                 performerName: currentUser.fullName || currentUser.username,
                 performerRole: 'DANGKY',
@@ -1097,10 +1133,9 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                 referenceCode: `${idsToUpdate.length} hồ sơ`,
                 details: `Phân công cán bộ "${staffName}" phụ trách ${idsToUpdate.length} hồ sơ Đăng ký`
             });
-            loadData();
-            setSelectedIds(new Set());
         } catch (e) {
             console.error('Error assigning staff:', e);
+            loadData();
         }
     };
 
@@ -1113,6 +1148,11 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
             if (reason) {
                 updatePayload.notes = reason;
             }
+
+            // Optimistic UI update immediately
+            setRecords(prev => prev.map(r => idsToUpdate.includes(r.id) ? { ...r, ...updatePayload } : r));
+            setSelectedIds(new Set());
+
             await bulkUpdateDangKyRecordsApi(idsToUpdate, updatePayload);
             addActivityLog({
                 performerName: currentUser.fullName || currentUser.username,
@@ -1123,10 +1163,9 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                 referenceCode: `${idsToUpdate.length} hồ sơ`,
                 details: `Cập nhật trạng thái sang "${targetStatus}" cho ${idsToUpdate.length} hồ sơ Đăng ký`
             });
-            loadData();
-            setSelectedIds(new Set());
         } catch (e) {
             console.error('Error updating status:', e);
+            loadData();
         }
     };
 
@@ -1146,10 +1185,17 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
             }
             const idsToUpdate = Array.from(selectedIds);
             const reasonText = reason.trim() ? `[Trả/Rút hồ sơ]: ${reason.trim()}` : '';
-            await bulkUpdateDangKyRecordsApi(idsToUpdate, { 
+            const updatePayload: Partial<DangKyRecord> = { 
                 status: targetStatus,
                 notes: reasonText || undefined
-            });
+            };
+
+            // Optimistic UI update immediately
+            setRecords(prev => prev.map(r => idsToUpdate.includes(r.id) ? { ...r, ...updatePayload } : r));
+            setReturnModalOpen(false);
+            setSelectedIds(new Set());
+
+            await bulkUpdateDangKyRecordsApi(idsToUpdate, updatePayload);
             addActivityLog({
                 performerName: currentUser.fullName || currentUser.username,
                 performerRole: 'DANGKY',
@@ -1159,11 +1205,9 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                 referenceCode: `${idsToUpdate.length} hồ sơ`,
                 details: `Chuyển ${idsToUpdate.length} hồ sơ Đăng ký sang trạng thái "${targetStatus}"${reason ? ` (Lý do: ${reason})` : ''}`
             });
-            loadData();
-            setSelectedIds(new Set());
-            setReturnModalOpen(false);
         } catch (e) {
             console.error('Lỗi khi thực hiện trả hồ sơ:', e);
+            loadData();
         }
     };
 
