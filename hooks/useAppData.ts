@@ -5,18 +5,60 @@ import { fetchRecords, fetchEmployees, fetchUsers, fetchUpdateInfo, fetchHoliday
     createRecordApi, updateRecordApi, deleteRecordApi, createRecordsBatchApi,
     saveEmployeeApi, deleteEmployeeApi, saveUserApi, deleteUserApi, deleteAllDataApi, getSystemSetting
 } from '../services/api';
-import { supabase } from '../services/supabaseClient';
-import { mapRecordFromDb } from '../services/apiCore';
-import { DEFAULT_WARDS as STATIC_WARDS, APP_VERSION } from '../constants';
+import { supabase, isConfigured } from '../services/supabaseClient';
+import { mapRecordFromDb, getFromCache, saveToCache, CACHE_KEYS } from '../services/apiCore';
+import { DEFAULT_WARDS as STATIC_WARDS, APP_VERSION, MOCK_EMPLOYEES, MOCK_USERS, MOCK_RECORDS } from '../constants';
 import { migrateUnbatchedRecords } from '../utils/appHelpers';
 
+// Helper to fetch with timeout and safe fallback
+const safeFetch = async <T>(fetchFn: () => Promise<T>, fallbackValue: T, timeoutMs = 8000): Promise<T> => {
+    try {
+        const timeoutPromise = new Promise<T>((resolve) => 
+            setTimeout(() => resolve(fallbackValue), timeoutMs)
+        );
+        return await Promise.race([
+            fetchFn().catch((err) => {
+                console.warn('safeFetch request error, using fallback:', err?.message || err);
+                return fallbackValue;
+            }),
+            timeoutPromise
+        ]);
+    } catch {
+        return fallbackValue;
+    }
+};
+
 export const useAppData = (currentUser: User | null) => {
-    const [records, setRecords] = useState<RecordFile[]>([]);
-    const [employees, setEmployees] = useState<Employee[]>([]);
-    const [users, setUsers] = useState<User[]>([]);
-    const [holidays, setHolidays] = useState<Holiday[]>([]); // State mới cho ngày nghỉ
-    const [rolePermissions, setRolePermissions] = useState<RolePermissions>(DEFAULT_ROLE_PERMISSIONS);
-    const [departmentPermissions, setDepartmentPermissions] = useState<DepartmentPermissions>({});
+    // Khởi tạo ngay lập tức từ Cache để ứng dụng hiển thị tức thì không chờ đợi
+    const [records, setRecords] = useState<RecordFile[]>(() => {
+        const cached = getFromCache<RecordFile[]>(CACHE_KEYS.RECORDS, []);
+        const initial = cached && cached.length > 0 ? cached : MOCK_RECORDS;
+        const { migratedRecords } = migrateUnbatchedRecords(initial);
+        return migratedRecords;
+    });
+
+    const [employees, setEmployees] = useState<Employee[]>(() => {
+        return getFromCache<Employee[]>(CACHE_KEYS.EMPLOYEES, MOCK_EMPLOYEES);
+    });
+
+    const [users, setUsers] = useState<User[]>(() => {
+        return getFromCache<User[]>(CACHE_KEYS.USERS, MOCK_USERS);
+    });
+
+    const [holidays, setHolidays] = useState<Holiday[]>(() => {
+        return getFromCache<Holiday[]>(CACHE_KEYS.HOLIDAYS, []);
+    });
+
+    const [rolePermissions, setRolePermissions] = useState<RolePermissions>(() => {
+        const cached = getFromCache<RolePermissions | null>('system_role_permissions', null);
+        return cached || DEFAULT_ROLE_PERMISSIONS;
+    });
+
+    const [departmentPermissions, setDepartmentPermissions] = useState<DepartmentPermissions>(() => {
+        const cached = getFromCache<DepartmentPermissions | null>('system_department_permissions', null);
+        return cached || {};
+    });
+
     const [connectionStatus, setConnectionStatus] = useState<'connected' | 'offline'>('connected');
     
     // Wards State
@@ -32,30 +74,42 @@ export const useAppData = (currentUser: User | null) => {
 
     const loadData = useCallback(async () => {
         try {
-            // Tạo timeout promise để tránh việc fetch bị treo mãi mãi
-            // Tăng timeout lên 30s để xử lý trường hợp mạng chậm hoặc DB bị sleep
-            const timeoutPromise = new Promise((_, reject) => 
-                setTimeout(() => reject(new Error("Timeout")), 30000)
-            );
-
-            const dataPromise = Promise.all([
-                fetchRecords(),
-                fetchEmployees(),
-                fetchUsers(),
-                fetchUpdateInfo(),
-                fetchHolidays(), // Tải thêm danh sách ngày nghỉ
-                getSystemSetting('role_permissions'),
-                getSystemSetting('department_permissions')
+            // Tải dữ liệu song song với timeout an toàn cho từng request
+            const [
+                recData,
+                empData,
+                userData,
+                updateInfo,
+                holidayData,
+                permsData,
+                deptPermsData
+            ] = await Promise.all([
+                safeFetch(fetchRecords, getFromCache<RecordFile[]>(CACHE_KEYS.RECORDS, []), 12000),
+                safeFetch(fetchEmployees, getFromCache<Employee[]>(CACHE_KEYS.EMPLOYEES, MOCK_EMPLOYEES), 8000),
+                safeFetch(fetchUsers, getFromCache<User[]>(CACHE_KEYS.USERS, MOCK_USERS), 8000),
+                safeFetch(fetchUpdateInfo, { version: null, url: null }, 5000),
+                safeFetch(fetchHolidays, getFromCache<Holiday[]>(CACHE_KEYS.HOLIDAYS, []), 6000),
+                safeFetch(() => getSystemSetting('role_permissions'), null, 5000),
+                safeFetch(() => getSystemSetting('department_permissions'), null, 5000)
             ]);
 
-            // Race giữa fetch data và timeout
-            const [recData, empData, userData, updateInfo, holidayData, permsData, deptPermsData] = await Promise.race([dataPromise, timeoutPromise]) as any;
+            if (Array.isArray(recData) && recData.length > 0) {
+                const { migratedRecords } = migrateUnbatchedRecords(recData);
+                setRecords(migratedRecords);
+            }
 
-            const { migratedRecords } = migrateUnbatchedRecords(Array.isArray(recData) ? recData : []);
-            setRecords(migratedRecords);
-            setEmployees(empData);
-            setUsers(userData);
-            setHolidays(holidayData); // Cập nhật state holidays
+            if (Array.isArray(empData) && empData.length > 0) {
+                setEmployees(empData);
+            }
+
+            if (Array.isArray(userData) && userData.length > 0) {
+                setUsers(userData);
+            }
+
+            if (Array.isArray(holidayData)) {
+                setHolidays(holidayData);
+            }
+
             if (permsData) {
                 try {
                     const parsed = JSON.parse(permsData);
@@ -64,10 +118,12 @@ export const useAppData = (currentUser: User | null) => {
                         sanitized[roleKey] = (parsed[roleKey] || []).filter((p: string) => p !== 'CHECK_RECORDS' && p !== 'BTN_CLOSE_BATCH');
                     });
                     setRolePermissions(sanitized);
+                    saveToCache('system_role_permissions', sanitized);
                 } catch (e) {
                     console.error("Failed to parse role_permissions", e);
                 }
             }
+
             if (deptPermsData) {
                 try {
                     const parsedDept = JSON.parse(deptPermsData);
@@ -77,11 +133,13 @@ export const useAppData = (currentUser: User | null) => {
                         }
                     });
                     setDepartmentPermissions(parsedDept);
+                    saveToCache('system_department_permissions', parsedDept);
                 } catch (e) {
                     console.error("Failed to parse department_permissions", e);
                 }
             }
-            setConnectionStatus('connected');
+
+            setConnectionStatus(isConfigured ? 'connected' : 'offline');
 
             if (updateInfo && updateInfo.version && updateInfo.version !== APP_VERSION) {
                 setIsUpdateAvailable(true);
@@ -89,20 +147,8 @@ export const useAppData = (currentUser: User | null) => {
                 setUpdateUrl(updateInfo.url);
             }
         } catch (error) {
-            console.error("Lỗi tải dữ liệu hoặc Timeout:", error);
-            // Quan trọng: Khi lỗi, chuyển sang OFFLINE nhưng vẫn cho phép App hoạt động
+            console.warn("Dữ liệu tải hoàn tất với chế độ offline/cache:", error);
             setConnectionStatus('offline');
-            
-            // Nếu cache cũng rỗng (lần đầu chạy) hoặc bị timeout nên không nhận được data, 
-            // ta sẽ chủ động đọc lại từ Cache để người dùng có thể Đăng nhập và làm việc.
-            import('../services/apiCore').then(({ getFromCache, CACHE_KEYS }) => {
-                import('../constants').then(({ MOCK_EMPLOYEES, MOCK_USERS }) => {
-                    setRecords((prev) => prev.length > 0 ? prev : getFromCache(CACHE_KEYS.RECORDS, []));
-                    setEmployees((prev) => prev.length > 0 ? prev : getFromCache(CACHE_KEYS.EMPLOYEES, MOCK_EMPLOYEES));
-                    setUsers((prev) => prev.length > 0 ? prev : getFromCache(CACHE_KEYS.USERS, MOCK_USERS));
-                    setHolidays((prev) => prev.length > 0 ? prev : getFromCache(CACHE_KEYS.HOLIDAYS, []));
-                });
-            });
         }
     }, []);
 

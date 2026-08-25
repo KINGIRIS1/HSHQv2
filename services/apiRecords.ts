@@ -53,176 +53,220 @@ const OPTIONAL_NEW_COLUMNS = [
     'statusLogs', 'archiveHandoverDate', 'archiveHandoverBatch'
 ];
 
+// Helper to fetch with timeout
+const withQueryTimeout = async (promise: any, timeoutMs = 10000): Promise<{ data: any[] | null; error: any }> => {
+    try {
+        const timeoutPromise = new Promise<{ data: any[] | null; error: any }>((resolve) => 
+            setTimeout(() => resolve({ data: null, error: { message: 'Timeout' } }), timeoutMs)
+        );
+        return await Promise.race([promise, timeoutPromise]);
+    } catch (err) {
+        return { data: null, error: err };
+    }
+};
+
 export const fetchRecords = async (): Promise<RecordFile[]> => {
   if (!isConfigured) {
-      console.warn("Supabase chưa được cấu hình.");
-      return [];
+      const cached = getFromCache<RecordFile[]>(CACHE_KEYS.RECORDS, []);
+      return cached.length > 0 ? cached : [];
   }
 
   try {
-    let allRecords: any[] = [];
     const step = 1000;
-    let retryCount = 0;
-    const maxRetries = 1;
 
-    // 1. Fetch from dangky_records
-    try {
-        let fromDk = 0;
-        let hasMoreDk = true;
-        while (hasMoreDk) {
-            const { data, error } = await supabase
-                .from('dangky_records')
-                .select('*')
-                .order('receivedDate', { ascending: false })
-                .order('id', { ascending: true }) 
-                .range(fromDk, fromDk + step - 1);
-
-            if (error) {
-                if (error.code === 'PGRST205' || error.code === '42P01' || error.message?.includes('does not exist')) {
-                    console.info('Bảng dangky_records chưa tồn tại, bỏ qua.');
-                } else {
-                    console.warn('Lỗi khi fetch dangky_records:', error);
-                }
-                hasMoreDk = false;
-            } else if (data && data.length > 0) {
-                const mapped = data.map(item => {
-                    const parsedOwners = Array.isArray(item.owners) ? item.owners : (typeof item.owners === 'string' ? JSON.parse(item.owners || '[]') : []);
-                    const parsedTransferees = Array.isArray(item.transferees) ? item.transferees : (typeof item.transferees === 'string' ? JSON.parse(item.transferees || '[]') : []);
-                    
-                    let cName = item.customerName;
-                    if (!cName || cName.trim() === '' || cName === 'Chưa có tên') {
-                        const ownerNames = parsedOwners.map((o: any) => o?.name).filter(Boolean).join(', ');
-                        const transfereeNames = parsedTransferees.map((t: any) => t?.name).filter(Boolean).join(', ');
-                        if (ownerNames && transfereeNames) {
-                            cName = `${ownerNames} → ${transfereeNames}`;
-                        } else if (ownerNames) {
-                            cName = ownerNames;
-                        } else if (transfereeNames) {
-                            cName = transfereeNames;
-                        }
-                    }
-
-                    let cCccd = item.cccd;
-                    if (!cCccd || cCccd.trim() === '') {
-                        const oCccd = parsedOwners.map((o: any) => o?.cccd).filter(Boolean).join(', ');
-                        const tCccd = parsedTransferees.map((t: any) => t?.cccd).filter(Boolean).join(', ');
-                        cCccd = [oCccd, tCccd].filter(Boolean).join(', ');
-                    }
-
-                    let cPhone = item.phoneNumber;
-                    if (!cPhone || cPhone.trim() === '') {
-                        const oPhone = parsedOwners.map((o: any) => o?.phone).filter(Boolean).join(', ');
-                        const tPhone = parsedTransferees.map((t: any) => t?.phone).filter(Boolean).join(', ');
-                        cPhone = [oPhone, tPhone].filter(Boolean).join(', ');
-                    }
-
-                    let cAddr = item.customerAddress;
-                    if (!cAddr || cAddr.trim() === '') {
-                        const oAddr = parsedOwners.map((o: any) => o?.address).filter(Boolean).join(', ');
-                        const tAddr = parsedTransferees.map((t: any) => t?.address).filter(Boolean).join(', ');
-                        cAddr = [oAddr, tAddr].filter(Boolean).join('; ');
-                    }
-
-                    return { 
-                        ...item, 
-                        owners: parsedOwners,
-                        transferees: parsedTransferees,
-                        customerName: cName || item.customerName || '',
-                        cccd: cCccd || item.cccd || '',
-                        phoneNumber: cPhone || item.phoneNumber || '',
-                        customerAddress: cAddr || item.customerAddress || '',
-                        sourceTable: 'dangky_records' as const 
-                    };
-                });
-                allRecords = [...allRecords, ...mapped];
-                fromDk += step;
-                if (data.length < step) hasMoreDk = false;
-            } else {
-                hasMoreDk = false;
-            }
-        }
-    } catch (dkError) {
-        console.warn('Lỗi fetch dangky_records:', dkError);
-    }
-
-    // 2. Fetch from land_records
-    let hasMoreLand = true;
-    let fromLand = 0;
-    while (hasMoreLand) {
+    // 1. Fetch Dang Ky Records
+    const fetchDangKy = async (): Promise<any[]> => {
+        const results: any[] = [];
         try {
-            const { data, error } = await supabase
-                .from('land_records')
-                .select('*')
-                .order('receivedDate', { ascending: false })
-                .order('id', { ascending: true }) 
-                .range(fromLand, fromLand + step - 1);
+            let fromDk = 0;
+            let hasMoreDk = true;
+            while (hasMoreDk) {
+                const queryPromise = supabase
+                    .from('dangky_records')
+                    .select('*')
+                    .order('receivedDate', { ascending: false })
+                    .order('id', { ascending: true }) 
+                    .range(fromDk, fromDk + step - 1);
 
-            if (error) throw error;
+                const { data, error } = await withQueryTimeout(queryPromise as any, 8000);
 
-            if (data && data.length > 0) {
-                const mapped = data.map(item => ({ ...item, sourceTable: item.sourceTable || ('land_records' as const) }));
-                allRecords = [...allRecords, ...mapped];
-                fromLand += step;
-                if (data.length < step) hasMoreLand = false;
-            } else {
-                hasMoreLand = false;
-            }
-        } catch (fetchError: any) {
-            if (retryCount < maxRetries && (fetchError.message?.includes('fetch') || !fetchError.code)) {
-                console.warn(`Lỗi fetch land_records, đang thử lại lần ${retryCount + 1}...`);
-                retryCount++;
-                await new Promise(resolve => setTimeout(resolve, 1000));
-                continue; 
-            }
-            break;
-        }
-    }
+                if (error) {
+                    if (error?.code === 'PGRST205' || error?.code === '42P01' || error?.message?.includes('does not exist')) {
+                        // table doesn't exist yet
+                    } else {
+                        console.warn('Lỗi fetch dangky_records:', error?.message || error);
+                    }
+                    hasMoreDk = false;
+                } else if (data && data.length > 0) {
+                    const mapped = (data as any[]).map((item: any) => {
+                        const parsedOwners = Array.isArray(item.owners) ? item.owners : (typeof item.owners === 'string' ? JSON.parse(item.owners || '[]') : []);
+                        const parsedTransferees = Array.isArray(item.transferees) ? item.transferees : (typeof item.transferees === 'string' ? JSON.parse(item.transferees || '[]') : []);
+                        
+                        let cName = item.customerName;
+                        if (!cName || cName.trim() === '' || cName === 'Chưa có tên') {
+                            const ownerNames = parsedOwners.map((o: any) => o?.name).filter(Boolean).join(', ');
+                            const transfereeNames = parsedTransferees.map((t: any) => t?.name).filter(Boolean).join(', ');
+                            if (ownerNames && transfereeNames) {
+                                cName = `${ownerNames} → ${transfereeNames}`;
+                            } else if (ownerNames) {
+                                cName = ownerNames;
+                            } else if (transfereeNames) {
+                                cName = transfereeNames;
+                            }
+                        }
 
-    // 3. Fetch from luutru_records (bảng lưu trữ chính thức)
-    try {
-        let fromLt = 0;
-        let hasMoreLt = true;
-        while (hasMoreLt) {
-            const { data, error } = await supabase
-                .from('luutru_records')
-                .select('*')
-                .order('receivedDate', { ascending: false })
-                .order('id', { ascending: true }) 
-                .range(fromLt, fromLt + step - 1);
+                        let cCccd = item.cccd;
+                        if (!cCccd || cCccd.trim() === '') {
+                            const oCccd = parsedOwners.map((o: any) => o?.cccd).filter(Boolean).join(', ');
+                            const tCccd = parsedTransferees.map((t: any) => t?.cccd).filter(Boolean).join(', ');
+                            cCccd = [oCccd, tCccd].filter(Boolean).join(', ');
+                        }
 
-            if (error) {
-                if (error.code === 'PGRST205' || error.code === '42P01' || error.message?.includes('does not exist')) {
-                    console.info('Bảng luutru_records chưa tồn tại, bỏ qua.');
+                        let cPhone = item.phoneNumber;
+                        if (!cPhone || cPhone.trim() === '') {
+                            const oPhone = parsedOwners.map((o: any) => o?.phone).filter(Boolean).join(', ');
+                            const tPhone = parsedTransferees.map((t: any) => t?.phone).filter(Boolean).join(', ');
+                            cPhone = [oPhone, tPhone].filter(Boolean).join(', ');
+                        }
+
+                        let cAddr = item.customerAddress;
+                        if (!cAddr || cAddr.trim() === '') {
+                            const oAddr = parsedOwners.map((o: any) => o?.address).filter(Boolean).join(', ');
+                            const tAddr = parsedTransferees.map((t: any) => t?.address).filter(Boolean).join(', ');
+                            cAddr = [oAddr, tAddr].filter(Boolean).join('; ');
+                        }
+
+                        return { 
+                            ...item, 
+                            owners: parsedOwners, 
+                            transferees: parsedTransferees,
+                            customerName: cName || item.customerName || '',
+                            cccd: cCccd || item.cccd || '',
+                            phoneNumber: cPhone || item.phoneNumber || '',
+                            customerAddress: cAddr || item.customerAddress || '',
+                            sourceTable: 'dangky_records' as const 
+                        };
+                    });
+                    results.push(...mapped);
+                    fromDk += step;
+                    if (data.length < step) hasMoreDk = false;
                 } else {
-                    console.warn('Lỗi khi fetch luutru_records:', error);
+                    hasMoreDk = false;
                 }
-                hasMoreLt = false;
-            } else if (data && data.length > 0) {
-                const mapped = data.map(item => ({ ...item, sourceTable: 'luutru_records' as const }));
-                allRecords = [...allRecords, ...mapped];
-                fromLt += step;
-                if (data.length < step) hasMoreLt = false;
-            } else {
-                hasMoreLt = false;
             }
+        } catch (e) {
+            console.warn('Lỗi fetchDangKy:', e);
         }
-    } catch (ltError) {
-        console.warn('Lỗi fetch luutru_records:', ltError);
-    }
+        return results;
+    };
+
+    // 2. Fetch Land Records
+    const fetchLand = async (): Promise<any[]> => {
+        const results: any[] = [];
+        try {
+            let fromLand = 0;
+            let hasMoreLand = true;
+            while (hasMoreLand) {
+                const queryPromise = supabase
+                    .from('land_records')
+                    .select('*')
+                    .order('receivedDate', { ascending: false })
+                    .order('id', { ascending: true }) 
+                    .range(fromLand, fromLand + step - 1);
+
+                const { data, error } = await withQueryTimeout(queryPromise as any, 10000);
+
+                if (error) {
+                    console.warn('Lỗi fetch land_records:', error?.message || error);
+                    hasMoreLand = false;
+                } else if (data && data.length > 0) {
+                    const mapped = (data as any[]).map((item: any) => ({ ...item, sourceTable: item.sourceTable || ('land_records' as const) }));
+                    results.push(...mapped);
+                    fromLand += step;
+                    if (data.length < step) hasMoreLand = false;
+                } else {
+                    hasMoreLand = false;
+                }
+            }
+        } catch (e) {
+            console.warn('Lỗi fetchLand:', e);
+        }
+        return results;
+    };
+
+    // 3. Fetch Luu Tru Records
+    const fetchLuuTru = async (): Promise<any[]> => {
+        const results: any[] = [];
+        try {
+            let fromLt = 0;
+            let hasMoreLt = true;
+            while (hasMoreLt) {
+                const queryPromise = supabase
+                    .from('luutru_records')
+                    .select('*')
+                    .order('receivedDate', { ascending: false })
+                    .order('id', { ascending: true }) 
+                    .range(fromLt, fromLt + step - 1);
+
+                const { data, error } = await withQueryTimeout(queryPromise as any, 8000);
+
+                if (error) {
+                    if (error?.code === 'PGRST205' || error?.code === '42P01' || error?.message?.includes('does not exist')) {
+                        // table doesn't exist yet
+                    } else {
+                        console.warn('Lỗi fetch luutru_records:', error?.message || error);
+                    }
+                    hasMoreLt = false;
+                } else if (data && data.length > 0) {
+                    const mapped = (data as any[]).map((item: any) => ({ ...item, sourceTable: 'luutru_records' as const }));
+                    results.push(...mapped);
+                    fromLt += step;
+                    if (data.length < step) hasMoreLt = false;
+                } else {
+                    hasMoreLt = false;
+                }
+            }
+        } catch (e) {
+            console.warn('Lỗi fetchLuuTru:', e);
+        }
+        return results;
+    };
+
+    // Run in parallel
+    const [dkRes, landRes, ltRes] = await Promise.allSettled([
+        fetchDangKy(),
+        fetchLand(),
+        fetchLuuTru()
+    ]);
+
+    const allRecords: any[] = [
+        ...(dkRes.status === 'fulfilled' ? dkRes.value : []),
+        ...(landRes.status === 'fulfilled' ? landRes.value : []),
+        ...(ltRes.status === 'fulfilled' ? ltRes.value : [])
+    ];
     
+    if (allRecords.length === 0) {
+        // Fallback to cache if all queries returned empty / failed
+        const cached = getFromCache<RecordFile[]>(CACHE_KEYS.RECORDS, []);
+        if (cached.length > 0) return cached;
+    }
+
     const uniqueMap = new Map();
     allRecords.forEach((item: any) => {
         if (item.id) {
             uniqueMap.set(item.id, mapRecordFromDb(item));
         }
     });
-    const uniqueRecords = Array.from(uniqueMap.values());
+    const uniqueRecords = Array.from(uniqueMap.values()) as RecordFile[];
     
-    console.log(`[Fetch] Total fetched across all cloud tables: ${uniqueRecords.length}`);
-    return uniqueRecords as RecordFile[];
+    if (uniqueRecords.length > 0) {
+        saveToCache(CACHE_KEYS.RECORDS, uniqueRecords);
+    }
+    
+    return uniqueRecords;
 
   } catch (error) {
-    logError("fetchRecords", error, true);
+    console.warn("fetchRecords fallback to cache:", error);
     const cached = getFromCache<RecordFile[]>(CACHE_KEYS.RECORDS, []);
     return cached.length > 0 ? cached : MOCK_RECORDS;
   }
