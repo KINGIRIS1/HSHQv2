@@ -98,7 +98,7 @@ const SystemView: React.FC<SystemViewProps> = ({
                         onClick={() => setActiveTab('workflow_sla')}
                         className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'workflow_sla' ? 'border-blue-600 text-blue-700 bg-white shadow-xs' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
                     >
-                        <GitFork size={16} className="text-blue-600"/> Quy trình & SLA Đăng ký
+                        <GitFork size={16} className="text-blue-600"/> Quy trình & SLA
                     </button>
                 )}
             </div>

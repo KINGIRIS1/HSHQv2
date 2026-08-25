@@ -5,10 +5,17 @@ import { logError, getFromCache, saveToCache, CACHE_KEYS } from './apiCore';
 export const fetchExcerptHistory = async (): Promise<any[]> => {
     if (!isConfigured) return getFromCache(CACHE_KEYS.EXCERPT_HISTORY, []);
     try {
-        const { data, error } = await supabase.from('excerpt_history').select('*').order('createdAt', { ascending: false }).limit(200);
+        let { data, error } = await supabase.from('excerpt_history').select('*').order('created_at', { ascending: false }).limit(200);
+        if (error && error.code === '42703') {
+            const fallback = await supabase.from('excerpt_history').select('*').order('createdAt', { ascending: false }).limit(200);
+            if (!fallback.error) {
+                data = fallback.data;
+                error = null;
+            }
+        }
         if (error) throw error;
         saveToCache(CACHE_KEYS.EXCERPT_HISTORY, data);
-        return data;
+        return data || [];
     } catch (error) {
         logError("fetchExcerptHistory", error, true);
         return getFromCache(CACHE_KEYS.EXCERPT_HISTORY, []);
@@ -67,10 +74,17 @@ export const saveExcerptCounters = async (counters: Record<string, number>): Pro
 export const fetchTrichDoHistory = async (): Promise<any[]> => {
     if (!isConfigured) return getFromCache(CACHE_KEYS.TRICHDO_HISTORY, []);
     try {
-        const { data, error } = await supabase.from('trichdo_history').select('*').order('createdAt', { ascending: false }).limit(200);
+        let { data, error } = await supabase.from('trichdo_history').select('*').order('created_at', { ascending: false }).limit(200);
+        if (error && error.code === '42703') {
+            const fallback = await supabase.from('trichdo_history').select('*').order('createdAt', { ascending: false }).limit(200);
+            if (!fallback.error) {
+                data = fallback.data;
+                error = null;
+            }
+        }
         if (error) throw error;
         saveToCache(CACHE_KEYS.TRICHDO_HISTORY, data);
-        return data;
+        return data || [];
     } catch (error) {
         logError("fetchTrichDoHistory", error, true);
         return getFromCache(CACHE_KEYS.TRICHDO_HISTORY, []);

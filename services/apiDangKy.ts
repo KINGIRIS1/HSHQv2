@@ -225,43 +225,68 @@ export const mapDangKyToDb = (record: DangKyRecord): any => {
 
 // Fetch DangKy Records
 export const fetchDangKyRecords = async (): Promise<DangKyRecord[]> => {
-  let dbRecords: DangKyRecord[] = [];
+  let dbRecords: DangKyRecord[] | null = null;
   if (isConfigured) {
     try {
-      const { data, error } = await supabase
+      // Thử order theo created_at hoặc receivedDate (chuẩn Supabase)
+      let { data, error } = await supabase
         .from('dangky_records')
         .select('*')
-        .order('createdAt', { ascending: false });
+        .order('created_at', { ascending: false });
+
+      if (error && (error.code === '42703' || error.message?.includes('created_at') || error.message?.includes('createdAt'))) {
+        // Nếu không có created_at, order theo receivedDate
+        const fallbackRes = await supabase
+          .from('dangky_records')
+          .select('*')
+          .order('receivedDate', { ascending: false });
+        
+        if (!fallbackRes.error && fallbackRes.data) {
+          data = fallbackRes.data;
+          error = null;
+        } else {
+          // Fallback cuối cùng: query không order
+          const anyRes = await supabase.from('dangky_records').select('*');
+          if (!anyRes.error && anyRes.data) {
+            data = anyRes.data;
+            error = null;
+          }
+        }
+      }
 
       if (error) {
-        logError('fetchDangKyRecords Supabase', error, true);
-      } else if (data) {
+        if (error.code !== 'PGRST205' && error.code !== '42P01') {
+          console.warn('fetchDangKyRecords Supabase:', error.message || error);
+        }
+      } else if (data !== null && Array.isArray(data)) {
         dbRecords = data.map(mapDangKyFromDb);
       }
     } catch (e) {
-      logError('fetchDangKyRecords catch', e, true);
+      console.warn('fetchDangKyRecords catch:', e);
     }
   }
 
-  // Fallback to cache
+  // If successfully fetched from DB, cache and return
+  if (dbRecords !== null) {
+    saveToCache(CACHE_KEYS.DANGKY_RECORDS, dbRecords);
+    return dbRecords;
+  }
+
+  // Fallback to cache if offline / DB failure
   const cached = getFromCache<DangKyRecord[] | null>(CACHE_KEYS.DANGKY_RECORDS, null);
-  
-  // Check general records cache for any dangky records
+  if (cached !== null) {
+    return cached;
+  }
+
+  // Migration fallback: check general records cache on first run
   const generalCached: any[] = getFromCache(CACHE_KEYS.RECORDS, []);
-  const dangKyFromGeneral = generalCached.filter(r => r.sourceTable === 'dangky_records');
+  const dangKyFromGeneral = generalCached
+    .filter(r => r.sourceTable === 'dangky_records')
+    .map(mapDangKyFromDb);
 
-  // Merge all sources without duplicates (prefer dbRecords, then cached, then dangKyFromGeneral)
-  const mapMerged = new Map<string, DangKyRecord>();
-  [...dangKyFromGeneral, ...(cached || []), ...dbRecords].forEach(r => {
-    if (r && (r.id || r.code)) {
-      mapMerged.set(r.id || r.code, { ...mapMerged.get(r.id || r.code), ...r, sourceTable: 'dangky_records' });
-    }
-  });
-
-  const mergedList = Array.from(mapMerged.values());
-  if (mergedList.length > 0) {
-    saveToCache(CACHE_KEYS.DANGKY_RECORDS, mergedList);
-    return mergedList;
+  if (dangKyFromGeneral.length > 0) {
+    saveToCache(CACHE_KEYS.DANGKY_RECORDS, dangKyFromGeneral);
+    return dangKyFromGeneral;
   }
 
   saveToCache(CACHE_KEYS.DANGKY_RECORDS, MOCK_DANGKY_RECORDS);
@@ -344,31 +369,40 @@ export const saveDangKyRecordApi = async (record: DangKyRecord): Promise<DangKyR
 // Delete DangKy Record
 export const deleteDangKyRecordApi = async (idOrCode: string): Promise<boolean> => {
   if (!idOrCode) return true;
-  const allRecords = await fetchDangKyRecords();
   const cleanTarget = String(idOrCode).trim();
   const targetLower = cleanTarget.toLowerCase();
 
-  const updatedList = allRecords.filter(r => {
-    const rId = String(r.id || '').trim();
-    const rCode = String(r.code || '').trim();
-    return rId !== cleanTarget && 
-           rCode !== cleanTarget && 
-           rId.toLowerCase() !== targetLower && 
-           rCode.toLowerCase() !== targetLower;
+  // 1. Remove from DANGKY_RECORDS cache
+  const cachedDangKy = getFromCache<DangKyRecord[]>(CACHE_KEYS.DANGKY_RECORDS, []);
+  const updatedDangKy = cachedDangKy.filter(r => {
+    const rId = String(r.id || '').trim().toLowerCase();
+    const rCode = String(r.code || '').trim().toLowerCase();
+    return rId !== targetLower && rCode !== targetLower;
   });
+  saveToCache(CACHE_KEYS.DANGKY_RECORDS, updatedDangKy);
 
-  saveToCache(CACHE_KEYS.DANGKY_RECORDS, updatedList);
+  // 2. Remove from GENERAL RECORDS cache (offline_records)
+  const generalCached = getFromCache<any[]>(CACHE_KEYS.RECORDS, []);
+  const updatedGeneral = generalCached.filter(r => {
+    const rId = String(r.id || '').trim().toLowerCase();
+    const rCode = String(r.code || '').trim().toLowerCase();
+    return rId !== targetLower && rCode !== targetLower;
+  });
+  saveToCache(CACHE_KEYS.RECORDS, updatedGeneral);
 
+  // 3. Delete from Supabase tables
   if (isConfigured) {
     try {
       await Promise.allSettled([
         supabase.from('dangky_records').delete().eq('id', cleanTarget),
         supabase.from('dangky_records').delete().eq('code', cleanTarget),
         supabase.from('land_records').delete().eq('id', cleanTarget),
-        supabase.from('land_records').delete().eq('code', cleanTarget)
+        supabase.from('land_records').delete().eq('code', cleanTarget),
+        supabase.from('luutru_records').delete().eq('id', cleanTarget),
+        supabase.from('luutru_records').delete().eq('code', cleanTarget)
       ]);
     } catch (e) {
-      logError('deleteDangKyRecordApi catch', e, true);
+      console.warn('deleteDangKyRecordApi catch:', e);
     }
   }
 
@@ -378,27 +412,40 @@ export const deleteDangKyRecordApi = async (idOrCode: string): Promise<boolean> 
 // Bulk Delete DangKy Records
 export const bulkDeleteDangKyRecordsApi = async (idsOrCodes: string[]): Promise<boolean> => {
   if (!idsOrCodes || idsOrCodes.length === 0) return true;
-  const allRecords = await fetchDangKyRecords();
   const cleanSet = new Set(idsOrCodes.map(x => String(x).trim().toLowerCase()));
 
-  const updatedList = allRecords.filter(r => {
+  // 1. Remove from DANGKY_RECORDS cache
+  const cachedDangKy = getFromCache<DangKyRecord[]>(CACHE_KEYS.DANGKY_RECORDS, []);
+  const updatedDangKy = cachedDangKy.filter(r => {
     const rId = String(r.id || '').trim().toLowerCase();
     const rCode = String(r.code || '').trim().toLowerCase();
     return !cleanSet.has(rId) && !cleanSet.has(rCode);
   });
+  saveToCache(CACHE_KEYS.DANGKY_RECORDS, updatedDangKy);
 
-  saveToCache(CACHE_KEYS.DANGKY_RECORDS, updatedList);
+  // 2. Remove from GENERAL RECORDS cache
+  const generalCached = getFromCache<any[]>(CACHE_KEYS.RECORDS, []);
+  const updatedGeneral = generalCached.filter(r => {
+    const rId = String(r.id || '').trim().toLowerCase();
+    const rCode = String(r.code || '').trim().toLowerCase();
+    return !cleanSet.has(rId) && !cleanSet.has(rCode);
+  });
+  saveToCache(CACHE_KEYS.RECORDS, updatedGeneral);
 
+  // 3. Delete from Supabase tables
   if (isConfigured) {
     try {
+      const targets = Array.from(cleanSet);
       await Promise.allSettled([
-        supabase.from('dangky_records').delete().in('id', idsOrCodes),
-        supabase.from('dangky_records').delete().in('code', idsOrCodes),
-        supabase.from('land_records').delete().in('id', idsOrCodes),
-        supabase.from('land_records').delete().in('code', idsOrCodes)
+        supabase.from('dangky_records').delete().in('id', targets),
+        supabase.from('dangky_records').delete().in('code', targets),
+        supabase.from('land_records').delete().in('id', targets),
+        supabase.from('land_records').delete().in('code', targets),
+        supabase.from('luutru_records').delete().in('id', targets),
+        supabase.from('luutru_records').delete().in('code', targets)
       ]);
     } catch (e) {
-      logError('bulkDeleteDangKyRecordsApi catch', e, true);
+      console.warn('bulkDeleteDangKyRecordsApi catch:', e);
     }
   }
 

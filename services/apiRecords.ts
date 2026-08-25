@@ -412,9 +412,24 @@ const syncCacheOnUpdate = (updatedRecord: RecordFile) => {
 
 const syncCacheOnDelete = (id: string) => {
     try {
+        const targetLower = String(id || '').trim().toLowerCase();
         const cached: RecordFile[] = getFromCache(CACHE_KEYS.RECORDS, []);
-        const filtered = cached.filter(r => r.id !== id);
+        const filtered = cached.filter(r => {
+            const rId = String(r.id || '').trim().toLowerCase();
+            const rCode = String(r.code || '').trim().toLowerCase();
+            return rId !== targetLower && rCode !== targetLower;
+        });
         saveToCache(CACHE_KEYS.RECORDS, filtered);
+
+        const cachedDangKy: any[] = getFromCache(CACHE_KEYS.DANGKY_RECORDS, []);
+        if (cachedDangKy && cachedDangKy.length > 0) {
+            const filteredDk = cachedDangKy.filter(r => {
+                const rId = String(r.id || '').trim().toLowerCase();
+                const rCode = String(r.code || '').trim().toLowerCase();
+                return rId !== targetLower && rCode !== targetLower;
+            });
+            saveToCache(CACHE_KEYS.DANGKY_RECORDS, filteredDk);
+        }
     } catch (e) {
         console.error("Error syncing cache for deleted record", e);
     }
