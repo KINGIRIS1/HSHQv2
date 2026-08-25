@@ -302,6 +302,11 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
         alert("Vui lòng chọn Loại hồ sơ trước khi lưu.");
         return;
     }
+
+    if (!finalData.ward || !finalData.ward.trim()) {
+        alert("Vui lòng chọn Xã / Phường trước khi lưu.");
+        return;
+    }
     
     // Logic tự động set ngày khi trạng thái thay đổi hoặc xóa ngày khi quay lui
     // Chỉ áp dụng logic này nếu trạng thái khác với ban đầu (hoặc là tạo mới)
@@ -523,13 +528,6 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
   const handleChange = (field: keyof RecordFile, value: any) => {
     setFormData(prev => {
       const updated = { ...prev, [field]: value };
-      if (field === 'assignedTo' && value) {
-        const emp = employees.find(e => e.id === value);
-        const firstWard = emp?.managedWards?.[0];
-        if (firstWard) {
-          updated.ward = firstWard;
-        }
-      }
       if (updated.ward) {
         const norm = getNormalizedWard(updated.ward);
         if (GROUPS.includes(norm)) {

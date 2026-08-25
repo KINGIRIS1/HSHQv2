@@ -93,7 +93,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
 
   const [formData, setFormData] = useState<Partial<RecordFile>>({
     code: '', customerName: '', phoneNumber: '', cccd: '', customerAddress: '', authorizedBy: '', authDocType: '', otherDocs: '', content: '',
-    receivedDate: todayStr, deadline: '', ward: processingWard, landPlot: '', mapSheet: '', area: 0,
+    receivedDate: todayStr, deadline: '', ward: '', landPlot: '', mapSheet: '', area: 0,
     address: '', recordType: '', status: RecordStatus.RECEIVED,
     issueNumber: '', entryNumber: '', issueDate: '', residentialArea: 0,
     owners: [{ name: '', cccd: '', address: '', phone: '' }],
@@ -166,18 +166,19 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
 
   useEffect(() => {
     if (!initialData) {
+        const targetWardForCode = formData.ward || processingWard;
         if (!isDangKy) {
-            const newCode = generateCode(processingWard, formData.receivedDate || '');
+            const newCode = generateCode(targetWardForCode, formData.receivedDate || '');
             setFormData(prev => {
                 if (prev.code === newCode) return prev;
                 return { ...prev, code: newCode };
             });
         } else if (!formData.code) {
-            const newCode = generateCode(processingWard, formData.receivedDate || '');
+            const newCode = generateCode(targetWardForCode, formData.receivedDate || '');
             setFormData(prev => ({ ...prev, code: newCode }));
         }
     }
-  }, [processingWard, formData.receivedDate, records, initialData, isDangKy]);
+  }, [formData.ward, processingWard, formData.receivedDate, records, initialData, isDangKy]);
 
   const handleChange = (field: keyof RecordFile, value: any) => {
     setFormData(prev => {
@@ -472,8 +473,8 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
         }
     }
 
-    if (!formData.code || (!effectiveCustomerName && !formData.applicantName) || (isDeadlineRequired && !formData.deadline) || !formData.recordType) { 
-        setNotification({ type: 'error', message: "Vui lòng điền các trường bắt buộc (*) và chọn Loại hồ sơ." });
+    if (!formData.code || (!effectiveCustomerName && !formData.applicantName) || (isDeadlineRequired && !formData.deadline) || !formData.recordType || (!isCongVan && !formData.ward)) { 
+        setNotification({ type: 'error', message: "Vui lòng điền các trường bắt buộc (*), chọn Loại hồ sơ và Xã/Phường." });
         return; 
     }
     setLoading(true);
@@ -529,7 +530,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
           code: '', customerName: '', phoneNumber: '', cccd: '', customerAddress: '', 
           authorizedBy: '', authDocType: '', otherDocs: '', content: '', 
           receivedDate: todayStrLocal, deadline: '', 
-          ward: processingWard, landPlot: '', mapSheet: '', area: 0, address: '', 
+          ward: '', landPlot: '', mapSheet: '', area: 0, address: '', 
           recordType: '', status: RecordStatus.RECEIVED,
           issueNumber: '', entryNumber: '', issueDate: '', residentialArea: 0,
           owners: [{ name: '', cccd: '', address: '', phone: '' }],

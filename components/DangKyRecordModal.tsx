@@ -80,7 +80,7 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
       issueDate: '',
       totalArea: 0,
       residentialArea: 0,
-      ward: wards[0] || '',
+      ward: '',
       recordType: defaultType,
       receivedDate: todayStr,
       assignedDate: todayStr,
@@ -423,6 +423,10 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
   const executeSave = async () => {
     if (!formData.code.trim()) {
       alert('Vui lòng nhập Mã hồ sơ!');
+      return;
+    }
+    if (!formData.ward || !formData.ward.trim()) {
+      alert('Vui lòng chọn Xã / Phường cho hồ sơ!');
       return;
     }
 
