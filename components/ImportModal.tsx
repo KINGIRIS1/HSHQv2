@@ -490,48 +490,46 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100] p-4 backdrop-blur-sm">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-5xl h-[85vh] flex flex-col animate-fade-in-up">
         {/* HEADER */}
-        <div className="flex justify-between items-center p-5 border-b shrink-0 bg-slate-900 text-white rounded-t-lg">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-md">
-              <FileSpreadsheet size={20} />
-            </div>
-            <div>
-              <h2 className="text-lg font-bold flex items-center gap-2 text-white">
-                {mode === 'create' ? 'Tiếp nhận hàng loạt từ Excel' : 'Cập nhật hàng loạt từ file Excel'}
-              </h2>
-              <p className="text-xs text-slate-300">
-                {mode === 'create' 
-                  ? 'Thêm mới hàng loạt hồ sơ Đo đạc & Lưu trữ từ file Excel' 
-                  : 'Cập nhật tự động thông tin, trạng thái, ngày tháng dựa theo Mã hồ sơ'}
-              </p>
-            </div>
-          </div>
-          <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors cursor-pointer">
-            <X size={20} />
+        <div className="flex justify-between items-center p-5 border-b shrink-0">
+          <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+            {mode === 'create' ? (
+              <>
+                <FileSpreadsheet className="text-green-600" />
+                Tiếp nhận hàng loạt từ Excel
+              </>
+            ) : (
+              <>
+                <RefreshCw className="text-amber-600" />
+                Cập nhật thông tin từ Excel
+              </>
+            )}
+          </h2>
+          <button onClick={onClose} className="text-gray-500 hover:text-red-600">
+            <X size={24} />
           </button>
         </div>
 
         {/* MODE INFO & FILE CONTROLS */}
         <div className="p-4 border-b bg-slate-50 shrink-0 space-y-3">
-            {/* Always display mode switcher */}
-            <div className="flex justify-center">
-                <div className="bg-white border border-gray-300 rounded-xl p-1 flex shadow-xs">
-                    <button 
-                        type="button"
-                        onClick={() => { setMode('create'); setPreviewData([]); setFileName(''); }}
-                        className={`flex items-center gap-2 px-5 py-1.5 rounded-lg font-bold text-xs transition-all cursor-pointer ${mode === 'create' ? 'bg-blue-600 text-white shadow-xs' : 'text-gray-600 hover:bg-gray-100'}`}
-                    >
-                        <PlusCircle size={15} /> Tiếp nhận hàng loạt
-                    </button>
-                    <button 
-                        type="button"
-                        onClick={() => { setMode('update'); setPreviewData([]); setFileName(''); }}
-                        className={`flex items-center gap-2 px-5 py-1.5 rounded-lg font-bold text-xs transition-all cursor-pointer ${mode === 'update' ? 'bg-amber-600 text-white shadow-xs' : 'text-gray-600 hover:bg-gray-100'}`}
-                    >
-                        <RefreshCw size={15} /> Cập nhật hàng loạt
-                    </button>
-                </div>
-            </div>
+            {/* Show mode switcher only when initialMode is not explicitly provided */}
+            {!initialMode && (
+              <div className="flex justify-center">
+                  <div className="bg-white border border-gray-300 rounded-lg p-1 flex shadow-sm">
+                      <button 
+                          onClick={() => { setMode('create'); setPreviewData([]); setFileName(''); }}
+                          className={`flex items-center gap-2 px-6 py-1.5 rounded-md font-medium text-sm transition-all ${mode === 'create' ? 'bg-blue-600 text-white shadow' : 'text-gray-600 hover:bg-gray-100'}`}
+                      >
+                          <PlusCircle size={16} /> Nhập hồ sơ mới
+                      </button>
+                      <button 
+                          onClick={() => { setMode('update'); setPreviewData([]); setFileName(''); }}
+                          className={`flex items-center gap-2 px-6 py-1.5 rounded-md font-medium text-sm transition-all ${mode === 'update' ? 'bg-orange-500 text-white shadow' : 'text-gray-600 hover:bg-gray-100'}`}
+                      >
+                          <RefreshCw size={16} /> Cập nhật thông tin
+                      </button>
+                  </div>
+              </div>
+            )}
 
             {/* BAR ROW: FILTERS ON LEFT | ACTION BUTTONS ON RIGHT */}
             <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-xl border border-slate-200 shadow-xs">

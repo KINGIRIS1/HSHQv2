@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { RecordFile, Holiday, RecordStatus, User, Employee, DangKyParty } from '../../types';
 import { RECORD_TYPES, EXTENDED_RECORD_TYPES, getShortRecordType, getWardLabel } from '../../constants';
-import { detectProcedureId, getDefaultDocsForProcedure, isDangKyRecordType, isArchiveRecordType } from '../../constants/procedures';
+import { detectProcedureId, getDefaultDocsForProcedure } from '../../constants/procedures';
 import { addActivityLog } from '../../services/activityLogService';
 import { AutoResizeTextarea } from '../AutoResizeTextarea';
 import { Save, User as UserIcon, Calendar, MapPin, FileCheck, Loader2, Printer, RotateCcw, XCircle, CheckCircle, AlertCircle, X, Phone, FileText, BookOpen, Clock, Hash, Map, ChevronDown, ChevronUp, Users, UserPlus, Plus, Shield } from 'lucide-react';
@@ -154,8 +154,15 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
   }, [notification]);
 
   // Kiểm tra loại hồ sơ 3.x.x Đăng ký
-  const isDangKy = isDangKyRecordType(formData.recordType, formData.code);
-  const isArchive = isArchiveRecordType(formData.recordType, formData.code);
+  const isDangKy = formData.recordType ? (
+      formData.recordType.startsWith('3.') || 
+      formData.recordType.toLowerCase().includes('chuyển nhượng') || 
+      formData.recordType.toLowerCase().includes('tặng cho') || 
+      formData.recordType.toLowerCase().includes('thừa kế') || 
+      formData.recordType.toLowerCase().includes('cấp đổi') || 
+      formData.recordType.toLowerCase().includes('cấp lại') ||
+      formData.recordType.toLowerCase().includes('đăng ký')
+  ) : false;
 
   useEffect(() => {
     if (!initialData) {
@@ -481,7 +488,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
         id: formData.id || Math.random().toString(36).substr(2, 9), 
         status: formData.status || RecordStatus.RECEIVED,
         receivedBy: formData.receivedBy || currentUser.employeeId || currentUser.fullName || currentUser.name || currentUser.username,
-        sourceTable: isDangKy ? 'dangky_records' : (isArchive ? 'luutru_records' : (formData.sourceTable || 'land_records'))
+        sourceTable: isDangKy ? 'dangky_records' : (formData.sourceTable || 'land_records')
     } as RecordFile;
     const savedRecord = await onSave(recordToSave);
     setLoading(false);

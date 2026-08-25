@@ -1,55 +1,43 @@
 import { supabase, isConfigured } from './supabaseClient';
 import { RecordFile } from '../types';
-import { MOCK_RECORDS, API_BASE_URL } from '../constants';
-import { isArchiveRecordType, isDangKyRecordType } from '../constants/procedures';
+import { MOCK_RECORDS, API_BASE_URL, isArchiveRecordType } from '../constants';
 import { logError, getFromCache, saveToCache, CACHE_KEYS, sanitizeData, sanitizePayloadFor22P02, normalizeCode, mapRecordFromDb } from './apiCore';
 
 const RECORD_DB_COLUMNS = [
     'id', 'code', 'customerName', 'phoneNumber', 'cccd', 'customerAddress', 'ward', 'landPlot', 'mapSheet', 
-    'area', 'totalArea', 'address', 'group', 'content', 'recordType', 'receivedDate', 'receivedBy', 'deadline', 
+    'area', 'address', 'group', 'content', 'recordType', 'receivedDate', 'receivedBy', 'deadline', 
     'assignedDate', 'submissionDate', 'approvalDate', 'completedDate', 'status', 'assignedTo', 'submittedTo', 'checkedBy',
     'pendingCheckDate', 'checkedDate', 'completedWorkDate',
     'notes', 'privateNotes', 'personalNotes', 
     'authorizedBy', 'authorizedPersonName', 'authorizedPersonId', 'authorizedPersonPhone', 'authorizedPersonAddress', 'authDocType', 'otherDocs', 'exportBatch', 'exportDate', 'handoverWard',
     'measurementNumber', 'excerptNumber',
     'reminderDate', 'lastRemindedAt', 'deadlineReminded',
-    'receiptNumber', 'invoiceNumber', 'receiptType', 'feeAmount', 'returnedPrice', 'resultReturnedDate', 'receiverName',
+    'receiptNumber', 'resultReturnedDate', 'receiverName',
     'needsMapCorrection', 'explanationPlan',
     'issueNumber', 'entryNumber', 'issueDate', 'residentialArea',
     'price', 'advancePayment', 'isHandedOver',
-    'statusLogs', 'archiveHandoverDate', 'archiveHandoverBatch',
-    'owners', 'transferees', 'applicantName', 'applicantPhone', 'applicantCccd', 'applicantAddress', 'applicantIsOwner',
-    'submitterName', 'submitterPhone', 'nonBoundaryWard', 'isNonBoundary', 'attachedDocs', 'attachedDocuments', 'deliveryDate',
-    'appraisalDate', 'appraisalStaff', 'taxFormDate', 'taxFormNumber', 'taxFormStaff', 'taxKV7TransferDate', 'taxKV7Staff',
-    'taxNoticeDate', 'taxNoticeStaff', 'taxPaymentReceiptDate', 'printDate', 'printStaff'
+    'statusLogs', 'archiveHandoverDate', 'archiveHandoverBatch'
 ];
 
 export const getTargetTable = (record: Partial<RecordFile>): 'dangky_records' | 'land_records' | 'luutru_records' => {
-    // 1. Prioritize explicit check for Archive (1.x) or Dang Ky (3.x, Chuyển quyền, Cấp đổi, Biến động...)
-    if (isArchiveRecordType(record.recordType, record.code) || isArchiveRecordType(record.content, record.code)) {
-        return 'luutru_records';
-    }
-
-    if (isDangKyRecordType(record.recordType, record.code) || isDangKyRecordType(record.content, record.code)) {
-        return 'dangky_records';
-    }
-
     if (record.sourceTable === 'luutru_records' || record.sourceTable === 'archive_records') return 'luutru_records';
     if (record.sourceTable === 'dangky_records') return 'dangky_records';
     if (record.sourceTable === 'land_records') return 'land_records';
+
+    // Check if recordType or content is an archive type
+    if (isArchiveRecordType(record.recordType) || isArchiveRecordType(record.content)) {
+        return 'luutru_records';
+    }
 
     if (record.id) {
         const cached: RecordFile[] = getFromCache(CACHE_KEYS.RECORDS, []);
         const found = cached.find(r => r.id === record.id);
         if (found) {
-            if (isArchiveRecordType(found.recordType, found.code) || isArchiveRecordType(found.content, found.code)) {
-                return 'luutru_records';
-            }
-            if (isDangKyRecordType(found.recordType, found.code) || isDangKyRecordType(found.content, found.code)) {
-                return 'dangky_records';
-            }
             if (found.sourceTable === 'luutru_records' || found.sourceTable === 'archive_records') return 'luutru_records';
             if (found.sourceTable === 'dangky_records' || found.sourceTable === 'land_records') return found.sourceTable;
+            if (isArchiveRecordType(found.recordType) || isArchiveRecordType(found.content)) {
+                return 'luutru_records';
+            }
         }
     }
     return 'land_records';
@@ -65,223 +53,176 @@ const OPTIONAL_NEW_COLUMNS = [
     'statusLogs', 'archiveHandoverDate', 'archiveHandoverBatch'
 ];
 
-// Helper to fetch with timeout
-const withQueryTimeout = async (promise: any, timeoutMs = 10000): Promise<{ data: any[] | null; error: any }> => {
-    try {
-        let timer: any;
-        const timeoutPromise = new Promise<{ data: any[] | null; error: any }>((resolve) => {
-            timer = setTimeout(() => resolve({ data: null, error: { message: 'Timeout' } }), timeoutMs);
-        });
-        const result = await Promise.race([promise, timeoutPromise]);
-        clearTimeout(timer);
-        return result;
-    } catch (err) {
-        return { data: null, error: err };
-    }
-};
-
 export const fetchRecords = async (): Promise<RecordFile[]> => {
   if (!isConfigured) {
-      const cached = getFromCache<RecordFile[]>(CACHE_KEYS.RECORDS, []);
-      return cached.length > 0 ? cached : [];
+      console.warn("Supabase chưa được cấu hình.");
+      return [];
   }
 
   try {
+    let allRecords: any[] = [];
     const step = 1000;
+    let retryCount = 0;
+    const maxRetries = 1;
 
-    // 1. Fetch Dang Ky Records
-    const fetchDangKy = async (): Promise<any[]> => {
-        const results: any[] = [];
-        try {
-            let fromDk = 0;
-            let hasMoreDk = true;
-            while (hasMoreDk) {
-                const queryPromise = supabase
-                    .from('dangky_records')
-                    .select('*')
-                    .order('receivedDate', { ascending: false })
-                    .order('id', { ascending: true }) 
-                    .range(fromDk, fromDk + step - 1);
+    // 1. Fetch from dangky_records
+    try {
+        let fromDk = 0;
+        let hasMoreDk = true;
+        while (hasMoreDk) {
+            const { data, error } = await supabase
+                .from('dangky_records')
+                .select('*')
+                .order('receivedDate', { ascending: false })
+                .order('id', { ascending: true }) 
+                .range(fromDk, fromDk + step - 1);
 
-                const { data, error } = await withQueryTimeout(queryPromise as any, 8000);
-
-                if (error) {
-                    if (error?.code === 'PGRST205' || error?.code === '42P01' || error?.message?.includes('does not exist')) {
-                        // table doesn't exist yet
-                    } else {
-                        console.warn('Lỗi fetch dangky_records:', error?.message || error);
+            if (error) {
+                if (error.code === 'PGRST205' || error.code === '42P01' || error.message?.includes('does not exist')) {
+                    console.info('Bảng dangky_records chưa tồn tại, bỏ qua.');
+                } else {
+                    console.warn('Lỗi khi fetch dangky_records:', error);
+                }
+                hasMoreDk = false;
+            } else if (data && data.length > 0) {
+                const mapped = data.map(item => {
+                    const parsedOwners = Array.isArray(item.owners) ? item.owners : (typeof item.owners === 'string' ? JSON.parse(item.owners || '[]') : []);
+                    const parsedTransferees = Array.isArray(item.transferees) ? item.transferees : (typeof item.transferees === 'string' ? JSON.parse(item.transferees || '[]') : []);
+                    
+                    let cName = item.customerName;
+                    if (!cName || cName.trim() === '' || cName === 'Chưa có tên') {
+                        const ownerNames = parsedOwners.map((o: any) => o?.name).filter(Boolean).join(', ');
+                        const transfereeNames = parsedTransferees.map((t: any) => t?.name).filter(Boolean).join(', ');
+                        if (ownerNames && transfereeNames) {
+                            cName = `${ownerNames} → ${transfereeNames}`;
+                        } else if (ownerNames) {
+                            cName = ownerNames;
+                        } else if (transfereeNames) {
+                            cName = transfereeNames;
+                        }
                     }
-                    hasMoreDk = false;
-                } else if (data && data.length > 0) {
-                    const mapped = (data as any[]).map((item: any) => {
-                        const parsedOwners = Array.isArray(item.owners) ? item.owners : (typeof item.owners === 'string' ? JSON.parse(item.owners || '[]') : []);
-                        const parsedTransferees = Array.isArray(item.transferees) ? item.transferees : (typeof item.transferees === 'string' ? JSON.parse(item.transferees || '[]') : []);
-                        
-                        let cName = item.customerName;
-                        if (!cName || cName.trim() === '' || cName === 'Chưa có tên') {
-                            const ownerNames = parsedOwners.map((o: any) => o?.name).filter(Boolean).join(', ');
-                            const transfereeNames = parsedTransferees.map((t: any) => t?.name).filter(Boolean).join(', ');
-                            if (ownerNames && transfereeNames) {
-                                cName = `${ownerNames} → ${transfereeNames}`;
-                            } else if (ownerNames) {
-                                cName = ownerNames;
-                            } else if (transfereeNames) {
-                                cName = transfereeNames;
-                            }
-                        }
 
-                        let cCccd = item.cccd;
-                        if (!cCccd || cCccd.trim() === '') {
-                            const oCccd = parsedOwners.map((o: any) => o?.cccd).filter(Boolean).join(', ');
-                            const tCccd = parsedTransferees.map((t: any) => t?.cccd).filter(Boolean).join(', ');
-                            cCccd = [oCccd, tCccd].filter(Boolean).join(', ');
-                        }
-
-                        let cPhone = item.phoneNumber;
-                        if (!cPhone || cPhone.trim() === '') {
-                            const oPhone = parsedOwners.map((o: any) => o?.phone).filter(Boolean).join(', ');
-                            const tPhone = parsedTransferees.map((t: any) => t?.phone).filter(Boolean).join(', ');
-                            cPhone = [oPhone, tPhone].filter(Boolean).join(', ');
-                        }
-
-                        let cAddr = item.customerAddress;
-                        if (!cAddr || cAddr.trim() === '') {
-                            const oAddr = parsedOwners.map((o: any) => o?.address).filter(Boolean).join(', ');
-                            const tAddr = parsedTransferees.map((t: any) => t?.address).filter(Boolean).join(', ');
-                            cAddr = [oAddr, tAddr].filter(Boolean).join('; ');
-                        }
-
-                        return { 
-                            ...item, 
-                            owners: parsedOwners, 
-                            transferees: parsedTransferees,
-                            customerName: cName || item.customerName || '',
-                            cccd: cCccd || item.cccd || '',
-                            phoneNumber: cPhone || item.phoneNumber || '',
-                            customerAddress: cAddr || item.customerAddress || '',
-                            sourceTable: 'dangky_records' as const 
-                        };
-                    });
-                    results.push(...mapped);
-                    fromDk += step;
-                    if (data.length < step) hasMoreDk = false;
-                } else {
-                    hasMoreDk = false;
-                }
-            }
-        } catch (e) {
-            console.warn('Lỗi fetchDangKy:', e);
-        }
-        return results;
-    };
-
-    // 2. Fetch Land Records
-    const fetchLand = async (): Promise<any[]> => {
-        const results: any[] = [];
-        try {
-            let fromLand = 0;
-            let hasMoreLand = true;
-            while (hasMoreLand) {
-                const queryPromise = supabase
-                    .from('land_records')
-                    .select('*')
-                    .order('receivedDate', { ascending: false })
-                    .order('id', { ascending: true }) 
-                    .range(fromLand, fromLand + step - 1);
-
-                const { data, error } = await withQueryTimeout(queryPromise as any, 10000);
-
-                if (error) {
-                    console.warn('Lỗi fetch land_records:', error?.message || error);
-                    hasMoreLand = false;
-                } else if (data && data.length > 0) {
-                    const mapped = (data as any[]).map((item: any) => ({ ...item, sourceTable: item.sourceTable || ('land_records' as const) }));
-                    results.push(...mapped);
-                    fromLand += step;
-                    if (data.length < step) hasMoreLand = false;
-                } else {
-                    hasMoreLand = false;
-                }
-            }
-        } catch (e) {
-            console.warn('Lỗi fetchLand:', e);
-        }
-        return results;
-    };
-
-    // 3. Fetch Luu Tru Records
-    const fetchLuuTru = async (): Promise<any[]> => {
-        const results: any[] = [];
-        try {
-            let fromLt = 0;
-            let hasMoreLt = true;
-            while (hasMoreLt) {
-                const queryPromise = supabase
-                    .from('luutru_records')
-                    .select('*')
-                    .order('receivedDate', { ascending: false })
-                    .order('id', { ascending: true }) 
-                    .range(fromLt, fromLt + step - 1);
-
-                const { data, error } = await withQueryTimeout(queryPromise as any, 8000);
-
-                if (error) {
-                    if (error?.code === 'PGRST205' || error?.code === '42P01' || error?.message?.includes('does not exist')) {
-                        // table doesn't exist yet
-                    } else {
-                        console.warn('Lỗi fetch luutru_records:', error?.message || error);
+                    let cCccd = item.cccd;
+                    if (!cCccd || cCccd.trim() === '') {
+                        const oCccd = parsedOwners.map((o: any) => o?.cccd).filter(Boolean).join(', ');
+                        const tCccd = parsedTransferees.map((t: any) => t?.cccd).filter(Boolean).join(', ');
+                        cCccd = [oCccd, tCccd].filter(Boolean).join(', ');
                     }
-                    hasMoreLt = false;
-                } else if (data && data.length > 0) {
-                    const mapped = (data as any[]).map((item: any) => ({ ...item, sourceTable: 'luutru_records' as const }));
-                    results.push(...mapped);
-                    fromLt += step;
-                    if (data.length < step) hasMoreLt = false;
-                } else {
-                    hasMoreLt = false;
-                }
+
+                    let cPhone = item.phoneNumber;
+                    if (!cPhone || cPhone.trim() === '') {
+                        const oPhone = parsedOwners.map((o: any) => o?.phone).filter(Boolean).join(', ');
+                        const tPhone = parsedTransferees.map((t: any) => t?.phone).filter(Boolean).join(', ');
+                        cPhone = [oPhone, tPhone].filter(Boolean).join(', ');
+                    }
+
+                    let cAddr = item.customerAddress;
+                    if (!cAddr || cAddr.trim() === '') {
+                        const oAddr = parsedOwners.map((o: any) => o?.address).filter(Boolean).join(', ');
+                        const tAddr = parsedTransferees.map((t: any) => t?.address).filter(Boolean).join(', ');
+                        cAddr = [oAddr, tAddr].filter(Boolean).join('; ');
+                    }
+
+                    return { 
+                        ...item, 
+                        owners: parsedOwners,
+                        transferees: parsedTransferees,
+                        customerName: cName || item.customerName || '',
+                        cccd: cCccd || item.cccd || '',
+                        phoneNumber: cPhone || item.phoneNumber || '',
+                        customerAddress: cAddr || item.customerAddress || '',
+                        sourceTable: 'dangky_records' as const 
+                    };
+                });
+                allRecords = [...allRecords, ...mapped];
+                fromDk += step;
+                if (data.length < step) hasMoreDk = false;
+            } else {
+                hasMoreDk = false;
             }
-        } catch (e) {
-            console.warn('Lỗi fetchLuuTru:', e);
         }
-        return results;
-    };
-
-    // Run in parallel
-    const [dkRes, landRes, ltRes] = await Promise.allSettled([
-        fetchDangKy(),
-        fetchLand(),
-        fetchLuuTru()
-    ]);
-
-    const allRecords: any[] = [
-        ...(dkRes.status === 'fulfilled' ? dkRes.value : []),
-        ...(landRes.status === 'fulfilled' ? landRes.value : []),
-        ...(ltRes.status === 'fulfilled' ? ltRes.value : [])
-    ];
-    
-    if (allRecords.length === 0) {
-        // Fallback to cache if all queries returned empty / failed
-        const cached = getFromCache<RecordFile[]>(CACHE_KEYS.RECORDS, []);
-        if (cached.length > 0) return cached;
+    } catch (dkError) {
+        console.warn('Lỗi fetch dangky_records:', dkError);
     }
 
+    // 2. Fetch from land_records
+    let hasMoreLand = true;
+    let fromLand = 0;
+    while (hasMoreLand) {
+        try {
+            const { data, error } = await supabase
+                .from('land_records')
+                .select('*')
+                .order('receivedDate', { ascending: false })
+                .order('id', { ascending: true }) 
+                .range(fromLand, fromLand + step - 1);
+
+            if (error) throw error;
+
+            if (data && data.length > 0) {
+                const mapped = data.map(item => ({ ...item, sourceTable: item.sourceTable || ('land_records' as const) }));
+                allRecords = [...allRecords, ...mapped];
+                fromLand += step;
+                if (data.length < step) hasMoreLand = false;
+            } else {
+                hasMoreLand = false;
+            }
+        } catch (fetchError: any) {
+            if (retryCount < maxRetries && (fetchError.message?.includes('fetch') || !fetchError.code)) {
+                console.warn(`Lỗi fetch land_records, đang thử lại lần ${retryCount + 1}...`);
+                retryCount++;
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                continue; 
+            }
+            break;
+        }
+    }
+
+    // 3. Fetch from luutru_records (bảng lưu trữ chính thức)
+    try {
+        let fromLt = 0;
+        let hasMoreLt = true;
+        while (hasMoreLt) {
+            const { data, error } = await supabase
+                .from('luutru_records')
+                .select('*')
+                .order('receivedDate', { ascending: false })
+                .order('id', { ascending: true }) 
+                .range(fromLt, fromLt + step - 1);
+
+            if (error) {
+                if (error.code === 'PGRST205' || error.code === '42P01' || error.message?.includes('does not exist')) {
+                    console.info('Bảng luutru_records chưa tồn tại, bỏ qua.');
+                } else {
+                    console.warn('Lỗi khi fetch luutru_records:', error);
+                }
+                hasMoreLt = false;
+            } else if (data && data.length > 0) {
+                const mapped = data.map(item => ({ ...item, sourceTable: 'luutru_records' as const }));
+                allRecords = [...allRecords, ...mapped];
+                fromLt += step;
+                if (data.length < step) hasMoreLt = false;
+            } else {
+                hasMoreLt = false;
+            }
+        }
+    } catch (ltError) {
+        console.warn('Lỗi fetch luutru_records:', ltError);
+    }
+    
     const uniqueMap = new Map();
     allRecords.forEach((item: any) => {
         if (item.id) {
             uniqueMap.set(item.id, mapRecordFromDb(item));
         }
     });
-    const uniqueRecords = Array.from(uniqueMap.values()) as RecordFile[];
+    const uniqueRecords = Array.from(uniqueMap.values());
     
-    if (uniqueRecords.length > 0) {
-        saveToCache(CACHE_KEYS.RECORDS, uniqueRecords);
-    }
-    
-    return uniqueRecords;
+    console.log(`[Fetch] Total fetched across all cloud tables: ${uniqueRecords.length}`);
+    return uniqueRecords as RecordFile[];
 
   } catch (error) {
-    console.warn("fetchRecords fallback to cache:", error);
+    logError("fetchRecords", error, true);
     const cached = getFromCache<RecordFile[]>(CACHE_KEYS.RECORDS, []);
     return cached.length > 0 ? cached : MOCK_RECORDS;
   }
@@ -386,14 +327,6 @@ const syncCacheOnCreate = (newRecord: RecordFile) => {
             cached.unshift(newRecord);
             saveToCache(CACHE_KEYS.RECORDS, cached);
         }
-
-        if (newRecord.sourceTable === 'dangky_records' || getTargetTable(newRecord) === 'dangky_records') {
-            const dkCached: any[] = getFromCache(CACHE_KEYS.DANGKY_RECORDS, []);
-            if (!dkCached.some(r => r.id === newRecord.id || (r.code && r.code === newRecord.code))) {
-                dkCached.unshift(newRecord);
-                saveToCache(CACHE_KEYS.DANGKY_RECORDS, dkCached);
-            }
-        }
     } catch (e) {
         console.error("Error syncing cache for created record", e);
     }
@@ -409,17 +342,6 @@ const syncCacheOnUpdate = (updatedRecord: RecordFile) => {
             cached.unshift(updatedRecord);
         }
         saveToCache(CACHE_KEYS.RECORDS, cached);
-
-        if (updatedRecord.sourceTable === 'dangky_records' || getTargetTable(updatedRecord) === 'dangky_records') {
-            const dkCached: any[] = getFromCache(CACHE_KEYS.DANGKY_RECORDS, []);
-            const dkIndex = dkCached.findIndex(r => r.id === updatedRecord.id || (r.code && r.code === updatedRecord.code));
-            if (dkIndex !== -1) {
-                dkCached[dkIndex] = { ...dkCached[dkIndex], ...updatedRecord };
-            } else {
-                dkCached.unshift(updatedRecord);
-            }
-            saveToCache(CACHE_KEYS.DANGKY_RECORDS, dkCached);
-        }
     } catch (e) {
         console.error("Error syncing cache for updated record", e);
     }
@@ -427,24 +349,9 @@ const syncCacheOnUpdate = (updatedRecord: RecordFile) => {
 
 const syncCacheOnDelete = (id: string) => {
     try {
-        const targetLower = String(id || '').trim().toLowerCase();
         const cached: RecordFile[] = getFromCache(CACHE_KEYS.RECORDS, []);
-        const filtered = cached.filter(r => {
-            const rId = String(r.id || '').trim().toLowerCase();
-            const rCode = String(r.code || '').trim().toLowerCase();
-            return rId !== targetLower && rCode !== targetLower;
-        });
+        const filtered = cached.filter(r => r.id !== id);
         saveToCache(CACHE_KEYS.RECORDS, filtered);
-
-        const cachedDangKy: any[] = getFromCache(CACHE_KEYS.DANGKY_RECORDS, []);
-        if (cachedDangKy && cachedDangKy.length > 0) {
-            const filteredDk = cachedDangKy.filter(r => {
-                const rId = String(r.id || '').trim().toLowerCase();
-                const rCode = String(r.code || '').trim().toLowerCase();
-                return rId !== targetLower && rCode !== targetLower;
-            });
-            saveToCache(CACHE_KEYS.DANGKY_RECORDS, filteredDk);
-        }
     } catch (e) {
         console.error("Error syncing cache for deleted record", e);
     }
@@ -478,14 +385,10 @@ export const createRecordApi = async (record: RecordFile): Promise<RecordFile | 
             finalCode = await getNextGlobalRecordCode(record.receivedDate || new Date().toISOString());
         }
         
-        const isUUID = recordToSave.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(recordToSave.id).trim());
-        const standardId = isUUID ? recordToSave.id : (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
-            const r = (Math.random() * 16) | 0;
-            const v = c === 'x' ? r : ((r & 0x3) | 0x8);
-            return v.toString(16);
-        }));
-
-        recordToSave = { ...record, id: standardId, code: finalCode };
+        recordToSave = { ...record, code: finalCode };
+        if (!recordToSave.id) {
+            recordToSave.id = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substr(2, 9);
+        }
         
         const targetTable = getTargetTable(recordToSave);
         const payload = sanitizeData(recordToSave, RECORD_DB_COLUMNS);
@@ -510,47 +413,17 @@ export const createRecordApi = async (record: RecordFile): Promise<RecordFile | 
             const { data: fallbackData, error: fallbackError } = await supabase.from(targetTable).insert([fallbackPayload]).select();
             if (fallbackError) throw fallbackError;
             const result = mapRecordFromDb({ ...recordToSave, ...(fallbackData?.[0] || {}), sourceTable: targetTable }) as RecordFile;
-            if (result) {
-                syncCacheOnCreate(result);
-                if (typeof window !== 'undefined') {
-                    window.dispatchEvent(new CustomEvent('records_data_changed', { detail: { type: 'CREATE', record: result } }));
-                }
-            }
+            if (result) syncCacheOnCreate(result);
             return result;
         }
         
-        if (error) {
-            // Fallback for missing dangky_records table
-            if (targetTable === 'dangky_records' && (error.code === '42P01' || error.code === 'PGRST205' || String(error.message || '').includes('schema cache'))) {
-                console.warn('Table dangky_records missing on Supabase, falling back to land_records...');
-                const landRes = await supabase.from('land_records').insert([payload]).select();
-                if (!landRes.error) {
-                    const result = mapRecordFromDb({ ...recordToSave, ...(landRes.data?.[0] || {}), sourceTable: 'dangky_records' }) as RecordFile;
-                    if (result) {
-                        syncCacheOnCreate(result);
-                        if (typeof window !== 'undefined') {
-                            window.dispatchEvent(new CustomEvent('records_data_changed', { detail: { type: 'CREATE', record: result } }));
-                        }
-                    }
-                    return result;
-                }
-            }
-            throw error;
-        }
+        if (error) throw error;
         const result = mapRecordFromDb({ ...recordToSave, ...(data?.[0] || {}), sourceTable: targetTable }) as RecordFile;
-        if (result) {
-            syncCacheOnCreate(result);
-            if (typeof window !== 'undefined') {
-                window.dispatchEvent(new CustomEvent('records_data_changed', { detail: { type: 'CREATE', record: result } }));
-            }
-        }
+        if (result) syncCacheOnCreate(result);
         return result;
     } catch (error) {
         logError("createRecordApi", error, true);
         syncCacheOnCreate(recordToSave);
-        if (typeof window !== 'undefined') {
-            window.dispatchEvent(new CustomEvent('records_data_changed', { detail: { type: 'CREATE', record: recordToSave } }));
-        }
         return recordToSave;
     }
 };
@@ -581,30 +454,17 @@ export const updateRecordApi = async (record: RecordFile): Promise<RecordFile | 
             const { data: fallbackData, error: fallbackError } = await supabase.from(targetTable).update(fallbackPayload).eq('id', record.id).select();
             if (fallbackError) throw fallbackError;
             const result = mapRecordFromDb({ ...record, ...(fallbackData?.[0] || {}), sourceTable: targetTable }) as RecordFile;
-            if (result) {
-                syncCacheOnUpdate(result);
-                if (typeof window !== 'undefined') {
-                    window.dispatchEvent(new CustomEvent('records_data_changed', { detail: { type: 'UPDATE', record: result } }));
-                }
-            }
+            if (result) syncCacheOnUpdate(result);
             return result;
         }
         
         if (error) throw error;
         const result = mapRecordFromDb({ ...record, ...(data?.[0] || {}), sourceTable: targetTable }) as RecordFile;
-        if (result) {
-            syncCacheOnUpdate(result);
-            if (typeof window !== 'undefined') {
-                window.dispatchEvent(new CustomEvent('records_data_changed', { detail: { type: 'UPDATE', record: result } }));
-            }
-        }
+        if (result) syncCacheOnUpdate(result);
         return result;
     } catch (error) {
         logError("updateRecordApi", error, true);
         syncCacheOnUpdate(record);
-        if (typeof window !== 'undefined') {
-            window.dispatchEvent(new CustomEvent('records_data_changed', { detail: { type: 'UPDATE', record } }));
-        }
         return record;
     }
 };
@@ -636,31 +496,18 @@ export const updateRecordFieldsApi = async (id: string, fields: Partial<RecordFi
             const { data: fallbackData, error: fallbackError } = await supabase.from(targetTable).update(fallbackPayload).eq('id', id).select();
             if (fallbackError) throw fallbackError;
             const result = mapRecordFromDb({ id, ...fields, ...(fallbackData?.[0] || {}), sourceTable: targetTable }) as RecordFile;
-            if (result) {
-                syncCacheOnUpdate(result);
-                if (typeof window !== 'undefined') {
-                    window.dispatchEvent(new CustomEvent('records_data_changed', { detail: { type: 'UPDATE', record: result } }));
-                }
-            }
+            if (result) syncCacheOnUpdate(result);
             return result;
         }
         
         if (error) throw error;
         const result = mapRecordFromDb({ id, ...fields, ...(data?.[0] || {}), sourceTable: targetTable }) as RecordFile;
-        if (result) {
-            syncCacheOnUpdate(result);
-            if (typeof window !== 'undefined') {
-                window.dispatchEvent(new CustomEvent('records_data_changed', { detail: { type: 'UPDATE', record: result } }));
-            }
-        }
+        if (result) syncCacheOnUpdate(result);
         return result;
     } catch (error) {
         logError("updateRecordFieldsApi", error, true);
         const fallbackRecord = { id, ...fields } as RecordFile;
         syncCacheOnUpdate(fallbackRecord);
-        if (typeof window !== 'undefined') {
-            window.dispatchEvent(new CustomEvent('records_data_changed', { detail: { type: 'UPDATE', record: fallbackRecord } }));
-        }
         return fallbackRecord;
     }
 };

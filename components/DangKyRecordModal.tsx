@@ -10,7 +10,6 @@ import { detectProcedureId, getShortRecordType, getDefaultDocsForProcedure } fro
 import { addActivityLog } from '../services/activityLogService';
 import { AutoResizeTextarea } from './AutoResizeTextarea';
 import { isStepActiveInProcedure, getValidStatusesForDangKyRecord } from '../constants/procedureWorkflows';
-import { parseAttachedDocs } from './DangKyDetailModal';
 
 interface DangKyRecordModalProps {
   isOpen: boolean;
@@ -60,16 +59,9 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
     const todayStr = new Date().toISOString().split('T')[0];
     const defaultType = '3.1.1 Chuyển quyền';
     const initialDeadline = calculateDeadlineHelper(defaultType, todayStr, holidays || []);
-    const newId = (typeof crypto !== 'undefined' && crypto.randomUUID) 
-      ? crypto.randomUUID() 
-      : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
-          const r = (Math.random() * 16) | 0;
-          const v = c === 'x' ? r : ((r & 0x3) | 0x8);
-          return v.toString(16);
-        });
     
     return {
-      id: newId,
+      id: `dk-${Date.now()}`,
       code: `HS-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`,
       owners: [{ name: '', cccd: '', address: '', phone: '' }],
       transferees: [],
@@ -135,7 +127,7 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
         owners: initialData.owners && initialData.owners.length > 0 ? initialData.owners : [{ name: '', cccd: '', address: '', phone: '' }],
         transferees: initialData.transferees || []
       });
-      const initialDocs = parseAttachedDocs(initialData.attachedDocs, initialData.otherDocs, initialData.attachedDocuments).map(d => ({
+      const initialDocs = ((initialData.attachedDocs || initialData.attachedDocuments || []) as any[]).map((d: any) => ({
         name: d.name || '',
         type: d.type || 'Bản chính'
       }));
