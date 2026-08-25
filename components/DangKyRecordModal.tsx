@@ -1258,8 +1258,11 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
 
           {/* 7. THÔNG TIN NGƯỜI ĐƯỢC ỦY QUYỀN (NẾU CÓ) */}
           <div className="bg-white rounded-xl border border-slate-200 shadow-xs">
-            <div className="p-3.5 sm:p-4 flex items-center justify-between gap-2 bg-white rounded-xl">
-              <h3 className="text-xs sm:text-sm font-bold text-slate-800 uppercase flex items-center gap-1.5">
+            <div 
+              onClick={() => setShowAuthorizedSection(!showAuthorizedSection)}
+              className="p-3.5 sm:p-4 flex items-center justify-between gap-2 bg-white rounded-xl cursor-pointer select-none hover:bg-slate-50/80 transition-colors"
+            >
+              <h3 className="text-xs sm:text-sm font-bold text-slate-800 uppercase flex items-center gap-1.5 cursor-pointer">
                 <span className="p-1 bg-indigo-100 text-indigo-600 rounded-md">
                   <Shield size={14} />
                 </span>
@@ -1267,7 +1270,10 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
               </h3>
               <button
                 type="button"
-                onClick={() => setShowAuthorizedSection(!showAuthorizedSection)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowAuthorizedSection(!showAuthorizedSection);
+                }}
                 className="text-xs font-bold uppercase rounded-md border border-slate-200 hover:bg-slate-50 px-2.5 py-1 text-slate-600 bg-white shadow-xs cursor-pointer"
               >
                 {showAuthorizedSection ? '▲ ẨN' : '▼ HIỆN'}

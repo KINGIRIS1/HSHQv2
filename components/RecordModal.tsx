@@ -803,14 +803,20 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
 
                             {/* THÔNG TIN NGƯỜI ĐƯỢC ỦY QUYỀN (NẾU CÓ) */}
                             <div className="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden">
-                                <div className="p-3.5 flex items-center justify-between gap-4 border-b border-slate-100 bg-slate-50/50">
-                                    <h3 className="text-xs font-bold text-slate-700 uppercase flex items-center gap-2">
+                                <div 
+                                    onClick={() => setIsAuthOpen(!isAuthOpen)}
+                                    className="p-3.5 flex items-center justify-between gap-4 border-b border-slate-100 bg-slate-50/50 cursor-pointer select-none hover:bg-slate-100/70 transition-colors"
+                                >
+                                    <h3 className="text-xs font-bold text-slate-700 uppercase flex items-center gap-2 cursor-pointer">
                                         <UserIcon size={14} className="text-indigo-600" />
                                         Thông tin người được ủy quyền (nếu có)
                                     </h3>
                                     <button
                                         type="button"
-                                        onClick={() => setIsAuthOpen(!isAuthOpen)}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setIsAuthOpen(!isAuthOpen);
+                                        }}
                                         className="flex items-center gap-1 text-[10px] font-bold uppercase rounded-lg border border-slate-200 hover:bg-white transition-all px-2.5 py-1 text-slate-600 bg-white shadow-2xs cursor-pointer"
                                     >
                                         {isAuthOpen ? '▲ ẨN NHẬP LIỆU' : '▼ HIỆN NHẬP LIỆU'}

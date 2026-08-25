@@ -1073,14 +1073,20 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
 
                 {/* 6. THÔNG TIN NGƯỜI ĐƯỢC ỦY QUYỀN (NẾU CÓ - TOÀN KHUNG) */}
                 <div className="bg-white rounded-xl border border-slate-200 shadow-xs">
-                    <div className="p-3.5 sm:p-4 flex items-center justify-between gap-2 bg-white rounded-xl">
-                        <h3 className="text-xs sm:text-sm font-bold text-slate-800 uppercase flex items-center gap-1.5">
+                    <div 
+                        onClick={() => setIsAuthOpen(!isAuthOpen)}
+                        className="p-3.5 sm:p-4 flex items-center justify-between gap-2 bg-white rounded-xl cursor-pointer select-none hover:bg-slate-50/80 transition-colors"
+                    >
+                        <h3 className="text-xs sm:text-sm font-bold text-slate-800 uppercase flex items-center gap-1.5 cursor-pointer">
                             <span className="p-1 bg-indigo-100 text-indigo-600 rounded-md"><Shield size={14} /></span>
                             Người ủy quyền (nếu có)
                         </h3>
                         <button
                             type="button"
-                            onClick={() => setIsAuthOpen(!isAuthOpen)}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setIsAuthOpen(!isAuthOpen);
+                            }}
                             className="text-xs font-bold uppercase rounded-md border border-slate-200 hover:bg-slate-50 px-2.5 py-1 text-slate-600 bg-white shadow-xs cursor-pointer"
                         >
                             {isAuthOpen ? '▲ ẨN' : '▼ HIỆN'}
@@ -1378,14 +1384,20 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
 
                 {/* 5. THÔNG TIN NGƯỜI ĐƯỢC ỦY QUYỀN (NẾU CÓ - TOÀN KHUNG) */}
                 <div className="bg-white rounded-xl border border-slate-200 shadow-xs">
-                    <div className="p-3.5 sm:p-4 flex items-center justify-between gap-2 bg-white rounded-xl">
-                        <h3 className="text-xs sm:text-sm font-bold text-slate-800 uppercase flex items-center gap-1.5">
+                    <div 
+                        onClick={() => setIsAuthOpen(!isAuthOpen)}
+                        className="p-3.5 sm:p-4 flex items-center justify-between gap-2 bg-white rounded-xl cursor-pointer select-none hover:bg-slate-50/80 transition-colors"
+                    >
+                        <h3 className="text-xs sm:text-sm font-bold text-slate-800 uppercase flex items-center gap-1.5 cursor-pointer">
                             <span className="p-1 bg-indigo-100 text-indigo-600 rounded-md"><Shield size={14} /></span>
                             Người ủy quyền (nếu có)
                         </h3>
                         <button
                             type="button"
-                            onClick={() => setIsAuthOpen(!isAuthOpen)}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setIsAuthOpen(!isAuthOpen);
+                            }}
                             className="text-xs font-bold uppercase rounded-md border border-slate-200 hover:bg-slate-50 px-2.5 py-1 text-slate-600 bg-white shadow-xs cursor-pointer"
                         >
                             {isAuthOpen ? '▲ ẨN' : '▼ HIỆN'}
