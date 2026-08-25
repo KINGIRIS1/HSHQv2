@@ -34,6 +34,95 @@ const STEP_ICONS: Record<string, any> = {
   tra_ket_qua: FileCheck
 };
 
+export interface AttachedDocItem {
+  id?: string;
+  name: string;
+  type: string;
+}
+
+export const parseAttachedDocs = (rawDocs: any, otherDocsStr?: string, attachedDocumentsRaw?: any): AttachedDocItem[] => {
+  const tryParseJson = (str: string): any => {
+    if (!str || typeof str !== 'string') return null;
+    const clean = str.trim();
+    if ((clean.startsWith('[') && clean.endsWith(']')) || (clean.startsWith('{') && clean.endsWith('}'))) {
+      try {
+        return JSON.parse(clean);
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  };
+
+  // 1. If rawDocs is already an Array
+  if (Array.isArray(rawDocs) && rawDocs.length > 0) {
+    return rawDocs.map((d, i) => {
+      if (typeof d === 'string') {
+        const json = tryParseJson(d);
+        if (json && typeof json === 'object') {
+          return {
+            id: json.id || String(i + 1),
+            name: json.name || json.docName || d,
+            type: json.type || json.docType || 'Bản chính'
+          };
+        }
+        return { id: String(i + 1), name: d, type: 'Bản chính' };
+      }
+      return {
+        id: d.id || String(i + 1),
+        name: d.name || d.docName || '',
+        type: d.type || d.docType || 'Bản chính'
+      };
+    }).filter(d => d.name && d.name.trim() !== '');
+  }
+
+  // 2. If rawDocs is a JSON string
+  if (typeof rawDocs === 'string' && rawDocs.trim()) {
+    const parsed = tryParseJson(rawDocs);
+    if (Array.isArray(parsed)) {
+      return parseAttachedDocs(parsed);
+    } else if (parsed && typeof parsed === 'object') {
+      return [{
+        id: parsed.id || '1',
+        name: parsed.name || parsed.docName || rawDocs,
+        type: parsed.type || parsed.docType || 'Bản chính'
+      }];
+    }
+  }
+
+  // 3. If attachedDocumentsRaw is provided
+  if (Array.isArray(attachedDocumentsRaw) && attachedDocumentsRaw.length > 0) {
+    return parseAttachedDocs(attachedDocumentsRaw);
+  }
+  if (typeof attachedDocumentsRaw === 'string' && attachedDocumentsRaw.trim()) {
+    const parsed = tryParseJson(attachedDocumentsRaw);
+    if (parsed) return parseAttachedDocs(parsed);
+  }
+
+  // 4. If otherDocsStr is a JSON string
+  if (typeof otherDocsStr === 'string' && otherDocsStr.trim()) {
+    const parsed = tryParseJson(otherDocsStr);
+    if (Array.isArray(parsed)) {
+      return parseAttachedDocs(parsed);
+    } else if (parsed && typeof parsed === 'object') {
+      return [{
+        id: parsed.id || '1',
+        name: parsed.name || parsed.docName || otherDocsStr,
+        type: parsed.type || parsed.docType || 'Bản chính'
+      }];
+    } else {
+      // Normal semicolon / newline separated text
+      return otherDocsStr.split(/[\n;]/).map((item, idx) => ({
+        id: String(idx + 1),
+        name: item.trim(),
+        type: 'Bản chính'
+      })).filter(d => d.name !== '');
+    }
+  }
+
+  return [];
+};
+
 interface DangKyDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -415,14 +504,73 @@ export const DangKyDetailModal: React.FC<DangKyDetailModalProps> = ({
   const owners = record.owners || [];
   const transferees = record.transferees || [];
   const hasTransferees = transferees.length > 0 && transferees.some(t => t.name && t.name.trim() !== '');
-  const primaryPerson = record.applicantName 
-    ? {
-        name: record.applicantName,
-        phone: record.applicantPhone || '',
-        cccd: record.applicantCccd || '',
-        address: record.applicantAddress || ''
-      }
-    : (hasTransferees ? transferees[0] : (owners.length > 0 ? owners[0] : null));
+  const hasOwners = owners.length > 0 && owners.some(o => o.name && o.name.trim() !== '');
+
+  // Ưu tiên hiển thị: 1. Người nộp / Khách hàng -> 2. Người được ủy quyền -> 3. Người nhận CQ -> 4. Chủ sử dụng
+  const primaryPerson = (() => {
+    if (record.applicantName && record.applicantName.trim()) {
+      return {
+        role: '',
+        roleBadge: '',
+        name: record.applicantName.trim(),
+        phone: record.applicantPhone || record.phoneNumber || 'Chưa cập nhật',
+        cccd: record.applicantCccd || record.cccd || 'Chưa cập nhật',
+        address: record.applicantAddress || record.customerAddress || 'Chưa cập nhật'
+      };
+    }
+    if (record.authorizedPersonName && record.authorizedPersonName.trim()) {
+      return {
+        role: 'Người được ủy quyền',
+        roleBadge: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+        name: record.authorizedPersonName.trim(),
+        phone: record.authorizedPersonPhone || record.phoneNumber || 'Chưa cập nhật',
+        cccd: record.authorizedPersonId || record.cccd || 'Chưa cập nhật',
+        address: record.authorizedPersonAddress || record.customerAddress || 'Chưa cập nhật'
+      };
+    }
+    if (hasTransferees) {
+      const t = transferees[0];
+      return {
+        role: 'Người nhận chuyển quyền',
+        roleBadge: 'bg-teal-50 text-teal-700 border-teal-200',
+        name: t.name.trim(),
+        phone: t.phone || record.phoneNumber || 'Chưa cập nhật',
+        cccd: t.cccd || record.cccd || 'Chưa cập nhật',
+        address: t.address || record.customerAddress || 'Chưa cập nhật'
+      };
+    }
+    if (hasOwners) {
+      const o = owners[0];
+      return {
+        role: 'Chủ sử dụng',
+        roleBadge: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+        name: o.name.trim(),
+        phone: o.phone || record.phoneNumber || 'Chưa cập nhật',
+        cccd: o.cccd || record.cccd || 'Chưa cập nhật',
+        address: o.address || record.customerAddress || 'Chưa cập nhật'
+      };
+    }
+    if (record.customerName && record.customerName.trim()) {
+      return {
+        role: '',
+        roleBadge: '',
+        name: record.customerName.trim(),
+        phone: record.phoneNumber || 'Chưa cập nhật',
+        cccd: record.cccd || 'Chưa cập nhật',
+        address: record.customerAddress || record.address || 'Chưa cập nhật'
+      };
+    }
+    return {
+      role: '',
+      roleBadge: '',
+      name: 'Chưa cập nhật tên',
+      phone: record.phoneNumber || 'Chưa cập nhật',
+      cccd: record.cccd || 'Chưa cập nhật',
+      address: record.customerAddress || record.address || 'Chưa cập nhật'
+    };
+  })();
+
+  const parsedAttachedDocs = parseAttachedDocs(record.attachedDocs, record.otherDocs, record.attachedDocuments);
   const nextStatus = getNextStatusForDangKyRecord(record);
 
   return (
@@ -505,45 +653,50 @@ export const DangKyDetailModal: React.FC<DangKyDetailModalProps> = ({
             {/* COLUMN 1: THÔNG TIN CHỦ HỒ SƠ & ĐỊA CHÍNH */}
             <div className="space-y-6">
               
-              {/* THÔNG TIN NGƯỜI NỘP HỒ SƠ */}
+              {/* THÔNG TIN KHÁCH HÀNG */}
               <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
-                <h3 className="text-xs font-bold text-blue-600 uppercase mb-4 flex items-center gap-2 border-l-4 border-blue-600 pl-2">
-                  <UserIcon size={16}/> Người nộp hồ sơ
-                </h3>
+                <div className="flex items-center justify-between mb-4 border-l-4 border-blue-600 pl-2">
+                  <h3 className="text-xs font-bold text-blue-600 uppercase flex items-center gap-2">
+                    <UserIcon size={16}/> Thông tin khách hàng
+                  </h3>
+                  {primaryPerson.role && primaryPerson.roleBadge && (
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${primaryPerson.roleBadge}`}>
+                      {primaryPerson.role}
+                    </span>
+                  )}
+                </div>
                 
-                {!primaryPerson || !primaryPerson.name ? (
-                  <p className="text-xs text-gray-400 italic">Chưa có thông tin người nộp hồ sơ</p>
-                ) : (
-                  <div className="space-y-3">
-                    <div>
-                      <label className="text-[10px] text-gray-400 uppercase font-bold block mb-1">
-                        Họ và tên người nộp
-                      </label>
-                      <p className="text-base font-bold text-gray-800 uppercase">{primaryPerson.name}</p>
-                    </div>
-                    
-                    {primaryPerson.phone && (
-                      <div>
-                        <label className="text-[10px] text-gray-400 uppercase font-bold block mb-0.5">Số điện thoại</label>
-                        <p className="text-xs font-bold text-emerald-700 font-mono">{primaryPerson.phone}</p>
-                      </div>
-                    )}
-
-                    {primaryPerson.cccd && (
-                      <div>
-                        <label className="text-[10px] text-gray-400 uppercase font-bold block mb-0.5">Số CCCD / CMND</label>
-                        <p className="text-xs font-bold text-gray-800 font-mono">{primaryPerson.cccd}</p>
-                      </div>
-                    )}
-
-                    {primaryPerson.address && (
-                      <div>
-                        <label className="text-[10px] text-gray-400 uppercase font-bold block mb-0.5">Địa chỉ thường trú</label>
-                        <p className="text-xs font-semibold text-gray-700">{primaryPerson.address}</p>
-                      </div>
-                    )}
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-[10px] text-gray-400 uppercase font-bold block mb-0.5">
+                      Họ và tên
+                    </label>
+                    <p className="text-base font-bold text-gray-800 uppercase">{primaryPerson.name}</p>
                   </div>
-                )}
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[10px] text-gray-400 uppercase font-bold block mb-0.5">Số điện thoại</label>
+                      <p className={`text-xs font-bold font-mono ${primaryPerson.phone && primaryPerson.phone !== 'Chưa cập nhật' ? 'text-emerald-700' : 'text-gray-400 italic'}`}>
+                        {primaryPerson.phone}
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] text-gray-400 uppercase font-bold block mb-0.5">Số CCCD / CMND</label>
+                      <p className={`text-xs font-bold font-mono ${primaryPerson.cccd && primaryPerson.cccd !== 'Chưa cập nhật' ? 'text-gray-800' : 'text-gray-400 italic'}`}>
+                        {primaryPerson.cccd}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] text-gray-400 uppercase font-bold block mb-0.5">Địa chỉ thường trú</label>
+                    <p className={`text-xs font-semibold ${primaryPerson.address && primaryPerson.address !== 'Chưa cập nhật' ? 'text-gray-700' : 'text-gray-400 italic'}`}>
+                      {primaryPerson.address}
+                    </p>
+                  </div>
+                </div>
 
                 {/* NGƯỜI ĐƯỢC ỦY QUYỀN (NẾU CÓ) */}
                 {record.authorizedPersonName && (
@@ -697,8 +850,8 @@ export const DangKyDetailModal: React.FC<DangKyDetailModalProps> = ({
                   <label className="text-[10px] text-teal-600 uppercase font-bold block mb-2 flex items-center gap-1">
                     <FileText size={12} /> Giấy tờ kèm theo
                   </label>
-                  {record.attachedDocs && record.attachedDocs.length > 0 ? (
-                    <div className="overflow-x-auto border border-gray-200 rounded-lg bg-white">
+                  {parsedAttachedDocs && parsedAttachedDocs.length > 0 ? (
+                    <div className="overflow-x-auto border border-gray-200 rounded-lg bg-white shadow-2xs">
                       <table className="w-full text-left border-collapse text-xs">
                         <thead>
                           <tr className="bg-slate-50 border-b border-gray-200 text-[10px] font-bold text-gray-500 uppercase">
@@ -708,7 +861,7 @@ export const DangKyDetailModal: React.FC<DangKyDetailModalProps> = ({
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
-                          {record.attachedDocs.map((doc, idx) => (
+                          {parsedAttachedDocs.map((doc, idx) => (
                             <tr key={idx} className="hover:bg-slate-50/50">
                               <td className="py-1.5 px-2 text-center font-bold text-gray-400">{idx + 1}</td>
                               <td className="py-1.5 px-2 font-medium text-gray-800">{doc.name}</td>
@@ -726,7 +879,7 @@ export const DangKyDetailModal: React.FC<DangKyDetailModalProps> = ({
                         </tbody>
                       </table>
                     </div>
-                  ) : record.otherDocs ? (
+                  ) : record.otherDocs && !record.otherDocs.trim().startsWith('[') ? (
                     <div className="bg-slate-50 p-2.5 rounded-lg border border-gray-200 text-xs text-gray-700 font-medium">
                       {record.otherDocs}
                     </div>

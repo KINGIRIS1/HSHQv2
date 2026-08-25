@@ -437,12 +437,41 @@ export const getCanonicalRecordType = (type?: string | null, code?: string | nul
 };
 
 // Check if a record type belongs to Archive module (Lưu trữ)
-export const isArchiveRecordType = (type?: string | null): boolean => {
-  if (!type) return false;
-  const short = getShortRecordType(type);
+export const isArchiveRecordType = (type?: string | null, code?: string | null): boolean => {
+  if (!type && !code) return false;
+  const short = getShortRecordType(type, code);
   if (short === '1.1 Sao lục' || short === '1.2 Công văn') return true;
-  const tLower = type.toLowerCase();
-  return tLower.includes('1.1') || tLower.includes('sao lục') || tLower.includes('1.2') || tLower.includes('công văn') || tLower.includes('cc dl đđ') || tLower.includes('cung cấp dữ liệu');
+  const tLower = (type || '').toLowerCase();
+  const cLower = (code || '').toLowerCase();
+  return tLower.includes('1.1') || tLower.includes('sao lục') || tLower.includes('1.2') || tLower.includes('công văn') || tLower.includes('cc dl đđ') || tLower.includes('cung cấp dữ liệu') ||
+         cLower.includes('1.1') || cLower.includes('sl-') || cLower.includes('cv-') || cLower.includes('1.2');
+};
+
+// Check if a record belongs to Dang Ky (Đăng ký đất đai / Cấp giấy)
+export const isDangKyRecordType = (type?: string | null, code?: string | null): boolean => {
+  if (!type && !code) return false;
+  const detectedId = detectProcedureId(code, type);
+  if (detectedId && detectedId.startsWith('3.')) return true;
+
+  const tLower = (type || '').toLowerCase();
+  const cLower = (code || '').toLowerCase();
+
+  if (tLower.startsWith('3.') || cLower.startsWith('3.')) return true;
+
+  const dangKyKeywords = [
+    'chuyển quyền', 'chuyển nhượng', 'tặng cho', 'thừa kế', 'cấp đổi', 'cấp lại',
+    'đăng ký biến động', 'đkbđ', 'biến động', 'giao dịch bảo đảm', 'thế chấp', 'xóa thế chấp',
+    'đính chính', 'cấp gcn', 'cấp giấy', 'phân chia quyền', 'tách hợp thửa đăng ký', '3.1', '3.2', '3.3', '3.4', '3.5', '3.6', '3.7', '3.8', '3.9'
+  ];
+
+  return dangKyKeywords.some(kw => tLower.includes(kw) || cLower.includes(kw));
+};
+
+// Check if a record belongs to Do Dac (Đo đạc)
+export const isDoDacRecordType = (type?: string | null, code?: string | null): boolean => {
+  if (isArchiveRecordType(type, code)) return false;
+  if (isDangKyRecordType(type, code)) return false;
+  return true;
 };
 
 // Get default attached documents for a procedure

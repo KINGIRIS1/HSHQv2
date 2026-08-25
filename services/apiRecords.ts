@@ -1,43 +1,55 @@
 import { supabase, isConfigured } from './supabaseClient';
 import { RecordFile } from '../types';
-import { MOCK_RECORDS, API_BASE_URL, isArchiveRecordType } from '../constants';
+import { MOCK_RECORDS, API_BASE_URL } from '../constants';
+import { isArchiveRecordType, isDangKyRecordType } from '../constants/procedures';
 import { logError, getFromCache, saveToCache, CACHE_KEYS, sanitizeData, sanitizePayloadFor22P02, normalizeCode, mapRecordFromDb } from './apiCore';
 
 const RECORD_DB_COLUMNS = [
     'id', 'code', 'customerName', 'phoneNumber', 'cccd', 'customerAddress', 'ward', 'landPlot', 'mapSheet', 
-    'area', 'address', 'group', 'content', 'recordType', 'receivedDate', 'receivedBy', 'deadline', 
+    'area', 'totalArea', 'address', 'group', 'content', 'recordType', 'receivedDate', 'receivedBy', 'deadline', 
     'assignedDate', 'submissionDate', 'approvalDate', 'completedDate', 'status', 'assignedTo', 'submittedTo', 'checkedBy',
     'pendingCheckDate', 'checkedDate', 'completedWorkDate',
     'notes', 'privateNotes', 'personalNotes', 
     'authorizedBy', 'authorizedPersonName', 'authorizedPersonId', 'authorizedPersonPhone', 'authorizedPersonAddress', 'authDocType', 'otherDocs', 'exportBatch', 'exportDate', 'handoverWard',
     'measurementNumber', 'excerptNumber',
     'reminderDate', 'lastRemindedAt', 'deadlineReminded',
-    'receiptNumber', 'resultReturnedDate', 'receiverName',
+    'receiptNumber', 'invoiceNumber', 'receiptType', 'feeAmount', 'returnedPrice', 'resultReturnedDate', 'receiverName',
     'needsMapCorrection', 'explanationPlan',
     'issueNumber', 'entryNumber', 'issueDate', 'residentialArea',
     'price', 'advancePayment', 'isHandedOver',
-    'statusLogs', 'archiveHandoverDate', 'archiveHandoverBatch'
+    'statusLogs', 'archiveHandoverDate', 'archiveHandoverBatch',
+    'owners', 'transferees', 'applicantName', 'applicantPhone', 'applicantCccd', 'applicantAddress', 'applicantIsOwner',
+    'submitterName', 'submitterPhone', 'nonBoundaryWard', 'isNonBoundary', 'attachedDocs', 'attachedDocuments', 'deliveryDate',
+    'appraisalDate', 'appraisalStaff', 'taxFormDate', 'taxFormNumber', 'taxFormStaff', 'taxKV7TransferDate', 'taxKV7Staff',
+    'taxNoticeDate', 'taxNoticeStaff', 'taxPaymentReceiptDate', 'printDate', 'printStaff'
 ];
 
 export const getTargetTable = (record: Partial<RecordFile>): 'dangky_records' | 'land_records' | 'luutru_records' => {
+    // 1. Prioritize explicit check for Archive (1.x) or Dang Ky (3.x, Chuyển quyền, Cấp đổi, Biến động...)
+    if (isArchiveRecordType(record.recordType, record.code) || isArchiveRecordType(record.content, record.code)) {
+        return 'luutru_records';
+    }
+
+    if (isDangKyRecordType(record.recordType, record.code) || isDangKyRecordType(record.content, record.code)) {
+        return 'dangky_records';
+    }
+
     if (record.sourceTable === 'luutru_records' || record.sourceTable === 'archive_records') return 'luutru_records';
     if (record.sourceTable === 'dangky_records') return 'dangky_records';
     if (record.sourceTable === 'land_records') return 'land_records';
-
-    // Check if recordType or content is an archive type
-    if (isArchiveRecordType(record.recordType) || isArchiveRecordType(record.content)) {
-        return 'luutru_records';
-    }
 
     if (record.id) {
         const cached: RecordFile[] = getFromCache(CACHE_KEYS.RECORDS, []);
         const found = cached.find(r => r.id === record.id);
         if (found) {
-            if (found.sourceTable === 'luutru_records' || found.sourceTable === 'archive_records') return 'luutru_records';
-            if (found.sourceTable === 'dangky_records' || found.sourceTable === 'land_records') return found.sourceTable;
-            if (isArchiveRecordType(found.recordType) || isArchiveRecordType(found.content)) {
+            if (isArchiveRecordType(found.recordType, found.code) || isArchiveRecordType(found.content, found.code)) {
                 return 'luutru_records';
             }
+            if (isDangKyRecordType(found.recordType, found.code) || isDangKyRecordType(found.content, found.code)) {
+                return 'dangky_records';
+            }
+            if (found.sourceTable === 'luutru_records' || found.sourceTable === 'archive_records') return 'luutru_records';
+            if (found.sourceTable === 'dangky_records' || found.sourceTable === 'land_records') return found.sourceTable;
         }
     }
     return 'land_records';

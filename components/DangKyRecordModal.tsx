@@ -10,6 +10,7 @@ import { detectProcedureId, getShortRecordType, getDefaultDocsForProcedure } fro
 import { addActivityLog } from '../services/activityLogService';
 import { AutoResizeTextarea } from './AutoResizeTextarea';
 import { isStepActiveInProcedure, getValidStatusesForDangKyRecord } from '../constants/procedureWorkflows';
+import { parseAttachedDocs } from './DangKyDetailModal';
 
 interface DangKyRecordModalProps {
   isOpen: boolean;
@@ -127,7 +128,7 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
         owners: initialData.owners && initialData.owners.length > 0 ? initialData.owners : [{ name: '', cccd: '', address: '', phone: '' }],
         transferees: initialData.transferees || []
       });
-      const initialDocs = ((initialData.attachedDocs || initialData.attachedDocuments || []) as any[]).map((d: any) => ({
+      const initialDocs = parseAttachedDocs(initialData.attachedDocs, initialData.otherDocs, initialData.attachedDocuments).map(d => ({
         name: d.name || '',
         type: d.type || 'Bản chính'
       }));
