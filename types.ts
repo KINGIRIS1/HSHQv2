@@ -524,6 +524,7 @@ export interface DangKyRecord {
   address?: string;                        // Địa chỉ thửa đất / nơi cư trú
   submitterName?: string;                  // Tên người nộp (alias)
   submitterPhone?: string;                 // SĐT người nộp (alias)
+  sourceTable?: 'dangky_records' | 'land_records' | 'luutru_records';
   createdAt?: string;
   updatedAt?: string;
 }

@@ -60,9 +60,16 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
     const todayStr = new Date().toISOString().split('T')[0];
     const defaultType = '3.1.1 Chuyển quyền';
     const initialDeadline = calculateDeadlineHelper(defaultType, todayStr, holidays || []);
+    const newId = (typeof crypto !== 'undefined' && crypto.randomUUID) 
+      ? crypto.randomUUID() 
+      : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+          const r = (Math.random() * 16) | 0;
+          const v = c === 'x' ? r : ((r & 0x3) | 0x8);
+          return v.toString(16);
+        });
     
     return {
-      id: `dk-${Date.now()}`,
+      id: newId,
       code: `HS-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`,
       owners: [{ name: '', cccd: '', address: '', phone: '' }],
       transferees: [],

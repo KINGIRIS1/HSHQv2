@@ -253,6 +253,22 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
     useEffect(() => {
         loadData();
         fetchEmployees().then(data => setEmployeesList(data || [])).catch(() => {});
+
+        const handleDataChange = () => {
+            loadData();
+        };
+
+        if (typeof window !== 'undefined') {
+            window.addEventListener('records_data_changed', handleDataChange);
+            window.addEventListener('focus', handleDataChange);
+        }
+
+        return () => {
+            if (typeof window !== 'undefined') {
+                window.removeEventListener('records_data_changed', handleDataChange);
+                window.removeEventListener('focus', handleDataChange);
+            }
+        };
     }, []);
 
     // Tự động chuyển về trang 1 và bỏ chọn khi đổi Tab
@@ -765,18 +781,14 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
         if (submitterName) {
             return {
                 name: submitterName,
-                phone: r.applicantPhone || (r as any).submitterPhone || r.phoneNumber || '',
-                roleLabel: '',
-                roleColor: ''
+                phone: r.applicantPhone || (r as any).submitterPhone || r.phoneNumber || ''
             };
         }
         // Priority 2: Authorized Person
         if (r.authorizedPersonName && r.authorizedPersonName.trim()) {
             return {
                 name: r.authorizedPersonName.trim(),
-                phone: r.authorizedPersonPhone || r.phoneNumber || '',
-                roleLabel: 'Người UQ',
-                roleColor: 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                phone: r.authorizedPersonPhone || r.phoneNumber || ''
             };
         }
         // Priority 3: Transferee
@@ -784,9 +796,7 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
             const t = r.transferees[0];
             return {
                 name: t.name.trim(),
-                phone: t.phone || r.phoneNumber || '',
-                roleLabel: 'Người nhận CQ',
-                roleColor: 'bg-teal-50 text-teal-700 border-teal-200'
+                phone: t.phone || r.phoneNumber || ''
             };
         }
         // Priority 4: Owner
@@ -794,25 +804,19 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
             const o = r.owners[0];
             return {
                 name: o.name.trim(),
-                phone: o.phone || r.phoneNumber || '',
-                roleLabel: 'Chủ sử dụng',
-                roleColor: 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                phone: o.phone || r.phoneNumber || ''
             };
         }
         // Priority 5: Customer fallback
         if (r.customerName && r.customerName.trim()) {
             return {
                 name: r.customerName.trim(),
-                phone: r.phoneNumber || '',
-                roleLabel: '',
-                roleColor: ''
+                phone: r.phoneNumber || ''
             };
         }
         return {
             name: 'Chưa cập nhật tên',
-            phone: r.phoneNumber || '',
-            roleLabel: '',
-            roleColor: ''
+            phone: r.phoneNumber || ''
         };
     };
 
@@ -1386,7 +1390,7 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
         onProgress?: (processed: number, total: number) => void
     ): Promise<boolean> => {
         try {
-            await saveDangKyRecordsBatchApi(importedRecords);
+            await saveDangKyRecordsBatchApi(importedRecords, onProgress);
             addActivityLog({
                 performerName: currentUser.fullName || currentUser.username,
                 performerRole: 'DANGKY',
@@ -2086,11 +2090,6 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                                                                 <span className="font-semibold text-gray-900 text-sm">
                                                                     {cust.name}
                                                                 </span>
-                                                                {cust.roleLabel && cust.roleLabel !== '-' && (
-                                                                    <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded border ${cust.roleColor}`}>
-                                                                        {cust.roleLabel}
-                                                                    </span>
-                                                                )}
                                                             </div>
                                                             {cust.phone ? (
                                                                 <div className="text-xs text-emerald-700 font-mono flex items-center gap-1.5 font-medium">

@@ -199,3 +199,27 @@ END $$;
 ALTER TABLE dangky_records ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Cho phép tất cả thao tác trên dangky_records" ON dangky_records;
 CREATE POLICY "Cho phép tất cả thao tác trên dangky_records" ON dangky_records FOR ALL USING (true);
+
+-- 6. TẠO BẢNG RECORD_HISTORY (NẾU CHƯA CÓ) ĐỂ TRÁNH LỖI 42P01
+CREATE TABLE IF NOT EXISTS record_history (
+    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+    record_id TEXT,
+    record_code TEXT,
+    action TEXT,
+    changes JSONB DEFAULT '{}'::jsonb,
+    performed_by TEXT,
+    performed_at TIMESTAMPTZ DEFAULT NOW(),
+    notes TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE record_history ADD COLUMN IF NOT EXISTS record_id TEXT;
+ALTER TABLE record_history ADD COLUMN IF NOT EXISTS record_code TEXT;
+ALTER TABLE record_history ADD COLUMN IF NOT EXISTS action TEXT;
+ALTER TABLE record_history ADD COLUMN IF NOT EXISTS changes JSONB DEFAULT '{}'::jsonb;
+ALTER TABLE record_history ADD COLUMN IF NOT EXISTS performed_by TEXT;
+ALTER TABLE record_history ADD COLUMN IF NOT EXISTS performed_at TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE record_history ADD COLUMN IF NOT EXISTS record_module VARCHAR(50) DEFAULT 'records';
+ALTER TABLE record_history ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Cho phép tất cả thao tác trên record_history" ON record_history;
+CREATE POLICY "Cho phép tất cả thao tác trên record_history" ON record_history FOR ALL USING (true);

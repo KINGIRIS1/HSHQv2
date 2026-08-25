@@ -520,8 +520,8 @@ export const DangKyDetailModal: React.FC<DangKyDetailModalProps> = ({
     }
     if (record.authorizedPersonName && record.authorizedPersonName.trim()) {
       return {
-        role: 'Người được ủy quyền',
-        roleBadge: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+        role: '',
+        roleBadge: '',
         name: record.authorizedPersonName.trim(),
         phone: record.authorizedPersonPhone || record.phoneNumber || 'Chưa cập nhật',
         cccd: record.authorizedPersonId || record.cccd || 'Chưa cập nhật',
@@ -531,8 +531,8 @@ export const DangKyDetailModal: React.FC<DangKyDetailModalProps> = ({
     if (hasTransferees) {
       const t = transferees[0];
       return {
-        role: 'Người nhận chuyển quyền',
-        roleBadge: 'bg-teal-50 text-teal-700 border-teal-200',
+        role: '',
+        roleBadge: '',
         name: t.name.trim(),
         phone: t.phone || record.phoneNumber || 'Chưa cập nhật',
         cccd: t.cccd || record.cccd || 'Chưa cập nhật',
@@ -542,8 +542,8 @@ export const DangKyDetailModal: React.FC<DangKyDetailModalProps> = ({
     if (hasOwners) {
       const o = owners[0];
       return {
-        role: 'Chủ sử dụng',
-        roleBadge: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+        role: '',
+        roleBadge: '',
         name: o.name.trim(),
         phone: o.phone || record.phoneNumber || 'Chưa cập nhật',
         cccd: o.cccd || record.cccd || 'Chưa cập nhật',

@@ -475,10 +475,14 @@ export const createRecordApi = async (record: RecordFile): Promise<RecordFile | 
             finalCode = await getNextGlobalRecordCode(record.receivedDate || new Date().toISOString());
         }
         
-        recordToSave = { ...record, code: finalCode };
-        if (!recordToSave.id) {
-            recordToSave.id = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substr(2, 9);
-        }
+        const isUUID = recordToSave.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(recordToSave.id).trim());
+        const standardId = isUUID ? recordToSave.id : (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+            const r = (Math.random() * 16) | 0;
+            const v = c === 'x' ? r : ((r & 0x3) | 0x8);
+            return v.toString(16);
+        }));
+
+        recordToSave = { ...record, id: standardId, code: finalCode };
         
         const targetTable = getTargetTable(recordToSave);
         const payload = sanitizeData(recordToSave, RECORD_DB_COLUMNS);
@@ -503,17 +507,47 @@ export const createRecordApi = async (record: RecordFile): Promise<RecordFile | 
             const { data: fallbackData, error: fallbackError } = await supabase.from(targetTable).insert([fallbackPayload]).select();
             if (fallbackError) throw fallbackError;
             const result = mapRecordFromDb({ ...recordToSave, ...(fallbackData?.[0] || {}), sourceTable: targetTable }) as RecordFile;
-            if (result) syncCacheOnCreate(result);
+            if (result) {
+                syncCacheOnCreate(result);
+                if (typeof window !== 'undefined') {
+                    window.dispatchEvent(new CustomEvent('records_data_changed', { detail: { type: 'CREATE', record: result } }));
+                }
+            }
             return result;
         }
         
-        if (error) throw error;
+        if (error) {
+            // Fallback for missing dangky_records table
+            if (targetTable === 'dangky_records' && (error.code === '42P01' || error.code === 'PGRST205' || String(error.message || '').includes('schema cache'))) {
+                console.warn('Table dangky_records missing on Supabase, falling back to land_records...');
+                const landRes = await supabase.from('land_records').insert([payload]).select();
+                if (!landRes.error) {
+                    const result = mapRecordFromDb({ ...recordToSave, ...(landRes.data?.[0] || {}), sourceTable: 'dangky_records' }) as RecordFile;
+                    if (result) {
+                        syncCacheOnCreate(result);
+                        if (typeof window !== 'undefined') {
+                            window.dispatchEvent(new CustomEvent('records_data_changed', { detail: { type: 'CREATE', record: result } }));
+                        }
+                    }
+                    return result;
+                }
+            }
+            throw error;
+        }
         const result = mapRecordFromDb({ ...recordToSave, ...(data?.[0] || {}), sourceTable: targetTable }) as RecordFile;
-        if (result) syncCacheOnCreate(result);
+        if (result) {
+            syncCacheOnCreate(result);
+            if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('records_data_changed', { detail: { type: 'CREATE', record: result } }));
+            }
+        }
         return result;
     } catch (error) {
         logError("createRecordApi", error, true);
         syncCacheOnCreate(recordToSave);
+        if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('records_data_changed', { detail: { type: 'CREATE', record: recordToSave } }));
+        }
         return recordToSave;
     }
 };
@@ -544,17 +578,30 @@ export const updateRecordApi = async (record: RecordFile): Promise<RecordFile | 
             const { data: fallbackData, error: fallbackError } = await supabase.from(targetTable).update(fallbackPayload).eq('id', record.id).select();
             if (fallbackError) throw fallbackError;
             const result = mapRecordFromDb({ ...record, ...(fallbackData?.[0] || {}), sourceTable: targetTable }) as RecordFile;
-            if (result) syncCacheOnUpdate(result);
+            if (result) {
+                syncCacheOnUpdate(result);
+                if (typeof window !== 'undefined') {
+                    window.dispatchEvent(new CustomEvent('records_data_changed', { detail: { type: 'UPDATE', record: result } }));
+                }
+            }
             return result;
         }
         
         if (error) throw error;
         const result = mapRecordFromDb({ ...record, ...(data?.[0] || {}), sourceTable: targetTable }) as RecordFile;
-        if (result) syncCacheOnUpdate(result);
+        if (result) {
+            syncCacheOnUpdate(result);
+            if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('records_data_changed', { detail: { type: 'UPDATE', record: result } }));
+            }
+        }
         return result;
     } catch (error) {
         logError("updateRecordApi", error, true);
         syncCacheOnUpdate(record);
+        if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('records_data_changed', { detail: { type: 'UPDATE', record } }));
+        }
         return record;
     }
 };
@@ -586,18 +633,31 @@ export const updateRecordFieldsApi = async (id: string, fields: Partial<RecordFi
             const { data: fallbackData, error: fallbackError } = await supabase.from(targetTable).update(fallbackPayload).eq('id', id).select();
             if (fallbackError) throw fallbackError;
             const result = mapRecordFromDb({ id, ...fields, ...(fallbackData?.[0] || {}), sourceTable: targetTable }) as RecordFile;
-            if (result) syncCacheOnUpdate(result);
+            if (result) {
+                syncCacheOnUpdate(result);
+                if (typeof window !== 'undefined') {
+                    window.dispatchEvent(new CustomEvent('records_data_changed', { detail: { type: 'UPDATE', record: result } }));
+                }
+            }
             return result;
         }
         
         if (error) throw error;
         const result = mapRecordFromDb({ id, ...fields, ...(data?.[0] || {}), sourceTable: targetTable }) as RecordFile;
-        if (result) syncCacheOnUpdate(result);
+        if (result) {
+            syncCacheOnUpdate(result);
+            if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('records_data_changed', { detail: { type: 'UPDATE', record: result } }));
+            }
+        }
         return result;
     } catch (error) {
         logError("updateRecordFieldsApi", error, true);
         const fallbackRecord = { id, ...fields } as RecordFile;
         syncCacheOnUpdate(fallbackRecord);
+        if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('records_data_changed', { detail: { type: 'UPDATE', record: fallbackRecord } }));
+        }
         return fallbackRecord;
     }
 };
