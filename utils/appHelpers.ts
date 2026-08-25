@@ -289,7 +289,7 @@ export const calculateDeadlineHelper = (type: string, receivedDateStr: string, h
         } else if (lowerType.includes('cấp đổi') || lowerType.includes('3.2.1')) {
             daysToAdd = 10;
         } else if (lowerType.includes('cấp lại') || lowerType.includes('3.3.1')) {
-            daysToAdd = 10;
+            daysToAdd = 15;
         } else if (lowerType.includes('chuyển mục đích') || lowerType.includes('3.6.1')) {
             daysToAdd = 7;
         } else if (lowerType.includes('gia hạn') || lowerType.includes('3.5.1') || lowerType.includes('đính chính') || lowerType.includes('3.7.1') || lowerType.includes('3.7.2') || lowerType.includes('thay đổi thông tin')) {

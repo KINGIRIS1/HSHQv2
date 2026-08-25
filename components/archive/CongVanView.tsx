@@ -352,10 +352,27 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
         e.preventDefault();
         if (!formData.so_hieu || !formData.trich_yeu) { alert('Vui lòng nhập Số hiệu và Trích yếu.'); return; }
         
+        const existingRecord = editingId ? records.find(r => r.id === editingId) : null;
+        const initialHistory = existingRecord?.data?.history || [
+            {
+                action: 'Tiếp nhận công văn',
+                status: 'draft',
+                timestamp: new Date().toISOString(),
+                user: currentUser.name || currentUser.fullName || currentUser.username || 'Cán bộ tiếp nhận',
+                note: 'Tạo mới từ phân hệ Công văn'
+            }
+        ];
+
         const success = await saveArchiveRecord({
             ...formData,
             id: editingId || undefined,
-            created_by: currentUser.username
+            data: {
+                ...(existingRecord?.data || {}),
+                ...(formData.data || {}),
+                receivedBy: existingRecord?.data?.receivedBy || currentUser.name || currentUser.fullName || currentUser.username,
+                history: initialHistory
+            },
+            created_by: existingRecord?.created_by || currentUser.username || currentUser.name
         });
 
         if (success) {

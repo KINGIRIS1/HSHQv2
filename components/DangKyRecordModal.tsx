@@ -9,6 +9,7 @@ import { calculateDeadlineHelper } from '../utils/appHelpers';
 import { detectProcedureId, getShortRecordType, getDefaultDocsForProcedure } from '../constants/procedures';
 import { addActivityLog } from '../services/activityLogService';
 import { AutoResizeTextarea } from './AutoResizeTextarea';
+import { isStepActiveInProcedure, getValidStatusesForDangKyRecord } from '../constants/procedureWorkflows';
 
 interface DangKyRecordModalProps {
   isOpen: boolean;
@@ -85,7 +86,7 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
       receivedDate: todayStr,
       assignedDate: todayStr,
       deadline: initialDeadline,
-      receivedBy: currentUser?.name || '',
+      receivedBy: currentUser?.fullName || currentUser?.name || currentUser?.username || '',
       appraisalDate: '',
       appraisalStaff: '',
       taxFormDate: '',
@@ -459,6 +460,11 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
         recordToSave.applicantAddress = recordToSave.owners[0].address || '';
       }
 
+      // Gán cán bộ tiếp nhận nếu là thêm mới hoặc chưa có
+      if (!initialData || !recordToSave.receivedBy) {
+        recordToSave.receivedBy = recordToSave.receivedBy || currentUser?.fullName || currentUser?.name || currentUser?.username || '';
+      }
+
       await onSave(recordToSave);
       const ownerNames = recordToSave.owners?.map(o => o.name).filter(Boolean).join(', ') || recordToSave.owners?.[0]?.name || '';
       addActivityLog({
@@ -561,7 +567,7 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
                     onChange={e => handleFieldChange('status', e.target.value as DangKyStatusType)}
                     className={`${inputClass} font-bold bg-amber-50/80 border-amber-300 text-amber-900`}
                   >
-                    {DANG_KY_STATUS_LIST.map(st => (
+                    {getValidStatusesForDangKyRecord(formData.recordType, formData.code).map(st => (
                       <option key={st} value={st}>
                         {st}
                       </option>
@@ -594,16 +600,25 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
               </div>
             </div>
 
-            {/* Các mốc ngày tháng theo trạng thái xử lý (Chỉ hiển thị khi đến hoặc qua bước) */}
+            {/* Các mốc ngày tháng theo trạng thái xử lý (Chỉ hiển thị khi đến hoặc qua bước VÀ quy trình có bước đó) */}
             {(() => {
               const currentStepLevel = getStepLevel(formData.status);
               if (currentStepLevel < 1) return null;
+
+              const procKey = formData.recordType;
+              const hasThamDinh = isStepActiveInProcedure(procKey, 'tham_dinh');
+              const hasPhieuChuyen = isStepActiveInProcedure(procKey, 'phieu_chuyen') || isStepActiveInProcedure(procKey, 'phieu_chuyen_thue');
+              const hasThueKV7 = isStepActiveInProcedure(procKey, 'chuyen_thue_kv7') || isStepActiveInProcedure(procKey, 'thue_kv7');
+              const hasGiayNopTien = isStepActiveInProcedure(procKey, 'giay_nop_tien') || isStepActiveInProcedure(procKey, 'thong_bao_thue');
+              const hasInGCN = isStepActiveInProcedure(procKey, 'in_gcn');
+              const hasKiemTra = isStepActiveInProcedure(procKey, 'kiem_tra');
+              const hasTrinhKy = isStepActiveInProcedure(procKey, 'trinh_ky');
 
               return (
                 <div className="pt-3 border-t border-slate-100 animate-fade-in">
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
                     {/* Step 1: Ngày thẩm định */}
-                    {currentStepLevel >= 1 && (
+                    {hasThamDinh && currentStepLevel >= 1 && (
                       <div>
                         <label className="block text-xs font-bold text-teal-800 mb-1">Ngày thẩm định</label>
                         <input
@@ -616,7 +631,7 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
                     )}
 
                     {/* Step 2: Ngày phiếu chuyển thuế */}
-                    {currentStepLevel >= 2 && (
+                    {hasPhieuChuyen && currentStepLevel >= 2 && (
                       <div>
                         <label className="block text-xs font-bold text-amber-800 mb-1">Ngày phiếu chuyển thuế</label>
                         <input
@@ -629,7 +644,7 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
                     )}
 
                     {/* Step 3: Ngày chuyển Thuế KV7 */}
-                    {currentStepLevel >= 3 && (
+                    {hasThueKV7 && currentStepLevel >= 3 && (
                       <div>
                         <label className="block text-xs font-bold text-orange-800 mb-1">Ngày chuyển Thuế KV7</label>
                         <input
@@ -642,7 +657,7 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
                     )}
 
                     {/* Step 4: Ngày giấy nộp tiền / TBT */}
-                    {currentStepLevel >= 4 && (
+                    {hasGiayNopTien && currentStepLevel >= 4 && (
                       <div>
                         <label className="block text-xs font-bold text-rose-800 mb-1">Ngày giấy nộp tiền</label>
                         <input
@@ -658,7 +673,7 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
                     )}
 
                     {/* Step 5: Ngày in GCN */}
-                    {currentStepLevel >= 5 && (
+                    {hasInGCN && currentStepLevel >= 5 && (
                       <div>
                         <label className="block text-xs font-bold text-purple-800 mb-1">Ngày in GCN</label>
                         <input
@@ -671,7 +686,7 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
                     )}
 
                     {/* Step 6: Ngày trình kiểm tra */}
-                    {currentStepLevel >= 6 && (
+                    {hasKiemTra && currentStepLevel >= 6 && (
                       <div>
                         <label className="block text-xs font-bold text-blue-800 mb-1">Ngày trình kiểm tra</label>
                         <input
@@ -684,7 +699,7 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
                     )}
 
                     {/* Step 7: Ngày trình ký */}
-                    {currentStepLevel >= 7 && (
+                    {hasTrinhKy && currentStepLevel >= 7 && (
                       <div>
                         <label className="block text-xs font-bold text-purple-800 mb-1">Ngày trình ký</label>
                         <input

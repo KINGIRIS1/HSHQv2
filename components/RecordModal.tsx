@@ -308,6 +308,11 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
         alert("Vui lòng chọn Xã / Phường trước khi lưu.");
         return;
     }
+
+    // Đảm bảo gán Cán bộ tiếp nhận nếu là thêm mới từ module chuyên môn hoặc chưa có
+    if (!initialData || !finalData.receivedBy) {
+        finalData.receivedBy = finalData.receivedBy || currentUser.employeeId || currentUser.username || currentUser.name;
+    }
     
     // Logic tự động set ngày khi trạng thái thay đổi hoặc xóa ngày khi quay lui
     // Chỉ áp dụng logic này nếu trạng thái khác với ban đầu (hoặc là tạo mới)

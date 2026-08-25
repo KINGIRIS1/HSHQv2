@@ -163,7 +163,7 @@ const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calc
                   receivedDate: receivedDate,
                   deadline: deadline,
                   status: RecordStatus.RECEIVED,
-                  receivedBy: currentUser?.employeeId,
+                  receivedBy: currentUser?.employeeId || currentUser?.fullName || currentUser?.name || currentUser?.username,
                   content: String(getVal(['NỘI DUNG', 'GHI CHÚ']) || ''),
                   authorizedBy: authorizedBy,
                   authDocType: authDocType,
@@ -198,7 +198,7 @@ const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calc
           receivedDate: record.receivedDate || new Date().toISOString(),
           deadline: record.deadline || '',
           status: RecordStatus.RECEIVED,
-          receivedBy: currentUser?.employeeId
+          receivedBy: record.receivedBy || currentUser?.employeeId || currentUser?.fullName || currentUser?.name || currentUser?.username
       } as RecordFile;
 
       const savedRecord = await onSave(newRecord);

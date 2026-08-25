@@ -225,6 +225,7 @@ export const mapDangKyToDb = (record: DangKyRecord): any => {
 
 // Fetch DangKy Records
 export const fetchDangKyRecords = async (): Promise<DangKyRecord[]> => {
+  let dbRecords: DangKyRecord[] = [];
   if (isConfigured) {
     try {
       const { data, error } = await supabase
@@ -235,22 +236,34 @@ export const fetchDangKyRecords = async (): Promise<DangKyRecord[]> => {
       if (error) {
         logError('fetchDangKyRecords Supabase', error, true);
       } else if (data) {
-        const mapped = data.map(mapDangKyFromDb);
-        saveToCache(CACHE_KEYS.DANGKY_RECORDS, mapped);
-        return mapped;
+        dbRecords = data.map(mapDangKyFromDb);
       }
     } catch (e) {
       logError('fetchDangKyRecords catch', e, true);
     }
   }
 
-  // Fallback to cache or mock
+  // Fallback to cache
   const cached = getFromCache<DangKyRecord[] | null>(CACHE_KEYS.DANGKY_RECORDS, null);
-  if (cached !== null && Array.isArray(cached)) {
-    return cached;
+  
+  // Check general records cache for any dangky records
+  const generalCached: any[] = getFromCache(CACHE_KEYS.RECORDS, []);
+  const dangKyFromGeneral = generalCached.filter(r => r.sourceTable === 'dangky_records');
+
+  // Merge all sources without duplicates (prefer dbRecords, then cached, then dangKyFromGeneral)
+  const mapMerged = new Map<string, DangKyRecord>();
+  [...dangKyFromGeneral, ...(cached || []), ...dbRecords].forEach(r => {
+    if (r && (r.id || r.code)) {
+      mapMerged.set(r.id || r.code, { ...mapMerged.get(r.id || r.code), ...r, sourceTable: 'dangky_records' });
+    }
+  });
+
+  const mergedList = Array.from(mapMerged.values());
+  if (mergedList.length > 0) {
+    saveToCache(CACHE_KEYS.DANGKY_RECORDS, mergedList);
+    return mergedList;
   }
 
-  // Khởi tạo mock lần đầu nếu chưa từng có dữ liệu trong cache
   saveToCache(CACHE_KEYS.DANGKY_RECORDS, MOCK_DANGKY_RECORDS);
   return MOCK_DANGKY_RECORDS;
 };
@@ -258,11 +271,11 @@ export const fetchDangKyRecords = async (): Promise<DangKyRecord[]> => {
 // Save / Add DangKy Record
 export const saveDangKyRecordApi = async (record: DangKyRecord): Promise<DangKyRecord> => {
   const allRecords = await fetchDangKyRecords();
-  const index = allRecords.findIndex(r => r.id === record.id || r.code === record.code);
+  const index = allRecords.findIndex(r => r.id === record.id || (record.code && r.code === record.code));
   let updatedList: DangKyRecord[];
 
   const now = new Date().toISOString();
-  const updatedRecord = { ...record, updatedAt: now };
+  const updatedRecord = { ...record, sourceTable: 'dangky_records' as const, updatedAt: now };
 
   if (index >= 0) {
     updatedList = [...allRecords];
@@ -272,6 +285,20 @@ export const saveDangKyRecordApi = async (record: DangKyRecord): Promise<DangKyR
   }
 
   saveToCache(CACHE_KEYS.DANGKY_RECORDS, updatedList);
+
+  // Also sync to general records cache (offline_records)
+  try {
+    const generalCached: any[] = getFromCache(CACHE_KEYS.RECORDS, []);
+    const genIndex = generalCached.findIndex(r => r.id === updatedRecord.id || (updatedRecord.code && r.code === updatedRecord.code));
+    if (genIndex >= 0) {
+      generalCached[genIndex] = { ...generalCached[genIndex], ...updatedRecord };
+    } else {
+      generalCached.unshift(updatedRecord);
+    }
+    saveToCache(CACHE_KEYS.RECORDS, generalCached);
+  } catch (e) {
+    console.error('Error syncing dangky record to general records cache:', e);
+  }
 
   if (isConfigured) {
     try {

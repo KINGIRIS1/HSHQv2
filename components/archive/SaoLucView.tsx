@@ -225,6 +225,17 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Tân Qua
         }
         
         // Map form data về cấu trúc ArchiveRecord
+        const existingRecord = editingId ? records.find(r => r.id === editingId) : null;
+        const initialHistory = existingRecord?.data?.history || [
+            {
+                action: 'Tiếp nhận hồ sơ',
+                status: 'draft',
+                timestamp: new Date().toISOString(),
+                user: currentUser.name || currentUser.fullName || currentUser.username || 'Cán bộ tiếp nhận',
+                note: 'Tạo mới từ phân hệ Sao lục'
+            }
+        ];
+
         const recordToSave: Partial<ArchiveRecord> = {
             id: editingId || undefined,
             type: 'saoluc',
@@ -234,14 +245,17 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Tân Qua
             ngay_thang: formData.ngay_nhan,     // Ngày nhận
             trich_yeu: formData.noi_dung,       // Nội dung
             data: {                             // Các trường mở rộng
+                ...(existingRecord?.data || {}),
                 xa_phuong: formData.xa_phuong,
                 to_ban_do: formData.to_ban_do,
                 thua_dat: formData.thua_dat,
                 hen_tra: formData.hen_tra,
                 ngay_hoan_thanh: formData.ngay_hoan_thanh,
-                danh_sach: formData.danh_sach
+                danh_sach: formData.danh_sach,
+                receivedBy: existingRecord?.data?.receivedBy || currentUser.name || currentUser.fullName || currentUser.username,
+                history: initialHistory
             },
-            created_by: currentUser.username
+            created_by: existingRecord?.created_by || currentUser.username || currentUser.name
         };
 
         const success = await saveArchiveRecord(recordToSave);

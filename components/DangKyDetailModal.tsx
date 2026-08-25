@@ -5,7 +5,7 @@ import {
   DollarSign, CheckCircle2, Circle, Calendar, Printer, Pencil, 
   Trash2, ArrowRight, Building2, FileCheck, Layers, CalendarClock,
   Receipt, Bell, StickyNote, Save, Loader2, CheckSquare, Send, Info,
-  Award
+  Award, ShieldCheck, PauseCircle, Clock
 } from 'lucide-react';
 import { saveDangKyRecordApi } from '../services/apiDangKy';
 import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../services/docxService';
@@ -13,23 +13,25 @@ import DocxPreviewModal from './DocxPreviewModal';
 import SystemReceiptTemplate from './receive-record/SystemReceiptTemplate';
 import { getNormalizedWard } from '../constants';
 import { getShortRecordType, getCanonicalRecordType } from '../constants/procedures';
+import { 
+  getProcedureWorkflow, 
+  getNextStatusForDangKyRecord, 
+  WorkflowStep, 
+  STANDARD_AVAILABLE_STEPS 
+} from '../constants/procedureWorkflows';
 import { AutoResizeTextarea } from './AutoResizeTextarea';
 
-const NEXT_STATUS_MAP: Record<string, string> = {
-  'Tiếp nhận mới': 'Thẩm định',
-  'Thẩm định': 'Phiếu chuyển thuế',
-  'Phiếu chuyển thuế': 'Chờ Thuế KV7',
-  'Chờ Thuế KV7': 'Chờ giấy nộp tiền',
-  'Chờ giấy nộp tiền': 'Chờ In GCN',
-  'Chờ In GCN': 'Chờ kiểm tra',
-  'Chờ kiểm tra': 'Chờ ký duyệt',
-  'Chờ ký duyệt': 'Chờ bàn giao',
-  'Chờ bàn giao': 'Đã giao 1 cửa',
-  'Đã giao 1 cửa': 'Đã trả kết quả',
-  'Đã trả kết quả': 'Đã trả kết quả',
-  'Chờ bổ sung': 'Thẩm định',
-  'CSD rút HS': 'CSD rút HS',
-  'Trả hủy hồ sơ': 'Trả hủy hồ sơ'
+const STEP_ICONS: Record<string, any> = {
+  tiep_nhan: UserIcon,
+  tham_dinh: UserIcon,
+  phieu_chuyen_thue: Send,
+  thue_kv7: Building2,
+  thong_bao_thue: Receipt,
+  in_gcn: Printer,
+  trinh_kiem_tra: ShieldCheck,
+  trinh_ky: Send,
+  hoan_thanh: CheckSquare,
+  tra_ket_qua: FileCheck
 };
 
 interface DangKyDetailModalProps {
@@ -74,6 +76,9 @@ export const DangKyDetailModal: React.FC<DangKyDetailModalProps> = ({
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [systemReceiptData, setSystemReceiptData] = useState<any | null>(null);
 
+  // Dynamic procedure workflow steps
+  const [workflowSteps, setWorkflowSteps] = useState<WorkflowStep[]>([]);
+
   useEffect(() => {
     if (record) {
       setPersonalNote(record.personalNotes || record.notes || '');
@@ -87,8 +92,27 @@ export const DangKyDetailModal: React.FC<DangKyDetailModalProps> = ({
       } else {
         setExtendDate(new Date().toISOString().split('T')[0]);
       }
+
+      // Load workflow steps for this specific record procedure
+      const steps = getProcedureWorkflow(record.recordType, record.code);
+      setWorkflowSteps(steps);
     }
   }, [record, isOpen]);
+
+  // Listen to workflow configuration change in real time
+  useEffect(() => {
+    const handleWorkflowChanged = () => {
+      if (record) {
+        const updatedSteps = getProcedureWorkflow(record.recordType, record.code);
+        setWorkflowSteps(updatedSteps);
+      }
+    };
+
+    window.addEventListener('registration_workflow_changed', handleWorkflowChanged);
+    return () => {
+      window.removeEventListener('registration_workflow_changed', handleWorkflowChanged);
+    };
+  }, [record]);
 
   if (!isOpen || !record) return null;
 
@@ -340,7 +364,9 @@ export const DangKyDetailModal: React.FC<DangKyDetailModalProps> = ({
     isLast,
     colorClass,
     forceActive,
-    subText
+    subText,
+    slaLabel,
+    isExcludedFromTotalSla
   }: {
     date?: string | null;
     label: string;
@@ -349,6 +375,8 @@ export const DangKyDetailModal: React.FC<DangKyDetailModalProps> = ({
     colorClass: { text: string; border: string; bg: string };
     forceActive?: boolean;
     subText?: string | null;
+    slaLabel?: string | null;
+    isExcludedFromTotalSla?: boolean;
   }) => {
     const isActive = !!date || !!forceActive;
     return (
@@ -360,7 +388,18 @@ export const DangKyDetailModal: React.FC<DangKyDetailModalProps> = ({
           {!isLast && <div className={`w-0.5 grow ${isActive ? colorClass.bg : 'bg-gray-100'} my-1`}></div>}
         </div>
         <div className="pb-6 flex-1">
-          <p className={`text-xs font-bold uppercase mb-0.5 ${isActive ? colorClass.text : 'text-gray-400'}`}>{label}</p>
+          <div className="flex items-center justify-between gap-2 flex-wrap mb-0.5">
+            <p className={`text-xs font-bold uppercase ${isActive ? colorClass.text : 'text-gray-400'}`}>{label}</p>
+            {slaLabel && (
+              <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold font-mono ${
+                isExcludedFromTotalSla 
+                  ? 'bg-amber-100 text-amber-800 border border-amber-200' 
+                  : 'bg-slate-100 text-slate-700 border border-slate-200'
+              }`}>
+                {isExcludedFromTotalSla ? `[${slaLabel} - Dừng SLA]` : `SLA: ${slaLabel}`}
+              </span>
+            )}
+          </div>
           <div className="flex items-center gap-2">
             <Icon size={14} className={isActive ? 'text-gray-500' : 'text-gray-300'} />
             <span className={`text-sm font-medium ${isActive ? 'text-gray-800' : 'text-gray-400 italic'}`}>
@@ -384,7 +423,7 @@ export const DangKyDetailModal: React.FC<DangKyDetailModalProps> = ({
         address: record.applicantAddress || ''
       }
     : (hasTransferees ? transferees[0] : (owners.length > 0 ? owners[0] : null));
-  const nextStatus = NEXT_STATUS_MAP[record.status] || null;
+  const nextStatus = getNextStatusForDangKyRecord(record);
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-xs animate-fade-in">
@@ -776,116 +815,105 @@ export const DangKyDetailModal: React.FC<DangKyDetailModalProps> = ({
                     <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded inline-block font-mono">
                       Ngày nhận: {formatDate(record.receivedDate)}
                     </span>
-                    <button
-                      onClick={() => {
-                        if (onOpenExtendModal) {
-                          onClose();
-                          onOpenExtendModal(record);
-                        } else {
-                          setShowExtendForm(true);
-                        }
-                      }}
-                      className="text-[10px] bg-amber-50 border border-amber-200 text-amber-800 px-2 py-0.5 rounded font-bold hover:bg-amber-100 transition-colors flex items-center gap-1 cursor-pointer"
-                      title="Gia hạn thời gian hẹn trả"
-                    >
-                      <CalendarClock size={11} /> Gia hạn
-                    </button>
                   </div>
                 </div>
 
                 <div className="p-6 space-y-0">
-                  <TimelineItem 
-                    date={record.receivedDate} 
-                    label="TIẾP NHẬN MỚI" 
-                    icon={UserIcon}
-                    colorClass={{text: 'text-emerald-700', border: 'border-emerald-600', bg: 'bg-emerald-600'}}
-                    subText={formatStaffInfo(record.receivedBy)}
-                  />
+                  {workflowSteps && workflowSteps.length > 0 ? (
+                    workflowSteps.map((step, idx) => {
+                      const StepIcon = STEP_ICONS[step.code] || STEP_ICONS.tham_dinh;
+                      const isLast = idx === workflowSteps.length - 1;
+                      
+                      // Resolve date & staff
+                      let stepDate: string | undefined = step.dateField ? (record as any)[step.dateField] : undefined;
+                      let stepStaff: string | undefined = step.staffField ? (record as any)[step.staffField] : undefined;
+                      let isForceActive = !!stepDate || !!stepStaff;
 
-                  <TimelineItem 
-                    date={record.appraisalDate} 
-                    forceActive={!!record.appraisalStaff || !!record.appraisalDate}
-                    label="THẨM ĐỊNH HỒ SƠ" 
-                    icon={UserIcon}
-                    colorClass={{text: 'text-blue-700', border: 'border-blue-600', bg: 'bg-blue-600'}}
-                    subText={formatStaffInfo(record.appraisalStaff)}
-                  />
+                      if (step.code === 'tiep_nhan') {
+                        stepDate = stepDate || record.receivedDate;
+                        stepStaff = stepStaff || record.receivedBy;
+                      } else if (step.code === 'tham_dinh') {
+                        stepDate = stepDate || record.appraisalDate;
+                        stepStaff = stepStaff || record.appraisalStaff;
+                        isForceActive = !!record.appraisalStaff || !!record.appraisalDate;
+                      } else if (step.code === 'phieu_chuyen_thue') {
+                        stepDate = stepDate || record.taxFormDate;
+                        stepStaff = stepStaff || record.taxFormStaff;
+                        isForceActive = !!record.taxFormStaff || !!record.taxFormDate;
+                      } else if (step.code === 'thue_kv7') {
+                        stepDate = stepDate || record.taxKV7TransferDate;
+                        stepStaff = stepStaff || record.taxKV7Staff;
+                        isForceActive = !!record.taxKV7Staff || !!record.taxKV7TransferDate;
+                      } else if (step.code === 'thong_bao_thue') {
+                        stepDate = stepDate || record.taxNoticeDate;
+                        stepStaff = stepStaff || record.taxNoticeStaff;
+                        isForceActive = !!record.taxNoticeStaff || !!record.taxNoticeDate;
+                      } else if (step.code === 'in_gcn') {
+                        stepDate = stepDate || record.printDate;
+                        stepStaff = stepStaff || record.printStaff;
+                        isForceActive = !!record.printDate || !!record.printStaff;
+                      } else if (step.code === 'trinh_kiem_tra') {
+                        stepDate = stepDate || record.pendingCheckDate;
+                        stepStaff = stepStaff || record.checkedBy;
+                        isForceActive = !!record.pendingCheckDate || !!record.checkedBy;
+                      } else if (step.code === 'trinh_ky') {
+                        stepDate = stepDate || record.submissionDate;
+                        stepStaff = stepStaff || record.submittedTo;
+                        isForceActive = !!record.submissionDate || !!record.submittedTo;
+                      } else if (step.code === 'hoan_thanh') {
+                        stepDate = stepDate || record.completedDate || record.exportDate;
+                        stepStaff = stepStaff || (record.exportBatch ? `Đợt xuất: ${record.exportBatch}` : undefined);
+                        isForceActive = !!record.completedDate || !!record.exportBatch;
+                      } else if (step.code === 'tra_ket_qua') {
+                        stepDate = stepDate || record.resultReturnedDate;
+                        stepStaff = stepStaff || (record.receiverName ? `Người nhận: ${record.receiverName}` : undefined);
+                        isForceActive = !!record.resultReturnedDate;
+                      }
 
-                  <TimelineItem 
-                    date={record.taxFormDate} 
-                    forceActive={!!record.taxFormStaff || !!record.taxFormDate}
-                    label="PHIẾU CHUYỂN THUẾ" 
-                    icon={Send}
-                    colorClass={{text: 'text-orange-700', border: 'border-orange-600', bg: 'bg-orange-600'}}
-                    subText={formatStaffInfo(record.taxFormStaff)}
-                  />
+                      // Determine colors
+                      let colorClass = { text: 'text-blue-700', border: 'border-blue-600', bg: 'bg-blue-600' };
+                      if (record.status === 'Trả hủy hồ sơ' && step.code === 'hoan_thanh') {
+                        colorClass = { text: 'text-red-700', border: 'border-red-600', bg: 'bg-red-600' };
+                      } else if (step.isExcludedFromTotalSla) {
+                        colorClass = { text: 'text-amber-700', border: 'border-amber-600', bg: 'bg-amber-600' };
+                      } else if (step.colorScheme === 'emerald' || step.code === 'tiep_nhan' || step.code === 'tra_ket_qua') {
+                        colorClass = { text: 'text-emerald-700', border: 'border-emerald-600', bg: 'bg-emerald-600' };
+                      } else if (step.colorScheme === 'orange' || step.code === 'phieu_chuyen_thue') {
+                        colorClass = { text: 'text-orange-700', border: 'border-orange-600', bg: 'bg-orange-600' };
+                      } else if (step.colorScheme === 'amber' || step.code === 'thue_kv7' || step.code === 'trinh_kiem_tra') {
+                        colorClass = { text: 'text-amber-700', border: 'border-amber-600', bg: 'bg-amber-600' };
+                      } else if (step.colorScheme === 'purple' || step.code === 'in_gcn') {
+                        colorClass = { text: 'text-purple-700', border: 'border-purple-600', bg: 'bg-purple-600' };
+                      } else if (step.colorScheme === 'indigo' || step.code === 'trinh_ky') {
+                        colorClass = { text: 'text-indigo-700', border: 'border-indigo-600', bg: 'bg-indigo-600' };
+                      } else if (step.colorScheme === 'green' || step.code === 'hoan_thanh') {
+                        colorClass = { text: 'text-green-700', border: 'border-green-600', bg: 'bg-green-600' };
+                      }
 
-                  <TimelineItem 
-                    date={record.taxKV7TransferDate} 
-                    forceActive={!!record.taxKV7Staff || !!record.taxKV7TransferDate}
-                    label="THUẾ KV7" 
-                    icon={Building2}
-                    colorClass={{text: 'text-amber-700', border: 'border-amber-600', bg: 'bg-amber-600'}}
-                    subText={formatStaffInfo(record.taxKV7Staff)}
-                  />
+                      let displayLabel = step.name;
+                      if (step.code === 'hoan_thanh') {
+                        if (record.status === 'Trả hủy hồ sơ') displayLabel = 'TRẢ HỦY HỒ SƠ';
+                        else if (record.status === 'CSD rút HS') displayLabel = 'CSD RÚT HỒ SƠ';
+                      }
 
-                  <TimelineItem 
-                    date={record.taxNoticeDate} 
-                    forceActive={!!record.taxNoticeStaff || !!record.taxNoticeDate}
-                    label="THÔNG BÁO THUẾ" 
-                    icon={Receipt}
-                    colorClass={{text: 'text-yellow-700', border: 'border-yellow-600', bg: 'bg-yellow-600'}}
-                    subText={formatStaffInfo(record.taxNoticeStaff)}
-                  />
-
-                  <TimelineItem 
-                    date={record.printDate} 
-                    forceActive={!!record.printDate || !!record.printStaff}
-                    label="IN GIẤY CHỨNG NHẬN" 
-                    icon={Printer}
-                    colorClass={{text: 'text-purple-700', border: 'border-purple-600', bg: 'bg-purple-600'}}
-                    subText={formatStaffInfo(record.printStaff)}
-                  />
-
-                  <TimelineItem 
-                    date={record.pendingCheckDate} 
-                    forceActive={!!record.pendingCheckDate || !!record.checkedBy}
-                    label="TRÌNH KIỂM TRA" 
-                    icon={Send}
-                    colorClass={{text: 'text-amber-700', border: 'border-amber-600', bg: 'bg-amber-600'}}
-                    subText={formatStaffInfo(record.checkedBy)}
-                  />
-
-                  <TimelineItem 
-                    date={record.submissionDate} 
-                    forceActive={!!record.submissionDate || !!record.submittedTo}
-                    label="TRÌNH KÝ DUYỆT" 
-                    icon={Send}
-                    colorClass={{text: 'text-indigo-700', border: 'border-indigo-600', bg: 'bg-indigo-600'}}
-                    subText={formatStaffInfo(record.submittedTo)}
-                  />
-
-                  <TimelineItem 
-                    date={record.completedDate || record.exportDate} 
-                    forceActive={!!record.completedDate || !!record.exportBatch}
-                    label={record.status === 'Trả hủy hồ sơ' ? 'TRẢ HỦY HỒ SƠ' : record.status === 'CSD rút HS' ? 'CSD RÚT HỒ SƠ' : 'HOÀN THÀNH'} 
-                    icon={CheckSquare}
-                    colorClass={{
-                      text: record.status === 'Trả hủy hồ sơ' ? 'text-red-700' : 'text-green-700', 
-                      border: record.status === 'Trả hủy hồ sơ' ? 'border-red-600' : 'border-green-600', 
-                      bg: record.status === 'Trả hủy hồ sơ' ? 'bg-red-600' : 'bg-green-600'
-                    }}
-                    subText={record.exportBatch ? `Đợt xuất: ${record.exportBatch}` : undefined}
-                  />
-
-                  <TimelineItem 
-                    date={record.resultReturnedDate} 
-                    label="TRẢ KẾT QUẢ CHO DÂN" 
-                    icon={FileCheck}
-                    isLast={true}
-                    colorClass={{text: 'text-emerald-700', border: 'border-emerald-600', bg: 'bg-emerald-600'}}
-                    subText={record.receiverName ? `Người nhận: ${record.receiverName}` : undefined}
-                  />
+                      return (
+                        <TimelineItem
+                          key={step.id || idx}
+                          date={stepDate}
+                          forceActive={isForceActive}
+                          label={displayLabel}
+                          icon={StepIcon}
+                          isLast={isLast}
+                          colorClass={colorClass}
+                          slaLabel={step.slaLabel || (step.slaHours ? `${step.slaHours}h` : '')}
+                          isExcludedFromTotalSla={step.isExcludedFromTotalSla}
+                          subText={step.code === 'hoan_thanh' || step.code === 'tra_ket_qua' ? stepStaff : formatStaffInfo(stepStaff)}
+                        />
+                      );
+                    })
+                  ) : (
+                    <p className="text-xs text-gray-400 italic py-4 text-center">Chưa có dữ liệu tiến độ</p>
+                  )}
                 </div>
               </div>
             </div>

@@ -167,7 +167,7 @@ export const PROCEDURE_CATALOG: ProcedureDefinition[] = [
     name: '3.3.1 Cấp lại Giấy chứng nhận do bị mất',
     shortName: '3.3.1 Cấp lại',
     module: 'dangky',
-    defaultDeadline: 10,
+    defaultDeadline: 15,
     prefixes: ['3.3.1', 'CL'],
     keywords: ['cấp lại', 'bị mất', 'mất gcn', 'mất sổ']
   },
@@ -339,7 +339,7 @@ export const DANG_KY_DEADLINE_MAP: Record<string, number> = PROCEDURE_CATALOG
     'Thỏa thuận': 13,
     'Cấp đổi': 10,
     'Cấp đổi (có thuế)': 15,
-    'Cấp lại': 10,
+    'Cấp lại': 15,
     'Cấp lại (có thuế)': 15,
     'Tách - hợp thửa': 17,
     'Tách thửa': 17,

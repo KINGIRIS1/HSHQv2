@@ -487,7 +487,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
         authDocType: `${authCccd}|${authAddress}|${authPhone}`,
         id: formData.id || Math.random().toString(36).substr(2, 9), 
         status: formData.status || RecordStatus.RECEIVED,
-        receivedBy: formData.receivedBy || currentUser.employeeId,
+        receivedBy: formData.receivedBy || currentUser.employeeId || currentUser.fullName || currentUser.name || currentUser.username,
         sourceTable: isDangKy ? 'dangky_records' : (formData.sourceTable || 'land_records')
     } as RecordFile;
     const savedRecord = await onSave(recordToSave);

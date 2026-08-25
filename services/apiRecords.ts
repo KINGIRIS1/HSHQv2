@@ -327,6 +327,14 @@ const syncCacheOnCreate = (newRecord: RecordFile) => {
             cached.unshift(newRecord);
             saveToCache(CACHE_KEYS.RECORDS, cached);
         }
+
+        if (newRecord.sourceTable === 'dangky_records' || getTargetTable(newRecord) === 'dangky_records') {
+            const dkCached: any[] = getFromCache(CACHE_KEYS.DANGKY_RECORDS, []);
+            if (!dkCached.some(r => r.id === newRecord.id || (r.code && r.code === newRecord.code))) {
+                dkCached.unshift(newRecord);
+                saveToCache(CACHE_KEYS.DANGKY_RECORDS, dkCached);
+            }
+        }
     } catch (e) {
         console.error("Error syncing cache for created record", e);
     }
@@ -342,6 +350,17 @@ const syncCacheOnUpdate = (updatedRecord: RecordFile) => {
             cached.unshift(updatedRecord);
         }
         saveToCache(CACHE_KEYS.RECORDS, cached);
+
+        if (updatedRecord.sourceTable === 'dangky_records' || getTargetTable(updatedRecord) === 'dangky_records') {
+            const dkCached: any[] = getFromCache(CACHE_KEYS.DANGKY_RECORDS, []);
+            const dkIndex = dkCached.findIndex(r => r.id === updatedRecord.id || (r.code && r.code === updatedRecord.code));
+            if (dkIndex !== -1) {
+                dkCached[dkIndex] = { ...dkCached[dkIndex], ...updatedRecord };
+            } else {
+                dkCached.unshift(updatedRecord);
+            }
+            saveToCache(CACHE_KEYS.DANGKY_RECORDS, dkCached);
+        }
     } catch (e) {
         console.error("Error syncing cache for updated record", e);
     }

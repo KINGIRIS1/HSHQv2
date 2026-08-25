@@ -33,6 +33,7 @@ import {
 import { detectProcedureId, getShortRecordType } from '../constants/procedures';
 import { addActivityLog } from '../services/activityLogService';
 import { saveDangKyRecordsBatchApi } from '../services/apiDangKy';
+import { getNextStatusForDangKyRecord } from '../constants/procedureWorkflows';
 
 const NEXT_STATUS_MAP: Record<DangKyStatusType, DangKyStatusType> = {
   'Tiếp nhận mới': 'Thẩm định',
@@ -799,8 +800,28 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
     // Quick Step Transition per record with modal assignment rules
     const handleNextStatus = async (r: DangKyRecord) => {
         const normStatus = normalizeDangKyStatus(r.status);
-        const nextStatus = NEXT_STATUS_MAP[r.status];
+        const nextStatus = getNextStatusForDangKyRecord(r);
         if (!nextStatus || nextStatus === r.status) return;
+
+        // RÀNG BUỘC 1: Đối với hồ sơ chuyển sang bước Thuế KV7 -> Luôn yêu cầu nhập Số phiếu chuyển thuế trước
+        if ((nextStatus as string) === 'Chờ Thuế KV7' || ((normStatus as string) === 'Phiếu chuyển thuế' && (nextStatus as string) === 'Chờ Thuế KV7')) {
+            const hasTaxNumber = (r.taxFormNumber && r.taxFormNumber.trim() !== '') || ((r as any).taxCode && (r as any).taxCode.trim() !== '');
+            if (!hasTaxNumber) {
+                alert(`⚠️ YÊU CẦU NGHIỆP VỤ:\nHồ sơ [${r.code}] chưa có "Số phiếu chuyển thuế".\nVui lòng nhập Số phiếu chuyển trước khi chuyển thuế KV7!`);
+                handleOpenEdit(r);
+                return;
+            }
+        }
+
+        // RÀNG BUỘC 2: Đối với hồ sơ chuyển sang bước Chờ kiểm tra -> Luôn yêu cầu nhập Số seri GCN trước
+        if ((nextStatus as string) === 'Chờ kiểm tra' || ((normStatus as string) === 'Chờ In GCN' && (nextStatus as string) === 'Chờ kiểm tra')) {
+            const hasCertNumber = (r.issueNumber && r.issueNumber.trim() !== '') || ((r as any).certificateNumber && (r as any).certificateNumber.trim() !== '');
+            if (!hasCertNumber) {
+                alert(`⚠️ YÊU CẦU NGHIỆP VỤ:\nHồ sơ [${r.code}] chưa có "Số seri GCN" (Số phát hành GCN).\nVui lòng nhập Số seri GCN trước khi trình kiểm tra!`);
+                handleOpenEdit(r);
+                return;
+            }
+        }
 
         setSelectedIds(new Set([r.id]));
 
@@ -830,10 +851,15 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                 console.error('Lỗi khi chuyển bước:', e);
                 loadData();
             }
-        } else if (normStatus === 'Chờ ký duyệt') {
-            // Direct advance from Chờ ký duyệt to Chờ bàn giao without sign modal
+        } else if (normStatus === 'Chờ ký duyệt' || nextStatus === 'Chờ bàn giao') {
+            // Direct advance from Chờ ký duyệt to Chờ bàn giao -> Tự động điền ngày ký duyệt (approvalDate)
             const currentDateStr = new Date().toISOString().split('T')[0];
-            const updated: DangKyRecord = { ...r, status: 'Chờ bàn giao', completedDate: currentDateStr };
+            const updated: DangKyRecord = { 
+                ...r, 
+                status: 'Chờ bàn giao', 
+                completedDate: currentDateStr,
+                approvalDate: r.approvalDate || currentDateStr
+            };
             
             // Optimistic update immediately (0ms delay)
             setRecords(prev => prev.map(rec => rec.id === r.id ? updated : rec));
@@ -848,7 +874,7 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                     actionLabel: 'Hoàn thành ký duyệt',
                     targetType: 'Đăng ký',
                     referenceCode: r.code || r.id,
-                    details: `Xác nhận ký duyệt và chuyển hồ sơ Đăng ký ${r.code} sang "Chờ bàn giao"`
+                    details: `Xác nhận ký duyệt (Ngày ký: ${currentDateStr}) và chuyển hồ sơ Đăng ký ${r.code} sang "Chờ bàn giao"`
                 });
             } catch (e) {
                 console.error('Lỗi khi chuyển bước:', e);
@@ -863,8 +889,12 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
         } else {
             const currentDateStr = new Date().toISOString().split('T')[0];
             const updated: DangKyRecord = { ...r, status: nextStatus };
-            if (nextStatus === 'Chờ bàn giao') updated.completedDate = currentDateStr;
-            else if (nextStatus === 'Đã trả kết quả') updated.resultReturnedDate = currentDateStr;
+            if ((nextStatus as string) === 'Chờ bàn giao') {
+                updated.completedDate = currentDateStr;
+                if (!updated.approvalDate) updated.approvalDate = currentDateStr;
+            } else if ((nextStatus as string) === 'Đã trả kết quả') {
+                updated.resultReturnedDate = currentDateStr;
+            }
 
             // Optimistic update immediately (0ms delay)
             setRecords(prev => prev.map(rec => rec.id === r.id ? updated : rec));
@@ -900,7 +930,7 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
             for (const id of idsToUpdate) {
                 const rec = records.find(r => r.id === id);
                 if (!rec) continue;
-                const nextSt = NEXT_STATUS_MAP[rec.status] || rec.status;
+                const nextSt = getNextStatusForDangKyRecord(rec);
                 const nextNormSt = normalizeDangKyStatus(nextSt);
                 const payload: Partial<DangKyRecord> = {
                     status: nextSt,
