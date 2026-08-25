@@ -128,9 +128,10 @@ export const PROCEDURE_CATALOG: ProcedureDefinition[] = [
     defaultDocs: [
       { name: 'Mẫu số 28. Đơn đăng ký biến động đất đai, tài sản gắn liền với đất theo quy định.', type: 'Bản chính' },
       { name: 'Giấy chứng nhận đã cấp (bản gốc).', type: 'Bản chính' },
-      { name: 'Hợp đồng hoặc văn bản về việc chuyển quyền sử dụng đất, quyền sở hữu tài sản gắn liền với đất đối với trường hợp chuyển đổi, chuyển nhượng, thừa kế, góp vốn bằng quyền sử dụng đất, quyền sở hữu tài sản gắn liền với đất.', type: 'Bản chính' },
-      { name: 'Quyết định xử phạt vi phạm hành chính trong lĩnh vực đất đai đối với trường hợp có vi phạm hành chính trong lĩnh vực đất đai và giấy tờ chứng minh đã thực hiện quyết định xử phạt (nếu có)', type: 'Bản chính' },
-      { name: 'Tờ khai thuế theo quy định của pháp luật thuế hiện hành', type: 'Bản chính' }
+      { name: 'Văn bản thỏa thuận về việc thay đổi quyền sử dụng đất, quyền sở hữu tài sản gắn liền với đất theo thỏa thuận của các thành viên hộ gia đình hoặc của vợ và chồng.', type: 'Bản chính' },
+      { name: 'Văn bản về việc đại diện theo quy định của pháp luật về dân sự đối với trường hợp thực hiện thủ tục đăng ký đất đai, tài sản gắn liền với đất thông qua người đại diện.', type: 'Bản chính' },
+      { name: 'Tờ khai thuế theo quy định của pháp luật thuế hiện hành', type: 'Bản chính' },
+      { name: 'Bản trích lục bản đồ địa chính hoặc trích đo bản đồ địa chính', type: 'Bản chính' }
     ]
   },
   {
@@ -169,7 +170,13 @@ export const PROCEDURE_CATALOG: ProcedureDefinition[] = [
     module: 'dangky',
     defaultDeadline: 15,
     prefixes: ['3.3.1', 'CL'],
-    keywords: ['cấp lại', 'bị mất', 'mất gcn', 'mất sổ']
+    keywords: ['cấp lại', 'bị mất', 'mất gcn', 'mất sổ'],
+    defaultDocs: [
+      { name: 'Mảnh trích đo bản đồ địa chính thửa đất đối với trường hợp người sử dụng đất có nhu cầu đo đạc để xác định lại kích thước các cạnh, diện tích của thửa đất.', type: 'Bản chính' },
+      { name: 'Đơn đăng ký biến động đất đai, tài sản gắn liền với đất theo Mẫu số 18 ban hành kèm theo Nghị định số 151/2025/NĐ-CP.', type: 'Bản chính' },
+      { name: 'Văn bản về việc đại diện theo quy định của pháp luật về dân sự đối với trường hợp thực hiện thủ tục đăng ký đất đai, tài sản gắn liền với đất thông qua người đại diện.', type: 'Bản chính' },
+      { name: 'Hồ sơ Cung cấp thông tin', type: 'Bản chính' }
+    ]
   },
   {
     id: '3.3.2',
@@ -178,7 +185,13 @@ export const PROCEDURE_CATALOG: ProcedureDefinition[] = [
     module: 'dangky',
     defaultDeadline: 15,
     prefixes: ['3.3.2', 'CLT'],
-    keywords: ['cấp lại (có thuế)', 'cấp lại có thuế', 'cấp lại thay đổi diện tích']
+    keywords: ['cấp lại (có thuế)', 'cấp lại có thuế', 'cấp lại thay đổi diện tích'],
+    defaultDocs: [
+      { name: 'Mảnh trích đo bản đồ địa chính thửa đất đối với trường hợp người sử dụng đất có nhu cầu đo đạc để xác định lại kích thước các cạnh, diện tích của thửa đất.', type: 'Bản chính' },
+      { name: 'Đơn đăng ký biến động đất đai, tài sản gắn liền với đất theo Mẫu số 18 ban hành kèm theo Nghị định số 151/2025/NĐ-CP.', type: 'Bản chính' },
+      { name: 'Văn bản về việc đại diện theo quy định của pháp luật về dân sự đối với trường hợp thực hiện thủ tục đăng ký đất đai, tài sản gắn liền với đất thông qua người đại diện.', type: 'Bản chính' },
+      { name: 'Hồ sơ Cung cấp thông tin', type: 'Bản chính' }
+    ]
   },
   {
     id: '3.4.1',
@@ -187,7 +200,12 @@ export const PROCEDURE_CATALOG: ProcedureDefinition[] = [
     module: 'dangky',
     defaultDeadline: 17,
     prefixes: ['3.4.1', 'DK-TT-HT', 'DK-TT', 'DK-HT', 'TÁCH-HỢP'],
-    keywords: ['tách thửa', 'hợp thửa', 'tách - hợp thửa', 'không đổi người sử dụng đất']
+    keywords: ['tách thửa', 'hợp thửa', 'tách - hợp thửa', 'không đổi người sử dụng đất'],
+    defaultDocs: [
+      { name: 'Mẫu số 29. Đơn đề nghị tách thửa đất, hợp thửa đất theo quy định.', type: 'Bản chính' },
+      { name: 'Bản vẽ tách thửa đất, hợp thửa đất lập theo quy định.', type: 'Bản chính' },
+      { name: 'Giấy chứng nhận đã cấp (bản gốc).', type: 'Bản chính' }
+    ]
   },
   {
     id: '3.4.2',
@@ -203,9 +221,13 @@ export const PROCEDURE_CATALOG: ProcedureDefinition[] = [
     name: '3.5.1 Xác nhận tiếp tục sử dụng đất nông nghiệp khi hết hạn',
     shortName: '3.5.1 Gia hạn',
     module: 'dangky',
-    defaultDeadline: 7,
+    defaultDeadline: 12,
     prefixes: ['3.5.1', 'GH'],
-    keywords: ['gia hạn', 'tiếp tục sử dụng đất', 'hết hạn', 'đất nông nghiệp']
+    keywords: ['gia hạn', 'tiếp tục sử dụng đất', 'hết hạn', 'đất nông nghiệp'],
+    defaultDocs: [
+      { name: 'Giấy chứng nhận đã cấp (bản gốc).', type: 'Bản chính' },
+      { name: 'Mẫu số 31. Đơn xin xác nhận lại thời hạn sử dụng đất nông nghiệp.', type: 'Bản chính' }
+    ]
   },
   {
     id: '3.6.1',
@@ -345,7 +367,7 @@ export const DANG_KY_DEADLINE_MAP: Record<string, number> = PROCEDURE_CATALOG
     'Tách thửa': 17,
     'Hợp thửa': 17,
     'Tách thửa chuyển quyền': 17,
-    'Gia hạn': 7,
+    'Gia hạn': 12,
     'Chuyển mục đích không xin phép': 7,
     'Chuyển mục đích': 7,
     'Đính chính GCN': 7,

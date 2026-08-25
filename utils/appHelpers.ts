@@ -292,7 +292,9 @@ export const calculateDeadlineHelper = (type: string, receivedDateStr: string, h
             daysToAdd = 15;
         } else if (lowerType.includes('chuyển mục đích') || lowerType.includes('3.6.1')) {
             daysToAdd = 7;
-        } else if (lowerType.includes('gia hạn') || lowerType.includes('3.5.1') || lowerType.includes('đính chính') || lowerType.includes('3.7.1') || lowerType.includes('3.7.2') || lowerType.includes('thay đổi thông tin')) {
+        } else if (lowerType.includes('gia hạn') || lowerType.includes('3.5.1')) {
+            daysToAdd = 12;
+        } else if (lowerType.includes('đính chính') || lowerType.includes('3.7.1') || lowerType.includes('3.7.2') || lowerType.includes('thay đổi thông tin')) {
             daysToAdd = 7;
         } else if (lowerType.includes('xóa thế chấp') || lowerType.includes('xóa đk gdbd') || lowerType.includes('xóa gdbd') || lowerType.includes('3.8.2')) {
             daysToAdd = 1;
@@ -1036,6 +1038,63 @@ export function calculateEmployeeWorkload(
 
     return { inProgressPlots, completedPlots };
 }
+
+// --- HELPER PHÂN TÍCH GIẤY TỜ KÈM THEO CHUẨN NGUYÊN (TRÁNH HIỂN THỊ CHUỖI JSON THÔ) ---
+export const parseAttachedDocsHelper = (
+    attachedDocs?: any,
+    otherDocs?: any,
+    defaultDocs?: any
+): { id: string; name: string; type: string }[] => {
+    const tryParseJson = (val: any): any => {
+        if (!val) return null;
+        if (Array.isArray(val)) return val;
+        if (typeof val === 'object') return [val];
+        if (typeof val === 'string') {
+            const trimmed = val.trim();
+            if ((trimmed.startsWith('[') && trimmed.endsWith(']')) || (trimmed.startsWith('{') && trimmed.endsWith('}'))) {
+                try { return JSON.parse(trimmed); } catch { return null; }
+            }
+        }
+        return null;
+    };
+
+    if (Array.isArray(attachedDocs) && attachedDocs.length > 0) {
+        return attachedDocs.map((item, idx) => {
+            if (typeof item === 'string') {
+                const parsed = tryParseJson(item);
+                if (parsed) {
+                    const first = Array.isArray(parsed) ? parsed[0] : parsed;
+                    return { id: first?.id || String(idx + 1), name: first?.name || first?.docName || item, type: first?.type || first?.docType || 'Bản chính' };
+                }
+                return { id: String(idx + 1), name: item, type: 'Bản chính' };
+            }
+            return { id: item.id || String(idx + 1), name: item.name || item.docName || '', type: item.type || item.docType || 'Bản chính' };
+        }).filter(d => d.name && d.name.trim() !== '');
+    }
+
+    if (typeof attachedDocs === 'string' && attachedDocs.trim()) {
+        const parsed = tryParseJson(attachedDocs);
+        if (parsed) return parseAttachedDocsHelper(parsed);
+    }
+
+    if (otherDocs) {
+        const parsed = tryParseJson(otherDocs);
+        if (parsed) return parseAttachedDocsHelper(parsed);
+        if (typeof otherDocs === 'string' && otherDocs.trim()) {
+            return otherDocs.split(/[\n;]/).map((s, idx) => ({
+                id: String(idx + 1),
+                name: s.trim(),
+                type: 'Bản chính'
+            })).filter(d => d.name !== '');
+        }
+    }
+
+    if (defaultDocs) {
+        return parseAttachedDocsHelper(defaultDocs);
+    }
+
+    return [];
+};
 
 
 

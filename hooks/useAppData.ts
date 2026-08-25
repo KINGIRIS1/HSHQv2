@@ -13,16 +13,19 @@ import { migrateUnbatchedRecords } from '../utils/appHelpers';
 // Helper to fetch with timeout and safe fallback
 const safeFetch = async <T>(fetchFn: () => Promise<T>, fallbackValue: T, timeoutMs = 8000): Promise<T> => {
     try {
-        const timeoutPromise = new Promise<T>((resolve) => 
-            setTimeout(() => resolve(fallbackValue), timeoutMs)
-        );
-        return await Promise.race([
+        let timer: any;
+        const timeoutPromise = new Promise<T>((resolve) => {
+            timer = setTimeout(() => resolve(fallbackValue), timeoutMs);
+        });
+        const result = await Promise.race([
             fetchFn().catch((err) => {
                 console.warn('safeFetch request error, using fallback:', err?.message || err);
                 return fallbackValue;
             }),
             timeoutPromise
         ]);
+        clearTimeout(timer);
+        return result;
     } catch {
         return fallbackValue;
     }

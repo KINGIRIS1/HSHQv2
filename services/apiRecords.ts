@@ -68,10 +68,13 @@ const OPTIONAL_NEW_COLUMNS = [
 // Helper to fetch with timeout
 const withQueryTimeout = async (promise: any, timeoutMs = 10000): Promise<{ data: any[] | null; error: any }> => {
     try {
-        const timeoutPromise = new Promise<{ data: any[] | null; error: any }>((resolve) => 
-            setTimeout(() => resolve({ data: null, error: { message: 'Timeout' } }), timeoutMs)
-        );
-        return await Promise.race([promise, timeoutPromise]);
+        let timer: any;
+        const timeoutPromise = new Promise<{ data: any[] | null; error: any }>((resolve) => {
+            timer = setTimeout(() => resolve({ data: null, error: { message: 'Timeout' } }), timeoutMs);
+        });
+        const result = await Promise.race([promise, timeoutPromise]);
+        clearTimeout(timer);
+        return result;
     } catch (err) {
         return { data: null, error: err };
     }
