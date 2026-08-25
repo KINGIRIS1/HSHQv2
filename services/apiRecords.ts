@@ -893,16 +893,20 @@ export const forceUpdateRecordsBatchApi = async (records: RecordFile[], onProgre
                 });
             }
 
-            const landUpdates: any[] = [];
-            const luutruUpdates: any[] = [];
-            const dangkyUpdates: any[] = [];
+            const landUpdatesMap = new Map<string, any>();
+            const luutruUpdatesMap = new Map<string, any>();
+            const dangkyUpdatesMap = new Map<string, any>();
 
             chunkRecords.forEach((excelRecord) => {
                 const normCode = normalizeCode(excelRecord.code);
                 const dbEntry = dbMap.get(normCode);
                 
                 if (dbEntry) {
-                    const merged = { ...dbEntry.record };
+                    const recordId = dbEntry.record.id;
+                    let merged = landUpdatesMap.get(recordId) || luutruUpdatesMap.get(recordId) || dangkyUpdatesMap.get(recordId);
+                    if (!merged) {
+                        merged = { ...dbEntry.record };
+                    }
                     let hasChange = false;
 
                     Object.keys(excelRecord).forEach(key => {
@@ -917,19 +921,27 @@ export const forceUpdateRecordsBatchApi = async (records: RecordFile[], onProgre
                         }
                     });
 
-                    if (hasChange) {
+                    if (hasChange || (!landUpdatesMap.has(recordId) && !luutruUpdatesMap.has(recordId) && !dangkyUpdatesMap.has(recordId))) {
                         const sanitized = sanitizeData(merged, RECORD_DB_COLUMNS);
+                        landUpdatesMap.delete(recordId);
+                        luutruUpdatesMap.delete(recordId);
+                        dangkyUpdatesMap.delete(recordId);
+
                         if (dbEntry.table === 'luutru_records') {
-                            luutruUpdates.push(sanitized);
+                            luutruUpdatesMap.set(recordId, sanitized);
                         } else if (dbEntry.table === 'dangky_records') {
-                            dangkyUpdates.push(sanitized);
+                            dangkyUpdatesMap.set(recordId, sanitized);
                         } else {
-                            landUpdates.push(sanitized);
+                            landUpdatesMap.set(recordId, sanitized);
                         }
                         updateCount++;
                     }
                 }
             });
+
+            const landUpdates = Array.from(landUpdatesMap.values());
+            const luutruUpdates = Array.from(luutruUpdatesMap.values());
+            const dangkyUpdates = Array.from(dangkyUpdatesMap.values());
 
             const upsertIntoTable = async (table: 'land_records' | 'luutru_records' | 'dangky_records', updates: any[]) => {
                 if (updates.length === 0) return;

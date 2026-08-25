@@ -7,6 +7,40 @@ import { X, Upload, FileSpreadsheet, Save, Loader2, AlertCircle, Check, RefreshC
 import { calculateDeadlineHelper } from '../utils/appHelpers';
 import { getShortRecordType } from '../constants';
 
+const removeDiacritics = (str: string) => {
+    return str
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/đ/g, 'd')
+        .replace(/Đ/g, 'D')
+        .toLowerCase()
+        .trim();
+};
+
+const FIELD_LABELS: Record<string, string> = {
+    code: 'Mã hồ sơ',
+    owners: 'Chủ sử dụng',
+    transferees: 'Bên nhận',
+    ward: 'Xã/Phường',
+    landPlot: 'Thửa',
+    mapSheet: 'Tờ',
+    totalArea: 'Diện tích',
+    residentialArea: 'Đất ở',
+    issueNumber: 'Số phát hành',
+    entryNumber: 'Số vào sổ',
+    recordType: 'Loại hồ sơ',
+    receivedDate: 'Ngày nhận',
+    deadline: 'Hẹn trả',
+    status: 'Trạng thái',
+    appraisalStaff: 'Cán bộ thụ lý',
+    checkedBy: 'Cán bộ kiểm tra',
+    submittedTo: 'Lãnh đạo ký',
+    exportBatch: 'Đợt bàn giao',
+    receiptNumber: 'Số biên lai',
+    feeAmount: 'Lệ phí',
+    notes: 'Ghi chú'
+};
+
 interface DangKyImportModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -251,14 +285,28 @@ export const DangKyImportModal: React.FC<DangKyImportModalProps> = ({ isOpen, on
 
           // Cán bộ & Trạng thái
           const statusRaw = getVal(['TRẠNG THÁI', 'TRẠNG THÁI QUY TRÌNH', 'TÌNH TRẠNG']);
-          if (statusRaw !== undefined) {
-            record.status = normalizeDangKyStatus(String(statusRaw));
+          if (statusRaw !== undefined && String(statusRaw).trim() !== '') {
+            const normStatus = removeDiacritics(String(statusRaw));
+            const matchedStatus = DANG_KY_STATUS_LIST.find(s => removeDiacritics(s) === normStatus || removeDiacritics(s).includes(normStatus));
+            if (matchedStatus) {
+              record.status = matchedStatus;
+            } else {
+              errors.push(`Trạng thái "${statusRaw}" không hợp lệ.`);
+            }
           } else if (mode === 'create') {
             record.status = 'Tiếp nhận mới';
           }
 
           const staffRaw = getVal(['CÁN BỘ THỤ LÝ', 'NGƯỜI XỬ LÝ', 'CÁN BỘ XỬ LÝ', 'CÁN BỘ THẨM ĐỊNH', 'NGƯỜI THỤ LÝ', 'CÁN BỘ']);
-          if (staffRaw !== undefined) record.appraisalStaff = String(staffRaw).trim();
+          if (staffRaw !== undefined && String(staffRaw).trim() !== '') {
+            const normStaff = removeDiacritics(String(staffRaw));
+            const emp = employees.find(e => removeDiacritics(e.name).includes(normStaff));
+            if (emp) {
+              record.appraisalStaff = emp.name;
+            } else {
+              errors.push(`Không tìm thấy nhân viên "${staffRaw}".`);
+            }
+          }
 
           const checkerRaw = getVal(['CÁN BỘ KIỂM TRA', 'NGƯỜI KIỂM TRA']);
           if (checkerRaw !== undefined) record.checkedBy = String(checkerRaw).trim();
@@ -518,59 +566,73 @@ export const DangKyImportModal: React.FC<DangKyImportModalProps> = ({ isOpen, on
               {/* Table Preview */}
               <div className="border border-gray-200 rounded-xl overflow-hidden shadow-2xs">
                 <div className="overflow-x-auto max-h-[420px]">
-                  <table className="w-full text-left border-collapse text-xs">
-                    <thead>
-                      <tr className="bg-gray-100 text-gray-700 font-bold border-b border-gray-200 sticky top-0 z-10 select-none uppercase text-[11px]">
-                        <th className="p-2.5 text-center border-r border-gray-200 w-10">STT</th>
-                        <th className="p-2.5 border-r border-gray-200 min-w-[160px]">Mã Hồ Sơ</th>
-                        <th className="p-2.5 border-r border-gray-200 min-w-[180px]">Chủ Sử Dụng</th>
-                        <th className="p-2.5 border-r border-gray-200 min-w-[160px]">Bên Nhận CQ</th>
-                        <th className="p-2.5 border-r border-gray-200 min-w-[110px]">Xã / Phường</th>
-                        <th className="p-2.5 border-r border-gray-200 text-center min-w-[80px]">Thửa / Tờ</th>
-                        <th className="p-2.5 border-r border-gray-200 min-w-[130px]">Trạng Thái</th>
-                        <th className="p-2.5 border-r border-gray-200 min-w-[130px]">Cán Bộ Thụ Lý</th>
-                        <th className="p-2.5 border-r border-gray-200 text-center min-w-[100px]">Hẹn Trả</th>
-                        <th className="p-2.5 text-center min-w-[100px]">Đợt Bàn Giao</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {filteredPreview.map((rec, idx) => {
-                        const hasErr = rec._errors && rec._errors.length > 0;
-                        return (
-                          <tr key={idx} className={`hover:bg-blue-50/40 transition-colors ${hasErr ? 'bg-rose-50/50' : 'bg-white'}`}>
-                            <td className="p-2.5 text-center text-gray-500 border-r border-gray-200 font-mono">{idx + 1}</td>
-                            <td className="p-2.5 border-r border-gray-200 font-bold text-blue-700 font-mono">
-                              {rec.code || <span className="text-gray-400 italic">Tự sinh</span>}
-                            </td>
-                            <td className="p-2.5 border-r border-gray-200 font-semibold text-gray-800">
-                              {rec.owners?.[0]?.name || '-'}
-                            </td>
-                            <td className="p-2.5 border-r border-gray-200 text-gray-700">
-                              {rec.transferees?.[0]?.name || '-'}
-                            </td>
-                            <td className="p-2.5 border-r border-gray-200 text-gray-700">
-                              {rec.ward || '-'}
-                            </td>
-                            <td className="p-2.5 border-r border-gray-200 text-center text-gray-600 font-mono">
-                              {rec.landPlot || '-'}/{rec.mapSheet || '-'}
-                            </td>
-                            <td className="p-2.5 border-r border-gray-200 font-semibold text-amber-700">
-                              {rec.status || '-'}
-                            </td>
-                            <td className="p-2.5 border-r border-gray-200 text-gray-700">
-                              {rec.appraisalStaff || rec.checkedBy || '-'}
-                            </td>
-                            <td className="p-2.5 border-r border-gray-200 text-center font-mono text-gray-600">
-                              {rec.deadline ? rec.deadline.split('T')[0] : '-'}
-                            </td>
-                            <td className="p-2.5 text-center text-gray-700 font-medium">
-                              {rec.exportBatch || '-'}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                  {(() => {
+                    const activeUpdatedKeys = Array.from(
+                        new Set(
+                            previewData.flatMap(r => Object.keys(r))
+                        )
+                    ).filter(key => !['id', 'code', '_errors', 'sourceTable'].includes(key));
+
+                    return (
+                        <table className="w-full text-left border-collapse text-xs">
+                            <thead className="bg-gray-100 text-gray-700 font-bold border-b border-gray-200 sticky top-0 z-10 select-none uppercase text-[11px]">
+                                <tr>
+                                    <th className="p-3 border-b border-r border-gray-200 w-10 text-center">STT</th>
+                                    <th className="p-3 border-b border-r border-gray-200 min-w-[160px]">Mã Hồ Sơ</th>
+                                    {activeUpdatedKeys.map(key => (
+                                        <th key={key} className="p-3 border-b border-r border-gray-200 min-w-[130px]">{FIELD_LABELS[key] || key}</th>
+                                    ))}
+                                    <th className="p-3 border-b min-w-[160px]">Kiểm duyệt lỗi</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-200">
+                                {filteredPreview.map((record, idx) => {
+                                    const hasError = record._errors && record._errors.length > 0;
+                                    const originalIdx = previewData.indexOf(record) + 1;
+                                    return (
+                                        <tr key={originalIdx} className={`hover:bg-blue-50/40 transition-colors ${hasError ? 'bg-rose-50/50' : 'bg-white'}`}>
+                                            <td className="p-3 text-center text-gray-500 border-r border-gray-200 font-mono">{originalIdx}</td>
+                                            <td className="p-3 border-r border-gray-200 font-bold text-blue-700 font-mono">
+                                                {record.code || <span className="text-gray-400 italic">Tự sinh</span>}
+                                            </td>
+                                            {activeUpdatedKeys.map(key => {
+                                                const val = record[key];
+                                                let displayVal = val;
+                                                if (key === 'owners' && Array.isArray(val)) {
+                                                    displayVal = val.map((o: any) => o.name).filter(Boolean).join(', ');
+                                                } else if (key === 'transferees' && Array.isArray(val)) {
+                                                    displayVal = val.map((t: any) => t.name).filter(Boolean).join(', ');
+                                                }
+                                                return (
+                                                    <td key={key} className="p-3 border-r border-gray-200">
+                                                        {key === 'status' && displayVal ? (
+                                                            <span className="text-xs px-2.5 py-1 rounded-full font-bold inline-block shadow-2xs bg-blue-50 text-blue-700">
+                                                                {String(displayVal)}
+                                                            </span>
+                                                        ) : (
+                                                            <span className={displayVal !== undefined && displayVal !== null && String(displayVal).trim() !== '' ? 'text-gray-800' : 'text-gray-300 italic'}>
+                                                                {displayVal !== undefined && displayVal !== null && String(displayVal).trim() !== '' ? String(displayVal) : '(Giữ nguyên)'}
+                                                            </span>
+                                                        )}
+                                                    </td>
+                                                );
+                                            })}
+                                            <td className="p-3">
+                                                {hasError ? (
+                                                    <ul className="text-red-600 list-disc pl-4 text-xs font-medium">
+                                                        {record._errors!.map((err, i) => <li key={i}>{err}</li>)}
+                                                    </ul>
+                                                ) : (
+                                                    <span className="text-green-600 text-xs flex items-center gap-1 font-medium"><Check size={14} /> Hợp lệ</span>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    );
+                  })()}
                 </div>
               </div>
             </div>
