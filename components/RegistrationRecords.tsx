@@ -253,6 +253,22 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
     useEffect(() => {
         loadData();
         fetchEmployees().then(data => setEmployeesList(data || [])).catch(() => {});
+
+        const handleDataChange = () => {
+            loadData();
+        };
+
+        if (typeof window !== 'undefined') {
+            window.addEventListener('records_data_changed', handleDataChange);
+            window.addEventListener('focus', handleDataChange);
+        }
+
+        return () => {
+            if (typeof window !== 'undefined') {
+                window.removeEventListener('records_data_changed', handleDataChange);
+                window.removeEventListener('focus', handleDataChange);
+            }
+        };
     }, []);
 
     // Tự động chuyển về trang 1 và bỏ chọn khi đổi Tab
@@ -758,42 +774,49 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
         setSelectedIds(next);
     };
 
-    // Customer Priority Helper (Transferee > Owner > Authorized)
+    // Hồ sơ / Khách hàng Priority Helper: 1. Người nộp (applicantName/submitterName) -> 2. Người được ủy quyền -> 3. Người nhận CQ -> 4. Chủ sử dụng
     const getPrimaryCustomer = (r: DangKyRecord) => {
-        // Priority 1: Transferee
+        // Priority 1: Applicant / Submitter
+        const submitterName = (r.applicantName || (r as any).submitterName || '').trim();
+        if (submitterName) {
+            return {
+                name: submitterName,
+                phone: r.applicantPhone || (r as any).submitterPhone || r.phoneNumber || ''
+            };
+        }
+        // Priority 2: Authorized Person
+        if (r.authorizedPersonName && r.authorizedPersonName.trim()) {
+            return {
+                name: r.authorizedPersonName.trim(),
+                phone: r.authorizedPersonPhone || r.phoneNumber || ''
+            };
+        }
+        // Priority 3: Transferee
         if (r.transferees && r.transferees.length > 0 && r.transferees[0].name?.trim()) {
             const t = r.transferees[0];
             return {
-                name: t.name,
-                phone: t.phone || '',
-                roleLabel: 'Người nhận CQ',
-                roleColor: 'bg-teal-50 text-teal-700 border-teal-200'
+                name: t.name.trim(),
+                phone: t.phone || r.phoneNumber || ''
             };
         }
-        // Priority 2: Owner
+        // Priority 4: Owner
         if (r.owners && r.owners.length > 0 && r.owners[0].name?.trim()) {
             const o = r.owners[0];
             return {
-                name: o.name,
-                phone: o.phone || '',
-                roleLabel: 'Chủ sử dụng',
-                roleColor: 'bg-blue-50 text-blue-700 border-blue-200'
+                name: o.name.trim(),
+                phone: o.phone || r.phoneNumber || ''
             };
         }
-        // Priority 3: Authorized
-        if (r.authorizedPersonName && r.authorizedPersonName.trim()) {
+        // Priority 5: Customer fallback
+        if (r.customerName && r.customerName.trim()) {
             return {
-                name: r.authorizedPersonName,
-                phone: r.authorizedPersonPhone || '',
-                roleLabel: 'Người UQ',
-                roleColor: 'bg-amber-50 text-amber-700 border-amber-200'
+                name: r.customerName.trim(),
+                phone: r.phoneNumber || ''
             };
         }
         return {
-            name: 'Chưa nhập tên',
-            phone: '',
-            roleLabel: '-',
-            roleColor: 'bg-gray-50 text-gray-400 border-gray-200'
+            name: 'Chưa cập nhật tên',
+            phone: r.phoneNumber || ''
         };
     };
 
@@ -1367,7 +1390,7 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
         onProgress?: (processed: number, total: number) => void
     ): Promise<boolean> => {
         try {
-            await saveDangKyRecordsBatchApi(importedRecords);
+            await saveDangKyRecordsBatchApi(importedRecords, onProgress);
             addActivityLog({
                 performerName: currentUser.fullName || currentUser.username,
                 performerRole: 'DANGKY',
@@ -2004,7 +2027,7 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                                             />
                                         </th>
                                         <th className="p-3 border-r border-gray-200/60 min-w-[120px]">MÃ HỒ SƠ</th>
-                                        <th className="p-3 border-r border-gray-200/60 min-w-[210px]">THÔNG TIN KHÁCH HÀNG</th>
+                                        <th className="p-3 border-r border-gray-200/60 min-w-[220px]">THÔNG TIN HỒ SƠ</th>
                                         <th className="p-3 border-r border-gray-200/60 min-w-[130px]">LOẠI HỒ SƠ</th>
                                         <th className="p-3 border-r border-gray-200/60 text-center min-w-[145px]">THỜI HẠN XỬ LÝ</th>
                                         <th className="p-3 border-r border-gray-200/60 text-center min-w-[110px]">XÃ PHƯỜNG</th>
@@ -2063,12 +2086,14 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                                                     </td>
                                                     <td className="p-3 border-r border-gray-100">
                                                         <div className="space-y-1">
-                                                            <div className="font-medium text-gray-900 text-sm">
-                                                                {cust.name}
+                                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                                                <span className="font-semibold text-gray-900 text-sm">
+                                                                    {cust.name}
+                                                                </span>
                                                             </div>
                                                             {cust.phone ? (
-                                                                <div className="text-sm text-gray-600 font-mono flex items-center gap-1.5">
-                                                                    <Phone size={13} className="text-gray-500 shrink-0" />
+                                                                <div className="text-xs text-emerald-700 font-mono flex items-center gap-1.5 font-medium">
+                                                                    <Phone size={12} className="text-emerald-600 shrink-0" />
                                                                     <span>{cust.phone}</span>
                                                                 </div>
                                                             ) : (

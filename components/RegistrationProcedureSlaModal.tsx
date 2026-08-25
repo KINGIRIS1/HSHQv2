@@ -218,7 +218,7 @@ export const RegistrationProcedureSlaModal: React.FC<RegistrationProcedureSlaMod
           <div className="flex-1 max-w-2xl">
             <label className="block text-xs font-bold text-gray-700 uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
               <Layers size={15} className="text-blue-600" />
-              <span>Chọn Loại hồ sơ / Thủ tục Đăng ký:</span>
+              <span>Chọn Loại thủ tục (Lưu trữ, Đo đạc, Đăng ký):</span>
             </label>
             <div className="relative">
               <select
@@ -227,9 +227,10 @@ export const RegistrationProcedureSlaModal: React.FC<RegistrationProcedureSlaMod
                 className="w-full bg-slate-50 border-2 border-blue-200 hover:border-blue-400 focus:border-blue-600 focus:bg-white text-gray-900 font-bold text-sm rounded-xl px-3.5 py-2.5 outline-none transition-all cursor-pointer shadow-xs"
               >
                 {proceduresList.map(proc => {
-                  const displayName = proc.shortName ? `${proc.id} - ${proc.shortName}` : (proc.name.startsWith(proc.id) ? proc.name : `[${proc.id}] ${proc.name}`);
+                  const moduleLabel = proc.module === 'luutru' ? '📁 [Lưu trữ]' : proc.module === 'dodac' ? '📐 [Đo đạc]' : '📝 [Đăng ký]';
+                  const displayName = `${moduleLabel} ${proc.shortName || proc.name}`;
                   return (
-                    <option key={proc.id} value={proc.id} className="py-1">
+                    <option key={proc.id} value={proc.id} className="py-1 font-medium">
                       {displayName}
                     </option>
                   );
@@ -525,7 +526,7 @@ export const RegistrationProcedureSlaModal: React.FC<RegistrationProcedureSlaMod
             </div>
             <div>
               <h2 className="text-base font-bold uppercase tracking-wide">
-                Cấu hình Quy trình & SLA Đăng ký
+                Cấu hình Quy trình & SLA
               </h2>
               <p className="text-xs text-blue-100">
                 Tùy biến các bước tiến độ, phân bổ thời gian (SLA) và đồng bộ thao tác chuyển giao việc
