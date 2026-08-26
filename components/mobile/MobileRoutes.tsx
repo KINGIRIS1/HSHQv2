@@ -79,7 +79,6 @@ const MobileRoutes: React.FC<MobileRoutesProps> = (props) => {
         <MobileRecordList 
           records={records} 
           employees={employees}
-          currentUser={currentUser}
           onViewRecord={props.handleViewRecord}
           onEditRecord={(r) => { props.setEditingRecord(r); props.setIsModalOpen(true); }}
           onDeleteRecord={(r) => { props.setDeletingRecord(r); props.setIsDeleteModalOpen(true); }}

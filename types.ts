@@ -33,7 +33,6 @@ export const DEFAULT_ROLE_PERMISSIONS: RolePermissions = {
   [UserRole.TEAM_LEADER]: [
     'ADD_RECORDS', 'EXPORT_RECORDS',
     'ADD_CONTRACTS', 'EDIT_CONTRACTS', 'LIQUIDATE_CONTRACTS', 'DELETE_CONTRACTS', 'EXPORT_CONTRACTS',
-    'dangky_BTN_ASSIGN_STAFF', 'dangky_BTN_SUBMIT_CHECK', 'dangky_BTN_SUBMIT_SIGN', 'dangky_BTN_APPROVE_SIGN', 'dangky_BTN_REJECT_RECORD', 'dangky_HANDOVER_RECORDS', 'dangky_BTN_RETURN_RESULT', 'dangky_BTN_EXTEND_DEADLINE', 'dangky_EDIT_RECORDS', 'dangky_DELETE_RECORDS', 'dangky_VIEW_DETAILS',
     'dodac_BTN_ASSIGN_STAFF', 'dodac_BTN_SUBMIT_CHECK', 'dodac_BTN_SUBMIT_SIGN', 'dodac_BTN_APPROVE_SIGN', 'dodac_BTN_REJECT_RECORD', 'dodac_HANDOVER_RECORDS', 'dodac_BTN_RETURN_RESULT', 'dodac_VIEW_EXCERPTS', 'dodac_MANAGE_EXCERPTS', 'dodac_BTN_EXTEND_DEADLINE', 'dodac_EDIT_RECORDS', 'dodac_DELETE_RECORDS', 'dodac_VIEW_DETAILS',
     'luutru_BTN_ASSIGN_STAFF', 'luutru_BTN_SUBMIT_CHECK', 'luutru_BTN_SUBMIT_SIGN', 'luutru_BTN_APPROVE_SIGN', 'luutru_BTN_REJECT_RECORD', 'luutru_HANDOVER_RECORDS', 'luutru_BTN_RETURN_RESULT', 'luutru_VIEW_ARCHIVE', 'luutru_MANAGE_ARCHIVE', 'luutru_BTN_EXTEND_DEADLINE', 'luutru_EDIT_RECORDS', 'luutru_DELETE_RECORDS', 'luutru_VIEW_DETAILS',
     'VIEW_SCHEDULE', 'MANAGE_SCHEDULE', 'VIEW_REPORTS', 'VIEW_CHAT', 'VIEW_PERSONAL_PROFILE'
@@ -44,7 +43,6 @@ export const DEFAULT_ROLE_PERMISSIONS: RolePermissions = {
     'VIEW_SCHEDULE', 'VIEW_CHAT', 'VIEW_PERSONAL_PROFILE'
   ],
   [UserRole.EMPLOYEE]: [
-    'dangky_BTN_ASSIGN_STAFF', 'dangky_BTN_SUBMIT_CHECK', 'dangky_BTN_SUBMIT_SIGN', 'dangky_BTN_APPROVE_SIGN', 'dangky_BTN_REJECT_RECORD', 'dangky_HANDOVER_RECORDS', 'dangky_BTN_RETURN_RESULT', 'dangky_BTN_EXTEND_DEADLINE', 'dangky_EDIT_RECORDS', 'dangky_DELETE_RECORDS', 'dangky_VIEW_DETAILS',
     'dodac_BTN_ASSIGN_STAFF', 'dodac_BTN_SUBMIT_CHECK', 'dodac_BTN_SUBMIT_SIGN', 'dodac_BTN_APPROVE_SIGN', 'dodac_BTN_REJECT_RECORD', 'dodac_HANDOVER_RECORDS', 'dodac_BTN_RETURN_RESULT', 'dodac_VIEW_EXCERPTS', 'dodac_MANAGE_EXCERPTS', 'dodac_BTN_EXTEND_DEADLINE', 'dodac_EDIT_RECORDS', 'dodac_DELETE_RECORDS', 'dodac_VIEW_DETAILS',
     'luutru_BTN_ASSIGN_STAFF', 'luutru_BTN_SUBMIT_CHECK', 'luutru_BTN_SUBMIT_SIGN', 'luutru_BTN_APPROVE_SIGN', 'luutru_BTN_REJECT_RECORD', 'luutru_HANDOVER_RECORDS', 'luutru_BTN_RETURN_RESULT', 'luutru_VIEW_ARCHIVE', 'luutru_MANAGE_ARCHIVE', 'luutru_BTN_EXTEND_DEADLINE', 'luutru_EDIT_RECORDS', 'luutru_DELETE_RECORDS', 'luutru_VIEW_DETAILS',
     'VIEW_SCHEDULE', 'VIEW_CHAT', 'VIEW_PERSONAL_PROFILE'
@@ -140,7 +138,6 @@ export interface RecordFile {
 
   content?: string | null;        
   recordType?: string | null;    
-  procedureId?: string | null;    
   
   receivedDate?: string | null;   
   receivedBy?: string | null; // Người nhận hồ sơ (ID của user)
@@ -492,7 +489,6 @@ export interface DangKyRecord {
   invoiceNumber?: string;                   // Số Hóa đơn
   feeAmount?: number | string;              // Số tiền thu (VNĐ)
   status: DangKyStatusType;                 // Trạng thái quy trình (1 trong 14 trạng thái)
-  statusLogs?: any[];                       // Lịch sử cập nhật trạng thái
   notes?: string;                           // Ghi chú
   personalNotes?: string;                   // Ghi chú cá nhân
   reminderDate?: string;                     // Hẹn giờ nhắc việc
@@ -517,20 +513,61 @@ export interface DangKyRecord {
   deliveryDate?: string;                    // Ngày giao trả kết quả
   attachedDocs?: AttachedDoc[];             // Giấy tờ kèm theo
   attachedDocuments?: { name: string; type: string }[]; // Giấy tờ kèm theo khác
-  customerName?: string;                   // Tên khách hàng (fallback)
-  phoneNumber?: string;                    // SĐT liên hệ (fallback)
-  cccd?: string;                           // CCCD (fallback)
-  customerAddress?: string;                // Địa chỉ khách hàng (fallback)
-  address?: string;                        // Địa chỉ thửa đất / nơi cư trú
-  submitterName?: string;                  // Tên người nộp (alias)
-  submitterPhone?: string;                 // SĐT người nộp (alias)
-  sourceTable?: 'dangky_records' | 'land_records' | 'luutru_records';
   createdAt?: string;
   updatedAt?: string;
 }
 
-import { DANG_KY_RECORD_TYPES, DANG_KY_DEADLINE_MAP } from './constants/procedures';
-export { DANG_KY_RECORD_TYPES, DANG_KY_DEADLINE_MAP };
+export const DANG_KY_RECORD_TYPES = [
+  '3.1.1 Chuyển nhượng',
+  '3.1.2 Tặng cho',
+  '3.1.3 Thừa kế',
+  '3.1.4 Thỏa thuận',
+  '3.2.1 Cấp đổi',
+  '3.2.2 Cấp đổi (có thuế)',
+  '3.3.1 Cấp lại',
+  '3.3.2 Cấp lại (có thuế)',
+  '3.4.1 Tách - hợp thửa',
+  '3.5.1 Gia hạn',
+  '3.6.1 Chuyển mục đích không xin phép',
+  '3.7.1 Đính chính GCN',
+  '3.8.1 Đăng ký GDBD',
+  '3.8.2 Xóa ĐK GDBD',
+  '3.9.9 Khác'
+];
+
+export const DANG_KY_DEADLINE_MAP: Record<string, number> = {
+  '3.1.1 Chuyển nhượng': 13,
+  '3.1.2 Tặng cho': 13,
+  '3.1.3 Thừa kế': 13,
+  '3.1.4 Thỏa thuận': 13,
+  '3.2.1 Cấp đổi': 10,
+  '3.2.2 Cấp đổi (có thuế)': 15,
+  '3.3.1 Cấp lại': 10,
+  '3.3.2 Cấp lại (có thuế)': 15,
+  '3.4.1 Tách - hợp thửa': 17,
+  '3.5.1 Gia hạn': 7,
+  '3.6.1 Chuyển mục đích không xin phép': 10,
+  '3.7.1 Đính chính GCN': 7,
+  '3.8.1 Đăng ký GDBD': 3,
+  '3.8.2 Xóa ĐK GDBD': 3,
+  '3.9.9 Khác': 10,
+  // Backward compatibility keys
+  'Chuyển nhượng': 13,
+  'Tặng cho': 13,
+  'Thừa kế': 13,
+  'Thỏa thuận': 13,
+  'Cấp đổi': 10,
+  'Cấp đổi (có thuế)': 15,
+  'Cấp lại': 10,
+  'Cấp lại (có thuế)': 15,
+  'Tách - hợp thửa': 17,
+  'Gia hạn': 7,
+  'Chuyển mục đích không xin phép': 10,
+  'Đính chính GCN': 7,
+  'Đăng ký GDBD': 3,
+  'Xóa ĐK GDBD': 3,
+  'Khác': 10
+};
 
 declare global {
   interface Window {

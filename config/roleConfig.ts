@@ -139,16 +139,13 @@ export function isViewAllowedForUser(
   if (user.employeeId && employees && activePerms) {
     const emp = employees.find(e => e.id === user.employeeId);
     if (emp && emp.department) {
-      const isCapGiay = matchDepartmentKey('cấp giấy', emp.department) || matchDepartmentKey('đăng ký', emp.department);
       const isDodac = matchDepartmentKey('đo đạc', emp.department);
       const isLuutru = matchDepartmentKey('lưu trữ', emp.department);
 
-      if (isCapGiay && !isDodac && !isLuutru) {
-        activePerms = activePerms.filter(p => !p.startsWith('dodac_') && !p.startsWith('luutru_'));
-      } else if (isDodac && !isCapGiay && !isLuutru) {
-        activePerms = activePerms.filter(p => !p.startsWith('dangky_') && !p.startsWith('luutru_'));
-      } else if (isLuutru && !isCapGiay && !isDodac) {
-        activePerms = activePerms.filter(p => !p.startsWith('dangky_') && !p.startsWith('dodac_'));
+      if (isDodac && !isLuutru) {
+        activePerms = activePerms.filter(p => !p.startsWith('luutru_'));
+      } else if (isLuutru && !isDodac) {
+        activePerms = activePerms.filter(p => !p.startsWith('dodac_'));
       }
     }
   }
@@ -168,8 +165,7 @@ export function isViewAllowedForUser(
                activePerms.includes('DELETE_CONTRACTS') ||
                activePerms.includes('EXPORT_CONTRACTS');
       case 'records_group':
-        return activePerms.some(p => p.startsWith('dangky_')) ||
-               activePerms.some(p => p.startsWith('dodac_')) ||
+        return activePerms.some(p => p.startsWith('dodac_')) ||
                activePerms.some(p => p.startsWith('luutru_'));
       case 'tools_group':
         return activePerms.includes('VIEW_REPORTS') || activePerms.includes('dodac_MANAGE_EXCERPTS') || activePerms.includes('dodac_VIEW_EXCERPTS') || activePerms.includes('VIEW_SCHEDULE');
@@ -186,7 +182,7 @@ export function isViewAllowedForUser(
         return activePerms.some(p => p.startsWith('luutru_'));
       case 'registration_records':
       case 'vaoso_records':
-        return activePerms.some(p => p.startsWith('dangky_'));
+        return activePerms.some(p => p.startsWith('dodac_'));
       case 'other_records':
         return activePerms.some(p => p.startsWith('dodac_'));
 

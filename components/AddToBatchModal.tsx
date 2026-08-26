@@ -160,11 +160,7 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
   const todayFmt = formatDateDDMMYYYY(todayStr);
 
   const handleConfirm = () => {
-      if (!selectedHandoverWard) {
-          alert('Vui lòng chọn địa giới hành chính trước khi chốt danh sách bàn giao!');
-          return;
-      }
-      const handoverWard = selectedHandoverWard;
+      const handoverWard = selectedHandoverWard || 'SAME_AS_WARD';
 
       if (mode === 'new') {
           onConfirm(nextBatchInfo.batchName, nextBatchInfo.date, handoverWard);
@@ -273,14 +269,14 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
             {/* Giao khác địa bàn */}
             <div className="space-y-1.5 pt-2">
                 <label className="block text-xs font-bold text-gray-800">
-                    Chọn địa giới bàn giao <span className="text-red-500">*</span>
+                    Giao khác địa bàn (Xã/phường nhận kết quả)
                 </label>
                 <select 
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-blue-500 outline-none font-medium bg-white text-gray-800"
                     value={selectedHandoverWard}
                     onChange={(e) => setSelectedHandoverWard(e.target.value)}
                 >
-                    <option value="">-- Chọn địa giới (Bắt buộc) --</option>
+                    <option value="">-- Mặc định (Theo địa bàn từng hồ sơ) --</option>
                     {wards.map(w => (
                         <option key={w} value={w}>{getWardLabel(w)}</option>
                     ))}
@@ -299,7 +295,6 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
             </button>
             <button 
                 onClick={handleConfirm} 
-                disabled={!selectedHandoverWard}
                 className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold text-sm shadow-sm transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
             >
                 Xác nhận chốt

@@ -329,73 +329,43 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
     return filterAndSort([...myRecords], searchTerm, sortConfig);
   }, [myRecords, searchTerm, sortConfig]);
 
-  // Helper checks for record stage progression
-  const isFinishedRecord = (r: RecordFile) => {
-    return (
-      r.status === RecordStatus.SIGNED ||
-      r.status === RecordStatus.HANDOVER ||
-      r.status === RecordStatus.RETURNED ||
-      r.status === RecordStatus.REJECTED ||
-      r.status === RecordStatus.WITHDRAWN ||
-      !!r.completedDate ||
-      !!r.resultReturnedDate ||
-      (r.statusLogs && r.statusLogs.some(l => ['SIGNED', 'HANDOVER', 'RETURNED', 'REJECTED', 'WITHDRAWN'].includes(l.newStatus)))
-    );
-  };
-
-  const isReviewRecord = (r: RecordFile) => {
-    if (isFinishedRecord(r)) return false;
-    return (
-      r.status === RecordStatus.PENDING_SIGN ||
-      !!r.submissionDate ||
-      !!r.submittedTo ||
-      (r.statusLogs && r.statusLogs.some(l => l.newStatus === 'PENDING_SIGN'))
-    );
-  };
-
-  const isPendingCheckRecord = (r: RecordFile) => {
-    if (isFinishedRecord(r) || isReviewRecord(r)) return false;
-    return (
-      r.status === RecordStatus.PENDING_CHECK ||
-      r.status === RecordStatus.CHECKED ||
-      !!r.pendingCheckDate ||
-      !!r.checkedBy ||
-      (r.statusLogs && r.statusLogs.some(l => ['PENDING_CHECK', 'CHECKED'].includes(l.newStatus)))
-    );
-  };
-
-  const isPendingRecord = (r: RecordFile) => {
-    if (isFinishedRecord(r) || isReviewRecord(r) || isPendingCheckRecord(r)) return false;
-    if (r.pendingCheckDate || r.checkedBy || r.submissionDate || r.approvalDate || (r as any).deliveryDate || r.exportDate || r.resultReturnedDate) return false;
-    return (
-      r.status === RecordStatus.ASSIGNED ||
-      r.status === RecordStatus.IN_PROGRESS ||
-      r.status === RecordStatus.COMPLETED_WORK ||
-      r.status === RecordStatus.RECEIVED
-    );
-  };
-
-  // 1. Hồ sơ Đang thực hiện
+  // 1. Hồ sơ Đang thực hiện (ASSIGNED, IN_PROGRESS, COMPLETED_WORK)
   const pendingRecords = useMemo(() => {
-    let list = myRecords.filter(r => isPendingRecord(r));
+    let list = myRecords.filter(
+      (r) =>
+        r.status === RecordStatus.ASSIGNED ||
+        r.status === RecordStatus.IN_PROGRESS ||
+        r.status === RecordStatus.COMPLETED_WORK,
+    );
     return filterAndSort(list, searchTerm, sortConfig);
   }, [myRecords, searchTerm, sortConfig]);
 
   // 3. Hồ sơ Chờ kiểm tra (PENDING_CHECK) - Dành cho Tổ trưởng/Tổ phó
   const pendingCheckRecords = useMemo(() => {
-    let list = myRecords.filter(r => isPendingCheckRecord(r));
+    let list = myRecords.filter(
+      (r) =>
+        r.status === RecordStatus.PENDING_CHECK ||
+        r.status === RecordStatus.CHECKED,
+    );
     return filterAndSort(list, searchTerm, sortConfig);
   }, [myRecords, searchTerm, sortConfig]);
 
   // 4. Hồ sơ Chờ ký (PENDING_SIGN) - Chuyển thành Tab chính
   const reviewRecords = useMemo(() => {
-    let list = myRecords.filter(r => isReviewRecord(r));
+    let list = myRecords.filter((r) => r.status === RecordStatus.PENDING_SIGN);
     return filterAndSort(list, searchTerm, sortConfig);
   }, [myRecords, searchTerm, sortConfig]);
 
-  // 5. Hồ sơ Hoàn thành (SIGNED, HANDOVER, RETURNED, REJECTED, WITHDRAWN)
+  // 4. Hồ sơ Hoàn thành (SIGNED, HANDOVER, RETURNED, REJECTED, WITHDRAWN)
   const finishedRecords = useMemo(() => {
-    let list = myRecords.filter(r => isFinishedRecord(r));
+    let list = myRecords.filter(
+      (r) =>
+        r.status === RecordStatus.SIGNED ||
+        r.status === RecordStatus.HANDOVER ||
+        r.status === RecordStatus.RETURNED ||
+        r.status === RecordStatus.REJECTED ||
+        r.status === RecordStatus.WITHDRAWN,
+    );
     return filterAndSort(list, searchTerm, sortConfig);
   }, [myRecords, searchTerm, sortConfig]);
 
@@ -489,7 +459,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
     const headers = [
       "STT",
       "Mã hồ sơ",
-      "Thông tin khách hàng",
+      "Chủ sử dụng",
       "Số điện thoại",
       "CCCD",
       "Loại hồ sơ",
@@ -1262,7 +1232,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                         {renderSortHeader("Mã HS", "code")}
                       </th>
                       <th className="p-3 w-[180px]">
-                        {renderSortHeader("Thông tin khách hàng", "customerName")}
+                        {renderSortHeader("Chủ sử dụng", "customerName")}
                       </th>
                       <th className="p-3 w-[115px]">
                         {renderSortHeader("Loại hồ sơ", "recordType")}

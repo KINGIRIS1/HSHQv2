@@ -1,11 +1,9 @@
 import React, { useState, useMemo } from 'react';
-import { getRecordDateForStatus } from '../../hooks/useRecordFilter';
 import { 
     Search, 
     X,
     Eye, 
     CalendarClock, 
-    Calendar,
     CheckCircle2, 
     Pencil, 
     Clock, 
@@ -16,15 +14,10 @@ import {
     Bell,
     FileSpreadsheet,
     FileCheck,
-    FilePlus2,
-    Filter,
-    User as UserIcon,
-    ChevronDown,
-    ChevronUp,
-    MapPin
+    FilePlus2
 } from 'lucide-react';
-import { RecordFile, Employee, User, RecordStatus, UserRole, DANG_KY_STATUS_LIST } from '../../types';
-import { getShortRecordType, getWardLabel, getCanonicalRecordType, EXTENDED_RECORD_TYPES } from '../../constants';
+import { RecordFile, Employee, User, RecordStatus, UserRole } from '../../types';
+import { getShortRecordType, getWardLabel } from '../../constants';
 import { removeVietnameseTones, toTitleCase, getBatchDisplayParts, isRecordOverdue, isRecordApproaching } from '../../utils/appHelpers';
 import StatusBadge from '../StatusBadge';
 import * as XLSX from 'xlsx-js-style';
@@ -44,7 +37,7 @@ interface RecordLookupViewProps {
 const formatDate = (dateStr?: string | null) => {
     if (!dateStr) return '';
     const d = new Date(dateStr);
-    return isNaN(d.getTime()) ? '' : `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+    return isNaN(d.getTime()) ? '' : `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getFullYear()).slice(-2)}`;
 };
 
 export const RecordLookupView: React.FC<RecordLookupViewProps> = ({
@@ -58,19 +51,8 @@ export const RecordLookupView: React.FC<RecordLookupViewProps> = ({
     onExtendDeadline,
     onSupplementRecord
 }) => {
-    // Search Term State, Status Filter State & Checkbox Selection
+    // Search Term State
     const [searchTerm, setSearchTerm] = useState('');
-    const [selectedRecordIds, setSelectedRecordIds] = useState<Set<string>>(new Set());
-
-    // Filter Popover States (Giống tab Tất cả hồ sơ module đo đạc)
-    const [isFilterPopoverOpen, setIsFilterPopoverOpen] = useState(false);
-    const [selectedWardFilter, setSelectedWardFilter] = useState<string>('all');
-    const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>('all');
-    const [selectedEmployeeFilter, setSelectedEmployeeFilter] = useState<string>('all');
-    const [selectedRecordTypeFilter, setSelectedRecordTypeFilter] = useState<string>('all');
-    const [selectedBatchFilter, setSelectedBatchFilter] = useState<string>('all');
-    const [filterFromDate, setFilterFromDate] = useState<string>('');
-    const [filterToDate, setFilterToDate] = useState<string>('');
 
     // Pagination State: Mặc định 10 dòng/trang theo yêu cầu
     const [currentPage, setCurrentPage] = useState(1);
@@ -78,154 +60,23 @@ export const RecordLookupView: React.FC<RecordLookupViewProps> = ({
 
     // Determine display status (tương tự như tab chuyên môn)
     const getDisplayStatus = (r: RecordFile) => {
-        const raw = (r.status || '').trim();
-        const genericStatuses = [RecordStatus.RECEIVED, RecordStatus.ASSIGNED, RecordStatus.IN_PROGRESS, 'Tiếp nhận mới', 'Đang thực hiện', 'Đang xử lý'];
-        if (raw && !genericStatuses.includes(raw as any)) {
-            return raw;
-        }
+        if (r.status) return r.status;
         if (r.resultReturnedDate) return RecordStatus.RETURNED;
-        if ((r.exportBatch || r.exportDate) && raw !== RecordStatus.WITHDRAWN && raw !== RecordStatus.RETURNED && raw !== RecordStatus.REJECTED) {
+        if ((r.exportBatch || r.exportDate) && r.status !== RecordStatus.WITHDRAWN && r.status !== RecordStatus.RETURNED && r.status !== RecordStatus.REJECTED) {
             return RecordStatus.HANDOVER;
         }
-        if (r.approvalDate || r.submissionDate || (r as any).submittedTo) return RecordStatus.SIGNED;
-        if (r.pendingCheckDate || r.checkedBy) return RecordStatus.PENDING_CHECK;
-        if ((r as any).printDate || (r as any).printStaff) return 'Chờ In GCN';
-        if ((r as any).taxNoticeDate || (r as any).taxPaymentReceiptDate) return 'Chờ giấy nộp tiền';
-        if ((r as any).taxKV7TransferDate) return 'Chờ Thuế KV7';
-        if ((r as any).taxFormDate) return 'Phiếu chuyển thuế';
-        if ((r as any).appraisalDate) return 'Thẩm định';
-
-        if (Array.isArray(r.statusLogs) && r.statusLogs.length > 0) {
-            const lastLog = r.statusLogs[r.statusLogs.length - 1];
-            const logSt = lastLog?.newStatus || (lastLog as any)?.status || (lastLog as any)?.step;
-            if (logSt && !genericStatuses.includes(logSt)) return logSt;
-        }
-
-        return raw || RecordStatus.RECEIVED;
+        return RecordStatus.RECEIVED;
     };
 
-    // All available unique record types and batches (synchronized and unified with procedure catalog)
-    const availableRecordTypes = useMemo(() => {
-        const types = new Set<string>(EXTENDED_RECORD_TYPES);
-        records.forEach(r => { 
-            if (r.recordType) {
-                const canonical = getCanonicalRecordType(r.recordType, r.code);
-                if (canonical) types.add(canonical);
-                else types.add(r.recordType);
-            }
-        });
-        return Array.from(types);
-    }, [records]);
-
-    const availableBatches = useMemo(() => {
-        const batches = new Set<string>();
-        records.forEach(r => { if (r.exportBatch) batches.add(String(r.exportBatch)); });
-        return Array.from(batches);
-    }, [records]);
-
-    // Active filter count for badge
-    const activeFilterCount = useMemo(() => {
-        let count = 0;
-        if (selectedWardFilter !== 'all') count++;
-        if (selectedStatusFilter !== 'all') count++;
-        if (selectedRecordTypeFilter !== 'all') count++;
-        if (selectedBatchFilter !== 'all') count++;
-        if (filterFromDate) count++;
-        if (filterToDate) count++;
-        return count;
-    }, [selectedWardFilter, selectedStatusFilter, selectedRecordTypeFilter, selectedBatchFilter, filterFromDate, filterToDate]);
-
-    // Filter records by comprehensive filters and search keyword
+    // Filter records by search keyword
     const filteredRecords = useMemo(() => {
-        let result = records;
-
-        // 1. Ward Filter
-        if (selectedWardFilter !== 'all') {
-            result = result.filter(r => (r.ward || '') === selectedWardFilter);
-        }
-
-        // 2. Status Filter
-        if (selectedStatusFilter !== 'all') {
-            result = result.filter(r => {
-                const st = String(getDisplayStatus(r));
-                const filterVal = String(selectedStatusFilter);
-                if (filterVal === RecordStatus.RECEIVED || filterVal === 'Tiếp nhận mới') {
-                    return st === RecordStatus.RECEIVED || st === RecordStatus.ASSIGNED || st === RecordStatus.IN_PROGRESS || st === 'Tiếp nhận mới';
-                }
-                if (filterVal === RecordStatus.HANDOVER || filterVal === 'Chờ bàn giao') {
-                    return st === RecordStatus.HANDOVER || st === RecordStatus.SIGNED || st === 'Chờ bàn giao';
-                }
-                if (filterVal === RecordStatus.RETURNED || filterVal === 'Đã trả kết quả') {
-                    return st === RecordStatus.RETURNED || st === 'Đã trả kết quả';
-                }
-                if (filterVal === RecordStatus.WITHDRAWN || filterVal === 'CSD rút HS') {
-                    return st === RecordStatus.WITHDRAWN || st === 'CSD rút HS';
-                }
-                if (filterVal === RecordStatus.REJECTED || filterVal === 'Trả hủy hồ sơ') {
-                    return st === RecordStatus.REJECTED || st === 'Trả hủy hồ sơ';
-                }
-                return st === filterVal;
-            });
-        }
-
-        // 3. Record Type Filter
-        if (selectedRecordTypeFilter !== 'all') {
-            result = result.filter(r => {
-                const canonical = getCanonicalRecordType(r.recordType, r.code);
-                return canonical === selectedRecordTypeFilter || (r.recordType || '') === selectedRecordTypeFilter;
-            });
-        }
-
-        // 4. Batch Filter
-        if (selectedBatchFilter !== 'all') {
-            result = result.filter(r => String(r.exportBatch || '') === selectedBatchFilter);
-        }
-
-        // 4.5. Employee Filter
-        if (selectedEmployeeFilter !== 'all') {
-            if (selectedEmployeeFilter === 'unassigned') {
-                result = result.filter(r => !r.assignedTo && !(r as any).appraisalStaff && !(r as any).checkedBy);
-            } else {
-                const empObj = employees.find(e => e.id === selectedEmployeeFilter || e.name === selectedEmployeeFilter);
-                const empName = empObj?.name?.toLowerCase();
-                const empId = selectedEmployeeFilter.toLowerCase();
-
-                result = result.filter(r => {
-                    const aTo = r.assignedTo ? r.assignedTo.toLowerCase() : '';
-                    const appSt = (r as any).appraisalStaff ? (r as any).appraisalStaff.toLowerCase() : '';
-                    const chkBy = (r as any).checkedBy ? (r as any).checkedBy.toLowerCase() : '';
-                    const subTo = (r as any).submittedTo ? (r as any).submittedTo.toLowerCase() : '';
-
-                    return (
-                        aTo === empId || (empName && aTo === empName) ||
-                        appSt === empId || (empName && appSt === empName) ||
-                        chkBy === empId || (empName && chkBy === empName) ||
-                        subTo === empId || (empName && subTo === empName)
-                    );
-                });
-            }
-        }
-
-        // 5. Date Range Filter (by Status or receivedDate)
-        if (filterFromDate || filterToDate) {
-            result = result.filter(r => {
-                const targetDateStr = getRecordDateForStatus(r, selectedStatusFilter);
-                if (!targetDateStr) return false;
-                if (filterFromDate && targetDateStr < filterFromDate) return false;
-                if (filterToDate && targetDateStr > filterToDate) return false;
-                return true;
-            });
-        }
-
-        // 6. Search keyword
-        if (!searchTerm.trim()) return result;
+        if (!searchTerm.trim()) return records;
 
         const term = removeVietnameseTones(searchTerm.toLowerCase().trim());
-        return result.filter(r => {
+        return records.filter(r => {
             const code = removeVietnameseTones(r.code || '').toLowerCase();
             const name = removeVietnameseTones(r.customerName || '').toLowerCase();
             const phone = (r.phoneNumber || '').toLowerCase();
-            const cccd = (r.cccd || '').toLowerCase();
             const plot = (r.landPlot || '').toLowerCase();
             const sheet = (r.mapSheet || '').toLowerCase();
             const ward = removeVietnameseTones(r.ward || '').toLowerCase();
@@ -234,13 +85,6 @@ export const RecordLookupView: React.FC<RecordLookupViewProps> = ({
             const receipt = removeVietnameseTones(r.receiptNumber || '').toLowerCase();
             const batch = removeVietnameseTones(String(r.exportBatch || '')).toLowerCase();
 
-            const ownerNames = (r.owners || []).map(o => removeVietnameseTones(o.name || '').toLowerCase()).join(' ');
-            const ownerCccd = (r.owners || []).map(o => (o.cccd || '').toLowerCase()).join(' ');
-            const ownerPhone = (r.owners || []).map(o => (o.phone || '').toLowerCase()).join(' ');
-            const transfereeNames = (r.transferees || []).map(t => removeVietnameseTones(t.name || '').toLowerCase()).join(' ');
-            const transfereeCccd = (r.transferees || []).map(t => (t.cccd || '').toLowerCase()).join(' ');
-            const transfereePhone = (r.transferees || []).map(t => (t.phone || '').toLowerCase()).join(' ');
-
             const assignedEmp = employees.find(e => e.id === r.assignedTo);
             const empName = assignedEmp ? removeVietnameseTones(assignedEmp.name || '').toLowerCase() : '';
 
@@ -248,13 +92,6 @@ export const RecordLookupView: React.FC<RecordLookupViewProps> = ({
                 code.includes(term) ||
                 name.includes(term) ||
                 phone.includes(term) ||
-                cccd.includes(term) ||
-                ownerNames.includes(term) ||
-                ownerCccd.includes(term) ||
-                ownerPhone.includes(term) ||
-                transfereeNames.includes(term) ||
-                transfereeCccd.includes(term) ||
-                transfereePhone.includes(term) ||
                 plot === term ||
                 sheet === term ||
                 `thua ${plot}`.includes(term) ||
@@ -267,7 +104,7 @@ export const RecordLookupView: React.FC<RecordLookupViewProps> = ({
                 empName.includes(term)
             );
         });
-    }, [records, searchTerm, employees, selectedWardFilter, selectedStatusFilter, selectedRecordTypeFilter, selectedBatchFilter, filterFromDate, filterToDate]);
+    }, [records, searchTerm, employees]);
 
     // Pagination calculations
     const totalPages = Math.ceil(filteredRecords.length / pageSize) || 1;
@@ -276,32 +113,9 @@ export const RecordLookupView: React.FC<RecordLookupViewProps> = ({
         return filteredRecords.slice(start, start + pageSize);
     }, [filteredRecords, currentPage, pageSize]);
 
-    // Checkbox selection handlers
-    const handleSelectAll = () => {
-        if (selectedRecordIds.size === filteredRecords.length) {
-            setSelectedRecordIds(new Set());
-        } else {
-            setSelectedRecordIds(new Set(filteredRecords.map(r => r.id)));
-        }
-    };
-
-    const handleSelectOne = (id: string) => {
-        const next = new Set(selectedRecordIds);
-        if (next.has(id)) {
-            next.delete(id);
-        } else {
-            next.add(id);
-        }
-        setSelectedRecordIds(next);
-    };
-
     // Export to Excel helper
     const handleExportExcel = () => {
-        const recordsToExport = selectedRecordIds.size > 0
-            ? filteredRecords.filter(r => selectedRecordIds.has(r.id))
-            : filteredRecords;
-
-        if (recordsToExport.length === 0) return;
+        if (filteredRecords.length === 0) return;
 
         const headers = [
             'STT',
@@ -319,7 +133,7 @@ export const RecordLookupView: React.FC<RecordLookupViewProps> = ({
             'TRẠNG THÁI'
         ];
 
-        const dataRows = recordsToExport.map((r, idx) => {
+        const dataRows = filteredRecords.map((r, idx) => {
             const emp = employees.find(e => e.id === r.assignedTo);
             const displayStatus = getDisplayStatus(r);
             return [
@@ -344,7 +158,7 @@ export const RecordLookupView: React.FC<RecordLookupViewProps> = ({
             ['Độc lập - Tự do - Hạnh phúc'],
             [''],
             ['KẾT QUẢ TRA CỨU HỒ SƠ'],
-            [`Ngày xuất: ${new Date().toLocaleDateString('vi-VN')} | Tổng số hồ sơ xuất: ${recordsToExport.length}`],
+            [`Ngày xuất: ${new Date().toLocaleDateString('vi-VN')} | Tổng số hồ sơ: ${filteredRecords.length}`],
             [''],
             headers,
             ...dataRows
@@ -389,6 +203,7 @@ export const RecordLookupView: React.FC<RecordLookupViewProps> = ({
                 const cellRef = XLSX.utils.encode_cell({ r, c });
                 if (!ws[cellRef]) ws[cellRef] = { v: "", t: "s" };
 
+                // Căn giữa: STT(0), Mã HS(1), SĐT(3), Ngày nhận(5), Hạn trả(6), Tờ(8), Thửa(9), Đợt/HT(11), Trạng thái(12)
                 if ([0, 1, 3, 5, 6, 8, 9, 11, 12].includes(c)) ws[cellRef].s = centerStyle;
                 else ws[cellRef].s = cellStyle;
             }
@@ -419,255 +234,47 @@ export const RecordLookupView: React.FC<RecordLookupViewProps> = ({
 
     return (
         <div className="flex flex-col h-full bg-slate-50/50 rounded-xl overflow-hidden animate-fade-in">
-            {/* ROW 2: SEARCH BAR (Đặt ngoài cùng phía tay phải bằng 1/3 khung) */}
-            <div className="flex justify-end px-4 py-2 bg-slate-50 border-b border-slate-200 shrink-0">
-                <div className="relative w-full sm:w-1/3 min-w-[280px]">
-                    <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                    <input
-                        type="text"
-                        value={searchTerm}
-                        onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-                        placeholder="Nhập Mã hồ sơ, Tên chủ sử dụng, CCCD, SĐT, Tờ, Thửa..."
-                        className="w-full pl-9 pr-8 py-1.5 text-xs bg-white hover:bg-slate-50 focus:bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all font-medium text-slate-800 shadow-2xs"
-                        autoFocus
-                    />
-                    {searchTerm && (
-                        <button
-                            type="button"
-                            onClick={() => { setSearchTerm(''); setCurrentPage(1); }}
-                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 hover:bg-slate-100 rounded-full transition-colors cursor-pointer"
-                            title="Xóa từ khóa"
-                        >
-                            <X size={14} />
-                        </button>
-                    )}
-                </div>
-            </div>
-
-            {/* ROW 3: TOOLBAR, POPUP FILTER & EXCEL */}
-            <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 bg-white border-b border-slate-200 shrink-0 shadow-2xs">
-                <div className="flex flex-wrap items-center gap-2.5">
-                    {/* Popover Filter Button (Sao chép chuẩn từ tab Tất cả hồ sơ module đo đạc) */}
-                    <div className="relative">
-                        <button
-                            type="button"
-                            onClick={() => setIsFilterPopoverOpen(!isFilterPopoverOpen)}
-                            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all border cursor-pointer ${
-                                activeFilterCount > 0
-                                    ? "bg-blue-50 border-blue-300 text-blue-700 shadow-2xs"
-                                    : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100"
-                            }`}
-                        >
-                            <Filter size={14} className={activeFilterCount > 0 ? "text-blue-600" : "text-slate-500"} />
-                            <span>Bộ lọc tìm kiếm</span>
-                            {activeFilterCount > 0 && (
-                                <span className="bg-red-500 text-white text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ml-0.5">
-                                    {activeFilterCount}
-                                </span>
-                            )}
-                            {isFilterPopoverOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                        </button>
-
-                        {/* POPOVER FILTER CARD */}
-                        {isFilterPopoverOpen && (
-                            <>
-                                <div className="fixed inset-0 z-40" onClick={() => setIsFilterPopoverOpen(false)}></div>
-                                <div className="absolute left-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 p-4 z-50 animate-in fade-in zoom-in-95 duration-100 text-slate-800">
-                                    <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
-                                        <div className="flex items-center gap-2 font-bold text-blue-700 text-sm">
-                                            <Filter size={16} />
-                                            <span>Bộ lọc tìm kiếm nâng cao</span>
-                                        </div>
-                                        <button
-                                            type="button"
-                                            onClick={() => setIsFilterPopoverOpen(false)}
-                                            className="text-slate-400 hover:text-slate-600 p-1 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
-                                        >
-                                            <X size={16} />
-                                        </button>
-                                    </div>
-
-                                    <div className="space-y-3 max-h-[70vh] overflow-y-auto pr-1">
-                                        {/* 1. Xã / Phường */}
-                                        <div>
-                                            <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 mb-1">
-                                                <MapPin size={14} className="text-slate-500" />
-                                                <span>Địa danh (Xã/Phường):</span>
-                                            </label>
-                                            <select
-                                                value={selectedWardFilter}
-                                                onChange={(e) => setSelectedWardFilter(e.target.value)}
-                                                className="w-full text-xs border border-slate-200 rounded-lg p-2 font-medium bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
-                                            >
-                                                <option value="all">Tất cả Xã/Phường</option>
-                                                {wards.map((w) => (
-                                                    <option key={w} value={w}>{w}</option>
-                                                ))}
-                                            </select>
-                                        </div>
-
-                                        {/* 2. Trạng thái hồ sơ */}
-                                        <div>
-                                            <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 mb-1">
-                                                <CheckCircle2 size={14} className="text-slate-500" />
-                                                <span>Trạng thái hồ sơ:</span>
-                                            </label>
-                                            <select
-                                                value={selectedStatusFilter}
-                                                onChange={(e) => setSelectedStatusFilter(e.target.value)}
-                                                className="w-full text-xs border border-slate-200 rounded-lg p-2 font-medium bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
-                                            >
-                                                <option value="all">Tất cả trạng thái</option>
-                                                <option value="Tiếp nhận mới">Tiếp nhận mới / Đang xử lý</option>
-                                                <option value="Thẩm định">Thẩm định</option>
-                                                <option value="Phiếu chuyển thuế">Phiếu chuyển thuế</option>
-                                                <option value="Chờ Thuế KV7">Chờ Thuế KV7</option>
-                                                <option value="Chờ giấy nộp tiền">Chờ giấy nộp tiền</option>
-                                                <option value="Chờ In GCN">Chờ In GCN</option>
-                                                <option value="Chờ kiểm tra">Chờ kiểm tra</option>
-                                                <option value="Chờ ký duyệt">Chờ ký duyệt</option>
-                                                <option value="Chờ bàn giao">Chờ bàn giao / Đã bàn giao</option>
-                                                <option value="Đã giao 1 cửa">Đã giao 1 cửa</option>
-                                                <option value="Đã trả kết quả">Đã trả kết quả</option>
-                                                <option value="Chờ bổ sung">Chờ bổ sung</option>
-                                                <option value="CSD rút HS">Rút hồ sơ</option>
-                                                <option value="Trả hủy hồ sơ">Trả hủy / Từ chối</option>
-                                            </select>
-                                        </div>
-
-                                        {/* 3. Loại hồ sơ */}
-                                        <div>
-                                            <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 mb-1">
-                                                <span className="font-bold text-slate-500">📁</span>
-                                                <span>Loại hồ sơ:</span>
-                                            </label>
-                                            <select
-                                                value={selectedRecordTypeFilter}
-                                                onChange={(e) => setSelectedRecordTypeFilter(e.target.value)}
-                                                className="w-full text-xs border border-slate-200 rounded-lg p-2 font-medium bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
-                                            >
-                                                <option value="all">Tất cả loại hồ sơ</option>
-                                                {availableRecordTypes.map((t) => (
-                                                    <option key={t} value={t}>{t}</option>
-                                                ))}
-                                            </select>
-                                        </div>
-
-                                        {/* 3.5. Cán bộ xử lý */}
-                                        <div>
-                                            <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 mb-1">
-                                                <UserIcon size={14} className="text-slate-500" />
-                                                <span>Cán bộ xử lý:</span>
-                                            </label>
-                                            <select
-                                                value={selectedEmployeeFilter}
-                                                onChange={(e) => setSelectedEmployeeFilter(e.target.value)}
-                                                className="w-full text-xs border border-slate-200 rounded-lg p-2 font-medium bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
-                                            >
-                                                <option value="all">Tất cả cán bộ</option>
-                                                <option value="unassigned">Chưa giao cán bộ</option>
-                                                {employees.map((emp) => (
-                                                    <option key={emp.id} value={emp.id}>
-                                                        {emp.name} {emp.position ? `(${emp.position})` : ''}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </div>
-
-                                        {/* 4. Khoảng thời gian lọc theo trạng thái */}
-                                        <div>
-                                            <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 mb-1.5">
-                                                <Calendar size={14} className="text-slate-500" />
-                                                <span>Thời gian (Từ ngày - Đến ngày):</span>
-                                            </label>
-                                            <div className="grid grid-cols-2 gap-2">
-                                                <div>
-                                                    <label className="block text-[11px] font-medium text-slate-500 mb-0.5">Từ ngày:</label>
-                                                    <input
-                                                        type="date"
-                                                        value={filterFromDate}
-                                                        onChange={(e) => setFilterFromDate(e.target.value)}
-                                                        className="w-full text-xs border border-slate-200 rounded-lg p-1.5 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-[11px] font-medium text-slate-500 mb-0.5">Đến ngày:</label>
-                                                    <input
-                                                        type="date"
-                                                        value={filterToDate}
-                                                        onChange={(e) => setFilterToDate(e.target.value)}
-                                                        className="w-full text-xs border border-slate-200 rounded-lg p-1.5 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                    />
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Footer Actions */}
-                                    <div className="flex items-center justify-between pt-3 mt-3 border-t border-slate-100">
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                setSelectedWardFilter('all');
-                                                setSelectedStatusFilter('all');
-                                                setSelectedEmployeeFilter('all');
-                                                setSelectedRecordTypeFilter('all');
-                                                setSelectedBatchFilter('all');
-                                                setFilterFromDate('');
-                                                setFilterToDate('');
-                                            }}
-                                            className="text-xs font-bold text-slate-500 hover:text-slate-800 underline cursor-pointer"
-                                        >
-                                            Đặt lại bộ lọc
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => setIsFilterPopoverOpen(false)}
-                                            className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer shadow-xs"
-                                        >
-                                            Áp dụng ({filteredRecords.length})
-                                        </button>
-                                    </div>
-                                </div>
-                            </>
+            {/* 1. Single Clean Search Input Bar */}
+            <div className="p-3.5 bg-white border-b border-slate-200 shrink-0">
+                <div className="flex flex-col sm:flex-row items-center gap-3">
+                    <div className="relative flex-1 w-full">
+                        <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                        <input
+                            type="text"
+                            value={searchTerm}
+                            onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+                            placeholder="Nhập Mã hồ sơ, Tên chủ sử dụng, CCCD, SĐT, Số tờ, Số thửa, Địa chỉ để tra cứu nhanh..."
+                            className="w-full pl-10 pr-24 py-2 text-sm bg-slate-50 hover:bg-slate-100/70 focus:bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all font-medium text-slate-800"
+                            autoFocus
+                        />
+                        {searchTerm && (
+                            <button
+                                type="button"
+                                onClick={() => { setSearchTerm(''); setCurrentPage(1); }}
+                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 hover:bg-slate-200 rounded-full transition-colors cursor-pointer"
+                                title="Xóa từ khóa"
+                            >
+                                <X size={15} />
+                            </button>
                         )}
                     </div>
 
-                    {/* Quick status badges */}
-                    {activeFilterCount > 0 && (
+                    <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                        <span className="text-xs font-semibold text-slate-500 whitespace-nowrap bg-slate-100 px-2.5 py-1.5 rounded-lg border border-slate-200">
+                            Tìm thấy <strong className="text-blue-600 font-bold">{filteredRecords.length}</strong> hồ sơ
+                        </span>
+
                         <button
                             type="button"
-                            onClick={() => {
-                                setSelectedWardFilter('all');
-                                setSelectedStatusFilter('all');
-                                setSelectedRecordTypeFilter('all');
-                                setSelectedBatchFilter('all');
-                                setFilterFromDate('');
-                                setFilterToDate('');
-                            }}
-                            className="flex items-center gap-1 px-2.5 py-1 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg text-xs font-semibold hover:bg-amber-100 transition-colors cursor-pointer"
+                            onClick={handleExportExcel}
+                            disabled={filteredRecords.length === 0}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-emerald-50 text-slate-700 hover:text-emerald-700 border border-slate-300 hover:border-emerald-300 rounded-lg text-xs font-bold transition-all shadow-xs disabled:opacity-40 cursor-pointer whitespace-nowrap"
+                            title="Xuất kết quả tìm kiếm ra Excel"
                         >
-                            <span>Đang lọc ({activeFilterCount})</span>
-                            <X size={12} />
+                            <FileSpreadsheet size={15} className="text-emerald-600" />
+                            <span>Xuất Excel</span>
                         </button>
-                    )}
-                </div>
-
-                <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold text-slate-600">
-                        Đã chọn <strong className="text-indigo-600 font-bold">{selectedRecordIds.size}</strong> / <strong className="text-blue-600 font-bold">{filteredRecords.length}</strong> hồ sơ
-                    </span>
-
-                    <button
-                        type="button"
-                        onClick={handleExportExcel}
-                        disabled={filteredRecords.length === 0}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-emerald-50 text-slate-700 hover:text-emerald-700 border border-slate-300 hover:border-emerald-300 rounded-lg text-xs font-bold transition-all shadow-2xs disabled:opacity-40 cursor-pointer whitespace-nowrap"
-                        title="Xuất Excel các hồ sơ đã tích chọn (hoặc toàn bộ nếu chưa tích)"
-                    >
-                        <FileSpreadsheet size={15} className="text-emerald-600" />
-                        <span>Xuất Excel {selectedRecordIds.size > 0 ? `(${selectedRecordIds.size})` : ''}</span>
-                    </button>
+                    </div>
                 </div>
             </div>
 
@@ -680,40 +287,32 @@ export const RecordLookupView: React.FC<RecordLookupViewProps> = ({
                         </div>
                         <h3 className="text-sm font-bold text-slate-700 mb-1">Không tìm thấy hồ sơ phù hợp</h3>
                         <p className="text-xs text-slate-500 max-w-sm">
-                            Vui lòng kiểm tra lại từ khóa tìm kiếm (Mã hồ sơ, Tên khách hàng, SĐT, Số tờ, Số thửa,...).
+                            Vui lòng kiểm tra lại từ khóa tìm kiếm (Mã hồ sơ, Tên chủ sử dụng, SĐT, Số tờ, Số thửa,...).
                         </p>
                     </div>
                 ) : (
                     <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden flex flex-col h-full">
                         <div className="overflow-auto max-h-[calc(100vh-220px)] min-h-[350px]">
                             <table className="w-full text-left border-collapse text-xs">
-                                <thead className="bg-slate-50 sticky top-0 z-20 shadow-xs select-none">
-                                    <tr className="text-slate-600 border-b border-slate-200 font-bold uppercase text-[11px]">
-                                        <th className="p-3 w-12 text-center bg-slate-50">
-                                            <input
-                                                type="checkbox"
-                                                checked={filteredRecords.length > 0 && selectedRecordIds.size === filteredRecords.length}
-                                                onChange={handleSelectAll}
-                                                className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
-                                                title="Chọn tất cả hồ sơ"
-                                            />
-                                        </th>
-                                        <th className="p-3 w-[110px] text-center bg-slate-50">MÃ HỒ SƠ</th>
-                                        <th className="p-3 w-64 text-center bg-slate-50">THÔNG TIN KHÁCH HÀNG</th>
-                                        <th className="p-3 w-[115px] text-center bg-slate-50">LOẠI HỒ SƠ</th>
-                                        <th className="p-3 w-48 text-center bg-slate-50">THỜI HẠN XỬ LÝ</th>
-                                        <th className="p-3 w-32 text-center bg-slate-50">XÃ PHƯỜNG</th>
-                                        <th className="p-3 w-16 text-center bg-slate-50">TỜ</th>
-                                        <th className="p-3 w-16 text-center bg-slate-50">THỬA</th>
-                                        <th className="p-3 w-48 text-center bg-slate-50">GIAO NHÂN VIÊN</th>
-                                        <th className="p-3 w-32 text-center bg-slate-50">HOÀN THÀNH ĐỢT</th>
-                                        <th className="p-3 w-32 text-center bg-slate-50">TRẠNG THÁI</th>
+                                <thead>
+                                    <tr className="bg-slate-50 text-slate-600 border-b border-slate-200 font-bold uppercase text-[11px] select-none sticky top-0 z-10 shadow-xs">
+                                        <th className="p-3 w-12 text-center">STT</th>
+                                        <th className="p-3 w-[110px] text-center">MÃ HỒ SƠ</th>
+                                        <th className="p-3 w-64 text-center">THÔNG TIN CHỦ SỬ DỤNG</th>
+                                        <th className="p-3 w-[115px] text-center">LOẠI HỒ SƠ</th>
+                                        <th className="p-3 w-48 text-center">THỜI HẠN XỬ LÝ</th>
+                                        <th className="p-3 w-32 text-center">XÃ PHƯỜNG</th>
+                                        <th className="p-3 w-16 text-center">TỜ</th>
+                                        <th className="p-3 w-16 text-center">THỬA</th>
+                                        <th className="p-3 w-48 text-center">GIAO NHÂN VIÊN</th>
+                                        <th className="p-3 w-32 text-center">HOÀN THÀNH ĐỢT</th>
+                                        <th className="p-3 w-32 text-center">TRẠNG THÁI</th>
                                         <th className="p-3 w-28 text-center sticky top-0 right-0 bg-slate-50 z-30 border-b border-l border-slate-200 shadow-xs">THAO TÁC</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100 font-medium">
                                     {paginatedRecords.map((record, index) => {
-                                        const isSelected = selectedRecordIds.has(record.id);
+                                        const globalIndex = (currentPage - 1) * pageSize + index + 1;
                                         const assignedEmp = employees.find(e => e.id === record.assignedTo);
                                         const overdue = isRecordOverdue(record);
                                         const approaching = isRecordApproaching(record);
@@ -730,9 +329,7 @@ export const RecordLookupView: React.FC<RecordLookupViewProps> = ({
                                             <tr 
                                                 key={record.id}
                                                 className={`transition-all duration-200 group border-l-4 ${
-                                                    isSelected
-                                                        ? 'bg-blue-50/70 border-l-blue-600'
-                                                        : overdue 
+                                                    overdue 
                                                         ? 'bg-red-50/50 border-l-red-500 hover:bg-red-50' 
                                                         : approaching 
                                                         ? 'bg-orange-50/50 border-l-orange-500 hover:bg-orange-50' 
@@ -740,14 +337,9 @@ export const RecordLookupView: React.FC<RecordLookupViewProps> = ({
                                                 }`}
                                                 onDoubleClick={() => onViewRecord(record)}
                                             >
-                                                {/* Checkbox */}
-                                                <td className={`${cellClass} text-center`}>
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={isSelected}
-                                                        onChange={() => handleSelectOne(record.id)}
-                                                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
-                                                    />
+                                                {/* STT */}
+                                                <td className={`${cellClass} text-center text-slate-500 font-mono`}>
+                                                    {globalIndex}
                                                 </td>
 
                                                 {/* 1. MÃ HỒ SƠ */}

@@ -6,11 +6,8 @@ import {
   ClipboardList, User as UserIcon, ChevronUp, ChevronDown, RefreshCw, XCircle
 } from 'lucide-react';
 import { calculateDeadlineHelper } from '../utils/appHelpers';
-import { detectProcedureId, getShortRecordType, getDefaultDocsForProcedure } from '../constants/procedures';
 import { addActivityLog } from '../services/activityLogService';
 import { AutoResizeTextarea } from './AutoResizeTextarea';
-import { isStepActiveInProcedure, getValidStatusesForDangKyRecord } from '../constants/procedureWorkflows';
-import { parseAttachedDocs } from './DangKyDetailModal';
 
 interface DangKyRecordModalProps {
   isOpen: boolean;
@@ -45,31 +42,13 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
   const inputClass = "w-full border border-gray-300 rounded-lg px-3 py-1.5 2xl:py-2 text-xs sm:text-sm 2xl:text-base outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 transition-all font-medium text-slate-700 bg-white hover:border-gray-400 shadow-2xs";
   const labelClass = "block text-xs 2xl:text-sm font-bold text-slate-700 mb-1 2xl:mb-1.5";
 
-  // Danh sách các thủ tục đơn phương / không có bên nhận chuyển nhượng (mặc định người nộp là chủ hồ sơ, ẩn bên nhận)
-  const isNoTransfereeProcedure = (rType?: string, code?: string) => {
-    const procId = detectProcedureId(code, rType);
-    const noTransfereeIds = ['3.2.1', '3.3.1', '3.4.1', '3.6.1', '3.7.2', '3.8.1', '3.8.2'];
-    if (procId && noTransfereeIds.includes(procId)) return true;
-    const lower = (rType || '').toLowerCase();
-    if (lower.includes('3.2.1') || lower.includes('3.3.1') || lower.includes('3.4.1') || lower.includes('3.6.1') || lower.includes('3.7.2') || lower.includes('3.8.1') || lower.includes('3.8.2')) return true;
-    if (lower.includes('cấp đổi gcn (ố nhòe') || lower.includes('cấp lại giấy chứng nhận do bị mất') || lower.includes('không đổi người sử dụng đất') || lower.includes('chuyển mục đích sử dụng đất không phải xin phép') || lower.includes('thay đổi thông tin cá nhân') || lower.includes('đăng ký gdbd') || lower.includes('xóa đk gdbd')) return true;
-    return false;
-  };
-
   const createFreshRecord = (): DangKyRecord => {
     const todayStr = new Date().toISOString().split('T')[0];
-    const defaultType = '3.1.1 Chuyển quyền';
+    const defaultType = '3.1.1 Chuyển nhượng';
     const initialDeadline = calculateDeadlineHelper(defaultType, todayStr, holidays || []);
-    const newId = (typeof crypto !== 'undefined' && crypto.randomUUID) 
-      ? crypto.randomUUID() 
-      : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
-          const r = (Math.random() * 16) | 0;
-          const v = c === 'x' ? r : ((r & 0x3) | 0x8);
-          return v.toString(16);
-        });
     
     return {
-      id: newId,
+      id: `dk-${Date.now()}`,
       code: `HS-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`,
       owners: [{ name: '', cccd: '', address: '', phone: '' }],
       transferees: [],
@@ -89,12 +68,12 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
       issueDate: '',
       totalArea: 0,
       residentialArea: 0,
-      ward: '',
+      ward: wards[0] || '',
       recordType: defaultType,
       receivedDate: todayStr,
       assignedDate: todayStr,
       deadline: initialDeadline,
-      receivedBy: currentUser?.fullName || currentUser?.name || currentUser?.username || '',
+      receivedBy: currentUser?.name || '',
       appraisalDate: '',
       appraisalStaff: '',
       taxFormDate: '',
@@ -135,7 +114,7 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
         owners: initialData.owners && initialData.owners.length > 0 ? initialData.owners : [{ name: '', cccd: '', address: '', phone: '' }],
         transferees: initialData.transferees || []
       });
-      const initialDocs = parseAttachedDocs(initialData.attachedDocs, initialData.otherDocs, initialData.attachedDocuments).map(d => ({
+      const initialDocs = ((initialData.attachedDocs || initialData.attachedDocuments || []) as any[]).map((d: any) => ({
         name: d.name || '',
         type: d.type || 'Bản chính'
       }));
@@ -144,10 +123,8 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
         setShowAuthorizedSection(true);
       }
     } else {
-      const fresh = createFreshRecord();
-      setFormData(fresh);
-      const defDocs = getDefaultDocsForProcedure(fresh.recordType, fresh.code);
-      setAttachedDocs(defDocs.map(d => ({ name: d.name, type: d.type })));
+      setFormData(createFreshRecord());
+      setAttachedDocs([]);
     }
   }, [initialData, isOpen]);
 
@@ -176,34 +153,11 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
   const handleFieldChange = (field: keyof DangKyRecord, value: any) => {
     setFormData(prev => {
       const updated = { ...prev, [field]: value };
-      if (field === 'recordType' || field === 'code' || field === 'receivedDate') {
-        const rCode = field === 'code' ? value : prev.code;
+      if (field === 'recordType' || field === 'receivedDate') {
         const rType = field === 'recordType' ? value : prev.recordType;
         const rDate = field === 'receivedDate' ? value : prev.receivedDate;
-        
-        const procId = detectProcedureId(rCode, rType);
-        (updated as any).procedureId = procId;
-
-        // Nếu là thủ tục đơn phương / không có bên nhận:
-        if (field === 'recordType' && isNoTransfereeProcedure(rType, rCode)) {
-          updated.applicantIsOwner = false; // Ở chế độ đồng bộ chủ sở hữu (owners[0])
-          updated.transferees = []; // Xóa danh sách người nhận
-          const firstOwner = (prev.owners && prev.owners[0]) || { name: '', cccd: '', phone: '', address: '' };
-          if (firstOwner.name) updated.applicantName = firstOwner.name;
-          if (firstOwner.cccd) updated.applicantCccd = firstOwner.cccd;
-          if (firstOwner.phone) updated.applicantPhone = firstOwner.phone;
-          if (firstOwner.address) updated.applicantAddress = firstOwner.address;
-        }
-
-        if (field === 'recordType' && !initialData) {
-          const defDocs = getDefaultDocsForProcedure(rType, rCode);
-          if (defDocs.length > 0) {
-            setAttachedDocs(defDocs.map(d => ({ name: d.name, type: d.type })));
-          }
-        }
-
         if (rType && rDate) {
-          updated.deadline = calculateDeadlineHelper(rType, String(rDate).split('T')[0], holidays || [], rCode, procId);
+          updated.deadline = calculateDeadlineHelper(rType, String(rDate).split('T')[0], holidays || []);
         }
       }
 
@@ -443,35 +397,15 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
       alert('Vui lòng nhập Mã hồ sơ!');
       return;
     }
-    if (!formData.ward || !formData.ward.trim()) {
-      alert('Vui lòng chọn Xã / Phường cho hồ sơ!');
-      return;
-    }
 
     setIsSubmitting(true);
     try {
-      const isSingleParty = isNoTransfereeProcedure(formData.recordType, formData.code);
       const recordToSave: DangKyRecord = {
         ...formData,
-        transferees: isSingleParty ? [] : (formData.transferees || []),
-        applicantIsOwner: isSingleParty ? false : !!formData.applicantIsOwner,
         attachedDocs: attachedDocs,
         attachedDocuments: attachedDocs,
         updatedAt: new Date().toISOString()
       };
-
-      // Nếu người nộp trống ở thủ tục đơn phương, tự lấy theo chủ hồ sơ
-      if (isSingleParty && !recordToSave.applicantName && recordToSave.owners?.[0]?.name) {
-        recordToSave.applicantName = recordToSave.owners[0].name;
-        recordToSave.applicantCccd = recordToSave.owners[0].cccd || '';
-        recordToSave.applicantPhone = recordToSave.owners[0].phone || '';
-        recordToSave.applicantAddress = recordToSave.owners[0].address || '';
-      }
-
-      // Gán cán bộ tiếp nhận nếu là thêm mới hoặc chưa có
-      if (!initialData || !recordToSave.receivedBy) {
-        recordToSave.receivedBy = recordToSave.receivedBy || currentUser?.fullName || currentUser?.name || currentUser?.username || '';
-      }
 
       await onSave(recordToSave);
       const ownerNames = recordToSave.owners?.map(o => o.name).filter(Boolean).join(', ') || recordToSave.owners?.[0]?.name || '';
@@ -553,7 +487,7 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
                     Loại hồ sơ <span className="text-red-500">*</span>
                   </label>
                   <select
-                    value={getShortRecordType(formData.recordType, formData.code) || ''}
+                    value={formData.recordType || ''}
                     onChange={e => handleFieldChange('recordType', e.target.value)}
                     className={`${inputClass} font-semibold`}
                   >
@@ -575,7 +509,7 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
                     onChange={e => handleFieldChange('status', e.target.value as DangKyStatusType)}
                     className={`${inputClass} font-bold bg-amber-50/80 border-amber-300 text-amber-900`}
                   >
-                    {getValidStatusesForDangKyRecord(formData.recordType, formData.code).map(st => (
+                    {DANG_KY_STATUS_LIST.map(st => (
                       <option key={st} value={st}>
                         {st}
                       </option>
@@ -608,25 +542,16 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
               </div>
             </div>
 
-            {/* Các mốc ngày tháng theo trạng thái xử lý (Chỉ hiển thị khi đến hoặc qua bước VÀ quy trình có bước đó) */}
+            {/* Các mốc ngày tháng theo trạng thái xử lý (Chỉ hiển thị khi đến hoặc qua bước) */}
             {(() => {
               const currentStepLevel = getStepLevel(formData.status);
               if (currentStepLevel < 1) return null;
-
-              const procKey = formData.recordType;
-              const hasThamDinh = isStepActiveInProcedure(procKey, 'tham_dinh');
-              const hasPhieuChuyen = isStepActiveInProcedure(procKey, 'phieu_chuyen') || isStepActiveInProcedure(procKey, 'phieu_chuyen_thue');
-              const hasThueKV7 = isStepActiveInProcedure(procKey, 'chuyen_thue_kv7') || isStepActiveInProcedure(procKey, 'thue_kv7');
-              const hasGiayNopTien = isStepActiveInProcedure(procKey, 'giay_nop_tien') || isStepActiveInProcedure(procKey, 'thong_bao_thue');
-              const hasInGCN = isStepActiveInProcedure(procKey, 'in_gcn');
-              const hasKiemTra = isStepActiveInProcedure(procKey, 'kiem_tra');
-              const hasTrinhKy = isStepActiveInProcedure(procKey, 'trinh_ky');
 
               return (
                 <div className="pt-3 border-t border-slate-100 animate-fade-in">
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
                     {/* Step 1: Ngày thẩm định */}
-                    {hasThamDinh && currentStepLevel >= 1 && (
+                    {currentStepLevel >= 1 && (
                       <div>
                         <label className="block text-xs font-bold text-teal-800 mb-1">Ngày thẩm định</label>
                         <input
@@ -639,7 +564,7 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
                     )}
 
                     {/* Step 2: Ngày phiếu chuyển thuế */}
-                    {hasPhieuChuyen && currentStepLevel >= 2 && (
+                    {currentStepLevel >= 2 && (
                       <div>
                         <label className="block text-xs font-bold text-amber-800 mb-1">Ngày phiếu chuyển thuế</label>
                         <input
@@ -652,7 +577,7 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
                     )}
 
                     {/* Step 3: Ngày chuyển Thuế KV7 */}
-                    {hasThueKV7 && currentStepLevel >= 3 && (
+                    {currentStepLevel >= 3 && (
                       <div>
                         <label className="block text-xs font-bold text-orange-800 mb-1">Ngày chuyển Thuế KV7</label>
                         <input
@@ -665,7 +590,7 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
                     )}
 
                     {/* Step 4: Ngày giấy nộp tiền / TBT */}
-                    {hasGiayNopTien && currentStepLevel >= 4 && (
+                    {currentStepLevel >= 4 && (
                       <div>
                         <label className="block text-xs font-bold text-rose-800 mb-1">Ngày giấy nộp tiền</label>
                         <input
@@ -681,7 +606,7 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
                     )}
 
                     {/* Step 5: Ngày in GCN */}
-                    {hasInGCN && currentStepLevel >= 5 && (
+                    {currentStepLevel >= 5 && (
                       <div>
                         <label className="block text-xs font-bold text-purple-800 mb-1">Ngày in GCN</label>
                         <input
@@ -694,7 +619,7 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
                     )}
 
                     {/* Step 6: Ngày trình kiểm tra */}
-                    {hasKiemTra && currentStepLevel >= 6 && (
+                    {currentStepLevel >= 6 && (
                       <div>
                         <label className="block text-xs font-bold text-blue-800 mb-1">Ngày trình kiểm tra</label>
                         <input
@@ -707,7 +632,7 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
                     )}
 
                     {/* Step 7: Ngày trình ký */}
-                    {hasTrinhKy && currentStepLevel >= 7 && (
+                    {currentStepLevel >= 7 && (
                       <div>
                         <label className="block text-xs font-bold text-purple-800 mb-1">Ngày trình ký</label>
                         <input
@@ -782,7 +707,7 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
                   >
                     <option value="">-- Chọn Phi địa giới --</option>
                     {wards.map(w => (
-                      <option key={w} value={w}>{w.replace(/^Xã\s+/i, '')}</option>
+                      <option key={w} value={w}>{w}</option>
                     ))}
                   </select>
                 </div>
@@ -824,7 +749,7 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
                     value={formData.feeAmount || 0}
                     onChange={e => handleFieldChange('feeAmount', e.target.value ? Number(e.target.value) : 0)}
                     className="w-full border border-emerald-300 rounded-lg px-3 py-1.5 text-xs sm:text-sm font-bold text-emerald-900 bg-white font-mono"
-                    placeholder="0"
+                    placeholder="53163"
                   />
                 </div>
               </div>
@@ -840,17 +765,15 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
                 </span>
                 THÔNG TIN NGƯỜI NỘP HỒ SƠ
               </h3>
-              {!isNoTransfereeProcedure(formData.recordType, formData.code) && (
-                <label className="flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-blue-700 hover:text-blue-900 select-none">
-                  <input
-                    type="checkbox"
-                    checked={!!formData.applicantIsOwner}
-                    onChange={e => handleApplicantIsOwnerToggle(e.target.checked)}
-                    className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer"
-                  />
-                  Người nộp là chủ hồ sơ
-                </label>
-              )}
+              <label className="flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-blue-700 hover:text-blue-900 select-none">
+                <input
+                  type="checkbox"
+                  checked={!!formData.applicantIsOwner}
+                  onChange={e => handleApplicantIsOwnerToggle(e.target.checked)}
+                  className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer"
+                />
+                Người nộp là chủ hồ sơ
+              </label>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -1098,90 +1021,88 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
             </div>
           </div>
 
-          {/* 5. NGƯỜI NHẬN (CHUYỂN NHƯỢNG, THỪA KẾ, TẶNG CHO, THỎA THUẬN) (NẾU CÓ) - Ẩn đối với các thủ tục không có bên nhận */}
-          {!isNoTransfereeProcedure(formData.recordType, formData.code) && (
-            <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200 shadow-xs">
-              <div className="flex items-center justify-between border-b pb-2 mb-3 border-slate-100">
-                <h3 className="text-xs sm:text-sm font-bold text-slate-800 uppercase flex items-center gap-1.5">
-                  <span className="p-1 bg-blue-100 text-blue-600 rounded-md">
-                    <UserPlus size={14} />
-                  </span>
-                  NGƯỜI NHẬN (CHUYỂN NHƯỢNG, THỪA KẾ, TẶNG CHO, THỎA THUẬN) (NẾU CÓ)
-                </h3>
-                <button
-                  type="button"
-                  onClick={addTransferee}
-                  className="text-xs bg-blue-50 text-blue-600 px-2.5 py-1 rounded-md border border-blue-200 hover:bg-blue-100 font-bold flex items-center gap-1 transition-all active:scale-95 cursor-pointer shadow-2xs"
-                >
-                  <Plus size={14} /> THÊM MỚI
-                </button>
-              </div>
-              
-              {(formData.transferees || []).length === 0 ? (
-                <div className="text-center py-3 text-xs text-slate-400 italic bg-slate-50/80 rounded-lg border border-dashed border-slate-200">
-                  Không có người nhận (Click nút "+ THÊM MỚI" để nhập liệu).
-                </div>
-              ) : (
-                <div className="overflow-x-auto border border-slate-200 rounded-xl">
-                  <table className="w-full text-left border-collapse bg-white text-xs sm:text-sm min-w-[500px]">
-                    <thead>
-                      <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                        <th className="py-2 px-2.5 w-10 text-center">#</th>
-                        <th className="py-2 px-2.5">HỌ VÀ TÊN NGƯỜI NHẬN CHUYỂN NHƯỢNG</th>
-                        <th className="py-2 px-2.5">GIẤY CMND/ CCCD</th>
-                        <th className="py-2 px-2.5">SỐ ĐIỆN THOẠI</th>
-                        <th className="py-2 px-2.5 w-10 text-center">XÓA</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 text-xs sm:text-sm">
-                      {formData.transferees.map((tf, idx) => (
-                        <tr key={idx} className="hover:bg-slate-50/50">
-                          <td className="py-1.5 px-2.5 text-center font-bold text-slate-400">{idx + 1}</td>
-                          <td className="py-1.5 px-2.5">
-                            <input
-                              type="text"
-                              value={tf.name}
-                              onChange={e => updateTransferee(idx, 'name', e.target.value)}
-                              className="w-full px-2 py-1 text-xs sm:text-sm border border-slate-200 rounded-md focus:border-blue-500 outline-none text-slate-800 font-medium"
-                              placeholder="Họ tên..."
-                            />
-                          </td>
-                          <td className="py-1.5 px-2.5">
-                            <input
-                              type="text"
-                              value={tf.cccd || ''}
-                              onChange={e => updateTransferee(idx, 'cccd', e.target.value)}
-                              className="w-full px-2 py-1 text-xs sm:text-sm border border-slate-200 rounded-md focus:border-blue-500 outline-none font-mono text-slate-800"
-                              placeholder="CCCD..."
-                            />
-                          </td>
-                          <td className="py-1.5 px-2.5">
-                            <input
-                              type="text"
-                              value={tf.phone || ''}
-                              onChange={e => updateTransferee(idx, 'phone', e.target.value)}
-                              className="w-full px-2 py-1 text-xs sm:text-sm border border-slate-200 rounded-md focus:border-blue-500 outline-none text-slate-800"
-                              placeholder="SĐT..."
-                            />
-                          </td>
-                          <td className="py-1.5 px-2.5 text-center">
-                            <button
-                              type="button"
-                              onClick={() => removeTransferee(idx)}
-                              className="p-1 text-slate-400 hover:text-red-500 rounded-md hover:bg-slate-100 transition-colors cursor-pointer"
-                              title="Xóa dòng"
-                            >
-                              <X size={14} />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+          {/* 5. NGƯỜI NHẬN (CHUYỂN NHƯỢNG, THỪA KẾ, TẶNG CHO, THỎA THUẬN) (NẾU CÓ) */}
+          <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200 shadow-xs">
+            <div className="flex items-center justify-between border-b pb-2 mb-3 border-slate-100">
+              <h3 className="text-xs sm:text-sm font-bold text-slate-800 uppercase flex items-center gap-1.5">
+                <span className="p-1 bg-blue-100 text-blue-600 rounded-md">
+                  <UserPlus size={14} />
+                </span>
+                NGƯỜI NHẬN (CHUYỂN NHƯỢNG, THỪA KẾ, TẶNG CHO, THỎA THUẬN) (NẾU CÓ)
+              </h3>
+              <button
+                type="button"
+                onClick={addTransferee}
+                className="text-xs bg-blue-50 text-blue-600 px-2.5 py-1 rounded-md border border-blue-200 hover:bg-blue-100 font-bold flex items-center gap-1 transition-all active:scale-95 cursor-pointer shadow-2xs"
+              >
+                <Plus size={14} /> THÊM MỚI
+              </button>
             </div>
-          )}
+            
+            {(formData.transferees || []).length === 0 ? (
+              <div className="text-center py-3 text-xs text-slate-400 italic bg-slate-50/80 rounded-lg border border-dashed border-slate-200">
+                Không có người nhận (Click nút "+ THÊM MỚI" để nhập liệu).
+              </div>
+            ) : (
+              <div className="overflow-x-auto border border-slate-200 rounded-xl">
+                <table className="w-full text-left border-collapse bg-white text-xs sm:text-sm min-w-[500px]">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                      <th className="py-2 px-2.5 w-10 text-center">#</th>
+                      <th className="py-2 px-2.5">HỌ VÀ TÊN NGƯỜI NHẬN CHUYỂN NHƯỢNG</th>
+                      <th className="py-2 px-2.5">GIẤY CMND/ CCCD</th>
+                      <th className="py-2 px-2.5">SỐ ĐIỆN THOẠI</th>
+                      <th className="py-2 px-2.5 w-10 text-center">XÓA</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-xs sm:text-sm">
+                    {formData.transferees.map((tf, idx) => (
+                      <tr key={idx} className="hover:bg-slate-50/50">
+                        <td className="py-1.5 px-2.5 text-center font-bold text-slate-400">{idx + 1}</td>
+                        <td className="py-1.5 px-2.5">
+                          <input
+                            type="text"
+                            value={tf.name}
+                            onChange={e => updateTransferee(idx, 'name', e.target.value)}
+                            className="w-full px-2 py-1 text-xs sm:text-sm border border-slate-200 rounded-md focus:border-blue-500 outline-none text-slate-800 font-medium"
+                            placeholder="Họ tên..."
+                          />
+                        </td>
+                        <td className="py-1.5 px-2.5">
+                          <input
+                            type="text"
+                            value={tf.cccd || ''}
+                            onChange={e => updateTransferee(idx, 'cccd', e.target.value)}
+                            className="w-full px-2 py-1 text-xs sm:text-sm border border-slate-200 rounded-md focus:border-blue-500 outline-none font-mono text-slate-800"
+                            placeholder="CCCD..."
+                          />
+                        </td>
+                        <td className="py-1.5 px-2.5">
+                          <input
+                            type="text"
+                            value={tf.phone || ''}
+                            onChange={e => updateTransferee(idx, 'phone', e.target.value)}
+                            className="w-full px-2 py-1 text-xs sm:text-sm border border-slate-200 rounded-md focus:border-blue-500 outline-none text-slate-800"
+                            placeholder="SĐT..."
+                          />
+                        </td>
+                        <td className="py-1.5 px-2.5 text-center">
+                          <button
+                            type="button"
+                            onClick={() => removeTransferee(idx)}
+                            className="p-1 text-slate-400 hover:text-red-500 rounded-md hover:bg-slate-100 transition-colors cursor-pointer"
+                            title="Xóa dòng"
+                          >
+                            <X size={14} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
 
           {/* NỘI DUNG YÊU CẦU CHI TIẾT */}
           <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200 shadow-xs">
@@ -1290,11 +1211,8 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
 
           {/* 7. THÔNG TIN NGƯỜI ĐƯỢC ỦY QUYỀN (NẾU CÓ) */}
           <div className="bg-white rounded-xl border border-slate-200 shadow-xs">
-            <div 
-              onClick={() => setShowAuthorizedSection(!showAuthorizedSection)}
-              className="p-3.5 sm:p-4 flex items-center justify-between gap-2 bg-white rounded-xl cursor-pointer select-none hover:bg-slate-50/80 transition-colors"
-            >
-              <h3 className="text-xs sm:text-sm font-bold text-slate-800 uppercase flex items-center gap-1.5 cursor-pointer">
+            <div className="p-3.5 sm:p-4 flex items-center justify-between gap-2 bg-white rounded-xl">
+              <h3 className="text-xs sm:text-sm font-bold text-slate-800 uppercase flex items-center gap-1.5">
                 <span className="p-1 bg-indigo-100 text-indigo-600 rounded-md">
                   <Shield size={14} />
                 </span>
@@ -1302,10 +1220,7 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
               </h3>
               <button
                 type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowAuthorizedSection(!showAuthorizedSection);
-                }}
+                onClick={() => setShowAuthorizedSection(!showAuthorizedSection)}
                 className="text-xs font-bold uppercase rounded-md border border-slate-200 hover:bg-slate-50 px-2.5 py-1 text-slate-600 bg-white shadow-xs cursor-pointer"
               >
                 {showAuthorizedSection ? '▲ ẨN' : '▼ HIỆN'}
@@ -1373,21 +1288,8 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
                     GIAO NHÂN VIÊN XỬ LÝ (TỔ CẤP GIẤY)
                   </label>
                   <select
-                    value={(() => {
-                      const val = formData.assignedTo || '';
-                      const foundById = employees.find(e => e.id === val);
-                      if (foundById) return foundById.id;
-                      const foundByName = employees.find(e => e.name === val);
-                      if (foundByName) return foundByName.id;
-                      return val;
-                    })()}
-                    onChange={e => {
-                      const empId = e.target.value;
-                      handleFieldChange('assignedTo', empId);
-                      if (empId && !formData.assignedDate) {
-                        handleFieldChange('assignedDate', new Date().toISOString().split('T')[0]);
-                      }
-                    }}
+                    value={formData.assignedTo || ''}
+                    onChange={e => handleFieldChange('assignedTo', e.target.value)}
                     className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs sm:text-sm font-medium text-slate-800 focus:border-blue-500 outline-none shadow-2xs"
                   >
                     <option value="">-- Chưa giao --</option>
@@ -1396,7 +1298,7 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
                         ? employees.filter(e => !e.department || e.department.toLowerCase().includes('cấp giấy') || e.department.toLowerCase().includes('cap giay') || e.department.toLowerCase().includes('đăng ký') || e.department.toLowerCase().includes('dang ky'))
                         : employees
                     ).map(e => (
-                      <option key={e.id} value={e.id}>{e.name} {e.department ? `(${e.department})` : ''}</option>
+                      <option key={e.id} value={e.name}>{e.name} {e.department ? `(${e.department})` : ''}</option>
                     ))}
                   </select>
                 </div>
@@ -1486,7 +1388,7 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
                         <option value="">-- Không (Theo địa chỉ thửa đất) --</option>
                         {wards.map(w => (
                           <option key={w} value={w}>
-                            {w.replace(/^Xã\s+/i, '')}
+                            {w.startsWith('Xã ') || w.startsWith('Phường ') ? w : `Xã ${w}`}
                           </option>
                         ))}
                       </select>
@@ -1531,10 +1433,10 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
                       </label>
                       <input
                         type="number"
-                        value={formData.feeAmount ?? ''}
+                        value={formData.feeAmount ?? 310000}
                         onChange={e => handleFieldChange('feeAmount', e.target.value ? Number(e.target.value) : 0)}
                         className="w-full px-3 py-2 bg-white border border-emerald-300 rounded-lg text-xs sm:text-sm font-mono font-bold text-emerald-950 focus:border-emerald-500 outline-none"
-                        placeholder="Số tiền..."
+                        placeholder="310000"
                       />
                     </div>
                   </div>

@@ -1,14 +1,13 @@
 import React, { useState } from 'react';
-import { RecordFile, RecordStatus, Employee, User, UserRole } from '../../types';
+import { RecordFile, RecordStatus, Employee } from '../../types';
 import { STATUS_LABELS } from '../../constants';
-import { getShortRecordType } from '../../constants/procedures';
 import StatusBadge from '../StatusBadge';
 import { 
   Search, 
   Filter, 
   ChevronRight, 
   MapPin, 
-  User as UserIcon, 
+  User, 
   Phone, 
   Calendar,
   Clock,
@@ -20,7 +19,6 @@ import {
 interface MobileRecordListProps {
   records: RecordFile[];
   employees: Employee[];
-  currentUser?: User;
   onViewRecord: (r: RecordFile) => void;
   onEditRecord: (r: RecordFile) => void;
   onDeleteRecord: (r: RecordFile) => void;
@@ -30,20 +28,20 @@ interface MobileRecordListProps {
 const MobileRecordList: React.FC<MobileRecordListProps> = ({ 
   records, 
   employees, 
-  currentUser,
   onViewRecord, 
   onEditRecord, 
   onDeleteRecord,
   onAddRecord
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterWard, setFilterWard] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
 
   // Reset page when filtering
   React.useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm]);
+  }, [searchTerm, filterWard]);
 
   const formatDateDDMMYYYY = (dateStr?: string | null) => {
     if (!dateStr) return 'N/A';
@@ -59,20 +57,13 @@ const MobileRecordList: React.FC<MobileRecordListProps> = ({
     }
   };
 
-  // Restrict records for employee role
-  const accessibleRecords = React.useMemo(() => {
-    if (currentUser?.role === UserRole.EMPLOYEE && currentUser?.employeeId) {
-      return records.filter(r => r.assignedTo === currentUser.employeeId);
-    }
-    return records;
-  }, [records, currentUser]);
-
-  const filtered = accessibleRecords.filter(r => {
+  const filtered = records.filter(r => {
     const matchesSearch = 
       r.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       r.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (r.phoneNumber && r.phoneNumber.includes(searchTerm));
-    return matchesSearch;
+    const matchesWard = filterWard === 'all' || r.ward === filterWard;
+    return matchesSearch && matchesWard;
   });
 
   const getStatusColor = (status: RecordStatus) => {
@@ -111,7 +102,21 @@ const MobileRecordList: React.FC<MobileRecordListProps> = ({
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <select
+              value={filterWard}
+              onChange={(e) => setFilterWard(e.target.value)}
+              className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 flex-1 sm:flex-none"
+            >
+              <option value="all">Tất cả Xã/Phường</option>
+              {Array.from(new Set(records.map(r => r.ward).filter((w): w is string => !!w))).map(w => (
+                <option key={w} value={w}>{w}</option>
+              ))}
+            </select>
+            <div className="text-xs font-bold text-slate-500 whitespace-nowrap px-2 bg-slate-100 py-2 rounded-xl border border-slate-200">
+              {filtered.length} hồ sơ
+            </div>
+          </div>
         </div>
       </div>
 
@@ -153,7 +158,7 @@ const MobileRecordList: React.FC<MobileRecordListProps> = ({
                         {record.recordType && (
                           <div className="flex items-center gap-1.5 col-span-2">
                             <span className="text-slate-400 font-bold" title="Loại hồ sơ">📄</span>
-                            <span className="truncate text-slate-700" title={record.recordType || ''}>{getShortRecordType(record.recordType, record.code)}</span>
+                            <span className="truncate text-slate-700">{record.recordType}</span>
                           </div>
                         )}
 

@@ -114,19 +114,16 @@ export const exportReportToExcel = async (
         "Tờ",
         "Thửa",
         "Loại Hồ Sơ", 
+        "Loại HĐ/TL", // Yêu cầu 2: Loại hồ sơ thanh lý (Trích lục, đo đạc...)
+        "NV Xử Lý",
+        "Số Biên Lai", 
+        "Giá trị HĐ", // Yêu cầu 3: Đổi từ Thành Tiền -> Giá trị HĐ
+        "Giá trị TL", // Yêu cầu 1: Thêm cột Giá trị thanh lý
         "Ngày Nhận", 
-        "Ngày Trả", 
-        "Ngày Giao NV", 
-        "NV Xử Lý", 
-        "Ngày Trình Kiểm Tra", 
-        "NV Kiểm Tra", 
-        "Ngày Trình Ký", 
-        "Người Ký", 
-        "Ngày Hoàn Thành", 
-        "Đợt Xuất", 
-        "Ngày Trả Kết Quả", 
-        "Số BL/HĐ", 
-        "Số Tiền Thu", 
+        "Hẹn Trả", 
+        "Ngày hoàn thành",
+        "Đợt Xuất",
+        "Ngày trả kết quả",
         "Trạng Thái", 
         "Ghi Chú"
     ];
@@ -145,27 +142,24 @@ export const exportReportToExcel = async (
 
         return [
             i + 1,
-            r.code || '',
-            r.customerName || '',
+            r.code,
+            r.customerName,
             getNormalizedWard(r.ward || undefined),
             r.mapSheet || '',
             r.landPlot || '',
             getShortRecordType(r.recordType || undefined),
+            contractInfo.type, // Loại HĐ/TL
+            getEmployeeName(r.assignedTo || undefined),
+            r.receiptNumber || '',
+            contractInfo.amount,      // Giá trị HĐ
+            contractInfo.liquidation, // Giá trị TL
             formatDate(r.receivedDate),
             formatDate(r.deadline),
-            formatDate(r.assignedDate),
-            getEmployeeName(r.assignedTo || undefined),
-            formatDate(r.pendingCheckDate),
-            getEmployeeName(r.checkedBy || undefined),
-            formatDate(r.submissionDate),
-            getEmployeeName(r.submittedTo || undefined),
             formatDate(r.completedDate),      
             r.exportBatch ? extractBatchNumber(r.exportBatch) : '',
             formatDate(r.resultReturnedDate),
-            r.receiptNumber || '',
-            r.returnedPrice !== undefined && r.returnedPrice !== null ? r.returnedPrice : (contractInfo.amount || ''),
-            STATUS_LABELS[r.status] || '',
-            fullNotesText
+            STATUS_LABELS[r.status],
+            ""
         ];
     });
 
@@ -221,7 +215,7 @@ export const exportReportToExcel = async (
         { s: { r: 6, c: 0 }, e: { r: 6, c: totalCols } }
     ];
     
-    // Column Widths
+    // Column Widths (Adjusted for new columns)
     ws['!cols'] = [
         { wch: 5 },  // STT
         { wch: 15 }, // Mã HS
@@ -230,21 +224,18 @@ export const exportReportToExcel = async (
         { wch: 7 },  // Tờ
         { wch: 7 },  // Thửa
         { wch: 15 }, // Loại HS
-        { wch: 12 }, // Ngày Nhận
-        { wch: 12 }, // Ngày Trả
-        { wch: 12 }, // Ngày Giao NV
+        { wch: 15 }, // Loại HĐ/TL (New)
         { wch: 20 }, // NV Xử Lý
-        { wch: 14 }, // Ngày Trình Kiểm Tra
-        { wch: 18 }, // NV Kiểm Tra
-        { wch: 14 }, // Ngày Trình Ký
-        { wch: 18 }, // Người Ký
-        { wch: 14 }, // Ngày Hoàn Thành
+        { wch: 12 }, // Số BL
+        { wch: 15 }, // Giá trị HĐ
+        { wch: 15 }, // Giá trị TL (New)
+        { wch: 12 }, // Ngày Nhận
+        { wch: 12 }, // Hẹn Trả
+        { wch: 14 }, // Ngày hoàn thành
         { wch: 10 }, // Đợt Xuất
-        { wch: 14 }, // Ngày Trả Kết Quả
-        { wch: 12 }, // Số BL/HĐ
-        { wch: 15 }, // Số Tiền Thu
-        { wch: 15 }, // Trạng Thái
-        { wch: 25 }  // Ghi Chú
+        { wch: 14 }, // Ngày trả kết quả
+        { wch: 15 }, // Trạng thái
+        { wch: 20 }  // Ghi chú
     ];
 
     // Apply Styles

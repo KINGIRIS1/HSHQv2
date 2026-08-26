@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { X, Undo2, AlertCircle, Calendar, MessageSquare, PauseCircle, Ban, RefreshCw, CheckSquare, UserX } from 'lucide-react';
+import { X, Undo2, AlertCircle, Calendar, MessageSquare, PauseCircle, Ban, RefreshCw, CheckSquare } from 'lucide-react';
 import { RecordFile, User, Employee } from '../types';
 
-export type ReturnOptionType = 'pause_supplement' | 'cancel_reject' | 'return_handler' | 'csd_withdraw';
+export type ReturnOptionType = 'pause_supplement' | 'cancel_reject' | 'return_handler';
 
 interface RejectReturnStepModalProps {
   isOpen: boolean;
@@ -179,28 +179,6 @@ export const RejectReturnStepModal: React.FC<RejectReturnStepModalProps> = ({
                 <RefreshCw size={18} className="text-blue-600 shrink-0" />
                 <span className="text-xs sm:text-sm">
                   <strong>3. Trả về cán bộ thụ lý</strong>
-                </span>
-              </label>
-
-              {/* Option 4 */}
-              <label 
-                className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
-                  returnOption === 'csd_withdraw' 
-                    ? 'border-2 border-purple-500 bg-purple-50/60 text-purple-950 font-bold shadow-xs' 
-                    : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-medium'
-                }`}
-              >
-                <input 
-                  type="radio" 
-                  name="returnOption" 
-                  value="csd_withdraw"
-                  checked={returnOption === 'csd_withdraw'}
-                  onChange={() => setReturnOption('csd_withdraw')}
-                  className="w-4 h-4 text-purple-600 focus:ring-purple-500"
-                />
-                <UserX size={18} className="text-purple-600 shrink-0" />
-                <span className="text-xs sm:text-sm">
-                  <strong>4. Trả do CSD rút hồ sơ</strong>
                 </span>
               </label>
             </div>

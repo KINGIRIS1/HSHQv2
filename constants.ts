@@ -65,8 +65,40 @@ export const DEFAULT_WARDS = [
 
 export const WARDS = DEFAULT_WARDS;
 
-// Export centralized procedure configurations
-export * from './constants/procedures';
+// Danh sách loại hồ sơ CƠ BẢN (Dùng cho form Tiếp nhận hồ sơ thường xuyên)
+export const RECORD_TYPES = [
+  '1.1 Sao lục hồ sơ',
+  '1.2 Công văn',
+  '2.1 Trích lục',
+  '2.2 Trích đo',
+  '2.3 Duyệt đơn & Cung cấp số thửa',
+  '2.4 Trích đo Cắm mốc',
+  '2.5 Trích đo Tách - Hợp thửa',
+  '3.1.1 Chuyển nhượng',
+  '3.1.2 Tặng cho',
+  '3.1.3 Thừa kế',
+  '3.1.4 Thỏa thuận',
+  '3.2.1 Cấp đổi',
+  '3.2.2 Cấp đổi (có thuế)',
+  '3.3.1 Cấp lại',
+  '3.3.2 Cấp lại (có thuế)',
+  '3.4.1 Tách - hợp thửa',
+  '3.5.1 Gia hạn',
+  '3.6.1 Chuyển mục đích không xin phép',
+  '3.7.1 Đính chính GCN',
+  '3.8.1 Đăng ký GDBD',
+  '3.8.2 Xóa ĐK GDBD',
+  '3.9.9 Khác'
+];
+
+// Danh sách loại hồ sơ MỞ RỘNG (Dùng cho form Thêm mới trong "Tất cả hồ sơ" - Admin/Nội bộ)
+export const EXTENDED_RECORD_TYPES = [
+  ...RECORD_TYPES,
+  '1.2 Công văn',
+  'CMD',
+  'Thi hành án',
+  'Tòa án'
+];
 
 // Hàm chuẩn hóa hiển thị tên Xã/Phường (Xóa Xã/Phường/TT)
 export const getNormalizedWard = (ward: string | null | undefined): string => {
@@ -102,6 +134,81 @@ export const getWardFullLabel = (ward: string | null | undefined): string => {
 export const getWardLabel = (ward: string | null | undefined): string => {
   if (!ward) return '';
   return getNormalizedWard(ward);
+};
+
+// Hàm rút gọn tên loại hồ sơ để hiển thị trong Danh sách (Table)
+export const getShortRecordType = (type: string | null | undefined): string => {
+  if (!type) return '---';
+  const t = type.toLowerCase().trim();
+  
+  if (t.startsWith('1.1') || t === 'cung cấp tài liệu đất đai' || t === 'cung cấp dữ liệu đất đai' || t === 'sao lục' || t === 'sao luc' || t === 'sao lục hồ sơ' || t === '1.1 cc dl đđ' || t === '1.1 sao lục') return '1.1 Sao lục';
+  if (t.startsWith('1.2') || t === 'công văn') return '1.2 Công văn';
+  if (t.startsWith('2.1') || t === 'trích lục' || t === 'trích lục quy hoạch' || t === 'trích lục qh') return '2.1 Trích lục';
+  if (t.startsWith('2.2') || t === '2.3 trích đo' || t === 'trích đo') return '2.2 Trích đo';
+  if (t.startsWith('2.3') || t.startsWith('2.6') || t === 'cung cấp số thửa đất' || t === 'cung cấp số thửa' || t === 'cc số thửa' || t === 'cập nhập số thửa' || t === 'cập nhật số thửa' || t === 'cn số thửa' || t.includes('duyệt đơn-số thửa') || t.includes('duyệt đơn') || t.includes('cung cấp số thửa') || t.includes('dđ & cc')) return '2.3 DĐ & CC số thửa';
+  if (t.startsWith('2.4') || t === 'cắm mốc' || t === 'trích đo cắm mốc') return '2.4 Cắm mốc';
+  if (t.startsWith('2.5') || t === 'tách thửa' || t === 'tách-hợp thửa' || t === 'trích đo tách - hợp thửa') return '2.5 Tách-Hợp thửa';
+
+  // Fallbacks for legacy other categories
+  if (t.includes('cung cấp tài liệu đất đai') || t.includes('cung cấp dữ liệu') || t.includes('sao lục') || t.includes('sao luc') || t.includes('cc dl đđ')) return '1.1 Sao lục';
+  if (t.includes('trích lục quy hoạch')) return '2.1 Trích lục';
+  if (t.includes('cung cấp số thửa đất') || t.includes('số thửa') || t.includes('cập nhập số thửa') || t.includes('cập nhật số thửa') || t.includes('2.6') || t.includes('duyệt đơn') || t.includes('dđ & cc')) return '2.3 DĐ & CC số thửa';
+  if (t.includes('trích đo') && t.includes('cắm mốc')) return '2.4 Cắm mốc';
+  if (t.includes('trích đo') && (t.includes('tách') || t.includes('hợp'))) return '2.5 Tách-Hợp thửa';
+  if (t.includes('trích đo') || t.includes('2.2')) return '2.2 Trích đo';
+  if (t.includes('cắm mốc')) return '2.4 Cắm mốc';
+  if (t.includes('trích lục')) return '2.1 Trích lục';
+  if (t.includes('tách thửa')) return '2.5 Tách-Hợp thửa';
+  if (t.includes('hợp thửa')) return '2.5 Tách-Hợp thửa';
+
+  // Legacy fallback
+  if (t.includes('thi hành án')) return 'Thi hành án';
+  if (t.includes('tòa án')) return 'Tòa án';
+  if (t.includes('cmd')) return 'CMD';
+
+  return type; // Trả về nguyên bản nếu không khớp quy tắc rút gọn
+};
+
+export const getCanonicalRecordType = (type: string | null | undefined): string => {
+  if (!type) return '';
+  const t = type.toLowerCase().trim();
+  
+  if (t.startsWith('1.1') || t.includes('sao lục') || t.includes('cung cấp tài liệu') || t.includes('cung cấp dữ liệu') || t.includes('cc dl đđ')) return '1.1 Sao lục hồ sơ';
+  if (t.startsWith('1.2') || t.includes('công văn')) return '1.2 Công văn';
+  if (t.startsWith('2.1') || t.includes('trích lục')) return '2.1 Trích lục';
+  if (t.startsWith('2.2') || (t.includes('trích đo') && !t.includes('cắm mốc') && !t.includes('tách') && !t.includes('hợp'))) return '2.2 Trích đo';
+  if (t.startsWith('2.3') || t.startsWith('2.6') || t.includes('duyệt đơn') || t.includes('cung cấp số thửa') || t.includes('dđ & cc') || t.includes('số thửa')) return '2.3 Duyệt đơn & Cung cấp số thửa';
+  if (t.startsWith('2.4') || t.includes('cắm mốc') || (t.includes('trích đo') && t.includes('cắm mốc'))) return '2.4 Trích đo Cắm mốc';
+  if (t.startsWith('2.5') || t.includes('tách - hợp thửa') || t.includes('tách thửa') || t.includes('hợp thửa') || (t.includes('trích đo') && (t.includes('tách') || t.includes('hợp')))) return '2.5 Trích đo Tách - Hợp thửa';
+
+  if (t.includes('chuyển nhượng')) return '3.1.1 Chuyển nhượng';
+  if (t.includes('tặng cho')) return '3.1.2 Tặng cho';
+  if (t.includes('thừa kế')) return '3.1.3 Thừa kế';
+  if (t.includes('thỏa thuận')) return '3.1.4 Thỏa thuận';
+  if (t.includes('cấp đổi (có thuế)')) return '3.2.2 Cấp đổi (có thuế)';
+  if (t.includes('cấp đổi')) return '3.2.1 Cấp đổi';
+  if (t.includes('cấp lại (có thuế)')) return '3.3.2 Cấp lại (có thuế)';
+  if (t.includes('cấp lại')) return '3.3.1 Cấp lại';
+  if (t.includes('3.4.1') || (t.includes('tách') && t.includes('hợp'))) return '3.4.1 Tách - hợp thửa';
+  if (t.includes('gia hạn')) return '3.5.1 Gia hạn';
+  if (t.includes('chuyển mục đích')) return '3.6.1 Chuyển mục đích không xin phép';
+  if (t.includes('đính chính')) return '3.7.1 Đính chính GCN';
+  if (t.includes('xóa') && t.includes('gdbd')) return '3.8.2 Xóa ĐK GDBD';
+  if (t.includes('gdbd') || t.includes('giao dịch bảo đảm')) return '3.8.1 Đăng ký GDBD';
+
+  if (t.includes('thi hành án')) return 'Thi hành án';
+  if (t.includes('tòa án')) return 'Tòa án';
+  if (t.includes('cmd')) return 'CMD';
+
+  const found = RECORD_TYPES.find(rt => rt.toLowerCase() === t);
+  if (found) return found;
+
+  return type;
+};
+
+export const isArchiveRecordType = (type: string | null | undefined): boolean => {
+  const short = getShortRecordType(type);
+  return short === '1.1 Sao lục' || short === '1.2 Công văn';
 };
 
 export const MOCK_EMPLOYEES: Employee[] = [

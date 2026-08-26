@@ -4,48 +4,6 @@ import { RecordFile, User, UserRole, RecordStatus, Employee } from '../types';
 import { removeVietnameseTones, isRecordOverdue, isRecordApproaching } from '../utils/appHelpers';
 import { getShortRecordType, isArchiveRecordType } from '../constants';
 
-export function getRecordDateForStatus(r: any, targetStatus?: string): string | null {
-    if (!r) return null;
-    const statusStr = (targetStatus && targetStatus !== 'all') ? targetStatus : (r.status || '');
-
-    // Check specific status date fields
-    if (statusStr === 'RETURNED' || statusStr === 'Đã trả kết quả') {
-        const d = r.returnDate || r.actualReturnDate || r.resultReturnDate;
-        if (d) return String(d).split('T')[0];
-    }
-    if (statusStr === 'HANDOVER' || statusStr === 'Chờ bàn giao' || statusStr === 'SUBMITTED' || statusStr === 'APPROVED' || statusStr === 'Đã giao 1 cửa') {
-        const d = r.handoverDate || r.submittedDate || r.signingDate;
-        if (d) return String(d).split('T')[0];
-    }
-    if (statusStr === 'IN_PROGRESS' || statusStr === 'ASSIGNED' || statusStr === 'Thẩm định') {
-        const d = r.assignedDate || r.assessmentDate;
-        if (d) return String(d).split('T')[0];
-    }
-    if (statusStr === 'Phiếu chuyển thuế' || statusStr === 'Chờ Thuế KV7' || statusStr === 'Chờ giấy nộp tiền') {
-        const d = r.taxTransferDate || r.taxReceiptDate;
-        if (d) return String(d).split('T')[0];
-    }
-    if (statusStr === 'Chờ In GCN' || statusStr === 'Chờ ký duyệt' || statusStr === 'Chờ kiểm tra') {
-        const d = r.signingDate || r.printDate;
-        if (d) return String(d).split('T')[0];
-    }
-
-    // Check statusLogs
-    if (Array.isArray(r.statusLogs)) {
-        const matchLog = r.statusLogs.find((l: any) => l.status === statusStr);
-        if (matchLog && matchLog.date) return String(matchLog.date).split('T')[0];
-    }
-    // Check history (Đăng ký)
-    if (Array.isArray(r.history)) {
-        const matchHist = r.history.find((h: any) => h.stepName === statusStr || h.status === statusStr);
-        if (matchHist && matchHist.date) return String(matchHist.date).split('T')[0];
-    }
-
-    // Default fallback
-    const fallback = r.receivedDate || r.assignedDate || r.createdAt || r.updatedAt;
-    return fallback ? String(fallback).split('T')[0] : null;
-}
-
 export const useRecordFilter = (
     records: RecordFile[],
     currentUser: User | null,
@@ -273,27 +231,8 @@ export const useRecordFilter = (
             result = result.filter(r => r.status === filterStatus);
         }
         if (filterEmployee !== 'all' && currentView !== 'assign_tasks') {
-            if (filterEmployee === 'unassigned') {
-                result = result.filter(r => !r.assignedTo && !(r as any).appraisalStaff && !(r as any).checkedBy);
-            } else {
-                const empObj = employees.find(e => e.id === filterEmployee || e.name === filterEmployee);
-                const empName = empObj?.name?.toLowerCase();
-                const empId = filterEmployee.toLowerCase();
-
-                result = result.filter(r => {
-                    const aTo = r.assignedTo ? r.assignedTo.toLowerCase() : '';
-                    const appSt = (r as any).appraisalStaff ? (r as any).appraisalStaff.toLowerCase() : '';
-                    const chkBy = (r as any).checkedBy ? (r as any).checkedBy.toLowerCase() : '';
-                    const subTo = (r as any).submittedTo ? (r as any).submittedTo.toLowerCase() : '';
-
-                    return (
-                        aTo === empId || (empName && aTo === empName) ||
-                        appSt === empId || (empName && appSt === empName) ||
-                        chkBy === empId || (empName && chkBy === empName) ||
-                        subTo === empId || (empName && subTo === empName)
-                    );
-                });
-            }
+            if (filterEmployee === 'unassigned') result = result.filter(r => !r.assignedTo);
+            else result = result.filter(r => r.assignedTo === filterEmployee);
         }
 
         // Date Filters (General for other views)
@@ -302,10 +241,10 @@ export const useRecordFilter = (
                 result = result.filter(r => r.receivedDate && r.receivedDate.startsWith(filterSpecificDate));
             } else if (filterFromDate || filterToDate) {
                 result = result.filter(r => {
-                    const targetDateStr = getRecordDateForStatus(r, filterStatus);
-                    if (!targetDateStr) return false;
-                    if (filterFromDate && targetDateStr < filterFromDate) return false;
-                    if (filterToDate && targetDateStr > filterToDate) return false;
+                    if (!r.receivedDate) return false;
+                    const rDateOnly = r.receivedDate.split('T')[0];
+                    if (filterFromDate && rDateOnly < filterFromDate) return false;
+                    if (filterToDate && rDateOnly > filterToDate) return false;
                     return true;
                 });
             }

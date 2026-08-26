@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { RecordFile, Employee, User, Holiday, RecordStatus, RolePermissions, DepartmentPermissions } from '../types';
-import { getNormalizedWard, getCanonicalRecordType } from '../constants';
+import { getNormalizedWard } from '../constants';
 import { PlusCircle, FileSpreadsheet, LayoutList, Search, Settings, RotateCcw, RefreshCw, CalendarClock, Layers } from 'lucide-react';
 import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../services/docxService';
 import * as XLSX from 'xlsx-js-style';
@@ -14,6 +14,7 @@ import BulkImport from './receive-record/BulkImport';
 import DailyList from './receive-record/DailyList';
 import RecordLookupView from './records/RecordLookupView';
 import ExtendedRecordsView from './receive-record/ExtendedRecordsView';
+import ReturnedResultListView from './receive-record/ReturnedResultListView';
 import TemplateConfigModal from './TemplateConfigModal';
 import DocxPreviewModal from './DocxPreviewModal';
 import ExcelPreviewModal from './ExcelPreviewModal';
@@ -323,8 +324,8 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({
         
         NOI_DUNG: val(dataToUse.content),
         CONTENT: val(dataToUse.content),
-        LOAI_HS: val(getCanonicalRecordType(dataToUse.recordType, dataToUse.code)), 
-        RECORD_TYPE: val(getCanonicalRecordType(dataToUse.recordType, dataToUse.code)),
+        LOAI_HS: val(dataToUse.recordType), 
+        RECORD_TYPE: val(dataToUse.recordType),
         GIAY_TO_KHAC: val(dataToUse.otherDocs),
         GIA: dataToUse.price ? dataToUse.price.toLocaleString('vi-VN') + ' đ' : '',
         PRICE: dataToUse.price ? dataToUse.price.toLocaleString('vi-VN') + ' đ' : '',
@@ -402,6 +403,13 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({
             >
                 <CalendarClock size={16} /> Hồ sơ gia hạn
             </button>
+
+            <button 
+                onClick={() => setViewMode('returned_list')} 
+                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-md text-sm font-semibold transition-all whitespace-nowrap cursor-pointer ${viewMode === 'returned_list' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
+            >
+                <Layers size={16} /> Danh sách trả kết quả
+            </button>
         </div>
         
         {viewMode === 'create' && (
@@ -478,6 +486,17 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({
                     handlePreviewDocx(record);
                 }}
                 onViewRecord={onViewRecord}
+            />
+        )}
+
+        {viewMode === 'returned_list' && (
+            <ReturnedResultListView 
+                records={combinedRecords}
+                currentUser={currentUser}
+                wards={wards}
+                onUpdateBulk={onBulkUpdate}
+                onViewRecord={onViewRecord}
+                onPreviewExcel={handlePreviewExcel}
             />
         )}
       </div>

@@ -1,8 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { RecordFile, RecordStatus, Employee, User, UserRole } from '../types';
-import { GROUPS, EXTENDED_RECORD_TYPES, STATUS_LABELS, SELECTABLE_STATUSES, getShortRecordType, getWardLabel, getNormalizedWard, isArchiveRecordType, getCanonicalRecordType, detectProcedureId, RECORD_TYPES_LuuTru, RECORD_TYPES_DoDac } from '../constants';
-import { getDefaultDocsForProcedure } from '../constants/procedures';
+import { GROUPS, EXTENDED_RECORD_TYPES, STATUS_LABELS, SELECTABLE_STATUSES, getShortRecordType, getWardLabel, getNormalizedWard, isArchiveRecordType, getCanonicalRecordType } from '../constants';
 import { X, Save, Lock, User as UserIcon, MapPin, FileText, Calendar, FileCheck, ChevronDown, ChevronUp, XCircle, ClipboardList } from 'lucide-react';
 import { calculateDeadlineHelper, getDepartmentForRecord, extractBatchOnly } from '../utils/appHelpers';
 import { fetchContracts } from '../services/api';
@@ -126,24 +125,31 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
   if (isOtherView) {
     allowedRecordTypes = ['CMD', 'Thi hành án', 'Tòa án'];
   } else if (isArchiveView) {
-    allowedRecordTypes = [...RECORD_TYPES_LuuTru];
+    allowedRecordTypes = [
+      '1.1 Sao lục',
+      '1.2 Công văn'
+    ];
   } else if (isMeasurementView) {
-    allowedRecordTypes = [...RECORD_TYPES_DoDac];
+    allowedRecordTypes = [
+      '2.1 Trích lục',
+      '2.2 Trích đo',
+      '2.3 Duyệt đơn & Cung cấp số thửa',
+      '2.4 Trích đo Cắm mốc',
+      '2.5 Trích đo Tách - Hợp thửa'
+    ];
   } else {
     allowedRecordTypes = [
-      ...RECORD_TYPES_LuuTru,
-      ...RECORD_TYPES_DoDac,
+      '1.1 Sao lục hồ sơ',
+      '1.2 Công văn',
+      '2.1 Trích lục',
+      '2.2 Trích đo',
+      '2.3 Duyệt đơn & Cung cấp số thửa',
+      '2.4 Trích đo Cắm mốc',
+      '2.5 Trích đo Tách - Hợp thửa',
       'CMD',
       'Thi hành án',
       'Tòa án'
     ];
-  }
-
-  if (formData.recordType) {
-    const currentCanonical = getCanonicalRecordType(formData.recordType, formData.code);
-    if (currentCanonical && !allowedRecordTypes.includes(currentCanonical)) {
-      allowedRecordTypes = [currentCanonical, ...allowedRecordTypes];
-    }
   }
 
   const filteredEmployees = useMemo(() => {
@@ -176,8 +182,10 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
     if (isOpen) {
         if (initialData) {
             const dataToSet = { ...initialData };
-            dataToSet.procedureId = dataToSet.procedureId || detectProcedureId(dataToSet.code, dataToSet.recordType);
             const rLower = String(dataToSet.recordType || '').toLowerCase();
+            if ((rLower.includes('1.2') || rLower.includes('công văn') || rLower.includes('cong van') || rLower.includes('sao lục') || dataToSet.recordType === '1.1 Sao lục' || dataToSet.recordType === '1.1 CC DL ĐĐ' || dataToSet.recordType === '1.1 Sao lục hồ sơ' || dataToSet.recordType === '1.1 Cung cấp dữ liệu đất đai') && !dataToSet.price) {
+                dataToSet.price = 310000;
+            }
             if (dataToSet.exportBatch) {
                 dataToSet.exportBatch = extractBatchOnly(dataToSet.exportBatch);
             }
@@ -198,6 +206,12 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                 // 1. Kiểm tra price lưu sẵn
                 if (dataToSet.price && dataToSet.price > 0) {
                     setFormData(prev => ({ ...prev, returnedPrice: dataToSet.price }));
+                    return;
+                }
+
+                // 2. Cung cấp tài liệu đất đai hoặc 1.2 Công văn
+                if (rLower.includes('cung cấp tài liệu') || rLower.includes('cung cấp tldđ') || rLower.includes('cung cấp tlđđ') || rLower.includes('1.2') || rLower.includes('công văn') || rLower.includes('cong van')) {
+                    setFormData(prev => ({ ...prev, returnedPrice: 310000 }));
                     return;
                 }
 
@@ -237,6 +251,12 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                     }
                 } catch (err) {
                     console.error("Error loading contract price in RecordModal:", err);
+                }
+
+                // 4. Trích lục bản đồ địa chính
+                if (rLower.includes('trích lục')) {
+                    setFormData(prev => ({ ...prev, returnedPrice: 53163 }));
+                    return;
                 }
             };
             determinePrice();
@@ -302,16 +322,6 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
     if (!finalData.recordType) {
         alert("Vui lòng chọn Loại hồ sơ trước khi lưu.");
         return;
-    }
-
-    if (!finalData.ward || !finalData.ward.trim()) {
-        alert("Vui lòng chọn Xã / Phường trước khi lưu.");
-        return;
-    }
-
-    // Đảm bảo gán Cán bộ tiếp nhận nếu là thêm mới từ module chuyên môn hoặc chưa có
-    if (!initialData || !finalData.receivedBy) {
-        finalData.receivedBy = finalData.receivedBy || currentUser.employeeId || currentUser.username || currentUser.name;
     }
     
     // Logic tự động set ngày khi trạng thái thay đổi hoặc xóa ngày khi quay lui
@@ -534,30 +544,30 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
   const handleChange = (field: keyof RecordFile, value: any) => {
     setFormData(prev => {
       const updated = { ...prev, [field]: value };
+      if (field === 'assignedTo' && value) {
+        const emp = employees.find(e => e.id === value);
+        const firstWard = emp?.managedWards?.[0];
+        if (firstWard) {
+          updated.ward = firstWard;
+        }
+      }
       if (updated.ward) {
         const norm = getNormalizedWard(updated.ward);
         if (GROUPS.includes(norm)) {
           updated.group = norm;
         }
       }
-      if (field === 'recordType' || field === 'code' || field === 'receivedDate') {
-        const rCode = field === 'code' ? value : prev.code;
+      if (field === 'recordType' || field === 'receivedDate') {
         const rType = field === 'recordType' ? value : prev.recordType;
         const rDate = field === 'receivedDate' ? value : prev.receivedDate;
-        
-        const procId = detectProcedureId(rCode, rType);
-        updated.procedureId = procId;
-
-        if (field === 'recordType' && !initialData) {
-          const defDocs = getDefaultDocsForProcedure(rType, rCode);
-          if (defDocs.length > 0) {
-            setAttachedDocs(defDocs);
-            updated.otherDocs = JSON.stringify(defDocs);
-          }
-        }
-
         if (rType && rDate) {
-          updated.deadline = calculateDeadlineHelper(rType, String(rDate).split('T')[0], holidays || [], rCode, procId);
+          updated.deadline = calculateDeadlineHelper(rType, String(rDate).split('T')[0], holidays || []);
+        }
+        if (field === 'recordType') {
+          const rLower = String(value || '').toLowerCase();
+          if (rLower.includes('1.2') || rLower.includes('công văn') || rLower.includes('cong van') || rLower.includes('sao lục') || value === '1.1 Sao lục' || value === '1.1 CC DL ĐĐ' || value === '1.1 Sao lục hồ sơ' || value === '1.1 Cung cấp dữ liệu đất đai') {
+            updated.price = 310000;
+          }
         }
       }
       return updated;
@@ -648,7 +658,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                 {/* 2. CHỦ SỬ DỤNG HOẶC THÔNG TIN GỬI NHẬN */}
                 <div className="bg-white p-3.5 sm:p-5 rounded-2xl border border-slate-200 shadow-2xs">
                     <h3 className="text-xs sm:text-sm font-bold text-slate-800 uppercase mb-3 sm:mb-4 flex items-center gap-2 border-b border-slate-100 pb-2.5">
-                        <UserIcon size={16} className="text-blue-600" /> {isCongVan ? 'Thông tin gửi / nhận' : 'Thông tin khách hàng'}
+                        <UserIcon size={16} className="text-blue-600" /> {isCongVan ? 'Thông tin gửi / nhận' : 'Chủ sử dụng'}
                     </h3>
                     {isCongVan ? (
                         <div className="grid grid-cols-1 gap-3.5">
@@ -817,20 +827,14 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
 
                             {/* THÔNG TIN NGƯỜI ĐƯỢC ỦY QUYỀN (NẾU CÓ) */}
                             <div className="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden">
-                                <div 
-                                    onClick={() => setIsAuthOpen(!isAuthOpen)}
-                                    className="p-3.5 flex items-center justify-between gap-4 border-b border-slate-100 bg-slate-50/50 cursor-pointer select-none hover:bg-slate-100/70 transition-colors"
-                                >
-                                    <h3 className="text-xs font-bold text-slate-700 uppercase flex items-center gap-2 cursor-pointer">
+                                <div className="p-3.5 flex items-center justify-between gap-4 border-b border-slate-100 bg-slate-50/50">
+                                    <h3 className="text-xs font-bold text-slate-700 uppercase flex items-center gap-2">
                                         <UserIcon size={14} className="text-indigo-600" />
                                         Thông tin người được ủy quyền (nếu có)
                                     </h3>
                                     <button
                                         type="button"
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            setIsAuthOpen(!isAuthOpen);
-                                        }}
+                                        onClick={() => setIsAuthOpen(!isAuthOpen)}
                                         className="flex items-center gap-1 text-[10px] font-bold uppercase rounded-lg border border-slate-200 hover:bg-white transition-all px-2.5 py-1 text-slate-600 bg-white shadow-2xs cursor-pointer"
                                     >
                                         {isAuthOpen ? '▲ ẨN NHẬP LIỆU' : '▼ HIỆN NHẬP LIỆU'}

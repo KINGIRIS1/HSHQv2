@@ -38,29 +38,15 @@
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        background: url('./bg-airport.jpg') no-repeat center center / cover;
+        background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%);
         z-index: 9999;
         transition: opacity 0.5s ease-out, visibility 0.5s;
-      }
-      #initial-loader::before {
-        content: '';
-        position: absolute;
-        inset: 0;
-        background: rgba(15, 23, 42, 0.25);
-        backdrop-filter: blur(3px);
-        -webkit-backdrop-filter: blur(3px);
-        z-index: 0;
       }
       .loader-content {
         display: flex;
         flex-direction: column;
         align-items: center;
         position: relative;
-        z-index: 1;
-        background: transparent;
-        padding: 20px;
-        border: none;
-        box-shadow: none;
       }
       .logo-wrapper {
         position: relative;
@@ -72,16 +58,16 @@
         margin-bottom: 24px;
       }
       .logo-img {
-        width: 76px;
-        height: 76px;
+        width: 72px;
+        height: 72px;
         border-radius: 50%;
         object-fit: cover;
-        box-shadow: 0 0 30px rgba(255, 255, 255, 0.7);
+        box-shadow: 0 0 30px rgba(59, 130, 246, 0.35);
         animation: pulseLogo 2.5s ease-in-out infinite;
         position: relative;
         z-index: 2;
-        background: transparent;
-        padding: 0;
+        background: #0f172a;
+        padding: 4px;
       }
       .spinner-ring {
         position: absolute;
@@ -107,23 +93,22 @@
         animation: spinReverse 12s linear infinite;
       }
       .loader-title {
-        color: #0f172a;
+        color: #f8fafc;
         font-size: 16px;
-        font-weight: 800;
+        font-weight: 700;
         letter-spacing: 0.5px;
         text-transform: uppercase;
         margin-bottom: 6px;
         text-align: center;
-        text-shadow: 0 0 10px #ffffff, 0 0 16px #ffffff, 0 1px 3px rgba(255,255,255,0.95);
+        text-shadow: 0 2px 10px rgba(0,0,0,0.5);
       }
       .loader-subtitle {
-        color: #0f172a;
+        color: #94a3b8;
         font-size: 13px;
-        font-weight: 700;
+        font-weight: 500;
         display: flex;
         align-items: center;
         gap: 2px;
-        text-shadow: 0 0 8px #ffffff, 0 0 12px #ffffff, 0 1px 2px rgba(255,255,255,0.95);
       }
       .dot-pulse {
         display: inline-block;

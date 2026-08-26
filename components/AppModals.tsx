@@ -5,10 +5,6 @@ import ImportModal from './ImportModal';
 import AssignModal from './AssignModal';
 import { DetailModal } from './DetailModal';
 import { MobileDetailModal } from './mobile/MobileDetailModal';
-import DangKyRecordModal from './DangKyRecordModal';
-import DangKyDetailModal from './DangKyDetailModal';
-import { DangKyImportModal } from './DangKyImportModal';
-import { saveDangKyRecordApi, saveDangKyRecordsBatchApi } from '../services/apiDangKy';
 import { useIsMobile } from '../hooks/useIsMobile';
 import DeleteConfirmModal from './DeleteConfirmModal';
 import ExportModal from './ExportModal';
@@ -20,8 +16,6 @@ import ReturnResultModal from './ReturnResultModal';
 import BatchErrorDiagnosticModal from './BatchErrorDiagnosticModal';
 import RejectReturnStepModal, { ReturnOptionType } from './RejectReturnStepModal';
 import ExtendDeadlineModal from './ExtendDeadlineModal';
-import DocxPreviewModal from './DocxPreviewModal';
-import SystemReceiptTemplate from './receive-record/SystemReceiptTemplate';
 import * as XLSX from 'xlsx-js-style';
 
 interface AppModalsProps {
@@ -41,7 +35,6 @@ interface AppModalsProps {
     isDiagnosticModalOpen?: boolean;
     isRejectReturnStepModalOpen?: boolean;
     isExtendModalOpen?: boolean;
-    isPreviewOpen?: boolean;
     
     // Data States
     editingRecord: RecordFile | null;
@@ -56,9 +49,6 @@ interface AppModalsProps {
     // Preview Data
     previewWorkbook: XLSX.WorkBook | null;
     previewExcelName: string;
-    previewBlob?: Blob | null;
-    previewFileName?: string;
-    systemReceiptData?: RecordFile | null;
 
     // Setters
     setIsModalOpen: (v: boolean) => void;
@@ -75,8 +65,6 @@ interface AppModalsProps {
     setIsDiagnosticModalOpen?: (v: boolean) => void;
     setIsRejectReturnStepModalOpen?: (v: boolean) => void;
     setIsExtendModalOpen?: (v: boolean) => void;
-    setIsPreviewOpen?: (v: boolean) => void;
-    setSystemReceiptData?: (r: RecordFile | null) => void;
     
     setEditingRecord: (r: RecordFile | null) => void;
     setViewingRecord: (r: RecordFile | null) => void;
@@ -125,87 +113,27 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
     const targetRecordsForBatch = props.selectedRecordsForBulk.length > 0 ? props.selectedRecordsForBulk : props.filteredRecords;
     const isMobile = useIsMobile();
 
-    const getProcedureModuleCategory = (r: RecordFile | null) => {
-        if (!r) return null;
-        const code = (r.code || '').trim();
-        const type = (r.recordType || '').trim();
-        if (code.startsWith('1.') || type.startsWith('1.')) return 'luutru'; // 1.x -> Module Lưu trữ
-        if (code.startsWith('2.') || type.startsWith('2.')) return 'dodac';  // 2.x -> Module Đo đạc
-        if (code.startsWith('3.') || type.startsWith('3.')) return 'dangky'; // 3.x -> Module Đăng ký
-        return null;
-    };
-
-    // Chặn điều hướng nhầm: Mã 1.x & 2.x luôn bảo vệ bằng RecordModal & DetailModal, mã 3.x luôn dùng DangKyRecordModal & DangKyDetailModal
-    const isDangKyEditing = (() => {
-        const cat = getProcedureModuleCategory(props.editingRecord);
-        if (cat === 'dodac' || cat === 'luutru') return false;
-        if (cat === 'dangky') return true;
-        return (props.editingRecord as any)?.sourceTable === 'dangky_records' || (props.currentView === 'registration_records' || props.currentView === 'vaoso_records');
-    })();
-
-    const isDangKyViewing = (() => {
-        const cat = getProcedureModuleCategory(props.viewingRecord);
-        if (cat === 'dodac' || cat === 'luutru') return false;
-        if (cat === 'dangky') return true;
-        return (props.viewingRecord as any)?.sourceTable === 'dangky_records';
-    })();
-    const isDangKyView = props.currentView === 'registration_records' || props.currentView === 'vaoso_records';
-
     return (
         <>
-            {isDangKyEditing ? (
-                <DangKyRecordModal
-                    isOpen={props.isModalOpen && isDangKyEditing}
-                    onClose={() => { props.setIsModalOpen(false); props.setEditingRecord(null); }}
-                    initialData={props.editingRecord as any}
-                    employees={props.employees}
-                    currentUser={props.currentUser}
-                    wards={props.wards}
-                    holidays={props.holidays}
-                    onSave={async (record) => {
-                        await saveDangKyRecordApi(record);
-                        props.onRefreshData?.();
-                        props.setIsModalOpen(false);
-                        props.setEditingRecord(null);
-                    }}
-                />
-            ) : (
-                <RecordModal 
-                    isOpen={props.isModalOpen && !isDangKyEditing}
-                    onClose={() => { props.setIsModalOpen(false); props.setEditingRecord(null); }}
-                    onSubmit={props.handleAddOrUpdate}
-                    initialData={props.editingRecord}
-                    employees={props.employees}
-                    currentUser={props.currentUser}
-                    wards={props.wards}
-                    currentView={props.currentView}
-                    holidays={props.holidays}
-                />
-            )}
+            <RecordModal 
+                isOpen={props.isModalOpen}
+                onClose={() => { props.setIsModalOpen(false); props.setEditingRecord(null); }}
+                onSubmit={props.handleAddOrUpdate}
+                initialData={props.editingRecord}
+                employees={props.employees}
+                currentUser={props.currentUser}
+                wards={props.wards}
+                currentView={props.currentView}
+                holidays={props.holidays}
+            />
             
-            {isDangKyView ? (
-                <DangKyImportModal
-                    isOpen={props.isImportModalOpen && isDangKyView}
-                    onClose={() => props.setIsImportModalOpen(false)}
-                    employees={props.employees}
-                    initialMode={props.importModalMode}
-                    onImport={async (records, mode, onProgress) => {
-                        const success = await saveDangKyRecordsBatchApi(records);
-                        if (success) {
-                            props.onRefreshData?.();
-                        }
-                        return success;
-                    }}
-                />
-            ) : (
-                <ImportModal 
-                    isOpen={props.isImportModalOpen && !isDangKyView} 
-                    onClose={() => props.setIsImportModalOpen(false)} 
-                    onImport={props.handleImportRecords} 
-                    employees={props.employees} 
-                    initialMode={props.importModalMode}
-                />
-            )}
+            <ImportModal 
+                isOpen={props.isImportModalOpen} 
+                onClose={() => props.setIsImportModalOpen(false)} 
+                onImport={props.handleImportRecords} 
+                employees={props.employees} 
+                initialMode={props.importModalMode}
+            />
             
             <AssignModal 
                 isOpen={props.isAssignModalOpen} 
@@ -228,23 +156,9 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
                 })()}
             />
             
-            {isDangKyViewing ? (
-                <DangKyDetailModal
-                    isOpen={!!props.viewingRecord && isDangKyViewing}
-                    onClose={() => props.setViewingRecord(null)}
-                    record={props.viewingRecord as any}
-                    employees={props.employees}
-                    currentUser={props.currentUser}
-                    onEdit={(r) => {
-                        props.setViewingRecord(null);
-                        props.setEditingRecord(r as any);
-                        props.setIsModalOpen(true);
-                    }}
-                    onRefreshData={props.onRefreshData}
-                />
-            ) : isMobile ? (
+            {isMobile ? (
                 <MobileDetailModal 
-                    isOpen={!!props.viewingRecord && !isDangKyViewing} 
+                    isOpen={!!props.viewingRecord} 
                     onClose={() => props.setViewingRecord(null)} 
                     record={props.viewingRecord} 
                     employees={props.employees} 
@@ -258,7 +172,7 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
                 />
             ) : (
                 <DetailModal 
-                    isOpen={!!props.viewingRecord && !isDangKyViewing} 
+                    isOpen={!!props.viewingRecord} 
                     onClose={() => props.setViewingRecord(null)} 
                     record={props.viewingRecord} 
                     employees={props.employees} 
@@ -368,22 +282,6 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
                 users={props.users}
                 onConfirm={props.onConfirmExtendDeadline || (async () => {})}
             />
-
-            <DocxPreviewModal
-                isOpen={!!props.isPreviewOpen}
-                onClose={() => props.setIsPreviewOpen && props.setIsPreviewOpen(false)}
-                docxBlob={props.previewBlob || null}
-                fileName={props.previewFileName || ''}
-            />
-
-            {props.systemReceiptData && (
-                <SystemReceiptTemplate
-                    data={props.systemReceiptData}
-                    receivingWard={props.systemReceiptData.ward || ''}
-                    onClose={() => props.setSystemReceiptData && props.setSystemReceiptData(null)}
-                    currentUser={props.currentUser}
-                />
-            )}
         </>
     );
 };

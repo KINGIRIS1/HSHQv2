@@ -89,13 +89,6 @@ ALTER TABLE luutru_records ADD COLUMN IF NOT EXISTS "landPlot" TEXT;
 ALTER TABLE luutru_records ADD COLUMN IF NOT EXISTS "mapSheet" TEXT;
 ALTER TABLE luutru_records ADD COLUMN IF NOT EXISTS area NUMERIC;
 ALTER TABLE luutru_records ADD COLUMN IF NOT EXISTS price NUMERIC;
-ALTER TABLE luutru_records ADD COLUMN IF NOT EXISTS "authorizedPersonAddress" TEXT;
-ALTER TABLE luutru_records ADD COLUMN IF NOT EXISTS "authorizedPersonName" TEXT;
-ALTER TABLE luutru_records ADD COLUMN IF NOT EXISTS "authorizedPersonId" TEXT;
-ALTER TABLE luutru_records ADD COLUMN IF NOT EXISTS "authorizedPersonPhone" TEXT;
-ALTER TABLE luutru_records ADD COLUMN IF NOT EXISTS "authorizedBy" TEXT;
-ALTER TABLE luutru_records ADD COLUMN IF NOT EXISTS "authDocType" TEXT;
-ALTER TABLE luutru_records ADD COLUMN IF NOT EXISTS "otherDocs" TEXT;
 
 -- 3. BẢNG ARCHIVE_RECORDS (Kho lưu trữ tương thích)
 CREATE TABLE IF NOT EXISTS archive_records (

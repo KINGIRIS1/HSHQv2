@@ -50,7 +50,14 @@ const ReturnResultModal: React.FC<ReturnResultModalProps> = ({
                     return;
                 }
 
-                // 2. Tra cứu hợp đồng
+                // 2. Nếu là Cung cấp tài liệu đất đai hoặc 1.2 Công văn
+                const type = (record.recordType || '').toLowerCase();
+                if (type.includes('cung cấp tài liệu') || type.includes('cung cấp tldđ') || type.includes('cung cấp tlđđ') || type.includes('1.2') || type.includes('công văn') || type.includes('cong van')) {
+                    setReturnedPrice('310000');
+                    return;
+                }
+
+                // 3. Tra cứu hợp đồng
                 const fetchedContracts = await fetchContracts();
                 const match = fetchedContracts.find(c => {
                     if (!c || !record) return false;
@@ -84,10 +91,16 @@ const ReturnResultModal: React.FC<ReturnResultModalProps> = ({
                     return;
                 }
 
-                setReturnedPrice('');
+                // 4. Nếu là Trích lục bản đồ địa chính
+                if (type.includes('trích lục')) {
+                    setReturnedPrice('53163');
+                    return;
+                }
+
+                setReturnedPrice('0');
             } catch (err) {
                 console.error("Error loading default price:", err);
-                setReturnedPrice('');
+                setReturnedPrice('0');
             } finally {
                 setIsLoadingPrice(false);
             }
@@ -119,7 +132,12 @@ const ReturnResultModal: React.FC<ReturnResultModalProps> = ({
           return;
       }
 
-      const priceNum = returnedPrice.trim() ? parseFloat(returnedPrice) : 0;
+      if (!returnedPrice.trim()) {
+          setErrorMsg('Vui lòng nhập số tiền thực tế trước khi trả kết quả!');
+          return;
+      }
+
+      const priceNum = parseFloat(returnedPrice);
       if (isNaN(priceNum) || priceNum < 0) {
           setErrorMsg('Vui lòng nhập số tiền hợp lệ!');
           return;
