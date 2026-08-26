@@ -263,9 +263,20 @@ export const RECORD_TYPES: string[] = PROCEDURE_CATALOG
 export const EXTENDED_RECORD_TYPES: string[] = PROCEDURE_CATALOG.map(p => p.shortName);
 
 // Derived per-module procedure lists
-export const RECORD_TYPES_LuuTru: string[] = [];
+export const RECORD_TYPES_LuuTru: string[] = ['1.1 Sao lục', '1.2 Công văn', 'Sao lục', 'Công văn'];
 
-export const RECORD_TYPES_DoDac: string[] = [];
+export const RECORD_TYPES_DoDac: string[] = [
+  'Trích lục',
+  'Trích đo',
+  'Duyệt đơn & Cung cấp số thửa',
+  'Cắm mốc',
+  'Tách-Hợp thửa',
+  '2.1 Trích lục',
+  '2.2 Trích đo',
+  '2.3 Duyệt đơn & Cung cấp số thửa',
+  '2.4 Cắm mốc',
+  '2.5 Tách-Hợp thửa'
+];
 
 export const DANG_KY_RECORD_TYPES = PROCEDURE_CATALOG
   .filter(p => p.module === 'dangky')
