@@ -274,7 +274,7 @@ export const migrateArchiveRecordsFromLandRecords = async () => {
 
         // Upsert vào luutru_records với cơ chế tự động lọc các cột chưa có trên DB
         const { error: insertError } = await executeSupabaseOperationWithAutoClean(
-            (p) => supabase.from('luutru_records').upsert(p),
+            async (p) => await supabase.from('luutru_records').upsert(p),
             luutruPayloads
         );
 
@@ -372,14 +372,14 @@ export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise
 
         if (record.id) {
             const { data, error } = await executeSupabaseOperationWithAutoClean(
-                (p) => supabase.from('luutru_records').update(p).eq('id', record.id!).select(),
+                async (p) => await supabase.from('luutru_records').update(p).eq('id', record.id!).select(),
                 payload
             );
             if (error) throw error;
             return data && data.length > 0 ? mapLuutruDbToArchiveRecord(data[0]) : null;
         } else {
             const { data, error } = await executeSupabaseOperationWithAutoClean(
-                (p) => supabase.from('luutru_records').insert([p]).select(),
+                async (p) => await supabase.from('luutru_records').insert([p]).select(),
                 payload
             );
             if (error) throw error;
@@ -428,7 +428,7 @@ export const importArchiveRecords = async (records: Partial<ArchiveRecord>[]): P
         const payload = records.map(r => mapArchiveRecordToLuutruDb(r));
 
         const { error } = await executeSupabaseOperationWithAutoClean(
-            (p) => supabase.from('luutru_records').insert(p),
+            async (p) => await supabase.from('luutru_records').insert(p),
             payload
         );
         if (error) throw error;
@@ -476,7 +476,7 @@ export const updateArchiveRecordsBatch = async (ids: string[], updates: Partial<
         });
 
         const { error: upsertError } = await executeSupabaseOperationWithAutoClean(
-            (p) => supabase.from('luutru_records').upsert(p),
+            async (p) => await supabase.from('luutru_records').upsert(p),
             updatedPayloads
         );
 

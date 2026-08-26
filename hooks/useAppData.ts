@@ -6,8 +6,8 @@ import { fetchRecords, fetchEmployees, fetchUsers, fetchUpdateInfo, fetchHoliday
     saveEmployeeApi, deleteEmployeeApi, saveUserApi, deleteUserApi, deleteAllDataApi, getSystemSetting
 } from '../services/api';
 import { supabase } from '../services/supabaseClient';
-import { mapRecordFromDb } from '../services/apiCore';
-import { DEFAULT_WARDS as STATIC_WARDS, APP_VERSION } from '../constants';
+import { mapRecordFromDb, getFromCache, CACHE_KEYS } from '../services/apiCore';
+import { DEFAULT_WARDS as STATIC_WARDS, APP_VERSION, MOCK_EMPLOYEES, MOCK_USERS } from '../constants';
 import { migrateUnbatchedRecords } from '../utils/appHelpers';
 
 export const useAppData = (currentUser: User | null) => {
@@ -32,10 +32,39 @@ export const useAppData = (currentUser: User | null) => {
 
     const loadData = useCallback(async () => {
         try {
-            // Tạo timeout promise để tránh việc fetch bị treo mãi mãi
-            // Tăng timeout lên 30s để xử lý trường hợp mạng chậm hoặc DB bị sleep
+            // 1. Thử kết nối Server nội bộ (LAN Server / Express API) TRƯỚC TIÊN vì chạy rất nhanh trên mạng nội bộ
+            try {
+                const [recRes, empRes, userRes, holRes] = await Promise.all([
+                    fetch('/records', { signal: AbortSignal.timeout(4000) }).then(r => r.ok ? r.json() : null).catch(() => null),
+                    fetch('/employees', { signal: AbortSignal.timeout(4000) }).then(r => r.ok ? r.json() : null).catch(() => null),
+                    fetch('/users', { signal: AbortSignal.timeout(4000) }).then(r => r.ok ? r.json() : null).catch(() => null),
+                    fetch('/holidays', { signal: AbortSignal.timeout(4000) }).then(r => r.ok ? r.json() : null).catch(() => null),
+                ]);
+
+                if (recRes !== null || empRes !== null || userRes !== null) {
+                    console.log("✅ Kết nối thành công tới Server nội bộ (LAN Server)!");
+                    const rawRecs = Array.isArray(recRes) ? recRes : (recRes?.records || []);
+                    const { migratedRecords } = migrateUnbatchedRecords(rawRecs);
+                    setRecords(migratedRecords);
+                    if (Array.isArray(empRes)) setEmployees(empRes);
+                    else if (empRes?.employees && Array.isArray(empRes.employees)) setEmployees(empRes.employees);
+                    
+                    if (Array.isArray(userRes)) setUsers(userRes);
+                    else if (userRes?.users && Array.isArray(userRes.users)) setUsers(userRes.users);
+
+                    if (Array.isArray(holRes)) setHolidays(holRes);
+                    else if (holRes?.holidays && Array.isArray(holRes.holidays)) setHolidays(holRes.holidays);
+
+                    setConnectionStatus('connected');
+                    return;
+                }
+            } catch (localErr) {
+                console.log("Server nội bộ không phản hồi, chuyển sang thử kết nối Supabase Cloud...", localErr);
+            }
+
+            // 2. Nếu không có Server nội bộ, thử kết nối Supabase Cloud (với timeout 8s)
             const timeoutPromise = new Promise((_, reject) => 
-                setTimeout(() => reject(new Error("Timeout")), 30000)
+                setTimeout(() => reject(new Error("Timeout Supabase")), 8000)
             );
 
             const dataPromise = Promise.all([
@@ -89,20 +118,22 @@ export const useAppData = (currentUser: User | null) => {
                 setUpdateUrl(updateInfo.url);
             }
         } catch (error) {
-            console.error("Lỗi tải dữ liệu hoặc Timeout:", error);
-            // Quan trọng: Khi lỗi, chuyển sang OFFLINE nhưng vẫn cho phép App hoạt động
+            console.warn("Không thể kết nối Server nội bộ lẫn Supabase, chuyển sang chế độ Offline/Cache mượt mà:", error);
             setConnectionStatus('offline');
             
-            // Nếu cache cũng rỗng (lần đầu chạy) hoặc bị timeout nên không nhận được data, 
-            // ta sẽ chủ động đọc lại từ Cache để người dùng có thể Đăng nhập và làm việc.
-            import('../services/apiCore').then(({ getFromCache, CACHE_KEYS }) => {
-                import('../constants').then(({ MOCK_EMPLOYEES, MOCK_USERS }) => {
-                    setRecords((prev) => prev.length > 0 ? prev : getFromCache(CACHE_KEYS.RECORDS, []));
-                    setEmployees((prev) => prev.length > 0 ? prev : getFromCache(CACHE_KEYS.EMPLOYEES, MOCK_EMPLOYEES));
-                    setUsers((prev) => prev.length > 0 ? prev : getFromCache(CACHE_KEYS.USERS, MOCK_USERS));
-                    setHolidays((prev) => prev.length > 0 ? prev : getFromCache(CACHE_KEYS.HOLIDAYS, []));
-                });
-            });
+            // Đọc ngay lập tức dữ liệu từ Cache để người dùng tiếp tục làm việc bình thường không bị gián đoạn
+            const cachedRecords = getFromCache(CACHE_KEYS.RECORDS, []);
+            const cachedEmployees = getFromCache(CACHE_KEYS.EMPLOYEES, MOCK_EMPLOYEES);
+            const cachedUsers = getFromCache(CACHE_KEYS.USERS, MOCK_USERS);
+            const cachedHolidays = getFromCache(CACHE_KEYS.HOLIDAYS, []);
+
+            if (cachedRecords.length > 0) {
+                const { migratedRecords } = migrateUnbatchedRecords(cachedRecords);
+                setRecords(migratedRecords);
+            }
+            if (cachedEmployees.length > 0) setEmployees(cachedEmployees);
+            if (cachedUsers.length > 0) setUsers(cachedUsers);
+            if (cachedHolidays.length > 0) setHolidays(cachedHolidays);
         }
     }, []);
 

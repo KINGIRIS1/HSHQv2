@@ -26,6 +26,7 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, './'),
       buffer: 'buffer',
+      stream: 'stream-browserify',
     },
   },
   define: {

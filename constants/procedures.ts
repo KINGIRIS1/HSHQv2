@@ -333,46 +333,29 @@ export const getProcedureById = (id?: string | null): ProcedureDefinition | unde
   return PROCEDURE_MAP_BY_ID[id] || PROCEDURE_CATALOG.find(p => p.id === id || p.name === id || p.shortName === id);
 };
 
-// Automatic detection logic
+// Automatic detection logic based 100% on Procedure Code / ID prefix
 export const detectProcedureId = (code?: string | null, recordType?: string | null): string => {
-  const codeStr = (code || '').toUpperCase().trim();
-  const typeStr = (recordType || '').toLowerCase().trim();
+  const codeStr = (code || '').trim();
+  const typeStr = (recordType || '').trim();
 
-  // 1. Direct ID match in code or type
   for (const proc of PROCEDURE_CATALOG) {
-    if (codeStr.includes(proc.id) || typeStr.startsWith(proc.id.toLowerCase())) {
+    if (codeStr.toUpperCase().includes(proc.id) || typeStr.toUpperCase().startsWith(proc.id)) {
       return proc.id;
     }
-  }
-
-  // 2. Prefix match in code
-  if (codeStr) {
-    for (const proc of PROCEDURE_CATALOG) {
-      for (const prefix of proc.prefixes) {
-        if (codeStr.includes(prefix)) {
-          return proc.id;
-        }
+    for (const prefix of proc.prefixes) {
+      if (codeStr.toUpperCase().includes(prefix) || typeStr.toUpperCase().includes(prefix)) {
+        return proc.id;
       }
     }
   }
 
-  // 3. Keyword match in recordType
-  if (typeStr) {
-    if (typeStr.includes('trích đo') || typeStr.includes('đo đạc')) {
-      if (typeStr.includes('tách') || typeStr.includes('hợp')) return '2.5';
-      if (typeStr.includes('cắm mốc')) return '2.4';
-      if (typeStr.includes('số thửa') || typeStr.includes('duyệt đơn')) return '2.3';
-      return '2.2';
-    }
+  if (codeStr.startsWith('1.') || typeStr.startsWith('1.')) return '1.1';
+  if (codeStr.startsWith('2.') || typeStr.startsWith('2.')) return '2.1';
+  if (codeStr.startsWith('3.') || typeStr.startsWith('3.')) return '3.1.1';
 
-    for (const proc of PROCEDURE_CATALOG) {
-      for (const kw of proc.keywords) {
-        if (typeStr.includes(kw)) {
-          return proc.id;
-        }
-      }
-    }
-  }
+  if (codeStr.includes('1.') || typeStr.includes('1.')) return '1.1';
+  if (codeStr.includes('2.') || typeStr.includes('2.')) return '2.1';
+  if (codeStr.includes('3.') || typeStr.includes('3.')) return '3.1.1';
 
   return '3.9.9';
 };
@@ -403,11 +386,28 @@ export const getCanonicalRecordType = (type?: string | null, code?: string | nul
   return type;
 };
 
-// Check if a record type belongs to Archive module (Lưu trữ)
-export const isArchiveRecordType = (type?: string | null): boolean => {
-  if (!type) return false;
-  const short = getShortRecordType(type);
-  if (short === '1.1 Sao lục' || short === '1.2 Công văn') return true;
-  const tLower = type.toLowerCase();
-  return tLower.includes('1.1') || tLower.includes('sao lục') || tLower.includes('1.2') || tLower.includes('công văn') || tLower.includes('cc dl đđ') || tLower.includes('cung cấp dữ liệu');
+// Check if a record type belongs to Archive module (Lưu trữ - Mã 1.x)
+export const isArchiveRecordType = (type?: string | null, code?: string | null): boolean => {
+  const c = (code || '').trim();
+  const t = (type || '').trim();
+  const procId = detectProcedureId(c, t);
+  return c.startsWith('1.') || t.startsWith('1.') || procId.startsWith('1.');
+};
+
+// Check if a record type belongs to Survey module (Đo đạc - Mã 2.x)
+export const isDoDacRecordType = (type?: string | null, code?: string | null): boolean => {
+  const c = (code || '').trim();
+  const t = (type || '').trim();
+  const procId = detectProcedureId(c, t);
+  return c.startsWith('2.') || t.startsWith('2.') || procId.startsWith('2.');
+};
+
+// Check if a record type belongs to Registration module (Đăng ký - Mã 3.x)
+export const isDangKyRecordType = (type?: string | null, code?: string | null): boolean => {
+  const c = (code || '').trim();
+  const t = (type || '').trim();
+  if (c.startsWith('1.') || t.startsWith('1.') || c.startsWith('2.') || t.startsWith('2.')) return false;
+  const procId = detectProcedureId(c, t);
+  if (procId.startsWith('1.') || procId.startsWith('2.')) return false;
+  return c.startsWith('3.') || t.startsWith('3.') || procId.startsWith('3.');
 };

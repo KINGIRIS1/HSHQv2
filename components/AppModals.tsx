@@ -9,6 +9,7 @@ import DangKyRecordModal from './DangKyRecordModal';
 import DangKyDetailModal from './DangKyDetailModal';
 import { saveDangKyRecordApi } from '../services/apiDangKy';
 import { useIsMobile } from '../hooks/useIsMobile';
+import { isArchiveRecordType, isDoDacRecordType, isDangKyRecordType } from '../constants';
 import DeleteConfirmModal from './DeleteConfirmModal';
 import ExportModal from './ExportModal';
 import AddToBatchModal from './AddToBatchModal';
@@ -124,8 +125,29 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
     const targetRecordsForBatch = props.selectedRecordsForBulk.length > 0 ? props.selectedRecordsForBulk : props.filteredRecords;
     const isMobile = useIsMobile();
 
-    const isDangKyEditing = (props.editingRecord as any)?.sourceTable === 'dangky_records';
-    const isDangKyViewing = (props.viewingRecord as any)?.sourceTable === 'dangky_records';
+    const editingRec = props.editingRecord;
+    const viewingRec = props.viewingRecord;
+
+    const isDoDacEdit = editingRec ? ((editingRec.code || '').trim().startsWith('2.') || isDoDacRecordType(editingRec.recordType, editingRec.code)) : false;
+    const isArchiveEdit = editingRec ? ((editingRec.code || '').trim().startsWith('1.') || isArchiveRecordType(editingRec.recordType, editingRec.code) || editingRec.sourceTable === 'luutru_records') : false;
+
+    // Hồ sơ Đo đạc (Mã 2.x) hoặc Lưu trữ (Mã 1.x) TUYỆT ĐỐI KHÔNG mở DangKyRecordModal kể cả khi sourceTable ghi nhầm dangky_records
+    const isDangKyEditing = editingRec ? (
+        (isDangKyRecordType(editingRec.recordType, editingRec.code) || editingRec.sourceTable === 'dangky_records') && 
+        !isDoDacEdit && 
+        !isArchiveEdit &&
+        !(editingRec.code || '').trim().startsWith('2.')
+    ) : false;
+
+    const isDoDacView = viewingRec ? ((viewingRec.code || '').trim().startsWith('2.') || isDoDacRecordType(viewingRec.recordType, viewingRec.code)) : false;
+    const isArchiveView = viewingRec ? ((viewingRec.code || '').trim().startsWith('1.') || isArchiveRecordType(viewingRec.recordType, viewingRec.code) || viewingRec.sourceTable === 'luutru_records') : false;
+
+    const isDangKyViewing = viewingRec ? (
+        (isDangKyRecordType(viewingRec.recordType, viewingRec.code) || viewingRec.sourceTable === 'dangky_records') && 
+        !isDoDacView && 
+        !isArchiveView &&
+        !(viewingRec.code || '').trim().startsWith('2.')
+    ) : false;
 
     return (
         <>

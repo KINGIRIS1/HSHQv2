@@ -218,7 +218,7 @@ export const restoreFullBackupToSupabase = async (backupData: FullBackupData): P
             const chunks = chunkArray(combinedArchive, 200);
             for (const chunk of chunks) {
                 const { error: insErr } = await executeSupabaseOperationWithAutoClean(
-                    (p) => supabase.from('luutru_records').insert(p),
+                    async (p) => await supabase.from('luutru_records').insert(p),
                     chunk
                 );
                 if (insErr) throw insErr;

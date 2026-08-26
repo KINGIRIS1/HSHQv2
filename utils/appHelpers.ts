@@ -576,40 +576,22 @@ export function processAssignmentTimelineCheck(
 // --- HÀM XỬ LÝ VÀ ĐỊNH DẠNG ĐỢT GIAO 1 CỬA ---
 
 export function getDepartmentForRecord(r: RecordFile): string {
-    const type = (r.recordType || '').toLowerCase();
-    const code = (r.code || '').toLowerCase();
+    const code = (r.code || '').trim();
+    const type = (r.recordType || '').trim();
+    const procId = detectProcedureId(code, type);
 
-    // 1. Nhóm Lưu trữ: mã 1.x hoặc chứa từ khóa sao lục, công văn
-    if (
-        code.startsWith('1.') || 
-        type.includes('1.1') || type.includes('1.2') ||
-        type.includes('sao lục') || 
-        type.includes('công văn') || 
-        type.includes('lưu trữ')
-    ) {
+    if (code.startsWith('1.') || type.startsWith('1.') || procId.startsWith('1.')) {
         return 'Tổ Lưu trữ';
     }
-
-    // 2. Nhóm Đo đạc: mã 2.1 đến 2.6 hoặc chứa các từ khóa đo đạc, trích đo, cắm mốc, số thửa, duyệt đơn, trích lục
-    if (
-        code.startsWith('2.') || 
-        type.includes('2.1') || type.includes('2.2') || type.includes('2.3') || type.includes('2.4') || type.includes('2.5') || type.includes('2.6') || 
-        type.includes('đo đạc') || type.includes('đo dạc') || 
-        type.includes('trích đo') || 
-        type.includes('cắm mốc') || 
-        type.includes('số thửa') || 
-        type.includes('duyệt đơn') || 
-        type.includes('trích lục')
-    ) {
+    if (code.startsWith('2.') || type.startsWith('2.') || procId.startsWith('2.')) {
         return 'Tổ Đo đạc';
     }
+    if (code.startsWith('3.') || type.startsWith('3.') || procId.startsWith('3.')) {
+        return 'Tổ Cấp giấy';
+    }
 
-    // 3. Fallback theo returnHandoverDept nếu không khớp ở trên
     if (r.returnHandoverDept) {
-        const d = r.returnHandoverDept.toLowerCase();
-        if (d.includes('lưu trữ') || d.includes('thông tin')) return 'Tổ Lưu trữ';
-        if (d.includes('đo đạc') || d.includes('đo dạc')) return 'Tổ Đo đạc';
-        if (d.includes('cấp giấy') || d.includes('đăng ký')) return 'Tổ Đo đạc';
+        return r.returnHandoverDept;
     }
 
     return 'Tổ Đo đạc';

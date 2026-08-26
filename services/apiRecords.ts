@@ -168,6 +168,10 @@ export const fetchRecords = async (): Promise<RecordFile[]> => {
                 hasMoreLand = false;
             }
         } catch (fetchError: any) {
+            if (fetchError.code === '42P01' || fetchError.message?.includes('does not exist')) {
+                console.warn('Bảng land_records chưa được tạo trên Supabase, bỏ qua bước fetch land_records.');
+                break;
+            }
             if (retryCount < maxRetries && (fetchError.message?.includes('fetch') || !fetchError.code)) {
                 console.warn(`Lỗi fetch land_records, đang thử lại lần ${retryCount + 1}...`);
                 retryCount++;

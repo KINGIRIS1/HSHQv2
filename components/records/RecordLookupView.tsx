@@ -130,22 +130,22 @@ export const RecordLookupView: React.FC<RecordLookupViewProps> = ({
         if (selectedStatusFilter !== 'all') {
             result = result.filter(r => {
                 const st = getDisplayStatus(r);
-                if (selectedStatusFilter === RecordStatus.RECEIVED || selectedStatusFilter === 'Tiếp nhận mới') {
-                    return st === RecordStatus.RECEIVED || st === RecordStatus.ASSIGNED || st === RecordStatus.IN_PROGRESS || st === 'Tiếp nhận mới';
+                if (selectedStatusFilter === RecordStatus.RECEIVED || (selectedStatusFilter as any) === 'Tiếp nhận mới') {
+                    return st === RecordStatus.RECEIVED || st === RecordStatus.ASSIGNED || st === RecordStatus.IN_PROGRESS || (st as any) === 'Tiếp nhận mới';
                 }
-                if (selectedStatusFilter === RecordStatus.HANDOVER || selectedStatusFilter === 'Chờ bàn giao') {
-                    return st === RecordStatus.HANDOVER || st === RecordStatus.SUBMITTED || st === RecordStatus.APPROVED || st === 'Chờ bàn giao';
+                if (selectedStatusFilter === RecordStatus.HANDOVER || (selectedStatusFilter as any) === 'Chờ bàn giao') {
+                    return st === RecordStatus.HANDOVER || (st as any) === 'Chờ bàn giao';
                 }
-                if (selectedStatusFilter === RecordStatus.RETURNED || selectedStatusFilter === 'Đã trả kết quả') {
-                    return st === RecordStatus.RETURNED || st === 'Đã trả kết quả';
+                if (selectedStatusFilter === RecordStatus.RETURNED || (selectedStatusFilter as any) === 'Đã trả kết quả') {
+                    return st === RecordStatus.RETURNED || (st as any) === 'Đã trả kết quả';
                 }
-                if (selectedStatusFilter === RecordStatus.WITHDRAWN || selectedStatusFilter === 'CSD rút HS') {
-                    return st === RecordStatus.WITHDRAWN || st === 'CSD rút HS';
+                if (selectedStatusFilter === RecordStatus.WITHDRAWN || (selectedStatusFilter as any) === 'CSD rút HS') {
+                    return st === RecordStatus.WITHDRAWN || (st as any) === 'CSD rút HS';
                 }
-                if (selectedStatusFilter === RecordStatus.REJECTED || selectedStatusFilter === 'Trả hủy hồ sơ') {
-                    return st === RecordStatus.REJECTED || st === 'Trả hủy hồ sơ';
+                if (selectedStatusFilter === RecordStatus.REJECTED || (selectedStatusFilter as any) === 'Trả hủy hồ sơ') {
+                    return st === RecordStatus.REJECTED || (st as any) === 'Trả hủy hồ sơ';
                 }
-                return st === selectedStatusFilter;
+                return st === (selectedStatusFilter as any);
             });
         }
 
