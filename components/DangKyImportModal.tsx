@@ -283,7 +283,6 @@ export const DangKyImportModal: React.FC<DangKyImportModalProps> = ({ isOpen, on
           const notesRaw = getVal(['GHI CHÚ', 'NỘI DUNG CHI TIẾT', 'GHI CHÚ HỒ SƠ']);
           if (notesRaw !== undefined) record.notes = String(notesRaw).trim();
 
-          record.sourceTable = 'dangky_records';
           record.id = record.id || `dk-${Date.now()}-${i}`;
           record._errors = errors;
           mappedRecords.push(record);

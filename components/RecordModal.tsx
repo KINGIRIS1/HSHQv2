@@ -2,7 +2,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { RecordFile, RecordStatus, Employee, User, UserRole } from '../types';
 import { GROUPS, EXTENDED_RECORD_TYPES, STATUS_LABELS, SELECTABLE_STATUSES, getShortRecordType, getWardLabel, getNormalizedWard, isArchiveRecordType, getCanonicalRecordType, detectProcedureId, RECORD_TYPES_LuuTru, RECORD_TYPES_DoDac } from '../constants';
-import { getDefaultDocsForProcedure } from '../constants/procedures';
 import { X, Save, Lock, User as UserIcon, MapPin, FileText, Calendar, FileCheck, ChevronDown, ChevronUp, XCircle, ClipboardList } from 'lucide-react';
 import { calculateDeadlineHelper, getDepartmentForRecord, extractBatchOnly } from '../utils/appHelpers';
 import { fetchContracts } from '../services/api';
@@ -303,16 +302,6 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
         alert("Vui lòng chọn Loại hồ sơ trước khi lưu.");
         return;
     }
-
-    if (!finalData.ward || !finalData.ward.trim()) {
-        alert("Vui lòng chọn Xã / Phường trước khi lưu.");
-        return;
-    }
-
-    // Đảm bảo gán Cán bộ tiếp nhận nếu là thêm mới từ module chuyên môn hoặc chưa có
-    if (!initialData || !finalData.receivedBy) {
-        finalData.receivedBy = finalData.receivedBy || currentUser.employeeId || currentUser.username || currentUser.name;
-    }
     
     // Logic tự động set ngày khi trạng thái thay đổi hoặc xóa ngày khi quay lui
     // Chỉ áp dụng logic này nếu trạng thái khác với ban đầu (hoặc là tạo mới)
@@ -534,6 +523,13 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
   const handleChange = (field: keyof RecordFile, value: any) => {
     setFormData(prev => {
       const updated = { ...prev, [field]: value };
+      if (field === 'assignedTo' && value) {
+        const emp = employees.find(e => e.id === value);
+        const firstWard = emp?.managedWards?.[0];
+        if (firstWard) {
+          updated.ward = firstWard;
+        }
+      }
       if (updated.ward) {
         const norm = getNormalizedWard(updated.ward);
         if (GROUPS.includes(norm)) {
@@ -547,14 +543,6 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
         
         const procId = detectProcedureId(rCode, rType);
         updated.procedureId = procId;
-
-        if (field === 'recordType' && !initialData) {
-          const defDocs = getDefaultDocsForProcedure(rType, rCode);
-          if (defDocs.length > 0) {
-            setAttachedDocs(defDocs);
-            updated.otherDocs = JSON.stringify(defDocs);
-          }
-        }
 
         if (rType && rDate) {
           updated.deadline = calculateDeadlineHelper(rType, String(rDate).split('T')[0], holidays || [], rCode, procId);
@@ -817,20 +805,14 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
 
                             {/* THÔNG TIN NGƯỜI ĐƯỢC ỦY QUYỀN (NẾU CÓ) */}
                             <div className="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden">
-                                <div 
-                                    onClick={() => setIsAuthOpen(!isAuthOpen)}
-                                    className="p-3.5 flex items-center justify-between gap-4 border-b border-slate-100 bg-slate-50/50 cursor-pointer select-none hover:bg-slate-100/70 transition-colors"
-                                >
-                                    <h3 className="text-xs font-bold text-slate-700 uppercase flex items-center gap-2 cursor-pointer">
+                                <div className="p-3.5 flex items-center justify-between gap-4 border-b border-slate-100 bg-slate-50/50">
+                                    <h3 className="text-xs font-bold text-slate-700 uppercase flex items-center gap-2">
                                         <UserIcon size={14} className="text-indigo-600" />
                                         Thông tin người được ủy quyền (nếu có)
                                     </h3>
                                     <button
                                         type="button"
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            setIsAuthOpen(!isAuthOpen);
-                                        }}
+                                        onClick={() => setIsAuthOpen(!isAuthOpen)}
                                         className="flex items-center gap-1 text-[10px] font-bold uppercase rounded-lg border border-slate-200 hover:bg-white transition-all px-2.5 py-1 text-slate-600 bg-white shadow-2xs cursor-pointer"
                                     >
                                         {isAuthOpen ? '▲ ẨN NHẬP LIỆU' : '▼ HIỆN NHẬP LIỆU'}

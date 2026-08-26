@@ -1,6 +1,6 @@
 
 import { RecordFile, RecordStatus, Employee, DangKyRecord } from '../types';
-import { detectProcedureId, getProcedureById, DANG_KY_DEADLINE_MAP, isDangKyRecordType } from '../constants/procedures';
+import { detectProcedureId, getProcedureById, DANG_KY_DEADLINE_MAP } from '../constants/procedures';
 
 // --- HÀM TIỆN ÍCH XỬ LÝ CHUỖI TIẾNG VIỆT ---
 export function removeVietnameseTones(str: string): string {
@@ -289,12 +289,10 @@ export const calculateDeadlineHelper = (type: string, receivedDateStr: string, h
         } else if (lowerType.includes('cấp đổi') || lowerType.includes('3.2.1')) {
             daysToAdd = 10;
         } else if (lowerType.includes('cấp lại') || lowerType.includes('3.3.1')) {
-            daysToAdd = 15;
+            daysToAdd = 10;
         } else if (lowerType.includes('chuyển mục đích') || lowerType.includes('3.6.1')) {
             daysToAdd = 7;
-        } else if (lowerType.includes('gia hạn') || lowerType.includes('3.5.1')) {
-            daysToAdd = 12;
-        } else if (lowerType.includes('đính chính') || lowerType.includes('3.7.1') || lowerType.includes('3.7.2') || lowerType.includes('thay đổi thông tin')) {
+        } else if (lowerType.includes('gia hạn') || lowerType.includes('3.5.1') || lowerType.includes('đính chính') || lowerType.includes('3.7.1') || lowerType.includes('3.7.2') || lowerType.includes('thay đổi thông tin')) {
             daysToAdd = 7;
         } else if (lowerType.includes('xóa thế chấp') || lowerType.includes('xóa đk gdbd') || lowerType.includes('xóa gdbd') || lowerType.includes('3.8.2')) {
             daysToAdd = 1;
@@ -579,52 +577,39 @@ export function processAssignmentTimelineCheck(
 
 export function getDepartmentForRecord(r: RecordFile): string {
     const type = (r.recordType || '').toLowerCase();
-    const code = (r.code || '').trim().toLowerCase();
+    const code = (r.code || '').toLowerCase();
 
-    // Strict Prefix Classification:
-    // 1.x -> Lưu trữ
-    if (code.startsWith('1.') || type.includes('1.1') || type.includes('1.2') || type.includes('sao lục') || type.includes('công văn') || type.includes('lưu trữ')) {
+    // 1. Nhóm Lưu trữ: mã 1.x hoặc chứa từ khóa sao lục, công văn
+    if (
+        code.startsWith('1.') || 
+        type.includes('1.1') || type.includes('1.2') ||
+        type.includes('sao lục') || 
+        type.includes('công văn') || 
+        type.includes('lưu trữ')
+    ) {
         return 'Tổ Lưu trữ';
     }
 
-    // 2.x -> Đo đạc (ngoại trừ các ngoại lệ đặc biệt nếu có)
-    if (code.startsWith('2.') || type.includes('2.1') || type.includes('2.2') || type.includes('2.3') || type.includes('2.4') || type.includes('2.5') || type.includes('2.6')) {
-        return 'Tổ Đo đạc';
-    }
-
-    // 3.x -> Đăng ký (ngoại trừ 3.2.1 nếu là đo đạc cấp đổi không thuế)
-    if (code === '3.2.1') {
-        return 'Tổ Đo đạc';
-    }
-
-    if (code.startsWith('3.') || type.includes('3.1') || type.includes('3.3') || type.includes('3.4') || type.includes('3.5') || type.includes('3.6') || type.includes('3.7') || type.includes('3.8') || type.includes('3.9')) {
-        return 'Tổ Đăng ký';
-    }
-
-    // Fallback keywords if code prefix is missing
+    // 2. Nhóm Đo đạc: mã 2.1 đến 2.6 hoặc chứa các từ khóa đo đạc, trích đo, cắm mốc, số thửa, duyệt đơn, trích lục
     if (
+        code.startsWith('2.') || 
+        type.includes('2.1') || type.includes('2.2') || type.includes('2.3') || type.includes('2.4') || type.includes('2.5') || type.includes('2.6') || 
         type.includes('đo đạc') || type.includes('đo dạc') || 
-        type.includes('trích đo') || type.includes('cắm mốc') || 
-        type.includes('số thửa') || type.includes('duyệt đơn') || 
-        type.includes('trích lục') || type.includes('chỉnh lý')
+        type.includes('trích đo') || 
+        type.includes('cắm mốc') || 
+        type.includes('số thửa') || 
+        type.includes('duyệt đơn') || 
+        type.includes('trích lục')
     ) {
         return 'Tổ Đo đạc';
     }
 
-    if (
-        type.includes('đăng ký') || type.includes('cấp giấy') || 
-        type.includes('chuyển nhượng') || type.includes('tặng cho') || 
-        type.includes('thừa kế') || type.includes('thế chấp')
-    ) {
-        return 'Tổ Đăng ký';
-    }
-
-    // Fallback theo returnHandoverDept nếu không khớp ở trên
+    // 3. Fallback theo returnHandoverDept nếu không khớp ở trên
     if (r.returnHandoverDept) {
         const d = r.returnHandoverDept.toLowerCase();
         if (d.includes('lưu trữ') || d.includes('thông tin')) return 'Tổ Lưu trữ';
-        if (d.includes('cấp giấy') || d.includes('đăng ký') || d.includes('chuyển nhượng')) return 'Tổ Đăng ký';
         if (d.includes('đo đạc') || d.includes('đo dạc')) return 'Tổ Đo đạc';
+        if (d.includes('cấp giấy') || d.includes('đăng ký')) return 'Tổ Đo đạc';
     }
 
     return 'Tổ Đo đạc';
@@ -1051,63 +1036,6 @@ export function calculateEmployeeWorkload(
 
     return { inProgressPlots, completedPlots };
 }
-
-// --- HELPER PHÂN TÍCH GIẤY TỜ KÈM THEO CHUẨN NGUYÊN (TRÁNH HIỂN THỊ CHUỖI JSON THÔ) ---
-export const parseAttachedDocsHelper = (
-    attachedDocs?: any,
-    otherDocs?: any,
-    defaultDocs?: any
-): { id: string; name: string; type: string }[] => {
-    const tryParseJson = (val: any): any => {
-        if (!val) return null;
-        if (Array.isArray(val)) return val;
-        if (typeof val === 'object') return [val];
-        if (typeof val === 'string') {
-            const trimmed = val.trim();
-            if ((trimmed.startsWith('[') && trimmed.endsWith(']')) || (trimmed.startsWith('{') && trimmed.endsWith('}'))) {
-                try { return JSON.parse(trimmed); } catch { return null; }
-            }
-        }
-        return null;
-    };
-
-    if (Array.isArray(attachedDocs) && attachedDocs.length > 0) {
-        return attachedDocs.map((item, idx) => {
-            if (typeof item === 'string') {
-                const parsed = tryParseJson(item);
-                if (parsed) {
-                    const first = Array.isArray(parsed) ? parsed[0] : parsed;
-                    return { id: first?.id || String(idx + 1), name: first?.name || first?.docName || item, type: first?.type || first?.docType || 'Bản chính' };
-                }
-                return { id: String(idx + 1), name: item, type: 'Bản chính' };
-            }
-            return { id: item.id || String(idx + 1), name: item.name || item.docName || '', type: item.type || item.docType || 'Bản chính' };
-        }).filter(d => d.name && d.name.trim() !== '');
-    }
-
-    if (typeof attachedDocs === 'string' && attachedDocs.trim()) {
-        const parsed = tryParseJson(attachedDocs);
-        if (parsed) return parseAttachedDocsHelper(parsed);
-    }
-
-    if (otherDocs) {
-        const parsed = tryParseJson(otherDocs);
-        if (parsed) return parseAttachedDocsHelper(parsed);
-        if (typeof otherDocs === 'string' && otherDocs.trim()) {
-            return otherDocs.split(/[\n;]/).map((s, idx) => ({
-                id: String(idx + 1),
-                name: s.trim(),
-                type: 'Bản chính'
-            })).filter(d => d.name !== '');
-        }
-    }
-
-    if (defaultDocs) {
-        return parseAttachedDocsHelper(defaultDocs);
-    }
-
-    return [];
-};
 
 
 

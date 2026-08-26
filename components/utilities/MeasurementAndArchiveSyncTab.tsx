@@ -1,7 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { ShieldAlert, CheckCircle2, Wrench, Download, Upload, RefreshCw, AlertTriangle, Database, Users, Calendar, FileText, Check } from 'lucide-react';
 import { RecordFile, Employee, NotifyFunction, RecordStatus } from '../../types';
-import { isDangKyRecordType } from '../../constants/procedures';
 
 interface MeasurementAndArchiveSyncTabProps {
     records: RecordFile[];
@@ -27,10 +26,9 @@ export const MeasurementAndArchiveSyncTab: React.FC<MeasurementAndArchiveSyncTab
     const [selectedMissingIds, setSelectedMissingIds] = useState<Set<string>>(new Set());
     const [lastResultSummary, setLastResultSummary] = useState<{ updatedCount: number; timestamp: string } | null>(null);
 
-    // Filter measurement records (dept contains 'đo đạc' or 'kỹ thuật' or has measurement data) - excluding dang ky records
+    // Filter measurement records (dept contains 'đo đạc' or 'kỹ thuật' or has measurement data)
     const measurementRecords = useMemo(() => {
         return records.filter(r => {
-            if (isDangKyRecordType(r.recordType, r.code)) return false;
             const dept = ((r as any).department || '').toLowerCase();
             return dept.includes('đo đạc') || dept.includes('kỹ thuật') || dept.measurementNumber || r.needsMapCorrection;
         });

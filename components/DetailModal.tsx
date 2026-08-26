@@ -1063,11 +1063,10 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                                 icon={UserIcon}
                                 colorClass={{text: 'text-emerald-700', border: 'border-emerald-600', bg: 'bg-emerald-600'}}
                                 subText={record.receivedBy ? (() => {
-                                    const receiver = users.find(u => u.employeeId === record.receivedBy || u.username === record.receivedBy || u.name === record.receivedBy);
-                                    const emp = employees.find(e => e.id === record.receivedBy || e.name === record.receivedBy || (receiver && e.id === receiver.employeeId));
-                                    const displayName = receiver?.name || emp?.name || record.receivedBy;
-                                    const displayPos = emp?.position || (receiver?.role ? 'Cán bộ' : undefined);
-                                    return displayPos ? `${displayName} (${displayPos})` : displayName;
+                                    const receiver = users.find(u => u.employeeId === record.receivedBy);
+                                    if (!receiver) return undefined;
+                                    const emp = employees.find(e => e.id === receiver.employeeId);
+                                    return `${receiver.name} (${emp?.position || 'Nhân viên'})`;
                                 })() : undefined}
                             />
 

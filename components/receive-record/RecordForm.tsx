@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { RecordFile, Holiday, RecordStatus, User, Employee, DangKyParty } from '../../types';
 import { RECORD_TYPES, EXTENDED_RECORD_TYPES, getShortRecordType, getWardLabel } from '../../constants';
-import { detectProcedureId, getDefaultDocsForProcedure, isDangKyRecordType, isArchiveRecordType } from '../../constants/procedures';
+import { detectProcedureId } from '../../constants/procedures';
 import { addActivityLog } from '../../services/activityLogService';
 import { AutoResizeTextarea } from '../AutoResizeTextarea';
 import { Save, User as UserIcon, Calendar, MapPin, FileCheck, Loader2, Printer, RotateCcw, XCircle, CheckCircle, AlertCircle, X, Phone, FileText, BookOpen, Clock, Hash, Map, ChevronDown, ChevronUp, Users, UserPlus, Plus, Shield } from 'lucide-react';
@@ -93,7 +93,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
 
   const [formData, setFormData] = useState<Partial<RecordFile>>({
     code: '', customerName: '', phoneNumber: '', cccd: '', customerAddress: '', authorizedBy: '', authDocType: '', otherDocs: '', content: '',
-    receivedDate: todayStr, deadline: '', ward: '', landPlot: '', mapSheet: '', area: 0,
+    receivedDate: todayStr, deadline: '', ward: processingWard, landPlot: '', mapSheet: '', area: 0,
     address: '', recordType: '', status: RecordStatus.RECEIVED,
     issueNumber: '', entryNumber: '', issueDate: '', residentialArea: 0,
     owners: [{ name: '', cccd: '', address: '', phone: '' }],
@@ -154,24 +154,30 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
   }, [notification]);
 
   // Kiểm tra loại hồ sơ 3.x.x Đăng ký
-  const isDangKy = isDangKyRecordType(formData.recordType, formData.code);
-  const isArchive = isArchiveRecordType(formData.recordType, formData.code);
+  const isDangKy = formData.recordType ? (
+      formData.recordType.startsWith('3.') || 
+      formData.recordType.toLowerCase().includes('chuyển nhượng') || 
+      formData.recordType.toLowerCase().includes('tặng cho') || 
+      formData.recordType.toLowerCase().includes('thừa kế') || 
+      formData.recordType.toLowerCase().includes('cấp đổi') || 
+      formData.recordType.toLowerCase().includes('cấp lại') ||
+      formData.recordType.toLowerCase().includes('đăng ký')
+  ) : false;
 
   useEffect(() => {
     if (!initialData) {
-        const targetWardForCode = formData.ward || processingWard;
         if (!isDangKy) {
-            const newCode = generateCode(targetWardForCode, formData.receivedDate || '');
+            const newCode = generateCode(processingWard, formData.receivedDate || '');
             setFormData(prev => {
                 if (prev.code === newCode) return prev;
                 return { ...prev, code: newCode };
             });
         } else if (!formData.code) {
-            const newCode = generateCode(targetWardForCode, formData.receivedDate || '');
+            const newCode = generateCode(processingWard, formData.receivedDate || '');
             setFormData(prev => ({ ...prev, code: newCode }));
         }
     }
-  }, [formData.ward, processingWard, formData.receivedDate, records, initialData, isDangKy]);
+  }, [processingWard, formData.receivedDate, records, initialData, isDangKy]);
 
   const handleChange = (field: keyof RecordFile, value: any) => {
     setFormData(prev => {
@@ -194,17 +200,23 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
                 newData.price = null;
             }
 
-            // Auto-populate default documents according to procedure definition
-            const procDocs = getDefaultDocsForProcedure(value, prev.code);
-            if (procDocs.length > 0) {
-                setAttachedDocs(procDocs);
-                newData.otherDocs = JSON.stringify(procDocs);
-            } else {
-                setAttachedDocs([]);
-                newData.otherDocs = '';
-            }
+            // Auto-populate default documents for "1.1 Sao lục hồ sơ" and "Hồ sơ đo đạc" (starts with 2.)
+            if (value === '1.1 Sao lục hồ sơ' || value === '1.1 Sao lục' || value === '1.1 Cung cấp dữ liệu đất đai' || value === '1.1 CC DL ĐĐ' || value.startsWith('2.')) {
+                const defaultDocs: AttachedDocItem[] = [
+                    { id: '1', name: 'Phiếu yêu cầu lập hợp đồng đo đạc dịch vụ, Cắm mốc, trích lục, Cung cấp thông tin', type: 'Bản chính' },
+                    { id: '2', name: 'Giấy chứng nhận đã cấp', type: 'Bản sao' }
+                ];
+                setAttachedDocs(defaultDocs);
+                newData.otherDocs = JSON.stringify(defaultDocs);
+            } else if (value.startsWith('3.')) {
+                // Đăng ký hồ sơ - mặc định giấy tờ
+                const defaultDkDocs: AttachedDocItem[] = [
+                    { id: '1', name: 'Giấy chứng nhận QSD đất', type: 'Bản chính' },
+                    { id: '2', name: 'Đơn đăng ký biến động', type: 'Bản chính' }
+                ];
+                setAttachedDocs(defaultDkDocs);
+                newData.otherDocs = JSON.stringify(defaultDkDocs);
 
-            if (value.startsWith('3.')) {
                 // Nếu là thủ tục đơn phương / không có bên nhận:
                 if (isNoTransfereeProcedure(value, prev.code)) {
                     newData.applicantIsOwner = false;
@@ -215,6 +227,9 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
                     if (firstOwner.phone) newData.applicantPhone = firstOwner.phone;
                     if (firstOwner.address) newData.applicantAddress = firstOwner.address;
                 }
+            } else {
+                setAttachedDocs([]);
+                newData.otherDocs = '';
             }
         }
         return newData;
@@ -457,8 +472,8 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
         }
     }
 
-    if (!formData.code || (!effectiveCustomerName && !formData.applicantName) || (isDeadlineRequired && !formData.deadline) || !formData.recordType || (!isCongVan && !formData.ward)) { 
-        setNotification({ type: 'error', message: "Vui lòng điền các trường bắt buộc (*), chọn Loại hồ sơ và Xã/Phường." });
+    if (!formData.code || (!effectiveCustomerName && !formData.applicantName) || (isDeadlineRequired && !formData.deadline) || !formData.recordType) { 
+        setNotification({ type: 'error', message: "Vui lòng điền các trường bắt buộc (*) và chọn Loại hồ sơ." });
         return; 
     }
     setLoading(true);
@@ -480,8 +495,8 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
         authDocType: `${authCccd}|${authAddress}|${authPhone}`,
         id: formData.id || Math.random().toString(36).substr(2, 9), 
         status: formData.status || RecordStatus.RECEIVED,
-        receivedBy: formData.receivedBy || currentUser.employeeId || currentUser.fullName || currentUser.name || currentUser.username,
-        sourceTable: isDangKy ? 'dangky_records' : (isArchive ? 'luutru_records' : (formData.sourceTable || 'land_records'))
+        receivedBy: formData.receivedBy || currentUser.employeeId,
+        sourceTable: isDangKy ? 'dangky_records' : (formData.sourceTable || 'land_records')
     } as RecordFile;
     const savedRecord = await onSave(recordToSave);
     setLoading(false);
@@ -514,7 +529,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
           code: '', customerName: '', phoneNumber: '', cccd: '', customerAddress: '', 
           authorizedBy: '', authDocType: '', otherDocs: '', content: '', 
           receivedDate: todayStrLocal, deadline: '', 
-          ward: '', landPlot: '', mapSheet: '', area: 0, address: '', 
+          ward: processingWard, landPlot: '', mapSheet: '', area: 0, address: '', 
           recordType: '', status: RecordStatus.RECEIVED,
           issueNumber: '', entryNumber: '', issueDate: '', residentialArea: 0,
           owners: [{ name: '', cccd: '', address: '', phone: '' }],
@@ -1057,20 +1072,14 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
 
                 {/* 6. THÔNG TIN NGƯỜI ĐƯỢC ỦY QUYỀN (NẾU CÓ - TOÀN KHUNG) */}
                 <div className="bg-white rounded-xl border border-slate-200 shadow-xs">
-                    <div 
-                        onClick={() => setIsAuthOpen(!isAuthOpen)}
-                        className="p-3.5 sm:p-4 flex items-center justify-between gap-2 bg-white rounded-xl cursor-pointer select-none hover:bg-slate-50/80 transition-colors"
-                    >
-                        <h3 className="text-xs sm:text-sm font-bold text-slate-800 uppercase flex items-center gap-1.5 cursor-pointer">
+                    <div className="p-3.5 sm:p-4 flex items-center justify-between gap-2 bg-white rounded-xl">
+                        <h3 className="text-xs sm:text-sm font-bold text-slate-800 uppercase flex items-center gap-1.5">
                             <span className="p-1 bg-indigo-100 text-indigo-600 rounded-md"><Shield size={14} /></span>
                             Người ủy quyền (nếu có)
                         </h3>
                         <button
                             type="button"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                setIsAuthOpen(!isAuthOpen);
-                            }}
+                            onClick={() => setIsAuthOpen(!isAuthOpen)}
                             className="text-xs font-bold uppercase rounded-md border border-slate-200 hover:bg-slate-50 px-2.5 py-1 text-slate-600 bg-white shadow-xs cursor-pointer"
                         >
                             {isAuthOpen ? '▲ ẨN' : '▼ HIỆN'}
@@ -1368,20 +1377,14 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
 
                 {/* 5. THÔNG TIN NGƯỜI ĐƯỢC ỦY QUYỀN (NẾU CÓ - TOÀN KHUNG) */}
                 <div className="bg-white rounded-xl border border-slate-200 shadow-xs">
-                    <div 
-                        onClick={() => setIsAuthOpen(!isAuthOpen)}
-                        className="p-3.5 sm:p-4 flex items-center justify-between gap-2 bg-white rounded-xl cursor-pointer select-none hover:bg-slate-50/80 transition-colors"
-                    >
-                        <h3 className="text-xs sm:text-sm font-bold text-slate-800 uppercase flex items-center gap-1.5 cursor-pointer">
+                    <div className="p-3.5 sm:p-4 flex items-center justify-between gap-2 bg-white rounded-xl">
+                        <h3 className="text-xs sm:text-sm font-bold text-slate-800 uppercase flex items-center gap-1.5">
                             <span className="p-1 bg-indigo-100 text-indigo-600 rounded-md"><Shield size={14} /></span>
                             Người ủy quyền (nếu có)
                         </h3>
                         <button
                             type="button"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                setIsAuthOpen(!isAuthOpen);
-                            }}
+                            onClick={() => setIsAuthOpen(!isAuthOpen)}
                             className="text-xs font-bold uppercase rounded-md border border-slate-200 hover:bg-slate-50 px-2.5 py-1 text-slate-600 bg-white shadow-xs cursor-pointer"
                         >
                             {isAuthOpen ? '▲ ẨN' : '▼ HIỆN'}
