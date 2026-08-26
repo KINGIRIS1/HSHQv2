@@ -76,44 +76,78 @@ export const MOCK_DANGKY_RECORDS: DangKyRecord[] = [
   }
 ];
 
+// Infer actual active status from dates/logs if rawStatus is generic or empty
+export const resolveActualDangKyStatus = (item: any): string => {
+  if (!item) return 'Tiếp nhận mới';
+  
+  // Return early if specific Vietnamese status is already explicit
+  const raw = (item.status || '').trim();
+  const explicitStatuses = [
+    'Thẩm định', 'Phiếu chuyển thuế', 'Chờ Thuế KV7', 'Chờ giấy nộp tiền',
+    'Chờ In GCN', 'Chờ kiểm tra', 'Chờ ký duyệt', 'Chờ bàn giao',
+    'Đã giao 1 cửa', 'Đã trả kết quả', 'Chờ bổ sung', 'CSD rút HS', 'Trả hủy hồ sơ'
+  ];
+  if (explicitStatuses.includes(raw)) return raw;
+
+  // Deduce backwards from latest completion stages:
+  if (item.resultReturnedDate) return 'Đã trả kết quả';
+  if (item.deliveryDate) return 'Đã giao 1 cửa';
+  if (item.exportDate || item.exportBatch) return 'Chờ bàn giao';
+  if (item.approvalDate || item.submissionDate || item.submittedTo) return 'Chờ ký duyệt';
+  if (item.pendingCheckDate || item.checkedBy) return 'Chờ kiểm tra';
+  if (item.printDate || item.printStaff) return 'Chờ In GCN';
+  if (item.taxNoticeDate || item.taxPaymentReceiptDate || item.taxNoticeStaff) return 'Chờ giấy nộp tiền';
+  if (item.taxKV7TransferDate || item.taxKV7Staff) return 'Chờ Thuế KV7';
+  if (item.taxFormDate || item.taxFormStaff) return 'Phiếu chuyển thuế';
+  if (item.appraisalDate || item.appraisalStaff) return 'Thẩm định';
+
+  if (Array.isArray(item.statusLogs) && item.statusLogs.length > 0) {
+    const lastLog = item.statusLogs[item.statusLogs.length - 1];
+    const logSt = lastLog?.newStatus || lastLog?.status || lastLog?.step;
+    if (logSt && explicitStatuses.includes(logSt)) return logSt;
+  }
+
+  return raw || 'Tiếp nhận mới';
+};
+
 // Normalize raw status string to DangKyStatusType in Vietnamese
-export const normalizeDangKyStatus = (rawStatus?: string): DangKyRecord['status'] => {
-  if (!rawStatus) return 'Tiếp nhận mới';
-  const s = String(rawStatus).trim();
+export const normalizeDangKyStatus = (rawStatus?: string, item?: any): DangKyRecord['status'] => {
+  let s = String(rawStatus || '').trim();
+  if (item && (!s || s === 'IN_PROGRESS' || s === 'ASSIGNED' || s === 'RECEIVED' || s === 'processing' || s === 'Đang thực hiện' || s === 'Đang xử lý')) {
+    s = resolveActualDangKyStatus(item);
+  }
+  if (!s) return 'Tiếp nhận mới';
   const lower = s.toLowerCase();
 
-  if (lower.includes('tiếp nhận') || lower.includes('tiep_nhan') || lower === 'new' || lower === 'received' || lower === 'tiep_nhan_moi') {
-    return 'Tiếp nhận mới';
-  }
-  if (lower.includes('thẩm định') || lower.includes('tham_dinh') || lower === 'appraisal') {
-    return 'Thẩm định';
-  }
-  if (lower.includes('chuyển thuế') || lower.includes('phieu_chuyen') || lower === 'tax_transfer') {
-    return 'Phiếu chuyển thuế';
-  }
-  if (lower.includes('thuế kv7') || lower.includes('thue_kv7') || lower === 'tax_kv7') {
-    return 'Chờ Thuế KV7';
-  }
-  if (lower.includes('nộp tiền') || lower.includes('thông báo thuế') || lower.includes('gnt') || lower === 'tax_payment') {
-    return 'Chờ giấy nộp tiền';
-  }
-  if (lower.includes('in gcn') || lower.includes('in_gcn') || lower === 'printing') {
-    return 'Chờ In GCN';
-  }
-  if (lower.includes('kiểm tra') || lower.includes('kiem_tra') || lower === 'checking') {
-    return 'Chờ kiểm tra';
-  }
-  if (lower.includes('ký duyệt') || lower.includes('trình ký') || lower.includes('trinh_ky') || lower === 'submitted') {
-    return 'Chờ ký duyệt';
-  }
-  if (lower.includes('bàn giao') || lower.includes('cho_ban_giao') || lower === 'handover') {
-    return 'Chờ bàn giao';
+  if (lower.includes('trả kết quả') || lower.includes('đã trả') || lower.includes('da_tra_kq') || lower === 'returned' || lower === 'completed' || lower === 'done') {
+    return 'Đã trả kết quả';
   }
   if (lower.includes('giao 1 cửa') || lower.includes('1 cửa') || lower.includes('giao_1_cua') || lower === 'one_door') {
     return 'Đã giao 1 cửa';
   }
-  if (lower.includes('trả kết quả') || lower.includes('đã trả') || lower.includes('da_tra_kq') || lower === 'returned' || lower === 'completed' || lower === 'done') {
-    return 'Đã trả kết quả';
+  if (lower.includes('bàn giao') || lower.includes('cho_ban_giao') || lower === 'handover') {
+    return 'Chờ bàn giao';
+  }
+  if (lower.includes('ký duyệt') || lower.includes('trình ký') || lower.includes('trinh_ky') || lower === 'submitted') {
+    return 'Chờ ký duyệt';
+  }
+  if (lower.includes('kiểm tra') || lower.includes('kiem_tra') || lower === 'checking') {
+    return 'Chờ kiểm tra';
+  }
+  if (lower.includes('in gcn') || lower.includes('in_gcn') || lower === 'printing') {
+    return 'Chờ In GCN';
+  }
+  if (lower.includes('nộp tiền') || lower.includes('thông báo thuế') || lower.includes('gnt') || lower === 'tax_payment') {
+    return 'Chờ giấy nộp tiền';
+  }
+  if (lower.includes('thuế kv7') || lower.includes('thue_kv7') || lower === 'tax_kv7') {
+    return 'Chờ Thuế KV7';
+  }
+  if (lower.includes('chuyển thuế') || lower.includes('phieu_chuyen') || lower === 'tax_transfer') {
+    return 'Phiếu chuyển thuế';
+  }
+  if (lower.includes('thẩm định') || lower.includes('tham_dinh') || lower === 'appraisal') {
+    return 'Thẩm định';
   }
   if (lower.includes('bổ sung') || lower.includes('bo_sung') || lower === 'pending') {
     return 'Chờ bổ sung';
@@ -123,6 +157,9 @@ export const normalizeDangKyStatus = (rawStatus?: string): DangKyRecord['status'
   }
   if (lower.includes('hủy') || lower.includes('tra_huy') || lower === 'cancelled' || lower === 'rejected') {
     return 'Trả hủy hồ sơ';
+  }
+  if (lower.includes('tiếp nhận') || lower.includes('tiep_nhan') || lower === 'new' || lower === 'received' || lower === 'tiep_nhan_moi') {
+    return 'Tiếp nhận mới';
   }
 
   return 'Tiếp nhận mới';
@@ -190,7 +227,7 @@ export const mapDangKyFromDb = (item: any): DangKyRecord => {
     feeAmount: item.feeAmount ?? item.fee_amount ?? 0,
     price: item.price ?? null,
     returnedPrice: item.returnedPrice ?? item.returned_price ?? null,
-    status: normalizeDangKyStatus(item.status),
+    status: normalizeDangKyStatus(item.status, item),
     statusLogs: Array.isArray(item.statusLogs) ? item.statusLogs : (Array.isArray(item.status_logs) ? item.status_logs : []),
     notes: item.notes || '',
     personalNotes: item.personalNotes || item.personal_notes || '',

@@ -70,16 +70,30 @@ const RecordRow: React.FC<RecordRowProps> = ({
   // LOGIC MỚI: Tự động xác định trạng thái hiển thị
   // Nếu có thông tin xuất (Batch/Date) và chưa hoàn thành (Trả/Rút/Từ chối), coi như là Đã giao 1 cửa
   const getDisplayStatus = (r: RecordFile) => {
-      if (r.status) {
-          return r.status;
+      const raw = (r.status || '').trim();
+      const genericStatuses = [RecordStatus.RECEIVED, RecordStatus.ASSIGNED, RecordStatus.IN_PROGRESS, 'Tiếp nhận mới', 'Đang thực hiện', 'Đang xử lý'];
+      if (raw && !genericStatuses.includes(raw as any)) {
+          return raw;
       }
-      if (r.resultReturnedDate) {
-          return RecordStatus.RETURNED;
-      }
-      if ((r.exportBatch || r.exportDate) && r.status !== RecordStatus.WITHDRAWN && r.status !== RecordStatus.RETURNED && r.status !== RecordStatus.REJECTED) {
+      if (r.resultReturnedDate) return RecordStatus.RETURNED;
+      if ((r.exportBatch || r.exportDate) && raw !== RecordStatus.WITHDRAWN && raw !== RecordStatus.RETURNED && raw !== RecordStatus.REJECTED) {
           return RecordStatus.HANDOVER;
       }
-      return RecordStatus.RECEIVED;
+      if (r.approvalDate || r.submissionDate || (r as any).submittedTo) return RecordStatus.SIGNED;
+      if (r.pendingCheckDate || r.checkedBy) return RecordStatus.PENDING_CHECK;
+      if ((r as any).printDate || (r as any).printStaff) return 'Chờ In GCN';
+      if ((r as any).taxNoticeDate || (r as any).taxPaymentReceiptDate) return 'Chờ giấy nộp tiền';
+      if ((r as any).taxKV7TransferDate) return 'Chờ Thuế KV7';
+      if ((r as any).taxFormDate) return 'Phiếu chuyển thuế';
+      if ((r as any).appraisalDate) return 'Thẩm định';
+
+      if (Array.isArray(r.statusLogs) && r.statusLogs.length > 0) {
+          const lastLog = r.statusLogs[r.statusLogs.length - 1];
+          const logSt = lastLog?.newStatus || (lastLog as any)?.status || (lastLog as any)?.step;
+          if (logSt && !genericStatuses.includes(logSt)) return logSt;
+      }
+
+      return raw || RecordStatus.RECEIVED;
   };
   
   const displayStatus = getDisplayStatus(record);

@@ -366,6 +366,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
 
   const isPendingRecord = (r: RecordFile) => {
     if (isFinishedRecord(r) || isReviewRecord(r) || isPendingCheckRecord(r)) return false;
+    if (r.pendingCheckDate || r.checkedBy || r.submissionDate || r.approvalDate || (r as any).deliveryDate || r.exportDate || r.resultReturnedDate) return false;
     return (
       r.status === RecordStatus.ASSIGNED ||
       r.status === RecordStatus.IN_PROGRESS ||
