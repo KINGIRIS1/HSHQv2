@@ -836,16 +836,6 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
             }
         }
 
-        // RÀNG BUỘC 2: Đối với hồ sơ chuyển sang bước Chờ kiểm tra -> Luôn yêu cầu nhập Số seri GCN trước
-        if ((nextStatus as string) === 'Chờ kiểm tra' || ((normStatus as string) === 'Chờ In GCN' && (nextStatus as string) === 'Chờ kiểm tra')) {
-            const hasCertNumber = (r.issueNumber && r.issueNumber.trim() !== '') || ((r as any).certificateNumber && (r as any).certificateNumber.trim() !== '');
-            if (!hasCertNumber) {
-                alert(`⚠️ YÊU CẦU NGHIỆP VỤ:\nHồ sơ [${r.code}] chưa có "Số seri GCN" (Số phát hành GCN).\nVui lòng nhập Số seri GCN trước khi trình kiểm tra!`);
-                handleOpenEdit(r);
-                return;
-            }
-        }
-
         setSelectedIds(new Set([r.id]));
 
         if (normStatus === 'Phiếu chuyển thuế' || normStatus === 'Chờ Thuế KV7') {
@@ -1095,7 +1085,7 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
     };
 
     // Confirm Trình Kiểm Tra
-    const handleSubmitCheckConfirm = async (checkerName: string, dateStr?: string) => {
+    const handleSubmitCheckConfirm = async (checkerName: string, dateStr?: string, issueNumber?: string) => {
         if (selectedIds.size === 0 || !checkerName) return;
         try {
             const idsToUpdate = Array.from(selectedIds);
@@ -1105,6 +1095,9 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                 checkedBy: checkerName,
                 pendingCheckDate: targetDate
             };
+            if (issueNumber !== undefined && issueNumber.trim() !== '') {
+                updatePayload.issueNumber = issueNumber.trim();
+            }
 
             // Optimistic UI update immediately
             setRecords(prev => prev.map(r => idsToUpdate.includes(r.id) ? { ...r, ...updatePayload } : r));
@@ -1119,7 +1112,7 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                 actionLabel: 'Trình kiểm tra',
                 targetType: 'Đăng ký',
                 referenceCode: `${idsToUpdate.length} hồ sơ`,
-                details: `Trình cán bộ "${checkerName}" kiểm tra ${idsToUpdate.length} hồ sơ Đăng ký`
+                details: `Trình cán bộ "${checkerName}" kiểm tra ${idsToUpdate.length} hồ sơ Đăng ký${issueNumber ? ` (Số phát hành: ${issueNumber})` : ''}`
             });
         } catch (e) {
             console.error('Lỗi khi trình kiểm tra:', e);
@@ -2359,6 +2352,11 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                     onClose={() => setIsSubmitCheckModalOpen(false)}
                     selectedCount={selectedIds.size}
                     employees={employeesList}
+                    initialIssueNumber={
+                        selectedIds.size === 1
+                            ? records.find(r => selectedIds.has(r.id))?.issueNumber || ''
+                            : ''
+                    }
                     onConfirm={handleSubmitCheckConfirm}
                 />
             )}
@@ -2855,7 +2853,8 @@ interface SubmitCheckDangKyModalProps {
     onClose: () => void;
     selectedCount: number;
     employees: Employee[];
-    onConfirm: (checkerName: string, dateStr?: string) => void;
+    initialIssueNumber?: string;
+    onConfirm: (checkerName: string, dateStr?: string, issueNumber?: string) => void;
 }
 
 const SubmitCheckDangKyModal: React.FC<SubmitCheckDangKyModalProps> = ({
@@ -2863,9 +2862,17 @@ const SubmitCheckDangKyModal: React.FC<SubmitCheckDangKyModalProps> = ({
     onClose,
     selectedCount,
     employees,
+    initialIssueNumber = '',
     onConfirm
 }) => {
     const [selectedChecker, setSelectedChecker] = useState<string>('');
+    const [issueNumber, setIssueNumber] = useState<string>(initialIssueNumber);
+
+    useEffect(() => {
+        if (isOpen) {
+            setIssueNumber(initialIssueNumber);
+        }
+    }, [isOpen, initialIssueNumber]);
 
     if (!isOpen) return null;
 
@@ -2887,8 +2894,12 @@ const SubmitCheckDangKyModal: React.FC<SubmitCheckDangKyModalProps> = ({
             alert('Vui lòng chọn cán bộ phụ trách kiểm tra.');
             return;
         }
+        if (!issueNumber || !issueNumber.trim()) {
+            alert('Vui lòng nhập Số phát hành GCN (Số seri GCN) khi trình kiểm tra.');
+            return;
+        }
         const realtimeDate = new Date().toISOString().split('T')[0];
-        onConfirm(selectedChecker, realtimeDate);
+        onConfirm(selectedChecker, realtimeDate, issueNumber.trim());
     };
 
     return (
@@ -2914,7 +2925,7 @@ const SubmitCheckDangKyModal: React.FC<SubmitCheckDangKyModalProps> = ({
                         </p>
                     </div>
 
-                    <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                    <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                         {finalCheckEmployees.map(emp => (
                             <label
                                 key={emp.id}
@@ -2940,6 +2951,24 @@ const SubmitCheckDangKyModal: React.FC<SubmitCheckDangKyModalProps> = ({
                                 </div>
                             </label>
                         ))}
+                    </div>
+
+                    {/* Ô NHẬP SỐ PHÁT HÀNH GCN Ở DƯỚI CÙNG HỘP THOẠI */}
+                    <div className="pt-3 border-t border-gray-100 bg-orange-50/50 p-3 rounded-xl border border-orange-100">
+                        <label className="block text-xs font-bold text-orange-900 mb-1 flex items-center gap-1">
+                            <span>Số phát hành GCN (Số seri GCN)</span>
+                            <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                            type="text"
+                            className="w-full px-3 py-2 bg-white border border-orange-200 rounded-lg text-xs font-bold text-slate-800 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 outline-none transition-all shadow-2xs"
+                            placeholder="VD: CD 123456"
+                            value={issueNumber}
+                            onChange={(e) => setIssueNumber(e.target.value)}
+                        />
+                        <p className="text-[11px] text-orange-700/80 mt-1">
+                            Bắt buộc nhập Số phát hành GCN khi trình kiểm tra hồ sơ cấp giấy.
+                        </p>
                     </div>
 
                     <div className="flex justify-end gap-2.5 pt-3 border-t border-gray-100">
