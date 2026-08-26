@@ -1373,8 +1373,21 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
                     GIAO NHÂN VIÊN XỬ LÝ (TỔ CẤP GIẤY)
                   </label>
                   <select
-                    value={formData.assignedTo || ''}
-                    onChange={e => handleFieldChange('assignedTo', e.target.value)}
+                    value={(() => {
+                      const val = formData.assignedTo || '';
+                      const foundById = employees.find(e => e.id === val);
+                      if (foundById) return foundById.id;
+                      const foundByName = employees.find(e => e.name === val);
+                      if (foundByName) return foundByName.id;
+                      return val;
+                    })()}
+                    onChange={e => {
+                      const empId = e.target.value;
+                      handleFieldChange('assignedTo', empId);
+                      if (empId && !formData.assignedDate) {
+                        handleFieldChange('assignedDate', new Date().toISOString().split('T')[0]);
+                      }
+                    }}
                     className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs sm:text-sm font-medium text-slate-800 focus:border-blue-500 outline-none shadow-2xs"
                   >
                     <option value="">-- Chưa giao --</option>
@@ -1383,7 +1396,7 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
                         ? employees.filter(e => !e.department || e.department.toLowerCase().includes('cấp giấy') || e.department.toLowerCase().includes('cap giay') || e.department.toLowerCase().includes('đăng ký') || e.department.toLowerCase().includes('dang ky'))
                         : employees
                     ).map(e => (
-                      <option key={e.id} value={e.name}>{e.name} {e.department ? `(${e.department})` : ''}</option>
+                      <option key={e.id} value={e.id}>{e.name} {e.department ? `(${e.department})` : ''}</option>
                     ))}
                   </select>
                 </div>
