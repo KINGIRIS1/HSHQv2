@@ -483,18 +483,32 @@ export const isArchiveRecordType = (type?: string | null, code?: string | null):
 // Check if a record belongs to Dang Ky (Đăng ký đất đai / Cấp giấy)
 export const isDangKyRecordType = (type?: string | null, code?: string | null): boolean => {
   if (!type && !code) return false;
-  const detectedId = detectProcedureId(code, type);
-  if (detectedId && detectedId.startsWith('3.')) return true;
-
   const tLower = (type || '').toLowerCase();
   const cLower = (code || '').toLowerCase();
+
+  // If measurement procedure, return false
+  if (
+    cLower.startsWith('2.') ||
+    cLower === '3.2.1' ||
+    tLower.includes('đo đạc') ||
+    tLower.includes('đo dạc') ||
+    tLower.includes('trích đo') ||
+    tLower.includes('trích lục') ||
+    tLower.includes('cắm mốc') ||
+    tLower.includes('chỉnh lý')
+  ) {
+    return false;
+  }
+
+  const detectedId = detectProcedureId(code, type);
+  if (detectedId && detectedId.startsWith('3.')) return true;
 
   if (tLower.startsWith('3.') || cLower.startsWith('3.')) return true;
 
   const dangKyKeywords = [
     'chuyển quyền', 'chuyển nhượng', 'tặng cho', 'thừa kế', 'cấp đổi', 'cấp lại',
     'đăng ký biến động', 'đkbđ', 'biến động', 'giao dịch bảo đảm', 'thế chấp', 'xóa thế chấp',
-    'đính chính', 'cấp gcn', 'cấp giấy', 'phân chia quyền', 'tách hợp thửa đăng ký', '3.1', '3.2', '3.3', '3.4', '3.5', '3.6', '3.7', '3.8', '3.9'
+    'đính chính', 'cấp gcn', 'cấp giấy', 'phân chia quyền', 'tách hợp thửa đăng ký', '3.1', '3.3', '3.4', '3.5', '3.6', '3.7', '3.8', '3.9'
   ];
 
   return dangKyKeywords.some(kw => tLower.includes(kw) || cLower.includes(kw));

@@ -1,6 +1,6 @@
 
 import { RecordFile, RecordStatus, Employee, DangKyRecord } from '../types';
-import { detectProcedureId, getProcedureById, DANG_KY_DEADLINE_MAP } from '../constants/procedures';
+import { detectProcedureId, getProcedureById, DANG_KY_DEADLINE_MAP, isDangKyRecordType } from '../constants/procedures';
 
 // --- HÀM TIỆN ÍCH XỬ LÝ CHUỖI TIẾNG VIỆT ---
 export function removeVietnameseTones(str: string): string {
@@ -579,39 +579,52 @@ export function processAssignmentTimelineCheck(
 
 export function getDepartmentForRecord(r: RecordFile): string {
     const type = (r.recordType || '').toLowerCase();
-    const code = (r.code || '').toLowerCase();
+    const code = (r.code || '').trim().toLowerCase();
 
-    // 1. Nhóm Lưu trữ: mã 1.x hoặc chứa từ khóa sao lục, công văn
-    if (
-        code.startsWith('1.') || 
-        type.includes('1.1') || type.includes('1.2') ||
-        type.includes('sao lục') || 
-        type.includes('công văn') || 
-        type.includes('lưu trữ')
-    ) {
+    // Strict Prefix Classification:
+    // 1.x -> Lưu trữ
+    if (code.startsWith('1.') || type.includes('1.1') || type.includes('1.2') || type.includes('sao lục') || type.includes('công văn') || type.includes('lưu trữ')) {
         return 'Tổ Lưu trữ';
     }
 
-    // 2. Nhóm Đo đạc: mã 2.1 đến 2.6 hoặc chứa các từ khóa đo đạc, trích đo, cắm mốc, số thửa, duyệt đơn, trích lục
+    // 2.x -> Đo đạc (ngoại trừ các ngoại lệ đặc biệt nếu có)
+    if (code.startsWith('2.') || type.includes('2.1') || type.includes('2.2') || type.includes('2.3') || type.includes('2.4') || type.includes('2.5') || type.includes('2.6')) {
+        return 'Tổ Đo đạc';
+    }
+
+    // 3.x -> Đăng ký (ngoại trừ 3.2.1 nếu là đo đạc cấp đổi không thuế)
+    if (code === '3.2.1') {
+        return 'Tổ Đo đạc';
+    }
+
+    if (code.startsWith('3.') || type.includes('3.1') || type.includes('3.3') || type.includes('3.4') || type.includes('3.5') || type.includes('3.6') || type.includes('3.7') || type.includes('3.8') || type.includes('3.9')) {
+        return 'Tổ Đăng ký';
+    }
+
+    // Fallback keywords if code prefix is missing
     if (
-        code.startsWith('2.') || 
-        type.includes('2.1') || type.includes('2.2') || type.includes('2.3') || type.includes('2.4') || type.includes('2.5') || type.includes('2.6') || 
         type.includes('đo đạc') || type.includes('đo dạc') || 
-        type.includes('trích đo') || 
-        type.includes('cắm mốc') || 
-        type.includes('số thửa') || 
-        type.includes('duyệt đơn') || 
-        type.includes('trích lục')
+        type.includes('trích đo') || type.includes('cắm mốc') || 
+        type.includes('số thửa') || type.includes('duyệt đơn') || 
+        type.includes('trích lục') || type.includes('chỉnh lý')
     ) {
         return 'Tổ Đo đạc';
     }
 
-    // 3. Fallback theo returnHandoverDept nếu không khớp ở trên
+    if (
+        type.includes('đăng ký') || type.includes('cấp giấy') || 
+        type.includes('chuyển nhượng') || type.includes('tặng cho') || 
+        type.includes('thừa kế') || type.includes('thế chấp')
+    ) {
+        return 'Tổ Đăng ký';
+    }
+
+    // Fallback theo returnHandoverDept nếu không khớp ở trên
     if (r.returnHandoverDept) {
         const d = r.returnHandoverDept.toLowerCase();
         if (d.includes('lưu trữ') || d.includes('thông tin')) return 'Tổ Lưu trữ';
+        if (d.includes('cấp giấy') || d.includes('đăng ký') || d.includes('chuyển nhượng')) return 'Tổ Đăng ký';
         if (d.includes('đo đạc') || d.includes('đo dạc')) return 'Tổ Đo đạc';
-        if (d.includes('cấp giấy') || d.includes('đăng ký')) return 'Tổ Đo đạc';
     }
 
     return 'Tổ Đo đạc';

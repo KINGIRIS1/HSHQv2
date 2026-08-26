@@ -125,8 +125,15 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
     const targetRecordsForBatch = props.selectedRecordsForBulk.length > 0 ? props.selectedRecordsForBulk : props.filteredRecords;
     const isMobile = useIsMobile();
 
-    const isDangKyEditing = (props.editingRecord as any)?.sourceTable === 'dangky_records' || (props.currentView === 'registration_records' || props.currentView === 'vaoso_records');
-    const isDangKyViewing = (props.viewingRecord as any)?.sourceTable === 'dangky_records';
+    const isMeasurementRecord = (r: RecordFile | null) => {
+        if (!r) return false;
+        const code = (r.code || '').trim().toLowerCase();
+        const type = (r.recordType || '').toLowerCase();
+        return code.startsWith('2.') || code === '3.2.1' || type.includes('đo đạc') || type.includes('trích đo') || type.includes('trích lục') || type.includes('cắm mốc') || type.includes('chỉnh lý');
+    };
+
+    const isDangKyEditing = !isMeasurementRecord(props.editingRecord) && ((props.editingRecord as any)?.sourceTable === 'dangky_records' || (props.currentView === 'registration_records' || props.currentView === 'vaoso_records'));
+    const isDangKyViewing = !isMeasurementRecord(props.viewingRecord) && (props.viewingRecord as any)?.sourceTable === 'dangky_records';
     const isDangKyView = props.currentView === 'registration_records' || props.currentView === 'vaoso_records';
 
     return (
