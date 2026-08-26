@@ -688,7 +688,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
                                         <td className="p-3">{originalIdx}</td>
                                         <td className="p-3 font-medium text-blue-600">{record.code}</td>
                                         {activeUpdatedKeys.map(key => {
-                                            const val = record[key];
+                                            const val = (record as any)[key];
                                             return (
                                                 <td key={key} className="p-3">
                                                     {key === 'status' && val ? (

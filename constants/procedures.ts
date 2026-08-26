@@ -12,77 +12,6 @@ export interface ProcedureDefinition {
 
 export const PROCEDURE_CATALOG: ProcedureDefinition[] = [
   // ==========================================
-  // MODULE 1: LƯU TRỮ
-  // ==========================================
-  {
-    id: '1.1',
-    name: '1.1 Sao lục hồ sơ',
-    shortName: '1.1 Sao lục',
-    module: 'luutru',
-    defaultDeadline: 10,
-    prefixes: ['1.1', 'SL', 'SAOLUC', 'CCDL'],
-    keywords: ['sao lục', 'cung cấp tài liệu', 'cung cấp dữ liệu', 'cc dl đđ']
-  },
-  {
-    id: '1.2',
-    name: '1.2 Công văn',
-    shortName: '1.2 Công văn',
-    module: 'luutru',
-    defaultDeadline: 10,
-    prefixes: ['1.2', 'CV', 'CONGVAN'],
-    keywords: ['công văn']
-  },
-
-  // ==========================================
-  // MODULE 2: ĐO ĐẠC
-  // ==========================================
-  {
-    id: '2.1',
-    name: '2.1 Trích lục',
-    shortName: '2.1 Trích lục',
-    module: 'dodac',
-    defaultDeadline: 10,
-    prefixes: ['2.1', 'TL', 'TRICHLUC'],
-    keywords: ['trích lục', 'quy hoạch', 'trích lục qh']
-  },
-  {
-    id: '2.2',
-    name: '2.2 Trích đo',
-    shortName: '2.2 Trích đo',
-    module: 'dodac',
-    defaultDeadline: 30,
-    prefixes: ['2.2', 'TD', 'TRICHDO'],
-    keywords: ['trích đo']
-  },
-  {
-    id: '2.3',
-    name: '2.3 Duyệt đơn & Cung cấp số thửa',
-    shortName: '2.3 DĐ & CC số thửa',
-    module: 'dodac',
-    defaultDeadline: 12,
-    prefixes: ['2.3', '2.6', 'DD', 'SOTHUA'],
-    keywords: ['duyệt đơn', 'cung cấp số thửa', 'dđ & cc', 'số thửa', 'cập nhật số thửa', 'cập nhập số thửa']
-  },
-  {
-    id: '2.4',
-    name: '2.4 Trích đo Cắm mốc',
-    shortName: '2.4 Cắm mốc',
-    module: 'dodac',
-    defaultDeadline: 30,
-    prefixes: ['2.4', 'CM', 'CAMMOC'],
-    keywords: ['cắm mốc', 'trích đo cắm mốc']
-  },
-  {
-    id: '2.5',
-    name: '2.5 Trích đo Tách - Hợp thửa',
-    shortName: '2.5 Tách-Hợp thửa',
-    module: 'dodac',
-    defaultDeadline: 30,
-    prefixes: ['2.5', 'TD-TT', 'TD-HT', 'TD-TÁCH'],
-    keywords: ['trích đo tách', 'trích đo tách - hợp thửa', 'tách hợp thửa đo đạc']
-  },
-
-  // ==========================================
   // MODULE 3: ĐĂNG KÝ ĐẤT ĐAI
   // ==========================================
   {
@@ -334,13 +263,9 @@ export const RECORD_TYPES: string[] = PROCEDURE_CATALOG
 export const EXTENDED_RECORD_TYPES: string[] = PROCEDURE_CATALOG.map(p => p.shortName);
 
 // Derived per-module procedure lists
-export const RECORD_TYPES_LuuTru = PROCEDURE_CATALOG
-  .filter(p => p.module === 'luutru')
-  .map(p => p.shortName);
+export const RECORD_TYPES_LuuTru: string[] = [];
 
-export const RECORD_TYPES_DoDac = PROCEDURE_CATALOG
-  .filter(p => p.module === 'dodac')
-  .map(p => p.shortName);
+export const RECORD_TYPES_DoDac: string[] = [];
 
 export const DANG_KY_RECORD_TYPES = PROCEDURE_CATALOG
   .filter(p => p.module === 'dangky')

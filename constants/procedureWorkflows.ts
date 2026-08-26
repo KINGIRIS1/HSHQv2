@@ -272,39 +272,6 @@ export const createDefaultStepsFromCodes = (codes: string[], customSlaMap?: Reco
  * Build initial default workflow according to procedure category
  */
 export const getDefaultWorkflowForProcedure = (procedureId: string): WorkflowStep[] => {
-  // 0. Nhóm Lưu trữ (1.1, 1.2...)
-  if (procedureId.startsWith('1.')) {
-    return createDefaultStepsFromCodes([
-      'tiep_nhan',
-      'tham_dinh',
-      'hoan_thanh',
-      'tra_ket_qua'
-    ], {
-      tiep_nhan: { label: '2 giờ', hours: 2, excluded: false },
-      tham_dinh: { label: '4 ngày', hours: 32, excluded: false },
-      hoan_thanh: { label: '2 giờ', hours: 2, excluded: false },
-      tra_ket_qua: { label: '2 giờ', hours: 2, excluded: false }
-    });
-  }
-
-  // 0.5. Nhóm Đo đạc (2.1, 2.2, 2.3, 2.4, 2.5...)
-  if (procedureId.startsWith('2.')) {
-    const isComplex = ['2.2', '2.4', '2.5'].includes(procedureId);
-    return createDefaultStepsFromCodes([
-      'tiep_nhan',
-      'tham_dinh',
-      'trinh_kiem_tra',
-      'hoan_thanh',
-      'tra_ket_qua'
-    ], {
-      tiep_nhan: { label: '4 giờ', hours: 4, excluded: false },
-      tham_dinh: { label: isComplex ? '10 ngày' : '3 ngày', hours: isComplex ? 80 : 24, excluded: false },
-      trinh_kiem_tra: { label: '1 ngày', hours: 8, excluded: false },
-      hoan_thanh: { label: '4 giờ', hours: 4, excluded: false },
-      tra_ket_qua: { label: '4 giờ', hours: 4, excluded: false }
-    });
-  }
-
   // 1. Nhóm ĐKBĐ có thuế đầy đủ (3.1.1, 3.1.2, 3.1.3, 3.2.2, 3.3.2, 3.4.2)
   if (['3.1.1', '3.1.2', '3.1.3', '3.2.2', '3.3.2', '3.4.2'].includes(procedureId)) {
     return createDefaultStepsFromCodes([
