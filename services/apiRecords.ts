@@ -65,27 +65,19 @@ const OPTIONAL_NEW_COLUMNS = [
     'statusLogs', 'archiveHandoverDate', 'archiveHandoverBatch'
 ];
 
-// Helper to fetch with timeout and retry
-const withQueryTimeout = async (promiseFn: () => any, timeoutMs = 15000, retries = 1): Promise<{ data: any[] | null; error: any }> => {
-    for (let attempt = 0; attempt <= retries; attempt++) {
-        try {
-            let timer: any;
-            const timeoutPromise = new Promise<{ data: any[] | null; error: any }>((resolve) => {
-                timer = setTimeout(() => resolve({ data: null, error: { message: 'Timeout' } }), timeoutMs);
-            });
-            const queryPromise = promiseFn();
-            const result = await Promise.race([queryPromise, timeoutPromise]);
-            clearTimeout(timer);
-            if (!result.error || attempt === retries) {
-                return result;
-            }
-        } catch (err) {
-            if (attempt === retries) {
-                return { data: null, error: err };
-            }
-        }
+// Helper to fetch with timeout
+const withQueryTimeout = async (promise: any, timeoutMs = 10000): Promise<{ data: any[] | null; error: any }> => {
+    try {
+        let timer: any;
+        const timeoutPromise = new Promise<{ data: any[] | null; error: any }>((resolve) => {
+            timer = setTimeout(() => resolve({ data: null, error: { message: 'Timeout' } }), timeoutMs);
+        });
+        const result = await Promise.race([promise, timeoutPromise]);
+        clearTimeout(timer);
+        return result;
+    } catch (err) {
+        return { data: null, error: err };
     }
-    return { data: null, error: { message: 'Timeout' } };
 };
 
 export const fetchRecords = async (): Promise<RecordFile[]> => {
@@ -104,18 +96,18 @@ export const fetchRecords = async (): Promise<RecordFile[]> => {
             let fromDk = 0;
             let hasMoreDk = true;
             while (hasMoreDk) {
-                const { data, error } = await withQueryTimeout(() => supabase
+                const queryPromise = supabase
                     .from('dangky_records')
                     .select('*')
                     .order('receivedDate', { ascending: false })
                     .order('id', { ascending: true }) 
-                    .range(fromDk, fromDk + step - 1), 15000, 1);
+                    .range(fromDk, fromDk + step - 1);
+
+                const { data, error } = await withQueryTimeout(queryPromise as any, 8000);
 
                 if (error) {
                     if (error?.code === 'PGRST205' || error?.code === '42P01' || error?.message?.includes('does not exist')) {
                         // table doesn't exist yet
-                    } else if (error?.message === 'Timeout') {
-                        console.log('Timeout fetching dangky_records, using offline cache fallback.');
                     } else {
                         console.warn('Lỗi fetch dangky_records:', error?.message || error);
                     }
@@ -190,19 +182,17 @@ export const fetchRecords = async (): Promise<RecordFile[]> => {
             let fromLand = 0;
             let hasMoreLand = true;
             while (hasMoreLand) {
-                const { data, error } = await withQueryTimeout(() => supabase
+                const queryPromise = supabase
                     .from('land_records')
                     .select('*')
                     .order('receivedDate', { ascending: false })
                     .order('id', { ascending: true }) 
-                    .range(fromLand, fromLand + step - 1), 15000, 1);
+                    .range(fromLand, fromLand + step - 1);
+
+                const { data, error } = await withQueryTimeout(queryPromise as any, 10000);
 
                 if (error) {
-                    if (error?.message === 'Timeout') {
-                        console.log('Timeout fetching land_records, using offline cache fallback.');
-                    } else {
-                        console.warn('Lỗi fetch land_records:', error?.message || error);
-                    }
+                    console.warn('Lỗi fetch land_records:', error?.message || error);
                     hasMoreLand = false;
                 } else if (data && data.length > 0) {
                     const mapped = (data as any[]).map((item: any) => ({ ...item, sourceTable: item.sourceTable || ('land_records' as const) }));
@@ -226,18 +216,18 @@ export const fetchRecords = async (): Promise<RecordFile[]> => {
             let fromLt = 0;
             let hasMoreLt = true;
             while (hasMoreLt) {
-                const { data, error } = await withQueryTimeout(() => supabase
+                const queryPromise = supabase
                     .from('luutru_records')
                     .select('*')
                     .order('receivedDate', { ascending: false })
                     .order('id', { ascending: true }) 
-                    .range(fromLt, fromLt + step - 1), 15000, 1);
+                    .range(fromLt, fromLt + step - 1);
+
+                const { data, error } = await withQueryTimeout(queryPromise as any, 8000);
 
                 if (error) {
                     if (error?.code === 'PGRST205' || error?.code === '42P01' || error?.message?.includes('does not exist')) {
                         // table doesn't exist yet
-                    } else if (error?.message === 'Timeout') {
-                        console.log('Timeout fetching luutru_records, using offline cache fallback.');
                     } else {
                         console.warn('Lỗi fetch luutru_records:', error?.message || error);
                     }
@@ -893,20 +883,16 @@ export const forceUpdateRecordsBatchApi = async (records: RecordFile[], onProgre
                 });
             }
 
-            const landUpdatesMap = new Map<string, any>();
-            const luutruUpdatesMap = new Map<string, any>();
-            const dangkyUpdatesMap = new Map<string, any>();
+            const landUpdates: any[] = [];
+            const luutruUpdates: any[] = [];
+            const dangkyUpdates: any[] = [];
 
             chunkRecords.forEach((excelRecord) => {
                 const normCode = normalizeCode(excelRecord.code);
                 const dbEntry = dbMap.get(normCode);
                 
                 if (dbEntry) {
-                    const recordId = dbEntry.record.id;
-                    let merged = landUpdatesMap.get(recordId) || luutruUpdatesMap.get(recordId) || dangkyUpdatesMap.get(recordId);
-                    if (!merged) {
-                        merged = { ...dbEntry.record };
-                    }
+                    const merged = { ...dbEntry.record };
                     let hasChange = false;
 
                     Object.keys(excelRecord).forEach(key => {
@@ -921,27 +907,19 @@ export const forceUpdateRecordsBatchApi = async (records: RecordFile[], onProgre
                         }
                     });
 
-                    if (hasChange || (!landUpdatesMap.has(recordId) && !luutruUpdatesMap.has(recordId) && !dangkyUpdatesMap.has(recordId))) {
+                    if (hasChange) {
                         const sanitized = sanitizeData(merged, RECORD_DB_COLUMNS);
-                        landUpdatesMap.delete(recordId);
-                        luutruUpdatesMap.delete(recordId);
-                        dangkyUpdatesMap.delete(recordId);
-
                         if (dbEntry.table === 'luutru_records') {
-                            luutruUpdatesMap.set(recordId, sanitized);
+                            luutruUpdates.push(sanitized);
                         } else if (dbEntry.table === 'dangky_records') {
-                            dangkyUpdatesMap.set(recordId, sanitized);
+                            dangkyUpdates.push(sanitized);
                         } else {
-                            landUpdatesMap.set(recordId, sanitized);
+                            landUpdates.push(sanitized);
                         }
                         updateCount++;
                     }
                 }
             });
-
-            const landUpdates = Array.from(landUpdatesMap.values());
-            const luutruUpdates = Array.from(luutruUpdatesMap.values());
-            const dangkyUpdates = Array.from(dangkyUpdatesMap.values());
 
             const upsertIntoTable = async (table: 'land_records' | 'luutru_records' | 'dangky_records', updates: any[]) => {
                 if (updates.length === 0) return;
