@@ -56,7 +56,7 @@ const BienBanList: React.FC<BienBanListProps> = ({ data, onEdit, onDelete, onRef
                 item.created_by
             ];
         });
-        const headers = ['STT', 'Chủ sử dụng', 'Địa chỉ đất', 'Tờ', 'Thửa', 'Ngày lập', 'Người lập'];
+        const headers = ['STT', 'Thông tin khách hàng', 'Địa chỉ đất', 'Tờ', 'Thửa', 'Ngày lập', 'Người lập'];
         const wb = XLSX.utils.book_new();
         const ws = XLSX.utils.aoa_to_sheet([["DANH SÁCH BIÊN BẢN HIỆN TRẠNG"], ["Data Export"], [""], headers, ...dataRows]);
         ws['!cols'] = [{ wch: 5 }, { wch: 25 }, { wch: 30 }, { wch: 8 }, { wch: 8 }, { wch: 15 }, { wch: 20 }];
@@ -69,7 +69,7 @@ const BienBanList: React.FC<BienBanListProps> = ({ data, onEdit, onDelete, onRef
             <div className="p-4 border-b border-gray-200 flex flex-wrap gap-4 items-center bg-gray-50 rounded-t-lg">
                 <div className="relative flex-1 min-w-[200px]">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                    <input type="text" placeholder="Tìm tên chủ sử dụng..." className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+                    <input type="text" placeholder="Tìm tên khách hàng..." className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
                 </div>
                 <div className="flex items-center gap-2 bg-white px-2 py-1 border border-gray-300 rounded-lg">
                     <Calendar size={16} className="text-gray-500" />
@@ -88,7 +88,7 @@ const BienBanList: React.FC<BienBanListProps> = ({ data, onEdit, onDelete, onRef
                     <thead className="bg-gray-100 text-xs font-bold text-gray-600 uppercase sticky top-0 shadow-sm z-10">
                         <tr>
                             <th className="p-3 w-12 text-center">STT</th>
-                            <th className="p-3">Chủ sử dụng</th>
+                            <th className="p-3">Thông tin khách hàng</th>
                             <th className="p-3">Địa chỉ đất</th>
                             <th className="p-3 text-center">Tờ / Thửa</th>
                             <th className="p-3 text-center">Ngày lập</th>

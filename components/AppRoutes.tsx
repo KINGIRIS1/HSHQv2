@@ -317,13 +317,12 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
   const activeFilterCount = React.useMemo(() => {
     let count = 0;
     if (props.filterFromDate || props.filterToDate) count++;
-    if (props.filterAssignedFromDate || props.filterAssignedToDate) count++;
     if (props.filterWard && props.filterWard !== 'all') count++;
     if (props.filterRecordType && props.filterRecordType !== 'all') count++;
     if (props.filterStatus && props.filterStatus !== 'all') count++;
     if (props.filterEmployee && props.filterEmployee !== 'all') count++;
     return count;
-  }, [props.filterFromDate, props.filterToDate, props.filterAssignedFromDate, props.filterAssignedToDate, props.filterWard, props.filterRecordType, props.filterStatus, props.filterEmployee]);
+  }, [props.filterFromDate, props.filterToDate, props.filterWard, props.filterRecordType, props.filterStatus, props.filterEmployee]);
 
   const navigateToReceiveRecordSubTab = (subTab: 'create' | 'list' | 'bulk' | 'update' | 'vphc') => {
     ignoreSubTabResetRef.current = true;
@@ -823,11 +822,11 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                           </select>
                         </div>
 
-                        {/* 2. Thời gian nhận hồ sơ */}
+                        {/* 2. Thời gian lọc theo trạng thái */}
                         <div>
                           <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 mb-1">
                             <Calendar size={14} className="text-gray-500" />
-                            <span>Thời gian nhận hồ sơ:</span>
+                            <span>Thời gian (Từ ngày - Đến ngày):</span>
                           </label>
                           <div className="grid grid-cols-2 gap-2">
                             <div>
@@ -850,36 +849,6 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                             </div>
                           </div>
                         </div>
-
-                        {/* 3. Thời gian giao NV */}
-                        {(currentView === "all_records" || currentView === "other_records" || currentView === "archive_records") && (
-                          <div>
-                            <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 mb-1">
-                              <Calendar size={14} className="text-gray-500" />
-                              <span>Thời gian giao NV:</span>
-                            </label>
-                            <div className="grid grid-cols-2 gap-2">
-                              <div>
-                                <span className="text-[11px] text-gray-500 font-medium block mb-0.5">Từ ngày</span>
-                                <input
-                                  type="date"
-                                  value={props.filterAssignedFromDate || ""}
-                                  onChange={(e) => props.setFilterAssignedFromDate && props.setFilterAssignedFromDate(e.target.value)}
-                                  className="w-full text-xs border border-gray-200 rounded-lg p-2 font-medium bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                />
-                              </div>
-                              <div>
-                                <span className="text-[11px] text-gray-500 font-medium block mb-0.5">Đến ngày</span>
-                                <input
-                                  type="date"
-                                  value={props.filterAssignedToDate || ""}
-                                  onChange={(e) => props.setFilterAssignedToDate && props.setFilterAssignedToDate(e.target.value)}
-                                  className="w-full text-xs border border-gray-200 rounded-lg p-2 font-medium bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        )}
 
                         {/* 4. Loại hồ sơ */}
                         {isMeasurementView && (
@@ -915,7 +884,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                               className="w-full text-sm border border-gray-200 rounded-lg p-2 font-medium bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                             >
                               <option value="all">Tất cả loại HS</option>
-                              <option value="1.1 Sao lục">1.1 Sao lục</option>
+                              <option value="1.1 Sao lục hồ sơ">1.1 Sao lục hồ sơ</option>
                               <option value="1.2 Công văn">1.2 Công văn</option>
                             </select>
                           </div>
@@ -944,7 +913,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                         )}
 
                         {/* 6. Cán bộ xử lý */}
-                        {canPerformAction && (currentView === "all_records" || currentView === "other_records" || currentView === "archive_records") && (
+                        {canPerformAction && (
                           <div>
                             <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 mb-1">
                               <UserIcon size={14} className="text-gray-500" />
@@ -1068,16 +1037,17 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                       <button
                         onClick={() => {
                           setIsAddMenuOpen(false);
-                          navigateToReceiveRecordSubTab('bulk');
+                          if (props.setImportModalMode) props.setImportModalMode('create');
+                          props.setIsImportModalOpen(true);
                         }}
-                        className="w-full text-left px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-emerald-50 hover:text-emerald-600 flex items-center gap-2.5 transition-colors"
+                        className="w-full text-left px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-emerald-50 hover:text-emerald-600 flex items-center gap-2.5 transition-colors cursor-pointer"
                       >
                         <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
                           <FileSpreadsheet size={18} />
                         </div>
                         <div>
                           <div className="font-bold text-slate-800 text-sm">Tiếp nhận hàng loạt</div>
-                          <div className="text-[11px] text-slate-500">Nhập danh sách từ Excel</div>
+                          <div className="text-[11px] text-slate-500">Tải file Excel để thêm nhiều hồ sơ mới</div>
                         </div>
                       </button>
 
@@ -1087,14 +1057,14 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                           if (props.setImportModalMode) props.setImportModalMode('update');
                           props.setIsImportModalOpen(true);
                         }}
-                        className="w-full text-left px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-amber-50 hover:text-amber-600 flex items-center gap-2.5 transition-colors"
+                        className="w-full text-left px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-amber-50 hover:text-amber-600 flex items-center gap-2.5 transition-colors cursor-pointer"
                       >
                         <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
                           <RefreshCw size={18} />
                         </div>
                         <div>
-                          <div className="font-bold text-slate-800 text-sm">Cập nhật thông tin</div>
-                          <div className="text-[11px] text-slate-500">Đổi trạng thái, cán bộ, hạn trả...</div>
+                          <div className="font-bold text-slate-800 text-sm">Cập nhật hàng loạt</div>
+                          <div className="text-[11px] text-slate-500">Cập nhật thông tin hồ sơ bằng file Excel</div>
                         </div>
                       </button>
                     </div>

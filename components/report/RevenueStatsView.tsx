@@ -245,7 +245,7 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
         const rows = filteredRecords.map((r, index) => ({
             STT: index + 1,
             'Mã hồ sơ': r.code || '',
-            'Thông tin chủ sử dụng': r.customerName || '',
+            'Thông tin khách hàng': r.customerName || '',
             'Loại hồ sơ': getShortRecordType(r.recordType) || '',
             'Ngày thu tiền': r.resultReturnedDate ? new Date(r.resultReturnedDate).toLocaleDateString('vi-VN') : '—',
             'Loại chứng từ': r.computedReceiptType,
@@ -318,7 +318,7 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
                         </div>
                     </div>
 
-                    {/* Search Input & Export Button */}
+                    {/* Search Input */}
                     <div className="flex items-center gap-2.5 w-full sm:w-auto">
                         <div className="relative flex-1 sm:w-56">
                             <Search size={14} className="absolute left-3 top-3 text-slate-400" />
@@ -330,16 +330,6 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
                                 className="w-full pl-8 pr-3 py-1.5 text-xs border border-slate-300 rounded-xl outline-none focus:border-emerald-500 bg-white h-[38px] font-medium"
                             />
                         </div>
-
-                        <button
-                            type="button"
-                            onClick={handleExportExcel}
-                            className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-xl font-bold text-xs shadow-xs transition-all cursor-pointer h-[38px] shrink-0"
-                            title="Xuất Báo Cáo Doanh Thu (.xlsx)"
-                        >
-                            <FileSpreadsheet size={15} />
-                            <span className="hidden sm:inline">Xuất Excel</span>
-                        </button>
                     </div>
                 </div>
 
@@ -349,21 +339,34 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
                         <thead className="bg-slate-100/95 backdrop-blur-sm text-slate-600 font-bold uppercase tracking-wider text-[11px] border-b border-slate-200/80 sticky top-0 z-20 shadow-xs">
                             <tr>
                                 <th className="p-3.5 w-12 text-center">STT</th>
-                                <th className="p-3.5 w-32">MÃ HỒ SƠ</th>
-                                <th className="p-3.5 min-w-[180px]">THÔNG TIN CHỦ SỬ DỤNG</th>
-                                <th className="p-3.5 w-36">LOẠI HỒ SƠ</th>
-                                <th className="p-3.5 w-32 text-center">NGÀY THU TIỀN</th>
-                                <th className="p-3.5 w-32 text-center">LOẠI CHỨNG TỪ</th>
-                                <th className="p-3.5 w-32 text-center">SỐ BIÊN LAI/HĐ</th>
-                                <th className="p-3.5 w-36 text-right">SỐ TIỀN THU</th>
-                                <th className="p-3.5 w-44">XÃ PHÂN CÔNG GIẢI QUYẾT</th>
+                                <th className="p-3.5 w-28">MÃ HỒ SƠ</th>
+                                <th className="p-3.5 min-w-[160px]">CHỦ SỬ DỤNG</th>
+                                <th className="p-3.5 w-32">LOẠI HỒ SƠ</th>
+                                <th className="p-3.5 w-16 text-center">TỜ</th>
+                                <th className="p-3.5 w-16 text-center">THỬA</th>
+                                <th className="p-3.5 w-28">XÃ/PHƯỜNG</th>
+                                <th className="p-3.5 w-28 text-center">SỐ BL/HĐ</th>
+                                <th className="p-3.5 w-28 text-right">SỐ TIỀN THU</th>
+                                <th className="p-3.5 w-28 text-center">NGÀY TRẢ KQ</th>
+                                <th className="p-3.5 w-32">NGƯỜI THU TIỀN</th>
+                                <th className="p-3.5 min-w-[140px]">GHI CHÚ</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {paginatedRecords.length > 0 ? (
                                 paginatedRecords.map((r, idx) => {
                                     const itemNumber = (currentPage - 1) * pageSize + idx + 1;
-                                    const isHoaDon = r.computedReceiptType === 'Hóa Đơn';
+                                    const dateStr = (() => {
+                                        const dStr = r.resultReturnedDate || r.exportDate || r.completedDate;
+                                        if (!dStr) return '-';
+                                        if (dStr.includes('/')) return dStr;
+                                        const cleanStr = dStr.split('T')[0];
+                                        const parts = cleanStr.split('-');
+                                        if (parts.length === 3) {
+                                            return `${parts[2].padStart(2, '0')}/${parts[1].padStart(2, '0')}/${parts[0]}`;
+                                        }
+                                        return dStr;
+                                    })();
 
                                     return (
                                         <tr key={r.id || idx} className="hover:bg-slate-50/80 transition-colors group">
@@ -377,29 +380,16 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
                                             <td className="p-3.5 text-slate-600 font-medium">
                                                 {getShortRecordType(r.recordType)}
                                             </td>
-                                            <td className="p-3.5 text-center text-slate-500 font-medium">
-                                                {(() => {
-                                                    const dStr = r.resultReturnedDate || r.exportDate || r.completedDate;
-                                                    if (!dStr) return '-';
-                                                    if (dStr.includes('/')) return dStr;
-                                                    const cleanStr = dStr.split('T')[0];
-                                                    const parts = cleanStr.split('-');
-                                                    if (parts.length === 3) {
-                                                        return `${parts[2].padStart(2, '0')}/${parts[1].padStart(2, '0')}/${parts[0]}`;
-                                                    }
-                                                    return dStr;
-                                                })()}
+                                            <td className="p-3.5 text-center text-slate-600 font-medium font-mono">
+                                                {r.mapSheet || '—'}
                                             </td>
-                                            <td className="p-3.5 text-center">
-                                                {isHoaDon ? (
-                                                    <span className="px-2.5 py-1 rounded-md text-[10px] font-bold uppercase bg-orange-50 text-orange-600 border border-orange-200/60 inline-block tracking-wider">
-                                                        HÓA ĐƠN
-                                                    </span>
-                                                ) : (
-                                                    <span className="px-2.5 py-1 rounded-md text-[10px] font-bold uppercase bg-blue-50 text-blue-600 border border-blue-200/60 inline-block tracking-wider">
-                                                        BIÊN LAI
-                                                    </span>
-                                                )}
+                                            <td className="p-3.5 text-center text-slate-600 font-medium font-mono">
+                                                {r.landPlot || '—'}
+                                            </td>
+                                            <td className="p-3.5 text-slate-700 font-medium">
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+                                                    {r.assignedWard}
+                                                </span>
                                             </td>
                                             <td className="p-3.5 text-center font-mono font-bold text-slate-700">
                                                 {r.receiptNumber || '---'}
@@ -407,17 +397,21 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
                                             <td className="p-3.5 text-right font-mono font-bold text-emerald-600 text-sm">
                                                 {r.calcReturned.toLocaleString('vi-VN')} đ
                                             </td>
+                                            <td className="p-3.5 text-center text-slate-500 font-medium font-mono">
+                                                {dateStr}
+                                            </td>
                                             <td className="p-3.5 text-slate-700 font-medium">
-                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
-                                                    {r.assignedWard}
-                                                </span>
+                                                {r.receiverName || '—'}
+                                            </td>
+                                            <td className="p-3.5 text-slate-500 italic">
+                                                {r.notes || r.content || '—'}
                                             </td>
                                         </tr>
                                     );
                                 })
                             ) : (
                                 <tr>
-                                    <td colSpan={9} className="p-12 text-center text-slate-400 italic">
+                                    <td colSpan={12} className="p-12 text-center text-slate-400 italic">
                                         Không tìm thấy dữ liệu nguồn thu phù hợp.
                                     </td>
                                 </tr>

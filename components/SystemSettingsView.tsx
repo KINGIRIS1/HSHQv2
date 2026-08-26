@@ -9,8 +9,9 @@ import { createFullBackupData, downloadBackupAsFile, saveBackupToServer, restore
 import { isConfigured } from '../services/supabaseClient';
 
 const PERMISSION_DEPARTMENTS = [
-  { id: 'Tổ Lưu trữ', name: 'Tổ Lưu trữ', label: 'Tổ Lưu trữ', desc: 'Bộ phận phụ trách lưu trữ, khai thác thông tin đất đai và hồ sơ lưu trữ' },
-  { id: 'Tổ Đo đạc', name: 'Tổ Đo đạc', label: 'Tổ Đo đạc', desc: 'Bộ phận phụ trách đo đạc, chỉnh lý bản đồ và trích đo địa chính' }
+  { id: 'Tổ Cấp Giấy', name: 'Tổ Cấp Giấy', label: 'Tổ Cấp Giấy', desc: 'Bộ phận phụ trách tiếp nhận, xử lý và đăng ký cấp GCN' },
+  { id: 'Tổ Đo đạc', name: 'Tổ Đo đạc', label: 'Tổ Đo đạc', desc: 'Bộ phận phụ trách đo đạc, chỉnh lý bản đồ và trích đo địa chính' },
+  { id: 'Tổ Lưu trữ', name: 'Tổ Lưu trữ', label: 'Tổ Lưu trữ', desc: 'Bộ phận phụ trách lưu trữ, khai thác thông tin đất đai và hồ sơ lưu trữ' }
 ];
 
 const ROLES_FOR_DEPARTMENT = [
@@ -35,6 +36,24 @@ const PERMISSION_GROUPS = [
     items: [
       { id: 'ADD_RECORDS', label: 'Thêm / Nhập mới hồ sơ' },
       { id: 'EXPORT_RECORDS', label: 'Xuất danh sách hồ sơ (Excel)' },
+    ]
+  },
+  {
+    id: 'group_dangky',
+    title: '4. Tổ Cấp Giấy (Module Đăng ký)',
+    desc: 'Các chức năng xử lý hồ sơ đăng ký, cấp GCN',
+    items: [
+      { id: 'dangky_BTN_ASSIGN_STAFF', label: 'Giao việc' },
+      { id: 'dangky_BTN_SUBMIT_CHECK', label: 'Trình kiểm tra' },
+      { id: 'dangky_BTN_SUBMIT_SIGN', label: 'Trình ký' },
+      { id: 'dangky_BTN_APPROVE_SIGN', label: 'Ký duyệt' },
+      { id: 'dangky_BTN_REJECT_RECORD', label: 'Trả hồ sơ' },
+      { id: 'dangky_HANDOVER_RECORDS', label: 'Bàn giao 1 cửa' },
+      { id: 'dangky_BTN_RETURN_RESULT', label: 'Trả kết quả hồ sơ' },
+      { id: 'dangky_BTN_EXTEND_DEADLINE', label: 'Gia hạn' },
+      { id: 'dangky_EDIT_RECORDS', label: 'Sửa thông tin hồ sơ' },
+      { id: 'dangky_DELETE_RECORDS', label: 'Xóa hồ sơ' },
+      { id: 'dangky_VIEW_DETAILS', label: 'Xem chi tiết hồ sơ' },
     ]
   },
   {
@@ -79,7 +98,7 @@ const PERMISSION_GROUPS = [
   },
   {
     id: 'group_hopdong',
-    title: '4. Hợp đồng dịch vụ',
+    title: '5. Hợp đồng dịch vụ',
     desc: 'Các chức năng quản lý hợp đồng',
     items: [
       { id: 'ADD_CONTRACTS', label: 'Thêm mới hợp đồng' },
@@ -91,7 +110,7 @@ const PERMISSION_GROUPS = [
   },
   {
     id: 'group_system_management',
-    title: '5. Tiện ích, Báo cáo & Quản trị Hệ thống',
+    title: '6. Tiện ích, Báo cáo & Quản trị Hệ thống',
     desc: 'Lịch công tác, Báo cáo, Chat nội bộ, Nhân sự, Tài khoản & Cài đặt',
     items: [
       { id: 'VIEW_SCHEDULE', label: 'Xem lịch công tác tuần' },
@@ -172,6 +191,7 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
       let standardName = trimmed;
       if (matchDepartmentKey('đo đạc', trimmed)) standardName = 'Tổ Đo đạc';
       else if (matchDepartmentKey('lưu trữ', trimmed)) standardName = 'Tổ Lưu trữ';
+      else if (matchDepartmentKey('cấp giấy', trimmed) || matchDepartmentKey('đăng ký', trimmed)) standardName = 'Tổ Cấp Giấy';
 
       if (!resultList.includes(standardName)) {
         resultList.push(standardName);
@@ -451,19 +471,29 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
 
   const getDefaultDeptPerms = (deptName: string, role: string): string[] => {
       const basePerms = rolePermissions[role] || DEFAULT_ROLE_PERMISSIONS[role as UserRole] || [];
-      if (matchDepartmentKey('đo đạc', deptName)) {
-          const ARCHIVE_PERMS = [
-              'archive_records', 'archive_sub_all', 'archive_assign_tasks',
-              'archive_completed_list', 'archive_pending_check_list', 'archive_check_list',
-              'archive_handover_list', 'archive_director_completed', 'VIEW_ARCHIVE', 'MANAGE_ARCHIVE'
+      const isCapGiay = matchDepartmentKey('cấp giấy', deptName) || matchDepartmentKey('đăng ký', deptName);
+      const isDodac = matchDepartmentKey('đo đạc', deptName);
+      const isLuutru = matchDepartmentKey('lưu trữ', deptName);
+
+      if (isCapGiay) {
+          const OTHER_PERMS = [
+              'dodac_BTN_ASSIGN_STAFF', 'dodac_BTN_SUBMIT_CHECK', 'dodac_BTN_SUBMIT_SIGN', 'dodac_BTN_APPROVE_SIGN', 'dodac_BTN_REJECT_RECORD', 'dodac_HANDOVER_RECORDS', 'dodac_BTN_RETURN_RESULT', 'dodac_VIEW_EXCERPTS', 'dodac_MANAGE_EXCERPTS', 'dodac_BTN_EXTEND_DEADLINE', 'dodac_EDIT_RECORDS', 'dodac_DELETE_RECORDS', 'dodac_VIEW_DETAILS',
+              'luutru_BTN_ASSIGN_STAFF', 'luutru_BTN_SUBMIT_CHECK', 'luutru_BTN_SUBMIT_SIGN', 'luutru_BTN_APPROVE_SIGN', 'luutru_BTN_REJECT_RECORD', 'luutru_HANDOVER_RECORDS', 'luutru_BTN_RETURN_RESULT', 'luutru_VIEW_ARCHIVE', 'luutru_MANAGE_ARCHIVE', 'luutru_BTN_EXTEND_DEADLINE', 'luutru_EDIT_RECORDS', 'luutru_DELETE_RECORDS', 'luutru_VIEW_DETAILS',
+              'archive_records', 'archive_sub_all', 'archive_assign_tasks', 'archive_completed_list', 'archive_pending_check_list', 'archive_check_list', 'archive_handover_list', 'archive_director_completed', 'VIEW_ARCHIVE', 'MANAGE_ARCHIVE'
           ];
-          return basePerms.filter(p => !ARCHIVE_PERMS.includes(p));
-      } else if (matchDepartmentKey('lưu trữ', deptName)) {
-          const SURVEY_PERMS = [
-              'all_records', 'all_sub_all', 'assign_tasks', 'completed_list',
-              'pending_check_list', 'check_list', 'handover_list', 'director_completed', 'survey_list'
+          return basePerms.filter(p => !OTHER_PERMS.includes(p));
+      } else if (isDodac) {
+          const OTHER_PERMS = [
+              'dangky_BTN_ASSIGN_STAFF', 'dangky_BTN_SUBMIT_CHECK', 'dangky_BTN_SUBMIT_SIGN', 'dangky_BTN_APPROVE_SIGN', 'dangky_BTN_REJECT_RECORD', 'dangky_HANDOVER_RECORDS', 'dangky_BTN_RETURN_RESULT', 'dangky_BTN_EXTEND_DEADLINE', 'dangky_EDIT_RECORDS', 'dangky_DELETE_RECORDS', 'dangky_VIEW_DETAILS',
+              'archive_records', 'archive_sub_all', 'archive_assign_tasks', 'archive_completed_list', 'archive_pending_check_list', 'archive_check_list', 'archive_handover_list', 'archive_director_completed', 'VIEW_ARCHIVE', 'MANAGE_ARCHIVE'
           ];
-          return basePerms.filter(p => !SURVEY_PERMS.includes(p));
+          return basePerms.filter(p => !OTHER_PERMS.includes(p));
+      } else if (isLuutru) {
+          const OTHER_PERMS = [
+              'dangky_BTN_ASSIGN_STAFF', 'dangky_BTN_SUBMIT_CHECK', 'dangky_BTN_SUBMIT_SIGN', 'dangky_BTN_APPROVE_SIGN', 'dangky_BTN_REJECT_RECORD', 'dangky_HANDOVER_RECORDS', 'dangky_BTN_RETURN_RESULT', 'dangky_BTN_EXTEND_DEADLINE', 'dangky_EDIT_RECORDS', 'dangky_DELETE_RECORDS', 'dangky_VIEW_DETAILS',
+              'all_records', 'all_sub_all', 'assign_tasks', 'completed_list', 'pending_check_list', 'check_list', 'handover_list', 'director_completed', 'survey_list'
+          ];
+          return basePerms.filter(p => !OTHER_PERMS.includes(p));
       }
       return basePerms;
   };

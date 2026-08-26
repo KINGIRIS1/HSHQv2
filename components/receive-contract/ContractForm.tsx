@@ -22,6 +22,16 @@ function _nd(s: string | undefined | null): string {
     return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim();
 }
 
+const getRecordCccd = (r: any): string => {
+    if (!r) return '';
+    if (r.cccd) return String(r.cccd).trim();
+    if (r.applicantCccd) return String(r.applicantCccd).trim();
+    if (Array.isArray(r.owners) && r.owners.length > 0 && r.owners[0]?.cccd) {
+        return String(r.owners[0].cccd).trim();
+    }
+    return '';
+};
+
 const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrint, priceList, wards, records, generateCode, mode, contracts, onOpenGetNumberModal }) => {
   const [activeTab, setActiveTab] = useState<'dd' | 'tt' | 'cm' | 'tl'>('dd');
   const [tachThuaItems, setTachThuaItems] = useState<SplitItem[]>([]);
@@ -57,15 +67,27 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
 
   useEffect(() => {
       if (initialData) {
+          const linkedRecord = initialData.customerAddress
+              ? records?.find(r => r.code.trim().toLowerCase() === initialData.customerAddress?.trim().toLowerCase())
+              : undefined;
+          const cccdVal = initialData.cccd || getRecordCccd(linkedRecord) || '';
+
           setFormData({
               ...initialData,
+              cccd: cccdVal,
               liquidationArea: (mode === 'liquidation' && !initialData.liquidationArea) ? initialData.area : initialData.liquidationArea,
               liquidationAmount: (mode === 'liquidation' && !initialData.liquidationAmount) ? initialData.totalAmount : initialData.liquidationAmount,
               liquidationDate: initialData.liquidationDate || todayStr
           });
           
           const items = initialData.splitItems || [];
-          if (initialData.contractType === 'Đo đạc') {
+          const isTachThua = (initialData.contractType === 'Tách thửa') || 
+                             (initialData.serviceType || '').toLowerCase().includes('tách thửa') ||
+                             (initialData.serviceType || '').toLowerCase().includes('2.5');
+          if (isTachThua) {
+              setTachThuaItems(items);
+              setDoDacItems([]);
+          } else if (initialData.contractType === 'Đo đạc') {
               setDoDacItems(items);
               setTachThuaItems([]);
           } else {
@@ -73,7 +95,7 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
               setDoDacItems([]);
           }
 
-          const targetTab = initialData.contractType === 'Tách thửa' ? 'tt' : 
+          const targetTab = isTachThua ? 'tt' : 
                             initialData.contractType === 'Cắm mốc' ? 'cm' : 
                             initialData.contractType === 'Trích lục' ? 'tl' : 'dd';
           setActiveTab(targetTab);
@@ -396,10 +418,16 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
           );
 
           if (foundContract) {
+              const linkedRecord = foundContract.customerAddress
+                  ? records?.find(r => r.code.trim().toLowerCase() === foundContract.customerAddress?.trim().toLowerCase())
+                  : undefined;
+              const cccdVal = foundContract.cccd || getRecordCccd(linkedRecord) || '';
+
               // Nạp dữ liệu hợp đồng đã lưu
               setFormData(prev => ({
                   ...prev,
                   ...foundContract,
+                  cccd: cccdVal,
                   // Đồng bộ diện tích & số tiền thanh lý dựa vào mode
                   liquidationArea: (mode === 'liquidation' && !foundContract.liquidationArea) ? foundContract.area : foundContract.liquidationArea,
                   liquidationAmount: (mode === 'liquidation' && !foundContract.liquidationAmount) ? foundContract.totalAmount : foundContract.liquidationAmount
@@ -443,17 +471,17 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
               c.customerAddress.trim().toLowerCase() === found.code.trim().toLowerCase()
           );
 
-          if (recType.includes('trích lục')) {
+          if (recType.includes('2.5') || recType.includes('tách thửa')) {
+              setActiveTab('tt');
+              suggestedService = 'Đo đạc tách thửa';
+          } else if (recType.includes('2.1') || recType.includes('trích lục')) {
               setActiveTab('tl');
               const match = priceList.find(p => p.serviceName.toLowerCase().includes('trích lục'));
               suggestedService = match ? match.serviceName : 'Trích lục bản đồ địa chính';
-          } else if (recType.includes('cắm mốc')) {
+          } else if (recType.includes('2.4') || recType.includes('cắm mốc')) {
               setActiveTab('cm');
               const match = priceList.find(p => p.serviceName.toLowerCase().includes('cắm mốc'));
               suggestedService = match ? match.serviceName : 'Cắm mốc ranh giới';
-          } else if (recType.includes('tách thửa')) {
-              setActiveTab('tt');
-              suggestedService = 'Đo đạc tách thửa';
           } else {
               setActiveTab('dd');
               const area = found.area || 0;
@@ -499,7 +527,7 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
               customerAddress: found.code,
               customerName: found.customerName, 
               phoneNumber: found.phoneNumber, 
-              cccd: found.cccd || '',
+              cccd: getRecordCccd(found),
               ward: found.ward, 
               address: found.address || '', 
               landPlot: found.landPlot, 
@@ -736,7 +764,10 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
                 </h3>
 
                 <div className="space-y-2.5">
-                    <div><label className={labelClass}>Khách hàng</label><input className={inputClass} value={formData.customerName ?? ''} onChange={e => handleChange('customerName', e.target.value)} /></div>
+                    <div>
+                        <label className={labelClass}>Khách hàng</label>
+                        <input className={inputClass} value={formData.customerName ?? ''} onChange={e => handleChange('customerName', e.target.value)} placeholder="Họ tên khách hàng..." />
+                    </div>
                     <div className="grid grid-cols-2 gap-2">
                         <div><label className={labelClass}>Số CCCD/CMND</label><input className={inputClass} value={formData.cccd ?? ''} onChange={e => handleChange('cccd', e.target.value)} placeholder="CCCD/CMND..." /></div>
                         <div><label className={labelClass}>Số điện thoại</label><input className={inputClass} value={formData.phoneNumber ?? ''} onChange={e => handleChange('phoneNumber', e.target.value)} placeholder="Số ĐT..." /></div>
@@ -796,37 +827,6 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
                                 <span className="text-xs font-bold text-green-600">m²</span>
                             </div>
                             <p className="text-[10px] text-green-600 mt-1 italic">* Tự động quyết toán lại theo diện tích thực tế.</p>
-                        </div>
-                    )}
-
-                    {/* DYNAMIC TRANSITION BUTTON TO MULTI-PLOT MODE */}
-                    {activeTab === 'dd' && doDacItems.length === 0 && (
-                        <div className="mt-2">
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    const firstItem: SplitItem = {
-                                        serviceName: formData.serviceType || '',
-                                        quantity: 1,
-                                        price: formData.unitPrice || 0,
-                                        area: formData.area || undefined,
-                                        landPlot: formData.landPlot || '',
-                                        mapSheet: formData.mapSheet || ''
-                                    };
-                                    const secondItem: SplitItem = {
-                                        serviceName: '',
-                                        quantity: 1,
-                                        price: 0,
-                                        area: undefined,
-                                        landPlot: '',
-                                        mapSheet: ''
-                                    };
-                                    setDoDacItems([firstItem, secondItem]);
-                                }}
-                                className="w-full py-1.5 bg-purple-50 text-purple-700 hover:bg-purple-100 border border-dashed border-purple-300 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-sm active:scale-95"
-                            >
-                                <Plus size={13} /> Thêm thửa đất khác
-                            </button>
                         </div>
                     )}
                 </div>
@@ -901,20 +901,7 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
                             </div>
                         )}
 
-                        {/* CẢNH BÁO KIỂM TRA NGÀY BẤT THƯỜNG / SAI SO VỚI THỜI GIAN HIỆN TẠI */}
-                        {mode !== 'liquidation' && dateCheck.messages.length > 0 && (
-                            <div className={`col-span-full p-3 rounded-xl border text-xs space-y-1 animate-fade-in ${dateCheck.hasError ? 'bg-red-50 border-red-200 text-red-800' : 'bg-amber-50 border-amber-200 text-amber-800'}`}>
-                                <div className="flex items-center gap-1.5 font-bold text-sm">
-                                    <AlertTriangle size={16} className={dateCheck.hasError ? 'text-red-600' : 'text-amber-600'} />
-                                    <span>Cảnh báo ngày bất thường (So với thời gian hiện tại: {getTodayDateString()}):</span>
-                                </div>
-                                <ul className="list-disc list-inside pl-1 space-y-1 font-medium">
-                                    {dateCheck.messages.map((m, idx) => (
-                                        <li key={idx}>{m}</li>
-                                    ))}
-                                </ul>
-                            </div>
-                        )}
+
                     </div>
 
                     {/* Pricing Box */}
@@ -994,6 +981,38 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
                                             value={formData.unitPrice || derivedPricing.unitPrice || ''} 
                                         />
                                     </div>
+
+                                    {/* DYNAMIC TRANSITION BUTTON TO MULTI-PLOT MODE (Chiều rộng bằng 2 khung, đặt dưới Số thửa và Đơn giá) */}
+                                    {(activeTab === 'dd' || activeTab === 'cm') && doDacItems.length === 0 && (
+                                        <div className="col-span-2 pt-1">
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    if (activeTab !== 'dd') setActiveTab('dd');
+                                                    const firstItem: SplitItem = {
+                                                        serviceName: formData.serviceType || '',
+                                                        quantity: 1,
+                                                        price: formData.unitPrice || 0,
+                                                        area: formData.area || undefined,
+                                                        landPlot: formData.landPlot || '',
+                                                        mapSheet: formData.mapSheet || ''
+                                                    };
+                                                    const secondItem: SplitItem = {
+                                                        serviceName: '',
+                                                        quantity: 1,
+                                                        price: 0,
+                                                        area: undefined,
+                                                        landPlot: '',
+                                                        mapSheet: ''
+                                                    };
+                                                    setDoDacItems([firstItem, secondItem]);
+                                                }}
+                                                className="w-full py-2.5 bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold rounded-xl border border-dashed border-purple-300 transition-all flex items-center justify-center gap-2 text-xs shadow-xs active:scale-98 cursor-pointer"
+                                            >
+                                                <Plus size={15} /> Thêm thửa đất khác
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         )}

@@ -141,9 +141,7 @@ const GetContractNumberModal: React.FC<GetContractNumberModalProps> = ({ isOpen,
             <div>
               <h3 className="text-lg font-bold text-slate-800">Cấp Số Hợp Đồng Tự Động</h3>
               <p className="text-xs text-slate-500">
-                {numberType === 'HĐKT' 
-                  ? 'Hợp đồng đo đạc / cắm mốc (Bắt đầu lại theo năm mới)' 
-                  : 'Hợp đồng trích lục / tách thửa / khác'}
+                Mã HĐKT dùng chung cho tất cả các hợp đồng (Đo đạc, Tách thửa, Cắm mốc, Trích lục)
               </p>
             </div>
           </div>
@@ -158,20 +156,11 @@ const GetContractNumberModal: React.FC<GetContractNumberModalProps> = ({ isOpen,
         {/* BODY */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           
-          {/* NUMBER TYPE SELECTOR (TABS) */}
-          <div className="flex bg-slate-100 p-1 rounded-xl">
-            <button
-              onClick={() => { setNumberType('HĐKT'); setAllocatedNumber(null); }}
-              className={`flex-1 text-center py-2.5 rounded-lg text-sm font-bold transition-all ${numberType === 'HĐKT' ? 'bg-white text-purple-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
-            >
-              Mã HĐKT (Đo đạc / Cắm mốc)
-            </button>
-            <button
-              onClick={() => { setNumberType('HĐ'); setAllocatedNumber(null); }}
-              className={`flex-1 text-center py-2.5 rounded-lg text-sm font-bold transition-all ${numberType === 'HĐ' ? 'bg-white text-purple-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
-            >
-              Mã HĐ (Tách thửa / Trích lục)
-            </button>
+          {/* NUMBER TYPE SELECTOR (BADGE) */}
+          <div className="bg-purple-50 border border-purple-100 p-3 rounded-xl text-center">
+            <span className="text-xs font-bold text-purple-700 uppercase tracking-wide">
+              Mã HĐKT (Đo đạc / Tách thửa / Cắm mốc / Trích lục)
+            </span>
           </div>
 
           {/* YEAR SELECTOR */}

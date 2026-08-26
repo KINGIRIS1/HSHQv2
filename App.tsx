@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { RecordFile, RecordStatus, Employee, User, UserRole, Message, RecordStatusLog } from './types';
-import { DEFAULT_WARDS as STATIC_WARDS, isArchiveRecordType, STATUS_LABELS, APP_VERSION } from './constants';
+import { DEFAULT_WARDS as STATIC_WARDS, isArchiveRecordType, STATUS_LABELS, APP_VERSION, getNormalizedWard, getCanonicalRecordType } from './constants';
+import { isUserAdminOrSubadmin, isUserTeamLeader, isUserOneDoor, isUserEmployee, canUserPerformGeneralAction } from './constants/permissions';
 import Login from './components/Login'; 
 import MainLayout from './components/layout/MainLayout';
 import AppRoutes from './components/AppRoutes';
@@ -10,7 +11,7 @@ import AppModals from './components/AppModals';
 import { DEFAULT_VISIBLE_COLUMNS, confirmAction, COLUMN_DEFS, processAssignmentTimelineCheck } from './utils/appHelpers';
 import { exportReportToExcel, exportReturnedListToExcel } from './utils/excelExport';
 import { generateReport } from './services/geminiService';
-import { syncTemplatesFromCloud } from './services/docxService'; 
+import { syncTemplatesFromCloud, generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from './services/docxService'; 
 import { updateRecordApi, saveEmployeeApi, saveUserApi, forceUpdateRecordsBatchApi, updateRecordsBatchById } from './services/api';
 import { migrateArchiveRecordsFromLandRecords } from './services/apiArchive';
 import { ReturnOptionType } from './components/RejectReturnStepModal';
@@ -118,6 +119,10 @@ function App() {
   const [rejectReturnTargetRecords, setRejectReturnTargetRecords] = useState<RecordFile[]>([]);
   const [isExtendModalOpen, setIsExtendModalOpen] = useState(false);
   const [extendTargetRecords, setExtendTargetRecords] = useState<RecordFile[]>([]);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [previewBlob, setPreviewBlob] = useState<Blob | null>(null);
+  const [previewFileName, setPreviewFileName] = useState('');
+  const [systemReceiptData, setSystemReceiptData] = useState<RecordFile | null>(null);
 
   // Report States
   const [globalReportContent, setGlobalReportContent] = useState('');
@@ -232,10 +237,10 @@ function App() {
   }, [currentView]);
 
   // Permissions
-  const isAdmin = currentUser?.role === UserRole.ADMIN;
+  const isAdmin = isUserAdminOrSubadmin(currentUser);
   const isSubadmin = currentUser?.role === UserRole.SUBADMIN;
-  const isTeamLeader = currentUser?.role === UserRole.TEAM_LEADER;
-  const canPerformAction = isAdmin || isSubadmin || isTeamLeader || currentUser?.role === UserRole.ONEDOOR;
+  const isTeamLeader = isUserTeamLeader(currentUser);
+  const canPerformAction = canUserPerformGeneralAction(currentUser);
 
   // --- UPDATE HANDLERS ---
   
@@ -298,7 +303,7 @@ function App() {
   useEffect(() => {
       if (
           currentView === 'handover_list' && 
-          currentUser?.role === UserRole.ONEDOOR && 
+          isUserOneDoor(currentUser) && 
           recordFilterProps.handoverTab === 'today' &&
           !autoSwitchedHandoverRef.current
       ) {
@@ -346,7 +351,7 @@ function App() {
 
       const formatDateVN = (d: Date) => `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}`;
       try {
-          const scope = currentUser.role === UserRole.EMPLOYEE ? 'personal' : 'general';
+          const scope = isUserEmployee(currentUser) ? 'personal' : 'general';
           const result = await generateReport(filtered!, `Từ ngày ${formatDateVN(from)} đến ngày ${formatDateVN(to)}`, scope, currentUser.name, title);
           setGlobalReportContent(result);
       } catch (error) { setGlobalReportContent("Không thể tạo báo cáo. Vui lòng kiểm tra API Key."); } 
@@ -1057,6 +1062,136 @@ function App() {
       setExtendTargetRecords([]);
       setSelectedRecordIds(new Set());
       setToast({ type: 'success', message: `Đã gia hạn ngày hẹn cho ${updatedTargets.length} hồ sơ thành công!` });
+
+      const targetRecord = updatedTargets[0];
+      if (targetRecord && currentUser) {
+          const rDate = targetRecord.receivedDate ? new Date(targetRecord.receivedDate) : new Date();
+          const dDate = new Date(newDeadlineISO);
+          
+          let standardDays = "30"; 
+          const type = (targetRecord.recordType || '').toLowerCase();
+          if (type.includes('trích lục')) {
+              standardDays = "10";
+          } else if (type.includes('trích đo chỉnh lý')) {
+              standardDays = "15"; 
+          } else if (type.includes('trích đo') || type.includes('đo đạc') || type.includes('cắm mốc')) {
+              standardDays = "30";
+          }
+
+          let tp1Value = 'Phiếu yêu cầu';
+          if (type.includes('chỉnh lý') || type.includes('trích đo') || type.includes('trích lục')) {
+              tp1Value = 'Phiếu yêu cầu trích lục, trích đo';
+          } else if (type.includes('đo đạc') || type.includes('cắm mốc')) {
+              tp1Value = 'Phiếu yêu cầu Đo đạc, cắm mốc';
+          }
+          if (targetRecord.ward) {
+              tp1Value += ` tại ${getNormalizedWard(targetRecord.ward)}`;
+          }
+
+          let sdtLienHe = "";
+          const wRaw = (targetRecord.ward || "").toLowerCase();
+          if (wRaw.includes("minh hưng") || wRaw.includes("minh hung")) {
+              sdtLienHe = "Nhân viên phụ trách Nguyễn Thìn Trung: 0886 385 757";
+          } else if (wRaw.includes("nha bích") || wRaw.includes("nha bich")) {
+              sdtLienHe = "Nhân viên phụ trách Lê Văn Hạnh: 0919 334 344";
+          } else if (wRaw.includes("chơn thành") || wRaw.includes("chon thanh")) {
+              sdtLienHe = "Nhân viên phụ trách Phạm Hoài Sơn: 0972 219 691";
+          }
+
+          const day = rDate.getDate().toString().padStart(2, '0');
+          const month = (rDate.getMonth() + 1).toString().padStart(2, '0');
+          const year = rDate.getFullYear();
+          const dateFullString = `ngày ${day} tháng ${month} năm ${year}`;
+          const dateShortString = `${day}/${month}/${year}`;
+          
+          const dayDead = dDate.getDate().toString().padStart(2, '0');
+          const monthDead = (dDate.getMonth() + 1).toString().padStart(2, '0');
+          const yearDead = dDate.getFullYear();
+          const deadlineFullString = `ngày ${dayDead} tháng ${monthDead} năm ${yearDead}`;
+          const deadlineShortString = `${dayDead}/${monthDead}/${yearDead}`;
+
+          const val = (v: any) => (v === undefined || v === null) ? "" : String(v);
+
+          const printData = {
+              code: val(targetRecord.code),
+              customerName: val(targetRecord.customerName),
+              landPlot: val(targetRecord.landPlot),
+              mapSheet: val(targetRecord.mapSheet),
+              XAPHUONG: val(getNormalizedWard(targetRecord.ward)),
+              NGAYNHAN: dateFullString,
+              NGAY_NHAN: dateShortString, 
+              LOAI_GIAY_TO_UY_QUYEN: "",
+              DIA_CHI_CHI_TIET: val(targetRecord.address),
+              MA: val(targetRecord.code), 
+              SO_HS: val(targetRecord.code), 
+              MA_HO_SO: val(targetRecord.code),
+              CODE: val(targetRecord.code),
+              TEN: val(targetRecord.customerName).toUpperCase(), 
+              HO_TEN: val(targetRecord.customerName).toUpperCase(),
+              CHU_SU_DUNG: val(targetRecord.customerName).toUpperCase(),
+              KHACH_HANG: val(targetRecord.customerName).toUpperCase(),
+              ONG_BA: val(targetRecord.customerName).toUpperCase(), 
+              SDT: val(targetRecord.phoneNumber), 
+              DIEN_THOAI: val(targetRecord.phoneNumber),
+              PHONE: val(targetRecord.phoneNumber),
+              CCCD: val(targetRecord.cccd), 
+              CMND: val(targetRecord.cccd),
+              DIA_CHI_CHU_SU_DUNG: val(targetRecord.customerAddress),
+              DIA_CHI: val(targetRecord.address || getNormalizedWard(targetRecord.ward)),
+              DC: val(targetRecord.address || getNormalizedWard(targetRecord.ward)),
+              ADDRESS: val(targetRecord.address || getNormalizedWard(targetRecord.ward)),
+              XA: val(getNormalizedWard(targetRecord.ward)), 
+              PHUONG: val(getNormalizedWard(targetRecord.ward)),
+              WARD: val(getNormalizedWard(targetRecord.ward)),
+              TO: val(targetRecord.mapSheet), 
+              SO_TO: val(targetRecord.mapSheet),
+              THUA: val(targetRecord.landPlot), 
+              SO_THUA: val(targetRecord.landPlot),
+              DT: val(targetRecord.area), 
+              DIEN_TICH: val(targetRecord.area),
+              NGAY_NHAN_FULL: dateFullString,
+              NGAY: day, 
+              THANG: month, 
+              NAM: year,
+              RECEIVED_DATE: dateShortString,
+              HEN_TRA: deadlineShortString, 
+              NGAY_HEN: deadlineShortString,
+              DEADLINE: deadlineShortString,
+              HEN_TRA_FULL: deadlineFullString,
+              NGAY_HEN_FULL: deadlineFullString,
+              NGUOI_NHAN: val(currentUser?.name), 
+              CAN_BO: val(currentUser?.name),
+              USER: val(currentUser?.name),
+              NOI_DUNG: val(targetRecord.content),
+              CONTENT: val(targetRecord.content),
+              LOAI_HS: val(getCanonicalRecordType(targetRecord.recordType, targetRecord.code)), 
+              RECORD_TYPE: val(getCanonicalRecordType(targetRecord.recordType, targetRecord.code)),
+              GIAY_TO_KHAC: val(targetRecord.otherDocs),
+              GIA: targetRecord.price ? targetRecord.price.toLocaleString('vi-VN') + ' đ' : '',
+              PRICE: targetRecord.price ? targetRecord.price.toLocaleString('vi-VN') + ' đ' : '',
+              NGUOI_UY_QUYEN: "",
+              UY_QUYEN: "",
+              LOAI_UY_QUYEN: "",
+              TGTRA: standardDays, 
+              SO_NGAY: standardDays,
+              TP1: tp1Value, 
+              TIEU_DE: tp1Value,
+              SDTLH: sdtLienHe, 
+              TINH: "Bình Phước", 
+              HUYEN: "huyện Hớn Quản"
+          };
+
+          if (!hasTemplate(STORAGE_KEYS.RECEIPT_TEMPLATE)) {
+              setSystemReceiptData(targetRecord);
+          } else {
+              const blob = await generateDocxBlobAsync(STORAGE_KEYS.RECEIPT_TEMPLATE, printData);
+              if (blob) {
+                  setPreviewBlob(blob);
+                  setPreviewFileName(`BienNhan_${targetRecord.code}`);
+                  setIsPreviewOpen(true);
+              }
+          }
+      }
   }, [extendTargetRecords, currentUser]);
 
   const handleConfirmRejectReturnStep = useCallback(async (optionType: ReturnOptionType, reason: string, returnDateStr: string) => {
@@ -1089,6 +1224,9 @@ function App() {
           } else if (optionType === 'cancel_reject') {
               newStatus = RecordStatus.REJECTED;
               internalLogNote = `Trả hủy hồ sơ: ${reason || 'Không có lý do'} (Người trả: ${userLabel})`;
+          } else if (optionType === 'csd_withdraw') {
+              newStatus = RecordStatus.WITHDRAWN;
+              internalLogNote = `Trả do CSD rút hồ sơ: ${reason || 'Không có lý do'} (Người trả: ${userLabel})`;
           } else {
               newStatus = RecordStatus.IN_PROGRESS;
               internalLogNote = `Trả về cán bộ thụ lý: ${reason || 'Không có lý do'} (Người trả: ${userLabel})`;
@@ -1110,18 +1248,18 @@ function App() {
           addActivityLog({
               performerName: userLabel,
               performerRole: currentUser?.role || 'ONEDOOR',
-              actionType: optionType === 'cancel_reject' ? 'DELETE' : 'UPDATE',
-              actionLabel: optionType === 'pause_supplement' ? 'Chờ bổ sung' : optionType === 'cancel_reject' ? 'Trả hủy hồ sơ' : 'Trả cán bộ',
+              actionType: optionType === 'cancel_reject' || optionType === 'csd_withdraw' ? 'DELETE' : 'UPDATE',
+              actionLabel: optionType === 'pause_supplement' ? 'Chờ bổ sung' : optionType === 'cancel_reject' ? 'Trả hủy hồ sơ' : optionType === 'csd_withdraw' ? 'CSD rút hồ sơ' : 'Trả cán bộ',
               targetType: 'Hồ sơ',
               referenceCode: r.code || r.id,
-              details: `Trả hồ sơ ${r.code} (${optionType === 'pause_supplement' ? 'Trả chờ bổ sung' : optionType === 'cancel_reject' ? 'Trả hủy hồ sơ' : 'Trả về cán bộ thụ lý'}). Lý do: ${reason}`,
+              details: `Trả hồ sơ ${r.code} (${optionType === 'pause_supplement' ? 'Trả chờ bổ sung' : optionType === 'cancel_reject' ? 'Trả hủy hồ sơ' : optionType === 'csd_withdraw' ? 'Trả do CSD rút hồ sơ' : 'Trả về cán bộ thụ lý'}). Lý do: ${reason}`,
               recordId: r.id
           });
 
           return {
               ...r,
               status: newStatus,
-              ...(optionType === 'cancel_reject' ? { completedDate: targetDateISO } : {}),
+              ...(optionType === 'cancel_reject' || optionType === 'csd_withdraw' ? { completedDate: targetDateISO } : {}),
               ...(optionType === 'return_handler' ? { pendingCheckDate: null, submissionDate: null, checkedDate: null, approvalDate: null } : {}),
               privateNotes: updatedPrivateNotes,
               statusLogs: [...(r.statusLogs || []), newLog]
@@ -1150,6 +1288,8 @@ function App() {
           toastMsg = `Đã trả hủy ${updatedTargets.length} hồ sơ thành công! Hồ sơ đã chuyển sang danh sách Chờ bàn giao 1 cửa.`;
       } else if (optionType === 'pause_supplement') {
           toastMsg = `Đã chuyển ${updatedTargets.length} hồ sơ sang trạng thái Chờ bổ sung!`;
+      } else if (optionType === 'csd_withdraw') {
+          toastMsg = `Đã ghi nhận ${updatedTargets.length} hồ sơ do CSD rút! Hồ sơ đã chuyển sang trạng thái CSD rút hồ sơ.`;
       } else if (optionType === 'return_handler') {
           toastMsg = `Đã trả ${updatedTargets.length} hồ sơ về cho Cán bộ thụ lý!`;
       }
@@ -1468,6 +1608,9 @@ function App() {
             isDiagnosticModalOpen={isDiagnosticModalOpen} setIsDiagnosticModalOpen={setIsDiagnosticModalOpen}
             isRejectReturnStepModalOpen={isRejectReturnStepModalOpen} setIsRejectReturnStepModalOpen={setIsRejectReturnStepModalOpen}
             isExtendModalOpen={isExtendModalOpen} setIsExtendModalOpen={setIsExtendModalOpen}
+            isPreviewOpen={isPreviewOpen} setIsPreviewOpen={setIsPreviewOpen}
+            previewBlob={previewBlob} previewFileName={previewFileName}
+            systemReceiptData={systemReceiptData} setSystemReceiptData={setSystemReceiptData}
             
             editingRecord={editingRecord} setEditingRecord={setEditingRecord}
             viewingRecord={viewingRecord} setViewingRecord={setViewingRecord}

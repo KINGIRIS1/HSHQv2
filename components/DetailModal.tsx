@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { RecordFile, Employee, User, UserRole, SplitItem, RecordStatus } from '../types';
-import { getNormalizedWard, getShortRecordType, isArchiveRecordType } from '../constants';
+import { getNormalizedWard, getShortRecordType, isArchiveRecordType, getCanonicalRecordType } from '../constants';
 import StatusBadge from './StatusBadge';
 import { X, MapPin, FileText, User as UserIcon, Receipt, DollarSign, CheckCircle2, Circle, Send, FileSignature, CheckSquare, CalendarClock, FileCheck, Calculator, Loader2, StickyNote, Save, Bell, Printer, Pencil, Trash2, Info, FileDown, Undo2 } from 'lucide-react';
 import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../services/docxService';
@@ -186,13 +186,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
 
               } else {
                   setMatchedContract(null);
-                  // Fallback: Nếu không có hợp đồng nhưng là hồ sơ Trích lục -> Hiển thị 53.163
-                  const type = (record.recordType || '').toLowerCase();
-                  if (type.includes('trích lục')) {
-                      setContractPrice(53163);
-                  } else {
-                      setContractPrice(null);
-                  }
+                  setContractPrice(null);
                   setContractSplitItems(null);
                   setLiquidationInfo(null);
               }
@@ -468,8 +462,8 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
         // --- NHÓM NỘI DUNG ---
         NOI_DUNG: val(record.content),
         CONTENT: val(record.content),
-        LOAI_HS: val(record.recordType), 
-        RECORD_TYPE: val(record.recordType),
+        LOAI_HS: val(getCanonicalRecordType(record.recordType, record.code)), 
+        RECORD_TYPE: val(getCanonicalRecordType(record.recordType, record.code)),
         GIAY_TO_KHAC: val(record.otherDocs),
         
         // --- NHÓM ỦY QUYỀN (Không thể hiện trên biên nhận nữa theo yêu cầu) ---
@@ -573,7 +567,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                 <span className="bg-blue-100 text-blue-700 font-bold px-3 py-1 rounded text-sm border border-blue-200">
                     {record.code}
                 </span>
-                <h2 className="text-lg font-bold text-gray-800 uppercase">{record.recordType}</h2>
+                <h2 className="text-lg font-bold text-gray-800 uppercase">{getShortRecordType(record.recordType, record.code)}</h2>
                 <StatusBadge status={displayStatus} />
             </div>
             
@@ -598,7 +592,11 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                     </button>
                 )}
 
-                {onCreateLiquidation && record && record.recordType && (getShortRecordType(record.recordType).startsWith('2.2') || getShortRecordType(record.recordType).startsWith('2.4')) && (
+                {onCreateLiquidation && record && record.recordType && (() => {
+                    const st = getShortRecordType(record.recordType);
+                    const rt = (record.recordType || '').toLowerCase();
+                    return st.startsWith('2.1') || st.startsWith('2.2') || st.startsWith('2.4') || st.startsWith('2.5') || rt.includes('2.1') || rt.includes('2.2') || rt.includes('2.4') || rt.includes('2.5') || rt.includes('trích lục') || rt.includes('trích đo') || rt.includes('cắm mốc') || rt.includes('tách thửa');
+                })() && (
                     <button
                         onClick={() => { onClose(); onCreateLiquidation(record); }}
                         className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-200 text-gray-600 rounded hover:bg-gray-50 transition-colors text-sm font-medium"
@@ -608,7 +606,11 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                     </button>
                 )}
 
-                {record && record.recordType && (getShortRecordType(record.recordType).startsWith('2.2') || getShortRecordType(record.recordType).startsWith('2.4')) && (
+                {record && record.recordType && (() => {
+                    const st = getShortRecordType(record.recordType);
+                    const rt = (record.recordType || '').toLowerCase();
+                    return st.startsWith('2.1') || st.startsWith('2.2') || st.startsWith('2.4') || st.startsWith('2.5') || rt.includes('2.1') || rt.includes('2.2') || rt.includes('2.4') || rt.includes('2.5') || rt.includes('trích lục') || rt.includes('trích đo') || rt.includes('cắm mốc') || rt.includes('tách thửa');
+                })() && (
                     <button
                         onClick={() => {
                             const hasAnnexTemplate = hasTemplate(STORAGE_KEYS.CONTRACT_TEMPLATE_ANNEX);
@@ -665,12 +667,12 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                     {/* KHÁCH HÀNG */}
                     <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
                         <h3 className="text-xs font-bold text-blue-600 uppercase mb-4 flex items-center gap-2 border-l-4 border-blue-600 pl-2">
-                            <UserIcon size={16}/> {isCongVan ? 'Thông tin nơi gửi / nhận' : 'Thông tin chủ hồ sơ'}
+                            <UserIcon size={16}/> {isCongVan ? 'Thông tin nơi gửi / nhận' : 'Thông tin khách hàng'}
                         </h3>
                         <div className="grid grid-cols-1 gap-4">
                             <div>
                                 <label className="text-[10px] text-gray-400 uppercase font-bold block mb-1">
-                                    {isCongVan ? 'Số, ký hiệu Công văn' : 'Chủ sử dụng'}
+                                    {isCongVan ? 'Số, ký hiệu Công văn' : 'Thông tin khách hàng'}
                                 </label>
                                 <p className="text-base font-bold text-gray-800">{record.customerName}</p>
                             </div>
@@ -836,7 +838,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                         {(() => {
                             const isArchive = isArchiveRecordType(record?.recordType || '');
                             const is23Procedure = (record?.recordType || '').toLowerCase().includes('2.3') || (record?.recordType || '').toLowerCase().includes('dđ & cc số thửa') || (record?.recordType || '').toLowerCase().includes('dd & cc so thua');
-                            const isContractProcedure = !!(record?.recordType && (getShortRecordType(record.recordType).startsWith('2.2') || getShortRecordType(record.recordType).startsWith('2.4')));
+                            const isContractProcedure = !!(record?.recordType && (getShortRecordType(record.recordType).startsWith('2.1') || getShortRecordType(record.recordType).startsWith('2.2') || getShortRecordType(record.recordType).startsWith('2.4') || getShortRecordType(record.recordType).startsWith('2.5') || (record.recordType || '').toLowerCase().includes('2.1') || (record.recordType || '').toLowerCase().includes('2.5')));
                             const hasExcerptOrMeasurement = !isArchive && !is23Procedure && !!(recordTypeLower.includes('trích đo') || recordTypeLower.includes('trích lục') || record?.measurementNumber || record?.excerptNumber);
 
                             if (!isContractProcedure && !hasExcerptOrMeasurement) return null;
@@ -984,9 +986,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                                                 ? record.returnedPrice.toLocaleString('vi-VN') + ' đ'
                                                 : (record.price !== undefined && record.price !== null && record.price > 0
                                                     ? record.price.toLocaleString('vi-VN') + ' đ'
-                                                    : (record.recordType === 'Cung cấp tài liệu đất đai' 
-                                                        ? '310.000 đ' 
-                                                        : (contractPrice !== null && contractPrice !== undefined ? contractPrice.toLocaleString('vi-VN') + ' đ' : '---')))}
+                                                    : (contractPrice !== null && contractPrice !== undefined ? contractPrice.toLocaleString('vi-VN') + ' đ' : '---'))}
                                         </p>
                                     </div>
 
@@ -1063,10 +1063,11 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                                 icon={UserIcon}
                                 colorClass={{text: 'text-emerald-700', border: 'border-emerald-600', bg: 'bg-emerald-600'}}
                                 subText={record.receivedBy ? (() => {
-                                    const receiver = users.find(u => u.employeeId === record.receivedBy);
-                                    if (!receiver) return undefined;
-                                    const emp = employees.find(e => e.id === receiver.employeeId);
-                                    return `${receiver.name} (${emp?.position || 'Nhân viên'})`;
+                                    const receiver = users.find(u => u.employeeId === record.receivedBy || u.username === record.receivedBy || u.name === record.receivedBy);
+                                    const emp = employees.find(e => e.id === record.receivedBy || e.name === record.receivedBy || (receiver && e.id === receiver.employeeId));
+                                    const displayName = receiver?.name || emp?.name || record.receivedBy;
+                                    const displayPos = emp?.position || (receiver?.role ? 'Cán bộ' : undefined);
+                                    return displayPos ? `${displayName} (${displayPos})` : displayName;
                                 })() : undefined}
                             />
 

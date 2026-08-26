@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
 import Barcode from 'react-barcode';
 import { RecordFile } from '../../types';
-import { getNormalizedWard, getShortRecordType, getWardFullLabel } from '../../constants';
+import { getNormalizedWard, getShortRecordType, getWardFullLabel, getCanonicalRecordType } from '../../constants';
 import { Printer, FileSignature } from 'lucide-react';
 
 interface SystemReceiptTemplateProps {
@@ -267,7 +267,7 @@ const SystemReceiptTemplate: React.FC<SystemReceiptTemplateProps> = ({ data, rec
                 <div className="flex justify-between items-center p-4 border-b">
                     <h2 className="text-xl font-bold">In Biên Nhận & Phiếu Kiểm Soát</h2>
                     <div className="flex space-x-2">
-                        {onCreateContract && data && data.recordType && (getShortRecordType(data.recordType).startsWith('2.2') || getShortRecordType(data.recordType).startsWith('2.4')) && (
+                        {onCreateContract && data && data.recordType && (getShortRecordType(data.recordType).startsWith('2.1') || getShortRecordType(data.recordType).startsWith('2.2') || getShortRecordType(data.recordType).startsWith('2.4') || getShortRecordType(data.recordType).startsWith('2.5')) && (
                             <button onClick={() => { onCreateContract(data); onClose(); }} className="flex items-center px-4 py-2 bg-amber-600 text-white rounded hover:bg-amber-700">
                                 <FileSignature className="w-4 h-4 mr-2" /> Lập Hợp Đồng
                             </button>
@@ -329,7 +329,7 @@ const SystemReceiptTemplate: React.FC<SystemReceiptTemplateProps> = ({ data, rec
                                     <div>Thửa: {data.landPlot}</div>
                                 </div>
                                 <div>Địa chỉ thửa đất: <span className="font-bold">{getDisplayLandAddress()}</span></div>
-                                <div>Thủ tục hành chính cần giải quyết: <span className="font-bold">{data.recordType}</span></div>
+                                <div>Thủ tục hành chính cần giải quyết: <span className="font-bold">{getCanonicalRecordType(data.recordType, data.code)}</span></div>
                                 
                                 <div>1. Thành phần hồ sơ, yêu cầu và số lượng mỗi loại giấy tờ gồm:</div>
                                 <table className="w-full border-collapse border border-black mt-1 mb-2">

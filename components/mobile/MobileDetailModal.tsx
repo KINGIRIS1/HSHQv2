@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { RecordFile, Employee, User, UserRole, SplitItem, RecordStatus } from '../../types';
-import { getNormalizedWard, getShortRecordType } from '../../constants';
+import { getNormalizedWard, getShortRecordType, getCanonicalRecordType } from '../../constants';
 import StatusBadge from '../StatusBadge';
 import { 
   X, MapPin, FileText, User as UserIcon, Receipt, DollarSign, 
@@ -168,9 +168,7 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
           }
         } else {
           setMatchedContract(null);
-          const type = (record.recordType || '').toLowerCase();
-          if (type.includes('trích lục')) setContractPrice(53163);
-          else setContractPrice(null);
+          setContractPrice(null);
           setContractSplitItems(null);
           setLiquidationInfo(null);
         }
@@ -360,8 +358,8 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
         USER: val(currentUser?.name),
         NOI_DUNG: val(record.content),
         CONTENT: val(record.content),
-        LOAI_HS: val(record.recordType), 
-        RECORD_TYPE: val(record.recordType),
+        LOAI_HS: val(getCanonicalRecordType(record.recordType, record.code)), 
+        RECORD_TYPE: val(getCanonicalRecordType(record.recordType, record.code)),
         GIAY_TO_KHAC: val(record.otherDocs),
         NGUOI_UY_QUYEN: "",
         UY_QUYEN: "",
@@ -505,7 +503,7 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                 </div>
                 <div>
                   <p className="text-[10px] text-slate-400 font-bold uppercase">Loại hồ sơ</p>
-                  <p className="text-sm font-bold text-slate-800">{record.recordType}</p>
+                  <p className="text-sm font-bold text-slate-800">{getShortRecordType(record.recordType, record.code)}</p>
                 </div>
               </div>
             </div>
@@ -619,9 +617,7 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                       ? record.returnedPrice.toLocaleString('vi-VN') + ' đ'
                       : (record.price !== undefined && record.price !== null && record.price > 0
                           ? record.price.toLocaleString('vi-VN') + ' đ'
-                          : (record.recordType === 'Cung cấp tài liệu đất đai'
-                              ? '310.000 đ'
-                              : (contractPrice !== null ? contractPrice.toLocaleString('vi-VN') + ' đ' : '---')))}
+                          : (contractPrice !== null ? contractPrice.toLocaleString('vi-VN') + ' đ' : '---'))}
                   </span>
                 </div>
                 {liquidationInfo && (
@@ -635,7 +631,11 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                 )}
 
                 {/* LIÊN KẾT HỢP ĐỒNG */}
-                {record && record.recordType && (getShortRecordType(record.recordType).startsWith('2.2') || getShortRecordType(record.recordType).startsWith('2.4')) && (
+                {record && record.recordType && (() => {
+                  const st = getShortRecordType(record.recordType);
+                  const rt = (record.recordType || '').toLowerCase();
+                  return st.startsWith('2.1') || st.startsWith('2.2') || st.startsWith('2.4') || st.startsWith('2.5') || rt.includes('2.1') || rt.includes('2.2') || rt.includes('2.4') || rt.includes('2.5') || rt.includes('trích lục') || rt.includes('trích đo') || rt.includes('cắm mốc') || rt.includes('tách thửa');
+                })() && (
                   <div className="pt-3 border-t border-dashed border-slate-100">
                     {matchedContract ? (
                       <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3 flex flex-col gap-2.5">
@@ -748,10 +748,11 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                   icon={UserIcon}
                   colorClass={{text: 'text-emerald-600', border: 'border-emerald-600', bg: 'bg-emerald-600'}}
                   subText={record.receivedBy ? (() => {
-                      const receiver = users.find(u => u.employeeId === record.receivedBy);
-                      if (!receiver) return undefined;
-                      const emp = employees.find(e => e.id === receiver.employeeId);
-                      return `${receiver.name} (${emp?.position || 'Nhân viên'})`;
+                      const receiver = users.find(u => u.employeeId === record.receivedBy || u.username === record.receivedBy || u.name === record.receivedBy);
+                      const emp = employees.find(e => e.id === record.receivedBy || e.name === record.receivedBy || (receiver && e.id === receiver.employeeId));
+                      const displayName = receiver?.name || emp?.name || record.receivedBy;
+                      const displayPos = emp?.position || (receiver?.role ? 'Cán bộ' : undefined);
+                      return displayPos ? `${displayName} (${displayPos})` : displayName;
                   })() : undefined}
                 />
                 <TimelineItem 
@@ -830,17 +831,6 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
               </div>
             </div>
 
-            {/* Ghi chú hồ sơ */}
-            {cleanSyncNotes(record.notes) && (
-              <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 space-y-3">
-                <h3 className="text-xs font-bold text-blue-600 uppercase flex items-center gap-2">
-                  <StickyNote size={16} /> Ghi chú hồ sơ
-                </h3>
-                <div className="bg-blue-50/40 p-4 rounded-xl border border-blue-100 text-slate-800 text-sm font-medium leading-relaxed whitespace-pre-line">
-                  {cleanSyncNotes(record.notes)}
-                </div>
-              </div>
-            )}
 
             {/* Giấy tờ kèm theo */}
             {record.otherDocs && (() => {

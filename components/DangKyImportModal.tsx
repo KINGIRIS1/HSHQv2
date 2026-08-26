@@ -5,6 +5,7 @@ import { fetchHolidays } from '../services/api';
 import { normalizeDangKyStatus } from '../services/apiDangKy';
 import { X, Upload, FileSpreadsheet, Save, Loader2, AlertCircle, Check, RefreshCw, PlusCircle, AlertTriangle } from 'lucide-react';
 import { calculateDeadlineHelper } from '../utils/appHelpers';
+import { getShortRecordType } from '../constants';
 
 interface DangKyImportModalProps {
   isOpen: boolean;
@@ -232,9 +233,9 @@ export const DangKyImportModal: React.FC<DangKyImportModalProps> = ({ isOpen, on
           // Loại hồ sơ
           const typeRaw = getVal(['LOẠI HỒ SƠ', 'LOẠI BIẾN ĐỘNG', 'THỦ TỤC', 'NỘI DUNG']);
           if (typeRaw !== undefined) {
-            record.recordType = String(typeRaw).trim();
+            record.recordType = getShortRecordType(String(typeRaw).trim());
           } else if (mode === 'create') {
-            record.recordType = '3.1.1 Chuyển nhượng';
+            record.recordType = '3.1.1 Chuyển quyền';
           }
 
           // Ngày nhận & Hạn trả
@@ -282,6 +283,7 @@ export const DangKyImportModal: React.FC<DangKyImportModalProps> = ({ isOpen, on
           const notesRaw = getVal(['GHI CHÚ', 'NỘI DUNG CHI TIẾT', 'GHI CHÚ HỒ SƠ']);
           if (notesRaw !== undefined) record.notes = String(notesRaw).trim();
 
+          record.sourceTable = 'dangky_records';
           record.id = record.id || `dk-${Date.now()}-${i}`;
           record._errors = errors;
           mappedRecords.push(record);

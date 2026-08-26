@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { RecordFile, Holiday, RecordStatus, User, Employee, DangKyParty } from '../../types';
 import { RECORD_TYPES, EXTENDED_RECORD_TYPES, getShortRecordType, getWardLabel } from '../../constants';
+import { detectProcedureId, getDefaultDocsForProcedure, isDangKyRecordType, isArchiveRecordType } from '../../constants/procedures';
 import { addActivityLog } from '../../services/activityLogService';
 import { AutoResizeTextarea } from '../AutoResizeTextarea';
 import { Save, User as UserIcon, Calendar, MapPin, FileCheck, Loader2, Printer, RotateCcw, XCircle, CheckCircle, AlertCircle, X, Phone, FileText, BookOpen, Clock, Hash, Map, ChevronDown, ChevronUp, Users, UserPlus, Plus, Shield } from 'lucide-react';
@@ -92,7 +93,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
 
   const [formData, setFormData] = useState<Partial<RecordFile>>({
     code: '', customerName: '', phoneNumber: '', cccd: '', customerAddress: '', authorizedBy: '', authDocType: '', otherDocs: '', content: '',
-    receivedDate: todayStr, deadline: '', ward: processingWard, landPlot: '', mapSheet: '', area: 0,
+    receivedDate: todayStr, deadline: '', ward: '', landPlot: '', mapSheet: '', area: 0,
     address: '', recordType: '', status: RecordStatus.RECEIVED,
     issueNumber: '', entryNumber: '', issueDate: '', residentialArea: 0,
     owners: [{ name: '', cccd: '', address: '', phone: '' }],
@@ -109,6 +110,17 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
   const [authAddress, setAuthAddress] = useState('');
   const [authPhone, setAuthPhone] = useState('');
   const [isAuthOpen, setIsAuthOpen] = useState(false);
+
+  // Danh sách các thủ tục đơn phương / không có bên nhận chuyển nhượng (mặc định người nộp là chủ hồ sơ, ẩn bên nhận)
+  const isNoTransfereeProcedure = (rType?: string | null, code?: string | null) => {
+    const procId = detectProcedureId(code || undefined, rType || undefined);
+    const noTransfereeIds = ['3.2.1', '3.3.1', '3.4.1', '3.6.1', '3.7.2', '3.8.1', '3.8.2'];
+    if (procId && noTransfereeIds.includes(procId)) return true;
+    const lower = (rType || '').toLowerCase();
+    if (lower.includes('3.2.1') || lower.includes('3.3.1') || lower.includes('3.4.1') || lower.includes('3.6.1') || lower.includes('3.7.2') || lower.includes('3.8.1') || lower.includes('3.8.2')) return true;
+    if (lower.includes('cấp đổi gcn (ố nhòe') || lower.includes('cấp lại giấy chứng nhận do bị mất') || lower.includes('không đổi người sử dụng đất') || lower.includes('chuyển mục đích sử dụng đất không phải xin phép') || lower.includes('thay đổi thông tin cá nhân') || lower.includes('đăng ký gdbd') || lower.includes('xóa đk gdbd')) return true;
+    return false;
+  };
 
   useEffect(() => {
       if (initialData) {
@@ -141,26 +153,25 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
       }
   }, [notification]);
 
+  // Kiểm tra loại hồ sơ 3.x.x Đăng ký
+  const isDangKy = isDangKyRecordType(formData.recordType, formData.code);
+  const isArchive = isArchiveRecordType(formData.recordType, formData.code);
+
   useEffect(() => {
     if (!initialData) {
-        const newCode = generateCode(processingWard, formData.receivedDate || '');
-        setFormData(prev => {
-            if (prev.code === newCode) return prev;
-            return { ...prev, code: newCode };
-        });
+        const targetWardForCode = formData.ward || processingWard;
+        if (!isDangKy) {
+            const newCode = generateCode(targetWardForCode, formData.receivedDate || '');
+            setFormData(prev => {
+                if (prev.code === newCode) return prev;
+                return { ...prev, code: newCode };
+            });
+        } else if (!formData.code) {
+            const newCode = generateCode(targetWardForCode, formData.receivedDate || '');
+            setFormData(prev => ({ ...prev, code: newCode }));
+        }
     }
-  }, [processingWard, formData.receivedDate, records, initialData]);
-
-  // Kiểm tra loại hồ sơ 3.x.x Đăng ký
-  const isDangKy = formData.recordType ? (
-      formData.recordType.startsWith('3.') || 
-      formData.recordType.toLowerCase().includes('chuyển nhượng') || 
-      formData.recordType.toLowerCase().includes('tặng cho') || 
-      formData.recordType.toLowerCase().includes('thừa kế') || 
-      formData.recordType.toLowerCase().includes('cấp đổi') || 
-      formData.recordType.toLowerCase().includes('cấp lại') ||
-      formData.recordType.toLowerCase().includes('đăng ký')
-  ) : false;
+  }, [formData.ward, processingWard, formData.receivedDate, records, initialData, isDangKy]);
 
   const handleChange = (field: keyof RecordFile, value: any) => {
     setFormData(prev => {
@@ -178,42 +189,32 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
         }
         
         if (field === 'recordType') {
-            const vLower = String(value || '').toLowerCase();
-            if (
-                value === '1.1 Sao lục' || 
-                value === '1.1 CC DL ĐĐ' || 
-                value === 'Cung cấp tài liệu đất đai' || 
-                value === '1.1 Cung cấp dữ liệu đất đai' ||
-                value === '1.1 Sao lục hồ sơ' ||
-                vLower.includes('sao lục') ||
-                vLower.includes('1.2') || 
-                vLower.includes('công văn') || 
-                vLower.includes('cong van')
-            ) {
-                newData.price = 310000;
-            } else {
+            // Price is no longer defaulted to 310000 for procedure 1.1 / 1.2
+            if (!prev.price) {
                 newData.price = null;
             }
 
-            // Auto-populate default documents for "1.1 Sao lục hồ sơ" and "Hồ sơ đo đạc" (starts with 2.)
-            if (value === '1.1 Sao lục hồ sơ' || value === '1.1 Sao lục' || value === '1.1 Cung cấp dữ liệu đất đai' || value === '1.1 CC DL ĐĐ' || value.startsWith('2.')) {
-                const defaultDocs: AttachedDocItem[] = [
-                    { id: '1', name: 'Phiếu yêu cầu lập hợp đồng đo đạc dịch vụ, Cắm mốc, trích lục, Cung cấp thông tin', type: 'Bản chính' },
-                    { id: '2', name: 'Giấy chứng nhận đã cấp', type: 'Bản sao' }
-                ];
-                setAttachedDocs(defaultDocs);
-                newData.otherDocs = JSON.stringify(defaultDocs);
-            } else if (value.startsWith('3.')) {
-                // Đăng ký hồ sơ - mặc định giấy tờ
-                const defaultDkDocs: AttachedDocItem[] = [
-                    { id: '1', name: 'Giấy chứng nhận QSD đất', type: 'Bản chính' },
-                    { id: '2', name: 'Đơn đăng ký biến động', type: 'Bản chính' }
-                ];
-                setAttachedDocs(defaultDkDocs);
-                newData.otherDocs = JSON.stringify(defaultDkDocs);
+            // Auto-populate default documents according to procedure definition
+            const procDocs = getDefaultDocsForProcedure(value, prev.code);
+            if (procDocs.length > 0) {
+                setAttachedDocs(procDocs);
+                newData.otherDocs = JSON.stringify(procDocs);
             } else {
                 setAttachedDocs([]);
                 newData.otherDocs = '';
+            }
+
+            if (value.startsWith('3.')) {
+                // Nếu là thủ tục đơn phương / không có bên nhận:
+                if (isNoTransfereeProcedure(value, prev.code)) {
+                    newData.applicantIsOwner = false;
+                    newData.transferees = [];
+                    const firstOwner = (prev.owners && prev.owners[0]) || { name: '', cccd: '', phone: '', address: '' };
+                    if (firstOwner.name) newData.applicantName = firstOwner.name;
+                    if (firstOwner.cccd) newData.applicantCccd = firstOwner.cccd;
+                    if (firstOwner.phone) newData.applicantPhone = firstOwner.phone;
+                    if (firstOwner.address) newData.applicantAddress = firstOwner.address;
+                }
             }
         }
         return newData;
@@ -456,14 +457,21 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
         }
     }
 
-    if (!formData.code || (!effectiveCustomerName && !formData.applicantName) || (isDeadlineRequired && !formData.deadline) || !formData.recordType) { 
-        setNotification({ type: 'error', message: "Vui lòng điền các trường bắt buộc (*) và chọn Loại hồ sơ." });
+    if (!formData.code || (!effectiveCustomerName && !formData.applicantName) || (isDeadlineRequired && !formData.deadline) || !formData.recordType || (!isCongVan && !formData.ward)) { 
+        setNotification({ type: 'error', message: "Vui lòng điền các trường bắt buộc (*), chọn Loại hồ sơ và Xã/Phường." });
         return; 
     }
     setLoading(true);
+    const isSingleParty = isNoTransfereeProcedure(formData.recordType, formData.code);
     const recordToSave: RecordFile = { 
         ...formData, 
+        transferees: isSingleParty ? [] : (formData.transferees || []),
+        applicantIsOwner: isSingleParty ? false : !!formData.applicantIsOwner,
         customerName: effectiveCustomerName || formData.customerName || '',
+        applicantName: formData.applicantName || (isSingleParty ? formData.owners?.[0]?.name : formData.applicantName) || '',
+        applicantCccd: formData.applicantCccd || (isSingleParty ? formData.owners?.[0]?.cccd : formData.applicantCccd) || '',
+        applicantPhone: formData.applicantPhone || (isSingleParty ? formData.owners?.[0]?.phone : formData.applicantPhone) || '',
+        applicantAddress: formData.applicantAddress || (isSingleParty ? formData.owners?.[0]?.address : formData.applicantAddress) || '',
         authorizedBy: formData.authorizedBy || formData.authorizedPersonName || '',
         authorizedPersonName: formData.authorizedBy || formData.authorizedPersonName || '',
         authorizedPersonId: authCccd || formData.authorizedPersonId || '',
@@ -472,8 +480,8 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
         authDocType: `${authCccd}|${authAddress}|${authPhone}`,
         id: formData.id || Math.random().toString(36).substr(2, 9), 
         status: formData.status || RecordStatus.RECEIVED,
-        receivedBy: formData.receivedBy || currentUser.employeeId,
-        sourceTable: isDangKy ? 'dangky_records' : (formData.sourceTable || 'land_records')
+        receivedBy: formData.receivedBy || currentUser.employeeId || currentUser.fullName || currentUser.name || currentUser.username,
+        sourceTable: isDangKy ? 'dangky_records' : (isArchive ? 'luutru_records' : (formData.sourceTable || 'land_records'))
     } as RecordFile;
     const savedRecord = await onSave(recordToSave);
     setLoading(false);
@@ -506,7 +514,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
           code: '', customerName: '', phoneNumber: '', cccd: '', customerAddress: '', 
           authorizedBy: '', authDocType: '', otherDocs: '', content: '', 
           receivedDate: todayStrLocal, deadline: '', 
-          ward: processingWard, landPlot: '', mapSheet: '', area: 0, address: '', 
+          ward: '', landPlot: '', mapSheet: '', area: 0, address: '', 
           recordType: '', status: RecordStatus.RECEIVED,
           issueNumber: '', entryNumber: '', issueDate: '', residentialArea: 0,
           owners: [{ name: '', cccd: '', address: '', phone: '' }],
@@ -567,7 +575,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
 
                 <div>
                     <label className={labelClass}>Mã hồ sơ</label>
-                    <input type="text" readOnly={!initialData} className={`${inputClass} font-mono ${initialData ? 'bg-white font-bold text-blue-700' : 'bg-slate-100 text-slate-500 cursor-not-allowed'}`} value={formData.code || ''} onChange={(e) => initialData && handleChange('code', e.target.value)} />
+                    <input type="text" readOnly={!initialData && !isDangKy} className={`${inputClass} font-mono ${(!initialData && isDangKy) || initialData ? 'bg-white font-bold text-blue-700' : 'bg-slate-100 text-slate-500 cursor-not-allowed'}`} value={formData.code || ''} onChange={(e) => (initialData || isDangKy) && handleChange('code', e.target.value)} />
                 </div>
 
                 <div>
@@ -597,15 +605,17 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
                             </span>
                             THÔNG TIN NGƯỜI NỘP HỒ SƠ
                         </h3>
-                        <label className="flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-blue-700 hover:text-blue-900 select-none">
-                            <input
-                                type="checkbox"
-                                checked={!!formData.applicantIsOwner}
-                                onChange={e => handleApplicantIsOwnerToggle(e.target.checked)}
-                                className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer"
-                            />
-                            Người nộp là chủ hồ sơ
-                        </label>
+                        {!isNoTransfereeProcedure(formData.recordType, formData.code) && (
+                            <label className="flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-blue-700 hover:text-blue-900 select-none">
+                                <input
+                                    type="checkbox"
+                                    checked={!!formData.applicantIsOwner}
+                                    onChange={e => handleApplicantIsOwnerToggle(e.target.checked)}
+                                    className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer"
+                                />
+                                Người nộp là chủ hồ sơ
+                            </label>
+                        )}
                     </div>
                     
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -854,88 +864,90 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
                     </div>
                 </div>
 
-                {/* 4. NGƯỜI NHẬN (CHUYỂN NHƯỢNG, THỪA KẾ, TẶNG CHO, THỎA THUẬN) (NẾU CÓ) */}
-                <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200 shadow-xs">
-                    <div className="flex items-center justify-between border-b pb-2 mb-3 border-slate-100">
-                        <h3 className="text-xs sm:text-sm font-bold text-slate-800 uppercase flex items-center gap-1.5">
-                            <span className="p-1 bg-blue-100 text-blue-600 rounded-md">
-                                <UserPlus size={14} />
-                            </span>
-                            NGƯỜI NHẬN (CHUYỂN NHƯỢNG, THỪA KẾ, TẶNG CHO, THỎA THUẬN) (NẾU CÓ)
-                        </h3>
-                        <button
-                            type="button"
-                            onClick={addTransferee}
-                            className="text-xs bg-blue-50 text-blue-600 px-2.5 py-1 rounded-md border border-blue-200 hover:bg-blue-100 font-bold flex items-center gap-1 transition-all active:scale-95 cursor-pointer shadow-2xs"
-                        >
-                            <Plus size={14} /> THÊM MỚI
-                        </button>
-                    </div>
-                    
-                    {(formData.transferees || []).length === 0 ? (
-                        <div className="text-center py-3 text-xs text-slate-400 italic bg-slate-50/80 rounded-lg border border-dashed border-slate-200">
-                            Không có người nhận (Click nút "+ THÊM MỚI" để nhập liệu).
+                {/* 4. NGƯỜI NHẬN (CHUYỂN NHƯỢNG, THỪA KẾ, TẶNG CHO, THỎA THUẬN) (NẾU CÓ) - Ẩn đối với các thủ tục không có bên nhận */}
+                {!isNoTransfereeProcedure(formData.recordType, formData.code) && (
+                    <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200 shadow-xs">
+                        <div className="flex items-center justify-between border-b pb-2 mb-3 border-slate-100">
+                            <h3 className="text-xs sm:text-sm font-bold text-slate-800 uppercase flex items-center gap-1.5">
+                                <span className="p-1 bg-blue-100 text-blue-600 rounded-md">
+                                    <UserPlus size={14} />
+                                </span>
+                                NGƯỜI NHẬN (CHUYỂN NHƯỢNG, THỪA KẾ, TẶNG CHO, THỎA THUẬN) (NẾU CÓ)
+                            </h3>
+                            <button
+                                type="button"
+                                onClick={addTransferee}
+                                className="text-xs bg-blue-50 text-blue-600 px-2.5 py-1 rounded-md border border-blue-200 hover:bg-blue-100 font-bold flex items-center gap-1 transition-all active:scale-95 cursor-pointer shadow-2xs"
+                            >
+                                <Plus size={14} /> THÊM MỚI
+                            </button>
                         </div>
-                    ) : (
-                        <div className="overflow-x-auto border border-slate-200 rounded-xl">
-                            <table className="w-full text-left border-collapse bg-white text-xs sm:text-sm min-w-[500px]">
-                                <thead>
-                                    <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                                        <th className="py-2 px-2.5 w-10 text-center">#</th>
-                                        <th className="py-2 px-2.5">HỌ VÀ TÊN NGƯỜI NHẬN</th>
-                                        <th className="py-2 px-2.5">GIẤY CMND/ CCCD</th>
-                                        <th className="py-2 px-2.5">SỐ ĐIỆN THOẠI</th>
-                                        <th className="py-2 px-2.5 w-10 text-center">XÓA</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100 text-xs sm:text-sm">
-                                    {(formData.transferees || []).map((tf, idx) => (
-                                        <tr key={idx} className="hover:bg-slate-50/50">
-                                            <td className="py-1.5 px-2.5 text-center font-bold text-slate-400">{idx + 1}</td>
-                                            <td className="py-1.5 px-2.5">
-                                                <input
-                                                    type="text"
-                                                    value={tf.name}
-                                                    onChange={e => updateTransferee(idx, 'name', e.target.value)}
-                                                    className="w-full px-2 py-1 text-xs sm:text-sm border border-slate-200 rounded-md focus:border-blue-500 outline-none text-slate-800 font-medium"
-                                                    placeholder="Họ tên..."
-                                                />
-                                            </td>
-                                            <td className="py-1.5 px-2.5">
-                                                <input
-                                                    type="text"
-                                                    value={tf.cccd || ''}
-                                                    onChange={e => updateTransferee(idx, 'cccd', e.target.value)}
-                                                    className="w-full px-2 py-1 text-xs sm:text-sm border border-slate-200 rounded-md focus:border-blue-500 outline-none font-mono text-slate-800"
-                                                    placeholder="CCCD..."
-                                                />
-                                            </td>
-                                            <td className="py-1.5 px-2.5">
-                                                <input
-                                                    type="text"
-                                                    value={tf.phone || ''}
-                                                    onChange={e => updateTransferee(idx, 'phone', e.target.value)}
-                                                    className="w-full px-2 py-1 text-xs sm:text-sm border border-slate-200 rounded-md focus:border-blue-500 outline-none text-slate-800"
-                                                    placeholder="SĐT..."
-                                                />
-                                            </td>
-                                            <td className="py-1.5 px-2.5 text-center">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => removeTransferee(idx)}
-                                                    className="p-1 text-slate-400 hover:text-red-500 rounded-md hover:bg-slate-100 transition-colors cursor-pointer"
-                                                    title="Xóa dòng"
-                                                >
-                                                    <X size={14} />
-                                                </button>
-                                            </td>
+                        
+                        {(formData.transferees || []).length === 0 ? (
+                            <div className="text-center py-3 text-xs text-slate-400 italic bg-slate-50/80 rounded-lg border border-dashed border-slate-200">
+                                Không có người nhận (Click nút "+ THÊM MỚI" để nhập liệu).
+                            </div>
+                        ) : (
+                            <div className="overflow-x-auto border border-slate-200 rounded-xl">
+                                <table className="w-full text-left border-collapse bg-white text-xs sm:text-sm min-w-[500px]">
+                                    <thead>
+                                        <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                                            <th className="py-2 px-2.5 w-10 text-center">#</th>
+                                            <th className="py-2 px-2.5">HỌ VÀ TÊN NGƯỜI NHẬN</th>
+                                            <th className="py-2 px-2.5">GIẤY CMND/ CCCD</th>
+                                            <th className="py-2 px-2.5">SỐ ĐIỆN THOẠI</th>
+                                            <th className="py-2 px-2.5 w-10 text-center">XÓA</th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-                </div>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100 text-xs sm:text-sm">
+                                        {(formData.transferees || []).map((tf, idx) => (
+                                            <tr key={idx} className="hover:bg-slate-50/50">
+                                                <td className="py-1.5 px-2.5 text-center font-bold text-slate-400">{idx + 1}</td>
+                                                <td className="py-1.5 px-2.5">
+                                                    <input
+                                                        type="text"
+                                                        value={tf.name}
+                                                        onChange={e => updateTransferee(idx, 'name', e.target.value)}
+                                                        className="w-full px-2 py-1 text-xs sm:text-sm border border-slate-200 rounded-md focus:border-blue-500 outline-none text-slate-800 font-medium"
+                                                        placeholder="Họ tên..."
+                                                    />
+                                                </td>
+                                                <td className="py-1.5 px-2.5">
+                                                    <input
+                                                        type="text"
+                                                        value={tf.cccd || ''}
+                                                        onChange={e => updateTransferee(idx, 'cccd', e.target.value)}
+                                                        className="w-full px-2 py-1 text-xs sm:text-sm border border-slate-200 rounded-md focus:border-blue-500 outline-none font-mono text-slate-800"
+                                                        placeholder="CCCD..."
+                                                    />
+                                                </td>
+                                                <td className="py-1.5 px-2.5">
+                                                    <input
+                                                        type="text"
+                                                        value={tf.phone || ''}
+                                                        onChange={e => updateTransferee(idx, 'phone', e.target.value)}
+                                                        className="w-full px-2 py-1 text-xs sm:text-sm border border-slate-200 rounded-md focus:border-blue-500 outline-none text-slate-800"
+                                                        placeholder="SĐT..."
+                                                    />
+                                                </td>
+                                                <td className="py-1.5 px-2.5 text-center">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => removeTransferee(idx)}
+                                                        className="p-1 text-slate-400 hover:text-red-500 rounded-md hover:bg-slate-100 transition-colors cursor-pointer"
+                                                        title="Xóa dòng"
+                                                    >
+                                                        <X size={14} />
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 {/* NỘI DUNG YÊU CẦU CHI TIẾT */}
                 <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200 shadow-xs">
@@ -1045,14 +1057,20 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
 
                 {/* 6. THÔNG TIN NGƯỜI ĐƯỢC ỦY QUYỀN (NẾU CÓ - TOÀN KHUNG) */}
                 <div className="bg-white rounded-xl border border-slate-200 shadow-xs">
-                    <div className="p-3.5 sm:p-4 flex items-center justify-between gap-2 bg-white rounded-xl">
-                        <h3 className="text-xs sm:text-sm font-bold text-slate-800 uppercase flex items-center gap-1.5">
+                    <div 
+                        onClick={() => setIsAuthOpen(!isAuthOpen)}
+                        className="p-3.5 sm:p-4 flex items-center justify-between gap-2 bg-white rounded-xl cursor-pointer select-none hover:bg-slate-50/80 transition-colors"
+                    >
+                        <h3 className="text-xs sm:text-sm font-bold text-slate-800 uppercase flex items-center gap-1.5 cursor-pointer">
                             <span className="p-1 bg-indigo-100 text-indigo-600 rounded-md"><Shield size={14} /></span>
                             Người ủy quyền (nếu có)
                         </h3>
                         <button
                             type="button"
-                            onClick={() => setIsAuthOpen(!isAuthOpen)}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setIsAuthOpen(!isAuthOpen);
+                            }}
                             className="text-xs font-bold uppercase rounded-md border border-slate-200 hover:bg-slate-50 px-2.5 py-1 text-slate-600 bg-white shadow-xs cursor-pointer"
                         >
                             {isAuthOpen ? '▲ ẨN' : '▼ HIỆN'}
@@ -1350,14 +1368,20 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
 
                 {/* 5. THÔNG TIN NGƯỜI ĐƯỢC ỦY QUYỀN (NẾU CÓ - TOÀN KHUNG) */}
                 <div className="bg-white rounded-xl border border-slate-200 shadow-xs">
-                    <div className="p-3.5 sm:p-4 flex items-center justify-between gap-2 bg-white rounded-xl">
-                        <h3 className="text-xs sm:text-sm font-bold text-slate-800 uppercase flex items-center gap-1.5">
+                    <div 
+                        onClick={() => setIsAuthOpen(!isAuthOpen)}
+                        className="p-3.5 sm:p-4 flex items-center justify-between gap-2 bg-white rounded-xl cursor-pointer select-none hover:bg-slate-50/80 transition-colors"
+                    >
+                        <h3 className="text-xs sm:text-sm font-bold text-slate-800 uppercase flex items-center gap-1.5 cursor-pointer">
                             <span className="p-1 bg-indigo-100 text-indigo-600 rounded-md"><Shield size={14} /></span>
                             Người ủy quyền (nếu có)
                         </h3>
                         <button
                             type="button"
-                            onClick={() => setIsAuthOpen(!isAuthOpen)}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setIsAuthOpen(!isAuthOpen);
+                            }}
                             className="text-xs font-bold uppercase rounded-md border border-slate-200 hover:bg-slate-50 px-2.5 py-1 text-slate-600 bg-white shadow-xs cursor-pointer"
                         >
                             {isAuthOpen ? '▲ ẨN' : '▼ HIỆN'}
