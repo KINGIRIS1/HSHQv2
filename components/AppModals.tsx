@@ -125,15 +125,30 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
     const targetRecordsForBatch = props.selectedRecordsForBulk.length > 0 ? props.selectedRecordsForBulk : props.filteredRecords;
     const isMobile = useIsMobile();
 
-    const isMeasurementRecord = (r: RecordFile | null) => {
-        if (!r) return false;
-        const code = (r.code || '').trim().toLowerCase();
-        const type = (r.recordType || '').toLowerCase();
-        return code.startsWith('2.') || code === '3.2.1' || type.includes('đo đạc') || type.includes('trích đo') || type.includes('trích lục') || type.includes('cắm mốc') || type.includes('chỉnh lý');
+    const getProcedureModuleCategory = (r: RecordFile | null) => {
+        if (!r) return null;
+        const code = (r.code || '').trim();
+        const type = (r.recordType || '').trim();
+        if (code.startsWith('1.') || type.startsWith('1.')) return 'luutru'; // 1.x -> Module Lưu trữ
+        if (code.startsWith('2.') || type.startsWith('2.')) return 'dodac';  // 2.x -> Module Đo đạc
+        if (code.startsWith('3.') || type.startsWith('3.')) return 'dangky'; // 3.x -> Module Đăng ký
+        return null;
     };
 
-    const isDangKyEditing = !isMeasurementRecord(props.editingRecord) && ((props.editingRecord as any)?.sourceTable === 'dangky_records' || (props.currentView === 'registration_records' || props.currentView === 'vaoso_records'));
-    const isDangKyViewing = !isMeasurementRecord(props.viewingRecord) && (props.viewingRecord as any)?.sourceTable === 'dangky_records';
+    // Chặn điều hướng nhầm: Mã 1.x & 2.x luôn bảo vệ bằng RecordModal & DetailModal, mã 3.x luôn dùng DangKyRecordModal & DangKyDetailModal
+    const isDangKyEditing = (() => {
+        const cat = getProcedureModuleCategory(props.editingRecord);
+        if (cat === 'dodac' || cat === 'luutru') return false;
+        if (cat === 'dangky') return true;
+        return (props.editingRecord as any)?.sourceTable === 'dangky_records' || (props.currentView === 'registration_records' || props.currentView === 'vaoso_records');
+    })();
+
+    const isDangKyViewing = (() => {
+        const cat = getProcedureModuleCategory(props.viewingRecord);
+        if (cat === 'dodac' || cat === 'luutru') return false;
+        if (cat === 'dangky') return true;
+        return (props.viewingRecord as any)?.sourceTable === 'dangky_records';
+    })();
     const isDangKyView = props.currentView === 'registration_records' || props.currentView === 'vaoso_records';
 
     return (

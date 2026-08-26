@@ -578,48 +578,25 @@ export function processAssignmentTimelineCheck(
 // --- HÀM XỬ LÝ VÀ ĐỊNH DẠNG ĐỢT GIAO 1 CỬA ---
 
 export function getDepartmentForRecord(r: RecordFile): string {
-    const type = (r.recordType || '').toLowerCase();
+    const type = (r.recordType || '').trim().toLowerCase();
     const code = (r.code || '').trim().toLowerCase();
 
-    // Strict Prefix Classification:
-    // 1.x -> Lưu trữ
-    if (code.startsWith('1.') || type.includes('1.1') || type.includes('1.2') || type.includes('sao lục') || type.includes('công văn') || type.includes('lưu trữ')) {
+    // 1. Module Lưu trữ: mã 1.x (1.1, 1.2)
+    if (code.startsWith('1.') || type.startsWith('1.') || code === '1.1' || code === '1.2' || type === '1.1' || type === '1.2') {
         return 'Tổ Lưu trữ';
     }
 
-    // 2.x -> Đo đạc (ngoại trừ các ngoại lệ đặc biệt nếu có)
-    if (code.startsWith('2.') || type.includes('2.1') || type.includes('2.2') || type.includes('2.3') || type.includes('2.4') || type.includes('2.5') || type.includes('2.6')) {
+    // 2. Module Đo đạc: mã 2.x (2.1, 2.2, 2.3, 2.4, 2.5)
+    if (code.startsWith('2.') || type.startsWith('2.')) {
         return 'Tổ Đo đạc';
     }
 
-    // 3.x -> Đăng ký (ngoại trừ 3.2.1 nếu là đo đạc cấp đổi không thuế)
-    if (code === '3.2.1') {
-        return 'Tổ Đo đạc';
-    }
-
-    if (code.startsWith('3.') || type.includes('3.1') || type.includes('3.3') || type.includes('3.4') || type.includes('3.5') || type.includes('3.6') || type.includes('3.7') || type.includes('3.8') || type.includes('3.9')) {
+    // 3. Module Đăng ký: mã 3.x (3.1.1, 3.1.2, 3.1.3, 3.2.1, 3.3.1, 3.3.2, 3.4.1, 3.4.2, 3.5.1, 3.6.1, 3.7.1, 3.8.1, 3.8.2, 3.9.9)
+    if (code.startsWith('3.') || type.startsWith('3.')) {
         return 'Tổ Đăng ký';
     }
 
-    // Fallback keywords if code prefix is missing
-    if (
-        type.includes('đo đạc') || type.includes('đo dạc') || 
-        type.includes('trích đo') || type.includes('cắm mốc') || 
-        type.includes('số thửa') || type.includes('duyệt đơn') || 
-        type.includes('trích lục') || type.includes('chỉnh lý')
-    ) {
-        return 'Tổ Đo đạc';
-    }
-
-    if (
-        type.includes('đăng ký') || type.includes('cấp giấy') || 
-        type.includes('chuyển nhượng') || type.includes('tặng cho') || 
-        type.includes('thừa kế') || type.includes('thế chấp')
-    ) {
-        return 'Tổ Đăng ký';
-    }
-
-    // Fallback theo returnHandoverDept nếu không khớp ở trên
+    // Fallback theo returnHandoverDept nếu chưa định dạng mã thủ tục
     if (r.returnHandoverDept) {
         const d = r.returnHandoverDept.toLowerCase();
         if (d.includes('lưu trữ') || d.includes('thông tin')) return 'Tổ Lưu trữ';

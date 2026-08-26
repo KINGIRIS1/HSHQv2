@@ -469,56 +469,32 @@ export const getCanonicalRecordType = (type?: string | null, code?: string | nul
   return type;
 };
 
-// Check if a record type belongs to Archive module (Lưu trữ)
+// Check if a record type belongs to Archive module (Lưu trữ: mã 1.x -> 1.1, 1.2)
 export const isArchiveRecordType = (type?: string | null, code?: string | null): boolean => {
   if (!type && !code) return false;
-  const short = getShortRecordType(type, code);
-  if (short === '1.1 Sao lục' || short === '1.2 Công văn') return true;
-  const tLower = (type || '').toLowerCase();
-  const cLower = (code || '').toLowerCase();
-  return tLower.includes('1.1') || tLower.includes('sao lục') || tLower.includes('1.2') || tLower.includes('công văn') || tLower.includes('cc dl đđ') || tLower.includes('cung cấp dữ liệu') ||
-         cLower.includes('1.1') || cLower.includes('sl-') || cLower.includes('cv-') || cLower.includes('1.2');
+  const cStr = (code || '').trim();
+  const tStr = (type || '').trim();
+  return cStr.startsWith('1.') || tStr.startsWith('1.') || cStr === '1.1' || cStr === '1.2' || tStr === '1.1' || tStr === '1.2';
 };
 
-// Check if a record belongs to Dang Ky (Đăng ký đất đai / Cấp giấy)
+// Check if a record belongs to Do Dac module (Đo đạc: mã 2.x -> 2.1, 2.2, 2.3, 2.4, 2.5)
+export const isDoDacRecordType = (type?: string | null, code?: string | null): boolean => {
+  if (!type && !code) return false;
+  const cStr = (code || '').trim();
+  const tStr = (type || '').trim();
+  if (cStr.startsWith('1.') || tStr.startsWith('1.')) return false;
+  return cStr.startsWith('2.') || tStr.startsWith('2.');
+};
+
+// Check if a record belongs to Dang Ky module (Đăng ký đất đai / Cấp giấy: mã 3.x)
 export const isDangKyRecordType = (type?: string | null, code?: string | null): boolean => {
   if (!type && !code) return false;
-  const tLower = (type || '').toLowerCase();
-  const cLower = (code || '').toLowerCase();
-
-  // If measurement procedure, return false
-  if (
-    cLower.startsWith('2.') ||
-    cLower === '3.2.1' ||
-    tLower.includes('đo đạc') ||
-    tLower.includes('đo dạc') ||
-    tLower.includes('trích đo') ||
-    tLower.includes('trích lục') ||
-    tLower.includes('cắm mốc') ||
-    tLower.includes('chỉnh lý')
-  ) {
+  const cStr = (code || '').trim();
+  const tStr = (type || '').trim();
+  if (cStr.startsWith('1.') || tStr.startsWith('1.') || cStr.startsWith('2.') || tStr.startsWith('2.')) {
     return false;
   }
-
-  const detectedId = detectProcedureId(code, type);
-  if (detectedId && detectedId.startsWith('3.')) return true;
-
-  if (tLower.startsWith('3.') || cLower.startsWith('3.')) return true;
-
-  const dangKyKeywords = [
-    'chuyển quyền', 'chuyển nhượng', 'tặng cho', 'thừa kế', 'cấp đổi', 'cấp lại',
-    'đăng ký biến động', 'đkbđ', 'biến động', 'giao dịch bảo đảm', 'thế chấp', 'xóa thế chấp',
-    'đính chính', 'cấp gcn', 'cấp giấy', 'phân chia quyền', 'tách hợp thửa đăng ký', '3.1', '3.3', '3.4', '3.5', '3.6', '3.7', '3.8', '3.9'
-  ];
-
-  return dangKyKeywords.some(kw => tLower.includes(kw) || cLower.includes(kw));
-};
-
-// Check if a record belongs to Do Dac (Đo đạc)
-export const isDoDacRecordType = (type?: string | null, code?: string | null): boolean => {
-  if (isArchiveRecordType(type, code)) return false;
-  if (isDangKyRecordType(type, code)) return false;
-  return true;
+  return cStr.startsWith('3.') || tStr.startsWith('3.');
 };
 
 // Get default attached documents for a procedure
