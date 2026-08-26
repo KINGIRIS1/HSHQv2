@@ -21,6 +21,7 @@ import {
     fetchMapSheetConversions 
 } from './apiUtilities';
 import { supabase, isConfigured } from './supabaseClient';
+import { executeSupabaseOperationWithAutoClean } from './apiCore';
 
 export interface FullBackupData {
     backup_time: string;
@@ -216,7 +217,10 @@ export const restoreFullBackupToSupabase = async (backupData: FullBackupData): P
             if (error) console.warn("Lỗi xóa luutru_records:", error);
             const chunks = chunkArray(combinedArchive, 200);
             for (const chunk of chunks) {
-                const { error: insErr } = await supabase.from('luutru_records').insert(chunk);
+                const { error: insErr } = await executeSupabaseOperationWithAutoClean(
+                    (p) => supabase.from('luutru_records').insert(p),
+                    chunk
+                );
                 if (insErr) throw insErr;
             }
         }

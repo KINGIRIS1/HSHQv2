@@ -302,6 +302,90 @@ export const sanitizePayloadFor22P02 = (payload: any): any => {
     return clean;
 };
 
+export const stripColumnFromPayload = (payload: any, columnName: string): any => {
+    if (!payload || !columnName) return payload;
+    if (Array.isArray(payload)) {
+        return payload.map(item => stripColumnFromPayload(item, columnName));
+    }
+    if (typeof payload === 'object' && payload !== null) {
+        const clean = { ...payload };
+        delete clean[columnName];
+        
+        // Match snake_case and lowercased versions as well
+        const snakeCase = columnName.replace(/([A-Z])/g, "_$1").toLowerCase();
+        delete clean[snakeCase];
+        delete clean[columnName.toLowerCase()];
+        
+        return clean;
+    }
+    return payload;
+};
+
+export const executeSupabaseOperationWithAutoClean = async <T = any>(
+    operationFn: (currentPayload: any) => Promise<{ data: T | null; error: any }>,
+    initialPayload: any,
+    maxRetries = 10
+): Promise<{ data: T | null; error: any }> => {
+    let currentPayload = initialPayload;
+    let attempts = 0;
+
+    while (attempts < maxRetries) {
+        attempts++;
+        let res: { data: T | null; error: any };
+        try {
+            res = await operationFn(currentPayload);
+        } catch (catchedErr: any) {
+            res = { data: null, error: catchedErr };
+        }
+
+        if (!res.error) {
+            return res;
+        }
+
+        const err = res.error;
+        const msg = String(err.message || err.details || err.hint || (typeof err === 'string' ? err : ''));
+        const code = String(err.code || '');
+
+        // Check for 22P02 data type error
+        if (code === '22P02' || msg.includes('22P02')) {
+            currentPayload = sanitizePayloadFor22P02(currentPayload);
+            continue;
+        }
+
+        // Check for missing column error: PGRST204, 42703, schema cache, missing column
+        if (
+            code === 'PGRST204' || 
+            code === '42703' || 
+            msg.includes('schema cache') || 
+            msg.includes('Could not find the') || 
+            msg.includes('column') ||
+            msg.includes('does not exist')
+        ) {
+            // Extracts column name from common PostgREST error patterns:
+            // "Could not find the 'authorizedPersonAddress' column of 'luutru_records' in the schema cache"
+            // "column "authorizedPersonAddress" of relation "luutru_records" does not exist"
+            const match = msg.match(/Could not find the '([^']+)' column/) || 
+                          msg.match(/column "([^"]+)"/) ||
+                          msg.match(/column '([^']+)'/);
+            
+            if (match && match[1]) {
+                const missingCol = match[1];
+                console.warn(`[Auto-Clean DB Sync] Cột '${missingCol}' không tồn tại trên Supabase schema cache. Đang tự động loại bỏ và thử lại (lần ${attempts})...`);
+                currentPayload = stripColumnFromPayload(currentPayload, missingCol);
+                continue;
+            }
+        }
+
+        return res;
+    }
+
+    try {
+        return await operationFn(currentPayload);
+    } catch (finalErr: any) {
+        return { data: null, error: finalErr };
+    }
+};
+
 // --- MAPPERS ---
 export const mapRecordFromDb = (item: any): any => {
     if (!item) return item;
