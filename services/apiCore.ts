@@ -322,7 +322,7 @@ export const stripColumnFromPayload = (payload: any, columnName: string): any =>
 };
 
 export const executeSupabaseOperationWithAutoClean = async <T = any>(
-    operationFn: (currentPayload: any) => Promise<{ data: T | null; error: any }>,
+    operationFn: (currentPayload: any) => PromiseLike<{ data: T | null; error: any }> | Promise<{ data: T | null; error: any }>,
     initialPayload: any,
     maxRetries = 10
 ): Promise<{ data: T | null; error: any }> => {

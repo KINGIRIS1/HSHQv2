@@ -352,10 +352,27 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
         e.preventDefault();
         if (!formData.so_hieu || !formData.trich_yeu) { alert('Vui lòng nhập Số hiệu và Trích yếu.'); return; }
         
+        const existingRecord = editingId ? records.find(r => r.id === editingId) : null;
+        const initialHistory = existingRecord?.data?.history || [
+            {
+                action: 'Tiếp nhận công văn',
+                status: 'draft',
+                timestamp: new Date().toISOString(),
+                user: currentUser.name || currentUser.fullName || currentUser.username || 'Cán bộ tiếp nhận',
+                note: 'Tạo mới từ phân hệ Công văn'
+            }
+        ];
+
         const success = await saveArchiveRecord({
             ...formData,
             id: editingId || undefined,
-            created_by: currentUser.username
+            data: {
+                ...(existingRecord?.data || {}),
+                ...(formData.data || {}),
+                receivedBy: existingRecord?.data?.receivedBy || currentUser.name || currentUser.fullName || currentUser.username,
+                history: initialHistory
+            },
+            created_by: existingRecord?.created_by || currentUser.username || currentUser.name
         });
 
         if (success) {
@@ -400,12 +417,20 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
             const oldHistory = Array.isArray(record.data?.history) ? record.data.history : [];
             const newHistory = [...oldHistory, historyEntry];
 
-            await saveArchiveRecord({ 
-                ...record, 
+            // Optimistic update immediately (0ms delay)
+            const updatedRecord: ArchiveRecord = {
+                ...record,
                 status: newStatus,
                 data: { ...record.data, history: newHistory }
-            });
-            loadData();
+            };
+            setRecords(prev => prev.map(r => r.id === record.id ? updatedRecord : r));
+
+            try {
+                await saveArchiveRecord(updatedRecord);
+            } catch (e) {
+                console.error('Error in handleStatusChange:', e);
+                loadData();
+            }
         }
     };
 
@@ -436,9 +461,30 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
                 }
             };
             
-            await updateArchiveRecordsBatch(Array.from(selectedIds), updates);
+            const targetIds = Array.from(selectedIds);
+            // Optimistic update immediately (0ms delay)
+            setRecords(prev => prev.map(r => {
+                if (targetIds.includes(r.id)) {
+                    const oldHistory = Array.isArray(r.data?.history) ? r.data.history : [];
+                    return {
+                        ...r,
+                        status: newStatus,
+                        data: {
+                            ...(r.data || {}),
+                            history: [...oldHistory, historyEntry]
+                        }
+                    };
+                }
+                return r;
+            }));
             setSelectedIds(new Set());
-            loadData();
+
+            try {
+                await updateArchiveRecordsBatch(targetIds, updates);
+            } catch (e) {
+                console.error('Error in handleBatchStatusChange:', e);
+                loadData();
+            }
         }
     };
 
@@ -459,14 +505,23 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
             updateData.ngay_hoan_thanh = handoverDate;
             updateData.danh_sach = listName;
 
-            await saveArchiveRecord({ 
+            const updatedRec: ArchiveRecord = { 
                 ...pendingCompletionRecord, 
                 status: 'completed',
                 data: updateData
-            });
-            
+            };
+
+            // Optimistic UI update immediately
+            setRecords(prev => prev.map(r => r.id === updatedRec.id ? updatedRec : r));
             setPendingCompletionRecord(null);
-            loadData();
+            setShowHandoverModal(false);
+
+            try {
+                await saveArchiveRecord(updatedRec);
+            } catch (e) {
+                console.error('Error in handleConfirmHandover:', e);
+                loadData();
+            }
         } else if (selectedIds.size > 0 && subTab === 'signed') {
             const historyEntry = {
                 action: 'Đã giao 1 cửa',
@@ -485,9 +540,33 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
                 }
             };
             
-            await updateArchiveRecordsBatch(Array.from(selectedIds), updates);
+            const targetIds = Array.from(selectedIds);
+            // Optimistic UI update immediately
+            setRecords(prev => prev.map(r => {
+                if (targetIds.includes(r.id)) {
+                    const oldHistory = Array.isArray(r.data?.history) ? r.data.history : [];
+                    return {
+                        ...r,
+                        status: 'completed',
+                        data: {
+                            ...(r.data || {}),
+                            ngay_hoan_thanh: handoverDate,
+                            danh_sach: listName,
+                            history: [...oldHistory, historyEntry]
+                        }
+                    };
+                }
+                return r;
+            }));
+            setShowHandoverModal(false);
             setSelectedIds(new Set());
-            loadData();
+
+            try {
+                await updateArchiveRecordsBatch(targetIds, updates);
+            } catch (e) {
+                console.error('Error in batch handover:', e);
+                loadData();
+            }
         }
     };
 

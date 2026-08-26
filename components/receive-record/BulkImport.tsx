@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import * as XLSX from 'xlsx-js-style';
 import { RecordFile, RecordStatus } from '../../types';
 import { RECORD_TYPES } from '../../constants';
+import { detectProcedureId, getShortRecordType, isDangKyRecordType, isArchiveRecordType } from '../../constants/procedures';
 import { Upload, FileSpreadsheet, Wand2, Save, Printer, X, Check, Download } from 'lucide-react';
 import { confirmAction } from '../../utils/appHelpers';
 
@@ -82,6 +83,8 @@ const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calc
           const newBulkRecords: BulkRecordItem[] = [];
 
           const typeMapping: Record<string, string> = {
+              '1.1': '1.1 Sao lục',
+              'SAO LỤC': '1.1 Sao lục',
               '1.2': '1.2 Công văn',
               '1.2 CÔNG VĂN': '1.2 Công văn',
               'CÔNG VĂN': '1.2 Công văn',
@@ -109,8 +112,30 @@ const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calc
               'HIẾN ĐƯỜNG': 'Trích đo chỉnh lý bản đồ địa chính',
               'TÁCH THỬA': '2.5 Trích đo Tách - Hợp thửa',
               'HỢP THỬA': '2.2 Trích đo',
-              'CẤP ĐỔI': '2.2 Trích đo',
-              '2.5': '2.5 Trích đo Tách - Hợp thửa'
+              '2.5': '2.5 Trích đo Tách - Hợp thửa',
+              // Dang Ky procedures
+              '3.1.1': '3.1.1 Chuyển quyền',
+              'CHUYỂN NHƯỢNG': '3.1.1 Chuyển quyền',
+              'TẶNG CHO': '3.1.1 Chuyển quyền',
+              'THỪA KẾ': '3.1.1 Chuyển quyền',
+              'CHUYỂN QUYỀN': '3.1.1 Chuyển quyền',
+              '3.1.2': '3.1.2 Phân chia quyền',
+              '3.1.3': '3.1.3 Chuyển quyền theo B/A/QĐ',
+              '3.2.1': '3.2.1 Cấp đổi',
+              'CẤP ĐỔI': '3.2.1 Cấp đổi',
+              '3.2.2': '3.2.2 Cấp đổi đo đạc',
+              '3.3.1': '3.3.1 Cấp lại do mất',
+              'CẤP LẠI': '3.3.1 Cấp lại do mất',
+              '3.4.1': '3.4.1 Đính chính GCN',
+              'ĐÍNH CHÍNH': '3.4.1 Đính chính GCN',
+              '3.5.1': '3.5.1 ĐKBĐ thay đổi thông tin',
+              'BIẾN ĐỘNG': '3.5.1 ĐKBĐ thay đổi thông tin',
+              '3.6.1': '3.6.1 Tách thửa ĐK',
+              '3.7.1': '3.7.1 Cấp lần đầu',
+              '3.8.1': '3.8.1 Thế chấp QSDĐ',
+              'THẾ CHẤP': '3.8.1 Thế chấp QSDĐ',
+              'GIAO DỊCH BẢO ĐẢM': '3.8.1 Thế chấp QSDĐ',
+              '3.8.2': '3.8.2 Xóa thế chấp'
           };
 
           for (let i = headerRowIndex + 1; i < data.length; i++) {
@@ -132,14 +157,21 @@ const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calc
 
               if (!recordType) {
                   const lower = rawType.toLowerCase();
-                  if (lower.includes('1.2') || lower.includes('công văn') || lower.includes('cong van') || lower.includes('cung cấp tài liệu')) recordType = '1.2 Công văn';
+                  if (lower.includes('1.1') || lower.includes('sao lục')) recordType = '1.1 Sao lục';
+                  else if (lower.includes('1.2') || lower.includes('công văn') || lower.includes('cong van') || lower.includes('cung cấp tài liệu')) recordType = '1.2 Công văn';
                   else if (lower.includes('trích lục')) recordType = '2.1 Trích lục';
                   else if (lower.includes('chỉnh lý') || lower.includes('hiến đường')) recordType = 'Trích đo chỉnh lý bản đồ địa chính';
                   else if (lower.includes('số thửa') || lower.includes('cập nhật') || lower.includes('cập nhập') || lower.includes('2.6') || lower.includes('duyệt đơn')) recordType = '2.3 Duyệt đơn & Cung cấp số thửa';
                   else if (lower.includes('tách thửa')) recordType = '2.5 Trích đo Tách - Hợp thửa';
                   else if (lower.includes('trích đo') || lower.includes('hợp thửa')) recordType = '2.2 Trích đo';
                   else if (lower.includes('đo đạc') || lower.includes('cắm mốc')) recordType = '2.4 Trích đo Cắm mốc';
-                  else if (rawType) recordType = rawType;
+                  else if (lower.includes('chuyển nhượng') || lower.includes('tặng cho') || lower.includes('thừa kế') || lower.includes('chuyển quyền')) recordType = '3.1.1 Chuyển quyền';
+                  else if (lower.includes('cấp đổi')) recordType = '3.2.1 Cấp đổi';
+                  else if (lower.includes('cấp lại')) recordType = '3.3.1 Cấp lại do mất';
+                  else if (lower.includes('đính chính')) recordType = '3.4.1 Đính chính GCN';
+                  else if (lower.includes('thế chấp') || lower.includes('giao dịch bảo đảm')) recordType = '3.8.1 Thế chấp QSDĐ';
+                  else if (lower.includes('biến động') || lower.includes('đkbđ')) recordType = '3.5.1 ĐKBĐ thay đổi thông tin';
+                  else if (rawType) recordType = getShortRecordType(rawType);
                   else recordType = RECORD_TYPES[0];
               }
               
@@ -148,6 +180,10 @@ const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calc
 
               const receivedDate = new Date().toISOString();
               const deadline = calculateDeadline(String(recordType), receivedDate.split('T')[0]);
+
+              const isDangKy = isDangKyRecordType(String(recordType));
+              const isArchive = isArchiveRecordType(String(recordType));
+              const targetSourceTable = isDangKy ? 'dangky_records' : (isArchive ? 'luutru_records' : 'land_records');
 
               newBulkRecords.push({
                   tempId: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substr(2, 9),
@@ -163,7 +199,8 @@ const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calc
                   receivedDate: receivedDate,
                   deadline: deadline,
                   status: RecordStatus.RECEIVED,
-                  receivedBy: currentUser?.employeeId,
+                  sourceTable: targetSourceTable,
+                  receivedBy: currentUser?.employeeId || currentUser?.fullName || currentUser?.name || currentUser?.username,
                   content: String(getVal(['NỘI DUNG', 'GHI CHÚ']) || ''),
                   authorizedBy: authorizedBy,
                   authDocType: authDocType,
@@ -198,7 +235,7 @@ const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calc
           receivedDate: record.receivedDate || new Date().toISOString(),
           deadline: record.deadline || '',
           status: RecordStatus.RECEIVED,
-          receivedBy: currentUser?.employeeId
+          receivedBy: record.receivedBy || currentUser?.employeeId || currentUser?.fullName || currentUser?.name || currentUser?.username
       } as RecordFile;
 
       const savedRecord = await onSave(newRecord);

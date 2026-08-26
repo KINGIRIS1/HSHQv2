@@ -99,7 +99,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
         <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-center">
           {/* Left Column: Form Inputs */}
           <div className="md:col-span-7 space-y-5">
-            <h2 className="text-xl md:text-2xl font-black text-slate-950 text-center uppercase tracking-wider mb-6 drop-shadow-[0_0_12px_rgba(255,255,255,0.95)]">
+            <h2 className="text-xl md:text-2xl font-black text-white text-center uppercase tracking-wider mb-6 drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)]">
               ĐĂNG NHẬP HỆ THỐNG
             </h2>
 
@@ -113,7 +113,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* Username Input */}
               <div className="relative group">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-950 drop-shadow-[0_0_4px_rgba(255,255,255,0.95)]">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-white drop-shadow">
                   <UserIcon size={18} />
                 </div>
                 <input
@@ -121,7 +121,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
                   name="username"
                   autoComplete="username"
                   required
-                  className="w-full pl-10 pr-4 py-3 bg-white/30 hover:bg-white/40 focus:bg-white/50 border border-white/70 focus:border-slate-950 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all text-slate-950 font-black placeholder-slate-700 shadow-md backdrop-blur-md"
+                  className="w-full pl-10 pr-4 py-3 bg-white/20 hover:bg-white/25 focus:bg-white/30 border border-white/60 focus:border-white rounded-xl focus:ring-2 focus:ring-blue-400 outline-none transition-all text-white font-bold placeholder-white/80 shadow-md backdrop-blur-md"
                   placeholder="Tài khoản đăng nhập"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
@@ -130,7 +130,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
 
               {/* Password Input */}
               <div className="relative group">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-950 drop-shadow-[0_0_4px_rgba(255,255,255,0.95)]">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-white drop-shadow">
                   <Lock size={18} />
                 </div>
                 <input
@@ -138,7 +138,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
                   name="password"
                   autoComplete="current-password"
                   required
-                  className="w-full pl-10 pr-4 py-3 bg-white/30 hover:bg-white/40 focus:bg-white/50 border border-white/70 focus:border-slate-950 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all text-slate-950 font-black placeholder-slate-700 shadow-md backdrop-blur-md"
+                  className="w-full pl-10 pr-4 py-3 bg-white/20 hover:bg-white/25 focus:bg-white/30 border border-white/60 focus:border-white rounded-xl focus:ring-2 focus:ring-blue-400 outline-none transition-all text-white font-bold placeholder-white/80 shadow-md backdrop-blur-md"
                   placeholder="Mật khẩu"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -146,7 +146,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-950 hover:text-blue-900 transition-colors drop-shadow-[0_0_4px_rgba(255,255,255,0.95)]"
+                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-white/80 hover:text-white transition-colors"
                 >
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
@@ -158,13 +158,13 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
                   <div className="relative flex items-center justify-center">
                     <input
                       type="checkbox"
-                      className="peer h-5 w-5 cursor-pointer appearance-none rounded-md border-2 border-slate-800 bg-white/50 checked:border-blue-600 checked:bg-blue-600 focus:ring-2 focus:ring-blue-500 transition-all"
+                      className="peer h-5 w-5 cursor-pointer appearance-none rounded-md border-2 border-white/80 bg-white/30 checked:border-blue-500 checked:bg-blue-600 focus:ring-2 focus:ring-blue-400 transition-all"
                       checked={rememberMe}
                       onChange={(e) => setRememberMe(e.target.checked)}
                     />
                     <CheckCircle2 size={16} className="absolute text-white opacity-0 peer-checked:opacity-100 pointer-events-none transition-opacity stroke-[3]" />
                   </div>
-                  <span className="text-sm font-black text-slate-950 group-hover:text-blue-900 transition-colors drop-shadow-[0_0_10px_rgba(255,255,255,0.95)]">
+                  <span className="text-sm font-bold text-white group-hover:text-amber-300 transition-colors drop-shadow-[0_2px_6px_rgba(0,0,0,0.95)]">
                     Ghi nhớ đăng nhập
                   </span>
                 </label>

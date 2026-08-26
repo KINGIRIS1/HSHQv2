@@ -129,23 +129,24 @@ export const RecordLookupView: React.FC<RecordLookupViewProps> = ({
         // 2. Status Filter
         if (selectedStatusFilter !== 'all') {
             result = result.filter(r => {
-                const st = getDisplayStatus(r);
-                if (selectedStatusFilter === RecordStatus.RECEIVED || selectedStatusFilter === 'Tiếp nhận mới') {
+                const st = String(getDisplayStatus(r));
+                const filterVal = String(selectedStatusFilter);
+                if (filterVal === RecordStatus.RECEIVED || filterVal === 'Tiếp nhận mới') {
                     return st === RecordStatus.RECEIVED || st === RecordStatus.ASSIGNED || st === RecordStatus.IN_PROGRESS || st === 'Tiếp nhận mới';
                 }
-                if (selectedStatusFilter === RecordStatus.HANDOVER || selectedStatusFilter === 'Chờ bàn giao') {
-                    return st === RecordStatus.HANDOVER || st === RecordStatus.SUBMITTED || st === RecordStatus.APPROVED || st === 'Chờ bàn giao';
+                if (filterVal === RecordStatus.HANDOVER || filterVal === 'Chờ bàn giao') {
+                    return st === RecordStatus.HANDOVER || st === RecordStatus.SIGNED || st === 'Chờ bàn giao';
                 }
-                if (selectedStatusFilter === RecordStatus.RETURNED || selectedStatusFilter === 'Đã trả kết quả') {
+                if (filterVal === RecordStatus.RETURNED || filterVal === 'Đã trả kết quả') {
                     return st === RecordStatus.RETURNED || st === 'Đã trả kết quả';
                 }
-                if (selectedStatusFilter === RecordStatus.WITHDRAWN || selectedStatusFilter === 'CSD rút HS') {
+                if (filterVal === RecordStatus.WITHDRAWN || filterVal === 'CSD rút HS') {
                     return st === RecordStatus.WITHDRAWN || st === 'CSD rút HS';
                 }
-                if (selectedStatusFilter === RecordStatus.REJECTED || selectedStatusFilter === 'Trả hủy hồ sơ') {
+                if (filterVal === RecordStatus.REJECTED || filterVal === 'Trả hủy hồ sơ') {
                     return st === RecordStatus.REJECTED || st === 'Trả hủy hồ sơ';
                 }
-                return st === selectedStatusFilter;
+                return st === filterVal;
             });
         }
 

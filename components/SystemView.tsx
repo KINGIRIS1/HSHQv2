@@ -4,7 +4,8 @@ import UserManagement from './UserManagement';
 import EmployeeManagement from './EmployeeManagement';
 import SystemSettingsView from './SystemSettingsView';
 import ActivityLogView from './ActivityLogView';
-import { Shield, Users, Settings2, History } from 'lucide-react';
+import RegistrationProcedureSlaModal from './RegistrationProcedureSlaModal';
+import { Shield, Users, Settings2, History, GitFork } from 'lucide-react';
 import { fetchDangKyRecords } from '../services/apiDangKy';
 
 interface SystemViewProps {
@@ -43,7 +44,7 @@ const SystemView: React.FC<SystemViewProps> = ({
     onViewRecord
 }) => {
     const isAdmin = currentUser.role === UserRole.ADMIN;
-    const [activeTab, setActiveTab] = useState<'users' | 'employees' | 'logs' | 'settings'>('logs');
+    const [activeTab, setActiveTab] = useState<'users' | 'employees' | 'logs' | 'settings' | 'workflow_sla'>('logs');
     const [loadedDangKyRecords, setLoadedDangKyRecords] = useState<DangKyRecord[]>(dangKyRecords);
 
     useEffect(() => {
@@ -92,6 +93,14 @@ const SystemView: React.FC<SystemViewProps> = ({
                         <Settings2 size={16}/> Cấu hình
                     </button>
                 )}
+                {isAdmin && (
+                    <button 
+                        onClick={() => setActiveTab('workflow_sla')}
+                        className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'workflow_sla' ? 'border-blue-600 text-blue-700 bg-white shadow-xs' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                    >
+                        <GitFork size={16} className="text-blue-600"/> Quy trình & SLA
+                    </button>
+                )}
             </div>
 
             {/* CONTENT */}
@@ -130,6 +139,13 @@ const SystemView: React.FC<SystemViewProps> = ({
                         onHolidaysChanged={onHolidaysChanged} 
                         employees={employees}
                         onOpenCloudInspector={onOpenCloudInspector}
+                    />
+                )}
+                {activeTab === 'workflow_sla' && isAdmin && (
+                    <RegistrationProcedureSlaModal
+                        isOpen={true}
+                        onClose={() => setActiveTab('settings')}
+                        isEmbedded={true}
                     />
                 )}
             </div>

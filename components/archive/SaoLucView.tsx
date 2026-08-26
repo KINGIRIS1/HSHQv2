@@ -225,6 +225,17 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Tân Qua
         }
         
         // Map form data về cấu trúc ArchiveRecord
+        const existingRecord = editingId ? records.find(r => r.id === editingId) : null;
+        const initialHistory = existingRecord?.data?.history || [
+            {
+                action: 'Tiếp nhận hồ sơ',
+                status: 'draft',
+                timestamp: new Date().toISOString(),
+                user: currentUser.name || currentUser.fullName || currentUser.username || 'Cán bộ tiếp nhận',
+                note: 'Tạo mới từ phân hệ Sao lục'
+            }
+        ];
+
         const recordToSave: Partial<ArchiveRecord> = {
             id: editingId || undefined,
             type: 'saoluc',
@@ -234,14 +245,17 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Tân Qua
             ngay_thang: formData.ngay_nhan,     // Ngày nhận
             trich_yeu: formData.noi_dung,       // Nội dung
             data: {                             // Các trường mở rộng
+                ...(existingRecord?.data || {}),
                 xa_phuong: formData.xa_phuong,
                 to_ban_do: formData.to_ban_do,
                 thua_dat: formData.thua_dat,
                 hen_tra: formData.hen_tra,
                 ngay_hoan_thanh: formData.ngay_hoan_thanh,
-                danh_sach: formData.danh_sach
+                danh_sach: formData.danh_sach,
+                receivedBy: existingRecord?.data?.receivedBy || currentUser.name || currentUser.fullName || currentUser.username,
+                history: initialHistory
             },
-            created_by: currentUser.username
+            created_by: existingRecord?.created_by || currentUser.username || currentUser.name
         };
 
         const success = await saveArchiveRecord(recordToSave);
@@ -301,12 +315,20 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Tân Qua
             const oldHistory = Array.isArray(record.data?.history) ? record.data.history : [];
             const newHistory = [...oldHistory, historyEntry];
 
-            await saveArchiveRecord({ 
-                ...record, 
+            // Optimistic update immediately (0ms delay)
+            const updatedRecord: ArchiveRecord = {
+                ...record,
                 status: newStatus,
                 data: { ...record.data, history: newHistory }
-            });
-            loadData();
+            };
+            setRecords(prev => prev.map(r => r.id === record.id ? updatedRecord : r));
+
+            try {
+                await saveArchiveRecord(updatedRecord);
+            } catch (e) {
+                console.error('Error in handleStatusChange:', e);
+                loadData();
+            }
         }
     };
 
@@ -337,9 +359,30 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Tân Qua
                 }
             };
             
-            await updateArchiveRecordsBatch(Array.from(selectedIds), updates);
+            const targetIds = Array.from(selectedIds);
+            // Optimistic update immediately (0ms delay)
+            setRecords(prev => prev.map(r => {
+                if (targetIds.includes(r.id)) {
+                    const oldHistory = Array.isArray(r.data?.history) ? r.data.history : [];
+                    return {
+                        ...r,
+                        status: newStatus,
+                        data: {
+                            ...(r.data || {}),
+                            history: [...oldHistory, historyEntry]
+                        }
+                    };
+                }
+                return r;
+            }));
             setSelectedIds(new Set());
-            loadData();
+
+            try {
+                await updateArchiveRecordsBatch(targetIds, updates);
+            } catch (e) {
+                console.error('Error in handleBatchStatusChange:', e);
+                loadData();
+            }
         }
     };
 
@@ -360,14 +403,23 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Tân Qua
             updateData.ngay_hoan_thanh = handoverDate;
             updateData.danh_sach = listName;
 
-            await saveArchiveRecord({ 
+            const updatedRec: ArchiveRecord = { 
                 ...pendingCompletionRecord, 
                 status: 'completed',
                 data: updateData
-            });
-            
+            };
+
+            // Optimistic UI update immediately
+            setRecords(prev => prev.map(r => r.id === updatedRec.id ? updatedRec : r));
             setPendingCompletionRecord(null);
-            loadData();
+            setShowHandoverModal(false);
+
+            try {
+                await saveArchiveRecord(updatedRec);
+            } catch (e) {
+                console.error('Error in handleConfirmHandover:', e);
+                loadData();
+            }
         } else if (selectedIds.size > 0 && subTab === 'signed') {
             const historyEntry = {
                 action: 'Đã giao 1 cửa',
@@ -386,9 +438,33 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Tân Qua
                 }
             };
             
-            await updateArchiveRecordsBatch(Array.from(selectedIds), updates);
+            const targetIds = Array.from(selectedIds);
+            // Optimistic UI update immediately
+            setRecords(prev => prev.map(r => {
+                if (targetIds.includes(r.id)) {
+                    const oldHistory = Array.isArray(r.data?.history) ? r.data.history : [];
+                    return {
+                        ...r,
+                        status: 'completed',
+                        data: {
+                            ...(r.data || {}),
+                            ngay_hoan_thanh: handoverDate,
+                            danh_sach: listName,
+                            history: [...oldHistory, historyEntry]
+                        }
+                    };
+                }
+                return r;
+            }));
+            setShowHandoverModal(false);
             setSelectedIds(new Set());
-            loadData();
+
+            try {
+                await updateArchiveRecordsBatch(targetIds, updates);
+            } catch (e) {
+                console.error('Error in batch handover:', e);
+                loadData();
+            }
         }
     };
 

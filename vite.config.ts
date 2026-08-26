@@ -26,7 +26,11 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, './'),
       buffer: 'buffer',
+      stream: 'stream-browserify',
     },
+  },
+  optimizeDeps: {
+    include: ['stream-browserify', 'buffer', 'docx'],
   },
   define: {
     'global': 'window',

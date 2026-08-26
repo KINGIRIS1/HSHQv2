@@ -7,6 +7,7 @@ export interface ProcedureDefinition {
   price?: number;
   prefixes: string[];
   keywords: string[];
+  defaultDocs?: { name: string; type: 'Bản chính' | 'Bản sao'; note?: string }[];
 }
 
 export const PROCEDURE_CATALOG: ProcedureDefinition[] = [
@@ -91,7 +92,14 @@ export const PROCEDURE_CATALOG: ProcedureDefinition[] = [
     module: 'dangky',
     defaultDeadline: 13,
     prefixes: ['3.1.1', 'CN', 'TA', 'TK', 'CQ'],
-    keywords: ['chuyển nhượng', 'tặng cho', 'thừa kế', 'chuyển quyền', 'qsdđ', 'qsh tài sản']
+    keywords: ['chuyển nhượng', 'tặng cho', 'thừa kế', 'chuyển quyền', 'qsdđ', 'qsh tài sản'],
+    defaultDocs: [
+      { name: 'Mẫu số 28. Đơn đăng ký biến động đất đai, tài sản gắn liền với đất theo quy định.', type: 'Bản chính' },
+      { name: 'Giấy chứng nhận đã cấp (bản gốc).', type: 'Bản chính' },
+      { name: 'Hợp đồng hoặc văn bản về việc chuyển quyền sử dụng đất, quyền sở hữu tài sản gắn liền với đất đối với trường hợp chuyển đổi, chuyển nhượng, thừa kế, góp vốn bằng quyền sử dụng đất, quyền sở hữu tài sản gắn liền với đất.', type: 'Bản chính' },
+      { name: 'Quyết định xử phạt vi phạm hành chính trong lĩnh vực đất đai đối với trường hợp có vi phạm hành chính trong lĩnh vực đất đai và giấy tờ chứng minh đã thực hiện quyết định xử phạt (nếu có)', type: 'Bản chính' },
+      { name: 'Tờ khai thuế theo quy định của pháp luật thuế hiện hành', type: 'Bản chính' }
+    ]
   },
   {
     id: '3.1.2',
@@ -100,7 +108,14 @@ export const PROCEDURE_CATALOG: ProcedureDefinition[] = [
     module: 'dangky',
     defaultDeadline: 13,
     prefixes: ['3.1.2', 'TT', 'PCQ'],
-    keywords: ['thỏa thuận', 'thỏa thuận vợ chồng', 'phân chia', 'hộ gia đình', 'phân chia quyền']
+    keywords: ['thỏa thuận', 'thỏa thuận vợ chồng', 'phân chia', 'hộ gia đình', 'phân chia quyền'],
+    defaultDocs: [
+      { name: 'Mẫu số 28. Đơn đăng ký biến động đất đai, tài sản gắn liền với đất theo quy định.', type: 'Bản chính' },
+      { name: 'Giấy chứng nhận đã cấp (bản gốc).', type: 'Bản chính' },
+      { name: 'Hợp đồng hoặc văn bản về việc chuyển quyền sử dụng đất, quyền sở hữu tài sản gắn liền với đất đối với trường hợp chuyển đổi, chuyển nhượng, thừa kế, góp vốn bằng quyền sử dụng đất, quyền sở hữu tài sản gắn liền với đất.', type: 'Bản chính' },
+      { name: 'Quyết định xử phạt vi phạm hành chính trong lĩnh vực đất đai đối với trường hợp có vi phạm hành chính trong lĩnh vực đất đai và giấy tờ chứng minh đã thực hiện quyết định xử phạt (nếu có)', type: 'Bản chính' },
+      { name: 'Tờ khai thuế theo quy định của pháp luật thuế hiện hành', type: 'Bản chính' }
+    ]
   },
   {
     id: '3.1.3',
@@ -109,7 +124,15 @@ export const PROCEDURE_CATALOG: ProcedureDefinition[] = [
     module: 'dangky',
     defaultDeadline: 13,
     prefixes: ['3.1.3', 'QĐ-TA-THA', 'BẢN ÁN', 'THI HÀNH ÁN'],
-    keywords: ['bản án', 'tòa án', 'thi hành án', 'quyết định thi hành án']
+    keywords: ['bản án', 'tòa án', 'thi hành án', 'quyết định thi hành án'],
+    defaultDocs: [
+      { name: 'Mẫu số 28. Đơn đăng ký biến động đất đai, tài sản gắn liền với đất theo quy định.', type: 'Bản chính' },
+      { name: 'Giấy chứng nhận đã cấp (bản gốc).', type: 'Bản chính' },
+      { name: 'Văn bản thỏa thuận về việc thay đổi quyền sử dụng đất, quyền sở hữu tài sản gắn liền với đất theo thỏa thuận của các thành viên hộ gia đình hoặc của vợ và chồng.', type: 'Bản chính' },
+      { name: 'Văn bản về việc đại diện theo quy định của pháp luật về dân sự đối với trường hợp thực hiện thủ tục đăng ký đất đai, tài sản gắn liền với đất thông qua người đại diện.', type: 'Bản chính' },
+      { name: 'Tờ khai thuế theo quy định của pháp luật thuế hiện hành', type: 'Bản chính' },
+      { name: 'Bản trích lục bản đồ địa chính hoặc trích đo bản đồ địa chính', type: 'Bản chính' }
+    ]
   },
   {
     id: '3.2.1',
@@ -118,7 +141,12 @@ export const PROCEDURE_CATALOG: ProcedureDefinition[] = [
     module: 'dangky',
     defaultDeadline: 10,
     prefixes: ['3.2.1', 'CD'],
-    keywords: ['cấp đổi', 'ố nhòe', 'rách nát', 'thêm tên', 'không đổi diện tích']
+    keywords: ['cấp đổi', 'ố nhòe', 'rách nát', 'thêm tên', 'không đổi diện tích'],
+    defaultDocs: [
+      { name: 'Mẫu số 28. Đơn đăng ký biến động đất đai, tài sản gắn liền với đất theo quy định.', type: 'Bản chính' },
+      { name: 'Giấy chứng nhận đã cấp (bản gốc).', type: 'Bản chính' },
+      { name: 'Mảnh trích đo bản đồ địa chính thửa đất (nếu có).', type: 'Bản chính' }
+    ]
   },
   {
     id: '3.2.2',
@@ -127,16 +155,28 @@ export const PROCEDURE_CATALOG: ProcedureDefinition[] = [
     module: 'dangky',
     defaultDeadline: 15,
     prefixes: ['3.2.2', 'CDT'],
-    keywords: ['cấp đổi (có thuế)', 'cấp đổi có thuế', 'bản đồ chính quy', 'thay đổi kích thước', 'thay đổi diện tích']
+    keywords: ['cấp đổi (có thuế)', 'cấp đổi có thuế', 'bản đồ chính quy', 'thay đổi kích thước', 'thay đổi diện tích'],
+    defaultDocs: [
+      { name: 'Mẫu số 28. Đơn đăng ký biến động đất đai, tài sản gắn liền với đất theo quy định.', type: 'Bản chính' },
+      { name: 'Giấy chứng nhận đã cấp (bản gốc).', type: 'Bản chính' },
+      { name: 'Mảnh trích đo bản đồ địa chính thửa đất (nếu có).', type: 'Bản chính' },
+      { name: 'Tờ khai thuế theo quy định hiện hành', type: 'Bản chính' }
+    ]
   },
   {
     id: '3.3.1',
     name: '3.3.1 Cấp lại Giấy chứng nhận do bị mất',
     shortName: '3.3.1 Cấp lại',
     module: 'dangky',
-    defaultDeadline: 10,
+    defaultDeadline: 15,
     prefixes: ['3.3.1', 'CL'],
-    keywords: ['cấp lại', 'bị mất', 'mất gcn', 'mất sổ']
+    keywords: ['cấp lại', 'bị mất', 'mất gcn', 'mất sổ'],
+    defaultDocs: [
+      { name: 'Mảnh trích đo bản đồ địa chính thửa đất đối với trường hợp người sử dụng đất có nhu cầu đo đạc để xác định lại kích thước các cạnh, diện tích của thửa đất.', type: 'Bản chính' },
+      { name: 'Đơn đăng ký biến động đất đai, tài sản gắn liền với đất theo Mẫu số 18 ban hành kèm theo Nghị định số 151/2025/NĐ-CP.', type: 'Bản chính' },
+      { name: 'Văn bản về việc đại diện theo quy định của pháp luật về dân sự đối với trường hợp thực hiện thủ tục đăng ký đất đai, tài sản gắn liền với đất thông qua người đại diện.', type: 'Bản chính' },
+      { name: 'Hồ sơ Cung cấp thông tin', type: 'Bản chính' }
+    ]
   },
   {
     id: '3.3.2',
@@ -145,7 +185,13 @@ export const PROCEDURE_CATALOG: ProcedureDefinition[] = [
     module: 'dangky',
     defaultDeadline: 15,
     prefixes: ['3.3.2', 'CLT'],
-    keywords: ['cấp lại (có thuế)', 'cấp lại có thuế', 'cấp lại thay đổi diện tích']
+    keywords: ['cấp lại (có thuế)', 'cấp lại có thuế', 'cấp lại thay đổi diện tích'],
+    defaultDocs: [
+      { name: 'Mảnh trích đo bản đồ địa chính thửa đất đối với trường hợp người sử dụng đất có nhu cầu đo đạc để xác định lại kích thước các cạnh, diện tích của thửa đất.', type: 'Bản chính' },
+      { name: 'Đơn đăng ký biến động đất đai, tài sản gắn liền với đất theo Mẫu số 18 ban hành kèm theo Nghị định số 151/2025/NĐ-CP.', type: 'Bản chính' },
+      { name: 'Văn bản về việc đại diện theo quy định của pháp luật về dân sự đối với trường hợp thực hiện thủ tục đăng ký đất đai, tài sản gắn liền với đất thông qua người đại diện.', type: 'Bản chính' },
+      { name: 'Hồ sơ Cung cấp thông tin', type: 'Bản chính' }
+    ]
   },
   {
     id: '3.4.1',
@@ -154,7 +200,12 @@ export const PROCEDURE_CATALOG: ProcedureDefinition[] = [
     module: 'dangky',
     defaultDeadline: 17,
     prefixes: ['3.4.1', 'DK-TT-HT', 'DK-TT', 'DK-HT', 'TÁCH-HỢP'],
-    keywords: ['tách thửa', 'hợp thửa', 'tách - hợp thửa', 'không đổi người sử dụng đất']
+    keywords: ['tách thửa', 'hợp thửa', 'tách - hợp thửa', 'không đổi người sử dụng đất'],
+    defaultDocs: [
+      { name: 'Mẫu số 29. Đơn đề nghị tách thửa đất, hợp thửa đất theo quy định.', type: 'Bản chính' },
+      { name: 'Bản vẽ tách thửa đất, hợp thửa đất lập theo quy định.', type: 'Bản chính' },
+      { name: 'Giấy chứng nhận đã cấp (bản gốc).', type: 'Bản chính' }
+    ]
   },
   {
     id: '3.4.2',
@@ -170,9 +221,13 @@ export const PROCEDURE_CATALOG: ProcedureDefinition[] = [
     name: '3.5.1 Xác nhận tiếp tục sử dụng đất nông nghiệp khi hết hạn',
     shortName: '3.5.1 Gia hạn',
     module: 'dangky',
-    defaultDeadline: 7,
+    defaultDeadline: 12,
     prefixes: ['3.5.1', 'GH'],
-    keywords: ['gia hạn', 'tiếp tục sử dụng đất', 'hết hạn', 'đất nông nghiệp']
+    keywords: ['gia hạn', 'tiếp tục sử dụng đất', 'hết hạn', 'đất nông nghiệp'],
+    defaultDocs: [
+      { name: 'Giấy chứng nhận đã cấp (bản gốc).', type: 'Bản chính' },
+      { name: 'Mẫu số 31. Đơn xin xác nhận lại thời hạn sử dụng đất nông nghiệp.', type: 'Bản chính' }
+    ]
   },
   {
     id: '3.6.1',
@@ -279,13 +334,24 @@ export const RECORD_TYPES: string[] = PROCEDURE_CATALOG
 export const EXTENDED_RECORD_TYPES: string[] = PROCEDURE_CATALOG.map(p => p.shortName);
 
 // Derived per-module procedure lists
-export const RECORD_TYPES_LuuTru = PROCEDURE_CATALOG
-  .filter(p => p.module === 'luutru')
-  .map(p => p.shortName);
+export const RECORD_TYPES_LuuTru: string[] = Array.from(new Set([
+  ...PROCEDURE_CATALOG.filter(p => p.module === 'luutru').map(p => p.shortName),
+  '1.1 Sao lục', '1.2 Công văn', 'Sao lục', 'Công văn'
+]));
 
-export const RECORD_TYPES_DoDac = PROCEDURE_CATALOG
-  .filter(p => p.module === 'dodac')
-  .map(p => p.shortName);
+export const RECORD_TYPES_DoDac: string[] = Array.from(new Set([
+  ...PROCEDURE_CATALOG.filter(p => p.module === 'dodac').map(p => p.shortName),
+  'Trích lục',
+  'Trích đo',
+  'Duyệt đơn & Cung cấp số thửa',
+  'Cắm mốc',
+  'Tách-Hợp thửa',
+  '2.1 Trích lục',
+  '2.2 Trích đo',
+  '2.3 Duyệt đơn & Cung cấp số thửa',
+  '2.4 Cắm mốc',
+  '2.5 Tách-Hợp thửa'
+]));
 
 export const DANG_KY_RECORD_TYPES = PROCEDURE_CATALOG
   .filter(p => p.module === 'dangky')
@@ -306,13 +372,13 @@ export const DANG_KY_DEADLINE_MAP: Record<string, number> = PROCEDURE_CATALOG
     'Thỏa thuận': 13,
     'Cấp đổi': 10,
     'Cấp đổi (có thuế)': 15,
-    'Cấp lại': 10,
+    'Cấp lại': 15,
     'Cấp lại (có thuế)': 15,
     'Tách - hợp thửa': 17,
     'Tách thửa': 17,
     'Hợp thửa': 17,
     'Tách thửa chuyển quyền': 17,
-    'Gia hạn': 7,
+    'Gia hạn': 12,
     'Chuyển mục đích không xin phép': 7,
     'Chuyển mục đích': 7,
     'Đính chính GCN': 7,
@@ -404,10 +470,72 @@ export const getCanonicalRecordType = (type?: string | null, code?: string | nul
 };
 
 // Check if a record type belongs to Archive module (Lưu trữ)
-export const isArchiveRecordType = (type?: string | null): boolean => {
-  if (!type) return false;
-  const short = getShortRecordType(type);
+export const isArchiveRecordType = (type?: string | null, code?: string | null): boolean => {
+  if (!type && !code) return false;
+  const short = getShortRecordType(type, code);
   if (short === '1.1 Sao lục' || short === '1.2 Công văn') return true;
-  const tLower = type.toLowerCase();
-  return tLower.includes('1.1') || tLower.includes('sao lục') || tLower.includes('1.2') || tLower.includes('công văn') || tLower.includes('cc dl đđ') || tLower.includes('cung cấp dữ liệu');
+  const tLower = (type || '').toLowerCase();
+  const cLower = (code || '').toLowerCase();
+  return tLower.includes('1.1') || tLower.includes('sao lục') || tLower.includes('1.2') || tLower.includes('công văn') || tLower.includes('cc dl đđ') || tLower.includes('cung cấp dữ liệu') ||
+         cLower.includes('1.1') || cLower.includes('sl-') || cLower.includes('cv-') || cLower.includes('1.2');
 };
+
+// Check if a record belongs to Dang Ky (Đăng ký đất đai / Cấp giấy)
+export const isDangKyRecordType = (type?: string | null, code?: string | null): boolean => {
+  if (!type && !code) return false;
+  const detectedId = detectProcedureId(code, type);
+  if (detectedId && detectedId.startsWith('3.')) return true;
+
+  const tLower = (type || '').toLowerCase();
+  const cLower = (code || '').toLowerCase();
+
+  if (tLower.startsWith('3.') || cLower.startsWith('3.')) return true;
+
+  const dangKyKeywords = [
+    'chuyển quyền', 'chuyển nhượng', 'tặng cho', 'thừa kế', 'cấp đổi', 'cấp lại',
+    'đăng ký biến động', 'đkbđ', 'biến động', 'giao dịch bảo đảm', 'thế chấp', 'xóa thế chấp',
+    'đính chính', 'cấp gcn', 'cấp giấy', 'phân chia quyền', 'tách hợp thửa đăng ký', '3.1', '3.2', '3.3', '3.4', '3.5', '3.6', '3.7', '3.8', '3.9'
+  ];
+
+  return dangKyKeywords.some(kw => tLower.includes(kw) || cLower.includes(kw));
+};
+
+// Check if a record belongs to Do Dac (Đo đạc)
+export const isDoDacRecordType = (type?: string | null, code?: string | null): boolean => {
+  if (isArchiveRecordType(type, code)) return false;
+  if (isDangKyRecordType(type, code)) return false;
+  return true;
+};
+
+// Get default attached documents for a procedure
+export const getDefaultDocsForProcedure = (type?: string | null, code?: string | null): { id: string; name: string; type: 'Bản chính' | 'Bản sao' }[] => {
+  if (!type && !code) return [];
+  const detectedId = detectProcedureId(code, type);
+  const proc = getProcedureById(detectedId);
+  if (proc?.defaultDocs && proc.defaultDocs.length > 0) {
+    return proc.defaultDocs.map((d, idx) => ({
+      id: String(idx + 1),
+      name: d.name,
+      type: d.type
+    }));
+  }
+
+  // Generic fallback if not specifically defined in procedure definition
+  const tLower = (type || '').toLowerCase();
+  if (tLower.includes('1.1') || tLower.includes('sao lục') || tLower.includes('cc dl đđ') || (type && type.startsWith('2.'))) {
+    return [
+      { id: '1', name: 'Phiếu yêu cầu lập hợp đồng đo đạc dịch vụ, Cắm mốc, trích lục, Cung cấp thông tin', type: 'Bản chính' },
+      { id: '2', name: 'Giấy chứng nhận đã cấp', type: 'Bản sao' }
+    ];
+  }
+
+  if (type && type.startsWith('3.')) {
+    return [
+      { id: '1', name: 'Giấy chứng nhận QSD đất', type: 'Bản chính' },
+      { id: '2', name: 'Đơn đăng ký biến động', type: 'Bản chính' }
+    ];
+  }
+
+  return [];
+};
+

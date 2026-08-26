@@ -492,6 +492,7 @@ export interface DangKyRecord {
   invoiceNumber?: string;                   // Số Hóa đơn
   feeAmount?: number | string;              // Số tiền thu (VNĐ)
   status: DangKyStatusType;                 // Trạng thái quy trình (1 trong 14 trạng thái)
+  statusLogs?: any[];                       // Lịch sử cập nhật trạng thái
   notes?: string;                           // Ghi chú
   personalNotes?: string;                   // Ghi chú cá nhân
   reminderDate?: string;                     // Hẹn giờ nhắc việc
@@ -516,6 +517,14 @@ export interface DangKyRecord {
   deliveryDate?: string;                    // Ngày giao trả kết quả
   attachedDocs?: AttachedDoc[];             // Giấy tờ kèm theo
   attachedDocuments?: { name: string; type: string }[]; // Giấy tờ kèm theo khác
+  customerName?: string;                   // Tên khách hàng (fallback)
+  phoneNumber?: string;                    // SĐT liên hệ (fallback)
+  cccd?: string;                           // CCCD (fallback)
+  customerAddress?: string;                // Địa chỉ khách hàng (fallback)
+  address?: string;                        // Địa chỉ thửa đất / nơi cư trú
+  submitterName?: string;                  // Tên người nộp (alias)
+  submitterPhone?: string;                 // SĐT người nộp (alias)
+  sourceTable?: 'dangky_records' | 'land_records' | 'luutru_records';
   createdAt?: string;
   updatedAt?: string;
 }

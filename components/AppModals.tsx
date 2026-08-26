@@ -7,7 +7,8 @@ import { DetailModal } from './DetailModal';
 import { MobileDetailModal } from './mobile/MobileDetailModal';
 import DangKyRecordModal from './DangKyRecordModal';
 import DangKyDetailModal from './DangKyDetailModal';
-import { saveDangKyRecordApi } from '../services/apiDangKy';
+import { DangKyImportModal } from './DangKyImportModal';
+import { saveDangKyRecordApi, saveDangKyRecordsBatchApi } from '../services/apiDangKy';
 import { useIsMobile } from '../hooks/useIsMobile';
 import DeleteConfirmModal from './DeleteConfirmModal';
 import ExportModal from './ExportModal';
@@ -124,8 +125,9 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
     const targetRecordsForBatch = props.selectedRecordsForBulk.length > 0 ? props.selectedRecordsForBulk : props.filteredRecords;
     const isMobile = useIsMobile();
 
-    const isDangKyEditing = (props.editingRecord as any)?.sourceTable === 'dangky_records';
+    const isDangKyEditing = (props.editingRecord as any)?.sourceTable === 'dangky_records' || (props.currentView === 'registration_records' || props.currentView === 'vaoso_records');
     const isDangKyViewing = (props.viewingRecord as any)?.sourceTable === 'dangky_records';
+    const isDangKyView = props.currentView === 'registration_records' || props.currentView === 'vaoso_records';
 
     return (
         <>
@@ -159,13 +161,29 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
                 />
             )}
             
-            <ImportModal 
-                isOpen={props.isImportModalOpen} 
-                onClose={() => props.setIsImportModalOpen(false)} 
-                onImport={props.handleImportRecords} 
-                employees={props.employees} 
-                initialMode={props.importModalMode}
-            />
+            {isDangKyView ? (
+                <DangKyImportModal
+                    isOpen={props.isImportModalOpen && isDangKyView}
+                    onClose={() => props.setIsImportModalOpen(false)}
+                    employees={props.employees}
+                    initialMode={props.importModalMode}
+                    onImport={async (records, mode, onProgress) => {
+                        const success = await saveDangKyRecordsBatchApi(records);
+                        if (success) {
+                            props.onRefreshData?.();
+                        }
+                        return success;
+                    }}
+                />
+            ) : (
+                <ImportModal 
+                    isOpen={props.isImportModalOpen && !isDangKyView} 
+                    onClose={() => props.setIsImportModalOpen(false)} 
+                    onImport={props.handleImportRecords} 
+                    employees={props.employees} 
+                    initialMode={props.importModalMode}
+                />
+            )}
             
             <AssignModal 
                 isOpen={props.isAssignModalOpen} 

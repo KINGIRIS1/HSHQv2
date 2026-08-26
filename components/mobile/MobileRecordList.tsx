@@ -111,11 +111,7 @@ const MobileRecordList: React.FC<MobileRecordListProps> = ({
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-            <div className="text-xs font-bold text-slate-500 whitespace-nowrap px-3 py-2 bg-slate-100 rounded-xl border border-slate-200">
-              {filtered.length} hồ sơ
-            </div>
-          </div>
+
         </div>
       </div>
 
