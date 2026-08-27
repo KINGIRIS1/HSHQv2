@@ -970,11 +970,13 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                                             Số tiền thu
                                         </label>
                                         <p className="text-sm font-black text-emerald-800 whitespace-nowrap truncate mt-0.5">
-                                            {record.returnedPrice !== undefined && record.returnedPrice !== null
-                                                ? record.returnedPrice.toLocaleString('vi-VN') + ' đ'
-                                                : (record.price !== undefined && record.price !== null && record.price > 0
-                                                    ? record.price.toLocaleString('vi-VN') + ' đ'
-                                                    : (contractPrice !== null && contractPrice !== undefined ? contractPrice.toLocaleString('vi-VN') + ' đ' : '---'))}
+                                            {record.status === RecordStatus.REJECTED || record.status === RecordStatus.WITHDRAWN || (record.notes || '').toLowerCase().includes('trả hủy') || (record.notes || '').toLowerCase().includes('rút hồ sơ')
+                                                ? '0 đ (Miễn thu)'
+                                                : (record.returnedPrice !== undefined && record.returnedPrice !== null
+                                                    ? record.returnedPrice.toLocaleString('vi-VN') + ' đ'
+                                                    : (record.price !== undefined && record.price !== null && record.price > 0
+                                                        ? record.price.toLocaleString('vi-VN') + ' đ'
+                                                        : (contractPrice !== null && contractPrice !== undefined ? contractPrice.toLocaleString('vi-VN') + ' đ' : '---')))}
                                         </p>
                                     </div>
 
@@ -984,7 +986,11 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                                             {record.receiptType === 'Biên Lai' ? 'SỐ BIÊN LAI' : record.receiptType === 'Hóa Đơn' ? 'SỐ HÓA ĐƠN' : 'SỐ BIÊN LAI / HÓA ĐƠN'}
                                         </label>
                                         <p className="text-xs font-black text-blue-900 font-mono whitespace-nowrap truncate mt-0.5">
-                                            {record.receiptNumber || '---'}
+                                            {record.receiptNumber 
+                                                ? record.receiptNumber 
+                                                : (record.status === RecordStatus.REJECTED || record.status === RecordStatus.WITHDRAWN || (record.notes || '').toLowerCase().includes('trả hủy') || (record.notes || '').toLowerCase().includes('rút hồ sơ')
+                                                    ? 'Không phát hành' 
+                                                    : '---')}
                                         </p>
                                     </div>
                                 </div>

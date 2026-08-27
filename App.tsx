@@ -759,21 +759,24 @@ function App() {
   const handleConfirmReturnResult = useCallback(async (receiptNumber: string, receiverName: string, returnedPrice: number, receiptType?: 'Biên Lai' | 'Hóa Đơn', customReason?: string) => {
       if (!returnRecord) return;
       const nowStr = new Date().toISOString();
-      const typeLabel = receiptType || 'Biên Lai';
-      const performer = currentUser?.fullName || currentUser?.name || 'Cán bộ trả';
-      const reasonText = customReason?.trim() || `Đã trả kết quả cho ${receiverName}`;
-      const formattedNote = `Trả hồ sơ: ${reasonText} (${performer})`;
+      const typeLabel = receiptType || (receiptNumber ? 'Biên Lai' : '');
+      const performer = currentUser?.fullName || currentUser?.name || currentUser?.username || 'Cán bộ trả';
 
-      const statusLogs = createStatusLog(returnRecord, RecordStatus.RETURNED, `Trả kết quả cho người dân: ${receiverName} (${typeLabel} số: ${receiptNumber}, Số tiền: ${returnedPrice.toLocaleString('vi-VN')}đ)`);
-      const updates = { 
+      const feeDetailText = returnedPrice > 0 
+          ? `(${typeLabel || 'Biên lai'} số: ${receiptNumber}, Số tiền: ${returnedPrice.toLocaleString('vi-VN')}đ)`
+          : (receiptNumber ? `(${typeLabel || 'Phiếu'} số: ${receiptNumber}, Miễn thu phí)` : '(Không thu phí / Không phát hành HĐ/BL)');
+
+      const statusLogs = createStatusLog(returnRecord, RecordStatus.RETURNED, `Trả kết quả cho người dân: ${receiverName} ${feeDetailText}`);
+      const updates: Partial<RecordFile> = { 
           resultReturnedDate: nowStr, 
           status: RecordStatus.RETURNED, 
           receiptNumber: receiptNumber, 
           receiptType: typeLabel,
           receiverName: receiverName,
+          feeCollector: performer,
           returnedPrice: returnedPrice,
           price: returnedPrice,
-          notes: formattedNote,
+          feeAmount: returnedPrice,
           statusLogs
       }; 
       setRecords(prev => prev.map(r => r.id === returnRecord.id ? { ...r, ...updates } : r));
@@ -785,7 +788,7 @@ function App() {
           actionLabel: 'Trả kết quả',
           targetType: 'Hồ sơ',
           referenceCode: returnRecord.code,
-          details: `Xác nhận trả kết quả hồ sơ ${returnRecord.code} cho ${receiverName} (${typeLabel} số: ${receiptNumber}, Số tiền: ${returnedPrice.toLocaleString('vi-VN')}đ)`,
+          details: `Xác nhận trả kết quả hồ sơ ${returnRecord.code} cho ${receiverName} ${feeDetailText}`,
           recordId: returnRecord.id
       });
       setToast({ type: 'success', message: `Đã ghi nhận trả kết quả hồ sơ ${returnRecord.code} cho ${receiverName}.` });

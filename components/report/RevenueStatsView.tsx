@@ -98,12 +98,32 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
                     assignedWard = 'Chưa phân công';
                 }
 
+                // Determine fee collector (staff/user who returned result and collected fee)
+                let feeCollector = r.feeCollector || '';
+                if (!feeCollector && r.statusLogs && Array.isArray(r.statusLogs)) {
+                    const returnLog = r.statusLogs.find(log => 
+                        log.newStatus === RecordStatus.RETURNED || 
+                        (log.note && log.note.toLowerCase().includes('trả kết quả'))
+                    );
+                    if (returnLog && returnLog.changedBy) {
+                        feeCollector = returnLog.changedBy;
+                    }
+                }
+                if (!feeCollector && r.employeeName) {
+                    feeCollector = r.employeeName;
+                }
+                if (!feeCollector && r.assignedTo) {
+                    const emp = employees.find(e => e.id === r.assignedTo || e.name === r.assignedTo);
+                    if (emp) feeCollector = emp.name;
+                }
+
                 return {
                     ...r,
                     calcPrice: price,
                     calcReturned: price,
                     computedReceiptType: receiptType,
-                    assignedWard
+                    assignedWard,
+                    feeCollector: feeCollector || '---'
                 };
             })
             // Filter strictly by resultReturnedDate or exportDate or completedDate
@@ -251,6 +271,7 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
             'Loại chứng từ': r.computedReceiptType,
             'Số BL/HĐ': r.receiptNumber || '—',
             'Số tiền thu (Đ)': r.calcReturned,
+            'Người thu tiền': r.feeCollector || '—',
             'Xã phân công giải quyết': r.assignedWard
         }));
 
@@ -348,8 +369,7 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
                                 <th className="p-3.5 w-28 text-center">SỐ BL/HĐ</th>
                                 <th className="p-3.5 w-28 text-right">SỐ TIỀN THU</th>
                                 <th className="p-3.5 w-28 text-center">NGÀY TRẢ KQ</th>
-                                <th className="p-3.5 w-32">NGƯỜI THU TIỀN</th>
-                                <th className="p-3.5 min-w-[140px]">GHI CHÚ</th>
+                                <th className="p-3.5 w-36">NGƯỜI THU TIỀN</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -401,17 +421,14 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
                                                 {dateStr}
                                             </td>
                                             <td className="p-3.5 text-slate-700 font-medium">
-                                                {r.receiverName || '—'}
-                                            </td>
-                                            <td className="p-3.5 text-slate-500 italic">
-                                                {r.notes || r.content || '—'}
+                                                {r.feeCollector || '—'}
                                             </td>
                                         </tr>
                                     );
                                 })
                             ) : (
                                 <tr>
-                                    <td colSpan={12} className="p-12 text-center text-slate-400 italic">
+                                    <td colSpan={11} className="p-12 text-center text-slate-400 italic">
                                         Không tìm thấy dữ liệu nguồn thu phù hợp.
                                     </td>
                                 </tr>

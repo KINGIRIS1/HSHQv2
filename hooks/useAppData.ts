@@ -11,10 +11,18 @@ import { DEFAULT_WARDS as STATIC_WARDS, APP_VERSION, MOCK_EMPLOYEES, MOCK_USERS 
 import { migrateUnbatchedRecords } from '../utils/appHelpers';
 
 export const useAppData = (currentUser: User | null) => {
-    const [records, setRecords] = useState<RecordFile[]>([]);
-    const [employees, setEmployees] = useState<Employee[]>([]);
-    const [users, setUsers] = useState<User[]>([]);
-    const [holidays, setHolidays] = useState<Holiday[]>([]); // State mới cho ngày nghỉ
+    // 0ms First Paint from Persistent Cache / LocalStorage
+    const [records, setRecords] = useState<RecordFile[]>(() => {
+        const cached = getFromCache(CACHE_KEYS.RECORDS, []);
+        if (cached && cached.length > 0) {
+            const { migratedRecords } = migrateUnbatchedRecords(cached);
+            return migratedRecords;
+        }
+        return [];
+    });
+    const [employees, setEmployees] = useState<Employee[]>(() => getFromCache(CACHE_KEYS.EMPLOYEES, MOCK_EMPLOYEES));
+    const [users, setUsers] = useState<User[]>(() => getFromCache(CACHE_KEYS.USERS, MOCK_USERS));
+    const [holidays, setHolidays] = useState<Holiday[]>(() => getFromCache(CACHE_KEYS.HOLIDAYS, []));
     const [rolePermissions, setRolePermissions] = useState<RolePermissions>(DEFAULT_ROLE_PERMISSIONS);
     const [departmentPermissions, setDepartmentPermissions] = useState<DepartmentPermissions>({});
     const [connectionStatus, setConnectionStatus] = useState<'connected' | 'offline'>('connected');
@@ -32,17 +40,16 @@ export const useAppData = (currentUser: User | null) => {
 
     const loadData = useCallback(async () => {
         try {
-            // 1. Thử kết nối Server nội bộ (LAN Server / Express API) TRƯỚC TIÊN vì chạy rất nhanh trên mạng nội bộ
+            // 1. Thử kết nối Server nội bộ (LAN Server / Express API) với timeout cực nhanh (500ms)
             try {
                 const [recRes, empRes, userRes, holRes] = await Promise.all([
-                    fetch('/records', { signal: AbortSignal.timeout(4000) }).then(r => r.ok ? r.json() : null).catch(() => null),
-                    fetch('/employees', { signal: AbortSignal.timeout(4000) }).then(r => r.ok ? r.json() : null).catch(() => null),
-                    fetch('/users', { signal: AbortSignal.timeout(4000) }).then(r => r.ok ? r.json() : null).catch(() => null),
-                    fetch('/holidays', { signal: AbortSignal.timeout(4000) }).then(r => r.ok ? r.json() : null).catch(() => null),
+                    fetch('/records', { signal: AbortSignal.timeout(500) }).then(r => r.ok ? r.json() : null).catch(() => null),
+                    fetch('/employees', { signal: AbortSignal.timeout(500) }).then(r => r.ok ? r.json() : null).catch(() => null),
+                    fetch('/users', { signal: AbortSignal.timeout(500) }).then(r => r.ok ? r.json() : null).catch(() => null),
+                    fetch('/holidays', { signal: AbortSignal.timeout(500) }).then(r => r.ok ? r.json() : null).catch(() => null),
                 ]);
 
                 if (recRes !== null || empRes !== null || userRes !== null) {
-                    console.log("✅ Kết nối thành công tới Server nội bộ (LAN Server)!");
                     const rawRecs = Array.isArray(recRes) ? recRes : (recRes?.records || []);
                     const { migratedRecords } = migrateUnbatchedRecords(rawRecs);
                     setRecords(migratedRecords);
@@ -59,12 +66,12 @@ export const useAppData = (currentUser: User | null) => {
                     return;
                 }
             } catch (localErr) {
-                console.log("Server nội bộ không phản hồi, chuyển sang thử kết nối Supabase Cloud...", localErr);
+                // Tiếp tục sang Supabase Cloud
             }
 
-            // 2. Nếu không có Server nội bộ, thử kết nối Supabase Cloud (với timeout 8s)
+            // 2. Tải song song toàn bộ dữ liệu từ Supabase Cloud
             const timeoutPromise = new Promise((_, reject) => 
-                setTimeout(() => reject(new Error("Timeout Supabase")), 8000)
+                setTimeout(() => reject(new Error("Timeout Supabase")), 10000)
             );
 
             const dataPromise = Promise.all([
@@ -72,7 +79,7 @@ export const useAppData = (currentUser: User | null) => {
                 fetchEmployees(),
                 fetchUsers(),
                 fetchUpdateInfo(),
-                fetchHolidays(), // Tải thêm danh sách ngày nghỉ
+                fetchHolidays(),
                 getSystemSetting('role_permissions'),
                 getSystemSetting('department_permissions')
             ]);

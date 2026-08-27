@@ -752,7 +752,9 @@ export const DangKyDetailModal: React.FC<DangKyDetailModalProps> = ({
                         Số tiền thu
                       </label>
                       <p className="text-sm font-black text-emerald-800 whitespace-nowrap truncate mt-0.5">
-                        {formatCurrency(record.feeAmount || record.price || record.returnedPrice)}
+                        {record.status === 'Trả hủy hồ sơ' || record.status === 'CSD rút HS' || (record.notes || '').toLowerCase().includes('trả hủy') || (record.notes || '').toLowerCase().includes('rút hồ sơ')
+                          ? '0 đ (Miễn thu)'
+                          : formatCurrency(record.feeAmount || record.price || record.returnedPrice)}
                       </p>
                     </div>
 
@@ -762,19 +764,14 @@ export const DangKyDetailModal: React.FC<DangKyDetailModalProps> = ({
                         {record.receiptType === 'Biên Lai' ? 'SỐ BIÊN LAI' : record.receiptType === 'Hóa Đơn' ? 'SỐ HÓA ĐƠN' : 'SỐ BIÊN LAI / HÓA ĐƠN'}
                       </label>
                       <p className="text-xs font-black text-blue-900 font-mono whitespace-nowrap truncate mt-0.5">
-                        {record.receiptNumber || record.invoiceNumber || '---'}
+                        {record.receiptNumber || record.invoiceNumber || (
+                          record.status === 'Trả hủy hồ sơ' || record.status === 'CSD rút HS' || (record.notes || '').toLowerCase().includes('trả hủy') || (record.notes || '').toLowerCase().includes('rút hồ sơ')
+                            ? 'Không phát hành'
+                            : '---'
+                        )}
                       </p>
                     </div>
                   </div>
-
-                  {record.exportBatch && (
-                    <div className="mt-3 p-2.5 bg-slate-50 rounded-lg border border-slate-200 flex justify-between items-center text-xs">
-                      <span className="text-gray-500 font-medium">Đợt xuất bàn giao Một cửa:</span>
-                      <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                        Đợt {record.exportBatch}
-                      </span>
-                    </div>
-                  )}
                 </div>
 
                 {/* GHI CHÚ NỘI BỘ */}

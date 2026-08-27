@@ -195,6 +195,7 @@ export interface RecordFile {
   resultReturnedDate?: string | null; // Ngày trả kết quả cho dân
   feeAmount?: number | null;         // Số tiền thu
   returnedPrice?: number | null;     // Số tiền thực tế khi trả kết quả
+  feeCollector?: string | null;      // Cán bộ/nhân viên thực hiện thu tiền (tài khoản trả kết quả)
 
   // Tính năng Chốt danh sách bàn giao về phòng chuyên môn (Dành cho hồ sơ đã trả kết quả)
   returnBatch?: number | null;

@@ -68,184 +68,182 @@ export const fetchRecords = async (onProgress?: (loadedRecords: RecordFile[]) =>
   }
 
   try {
-    let allRecords: any[] = [];
-    const step = 500;
-    let retryCount = 0;
-    const maxRetries = 1;
+    const step = 1000;
 
-    // 1. Fetch from dangky_records
-    try {
-        let fromDk = 0;
-        let hasMoreDk = true;
-        while (hasMoreDk) {
-            const { data, error } = await supabase
-                .from('dangky_records')
-                .select('*')
-                .order('receivedDate', { ascending: false })
-                .order('id', { ascending: true }) 
-                .range(fromDk, fromDk + step - 1);
+    // Helper fetch dangky_records
+    const fetchDangKy = async () => {
+        const records: any[] = [];
+        let from = 0;
+        let hasMore = true;
+        while (hasMore) {
+            try {
+                const { data, error } = await supabase
+                    .from('dangky_records')
+                    .select('*')
+                    .order('receivedDate', { ascending: false })
+                    .order('id', { ascending: true }) 
+                    .range(from, from + step - 1);
 
-            if (error) {
-                if (error.code === 'PGRST205' || error.code === '42P01' || error.message?.includes('does not exist')) {
-                    console.info('Bảng dangky_records chưa tồn tại, bỏ qua.');
-                } else {
-                    console.warn('Lỗi khi fetch dangky_records:', error);
-                }
-                hasMoreDk = false;
-            } else if (data && data.length > 0) {
-                const mapped = data.map(item => {
-                    const parsedOwners = Array.isArray(item.owners) ? item.owners : (typeof item.owners === 'string' ? JSON.parse(item.owners || '[]') : []);
-                    const parsedTransferees = Array.isArray(item.transferees) ? item.transferees : (typeof item.transferees === 'string' ? JSON.parse(item.transferees || '[]') : []);
-                    
-                    let cName = item.customerName;
-                    if (!cName || cName.trim() === '' || cName === 'Chưa có tên') {
-                        const ownerNames = parsedOwners.map((o: any) => o?.name).filter(Boolean).join(', ');
-                        const transfereeNames = parsedTransferees.map((t: any) => t?.name).filter(Boolean).join(', ');
-                        if (ownerNames && transfereeNames) {
-                            cName = `${ownerNames} → ${transfereeNames}`;
-                        } else if (ownerNames) {
-                            cName = ownerNames;
-                        } else if (transfereeNames) {
-                            cName = transfereeNames;
+                if (error) {
+                    if (error.code !== 'PGRST205' && error.code !== '42P01' && !error.message?.includes('does not exist')) {
+                        console.warn('Lỗi khi fetch dangky_records:', error);
+                    }
+                    hasMore = false;
+                } else if (data && data.length > 0) {
+                    const mapped = data.map(item => {
+                        const parsedOwners = Array.isArray(item.owners) ? item.owners : (typeof item.owners === 'string' ? JSON.parse(item.owners || '[]') : []);
+                        const parsedTransferees = Array.isArray(item.transferees) ? item.transferees : (typeof item.transferees === 'string' ? JSON.parse(item.transferees || '[]') : []);
+                        
+                        let cName = item.customerName;
+                        if (!cName || cName.trim() === '' || cName === 'Chưa có tên') {
+                            const ownerNames = parsedOwners.map((o: any) => o?.name).filter(Boolean).join(', ');
+                            const transfereeNames = parsedTransferees.map((t: any) => t?.name).filter(Boolean).join(', ');
+                            if (ownerNames && transfereeNames) {
+                                cName = `${ownerNames} → ${transfereeNames}`;
+                            } else if (ownerNames) {
+                                cName = ownerNames;
+                            } else if (transfereeNames) {
+                                cName = transfereeNames;
+                            }
                         }
-                    }
 
-                    let cCccd = item.cccd;
-                    if (!cCccd || cCccd.trim() === '') {
-                        const oCccd = parsedOwners.map((o: any) => o?.cccd).filter(Boolean).join(', ');
-                        const tCccd = parsedTransferees.map((t: any) => t?.cccd).filter(Boolean).join(', ');
-                        cCccd = [oCccd, tCccd].filter(Boolean).join(', ');
-                    }
+                        let cCccd = item.cccd;
+                        if (!cCccd || cCccd.trim() === '') {
+                            const oCccd = parsedOwners.map((o: any) => o?.cccd).filter(Boolean).join(', ');
+                            const tCccd = parsedTransferees.map((t: any) => t?.cccd).filter(Boolean).join(', ');
+                            cCccd = [oCccd, tCccd].filter(Boolean).join(', ');
+                        }
 
-                    let cPhone = item.phoneNumber;
-                    if (!cPhone || cPhone.trim() === '') {
-                        const oPhone = parsedOwners.map((o: any) => o?.phone).filter(Boolean).join(', ');
-                        const tPhone = parsedTransferees.map((t: any) => t?.phone).filter(Boolean).join(', ');
-                        cPhone = [oPhone, tPhone].filter(Boolean).join(', ');
-                    }
+                        let cPhone = item.phoneNumber;
+                        if (!cPhone || cPhone.trim() === '') {
+                            const oPhone = parsedOwners.map((o: any) => o?.phone).filter(Boolean).join(', ');
+                            const tPhone = parsedTransferees.map((t: any) => t?.phone).filter(Boolean).join(', ');
+                            cPhone = [oPhone, tPhone].filter(Boolean).join(', ');
+                        }
 
-                    let cAddr = item.customerAddress;
-                    if (!cAddr || cAddr.trim() === '') {
-                        const oAddr = parsedOwners.map((o: any) => o?.address).filter(Boolean).join(', ');
-                        const tAddr = parsedTransferees.map((t: any) => t?.address).filter(Boolean).join(', ');
-                        cAddr = [oAddr, tAddr].filter(Boolean).join('; ');
-                    }
+                        let cAddr = item.customerAddress;
+                        if (!cAddr || cAddr.trim() === '') {
+                            const oAddr = parsedOwners.map((o: any) => o?.address).filter(Boolean).join(', ');
+                            const tAddr = parsedTransferees.map((t: any) => t?.address).filter(Boolean).join(', ');
+                            cAddr = [oAddr, tAddr].filter(Boolean).join('; ');
+                        }
 
-                    return { 
-                        ...item, 
-                        owners: parsedOwners,
-                        transferees: parsedTransferees,
-                        customerName: cName || item.customerName || '',
-                        cccd: cCccd || item.cccd || '',
-                        phoneNumber: cPhone || item.phoneNumber || '',
-                        customerAddress: cAddr || item.customerAddress || '',
-                        sourceTable: 'dangky_records' as const 
-                    };
-                });
-                allRecords = [...allRecords, ...mapped];
-                if (onProgress && allRecords.length > 0) {
-                    const tempMap = new Map<string, RecordFile>();
-                    allRecords.forEach(it => { if (it && it.id) tempMap.set(it.id, mapRecordFromDb(it)); });
-                    onProgress(Array.from(tempMap.values()));
-                }
-                fromDk += step;
-                if (data.length < step) hasMoreDk = false;
-            } else {
-                hasMoreDk = false;
-            }
-        }
-    } catch (dkError) {
-        console.warn('Lỗi fetch dangky_records:', dkError);
-    }
-
-    // 2. Fetch from land_records
-    let hasMoreLand = true;
-    let fromLand = 0;
-    while (hasMoreLand) {
-        try {
-            const { data, error } = await supabase
-                .from('land_records')
-                .select('*')
-                .order('receivedDate', { ascending: false })
-                .order('id', { ascending: true }) 
-                .range(fromLand, fromLand + step - 1);
-
-            if (error) throw error;
-
-            if (data && data.length > 0) {
-                const mapped = data.map(item => ({ ...item, sourceTable: item.sourceTable || ('land_records' as const) }));
-                allRecords = [...allRecords, ...mapped];
-                if (onProgress && allRecords.length > 0) {
-                    const tempMap = new Map<string, RecordFile>();
-                    allRecords.forEach(it => { if (it && it.id) tempMap.set(it.id, mapRecordFromDb(it)); });
-                    onProgress(Array.from(tempMap.values()));
-                }
-                fromLand += step;
-                if (data.length < step) hasMoreLand = false;
-            } else {
-                hasMoreLand = false;
-            }
-        } catch (fetchError: any) {
-            if (fetchError.code === '42P01' || fetchError.message?.includes('does not exist')) {
-                console.warn('Bảng land_records chưa được tạo trên Supabase, bỏ qua bước fetch land_records.');
-                break;
-            }
-            if (retryCount < maxRetries && (fetchError.message?.includes('fetch') || !fetchError.code)) {
-                console.warn(`Lỗi fetch land_records, đang thử lại lần ${retryCount + 1}...`);
-                retryCount++;
-                await new Promise(resolve => setTimeout(resolve, 1000));
-                continue; 
-            }
-            break;
-        }
-    }
-
-    // 3. Fetch from luutru_records (bảng lưu trữ chính thức)
-    try {
-        let fromLt = 0;
-        let hasMoreLt = true;
-        while (hasMoreLt) {
-            const { data, error } = await supabase
-                .from('luutru_records')
-                .select('*')
-                .order('receivedDate', { ascending: false })
-                .order('id', { ascending: true }) 
-                .range(fromLt, fromLt + step - 1);
-
-            if (error) {
-                if (error.code === 'PGRST205' || error.code === '42P01' || error.message?.includes('does not exist')) {
-                    console.info('Bảng luutru_records chưa tồn tại, bỏ qua.');
+                        return { 
+                            ...item, 
+                            owners: parsedOwners,
+                            transferees: parsedTransferees,
+                            customerName: cName || item.customerName || '',
+                            cccd: cCccd || item.cccd || '',
+                            phoneNumber: cPhone || item.phoneNumber || '',
+                            customerAddress: cAddr || item.customerAddress || '',
+                            sourceTable: 'dangky_records' as const 
+                        };
+                    });
+                    records.push(...mapped);
+                    from += step;
+                    if (data.length < step) hasMore = false;
                 } else {
-                    console.warn('Lỗi khi fetch luutru_records:', error);
+                    hasMore = false;
                 }
-                hasMoreLt = false;
-            } else if (data && data.length > 0) {
-                const mapped = data.map(item => ({ ...item, sourceTable: 'luutru_records' as const }));
-                allRecords = [...allRecords, ...mapped];
-                if (onProgress && allRecords.length > 0) {
-                    const tempMap = new Map<string, RecordFile>();
-                    allRecords.forEach(it => { if (it && it.id) tempMap.set(it.id, mapRecordFromDb(it)); });
-                    onProgress(Array.from(tempMap.values()));
-                }
-                fromLt += step;
-                if (data.length < step) hasMoreLt = false;
-            } else {
-                hasMoreLt = false;
+            } catch (err) {
+                console.warn('Lỗi fetch dangky_records:', err);
+                hasMore = false;
             }
         }
-    } catch (ltError) {
-        console.warn('Lỗi fetch luutru_records:', ltError);
-    }
+        return records;
+    };
+
+    // Helper fetch land_records
+    const fetchLand = async () => {
+        const records: any[] = [];
+        let from = 0;
+        let hasMore = true;
+        while (hasMore) {
+            try {
+                const { data, error } = await supabase
+                    .from('land_records')
+                    .select('*')
+                    .order('receivedDate', { ascending: false })
+                    .order('id', { ascending: true }) 
+                    .range(from, from + step - 1);
+
+                if (error) {
+                    if (error.code !== '42P01' && !error.message?.includes('does not exist')) {
+                        console.warn('Lỗi fetch land_records:', error);
+                    }
+                    hasMore = false;
+                } else if (data && data.length > 0) {
+                    const mapped = data.map(item => ({ ...item, sourceTable: item.sourceTable || ('land_records' as const) }));
+                    records.push(...mapped);
+                    from += step;
+                    if (data.length < step) hasMore = false;
+                } else {
+                    hasMore = false;
+                }
+            } catch (err) {
+                console.warn('Lỗi fetch land_records:', err);
+                hasMore = false;
+            }
+        }
+        return records;
+    };
+
+    // Helper fetch luutru_records
+    const fetchLuuTru = async () => {
+        const records: any[] = [];
+        let from = 0;
+        let hasMore = true;
+        while (hasMore) {
+            try {
+                const { data, error } = await supabase
+                    .from('luutru_records')
+                    .select('*')
+                    .order('receivedDate', { ascending: false })
+                    .order('id', { ascending: true }) 
+                    .range(from, from + step - 1);
+
+                if (error) {
+                    if (error.code !== 'PGRST205' && error.code !== '42P01' && !error.message?.includes('does not exist')) {
+                        console.warn('Lỗi fetch luutru_records:', error);
+                    }
+                    hasMore = false;
+                } else if (data && data.length > 0) {
+                    const mapped = data.map(item => ({ ...item, sourceTable: 'luutru_records' as const }));
+                    records.push(...mapped);
+                    from += step;
+                    if (data.length < step) hasMore = false;
+                } else {
+                    hasMore = false;
+                }
+            } catch (err) {
+                console.warn('Lỗi fetch luutru_records:', err);
+                hasMore = false;
+            }
+        }
+        return records;
+    };
+
+    // Chạy song song cả 3 bảng
+    const [dkRecords, landRecords, ltRecords] = await Promise.all([
+        fetchDangKy(),
+        fetchLand(),
+        fetchLuuTru()
+    ]);
+
+    const allRecords = [...dkRecords, ...landRecords, ...ltRecords];
     
     const uniqueMap = new Map();
     allRecords.forEach((item: any) => {
-        if (item.id) {
+        if (item && item.id) {
             uniqueMap.set(item.id, mapRecordFromDb(item));
         }
     });
     const uniqueRecords = Array.from(uniqueMap.values()) as RecordFile[];
     
-    console.log(`[Fetch] Total fetched across all cloud tables: ${uniqueRecords.length}`);
+    if (onProgress && uniqueRecords.length > 0) {
+        onProgress(uniqueRecords);
+    }
+    
     saveToCache(CACHE_KEYS.RECORDS, uniqueRecords);
     return uniqueRecords;
 

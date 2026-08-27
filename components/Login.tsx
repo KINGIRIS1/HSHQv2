@@ -3,7 +3,9 @@ import React, { useState, useEffect } from 'react';
 import { User } from '../types';
 import { addActivityLog } from '../services/activityLogService';
 import { LogIn, User as UserIcon, Lock, Eye, EyeOff, ShieldAlert, CheckCircle2 } from 'lucide-react';
-import { APP_VERSION } from '../constants';
+import { APP_VERSION, MOCK_USERS } from '../constants';
+import { getFromCache, CACHE_KEYS } from '../services/apiCore';
+import { fetchUsers } from '../services/apiPeople';
 
 interface LoginProps {
   onLogin: (user: User) => void;
@@ -26,7 +28,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
       }
   }, []);
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
@@ -37,37 +39,74 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
     
     const submittedUsername = (usernameInput?.value || username || '').trim();
     const submittedPassword = (passwordInput?.value || password || '').trim();
-    
-    setTimeout(() => {
-        const user = users.find(u => {
-            const dbUsername = (u.username || '').trim().toLowerCase();
-            const dbPassword = (u.password || '').trim();
-            return dbUsername === submittedUsername.toLowerCase() && dbPassword === submittedPassword;
+
+    if (!submittedUsername || !submittedPassword) {
+      setError('Vui lòng nhập đầy đủ tên đăng nhập và mật khẩu.');
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      // 1. Kiểm tra trong prop users
+      let candidateUsers = Array.isArray(users) && users.length > 0 ? users : [];
+
+      // 2. Nếu users rỗng hoặc chưa có, lấy từ Cache / LocalStorage
+      if (candidateUsers.length === 0) {
+        const cachedUsers = getFromCache<User[]>(CACHE_KEYS.USERS, MOCK_USERS);
+        if (cachedUsers && cachedUsers.length > 0) {
+          candidateUsers = cachedUsers;
+        }
+      }
+
+      let user = candidateUsers.find(u => {
+        const dbUsername = (u.username || '').trim().toLowerCase();
+        const dbPassword = (u.password || '').trim();
+        return dbUsername === submittedUsername.toLowerCase() && dbPassword === submittedPassword;
+      });
+
+      // 3. Nếu vẫn không thấy, fetch trực tiếp từ API/Database để tránh race condition
+      if (!user) {
+        try {
+          const freshUsers = await fetchUsers();
+          if (Array.isArray(freshUsers) && freshUsers.length > 0) {
+            user = freshUsers.find(u => {
+              const dbUsername = (u.username || '').trim().toLowerCase();
+              const dbPassword = (u.password || '').trim();
+              return dbUsername === submittedUsername.toLowerCase() && dbPassword === submittedPassword;
+            });
+          }
+        } catch (fetchErr) {
+          console.warn("Direct fetchUsers during login:", fetchErr);
+        }
+      }
+
+      if (user) {
+        if (rememberMe) {
+            localStorage.setItem('saved_username', submittedUsername);
+        } else {
+            localStorage.removeItem('saved_username');
+        }
+        
+        addActivityLog({
+            performerName: user.name || user.username,
+            performerRole: user.role || 'ONEDOOR',
+            actionType: 'LOGIN',
+            actionLabel: 'Đăng nhập',
+            targetType: 'Tài khoản',
+            referenceCode: user.username,
+            details: `Người dùng ${user.name || user.username} (${user.username}) đăng nhập hệ thống`
         });
 
-        if (user) {
-          if (rememberMe) {
-              localStorage.setItem('saved_username', submittedUsername);
-          } else {
-              localStorage.removeItem('saved_username');
-          }
-          
-          addActivityLog({
-              performerName: user.name || user.username,
-              performerRole: user.role || 'ONEDOOR',
-              actionType: 'LOGIN',
-              actionLabel: 'Đăng nhập',
-              targetType: 'Tài khoản',
-              referenceCode: user.username,
-              details: `Người dùng ${user.name || user.username} (${user.username}) đăng nhập hệ thống`
-          });
-
-          onLogin(user);
-        } else {
-          setError('Tên đăng nhập hoặc mật khẩu không chính xác.');
-          setIsLoading(false);
-        }
-    }, 600);
+        onLogin(user);
+      } else {
+        setError('Tên đăng nhập hoặc mật khẩu không chính xác.');
+        setIsLoading(false);
+      }
+    } catch (err) {
+      console.error("Lỗi đăng nhập:", err);
+      setError('Đã xảy ra lỗi khi xác thực. Vui lòng thử lại.');
+      setIsLoading(false);
+    }
   };
 
   return (

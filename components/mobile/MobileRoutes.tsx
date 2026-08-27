@@ -91,7 +91,18 @@ const MobileRoutes: React.FC<MobileRoutesProps> = (props) => {
       return <BarcodeGeneratorView />;
 
     case 'personal_profile':
-      const isDirector = currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.SUBADMIN;
+      const emp = employees.find(e => e.id === currentUser.employeeId);
+      const isDirector = 
+        currentUser.role === UserRole.ADMIN || 
+        currentUser.role === UserRole.SUBADMIN || 
+        (currentUser.role as string) === 'DIRECTOR' ||
+        (emp && (
+          (emp.department || '').toLowerCase().includes('giám đốc') ||
+          (emp.department || '').toLowerCase().includes('lãnh đạo') ||
+          (emp.position || '').toLowerCase().includes('giám đốc') ||
+          (emp.position || '').toLowerCase().includes('phó giám đốc') ||
+          (emp.position || '').toLowerCase().includes('lãnh đạo')
+        ));
       return (
         <PersonalProfile
           user={currentUser}

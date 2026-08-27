@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { RecordFile } from '../types';
-import { X, CheckCircle2, FileCheck, User, Receipt, DollarSign, Loader2, FileText } from 'lucide-react';
+import { RecordFile, RecordStatus } from '../types';
+import { X, CheckCircle2, FileCheck, User, Receipt, DollarSign, Loader2, FileText, AlertCircle } from 'lucide-react';
 import { fetchContracts } from '../services/api';
 
 interface ReturnResultModalProps {
@@ -23,16 +23,36 @@ const ReturnResultModal: React.FC<ReturnResultModalProps> = ({
   
   const recTypeLower = (record?.recordType || '').toLowerCase();
   const isFreeProcedure = recTypeLower.includes('2.3') || recTypeLower.includes('dđ & cc số thửa') || recTypeLower.includes('dd & cc so thua');
+  
+  const isCancelOrWithdraw = record ? (
+    record.status === RecordStatus.REJECTED || 
+    record.status === RecordStatus.WITHDRAWN || 
+    (record.status as any) === 'REJECTED' || 
+    (record.status as any) === 'WITHDRAWN' ||
+    (record.status as any) === 'CANCELLED' ||
+    (record.status as any) === 'Trả hủy' ||
+    (record.status as any) === 'Rút hồ sơ' ||
+    (record.status as any) === 'CSD rút hồ sơ' ||
+    (record.status as any) === 'Trả hủy hồ sơ' ||
+    (record.notes || '').toLowerCase().includes('trả hủy') ||
+    (record.notes || '').toLowerCase().includes('rút hồ sơ')
+  ) : false;
+
+  const isNoFeeProcedure = isFreeProcedure || isCancelOrWithdraw;
 
   useEffect(() => {
     if (isOpen && record) {
         setReceiptType((record.receiptType as 'Biên Lai' | 'Hóa Đơn') || 'Biên Lai');
         setReceiptNumber(record.receiptNumber || '');
         setReceiverName(record.receiverName || record.customerName || '');
-        setReturnReason('');
+        setReturnReason(
+            isCancelOrWithdraw 
+                ? (record.status === RecordStatus.WITHDRAWN ? 'CSD rút hồ sơ' : 'Trả hủy hồ sơ')
+                : ''
+        );
         setErrorMsg('');
         
-        if (isFreeProcedure) {
+        if (isNoFeeProcedure) {
             setReturnedPrice('0');
             return;
         }
@@ -95,7 +115,7 @@ const ReturnResultModal: React.FC<ReturnResultModalProps> = ({
 
         determinePrice();
     }
-  }, [isOpen, record, isFreeProcedure]);
+  }, [isOpen, record, isNoFeeProcedure, isCancelOrWithdraw]);
 
   if (!isOpen || !record) return null;
 
@@ -105,6 +125,13 @@ const ReturnResultModal: React.FC<ReturnResultModalProps> = ({
 
       if (!receiverName.trim()) {
           setErrorMsg('Vui lòng nhập họ tên người nhận kết quả!');
+          return;
+      }
+
+      if (isCancelOrWithdraw) {
+          // Trả hủy hoặc rút hồ sơ: không bắt buộc biên lai/hóa đơn và không thu tiền
+          onConfirm(receiptNumber.trim(), receiverName.trim(), 0, receiptNumber.trim() ? receiptType : undefined, returnReason.trim());
+          onClose();
           return;
       }
 
@@ -158,7 +185,19 @@ const ReturnResultModal: React.FC<ReturnResultModalProps> = ({
             )}
 
             <div className="space-y-4">
-                {isFreeProcedure && (
+                {isCancelOrWithdraw && (
+                    <div className="p-3 bg-amber-50 border border-amber-200 text-amber-900 text-xs font-medium rounded-xl flex items-start gap-2.5">
+                        <AlertCircle size={18} className="text-amber-600 shrink-0 mt-0.5" />
+                        <div>
+                            <div className="font-bold text-amber-800 uppercase text-[11px] mb-0.5">
+                                {record.status === RecordStatus.WITHDRAWN ? 'Hồ sơ CSD rút' : 'Hồ sơ trả hủy'}
+                            </div>
+                            <span>Hồ sơ thuộc diện Trả hủy / Rút hồ sơ — <strong>Miễn thu phí</strong> và <strong>không bắt buộc nhập Số Biên lai/Hóa đơn</strong>.</span>
+                        </div>
+                    </div>
+                )}
+
+                {isFreeProcedure && !isCancelOrWithdraw && (
                     <div className="p-3 bg-blue-50 border border-blue-200 text-blue-800 text-xs font-semibold rounded-xl flex items-center gap-2">
                         <span className="bg-blue-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded">Miễn phí</span>
                         <span>Thủ tục 2.3 không thu phí (không có Biên lai/Hóa đơn).</span>
@@ -166,7 +205,7 @@ const ReturnResultModal: React.FC<ReturnResultModalProps> = ({
                 )}
 
                 {/* Field 1: Số Biên lai / Hóa đơn with toggle */}
-                {!isFreeProcedure && (
+                {!isNoFeeProcedure && (
                     <div>
                         <div className="flex items-center justify-between mb-2">
                             <label className="block text-sm font-bold text-gray-800 flex items-center gap-2">
@@ -202,8 +241,25 @@ const ReturnResultModal: React.FC<ReturnResultModalProps> = ({
                     </div>
                 )}
 
+                {/* Optional input for Receipt Number on cancel/withdraw if they want to enter ref */}
+                {isCancelOrWithdraw && (
+                    <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1.5 flex items-center gap-1.5">
+                            <Receipt size={15} className="text-gray-500"/> 
+                            <span>Số Biên lai / Phiếu trả / Số công văn (Không bắt buộc)</span>
+                        </label>
+                        <input 
+                            type="text"
+                            className="w-full border border-gray-200 rounded-xl px-4 py-2 text-xs focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none text-gray-800 placeholder:text-gray-400"
+                            placeholder="Nhập số phiếu trả hoặc để trống..."
+                            value={receiptNumber}
+                            onChange={(e) => setReceiptNumber(e.target.value)}
+                        />
+                    </div>
+                )}
+
                 {/* Field 2: Số tiền */}
-                {!isFreeProcedure && (
+                {!isNoFeeProcedure && (
                     <div>
                         <label className="block text-sm font-bold text-gray-800 mb-2 flex items-center gap-2">
                             <DollarSign size={18} className="text-amber-500"/> 
@@ -237,7 +293,7 @@ const ReturnResultModal: React.FC<ReturnResultModalProps> = ({
                 <div>
                     <label className="block text-sm font-bold text-gray-800 mb-2 flex items-center gap-2">
                         <User size={18} className="text-purple-600"/> 
-                        <span>Người nhận kết quả</span> 
+                        <span>{isCancelOrWithdraw ? 'Người nhận lại hồ sơ' : 'Người nhận kết quả'}</span> 
                         <span className="text-red-500">*</span>
                     </label>
                     <input 
@@ -276,13 +332,13 @@ const ReturnResultModal: React.FC<ReturnResultModalProps> = ({
                 <button 
                     type="button" 
                     onClick={onClose} 
-                    className="px-5 py-2.5 border border-gray-300 rounded-xl text-gray-700 hover:bg-gray-100 font-medium text-sm transition-colors"
+                    className="px-5 py-2.5 border border-gray-300 rounded-xl text-gray-700 hover:bg-gray-100 font-medium text-sm transition-colors cursor-pointer"
                 >
                     Hủy bỏ
                 </button>
                 <button 
                     type="submit"
-                    className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm shadow-sm transition-all active:scale-95"
+                    className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm shadow-sm transition-all active:scale-95 cursor-pointer"
                 >
                     <CheckCircle2 size={18} /> Xác nhận trả
                 </button>
