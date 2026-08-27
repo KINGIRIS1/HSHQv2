@@ -200,6 +200,8 @@ export function isViewAllowedForUser(
       // Child Tabs - All Records Group
       case 'all_sub_all':
       case 'assign_tasks':
+      case 'completed_list':
+      case 'pending_supplement_list':
       case 'pending_check_list':
       case 'check_list':
       case 'handover_list':

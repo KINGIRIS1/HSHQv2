@@ -187,13 +187,11 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
     const mainRecords = records.filter((r) => {
       if (isDirectorUser) {
         if (!user.employeeId) {
-          return r.status === RecordStatus.PENDING_SIGN || r.status === RecordStatus.SIGNED;
+          return false;
         }
         return (
           r.submittedTo === user.employeeId || 
-          r.assignedTo === user.employeeId ||
-          r.status === RecordStatus.PENDING_SIGN ||
-          r.status === RecordStatus.SIGNED
+          r.assignedTo === user.employeeId
         );
       }
       if (!user.employeeId) return false;
@@ -231,13 +229,11 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
       .filter((r) => {
         if (isDirectorUser) {
           if (!user.employeeId) {
-            return r.status === "pending_sign" || r.status === "signed";
+            return false;
           }
           return (
             r.data?.submitted_to === user.employeeId ||
-            r.data?.assigned_to === user.employeeId ||
-            r.status === "pending_sign" ||
-            r.status === "signed"
+            r.data?.assigned_to === user.employeeId
           );
         }
         if (!user.employeeId) return false;
