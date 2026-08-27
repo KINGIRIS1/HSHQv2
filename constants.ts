@@ -11,13 +11,13 @@ export const APP_VERSION = '2.1.1';
 
 export const STATUS_LABELS: Record<RecordStatus, string> = {
   [RecordStatus.RECEIVED]: 'Tiếp nhận mới',
-  [RecordStatus.ASSIGNED]: 'Đang thực hiện',
+  [RecordStatus.ASSIGNED]: 'Đã giao việc',
   [RecordStatus.IN_PROGRESS]: 'Đang thực hiện',
-  [RecordStatus.COMPLETED_WORK]: 'Đang thực hiện',
+  [RecordStatus.COMPLETED_WORK]: 'Đã xong việc',
   [RecordStatus.PENDING_SUPPLEMENT]: 'Chờ bổ sung',
-  [RecordStatus.PENDING_CHECK]: 'Chờ kiểm tra',
+  [RecordStatus.PENDING_CHECK]: 'Trình kiểm tra',
   [RecordStatus.CHECKED]: 'Đã kiểm tra',
-  [RecordStatus.PENDING_SIGN]: 'Chờ ký duyệt',
+  [RecordStatus.PENDING_SIGN]: 'Trình ký duyệt',
   [RecordStatus.SIGNED]: 'Chờ bàn giao',
   [RecordStatus.HANDOVER]: 'Đã giao 1 cửa',
   [RecordStatus.RETURNED]: 'Đã trả kết quả',
@@ -27,10 +27,13 @@ export const STATUS_LABELS: Record<RecordStatus, string> = {
 
 export const SELECTABLE_STATUSES: { key: RecordStatus; label: string }[] = [
   { key: RecordStatus.RECEIVED, label: 'Tiếp nhận mới' },
+  { key: RecordStatus.ASSIGNED, label: 'Đã giao việc' },
   { key: RecordStatus.IN_PROGRESS, label: 'Đang thực hiện' },
+  { key: RecordStatus.COMPLETED_WORK, label: 'Đã xong việc' },
   { key: RecordStatus.PENDING_SUPPLEMENT, label: 'Chờ bổ sung' },
-  { key: RecordStatus.PENDING_CHECK, label: 'Chờ kiểm tra' },
-  { key: RecordStatus.PENDING_SIGN, label: 'Chờ ký duyệt' },
+  { key: RecordStatus.PENDING_CHECK, label: 'Trình kiểm tra' },
+  { key: RecordStatus.CHECKED, label: 'Đã kiểm tra' },
+  { key: RecordStatus.PENDING_SIGN, label: 'Trình ký duyệt' },
   { key: RecordStatus.SIGNED, label: 'Chờ bàn giao' },
   { key: RecordStatus.HANDOVER, label: 'Đã giao 1 cửa' },
   { key: RecordStatus.RETURNED, label: 'Đã trả kết quả' },

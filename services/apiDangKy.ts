@@ -1,6 +1,7 @@
 import { supabase, isConfigured } from './supabaseClient';
 import { DangKyRecord, DangKyParty } from '../types';
 import { getFromCache, getFromCacheAsync, saveToCache, CACHE_KEYS, logError } from './apiCore';
+import { isDoDacRecordType, isArchiveRecordType, isDangKyRecordType } from '../constants/procedures';
 
 // Mẫu dữ liệu giả định ban đầu khi chưa có dữ liệu trong DB
 export const MOCK_DANGKY_RECORDS: DangKyRecord[] = [
@@ -255,7 +256,12 @@ export const fetchDangKyRecords = async (onProgress?: (loadedRecords: DangKyReco
           data.forEach((item) => {
             const mapped = mapDangKyFromDb(item);
             if (mapped && mapped.id) {
-              uniqueMap.set(mapped.id, mapped);
+              // Ensure we isolate: Do not include Survey (Đo đạc 2.x) or Archive (Lưu trữ 1.x) records
+              const isDodac = isDoDacRecordType(mapped.recordType, mapped.code);
+              const isArchive = isArchiveRecordType(mapped.recordType, mapped.code);
+              if (!isDodac && !isArchive) {
+                uniqueMap.set(mapped.id, mapped);
+              }
             }
           });
           
@@ -288,7 +294,13 @@ export const fetchDangKyRecords = async (onProgress?: (loadedRecords: DangKyReco
   if (cached !== null && Array.isArray(cached) && cached.length > 0) {
     const uniqueMap = new Map<string, DangKyRecord>();
     cached.forEach((r) => {
-      if (r && r.id) uniqueMap.set(r.id, r);
+      if (r && r.id) {
+        const isDodac = isDoDacRecordType(r.recordType, r.code);
+        const isArchive = isArchiveRecordType(r.recordType, r.code);
+        if (!isDodac && !isArchive) {
+          uniqueMap.set(r.id, r);
+        }
+      }
     });
     return Array.from(uniqueMap.values());
   }

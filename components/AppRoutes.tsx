@@ -1488,6 +1488,8 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
           records={records}
           currentUser={currentUser}
           employees={employees}
+          rolePermissions={rolePermissions}
+          departmentPermissions={departmentPermissions}
           setCurrentView={props.setCurrentView}
         />
       );

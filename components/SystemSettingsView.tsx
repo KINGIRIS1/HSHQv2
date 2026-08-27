@@ -479,21 +479,26 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
           const OTHER_PERMS = [
               'dodac_BTN_ASSIGN_STAFF', 'dodac_BTN_SUBMIT_CHECK', 'dodac_BTN_SUBMIT_SIGN', 'dodac_BTN_APPROVE_SIGN', 'dodac_BTN_REJECT_RECORD', 'dodac_HANDOVER_RECORDS', 'dodac_BTN_RETURN_RESULT', 'dodac_VIEW_EXCERPTS', 'dodac_MANAGE_EXCERPTS', 'dodac_BTN_EXTEND_DEADLINE', 'dodac_EDIT_RECORDS', 'dodac_DELETE_RECORDS', 'dodac_VIEW_DETAILS',
               'luutru_BTN_ASSIGN_STAFF', 'luutru_BTN_SUBMIT_CHECK', 'luutru_BTN_SUBMIT_SIGN', 'luutru_BTN_APPROVE_SIGN', 'luutru_BTN_REJECT_RECORD', 'luutru_HANDOVER_RECORDS', 'luutru_BTN_RETURN_RESULT', 'luutru_VIEW_ARCHIVE', 'luutru_MANAGE_ARCHIVE', 'luutru_BTN_EXTEND_DEADLINE', 'luutru_EDIT_RECORDS', 'luutru_DELETE_RECORDS', 'luutru_VIEW_DETAILS',
+              'all_records', 'all_sub_all', 'assign_tasks', 'completed_list', 'pending_check_list', 'check_list', 'handover_list', 'director_completed', 'survey_list',
               'archive_records', 'archive_sub_all', 'archive_assign_tasks', 'archive_completed_list', 'archive_pending_check_list', 'archive_check_list', 'archive_handover_list', 'archive_director_completed', 'VIEW_ARCHIVE', 'MANAGE_ARCHIVE'
           ];
-          return basePerms.filter(p => !OTHER_PERMS.includes(p));
+          return basePerms.filter(p => !OTHER_PERMS.includes(p) && !p.startsWith('dodac_') && !p.startsWith('luutru_'));
       } else if (isDodac) {
           const OTHER_PERMS = [
               'dangky_BTN_ASSIGN_STAFF', 'dangky_BTN_SUBMIT_CHECK', 'dangky_BTN_SUBMIT_SIGN', 'dangky_BTN_APPROVE_SIGN', 'dangky_BTN_REJECT_RECORD', 'dangky_HANDOVER_RECORDS', 'dangky_BTN_RETURN_RESULT', 'dangky_BTN_EXTEND_DEADLINE', 'dangky_EDIT_RECORDS', 'dangky_DELETE_RECORDS', 'dangky_VIEW_DETAILS',
+              'luutru_BTN_ASSIGN_STAFF', 'luutru_BTN_SUBMIT_CHECK', 'luutru_BTN_SUBMIT_SIGN', 'luutru_BTN_APPROVE_SIGN', 'luutru_BTN_REJECT_RECORD', 'luutru_HANDOVER_RECORDS', 'luutru_BTN_RETURN_RESULT', 'luutru_VIEW_ARCHIVE', 'luutru_MANAGE_ARCHIVE', 'luutru_BTN_EXTEND_DEADLINE', 'luutru_EDIT_RECORDS', 'luutru_DELETE_RECORDS', 'luutru_VIEW_DETAILS',
+              'registration_records', 'vaoso_records',
               'archive_records', 'archive_sub_all', 'archive_assign_tasks', 'archive_completed_list', 'archive_pending_check_list', 'archive_check_list', 'archive_handover_list', 'archive_director_completed', 'VIEW_ARCHIVE', 'MANAGE_ARCHIVE'
           ];
-          return basePerms.filter(p => !OTHER_PERMS.includes(p));
+          return basePerms.filter(p => !OTHER_PERMS.includes(p) && !p.startsWith('dangky_') && !p.startsWith('luutru_'));
       } else if (isLuutru) {
           const OTHER_PERMS = [
               'dangky_BTN_ASSIGN_STAFF', 'dangky_BTN_SUBMIT_CHECK', 'dangky_BTN_SUBMIT_SIGN', 'dangky_BTN_APPROVE_SIGN', 'dangky_BTN_REJECT_RECORD', 'dangky_HANDOVER_RECORDS', 'dangky_BTN_RETURN_RESULT', 'dangky_BTN_EXTEND_DEADLINE', 'dangky_EDIT_RECORDS', 'dangky_DELETE_RECORDS', 'dangky_VIEW_DETAILS',
+              'dodac_BTN_ASSIGN_STAFF', 'dodac_BTN_SUBMIT_CHECK', 'dodac_BTN_SUBMIT_SIGN', 'dodac_BTN_APPROVE_SIGN', 'dodac_BTN_REJECT_RECORD', 'dodac_HANDOVER_RECORDS', 'dodac_BTN_RETURN_RESULT', 'dodac_VIEW_EXCERPTS', 'dodac_MANAGE_EXCERPTS', 'dodac_BTN_EXTEND_DEADLINE', 'dodac_EDIT_RECORDS', 'dodac_DELETE_RECORDS', 'dodac_VIEW_DETAILS',
+              'registration_records', 'vaoso_records',
               'all_records', 'all_sub_all', 'assign_tasks', 'completed_list', 'pending_check_list', 'check_list', 'handover_list', 'director_completed', 'survey_list'
           ];
-          return basePerms.filter(p => !OTHER_PERMS.includes(p));
+          return basePerms.filter(p => !OTHER_PERMS.includes(p) && !p.startsWith('dangky_') && !p.startsWith('dodac_'));
       }
       return basePerms;
   };

@@ -31,7 +31,7 @@ import {
   isDangKyRecordApproaching
 } from '../utils/appHelpers';
 import { isDangKyStepOverdue, isDangKyStepApproaching } from '../utils/stepDeadlineEngine';
-import { detectProcedureId, getShortRecordType } from '../constants/procedures';
+import { detectProcedureId, getShortRecordType, isDoDacRecordType, isArchiveRecordType } from '../constants/procedures';
 import { addActivityLog } from '../services/activityLogService';
 import { saveDangKyRecordsBatchApi } from '../services/apiDangKy';
 
@@ -259,7 +259,13 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
             const data = await fetchDangKyRecords();
             const uniqueMap = new Map<string, DangKyRecord>();
             (data || []).forEach(r => {
-                if (r && r.id) uniqueMap.set(r.id, r);
+                if (r && r.id) {
+                    const isDodac = isDoDacRecordType(r.recordType, r.code);
+                    const isArchive = isArchiveRecordType(r.recordType, r.code);
+                    if (!isDodac && !isArchive) {
+                        uniqueMap.set(r.id, r);
+                    }
+                }
             });
             setRecords(Array.from(uniqueMap.values()));
         } catch (e) {
@@ -653,6 +659,11 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
     // Filter Records
     const filteredRecords = useMemo(() => {
         return records.filter(r => {
+            // Strict isolation: Never display Survey (Đo đạc 2.x) or Archive (Lưu trữ 1.x) in Registration module
+            if (isDoDacRecordType(r.recordType, r.code) || isArchiveRecordType(r.recordType, r.code)) {
+                return false;
+            }
+
             const currentNormStatus = normalizeDangKyStatus(r.status);
 
             // Main Tab Status Filter
