@@ -4,6 +4,7 @@ import { Contract, PriceItem, Employee, User } from '../types';
 import { API_BASE_URL } from '../constants'; 
 import { getFromIdb, saveToIdb } from './indexedDbService';
 import { networkMonitor, isNetworkError } from './networkMonitor';
+import { resolveRecordStatus } from '../utils/appHelpers';
 
 // --- CACHE KEYS ---
 export const CACHE_KEYS = {
@@ -517,6 +518,9 @@ export const mapRecordFromDb = (item: any): any => {
     r.applicantCccd = val(r.applicantCccd, r.applicantcccd, r.applicant_cccd);
     r.applicantPhone = val(r.applicantPhone, r.applicantphone, r.applicant_phone);
     r.applicantAddress = val(r.applicantAddress, r.applicantaddress, r.applicant_address);
+
+    // Tự động suy luận trạng thái chuẩn của hồ sơ theo các mốc quy trình thực tế
+    r.status = resolveRecordStatus(r);
 
     return r;
 };

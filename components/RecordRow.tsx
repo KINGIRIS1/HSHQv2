@@ -2,7 +2,7 @@
 import React from 'react';
 import { RecordFile, RecordStatus, Employee, UserRole } from '../types';
 import { getNormalizedWard, getShortRecordType, getWardLabel, isArchiveRecordType } from '../constants';
-import { isRecordOverdue, isRecordApproaching, toTitleCase, formatBatchName, getBatchDisplayParts } from '../utils/appHelpers';
+import { isRecordOverdue, isRecordApproaching, toTitleCase, formatBatchName, getBatchDisplayParts, resolveRecordStatus } from '../utils/appHelpers';
 import StatusBadge from './StatusBadge';
 import { CheckSquare, Square, AlertCircle, Clock, Eye, ArrowRight, Pencil, Trash2, Bell, FileCheck, Phone, Map } from 'lucide-react';
 
@@ -67,22 +67,8 @@ const RecordRow: React.FC<RecordRowProps> = ({
 
   const resultReturnedDateStr = record.resultReturnedDate ? formatDate(record.resultReturnedDate) : '';
 
-  // LOGIC MỚI: Tự động xác định trạng thái hiển thị
-  // Nếu có thông tin xuất (Batch/Date) và chưa hoàn thành (Trả/Rút/Từ chối), coi như là Đã giao 1 cửa
-  const getDisplayStatus = (r: RecordFile) => {
-      if (r.status) {
-          return r.status;
-      }
-      if (r.resultReturnedDate) {
-          return RecordStatus.RETURNED;
-      }
-      if ((r.exportBatch || r.exportDate) && r.status !== RecordStatus.WITHDRAWN && r.status !== RecordStatus.RETURNED && r.status !== RecordStatus.REJECTED) {
-          return RecordStatus.HANDOVER;
-      }
-      return RecordStatus.RECEIVED;
-  };
-  
-  const displayStatus = getDisplayStatus(record);
+  // Tự động xác định trạng thái hiển thị chuẩn xác
+  const displayStatus = resolveRecordStatus(record);
 
   // Class chung cho các ô: Căn giữa cho sự cân đối, tăng padding thông thoáng hơn trên PC
   const cellClass = "p-3 md:p-3.5 align-middle text-slate-700 border-b border-slate-100/80 transition-colors duration-200";

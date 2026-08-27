@@ -80,8 +80,10 @@ export const useAppData = (currentUser: User | null) => {
             // Race giữa fetch data và timeout
             const [recData, empData, userData, updateInfo, holidayData, permsData, deptPermsData] = await Promise.race([dataPromise, timeoutPromise]) as any;
 
-            const { migratedRecords } = migrateUnbatchedRecords(Array.isArray(recData) ? recData : []);
+            const rawRecList = Array.isArray(recData) ? recData : [];
+            const { migratedRecords } = migrateUnbatchedRecords(rawRecList);
             setRecords(migratedRecords);
+
             setEmployees(empData);
             setUsers(userData);
             setHolidays(holidayData); // Cập nhật state holidays

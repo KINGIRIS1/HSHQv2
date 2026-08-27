@@ -9,7 +9,7 @@ import DocxPreviewModal from './DocxPreviewModal';
 import { updateRecordApi, fetchContracts } from '../services/api';
 import SystemReceiptTemplate from './receive-record/SystemReceiptTemplate';
 import SystemAnnexTemplate from './receive-record/SystemAnnexTemplate';
-import { getEmployeeName as getEmpNameHelper, extractBatchOnly, formatStaffInfoHelper } from '../utils/appHelpers';
+import { getEmployeeName as getEmpNameHelper, extractBatchOnly, formatStaffInfoHelper, resolveRecordStatus } from '../utils/appHelpers';
 import { AutoResizeTextarea } from './AutoResizeTextarea';
 
 
@@ -518,43 +518,31 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
       );
   };
 
-  // LOGIC HIỂN THỊ STATUS
-  const getDisplayStatus = (r: RecordFile) => {
-      if (r.status) {
-          return r.status;
-      }
-      if (r.resultReturnedDate) {
-          return RecordStatus.RETURNED;
-      }
-      if ((r.exportBatch || r.exportDate) && r.status !== RecordStatus.WITHDRAWN && r.status !== RecordStatus.RETURNED && r.status !== RecordStatus.REJECTED) {
-          return RecordStatus.HANDOVER;
-      }
-      return RecordStatus.RECEIVED;
-  };
-  const displayStatus = getDisplayStatus(record);
+  // LOGIC HIỂN THỊ STATUS CHUẨN XÁC
+  const displayStatus = resolveRecordStatus(record);
   const recordTypeLower = (record?.recordType || '').toLowerCase();
   const isCongVan = record?.recordType ? getShortRecordType(record.recordType) === '1.2 Công văn' : false;
 
   // LOGIC CHECK NẾU ĐÃ THỰC HIỆN XONG (Để hiển thị bước "Đã thực hiện")
   const isWorkDone = [
       RecordStatus.COMPLETED_WORK, RecordStatus.PENDING_CHECK, RecordStatus.CHECKED, RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER, RecordStatus.RETURNED
-  ].includes(record.status) || !!record.completedWorkDate;
+  ].includes(displayStatus) || !!record.completedWorkDate;
   
   const isPendingCheckActive = [
       RecordStatus.PENDING_CHECK, RecordStatus.CHECKED, RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER, RecordStatus.RETURNED
-  ].includes(record.status) || !!record.pendingCheckDate;
+  ].includes(displayStatus) || !!record.pendingCheckDate;
 
   const isCheckedActive = [
       RecordStatus.CHECKED, RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER, RecordStatus.RETURNED
-  ].includes(record.status) || !!record.checkedDate;
+  ].includes(displayStatus) || !!record.checkedDate;
 
   const isPendingSignActive = [
       RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER, RecordStatus.RETURNED
-  ].includes(record.status) || !!record.submissionDate;
+  ].includes(displayStatus) || !!record.submissionDate;
 
   const isSignedActive = [
       RecordStatus.SIGNED, RecordStatus.HANDOVER, RecordStatus.RETURNED
-  ].includes(record.status) || !!record.approvalDate;
+  ].includes(displayStatus) || !!record.approvalDate;
 
 
   return (

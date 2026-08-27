@@ -1,7 +1,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { RecordFile, User, UserRole, RecordStatus, Employee } from '../types';
-import { removeVietnameseTones, isRecordOverdue, isRecordApproaching } from '../utils/appHelpers';
+import { removeVietnameseTones, isRecordOverdue, isRecordApproaching, resolveRecordStatus } from '../utils/appHelpers';
 import { getShortRecordType, isArchiveRecordType } from '../constants';
 
 export function getRecordDateForStatus(r: any, targetStatus?: string): string | null {
@@ -270,7 +270,7 @@ export const useRecordFilter = (
             });
         }
         if (filterStatus !== 'all' && currentView !== 'handover_list' && currentView !== 'other_handover_list' && currentView !== 'archive_handover_list') {
-            result = result.filter(r => r.status === filterStatus);
+            result = result.filter(r => (r.status === filterStatus || resolveRecordStatus(r) === filterStatus));
         }
         if (filterEmployee !== 'all' && currentView !== 'assign_tasks') {
             if (filterEmployee === 'unassigned') {

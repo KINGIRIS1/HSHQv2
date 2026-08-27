@@ -83,6 +83,75 @@ export const DEFAULT_VISIBLE_COLUMNS = {
     receipt: false
 };
 
+// --- HÀM TỰ ĐỘNG SUY LUẬN VÀ CHUẨN HÓA TRẠNG THÁI HỒ SƠ ---
+/**
+ * Chuẩn hóa và tự động suy luận trạng thái chính xác của hồ sơ dựa trên các mốc thời gian thực tế.
+ * Giải quyết dứt điểm tình trạng hồ sơ đã qua các bước (chờ kiểm tra, đã kiểm tra, trình ký, đã ký, chốt đợt, trả kết quả)
+ * nhưng vẫn hiển thị nhầm là "Đang thực hiện".
+ */
+export function resolveRecordStatus(r: RecordFile | null | undefined): RecordStatus {
+    if (!r) return RecordStatus.RECEIVED;
+
+    // 1. Trạng thái kết thúc / dừng đặc biệt
+    if (r.status === RecordStatus.WITHDRAWN) {
+        return RecordStatus.WITHDRAWN;
+    }
+    if (r.status === RecordStatus.REJECTED) {
+        return RecordStatus.REJECTED;
+    }
+
+    // 2. Xét theo độ ưu tiên từ mốc hoàn thành cao nhất đến thấp nhất
+    // 2.1. Đã trả kết quả (RETURNED)
+    if (r.resultReturnedDate || r.status === RecordStatus.RETURNED) {
+        return RecordStatus.RETURNED;
+    }
+
+    // 2.2. Đã giao 1 cửa / Đã chốt đợt xuất (HANDOVER)
+    if (r.exportBatch || r.exportDate || r.status === RecordStatus.HANDOVER) {
+        return RecordStatus.HANDOVER;
+    }
+
+    // 2.3. Đã ký duyệt (SIGNED)
+    if (r.approvalDate || r.status === RecordStatus.SIGNED) {
+        return RecordStatus.SIGNED;
+    }
+
+    // 2.4. Trình ký duyệt (PENDING_SIGN)
+    if (r.submissionDate || r.status === RecordStatus.PENDING_SIGN) {
+        return RecordStatus.PENDING_SIGN;
+    }
+
+    // 2.5. Đã kiểm tra (CHECKED)
+    if (r.checkedDate || r.status === RecordStatus.CHECKED) {
+        return RecordStatus.CHECKED;
+    }
+
+    // 2.6. Trình kiểm tra (PENDING_CHECK)
+    if (r.pendingCheckDate || r.status === RecordStatus.PENDING_CHECK) {
+        return RecordStatus.PENDING_CHECK;
+    }
+
+    // 2.7. Chờ bổ sung (PENDING_SUPPLEMENT)
+    if (r.status === RecordStatus.PENDING_SUPPLEMENT) {
+        return RecordStatus.PENDING_SUPPLEMENT;
+    }
+
+    // 2.8. Đã hoàn thành công việc / đo đạc (COMPLETED_WORK)
+    if (r.completedWorkDate || r.status === RecordStatus.COMPLETED_WORK) {
+        return RecordStatus.COMPLETED_WORK;
+    }
+
+    // 2.9. Đang thực hiện / Đã giao việc (IN_PROGRESS / ASSIGNED)
+    if (r.assignedTo || r.assignedDate || r.status === RecordStatus.IN_PROGRESS || r.status === RecordStatus.ASSIGNED) {
+        return RecordStatus.IN_PROGRESS;
+    }
+
+    // 2.10. Mặc định tiếp nhận mới (RECEIVED)
+    return RecordStatus.RECEIVED;
+}
+
+export const getDisplayStatus = resolveRecordStatus;
+
 // --- CÁC HÀM CHECK LOGIC ---
 export const isRecordOverdue = (record: RecordFile): boolean => {
   // 1. Kiểm tra trạng thái "Đã xong"
@@ -94,7 +163,8 @@ export const isRecordOverdue = (record: RecordFile): boolean => {
       RecordStatus.SIGNED
   ];
 
-  if (completedStatuses.includes(record.status)) return false;
+  const currentStatus = resolveRecordStatus(record);
+  if (completedStatuses.includes(currentStatus)) return false;
   
   // 2. [QUAN TRỌNG] Kiểm tra dữ liệu thực tế (Fix lỗi trạng thái chưa cập nhật)
   // Nếu đã có ngày xuất (đã giao 1 cửa) hoặc đã có ngày trả kết quả -> Coi như đã xong -> Không quá hạn
@@ -119,7 +189,8 @@ export const isRecordApproaching = (record: RecordFile): boolean => {
       RecordStatus.SIGNED
   ];
 
-  if (completedStatuses.includes(record.status)) return false;
+  const currentStatus = resolveRecordStatus(record);
+  if (completedStatuses.includes(currentStatus)) return false;
   
   // Kiểm tra dữ liệu thực tế: Nếu đã xong thì không báo sắp đến hạn
   if (record.exportDate || record.exportBatch || record.resultReturnedDate) {
@@ -784,6 +855,14 @@ export function migrateUnbatchedRecords(records: RecordFile[]): { migratedRecord
 
     const migratedRecords = records.map(r => {
         let currentBatch = r.exportBatch;
+        let item = { ...r };
+
+        // Tự động kiểm tra và chuẩn hóa trạng thái chuẩn theo mốc thời gian thực tế
+        const resolvedStatus = resolveRecordStatus(item);
+        if (item.status !== resolvedStatus) {
+            item.status = resolvedStatus;
+            hasChanges = true;
+        }
 
         // Tự động làm sạch các tên đợt cũ bị lặp chữ "Đợt"
         if (typeof currentBatch === 'string' && /^Đợt\s+Đợt/i.test(currentBatch)) {
@@ -800,13 +879,13 @@ export function migrateUnbatchedRecords(records: RecordFile[]): { migratedRecord
         // Tự động đổi tên "Đợt Cuối" / "Đợt cuối" thành đợt số lớn nhất trong ngày
         if (typeof currentBatch === 'string' && /cuối/i.test(currentBatch)) {
             hasChanges = true;
-            const rawDate = r.exportDate || r.completedDate || r.receivedDate || new Date().toISOString();
+            const rawDate = item.exportDate || item.completedDate || item.receivedDate || new Date().toISOString();
             currentBatch = getFallbackBatchName(rawDate);
         }
 
         // Chuẩn hóa tên đợt sang dạng "Đợt X - Ngày DD/MM/YYYY"
         if (currentBatch && currentBatch !== 'NOT_BATCHED') {
-            const rawDate = r.exportDate || r.completedDate || r.receivedDate;
+            const rawDate = item.exportDate || item.completedDate || item.receivedDate;
             const formatted = formatBatchName(currentBatch, '', rawDate);
             if (formatted && formatted !== currentBatch) {
                 currentBatch = formatted;
@@ -814,43 +893,43 @@ export function migrateUnbatchedRecords(records: RecordFile[]): { migratedRecord
             }
         }
 
-        const isHandedOver = r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED || Boolean((r as any).is_handover);
+        const isHandedOver = item.status === RecordStatus.HANDOVER || item.status === RecordStatus.RETURNED || Boolean((item as any).is_handover);
         const missingBatch = !currentBatch || String(currentBatch).trim() === '' || currentBatch === 'NOT_BATCHED';
 
         if (isHandedOver && missingBatch) {
             hasChanges = true;
-            const rawDate = r.exportDate || r.completedDate || r.receivedDate || new Date().toISOString();
+            const rawDate = item.exportDate || item.completedDate || item.receivedDate || new Date().toISOString();
             const defaultBatchName = getFallbackBatchName(rawDate);
 
             return {
-                ...r,
+                ...item,
                 exportBatch: defaultBatchName,
-                exportDate: r.exportDate || rawDate,
-                completedDate: r.completedDate || rawDate,
-                status: r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED ? r.status : RecordStatus.HANDOVER
+                exportDate: item.exportDate || rawDate,
+                completedDate: item.completedDate || rawDate,
+                status: item.status === RecordStatus.HANDOVER || item.status === RecordStatus.RETURNED ? item.status : RecordStatus.HANDOVER
             };
         }
 
         // Tự động chuẩn hóa đợt số cũ (ví dụ: exportBatch = 1) thành chuỗi tên đợt chuẩn
         if (currentBatch && typeof currentBatch === 'number') {
             hasChanges = true;
-            const rawDate = r.exportDate || r.completedDate || r.receivedDate || new Date().toISOString();
+            const rawDate = item.exportDate || item.completedDate || item.receivedDate || new Date().toISOString();
             const dateFmt = formatDateDDMMYYYY(rawDate);
             const numStr = String(currentBatch).padStart(2, '0');
             return {
-                ...r,
+                ...item,
                 exportBatch: `Đợt ${numStr}-${dateFmt}`
             };
         }
 
-        if (currentBatch !== r.exportBatch) {
+        if (currentBatch !== item.exportBatch) {
             return {
-                ...r,
+                ...item,
                 exportBatch: currentBatch
             };
         }
 
-        return r;
+        return item;
     });
 
     return { migratedRecords, hasChanges };

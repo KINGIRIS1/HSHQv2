@@ -15,7 +15,7 @@ import DocxPreviewModal from '../DocxPreviewModal';
 import { updateRecordApi, fetchContracts } from '../../services/api';
 import SystemReceiptTemplate from '../receive-record/SystemReceiptTemplate';
 import SystemAnnexTemplate from '../receive-record/SystemAnnexTemplate';
-import { cleanSyncNotes, formatStaffInfoHelper } from '../../utils/appHelpers';
+import { cleanSyncNotes, formatStaffInfoHelper, resolveRecordStatus } from '../../utils/appHelpers';
 
 interface MobileDetailModalProps {
   isOpen: boolean;
@@ -495,7 +495,7 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
             <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
               <div className="flex justify-between items-center mb-4">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Trạng thái</span>
-                <StatusBadge status={record.status} />
+                <StatusBadge status={resolveRecordStatus(record)} />
               </div>
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">

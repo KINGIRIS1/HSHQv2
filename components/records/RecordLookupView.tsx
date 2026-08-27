@@ -25,7 +25,7 @@ import {
 } from 'lucide-react';
 import { RecordFile, Employee, User, RecordStatus, UserRole, DANG_KY_STATUS_LIST } from '../../types';
 import { getShortRecordType, getWardLabel, getCanonicalRecordType, EXTENDED_RECORD_TYPES } from '../../constants';
-import { removeVietnameseTones, toTitleCase, getBatchDisplayParts, isRecordOverdue, isRecordApproaching } from '../../utils/appHelpers';
+import { removeVietnameseTones, toTitleCase, getBatchDisplayParts, isRecordOverdue, isRecordApproaching, resolveRecordStatus } from '../../utils/appHelpers';
 import StatusBadge from '../StatusBadge';
 import * as XLSX from 'xlsx-js-style';
 
@@ -76,15 +76,8 @@ export const RecordLookupView: React.FC<RecordLookupViewProps> = ({
     const [currentPage, setCurrentPage] = useState(1);
     const [pageSize, setPageSize] = useState(10);
 
-    // Determine display status (tương tự như tab chuyên môn)
-    const getDisplayStatus = (r: RecordFile) => {
-        if (r.status) return r.status;
-        if (r.resultReturnedDate) return RecordStatus.RETURNED;
-        if ((r.exportBatch || r.exportDate) && r.status !== RecordStatus.WITHDRAWN && r.status !== RecordStatus.RETURNED && r.status !== RecordStatus.REJECTED) {
-            return RecordStatus.HANDOVER;
-        }
-        return RecordStatus.RECEIVED;
-    };
+    // Determine display status chuẩn xác theo mốc thời gian
+    const getDisplayStatus = resolveRecordStatus;
 
     // All available unique record types and batches (synchronized and unified with procedure catalog)
     const availableRecordTypes = useMemo(() => {
