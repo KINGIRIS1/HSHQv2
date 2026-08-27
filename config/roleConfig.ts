@@ -23,20 +23,20 @@ export const ROLE_VIEWS_CONFIG: Record<UserRole, RoleConfig> = {
     role: UserRole.ONEDOOR,
     allowedViews: [
       'dashboard', 'receive_record', 'receive_contract', 'receive_group',
+      'receive_sub_create', 'receive_sub_bulk', 'receive_sub_list', 'receive_sub_vphc',
       'personal_profile', 'account_settings', 'utilities', 'work_schedule', 
-      'tools_group', 'barcode_generator'
+      'tools_group', 'barcode_generator', 'lookup_records'
     ]
   },
   [UserRole.EMPLOYEE]: {
     role: UserRole.EMPLOYEE,
     allowedViews: [
       'dashboard', 'personal_profile', 'work_schedule', 'utilities', 'tools_group',
-      'reports', 'account_settings', 'lookup_records'
+      'account_settings', 'lookup_records'
     ]
   },
   [UserRole.TEAM_LEADER]: {
     role: UserRole.TEAM_LEADER,
-    // Thừa hưởng toàn bộ quyền cơ bản của Employee
     allowedViews: [
       'dashboard', 'personal_profile', 'work_schedule', 'utilities', 'tools_group',
       'reports', 'account_settings', 'lookup_records'
@@ -45,7 +45,7 @@ export const ROLE_VIEWS_CONFIG: Record<UserRole, RoleConfig> = {
     departmentSpecificViews: [
       {
         keyword: 'đo đạc',
-        views: ['all_records', 'assign_tasks', 'completed_list', 'pending_supplement_list', 'pending_check_list', 'check_list', 'handover_list', 'director_completed']
+        views: ['all_records', 'assign_tasks', 'completed_list', 'pending_supplement_list', 'pending_check_list', 'check_list', 'handover_list', 'excerpt_management']
       },
       {
         keyword: 'đăng ký',
@@ -79,48 +79,70 @@ function removeDiacritics(str: string): string {
  */
 export function isViewAllowedForUser(
   user: { role: UserRole; employeeId?: string },
-  employees: { id: string; department: string }[],
+  employees: { id: string; department: string; position?: string }[],
   viewId: string,
   rolePermissions?: Record<string, string[]>,
   departmentPermissions?: Record<string, string[]>
 ): boolean {
   if (!user) return false;
 
-  // Admin and Subadmin always allowed full access without department restrictions
-  if (user.role === UserRole.ADMIN || user.role === UserRole.SUBADMIN) return true;
-
-  // Views that are always accessible to any logged in user
-  if (['dashboard', 'personal_profile', 'account_settings', 'utilities', 'tools_group'].includes(viewId)) {
+  // 1. Admin & Subadmin: Toàn quyền truy cập mọi view, không phụ thuộc chức danh/tổ
+  if (user.role === UserRole.ADMIN || user.role === UserRole.SUBADMIN) {
     return true;
   }
 
-  // Evaluate Department-Role permissions first, then Role-based permissions
+  // 2. ONEDOOR (Bộ phận Một Cửa): Phân quyền độc lập, không dựa theo chức danh/tổ
+  if (user.role === UserRole.ONEDOOR) {
+    const onedoorAllowedViews = [
+      'dashboard', 'personal_profile', 'account_settings', 'utilities', 'work_schedule', 
+      'tools_group', 'barcode_generator', 'lookup_records',
+      'receive_group', 'receive_record', 'receive_contract',
+      'receive_sub_create', 'receive_sub_bulk', 'receive_sub_list', 'receive_sub_vphc'
+    ];
+    return onedoorAllowedViews.includes(viewId);
+  }
+
+  // Views cơ bản mà mọi user đã đăng nhập đều xem được
+  if (['dashboard', 'personal_profile', 'account_settings', 'utilities', 'tools_group', 'work_schedule'].includes(viewId)) {
+    return true;
+  }
+
+  // 3. TEAM_LEADER và EMPLOYEE: Phân quyền theo TỔ CHUYÊN MÔN và CHỨC DANH
+  const emp = user.employeeId && employees ? employees.find(e => e.id === user.employeeId) : null;
+  const isTeamLeader = user.role === UserRole.TEAM_LEADER;
+  
+  // Xác định vị trí/chức vụ quản lý (Tổ trưởng, Tổ phó, Trưởng phòng, Phó phòng, Lãnh đạo)
+  const posNormalized = emp?.position ? removeDiacritics(emp.position.toLowerCase()) : '';
+  const isLeaderPosition = isTeamLeader || 
+    posNormalized.includes('truong') || 
+    posNormalized.includes('pho') || 
+    posNormalized.includes('lanh dao') || 
+    posNormalized.includes('giam doc');
+
+  // Xác định Tổ chuyên môn
+  const deptNormalized = emp?.department ? removeDiacritics(emp.department.toLowerCase()) : '';
+  const isDodac = deptNormalized.includes('do dac');
+  const isLuutru = deptNormalized.includes('luu tru') || deptNormalized.includes('thong tin');
+  const isCapGiay = deptNormalized.includes('dang ky') || deptNormalized.includes('cap giay');
+
+  // Đánh giá quyền động (nếu có cấu hình phân quyền động)
   let activePerms: string[] | null = null;
-
-  let isCustomDeptPerm = false;
-
-  if (user.employeeId && employees && departmentPermissions) {
-    const emp = employees.find(e => e.id === user.employeeId);
-    if (emp && emp.department) {
-      const compositeKey = `${emp.department}_${user.role}`;
-      if (departmentPermissions[compositeKey]) {
-        activePerms = departmentPermissions[compositeKey];
-        isCustomDeptPerm = true;
-      } else if (departmentPermissions[emp.department]) {
-        activePerms = departmentPermissions[emp.department];
-        isCustomDeptPerm = true;
-      } else {
-        const matchingKey = Object.keys(departmentPermissions).find(k => {
-          if (k.endsWith(`_${user.role}`)) {
-            const deptPart = k.replace(`_${user.role}`, '');
-            return matchDepartmentKey(deptPart, emp.department);
-          }
-          return matchDepartmentKey(k, emp.department);
-        });
-        if (matchingKey && departmentPermissions[matchingKey]) {
-          activePerms = departmentPermissions[matchingKey];
-          isCustomDeptPerm = true;
+  if (emp && emp.department && departmentPermissions) {
+    const compositeKey = `${emp.department}_${user.role}`;
+    if (departmentPermissions[compositeKey]) {
+      activePerms = departmentPermissions[compositeKey];
+    } else if (departmentPermissions[emp.department]) {
+      activePerms = departmentPermissions[emp.department];
+    } else {
+      const matchingKey = Object.keys(departmentPermissions).find(k => {
+        if (k.endsWith(`_${user.role}`)) {
+          const deptPart = k.replace(`_${user.role}`, '');
+          return matchDepartmentKey(deptPart, emp.department);
         }
+        return matchDepartmentKey(k, emp.department);
+      });
+      if (matchingKey && departmentPermissions[matchingKey]) {
+        activePerms = departmentPermissions[matchingKey];
       }
     }
   }
@@ -133,28 +155,24 @@ export function isViewAllowedForUser(
     }
   }
 
-  // Luôn áp dụng quy tắc phân tách thuộc tính tổ chuyên môn (Department isolation):
-  // - Tài khoản thuộc Tổ Đo đạc (không thuộc Lưu trữ) sẽ không thể thấy Tab Lưu trữ
-  // - Tài khoản thuộc Tổ Lưu trữ (không thuộc Đo đạc) sẽ không thể thấy Tab Đo đạc
-  if (user.employeeId && employees && activePerms) {
-    const emp = employees.find(e => e.id === user.employeeId);
-    if (emp && emp.department) {
-      const isCapGiay = matchDepartmentKey('cấp giấy', emp.department) || matchDepartmentKey('đăng ký', emp.department);
-      const isDodac = matchDepartmentKey('đo đạc', emp.department);
-      const isLuutru = matchDepartmentKey('lưu trữ', emp.department);
-
-      if (isCapGiay && !isDodac && !isLuutru) {
-        activePerms = activePerms.filter(p => !p.startsWith('dodac_') && !p.startsWith('luutru_'));
-      } else if (isDodac && !isCapGiay && !isLuutru) {
-        activePerms = activePerms.filter(p => !p.startsWith('dangky_') && !p.startsWith('luutru_'));
-      } else if (isLuutru && !isCapGiay && !isDodac) {
-        activePerms = activePerms.filter(p => !p.startsWith('dangky_') && !p.startsWith('dodac_'));
-      }
+  // Áp dụng bộ lọc phân tách theo Tổ chuyên môn (Department isolation)
+  if (emp && emp.department && activePerms) {
+    if (isCapGiay && !isDodac && !isLuutru) {
+      activePerms = activePerms.filter(p => !p.startsWith('dodac_') && !p.startsWith('luutru_'));
+    } else if (isDodac && !isCapGiay && !isLuutru) {
+      activePerms = activePerms.filter(p => !p.startsWith('dangky_') && !p.startsWith('luutru_'));
+    } else if (isLuutru && !isCapGiay && !isDodac) {
+      activePerms = activePerms.filter(p => !p.startsWith('dangky_') && !p.startsWith('dodac_'));
     }
   }
 
   if (activePerms !== null) {
     if (activePerms.includes('*')) return true;
+
+    // Phân quyền theo chức danh: Chuyên viên / Nhân viên không có quyền Giao việc (assign_tasks)
+    if (!isLeaderPosition && ['assign_tasks', 'archive_assign_tasks', 'other_assign_tasks'].includes(viewId)) {
+      return false;
+    }
 
     // Check viewId-specific permission
     switch (viewId) {
@@ -181,14 +199,14 @@ export function isViewAllowedForUser(
         return activePerms.includes('ADD_RECORDS') ||
                activePerms.includes('EXPORT_RECORDS');
       case 'all_records':
-        return activePerms.some(p => p.startsWith('dodac_'));
+        return isDodac || activePerms.some(p => p.startsWith('dodac_'));
       case 'archive_records':
-        return activePerms.some(p => p.startsWith('luutru_'));
+        return isLuutru || activePerms.some(p => p.startsWith('luutru_'));
       case 'registration_records':
       case 'vaoso_records':
-        return activePerms.some(p => p.startsWith('dangky_'));
+        return isCapGiay || activePerms.some(p => p.startsWith('dangky_'));
       case 'other_records':
-        return activePerms.some(p => p.startsWith('dodac_'));
+        return isDodac || activePerms.some(p => p.startsWith('dodac_'));
 
       // Child Tabs - Receive Group
       case 'receive_sub_create':
@@ -197,34 +215,34 @@ export function isViewAllowedForUser(
       case 'receive_sub_vphc':
         return activePerms.includes('ADD_RECORDS') || activePerms.includes('EXPORT_RECORDS');
 
-      // Child Tabs - All Records Group
+      // Child Tabs - All Records Group (Đo đạc)
       case 'all_sub_all':
-      case 'assign_tasks':
       case 'completed_list':
       case 'pending_supplement_list':
       case 'pending_check_list':
       case 'check_list':
       case 'handover_list':
-      case 'director_completed':
-        return activePerms.some(p => p.startsWith('dodac_'));
+        return isDodac || activePerms.some(p => p.startsWith('dodac_'));
+      case 'assign_tasks':
+        return isLeaderPosition && (isDodac || activePerms.some(p => p.startsWith('dodac_')));
 
-      // Child Tabs - Archive Group
+      // Child Tabs - Archive Group (Lưu trữ)
       case 'archive_sub_all':
-      case 'archive_assign_tasks':
       case 'archive_completed_list':
       case 'archive_pending_check_list':
       case 'archive_check_list':
       case 'archive_handover_list':
-      case 'archive_director_completed':
-        return activePerms.some(p => p.startsWith('luutru_'));
+        return isLuutru || activePerms.some(p => p.startsWith('luutru_'));
+      case 'archive_assign_tasks':
+        return isLeaderPosition && (isLuutru || activePerms.some(p => p.startsWith('luutru_')));
 
       // Child Tabs - Other Records Group
       case 'other_sub_all':
-      case 'other_assign_tasks':
       case 'other_check_list':
       case 'other_handover_list':
-      case 'other_director_completed':
-        return activePerms.some(p => p.startsWith('dodac_'));
+        return isDodac || activePerms.some(p => p.startsWith('dodac_'));
+      case 'other_assign_tasks':
+        return isLeaderPosition && (isDodac || activePerms.some(p => p.startsWith('dodac_')));
 
       // Other Standalone Views
       case 'receive_contract':
@@ -234,9 +252,9 @@ export function isViewAllowedForUser(
                activePerms.includes('DELETE_CONTRACTS') ||
                activePerms.includes('EXPORT_CONTRACTS');
       case 'excerpt_management':
-        return activePerms.includes('dodac_MANAGE_EXCERPTS') || activePerms.includes('dodac_VIEW_EXCERPTS');
+        return (isDodac || isLuutru) && (activePerms.includes('dodac_MANAGE_EXCERPTS') || activePerms.includes('dodac_VIEW_EXCERPTS') || activePerms.includes('luutru_VIEW_ARCHIVE'));
       case 'reports':
-        return activePerms.includes('VIEW_REPORTS');
+        return isLeaderPosition && activePerms.includes('VIEW_REPORTS');
       case 'work_schedule':
         return activePerms.includes('VIEW_SCHEDULE') || activePerms.includes('MANAGE_SCHEDULE');
       case 'system_dashboard':
@@ -249,37 +267,23 @@ export function isViewAllowedForUser(
     }
   }
 
-  // If dynamic permissions object was provided but no activePerms found -> deny
-  if (rolePermissions || departmentPermissions) {
-    return false;
-  }
-
-  // Fallback to static config if dynamic perms not present at all
+  // Fallback nếu không có dynamic perms
   const config = ROLE_VIEWS_CONFIG[user.role];
   if (!config) return false;
 
-  // Admin / Subadmin allowed all
-  if (config.allowedViews.includes('*')) {
+  if (config.allowedViews.includes(viewId)) {
     return true;
   }
 
-  const targetViewId = viewId === 'pending_check_list' ? 'check_list' : (viewId === 'archive_pending_check_list' ? 'archive_check_list' : viewId);
-
-  if (config.allowedViews.includes(viewId) || config.allowedViews.includes(targetViewId)) {
-    return true;
-  }
-
-  if (config.departmentSpecificViews && user.employeeId && employees) {
-    const employee = employees.find(e => e.id === user.employeeId);
-    if (employee && employee.department) {
-      const deptNormalized = removeDiacritics(employee.department.toLowerCase());
-      
-      for (const deptView of config.departmentSpecificViews) {
-        const keywordNormalized = removeDiacritics(deptView.keyword.toLowerCase());
-        if (deptNormalized.includes(keywordNormalized)) {
-          if (deptView.views.includes(viewId) || deptView.views.includes(targetViewId)) {
-            return true;
+  if (config.departmentSpecificViews && emp && emp.department) {
+    for (const deptView of config.departmentSpecificViews) {
+      const keywordNormalized = removeDiacritics(deptView.keyword.toLowerCase());
+      if (deptNormalized.includes(keywordNormalized)) {
+        if (deptView.views.includes(viewId)) {
+          if (['assign_tasks', 'archive_assign_tasks', 'other_assign_tasks'].includes(viewId) && !isLeaderPosition) {
+            return false;
           }
+          return true;
         }
       }
     }

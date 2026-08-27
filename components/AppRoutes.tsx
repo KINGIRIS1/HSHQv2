@@ -417,10 +417,9 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
     if (
       currentView === "check_list" ||
       currentView === "other_check_list" ||
-      currentView === "archive_check_list" ||
       currentView === "archive_check_list"
     )
-      title = isDirector ? "Danh sách Chờ ký" : "Danh sách Trình Ký";
+      title = "Danh sách Trình Ký";
     else if (
       currentView === "director_completed" ||
       currentView === "other_director_completed" ||
@@ -436,7 +435,6 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
     else if (
       currentView === "assign_tasks" ||
       currentView === "other_assign_tasks" ||
-      currentView === "archive_assign_tasks" ||
       currentView === "archive_assign_tasks"
     )
       title = "Hồ sơ chưa giao";
@@ -512,17 +510,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                 onClick={() => props.setCurrentView("check_list")}
                 className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "check_list" ? "border-purple-600 text-purple-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
               >
-                <ClipboardList size={16} /> {isDirector ? "Chờ ký" : "Trình ký"}
-              </button>
-            )}
-
-            {isDirector && isViewAllowedForUser(currentUser, employees, "director_completed", rolePermissions, departmentPermissions) && (
-              <button
-                id="tab-records-director-completed"
-                onClick={() => props.setCurrentView("director_completed")}
-                className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "director_completed" ? "border-green-600 text-green-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
-              >
-                <CheckSquare size={16} /> Hoàn thành
+                <ClipboardList size={16} /> Trình ký
               </button>
             )}
 
@@ -587,19 +575,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                 onClick={() => props.setCurrentView("archive_check_list")}
                 className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "archive_check_list" ? "border-purple-600 text-purple-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
               >
-                <ClipboardList size={16} /> {isDirector ? "Chờ ký" : "Trình ký"}
-              </button>
-            )}
-
-            {isDirector && isViewAllowedForUser(currentUser, employees, "archive_director_completed", rolePermissions, departmentPermissions) && (
-              <button
-                id="tab-archive-director-completed"
-                onClick={() =>
-                  props.setCurrentView("archive_director_completed")
-                }
-                className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "archive_director_completed" ? "border-green-600 text-green-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
-              >
-                <CheckSquare size={16} /> Hoàn thành
+                <ClipboardList size={16} /> Trình ký
               </button>
             )}
 
@@ -644,17 +620,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                 onClick={() => props.setCurrentView("other_check_list")}
                 className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "other_check_list" ? "border-purple-600 text-purple-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
               >
-                <ClipboardList size={16} /> {isDirector ? "Chờ ký" : "Trình ký"}
-              </button>
-            )}
-
-            {isDirector && isViewAllowedForUser(currentUser, employees, "other_director_completed", rolePermissions, departmentPermissions) && (
-              <button
-                id="tab-other-director-completed"
-                onClick={() => props.setCurrentView("other_director_completed")}
-                className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "other_director_completed" ? "border-green-600 text-green-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
-              >
-                <CheckSquare size={16} /> Hoàn thành
+                <ClipboardList size={16} /> Trình ký
               </button>
             )}
 

@@ -47,6 +47,12 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
   const hasPermission = (permissionId: string) => {
     if (isAdmin || isSubadmin) return true;
 
+    // ONEDOOR role phân quyền độc lập, không dựa theo chức danh hay tổ
+    if (isOneDoor) {
+      const rolePerms = (rolePermissions && rolePermissions[UserRole.ONEDOOR]) || DEFAULT_ROLE_PERMISSIONS[UserRole.ONEDOOR] || [];
+      return rolePerms.includes('*') || rolePerms.includes(permissionId);
+    }
+
     if (currentUser.employeeId && employees) {
         const emp = employees.find(e => e.id === currentUser.employeeId);
         if (emp && emp.department) {

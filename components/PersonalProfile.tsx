@@ -1296,7 +1296,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
       case "pending_check":
         return "Chờ kiểm tra";
       case "pending_sign":
-        return "Chờ ký";
+        return "Trình ký";
       case "finished":
         return "Hoàn thành";
       case "reminder":
@@ -1378,13 +1378,13 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
           <div 
             onClick={() => { setActiveTab("pending_sign"); setCurrentPage(1); setSearchTerm(""); }}
             className={`cursor-pointer active:scale-95 transition-all text-center p-1.5 md:px-4 md:py-2 bg-purple-50 rounded-lg border ${activeTab === "pending_sign" ? "ring-2 ring-purple-500 border-purple-400 font-extrabold shadow-sm" : "border-purple-100 hover:border-purple-300"} min-w-0 md:min-w-[100px] flex flex-col justify-center`}
-            title="Xem danh sách chờ ký"
+            title="Xem danh sách trình ký"
           >
             <div className="text-base md:text-2xl font-bold text-purple-700">
               {reviewRecords.length}
             </div>
             <div className="text-[9px] md:text-xs text-purple-600 uppercase font-bold leading-tight mt-0.5">
-              Chờ ký
+              Trình ký
             </div>
           </div>
           <div 
