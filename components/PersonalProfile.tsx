@@ -185,91 +185,80 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
 
   const myRecords: RecordFile[] = useMemo(() => {
     const mainRecords = records.filter((r) => {
-      if (isDirectorUser) {
-        if (!user.employeeId) {
-          return false;
-        }
-        return (
-          r.submittedTo === user.employeeId || 
-          r.assignedTo === user.employeeId
-        );
-      }
       if (!user.employeeId) return false;
-      // Nếu là người kiểm tra, họ có thể thấy hồ sơ được giao cho họ HOẶC hồ sơ trình cho họ kiểm tra
-      const isCheckerUser =
-        employees
-          .find((e) => e.id === user.employeeId)
-          ?.position?.toLowerCase()
-          .includes("tổ") &&
-        (employees
-          .find((e) => e.id === user.employeeId)
-          ?.department?.toLowerCase()
-          .includes("đo đạc") ||
-          employees
-            .find((e) => e.id === user.employeeId)
-            ?.department?.toLowerCase()
-            .includes("kỹ thuật"));
-      if (isCheckerUser) {
-        // Chỉ hiển thị hồ sơ giao xử lý (assignedTo) HOẶC hồ sơ đã tới khâu kiểm tra (status >= PENDING_CHECK) nếu họ là người kiểm tra (checkedBy)
-        if (r.assignedTo === user.employeeId) return true;
-        if (r.checkedBy === user.employeeId) {
-          const reachedCheckStage =
-            r.status !== RecordStatus.RECEIVED &&
-            r.status !== RecordStatus.ASSIGNED &&
-            r.status !== RecordStatus.IN_PROGRESS &&
-            r.status !== RecordStatus.COMPLETED_WORK;
-          return reachedCheckStage;
-        }
-        return false;
+      
+      // Nếu là người trực tiếp thụ lý (assignedTo) -> Luôn thấy hồ sơ của mình
+      if (r.assignedTo === user.employeeId) return true;
+
+      // 1. Đối với người được trình ký (Ban Giám đốc / Lãnh đạo / Người ký duyệt)
+      if (r.submittedTo === user.employeeId) {
+        // Chỉ hiển thị trong hồ sơ cá nhân khi hồ sơ ĐÃ ĐƯỢC TRÌNH KÝ hoặc ĐÃ KÝ/HOÀN THÀNH
+        // Nếu hồ sơ đã bị thu hồi/quay về các bước trước (RECEIVED, ASSIGNED, IN_PROGRESS, COMPLETED_WORK, PENDING_CHECK) -> Ẩn khỏi hồ sơ của người được trình ký
+        const reachedSignStage =
+          r.status === RecordStatus.PENDING_SIGN ||
+          r.status === RecordStatus.SIGNED ||
+          r.status === RecordStatus.HANDOVER ||
+          r.status === RecordStatus.RETURNED ||
+          r.status === RecordStatus.REJECTED ||
+          r.status === RecordStatus.WITHDRAWN;
+        return reachedSignStage;
       }
-      return r.assignedTo === user.employeeId;
+
+      // 2. Đối với người được trình kiểm tra (Tổ trưởng / Người kiểm tra)
+      if (r.checkedBy === user.employeeId) {
+        // Chỉ hiển thị khi hồ sơ đã được nộp kiểm tra trở đi
+        // Nếu đã bị thu hồi/quay về RECEIVED, ASSIGNED, IN_PROGRESS -> Ẩn khỏi hồ sơ cá nhân của người kiểm tra
+        const reachedCheckStage =
+          r.status === RecordStatus.COMPLETED_WORK ||
+          r.status === RecordStatus.PENDING_CHECK ||
+          r.status === RecordStatus.CHECKED ||
+          r.status === RecordStatus.PENDING_SIGN ||
+          r.status === RecordStatus.SIGNED ||
+          r.status === RecordStatus.HANDOVER ||
+          r.status === RecordStatus.RETURNED ||
+          r.status === RecordStatus.REJECTED ||
+          r.status === RecordStatus.WITHDRAWN;
+        return reachedCheckStage;
+      }
+
+      return false;
     });
 
     const mappedArchives = archiveRecords
       .filter((r) => {
-        if (isDirectorUser) {
-          if (!user.employeeId) {
-            return false;
-          }
-          return (
-            r.data?.submitted_to === user.employeeId ||
-            r.data?.assigned_to === user.employeeId
-          );
-        }
         if (!user.employeeId) return false;
-        const isCheckerUser =
-          employees
-            .find((e) => e.id === user.employeeId)
-            ?.position?.toLowerCase()
-            .includes("tổ") &&
-          (employees
-            .find((e) => e.id === user.employeeId)
-            ?.department?.toLowerCase()
-            .includes("đo đạc") ||
-            employees
-              .find((e) => e.id === user.employeeId)
-              ?.department?.toLowerCase()
-              .includes("kỹ thuật"));
-        if (isCheckerUser) {
-          if (r.data?.assigned_to === user.employeeId) return true;
-          if (r.data?.checked_by === user.employeeId) {
-            // Map status của archive để kiểm tra xem đã tới khâu kiểm tra chưa
-            let status: RecordStatus = RecordStatus.RECEIVED;
-            if (r.status === "assigned") status = RecordStatus.ASSIGNED;
-            else if (r.status === "executed") status = RecordStatus.COMPLETED_WORK;
-            else if (r.status === "pending_sign") status = RecordStatus.PENDING_SIGN;
-            else if (r.status === "signed") status = RecordStatus.SIGNED;
-            else if (r.status === "completed") status = RecordStatus.RETURNED;
 
-            const reachedCheckStage =
-              status === RecordStatus.PENDING_SIGN ||
-              status === RecordStatus.SIGNED ||
-              status === RecordStatus.RETURNED;
-            return reachedCheckStage;
-          }
-          return false;
+        // Nếu là người trực tiếp thụ lý archive
+        if (r.data?.assigned_to === user.employeeId) return true;
+
+        // Map status của archive
+        let status: RecordStatus = RecordStatus.RECEIVED;
+        if (r.status === "assigned") status = RecordStatus.ASSIGNED;
+        else if (r.status === "executed") status = RecordStatus.COMPLETED_WORK;
+        else if (r.status === "pending_sign") status = RecordStatus.PENDING_SIGN;
+        else if (r.status === "signed") status = RecordStatus.SIGNED;
+        else if (r.status === "completed") status = RecordStatus.RETURNED;
+
+        // 1. Đối với người được trình ký archive
+        if (r.data?.submitted_to === user.employeeId) {
+          const reachedSignStage =
+            status === RecordStatus.PENDING_SIGN ||
+            status === RecordStatus.SIGNED ||
+            status === RecordStatus.RETURNED;
+          return reachedSignStage;
         }
-        return r.data?.assigned_to === user.employeeId;
+
+        // 2. Đối với người được trình kiểm tra archive
+        if (r.data?.checked_by === user.employeeId) {
+          const reachedCheckStage =
+            status === RecordStatus.COMPLETED_WORK ||
+            status === RecordStatus.PENDING_SIGN ||
+            status === RecordStatus.SIGNED ||
+            status === RecordStatus.RETURNED;
+          return reachedCheckStage;
+        }
+
+        return false;
       })
       .map((r) => {
         // Map status
