@@ -154,6 +154,17 @@ const SystemReceiptTemplate: React.FC<SystemReceiptTemplateProps> = ({ data, rec
     const currentUserName = currentUser?.name || currentUser?.username || 'NGUYỄN HỮU TRÍ';
     const wardName = getNormalizedWard(data.ward || '');
 
+    const isTrichDo22 = (() => {
+        const rawType = (data.recordType || '').trim().toLowerCase();
+        const rawCode = (data.code || '').trim().toUpperCase();
+        const shortType = getShortRecordType(data.recordType, data.code).toLowerCase();
+
+        if (shortType.startsWith('2.2') || rawType.startsWith('2.2')) return true;
+        if (rawCode.startsWith('2.2') || rawCode.startsWith('TD-') || rawCode.startsWith('TD_') || rawCode.startsWith('YC-') || rawCode.startsWith('YCDD-') || rawCode.startsWith('TRICHDO')) return true;
+        if ((rawType.includes('trích đo') || rawType.includes('trich do')) && !rawType.includes('cắm mốc') && !rawType.includes('tách') && !rawType.includes('chỉnh lý') && !rawType.includes('trích lục')) return true;
+        return false;
+    })();
+
     const getDisplayLandAddress = () => {
         let addr = '';
         if (data.address) {
@@ -356,8 +367,18 @@ const SystemReceiptTemplate: React.FC<SystemReceiptTemplateProps> = ({ data, rec
                                 <div>2. Số lượng hồ sơ: 01 (bộ)</div>
                                 <div>3. Thời gian nhận hồ sơ: <span className="font-bold">{formatDateTime(rDate)}</span></div>
                                 <div>4. Thời gian dự kiến trả kết quả giải quyết hồ sơ: <span className="font-bold">{formatDateTime(dDate)}</span></div>
-                                <div>5. Đăng ký trả kết quả tại: Trung tâm phục vụ hành chính công {getWardFullLabel(receivingWard)}</div>
-                                <div>6. Phí, lệ phí (nếu có): <span className="font-bold">Chưa thanh toán</span></div>
+                                {isTrichDo22 ? (
+                                    <>
+                                        <div className="font-bold">5. Lưu Ý: "YÊU CẦU CHỦ SỬ DỤNG ĐẤT CẮM RANH THỬA ĐẤT CẦN ĐO, MỜI LIÊN RANH LIỀN KỀ KÝ RANH TẠI THỬA ĐẤT"</div>
+                                        <div>6. Đăng ký trả kết quả tại: Trung tâm phục vụ hành chính công {getWardFullLabel(receivingWard)}</div>
+                                        <div>7. Phí, lệ phí (nếu có): <span className="font-bold">Chưa thanh toán</span></div>
+                                    </>
+                                ) : (
+                                    <>
+                                        <div>5. Đăng ký trả kết quả tại: Trung tâm phục vụ hành chính công {getWardFullLabel(receivingWard)}</div>
+                                        <div>6. Phí, lệ phí (nếu có): <span className="font-bold">Chưa thanh toán</span></div>
+                                    </>
+                                )}
                             </div>
 
                             {/* Signatures */}
