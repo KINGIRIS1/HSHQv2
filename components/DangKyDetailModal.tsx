@@ -92,6 +92,10 @@ export const DangKyDetailModal: React.FC<DangKyDetailModalProps> = ({
     }
   }, [record, isOpen]);
 
+  const stepDeadlines = useMemo(() => {
+    return record ? calculateRecordStepDeadlines(record) : [];
+  }, [record]);
+
   if (!isOpen || !record) return null;
 
   const isAdmin = currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.SUBADMIN;
@@ -327,10 +331,6 @@ export const DangKyDetailModal: React.FC<DangKyDetailModalProps> = ({
   const formatStaffInfo = (staffNameOrId?: string | null) => {
     return formatStaffInfoHelper(staffNameOrId, employees, []);
   };
-
-  const stepDeadlines = useMemo(() => {
-    return calculateRecordStepDeadlines(record);
-  }, [record]);
 
   // Timeline Step Item chuẩn như DetailModal với Deadline và SLA
   const TimelineItem = ({
