@@ -1,6 +1,6 @@
 import { supabase, isConfigured } from './supabaseClient';
 import { DangKyRecord, DangKyParty } from '../types';
-import { getFromCache, saveToCache, CACHE_KEYS, logError } from './apiCore';
+import { getFromCache, getFromCacheAsync, saveToCache, CACHE_KEYS, logError } from './apiCore';
 
 // Mẫu dữ liệu giả định ban đầu khi chưa có dữ liệu trong DB
 export const MOCK_DANGKY_RECORDS: DangKyRecord[] = [
@@ -224,29 +224,59 @@ export const mapDangKyToDb = (record: DangKyRecord): any => {
 };
 
 // Fetch DangKy Records
-export const fetchDangKyRecords = async (): Promise<DangKyRecord[]> => {
+export const fetchDangKyRecords = async (onProgress?: (loadedRecords: DangKyRecord[]) => void): Promise<DangKyRecord[]> => {
   if (isConfigured) {
     try {
-      const { data, error } = await supabase
-        .from('dangky_records')
-        .select('*')
-        .order('createdAt', { ascending: false });
+      const CHUNK_SIZE = 500;
+      let allDangKy: DangKyRecord[] = [];
+      let from = 0;
+      let hasMore = true;
 
-      if (error) {
-        logError('fetchDangKyRecords Supabase', error, true);
-      } else if (data) {
-        const mapped = data.map(mapDangKyFromDb);
-        saveToCache(CACHE_KEYS.DANGKY_RECORDS, mapped);
-        return mapped;
+      while (hasMore) {
+        const to = from + CHUNK_SIZE - 1;
+        const { data, error } = await supabase
+          .from('dangky_records')
+          .select('*')
+          .order('createdAt', { ascending: false })
+          .range(from, to);
+
+        if (error) {
+          logError('fetchDangKyRecords Supabase chunk', error, true);
+          if (allDangKy.length > 0) {
+            saveToCache(CACHE_KEYS.DANGKY_RECORDS, allDangKy);
+            return allDangKy;
+          }
+          break;
+        }
+
+        if (data && data.length > 0) {
+          const mapped = data.map(mapDangKyFromDb);
+          allDangKy = allDangKy.concat(mapped);
+          if (onProgress) {
+            onProgress(allDangKy);
+          }
+          if (data.length < CHUNK_SIZE) {
+            hasMore = false;
+          } else {
+            from += CHUNK_SIZE;
+          }
+        } else {
+          hasMore = false;
+        }
+      }
+
+      if (allDangKy.length > 0) {
+        saveToCache(CACHE_KEYS.DANGKY_RECORDS, allDangKy);
+        return allDangKy;
       }
     } catch (e) {
       logError('fetchDangKyRecords catch', e, true);
     }
   }
 
-  // Fallback to cache or mock
-  const cached = getFromCache<DangKyRecord[] | null>(CACHE_KEYS.DANGKY_RECORDS, null);
-  if (cached !== null && Array.isArray(cached)) {
+  // Fallback to cache or mock via async IDB
+  const cached = await getFromCacheAsync<DangKyRecord[] | null>(CACHE_KEYS.DANGKY_RECORDS, null);
+  if (cached !== null && Array.isArray(cached) && cached.length > 0) {
     return cached;
   }
 

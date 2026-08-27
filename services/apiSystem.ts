@@ -2,46 +2,14 @@
 import { supabase, isConfigured } from './supabaseClient';
 import { Holiday } from '../types';
 import { logError, getFromCache, saveToCache, CACHE_KEYS } from './apiCore';
+import { networkMonitor } from './networkMonitor';
 
 /**
- * Realtime health-check to probe server and internet connectivity.
- * Tests server /api/health endpoint or Supabase connection.
+ * Realtime health-check to probe server connectivity.
+ * Uses networkMonitor with single-flight checking.
  */
 export const healthCheck = async (): Promise<boolean> => {
-    if (typeof navigator !== 'undefined' && !navigator.onLine) {
-        return false;
-    }
-    try {
-        const response = await fetch(`/api/health?t=${Date.now()}`, {
-            method: 'GET',
-            cache: 'no-store',
-            signal: AbortSignal.timeout(3500),
-        }).catch(() => null);
-
-        if (response && (response.ok || response.status < 500)) {
-            return true;
-        }
-
-        // Fallback root ping
-        const fallback = await fetch(`/?t=${Date.now()}`, {
-            method: 'HEAD',
-            cache: 'no-store',
-            signal: AbortSignal.timeout(3500),
-        }).catch(() => null);
-
-        if (fallback && (fallback.ok || fallback.status < 500)) {
-            return true;
-        }
-
-        // Fallback Supabase check
-        if (isConfigured) {
-            const { error } = await supabase.from('system_settings').select('key').limit(1);
-            if (!error) return true;
-        }
-        return false;
-    } catch {
-        return false;
-    }
+    return await networkMonitor.checkBackendNow();
 };
 
 export const testDatabaseConnection = async (): Promise<{ status: string, message: string }> => {

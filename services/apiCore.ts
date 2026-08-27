@@ -2,6 +2,8 @@
 import { supabase, isConfigured } from './supabaseClient';
 import { Contract, PriceItem, Employee, User } from '../types';
 import { API_BASE_URL } from '../constants'; 
+import { getFromIdb, saveToIdb } from './indexedDbService';
+import { networkMonitor, isNetworkError } from './networkMonitor';
 
 // --- CACHE KEYS ---
 export const CACHE_KEYS = {
@@ -19,34 +21,64 @@ export const CACHE_KEYS = {
     DANGKY_RECORDS: 'offline_dangky_records'
 };
 
+// In-memory cache map for ultra-fast synchronous lookups
+const memoryCache = new Map<string, any>();
+
 // --- HELPERS ---
 export const saveToCache = (key: string, data: any) => {
     try {
-        localStorage.setItem(key, JSON.stringify(data));
-    } catch (e: any) {
-        if (e.name === 'QuotaExceededError' || e?.message?.includes('quota')) {
-            console.warn(`LocalStorage full when saving ${key}. Attempting to truncate...`);
-            if (Array.isArray(data) && data.length > 500) {
-                try {
-                    const truncated = data.slice(0, 500);
-                    localStorage.setItem(key, JSON.stringify(truncated));
-                    console.info(`Successfully saved truncated ${key} (500 items) to free space.`);
-                } catch (err) {
-                    console.warn(`Failed to save even truncated ${key}`, err);
-                }
+        // 1. Save into RAM memory
+        memoryCache.set(key, data);
+
+        // 2. Save full payload into IndexedDB (asynchronous, high capacity)
+        saveToIdb(key, data).catch((err: any) => {
+            console.warn(`[IndexedDB Sync] Failed to persist ${key}:`, err);
+        });
+
+        // 3. Fallback to localStorage if size allows
+        if (typeof window !== 'undefined') {
+            try {
+                localStorage.setItem(key, JSON.stringify(data));
+            } catch (storageErr) {
+                // If localStorage is full, IndexedDB holds the 100% full dataset
             }
-        } else {
-            console.warn('LocalStorage full or error:', e);
         }
+    } catch (e: any) {
+        console.warn('Cache save warning:', e);
+    }
+};
+
+/**
+ * Async cache loader that retrieves full 100% dataset from IndexedDB with fallback
+ */
+export const getFromCacheAsync = async <T>(key: string, fallback: T): Promise<T> => {
+    if (memoryCache.has(key)) {
+        return memoryCache.get(key) as T;
+    }
+    try {
+        const idbData = await getFromIdb<T>(key, fallback);
+        if (idbData && (!Array.isArray(idbData) || idbData.length > 0)) {
+            memoryCache.set(key, idbData);
+            return idbData;
+        }
+        return getFromCache(key, fallback);
+    } catch {
+        return getFromCache(key, fallback);
     }
 };
 
 export const getFromCache = <T>(key: string, fallback: T): T => {
+    if (memoryCache.has(key)) {
+        return memoryCache.get(key) as T;
+    }
     try {
-        const cached = localStorage.getItem(key);
-        if (cached) {
-            console.log(`[Offline Mode] Loaded data from cache: ${key}`);
-            return JSON.parse(cached);
+        if (typeof window !== 'undefined') {
+            const cached = localStorage.getItem(key);
+            if (cached) {
+                const parsed = JSON.parse(cached);
+                memoryCache.set(key, parsed);
+                return parsed;
+            }
         }
     } catch (e) {
         console.warn('Error reading cache:', e);
@@ -109,12 +141,10 @@ export const logError = (context: string, error: any, silent: boolean = false) =
          return; 
     }
 
-    if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('configuration') || msg.includes('Load failed')) {
-        console.error(`❌ [Lỗi kết nối] ${context}: Không thể kết nối tới cơ sở dữ liệu Cloud Supabase. Vui lòng kiểm tra lại mạng.`);
-        if (!hasShownConnectionAlert) {
-            hasShownConnectionAlert = true;
-            alert(`LỖI KẾT NỐI: Không thể kết nối tới cơ sở dữ liệu Cloud Supabase.\n\nHệ thống sẽ tự động chuyển sang chế độ Ngoại tuyến (Offline Mode) và tải dữ liệu từ bộ nhớ lưu trữ tạm thời trên trình duyệt của bạn.`);
-        }
+    if (isNetworkError(error) || msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('configuration') || msg.includes('Load failed')) {
+        console.error(`❌ [Lỗi kết nối] ${context}: Không thể kết nối tới máy chủ. Kích hoạt khóa ngoại tuyến an toàn.`);
+        // Trigger instant OFFLINE LOCK in 0.05s
+        networkMonitor.triggerConnectionLost();
     } else if (code === '42P01' || code === 'PGRST205' || (typeof msg === 'string' && msg.includes('schema cache'))) {
         console.error(`❌ Lỗi tại ${context}: Bảng dữ liệu chưa tồn tại trên Supabase! (Code: ${code || 'PGRST205'})`);
         if (!silent) {

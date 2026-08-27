@@ -303,16 +303,17 @@ export const migrateArchiveRecordsFromLandRecords = async () => {
 // Giữ alias tương thích
 export const migrateCungCapTaiLieu = migrateArchiveRecordsFromLandRecords;
 
-export const fetchArchiveRecords = async (type: 'saoluc' | 'vaoso' | 'congvan'): Promise<ArchiveRecord[]> => {
+export const fetchArchiveRecords = async (type: 'saoluc' | 'vaoso' | 'congvan', onProgress?: (loaded: ArchiveRecord[]) => void): Promise<ArchiveRecord[]> => {
     if (!isConfigured) {
-        const cached = getFromCache<ArchiveRecord[]>(CACHE_KEY_ARCHIVE, []);
+        const { getFromCacheAsync } = await import('./apiCore');
+        const cached = await getFromCacheAsync<ArchiveRecord[]>(CACHE_KEY_ARCHIVE, []);
         if (MOCK_ARCHIVE.length === 0 && cached.length > 0) MOCK_ARCHIVE = cached;
         return MOCK_ARCHIVE.filter(r => r.type === type);
     }
     try {
         let allData: ArchiveRecord[] = [];
         let page = 0;
-        const pageSize = 1000;
+        const pageSize = 500;
         let hasMore = true;
 
         while (hasMore) {
@@ -331,16 +332,21 @@ export const fetchArchiveRecords = async (type: 'saoluc' | 'vaoso' | 'congvan'):
                 const mapped = data.map(item => mapLuutruDbToArchiveRecord(item));
                 const filtered = mapped.filter(r => r.type === type);
                 allData = [...allData, ...filtered];
+                if (onProgress) {
+                    onProgress(allData);
+                }
                 if (data.length < pageSize) hasMore = false;
                 else page++;
             } else {
                 hasMore = false;
             }
         }
+        saveToCache(CACHE_KEY_ARCHIVE, allData);
         return allData;
     } catch (error: any) {
         logError(`fetchArchiveRecords-${type}`, error, true);
-        const cached = getFromCache<ArchiveRecord[]>(CACHE_KEY_ARCHIVE, []);
+        const { getFromCacheAsync } = await import('./apiCore');
+        const cached = await getFromCacheAsync<ArchiveRecord[]>(CACHE_KEY_ARCHIVE, []);
         if (MOCK_ARCHIVE.length === 0 && cached.length > 0) MOCK_ARCHIVE = cached;
         return MOCK_ARCHIVE.filter(r => r.type === type);
     }

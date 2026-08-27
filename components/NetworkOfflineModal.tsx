@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { WifiOff, RefreshCw, AlertCircle, CheckCircle2, ShieldAlert } from 'lucide-react';
-import { healthCheck } from '../services/api';
+import { networkMonitor } from '../services/networkMonitor';
 
 interface NetworkOfflineModalProps {
   onOnlineRestored?: () => void;
 }
 
 export const NetworkOfflineModal: React.FC<NetworkOfflineModalProps> = ({ onOnlineRestored }) => {
-  const [isOffline, setIsOffline] = useState<boolean>(() => (typeof navigator !== 'undefined' ? !navigator.onLine : false));
+  const [isOffline, setIsOffline] = useState<boolean>(() => !networkMonitor.isOnline);
   const [isChecking, setIsChecking] = useState<boolean>(false);
   const [countdown, setCountdown] = useState<number>(5);
   const [showRestoredNotice, setShowRestoredNotice] = useState<boolean>(false);
@@ -15,11 +15,6 @@ export const NetworkOfflineModal: React.FC<NetworkOfflineModalProps> = ({ onOnli
   const countdownTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isOfflineRef = useRef<boolean>(isOffline);
   isOfflineRef.current = isOffline;
-
-  // Function to actively ping an endpoint or verify connectivity via healthCheck
-  const checkConnection = useCallback(async (): Promise<boolean> => {
-    return await healthCheck();
-  }, []);
 
   const handleOnline = useCallback(() => {
     const wasOffline = isOfflineRef.current;
@@ -46,7 +41,7 @@ export const NetworkOfflineModal: React.FC<NetworkOfflineModalProps> = ({ onOnli
 
   const handleManualRetry = async () => {
     setIsChecking(true);
-    const connected = await checkConnection();
+    const connected = await networkMonitor.checkBackendNow();
     setIsChecking(false);
     if (connected) {
       handleOnline();
@@ -56,58 +51,30 @@ export const NetworkOfflineModal: React.FC<NetworkOfflineModalProps> = ({ onOnli
     }
   };
 
-  // Listen to browser network events & Heartbeat check
+  // Subscribe to Network Monitor and run lightweight adaptive heartbeat (3-4s)
   useEffect(() => {
-    const onOnlineEvent = async () => {
-      const connected = await checkConnection();
-      if (connected) {
+    // 1. Subscribe to central NetworkMonitor events
+    const unsubscribe = networkMonitor.subscribe((online) => {
+      if (online) {
         handleOnline();
-      }
-    };
-
-    const onOfflineEvent = () => {
-      handleOffline();
-    };
-
-    window.addEventListener('online', onOnlineEvent);
-    window.addEventListener('offline', onOfflineEvent);
-
-    // Initial check on mount
-    checkConnection().then((connected) => {
-      if (connected && isOfflineRef.current) {
-        handleOnline();
-      } else if (!connected && !isOfflineRef.current) {
+      } else {
         handleOffline();
       }
     });
 
-    // Periodic Heartbeat check every 8 seconds to ensure server health and sync
-    const heartbeatInterval = setInterval(async () => {
-      if (typeof navigator !== 'undefined' && !navigator.onLine) {
-        if (!isOfflineRef.current) {
-          handleOffline();
-        }
-        return;
-      }
+    // 2. Initial probe to verify backend on mount
+    networkMonitor.checkBackendNow();
 
-      const connected = await checkConnection();
-      if (connected) {
-        if (isOfflineRef.current) {
-          handleOnline();
-        }
-      } else {
-        if (!isOfflineRef.current) {
-          handleOffline();
-        }
-      }
-    }, 8000);
+    // 3. Adaptive Heartbeat (every 4 seconds) to Backend /api/health with single-flight check
+    const heartbeatInterval = setInterval(() => {
+      networkMonitor.checkBackendNow();
+    }, 4000);
 
     return () => {
-      window.removeEventListener('online', onOnlineEvent);
-      window.removeEventListener('offline', onOfflineEvent);
+      unsubscribe();
       clearInterval(heartbeatInterval);
     };
-  }, [checkConnection, handleOnline, handleOffline]);
+  }, [handleOnline, handleOffline]);
 
   // Countdown auto-retry when offline
   useEffect(() => {
@@ -120,7 +87,7 @@ export const NetworkOfflineModal: React.FC<NetworkOfflineModalProps> = ({ onOnli
       setCountdown((prev) => {
         if (prev <= 1) {
           // Trigger automatic re-check
-          checkConnection().then((connected) => {
+          networkMonitor.checkBackendNow().then((connected) => {
             if (connected) {
               handleOnline();
             }
@@ -134,7 +101,7 @@ export const NetworkOfflineModal: React.FC<NetworkOfflineModalProps> = ({ onOnli
     return () => {
       if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
     };
-  }, [isOffline, checkConnection, handleOnline]);
+  }, [isOffline, handleOnline]);
 
   return (
     <>

@@ -60,15 +60,16 @@ const OPTIONAL_NEW_COLUMNS = [
     'statusLogs', 'archiveHandoverDate', 'archiveHandoverBatch'
 ];
 
-export const fetchRecords = async (): Promise<RecordFile[]> => {
+export const fetchRecords = async (onProgress?: (loadedRecords: RecordFile[]) => void): Promise<RecordFile[]> => {
   if (!isConfigured) {
       console.warn("Supabase chưa được cấu hình.");
-      return [];
+      const { getFromCacheAsync } = await import('./apiCore');
+      return await getFromCacheAsync<RecordFile[]>(CACHE_KEYS.RECORDS, MOCK_RECORDS);
   }
 
   try {
     let allRecords: any[] = [];
-    const step = 1000;
+    const step = 500;
     let retryCount = 0;
     const maxRetries = 1;
 
@@ -142,6 +143,9 @@ export const fetchRecords = async (): Promise<RecordFile[]> => {
                     };
                 });
                 allRecords = [...allRecords, ...mapped];
+                if (onProgress && allRecords.length > 0) {
+                    onProgress(allRecords.map(mapRecordFromDb));
+                }
                 fromDk += step;
                 if (data.length < step) hasMoreDk = false;
             } else {
@@ -169,6 +173,9 @@ export const fetchRecords = async (): Promise<RecordFile[]> => {
             if (data && data.length > 0) {
                 const mapped = data.map(item => ({ ...item, sourceTable: item.sourceTable || ('land_records' as const) }));
                 allRecords = [...allRecords, ...mapped];
+                if (onProgress && allRecords.length > 0) {
+                    onProgress(allRecords.map(mapRecordFromDb));
+                }
                 fromLand += step;
                 if (data.length < step) hasMoreLand = false;
             } else {
@@ -211,6 +218,9 @@ export const fetchRecords = async (): Promise<RecordFile[]> => {
             } else if (data && data.length > 0) {
                 const mapped = data.map(item => ({ ...item, sourceTable: 'luutru_records' as const }));
                 allRecords = [...allRecords, ...mapped];
+                if (onProgress && allRecords.length > 0) {
+                    onProgress(allRecords.map(mapRecordFromDb));
+                }
                 fromLt += step;
                 if (data.length < step) hasMoreLt = false;
             } else {
@@ -227,14 +237,16 @@ export const fetchRecords = async (): Promise<RecordFile[]> => {
             uniqueMap.set(item.id, mapRecordFromDb(item));
         }
     });
-    const uniqueRecords = Array.from(uniqueMap.values());
+    const uniqueRecords = Array.from(uniqueMap.values()) as RecordFile[];
     
     console.log(`[Fetch] Total fetched across all cloud tables: ${uniqueRecords.length}`);
-    return uniqueRecords as RecordFile[];
+    saveToCache(CACHE_KEYS.RECORDS, uniqueRecords);
+    return uniqueRecords;
 
   } catch (error) {
     logError("fetchRecords", error, true);
-    const cached = getFromCache<RecordFile[]>(CACHE_KEYS.RECORDS, []);
+    const { getFromCacheAsync } = await import('./apiCore');
+    const cached = await getFromCacheAsync<RecordFile[]>(CACHE_KEYS.RECORDS, []);
     return cached.length > 0 ? cached : MOCK_RECORDS;
   }
 };
