@@ -369,7 +369,7 @@ const SystemReceiptTemplate: React.FC<SystemReceiptTemplateProps> = ({ data, rec
                                 <div>4. Thời gian dự kiến trả kết quả giải quyết hồ sơ: <span className="font-bold">{formatDateTime(dDate)}</span></div>
                                 {isTrichDo22 ? (
                                     <>
-                                        <div className="font-bold">5. Lưu Ý: "YÊU CẦU CHỦ SỬ DỤNG ĐẤT CẮM RANH THỬA ĐẤT CẦN ĐO, MỜI LIÊN RANH LIỀN KỀ KÝ RANH TẠI THỬA ĐẤT"</div>
+                                        <div className="font-bold">5. YÊU CẦU CHỦ SỬ DỤNG ĐẤT CẮM RANH THỬA ĐẤT CẦN ĐO, MỜI LIÊN RANH LIỀN KỀ XÁC MINH RANH MỐC VÀ KÝ RANH TẠI THỬA ĐẤT</div>
                                         <div>6. Đăng ký trả kết quả tại: Trung tâm phục vụ hành chính công {getWardFullLabel(receivingWard)}</div>
                                         <div>7. Phí, lệ phí (nếu có): <span className="font-bold">Chưa thanh toán</span></div>
                                     </>
