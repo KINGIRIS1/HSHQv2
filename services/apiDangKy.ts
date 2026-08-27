@@ -228,7 +228,7 @@ export const fetchDangKyRecords = async (onProgress?: (loadedRecords: DangKyReco
   if (isConfigured) {
     try {
       const CHUNK_SIZE = 500;
-      let allDangKy: DangKyRecord[] = [];
+      const uniqueMap = new Map<string, DangKyRecord>();
       let from = 0;
       let hasMore = true;
 
@@ -238,10 +238,12 @@ export const fetchDangKyRecords = async (onProgress?: (loadedRecords: DangKyReco
           .from('dangky_records')
           .select('*')
           .order('createdAt', { ascending: false })
+          .order('id', { ascending: true })
           .range(from, to);
 
         if (error) {
           logError('fetchDangKyRecords Supabase chunk', error, true);
+          const allDangKy = Array.from(uniqueMap.values());
           if (allDangKy.length > 0) {
             saveToCache(CACHE_KEYS.DANGKY_RECORDS, allDangKy);
             return allDangKy;
@@ -250,10 +252,16 @@ export const fetchDangKyRecords = async (onProgress?: (loadedRecords: DangKyReco
         }
 
         if (data && data.length > 0) {
-          const mapped = data.map(mapDangKyFromDb);
-          allDangKy = allDangKy.concat(mapped);
-          if (onProgress) {
-            onProgress(allDangKy);
+          data.forEach((item) => {
+            const mapped = mapDangKyFromDb(item);
+            if (mapped && mapped.id) {
+              uniqueMap.set(mapped.id, mapped);
+            }
+          });
+          
+          const currentList = Array.from(uniqueMap.values());
+          if (onProgress && currentList.length > 0) {
+            onProgress(currentList);
           }
           if (data.length < CHUNK_SIZE) {
             hasMore = false;
@@ -265,6 +273,7 @@ export const fetchDangKyRecords = async (onProgress?: (loadedRecords: DangKyReco
         }
       }
 
+      const allDangKy = Array.from(uniqueMap.values());
       if (allDangKy.length > 0) {
         saveToCache(CACHE_KEYS.DANGKY_RECORDS, allDangKy);
         return allDangKy;
@@ -277,7 +286,11 @@ export const fetchDangKyRecords = async (onProgress?: (loadedRecords: DangKyReco
   // Fallback to cache or mock via async IDB
   const cached = await getFromCacheAsync<DangKyRecord[] | null>(CACHE_KEYS.DANGKY_RECORDS, null);
   if (cached !== null && Array.isArray(cached) && cached.length > 0) {
-    return cached;
+    const uniqueMap = new Map<string, DangKyRecord>();
+    cached.forEach((r) => {
+      if (r && r.id) uniqueMap.set(r.id, r);
+    });
+    return Array.from(uniqueMap.values());
   }
 
   // Khởi tạo mock lần đầu nếu chưa từng có dữ liệu trong cache

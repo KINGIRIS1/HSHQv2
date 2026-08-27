@@ -144,7 +144,9 @@ export const fetchRecords = async (onProgress?: (loadedRecords: RecordFile[]) =>
                 });
                 allRecords = [...allRecords, ...mapped];
                 if (onProgress && allRecords.length > 0) {
-                    onProgress(allRecords.map(mapRecordFromDb));
+                    const tempMap = new Map<string, RecordFile>();
+                    allRecords.forEach(it => { if (it && it.id) tempMap.set(it.id, mapRecordFromDb(it)); });
+                    onProgress(Array.from(tempMap.values()));
                 }
                 fromDk += step;
                 if (data.length < step) hasMoreDk = false;
@@ -174,7 +176,9 @@ export const fetchRecords = async (onProgress?: (loadedRecords: RecordFile[]) =>
                 const mapped = data.map(item => ({ ...item, sourceTable: item.sourceTable || ('land_records' as const) }));
                 allRecords = [...allRecords, ...mapped];
                 if (onProgress && allRecords.length > 0) {
-                    onProgress(allRecords.map(mapRecordFromDb));
+                    const tempMap = new Map<string, RecordFile>();
+                    allRecords.forEach(it => { if (it && it.id) tempMap.set(it.id, mapRecordFromDb(it)); });
+                    onProgress(Array.from(tempMap.values()));
                 }
                 fromLand += step;
                 if (data.length < step) hasMoreLand = false;
@@ -219,7 +223,9 @@ export const fetchRecords = async (onProgress?: (loadedRecords: RecordFile[]) =>
                 const mapped = data.map(item => ({ ...item, sourceTable: 'luutru_records' as const }));
                 allRecords = [...allRecords, ...mapped];
                 if (onProgress && allRecords.length > 0) {
-                    onProgress(allRecords.map(mapRecordFromDb));
+                    const tempMap = new Map<string, RecordFile>();
+                    allRecords.forEach(it => { if (it && it.id) tempMap.set(it.id, mapRecordFromDb(it)); });
+                    onProgress(Array.from(tempMap.values()));
                 }
                 fromLt += step;
                 if (data.length < step) hasMoreLt = false;

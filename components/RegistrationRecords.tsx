@@ -257,7 +257,11 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
         setLoading(true);
         try {
             const data = await fetchDangKyRecords();
-            setRecords(data);
+            const uniqueMap = new Map<string, DangKyRecord>();
+            (data || []).forEach(r => {
+                if (r && r.id) uniqueMap.set(r.id, r);
+            });
+            setRecords(Array.from(uniqueMap.values()));
         } catch (e) {
             console.error('Error loading DangKy records:', e);
         } finally {
@@ -2021,7 +2025,7 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                                             </td>
                                         </tr>
                                     ) : (
-                                        paginatedRecords.map((r) => {
+                                        paginatedRecords.map((r, rIdx) => {
                                             const cust = getPrimaryCustomer(r);
                                             const isSelected = selectedIds.has(r.id);
                                             const isOverdue = isDangKyRecordOverdue(r);
@@ -2031,7 +2035,7 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
 
                                             return (
                                                 <tr 
-                                                    key={r.id} 
+                                                    key={`${r.id || 'dk'}-${rIdx}`} 
                                                     className={`transition-all duration-200 group border-l-4 ${
                                                         isOverdue 
                                                             ? 'bg-red-50/50 border-l-red-500 hover:bg-red-50' 
