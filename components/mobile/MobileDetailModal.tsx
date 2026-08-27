@@ -15,7 +15,7 @@ import DocxPreviewModal from '../DocxPreviewModal';
 import { updateRecordApi, fetchContracts } from '../../services/api';
 import SystemReceiptTemplate from '../receive-record/SystemReceiptTemplate';
 import SystemAnnexTemplate from '../receive-record/SystemAnnexTemplate';
-import { cleanSyncNotes } from '../../utils/appHelpers';
+import { cleanSyncNotes, formatStaffInfoHelper } from '../../utils/appHelpers';
 
 interface MobileDetailModalProps {
   isOpen: boolean;
@@ -747,12 +747,7 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                   label="TIẾP NHẬN MỚI" 
                   icon={UserIcon}
                   colorClass={{text: 'text-emerald-600', border: 'border-emerald-600', bg: 'bg-emerald-600'}}
-                  subText={record.receivedBy ? (() => {
-                      const receiver = users.find(u => u.employeeId === record.receivedBy);
-                      if (!receiver) return undefined;
-                      const emp = employees.find(e => e.id === receiver.employeeId);
-                      return `${receiver.name} (${emp?.position || 'Nhân viên'})`;
-                  })() : undefined}
+                  subText={formatStaffInfoHelper(record.receivedBy, employees, users)}
                 />
                 <TimelineItem 
                   date={record.assignedDate || record.completedWorkDate} 

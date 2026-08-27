@@ -170,7 +170,7 @@ export const PROCEDURE_CATALOG: ProcedureDefinition[] = [
     name: '3.5.1 Xác nhận tiếp tục sử dụng đất nông nghiệp khi hết hạn',
     shortName: '3.5.1 Gia hạn',
     module: 'dangky',
-    defaultDeadline: 7,
+    defaultDeadline: 12,
     prefixes: ['3.5.1', 'GH'],
     keywords: ['gia hạn', 'tiếp tục sử dụng đất', 'hết hạn', 'đất nông nghiệp']
   },
@@ -411,3 +411,50 @@ export const isDangKyRecordType = (type?: string | null, code?: string | null): 
   if (procId.startsWith('1.') || procId.startsWith('2.')) return false;
   return c.startsWith('3.') || t.startsWith('3.') || procId.startsWith('3.');
 };
+
+export interface AttachedDocItem {
+  name: string;
+  type: string;
+}
+
+// Get default attached documents for registration and other procedures
+export const getDefaultDocsForProcedure = (procIdOrType?: string | null, code?: string | null): AttachedDocItem[] => {
+  const procId = detectProcedureId(code, procIdOrType) || procIdOrType;
+  switch (procId) {
+    case '3.1.3':
+      return [
+        { name: 'Mẫu số 28. Đơn đăng ký biến động đất đai, tài sản gắn liền với đất theo quy định', type: 'Bản chính' },
+        { name: 'Giấy chứng nhận đã cấp (bản gốc)', type: 'Bản chính' },
+        { name: 'Văn bản thỏa thuận về việc thay đổi quyền sử dụng đất, quyền sở hữu tài sản gắn liền với đất theo thỏa thuận của các thành viên hộ gia đình hoặc của vợ và chồng', type: 'Bản chính' },
+        { name: 'Văn bản về việc đại diện theo quy định của pháp luật về dân sự đối với trường hợp thực hiện thủ tục đăng ký đất đai, tài sản gắn liền với đất thông qua người đại diện', type: 'Bản chính' },
+        { name: 'Tờ khai thuế theo quy định của pháp luật thuế hiện hành', type: 'Bản chính' },
+        { name: 'Bản trích lục bản đồ địa chính hoặc trích đo bản đồ địa chính', type: 'Bản chính' }
+      ];
+    case '3.3.2':
+      return [
+        { name: 'Bản trích lục bản đồ địa chính hoặc trích đo bản đồ địa chính', type: 'Bản chính' },
+        { name: 'Mẫu số 28. Đơn đăng ký biến động đất đai, tài sản gắn liền với đất theo quy định', type: 'Bản chính' },
+        { name: 'Hồ sơ Cung cấp thông tin', type: 'Bản chính' }
+      ];
+    case '3.5.1':
+      return [
+        { name: 'Giấy chứng nhận đã cấp (bản gốc)', type: 'Bản chính' },
+        { name: 'Mẫu số 31. Đơn xin xác nhận lại thời hạn sử dụng đất nông nghiệp', type: 'Bản chính' }
+      ];
+    case '3.4.1':
+      return [
+        { name: 'Mẫu số 29: Đơn đề nghị tách thửa đất, hợp thửa đất theo quy định', type: 'Bản chính' },
+        { name: 'Bản vẽ: Bản vẽ tách thửa đất, hợp thửa đất lập theo quy định', type: 'Bản chính' },
+        { name: 'Giấy chứng nhận đã cấp (bản gốc)', type: 'Bản chính' }
+      ];
+    default:
+      if (procId && procId.startsWith('3.')) {
+        return [
+          { name: 'Giấy chứng nhận QSD đất', type: 'Bản chính' },
+          { name: 'Đơn đăng ký biến động', type: 'Bản chính' }
+        ];
+      }
+      return [];
+  }
+};
+

@@ -6,7 +6,7 @@ import {
   ClipboardList, User as UserIcon, ChevronUp, ChevronDown, RefreshCw, XCircle
 } from 'lucide-react';
 import { calculateDeadlineHelper } from '../utils/appHelpers';
-import { detectProcedureId, getShortRecordType } from '../constants';
+import { detectProcedureId, getShortRecordType, getDefaultDocsForProcedure } from '../constants/procedures';
 import { addActivityLog } from '../services/activityLogService';
 import { AutoResizeTextarea } from './AutoResizeTextarea';
 
@@ -173,15 +173,20 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
         const procId = detectProcedureId(rCode, rType);
         (updated as any).procedureId = procId;
 
-        // Nếu là thủ tục đơn phương / không có bên nhận:
-        if (field === 'recordType' && isNoTransfereeProcedure(rType, rCode)) {
-          updated.applicantIsOwner = false; // Ở chế độ đồng bộ chủ sở hữu (owners[0])
-          updated.transferees = []; // Xóa danh sách người nhận
-          const firstOwner = (prev.owners && prev.owners[0]) || { name: '', cccd: '', phone: '', address: '' };
-          if (firstOwner.name) updated.applicantName = firstOwner.name;
-          if (firstOwner.cccd) updated.applicantCccd = firstOwner.cccd;
-          if (firstOwner.phone) updated.applicantPhone = firstOwner.phone;
-          if (firstOwner.address) updated.applicantAddress = firstOwner.address;
+        if (field === 'recordType') {
+          if (isNoTransfereeProcedure(rType, rCode)) {
+            updated.applicantIsOwner = false; // Ở chế độ đồng bộ chủ sở hữu (owners[0])
+            updated.transferees = []; // Xóa danh sách người nhận
+            const firstOwner = (prev.owners && prev.owners[0]) || { name: '', cccd: '', phone: '', address: '' };
+            if (firstOwner.name) updated.applicantName = firstOwner.name;
+            if (firstOwner.cccd) updated.applicantCccd = firstOwner.cccd;
+            if (firstOwner.phone) updated.applicantPhone = firstOwner.phone;
+            if (firstOwner.address) updated.applicantAddress = firstOwner.address;
+          }
+          if (!initialData) {
+            const defaultDocs = getDefaultDocsForProcedure(rType, rCode);
+            setAttachedDocs(defaultDocs);
+          }
         }
 
         if (rType && rDate) {
@@ -578,6 +583,23 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
                     className={`${inputClass} bg-pink-50/90 border-pink-200 text-red-600 font-bold`}
                   />
                 </div>
+              </div>
+
+              <div className="bg-emerald-50/50 p-3 rounded-lg border border-emerald-200/80 flex items-center justify-between mt-3">
+                <div className="flex items-center gap-2">
+                  <span className="p-1.5 bg-emerald-100 text-emerald-700 rounded-lg">
+                    <UserIcon size={14} />
+                  </span>
+                  <div>
+                    <span className="text-[10px] text-emerald-800 font-bold uppercase block">Cán bộ tiếp nhận hồ sơ</span>
+                    <span className="text-xs sm:text-sm font-bold text-emerald-950">
+                      {formData.receivedBy || currentUser?.name || currentUser?.username || 'Cán bộ'}
+                    </span>
+                  </div>
+                </div>
+                <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-bold">
+                  Đã chốt tài khoản
+                </span>
               </div>
             </div>
 

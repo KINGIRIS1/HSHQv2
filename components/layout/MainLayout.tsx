@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import TopNavigation from '../TopNavigation';
-import { Menu, WifiOff, ShieldCheck, UserCircle, LogOut, UserCog, ChevronDown, Settings, HelpCircle, Shield, Headphones, X, UserCheck, Phone, Mail, Clock, CheckCircle2 } from 'lucide-react';
+import { Menu, ShieldCheck, UserCircle, LogOut, UserCog, ChevronDown, Settings, HelpCircle, Shield, Headphones, X, UserCheck, Phone, Mail, Clock, CheckCircle2 } from 'lucide-react';
 import { User, UserRole, RolePermissions, DepartmentPermissions, Employee } from '../../types';
 import { isViewAllowedForUser } from '../../config/roleConfig';
 import UpdateRequiredModal from '../UpdateRequiredModal';
@@ -219,12 +219,6 @@ const MainLayout: React.FC<MainLayoutProps> = ({
 
                 {/* CONTENT */}
                 <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-[#f0f2f5]">
-                    {connectionStatus === 'offline' && (
-                        <div className="bg-red-600 text-white text-xs py-1 px-4 text-center font-bold flex items-center justify-center gap-2 shadow-sm z-30">
-                            <WifiOff size={14} /> MẤT KẾT NỐI SERVER - ĐANG CHẠY CHẾ ĐỘ OFFLINE (Chỉ xem)
-                        </div>
-                    )}
-
                     <main className="flex-1 p-4 overflow-hidden relative">
                         {children}
                     </main>

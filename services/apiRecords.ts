@@ -1,7 +1,7 @@
 import { supabase, isConfigured } from './supabaseClient';
 import { RecordFile } from '../types';
-import { MOCK_RECORDS, API_BASE_URL, isArchiveRecordType } from '../constants';
-import { logError, getFromCache, saveToCache, CACHE_KEYS, sanitizeData, sanitizePayloadFor22P02, normalizeCode, mapRecordFromDb } from './apiCore';
+import { MOCK_RECORDS, API_BASE_URL, isArchiveRecordType, isDoDacRecordType, isDangKyRecordType } from '../constants';
+import { logError, getFromCache, saveToCache, CACHE_KEYS, sanitizeData, sanitizePayloadFor22P02, normalizeCode, mapRecordFromDb, executeSupabaseOperationWithAutoClean } from './apiCore';
 
 const RECORD_DB_COLUMNS = [
     'id', 'code', 'customerName', 'phoneNumber', 'cccd', 'customerAddress', 'ward', 'landPlot', 'mapSheet', 
@@ -20,6 +20,13 @@ const RECORD_DB_COLUMNS = [
 ];
 
 export const getTargetTable = (record: Partial<RecordFile>): 'dangky_records' | 'land_records' | 'luutru_records' => {
+    const code = (record.code || '').trim();
+    const type = (record.recordType || '').trim();
+
+    if (code.startsWith('1.') || isArchiveRecordType(type, code)) return 'luutru_records';
+    if (code.startsWith('2.') || isDoDacRecordType(type, code)) return 'land_records';
+    if (code.startsWith('3.') || isDangKyRecordType(type, code)) return 'dangky_records';
+
     if (record.sourceTable === 'luutru_records' || record.sourceTable === 'archive_records') return 'luutru_records';
     if (record.sourceTable === 'dangky_records') return 'dangky_records';
     if (record.sourceTable === 'land_records') return 'land_records';
@@ -894,5 +901,186 @@ export const updateRecordsBatchById = async (updates: Partial<RecordFile>[], onP
         logError("updateRecordsBatchById", error);
         syncCacheOnBatchUpdate(updates);
         return { success: false, count: 0 };
+    }
+};
+
+/**
+ * Tự động quét và di chuyển/thay thế toàn bộ bản ghi bị lưu nhầm giữa 3 Module (Đo đạc, Lưu trữ, Đăng ký)
+ * - Mã 1.x (Lưu trữ) -> Ghi đè & chuyển về luutru_records
+ * - Mã 2.x (Đo đạc)  -> Ghi đè & chuyển về land_records
+ * - Mã 3.x (Đăng ký) -> Ghi đè & chuyển về dangky_records
+ */
+export const migrateMisplacedDangKyRecords = async () => {
+    migrateLocalCacheMisplacedRecords();
+
+    if (!isConfigured) return;
+    try {
+        // 1. Quét dangky_records
+        const { data: dangkyData } = await supabase.from('dangky_records').select('*');
+        if (dangkyData && dangkyData.length > 0) {
+            const doDacFromDK: any[] = [];
+            const luuTruFromDK: any[] = [];
+
+            dangkyData.forEach((r: any) => {
+                const code = (r.code || '').trim();
+                const type = (r.recordType || '').trim();
+                if (code.startsWith('2.') || isDoDacRecordType(type, code)) {
+                    doDacFromDK.push(r);
+                } else if (code.startsWith('1.') || isArchiveRecordType(type, code)) {
+                    luuTruFromDK.push(r);
+                }
+            });
+
+            if (doDacFromDK.length > 0) {
+                const payloads = doDacFromDK.map((r: any) => sanitizeData(r, RECORD_DB_COLUMNS));
+                const { error: insErr } = await executeSupabaseOperationWithAutoClean(
+                    async (p) => await supabase.from('land_records').upsert(p),
+                    payloads
+                );
+                if (!insErr) {
+                    await supabase.from('dangky_records').delete().in('id', doDacFromDK.map(r => r.id));
+                    console.log(`[Cross-Migration] Đã di chuyển & thay thế ${doDacFromDK.length} hồ sơ Đo đạc từ dangky_records sang land_records.`);
+                }
+            }
+
+            if (luuTruFromDK.length > 0) {
+                const payloads = luuTruFromDK.map((r: any) => sanitizeData(r, RECORD_DB_COLUMNS));
+                const { error: insErr } = await executeSupabaseOperationWithAutoClean(
+                    async (p) => await supabase.from('luutru_records').upsert(p),
+                    payloads
+                );
+                if (!insErr) {
+                    await supabase.from('dangky_records').delete().in('id', luuTruFromDK.map(r => r.id));
+                    console.log(`[Cross-Migration] Đã di chuyển & thay thế ${luuTruFromDK.length} hồ sơ Lưu trữ từ dangky_records sang luutru_records.`);
+                }
+            }
+        }
+
+        // 2. Quét land_records (Đo đạc)
+        const { data: landData } = await supabase.from('land_records').select('*');
+        if (landData && landData.length > 0) {
+            const dangKyFromLand: any[] = [];
+            const luuTruFromLand: any[] = [];
+
+            landData.forEach((r: any) => {
+                const code = (r.code || '').trim();
+                const type = (r.recordType || '').trim();
+                if (code.startsWith('3.') || isDangKyRecordType(type, code)) {
+                    dangKyFromLand.push(r);
+                } else if (code.startsWith('1.') || isArchiveRecordType(type, code)) {
+                    luuTruFromLand.push(r);
+                }
+            });
+
+            if (dangKyFromLand.length > 0) {
+                const payloads = dangKyFromLand.map((r: any) => sanitizeData(r, RECORD_DB_COLUMNS));
+                const { error: insErr } = await executeSupabaseOperationWithAutoClean(
+                    async (p) => await supabase.from('dangky_records').upsert(p),
+                    payloads
+                );
+                if (!insErr) {
+                    await supabase.from('land_records').delete().in('id', dangKyFromLand.map(r => r.id));
+                    console.log(`[Cross-Migration] Đã di chuyển & thay thế ${dangKyFromLand.length} hồ sơ Đăng ký từ land_records sang dangky_records.`);
+                }
+            }
+
+            if (luuTruFromLand.length > 0) {
+                const payloads = luuTruFromLand.map((r: any) => sanitizeData(r, RECORD_DB_COLUMNS));
+                const { error: insErr } = await executeSupabaseOperationWithAutoClean(
+                    async (p) => await supabase.from('luutru_records').upsert(p),
+                    payloads
+                );
+                if (!insErr) {
+                    await supabase.from('land_records').delete().in('id', luuTruFromLand.map(r => r.id));
+                    console.log(`[Cross-Migration] Đã di chuyển & thay thế ${luuTruFromLand.length} hồ sơ Lưu trữ từ land_records sang luutru_records.`);
+                }
+            }
+        }
+
+        // 3. Quét luutru_records (Lưu trữ)
+        const { data: luuTruData } = await supabase.from('luutru_records').select('*');
+        if (luuTruData && luuTruData.length > 0) {
+            const doDacFromLT: any[] = [];
+            const dangKyFromLT: any[] = [];
+
+            luuTruData.forEach((r: any) => {
+                const code = (r.code || '').trim();
+                const type = (r.recordType || '').trim();
+                if (code.startsWith('2.') || isDoDacRecordType(type, code)) {
+                    doDacFromLT.push(r);
+                } else if (code.startsWith('3.') || isDangKyRecordType(type, code)) {
+                    dangKyFromLT.push(r);
+                }
+            });
+
+            if (doDacFromLT.length > 0) {
+                const payloads = doDacFromLT.map((r: any) => sanitizeData(r, RECORD_DB_COLUMNS));
+                const { error: insErr } = await executeSupabaseOperationWithAutoClean(
+                    async (p) => await supabase.from('land_records').upsert(p),
+                    payloads
+                );
+                if (!insErr) {
+                    await supabase.from('luutru_records').delete().in('id', doDacFromLT.map(r => r.id));
+                    console.log(`[Cross-Migration] Đã di chuyển & thay thế ${doDacFromLT.length} hồ sơ Đo đạc từ luutru_records sang land_records.`);
+                }
+            }
+
+            if (dangKyFromLT.length > 0) {
+                const payloads = dangKyFromLT.map((r: any) => sanitizeData(r, RECORD_DB_COLUMNS));
+                const { error: insErr } = await executeSupabaseOperationWithAutoClean(
+                    async (p) => await supabase.from('dangky_records').upsert(p),
+                    payloads
+                );
+                if (!insErr) {
+                    await supabase.from('luutru_records').delete().in('id', dangKyFromLT.map(r => r.id));
+                    console.log(`[Cross-Migration] Đã di chuyển & thay thế ${dangKyFromLT.length} hồ sơ Đăng ký từ luutru_records sang dangky_records.`);
+                }
+            }
+        }
+
+    } catch (error: any) {
+        console.error('Lỗi trong quá trình di chuyển & thay thế hồ sơ giữa các module:', error);
+    }
+};
+
+export const migrateLocalCacheMisplacedRecords = () => {
+    try {
+        const cachedDangKy: RecordFile[] = getFromCache(CACHE_KEYS.DANGKY_RECORDS, []);
+        const cachedLand: RecordFile[] = getFromCache(CACHE_KEYS.RECORDS, []);
+        const cachedLuuTru: RecordFile[] = getFromCache('offline_luutru_records', []);
+
+        const validDangKy: RecordFile[] = [];
+        const validLand: RecordFile[] = [];
+        const validLuuTru: RecordFile[] = [];
+
+        // Distribute all records correctly according to code / procedure
+        const allRecords = [...cachedDangKy, ...cachedLand, ...cachedLuuTru];
+        const recordMap = new Map<string, RecordFile>();
+
+        allRecords.forEach(r => {
+            const key = r.id || r.code;
+            if (!key) return;
+            const code = (r.code || '').trim();
+            const type = (r.recordType || '').trim();
+
+            if (code.startsWith('1.') || isArchiveRecordType(type, code)) {
+                r.sourceTable = 'luutru_records';
+                validLuuTru.push(r);
+            } else if (code.startsWith('2.') || isDoDacRecordType(type, code)) {
+                r.sourceTable = 'land_records';
+                validLand.push(r);
+            } else {
+                r.sourceTable = 'dangky_records';
+                validDangKy.push(r);
+            }
+        });
+
+        saveToCache(CACHE_KEYS.DANGKY_RECORDS, validDangKy);
+        saveToCache(CACHE_KEYS.RECORDS, validLand);
+        saveToCache('offline_luutru_records', validLuuTru);
+
+        console.log(`[Cache Sync] Đã đồng bộ & thay thế cache local cho 3 module: ${validLand.length} Đo đạc, ${validLuuTru.length} Lưu trữ, ${validDangKy.length} Đăng ký.`);
+    } catch (err) {
+        console.warn('Lỗi khi migrate local cache misplaced records:', err);
     }
 };

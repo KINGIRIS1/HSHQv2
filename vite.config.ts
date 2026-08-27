@@ -27,6 +27,7 @@ export default defineConfig({
       '@': path.resolve(__dirname, './'),
       buffer: 'buffer',
       stream: 'stream-browserify',
+      util: 'util',
     },
   },
   define: {

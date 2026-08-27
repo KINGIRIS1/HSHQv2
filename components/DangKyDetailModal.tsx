@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { DangKyRecord, Employee, User, UserRole } from '../types';
 import { 
   X, MapPin, FileText, User as UserIcon, Users, UserPlus, Shield, 
   DollarSign, CheckCircle2, Circle, Calendar, Printer, Pencil, 
   Trash2, ArrowRight, Building2, FileCheck, Layers, CalendarClock,
   Receipt, Bell, StickyNote, Save, Loader2, CheckSquare, Send, Info,
-  Award
+  Award, Clock, AlertTriangle
 } from 'lucide-react';
 import { saveDangKyRecordApi } from '../services/apiDangKy';
 import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../services/docxService';
@@ -14,6 +14,8 @@ import SystemReceiptTemplate from './receive-record/SystemReceiptTemplate';
 import { getNormalizedWard } from '../constants';
 import { getShortRecordType, getCanonicalRecordType } from '../constants/procedures';
 import { AutoResizeTextarea } from './AutoResizeTextarea';
+import { formatStaffInfoHelper } from '../utils/appHelpers';
+import { calculateRecordStepDeadlines, StepDeadlineInfo } from '../utils/stepDeadlineEngine';
 
 const NEXT_STATUS_MAP: Record<string, string> = {
   'Tiếp nhận mới': 'Thẩm định',
@@ -323,17 +325,16 @@ export const DangKyDetailModal: React.FC<DangKyDetailModalProps> = ({
   };
 
   const formatStaffInfo = (staffNameOrId?: string | null) => {
-    if (!staffNameOrId) return null;
-    const emp = employees?.find(e => e.id === staffNameOrId || e.name === staffNameOrId);
-    if (emp) {
-      const pos = emp.position || '';
-      return pos ? `${emp.name} (${pos})` : emp.name;
-    }
-    return staffNameOrId;
+    return formatStaffInfoHelper(staffNameOrId, employees, []);
   };
 
-  // Timeline Step Item chuẩn như DetailModal
+  const stepDeadlines = useMemo(() => {
+    return calculateRecordStepDeadlines(record);
+  }, [record]);
+
+  // Timeline Step Item chuẩn như DetailModal với Deadline và SLA
   const TimelineItem = ({
+    stepCode,
     date,
     label,
     icon: Icon,
@@ -342,6 +343,7 @@ export const DangKyDetailModal: React.FC<DangKyDetailModalProps> = ({
     forceActive,
     subText
   }: {
+    stepCode?: string;
     date?: string | null;
     label: string;
     icon: any;
@@ -351,6 +353,8 @@ export const DangKyDetailModal: React.FC<DangKyDetailModalProps> = ({
     subText?: string | null;
   }) => {
     const isActive = !!date || !!forceActive;
+    const stepInfo = stepCode ? stepDeadlines.find((s: StepDeadlineInfo) => s.stepCode === stepCode) : undefined;
+
     return (
       <div className="relative flex gap-4">
         <div className="flex flex-col items-center">
@@ -359,14 +363,41 @@ export const DangKyDetailModal: React.FC<DangKyDetailModalProps> = ({
           </div>
           {!isLast && <div className={`w-0.5 grow ${isActive ? colorClass.bg : 'bg-gray-100'} my-1`}></div>}
         </div>
-        <div className="pb-6 flex-1">
-          <p className={`text-xs font-bold uppercase mb-0.5 ${isActive ? colorClass.text : 'text-gray-400'}`}>{label}</p>
+        <div className="pb-5 flex-1 min-w-0">
+          <div className="flex items-center justify-between gap-1 flex-wrap mb-0.5">
+            <p className={`text-xs font-bold uppercase ${isActive ? colorClass.text : 'text-gray-400'}`}>{label}</p>
+            {stepInfo && (
+              <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium whitespace-nowrap ${stepInfo.slaStatus.badgeClass}`}>
+                {stepInfo.slaStatus.label}
+              </span>
+            )}
+          </div>
           <div className="flex items-center gap-2">
             <Icon size={14} className={isActive ? 'text-gray-500' : 'text-gray-300'} />
-            <span className={`text-sm font-medium ${isActive ? 'text-gray-800' : 'text-gray-400 italic'}`}>
+            <span className={`text-xs sm:text-sm font-medium ${isActive ? 'text-gray-800' : 'text-gray-400 italic'}`}>
               {date ? formatDate(date) : (forceActive ? 'Đã hoàn tất' : 'Chưa thực hiện')}
             </span>
           </div>
+          {/* Thông tin Deadline và SLA của bước */}
+          {stepInfo && (
+            <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] font-mono">
+              <span className="text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                SLA: {stepInfo.slaDisplay}
+              </span>
+              {stepInfo.deadlineDate && stepInfo.isCurrentStep && (
+                <span className={`px-1.5 py-0.5 rounded flex items-center gap-1 ${
+                  stepInfo.slaStatus.status === 'overdue' 
+                    ? 'bg-rose-100 text-rose-800 font-bold' 
+                    : stepInfo.slaStatus.status === 'warning'
+                    ? 'bg-amber-100 text-amber-800 font-bold'
+                    : 'bg-emerald-100 text-emerald-800'
+                }`}>
+                  <Clock size={10} />
+                  Hạn bước: {formatDate(stepInfo.deadlineDate)} ({stepInfo.timeRemainingText})
+                </span>
+              )}
+            </div>
+          )}
           {subText && <p className="text-[11px] text-indigo-600 mt-1 italic font-medium">{subText}</p>}
         </div>
       </div>
@@ -795,6 +826,7 @@ export const DangKyDetailModal: React.FC<DangKyDetailModalProps> = ({
 
                 <div className="p-6 space-y-0">
                   <TimelineItem 
+                    stepCode="tiep_nhan"
                     date={record.receivedDate} 
                     label="TIẾP NHẬN MỚI" 
                     icon={UserIcon}
@@ -803,6 +835,7 @@ export const DangKyDetailModal: React.FC<DangKyDetailModalProps> = ({
                   />
 
                   <TimelineItem 
+                    stepCode="tham_dinh"
                     date={record.appraisalDate} 
                     forceActive={!!record.appraisalStaff || !!record.appraisalDate}
                     label="THẨM ĐỊNH HỒ SƠ" 
@@ -812,6 +845,7 @@ export const DangKyDetailModal: React.FC<DangKyDetailModalProps> = ({
                   />
 
                   <TimelineItem 
+                    stepCode="phieu_chuyen_thue"
                     date={record.taxFormDate} 
                     forceActive={!!record.taxFormStaff || !!record.taxFormDate}
                     label="PHIẾU CHUYỂN THUẾ" 
@@ -821,6 +855,7 @@ export const DangKyDetailModal: React.FC<DangKyDetailModalProps> = ({
                   />
 
                   <TimelineItem 
+                    stepCode="thue_kv7"
                     date={record.taxKV7TransferDate} 
                     forceActive={!!record.taxKV7Staff || !!record.taxKV7TransferDate}
                     label="THUẾ KV7" 
@@ -830,6 +865,7 @@ export const DangKyDetailModal: React.FC<DangKyDetailModalProps> = ({
                   />
 
                   <TimelineItem 
+                    stepCode="thong_bao_thue"
                     date={record.taxNoticeDate} 
                     forceActive={!!record.taxNoticeStaff || !!record.taxNoticeDate}
                     label="THÔNG BÁO THUẾ" 
@@ -839,6 +875,7 @@ export const DangKyDetailModal: React.FC<DangKyDetailModalProps> = ({
                   />
 
                   <TimelineItem 
+                    stepCode="in_gcn"
                     date={record.printDate} 
                     forceActive={!!record.printDate || !!record.printStaff}
                     label="IN GIẤY CHỨNG NHẬN" 
@@ -848,6 +885,7 @@ export const DangKyDetailModal: React.FC<DangKyDetailModalProps> = ({
                   />
 
                   <TimelineItem 
+                    stepCode="trinh_kiem_tra"
                     date={record.pendingCheckDate} 
                     forceActive={!!record.pendingCheckDate || !!record.checkedBy}
                     label="TRÌNH KIỂM TRA" 
@@ -857,6 +895,7 @@ export const DangKyDetailModal: React.FC<DangKyDetailModalProps> = ({
                   />
 
                   <TimelineItem 
+                    stepCode="trinh_ky"
                     date={record.submissionDate} 
                     forceActive={!!record.submissionDate || !!record.submittedTo}
                     label="TRÌNH KÝ DUYỆT" 
@@ -866,6 +905,7 @@ export const DangKyDetailModal: React.FC<DangKyDetailModalProps> = ({
                   />
 
                   <TimelineItem 
+                    stepCode="hoan_thanh"
                     date={record.completedDate || record.exportDate} 
                     forceActive={!!record.completedDate || !!record.exportBatch}
                     label={record.status === 'Trả hủy hồ sơ' ? 'TRẢ HỦY HỒ SƠ' : record.status === 'CSD rút HS' ? 'CSD RÚT HỒ SƠ' : 'HOÀN THÀNH'} 
@@ -879,6 +919,7 @@ export const DangKyDetailModal: React.FC<DangKyDetailModalProps> = ({
                   />
 
                   <TimelineItem 
+                    stepCode="tra_ket_qua"
                     date={record.resultReturnedDate} 
                     label="TRẢ KẾT QUẢ CHO DÂN" 
                     icon={FileCheck}

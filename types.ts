@@ -520,6 +520,26 @@ export interface DangKyRecord {
   updatedAt?: string;
 }
 
+export interface WorkflowStep {
+  id: string;
+  procedureId: string;
+  stepCode: string;
+  stepName: string;
+  order: number;
+  slaHours: number;
+  slaDisplay: string;
+  excludeFromTotalSla: boolean;
+  role?: string;
+  active: boolean;
+}
+
+export interface ProcedureWorkflow {
+  procedureId: string;
+  procedureName: string;
+  totalSlaHours?: number;
+  steps: WorkflowStep[];
+}
+
 import { DANG_KY_RECORD_TYPES, DANG_KY_DEADLINE_MAP } from './constants/procedures';
 export { DANG_KY_RECORD_TYPES, DANG_KY_DEADLINE_MAP };
 

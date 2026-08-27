@@ -224,6 +224,15 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Tân Qua
             return; 
         }
         
+        const existingRecord = editingId ? records.find(r => r.id === editingId) : null;
+        const existingHistory = Array.isArray(existingRecord?.data?.history) ? existingRecord.data.history : [];
+        const history = existingHistory.length > 0 ? existingHistory : [{
+            action: 'Tiếp nhận mới',
+            status: formData.status || 'draft',
+            timestamp: new Date().toISOString(),
+            user: currentUser.name || currentUser.username || currentUser.employeeId || 'Cán bộ'
+        }];
+
         // Map form data về cấu trúc ArchiveRecord
         const recordToSave: Partial<ArchiveRecord> = {
             id: editingId || undefined,
@@ -239,9 +248,10 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Tân Qua
                 thua_dat: formData.thua_dat,
                 hen_tra: formData.hen_tra,
                 ngay_hoan_thanh: formData.ngay_hoan_thanh,
-                danh_sach: formData.danh_sach
+                danh_sach: formData.danh_sach,
+                history
             },
-            created_by: currentUser.username
+            created_by: currentUser.username || currentUser.name || ''
         };
 
         const success = await saveArchiveRecord(recordToSave);

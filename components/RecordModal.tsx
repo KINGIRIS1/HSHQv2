@@ -248,6 +248,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
               receivedDate: recDate,
               deadline: '',
               price: undefined,
+              receivedBy: currentUser?.employeeId || currentUser?.name || '',
               code: `HS-${new Date().getFullYear()}-${Math.floor(Math.random() * 1000)}`
             });
             setAttachedDocs([]);

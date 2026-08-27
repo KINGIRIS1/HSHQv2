@@ -30,6 +30,7 @@ import {
   isDangKyRecordOverdue,
   isDangKyRecordApproaching
 } from '../utils/appHelpers';
+import { isDangKyStepOverdue, isDangKyStepApproaching } from '../utils/stepDeadlineEngine';
 import { detectProcedureId, getShortRecordType } from '../constants/procedures';
 import { addActivityLog } from '../services/activityLogService';
 import { saveDangKyRecordsBatchApi } from '../services/apiDangKy';
@@ -130,7 +131,7 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
     const [selectedBatchFilter, setSelectedBatchFilter] = useState<string>('all');
     const [filterFromDate, setFilterFromDate] = useState<string>('');
     const [filterToDate, setFilterToDate] = useState<string>('');
-    const [warningFilter, setWarningFilter] = useState<'all' | 'overdue' | 'approaching'>('all');
+    const [warningFilter, setWarningFilter] = useState<'all' | 'overdue' | 'approaching' | 'step_overdue' | 'step_approaching'>('all');
     const [isFilterPopoverOpen, setIsFilterPopoverOpen] = useState<boolean>(false);
     const [currentPage, setCurrentPage] = useState<number>(1);
     const [pageSize, setPageSize] = useState<number>(20);
@@ -145,8 +146,21 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
     const [isImportModalOpen, setIsImportModalOpen] = useState<boolean>(false);
     const [importModalMode, setImportModalMode] = useState<'create' | 'update'>('create');
     const [isSubmitCheckModalOpen, setIsSubmitCheckModalOpen] = useState<boolean>(false);
+    const [isTaxKV7ModalOpen, setIsTaxKV7ModalOpen] = useState<boolean>(false);
     const [isSubmitSignModalOpen, setIsSubmitSignModalOpen] = useState<boolean>(false);
     const [employeesList, setEmployeesList] = useState<Employee[]>([]);
+
+    const initialIssueNumber = useMemo(() => {
+        if (selectedIds.size === 0) return '';
+        const selectedList = records.filter(r => selectedIds.has(r.id));
+        return selectedList[0]?.issueNumber || (selectedList[0] as any)?.certificateCode || '';
+    }, [selectedIds, records]);
+
+    const initialTaxTransferNumber = useMemo(() => {
+        if (selectedIds.size === 0) return '';
+        const selectedList = records.filter(r => selectedIds.has(r.id));
+        return selectedList[0]?.taxFormNumber || (selectedList[0] as any)?.taxTransferNumber || '';
+    }, [selectedIds, records]);
 
     // --- State Chốt Đợt Bàn Giao 1 Cửa ---
     const [isLockModalOpen, setIsLockModalOpen] = useState<boolean>(false);
@@ -212,8 +226,9 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
         if (selectedBatchFilter !== 'all') count++;
         if (filterFromDate) count++;
         if (filterToDate) count++;
+        if (warningFilter !== 'all') count++;
         return count;
-    }, [selectedStatusFilter, selectedEmployeeFilter, selectedWardFilter, selectedRecordTypeFilter, selectedBatchFilter, filterFromDate, filterToDate]);
+    }, [selectedStatusFilter, selectedEmployeeFilter, selectedWardFilter, selectedRecordTypeFilter, selectedBatchFilter, filterFromDate, filterToDate, warningFilter]);
 
     const handleClearFilters = () => {
         setSelectedStatusFilter('all');
@@ -223,6 +238,7 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
         setSelectedBatchFilter('all');
         setFilterFromDate('');
         setFilterToDate('');
+        setWarningFilter('all');
     };
 
     // Modal state for Detail, Add/Edit & Delete
@@ -287,9 +303,13 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
         const daTraKq = records.filter(r => normalizeDangKyStatus(r.status) === 'Đã trả kết quả').length;
         const giao1CuaTotal = choBanGiao + choTraKq + daTraKq;
 
-        // Overdue & Approaching counts
+        // Overdue & Approaching counts (Total procedure SLA)
         const overdueCount = records.filter(r => isDangKyRecordOverdue(r)).length;
         const approachingCount = records.filter(r => isDangKyRecordApproaching(r)).length;
+
+        // Stage-specific Overdue & Approaching counts (Khâu hiện tại)
+        const stepOverdueCount = records.filter(r => isDangKyStepOverdue(r)).length;
+        const stepApproachingCount = records.filter(r => isDangKyStepApproaching(r)).length;
 
         return {
             all,
@@ -307,7 +327,9 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
             daTraKq,
             giao1CuaTotal,
             overdueCount,
-            approachingCount
+            approachingCount,
+            stepOverdueCount,
+            stepApproachingCount
         };
     }, [records]);
 
@@ -730,6 +752,14 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                 return false;
             }
 
+            if (warningFilter === 'step_overdue' && !isDangKyStepOverdue(r)) {
+                return false;
+            }
+
+            if (warningFilter === 'step_approaching' && !isDangKyStepApproaching(r)) {
+                return false;
+            }
+
             return true;
         });
     }, [records, activeMainTab, activeTbtSubTab, activeGiao1CuaSubTab, searchTerm, selectedStatusFilter, selectedEmployeeFilter, selectedWardFilter, selectedRecordTypeFilter, selectedBatchFilter, filterFromDate, filterToDate, warningFilter]);
@@ -804,13 +834,13 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
 
         setSelectedIds(new Set([r.id]));
 
-        if (normStatus === 'Phiếu chuyển thuế' || normStatus === 'Chờ Thuế KV7') {
-            // Direct advance without assignment modal for 2 Tax steps (Phiếu chuyển thuế -> Thuế KV7, Thuế KV7 -> Thông báo thuế)
+        if (nextStatus === 'Chờ Thuế KV7') {
+            setIsTaxKV7ModalOpen(true);
+        } else if (normStatus === 'Chờ Thuế KV7') {
+            // Direct advance from Thuế KV7 -> Thông báo thuế
             try {
                 const currentDateStr = new Date().toISOString().split('T')[0];
-                const updated: DangKyRecord = { ...r, status: nextStatus };
-                if (nextStatus === 'Chờ Thuế KV7') updated.taxKV7TransferDate = currentDateStr;
-                else if (nextStatus === 'Chờ giấy nộp tiền') updated.taxNoticeDate = currentDateStr;
+                const updated: DangKyRecord = { ...r, status: nextStatus, taxNoticeDate: currentDateStr };
 
                 await saveDangKyRecordApi(updated);
                 addActivityLog({
@@ -1022,16 +1052,20 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
     };
 
     // Confirm Trình Kiểm Tra
-    const handleSubmitCheckConfirm = async (checkerName: string, dateStr?: string) => {
+    const handleSubmitCheckConfirm = async (checkerName: string, dateStr?: string, issueNumber?: string) => {
         if (selectedIds.size === 0 || !checkerName) return;
         try {
             const idsToUpdate = Array.from(selectedIds);
             const targetDate = dateStr || new Date().toISOString().split('T')[0];
-            await bulkUpdateDangKyRecordsApi(idsToUpdate, {
+            const updatePayload: Partial<DangKyRecord> = {
                 status: 'Chờ kiểm tra',
                 checkedBy: checkerName,
                 pendingCheckDate: targetDate
-            });
+            };
+            if (issueNumber) {
+                updatePayload.issueNumber = issueNumber;
+            }
+            await bulkUpdateDangKyRecordsApi(idsToUpdate, updatePayload);
             addActivityLog({
                 performerName: currentUser.fullName || currentUser.username,
                 performerRole: 'DANGKY',
@@ -1039,13 +1073,41 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                 actionLabel: 'Trình kiểm tra',
                 targetType: 'Đăng ký',
                 referenceCode: `${idsToUpdate.length} hồ sơ`,
-                details: `Trình cán bộ "${checkerName}" kiểm tra ${idsToUpdate.length} hồ sơ Đăng ký`
+                details: `Trình cán bộ "${checkerName}" kiểm tra ${idsToUpdate.length} hồ sơ Đăng ký${issueNumber ? ` (Số GCN: ${issueNumber})` : ''}`
             });
             loadData();
             setSelectedIds(new Set());
             setIsSubmitCheckModalOpen(false);
         } catch (e) {
             console.error('Lỗi khi trình kiểm tra:', e);
+        }
+    };
+
+    // Confirm Chuyển Thuế KV7
+    const handleTaxKV7TransferConfirm = async (taxTransferNumber: string, dateStr?: string) => {
+        if (selectedIds.size === 0 || !taxTransferNumber) return;
+        try {
+            const idsToUpdate = Array.from(selectedIds);
+            const targetDate = dateStr || new Date().toISOString().split('T')[0];
+            await bulkUpdateDangKyRecordsApi(idsToUpdate, {
+                status: 'Chờ Thuế KV7',
+                taxFormNumber: taxTransferNumber,
+                taxKV7TransferDate: targetDate
+            });
+            addActivityLog({
+                performerName: currentUser.fullName || currentUser.username,
+                performerRole: 'DANGKY',
+                actionType: 'UPDATE',
+                actionLabel: 'Chuyển thuế KV7',
+                targetType: 'Đăng ký',
+                referenceCode: `${idsToUpdate.length} hồ sơ`,
+                details: `Chuyển Thuế KV7 cho ${idsToUpdate.length} hồ sơ Đăng ký (Số phiếu chuyển: ${taxTransferNumber})`
+            });
+            loadData();
+            setSelectedIds(new Set());
+            setIsTaxKV7ModalOpen(false);
+        } catch (e) {
+            console.error('Lỗi khi chuyển Thuế KV7:', e);
         }
     };
 
@@ -1654,7 +1716,7 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                                                 <div>
                                                     <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 mb-1">
                                                         <AlertTriangle size={14} className="text-gray-500" />
-                                                        <span>Cảnh báo thời hạn xử lý:</span>
+                                                        <span>Cảnh báo thời hạn xử lý & Deadline khâu:</span>
                                                     </label>
                                                     <select
                                                         value={warningFilter}
@@ -1662,8 +1724,10 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                                                         className="w-full text-xs border border-gray-200 rounded-lg p-2 font-medium bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
                                                     >
                                                         <option value="all">Tất cả hồ sơ</option>
-                                                        <option value="overdue">🔴 Đã quá hạn xử lý ({counts.overdueCount})</option>
-                                                        <option value="approaching">🟡 Sắp đến hạn xử lý ({counts.approachingCount})</option>
+                                                        <option value="step_overdue">🔴 Quá hạn khâu hiện tại ({counts.stepOverdueCount})</option>
+                                                        <option value="step_approaching">🟡 Sắp đến hạn khâu ({counts.stepApproachingCount})</option>
+                                                        <option value="overdue">🚨 Quá hạn toàn bộ hồ sơ ({counts.overdueCount})</option>
+                                                        <option value="approaching">⏰ Sắp đến hạn hẹn trả ({counts.approachingCount})</option>
                                                     </select>
                                                 </div>
                                             </div>
@@ -1962,6 +2026,8 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                                             const isSelected = selectedIds.has(r.id);
                                             const isOverdue = isDangKyRecordOverdue(r);
                                             const isApproaching = isDangKyRecordApproaching(r);
+                                            const isStepOver = isDangKyStepOverdue(r);
+                                            const isStepAppr = isDangKyStepApproaching(r);
 
                                             return (
                                                 <tr 
@@ -1969,8 +2035,12 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                                                     className={`transition-all duration-200 group border-l-4 ${
                                                         isOverdue 
                                                             ? 'bg-red-50/50 border-l-red-500 hover:bg-red-50' 
+                                                            : isStepOver
+                                                            ? 'bg-rose-50/40 border-l-rose-400 hover:bg-rose-50/70'
                                                             : isApproaching 
                                                             ? 'bg-orange-50/50 border-l-orange-500 hover:bg-orange-50' 
+                                                            : isStepAppr
+                                                            ? 'bg-amber-50/40 border-l-amber-400 hover:bg-amber-50/70'
                                                             : isSelected 
                                                             ? 'bg-blue-50/50 border-l-blue-500 hover:bg-blue-50' 
                                                             : 'border-l-transparent hover:bg-slate-50/80'
@@ -2062,10 +2132,17 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                                                         {(() => {
                                                             const normStatus = normalizeDangKyStatus(r.status);
                                                             return (
-                                                                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border shadow-2xs whitespace-nowrap ${getStatusBadgeClass(normStatus)}`}>
-                                                                    <span className="w-1.5 h-1.5 rounded-full bg-current opacity-75"></span>
-                                                                    {normStatus}
-                                                                </span>
+                                                                <div className="flex flex-col items-center gap-1">
+                                                                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border shadow-2xs whitespace-nowrap ${getStatusBadgeClass(normStatus)}`}>
+                                                                        <span className="w-1.5 h-1.5 rounded-full bg-current opacity-75"></span>
+                                                                        {normStatus}
+                                                                    </span>
+                                                                    {isStepOver && !isOverdue && (
+                                                                        <span className="text-[10px] text-rose-700 bg-rose-50 border border-rose-200 px-1.5 py-0.2 rounded font-bold whitespace-nowrap flex items-center gap-0.5 animate-pulse">
+                                                                            <AlertTriangle size={10} /> Trễ khâu
+                                                                        </span>
+                                                                    )}
+                                                                </div>
                                                             );
                                                         })()}
                                                     </td>
@@ -2259,8 +2336,20 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
                     isOpen={isSubmitCheckModalOpen}
                     onClose={() => setIsSubmitCheckModalOpen(false)}
                     selectedCount={selectedIds.size}
+                    initialIssueNumber={initialIssueNumber}
                     employees={employeesList}
                     onConfirm={handleSubmitCheckConfirm}
+                />
+            )}
+
+            {/* --- MODAL CHUYỂN THUẾ KV7 --- */}
+            {isTaxKV7ModalOpen && (
+                <TaxKV7TransferModal
+                    isOpen={isTaxKV7ModalOpen}
+                    onClose={() => setIsTaxKV7ModalOpen(false)}
+                    selectedCount={selectedIds.size}
+                    initialTaxTransferNumber={initialTaxTransferNumber}
+                    onConfirm={handleTaxKV7TransferConfirm}
                 />
             )}
 
@@ -2755,18 +2844,25 @@ interface SubmitCheckDangKyModalProps {
     isOpen: boolean;
     onClose: () => void;
     selectedCount: number;
+    initialIssueNumber?: string;
     employees: Employee[];
-    onConfirm: (checkerName: string, dateStr?: string) => void;
+    onConfirm: (checkerName: string, dateStr?: string, issueNumber?: string) => void;
 }
 
 const SubmitCheckDangKyModal: React.FC<SubmitCheckDangKyModalProps> = ({
     isOpen,
     onClose,
     selectedCount,
+    initialIssueNumber = '',
     employees,
     onConfirm
 }) => {
     const [selectedChecker, setSelectedChecker] = useState<string>('');
+    const [issueNum, setIssueNum] = useState<string>(initialIssueNumber);
+
+    useEffect(() => {
+        setIssueNum(initialIssueNumber);
+    }, [initialIssueNumber, isOpen]);
 
     if (!isOpen) return null;
 
@@ -2784,12 +2880,16 @@ const SubmitCheckDangKyModal: React.FC<SubmitCheckDangKyModalProps> = ({
     const finalCheckEmployees = targetEmployees.length > 0 ? targetEmployees : employees;
 
     const handleConfirm = () => {
+        if (!issueNum || !issueNum.trim()) {
+            alert('Vui lòng nhập Số phát hành / Số seri Giấy chứng nhận trước khi xác nhận trình kiểm tra!');
+            return;
+        }
         if (!selectedChecker) {
             alert('Vui lòng chọn cán bộ phụ trách kiểm tra.');
             return;
         }
         const realtimeDate = new Date().toISOString().split('T')[0];
-        onConfirm(selectedChecker, realtimeDate);
+        onConfirm(selectedChecker, realtimeDate, issueNum.trim());
     };
 
     return (
@@ -2811,11 +2911,28 @@ const SubmitCheckDangKyModal: React.FC<SubmitCheckDangKyModalProps> = ({
                             Bạn đang trình kiểm tra <span className="font-bold text-orange-600 text-sm">{selectedCount}</span> hồ sơ Đăng ký.
                         </p>
                         <p className="text-xs text-gray-500">
-                            Vui lòng chọn Tổ trưởng / Tổ phó / Cán bộ phụ trách kiểm tra:
+                            Vui lòng nhập Số phát hành GCN và chọn Cán bộ phụ trách kiểm tra:
                         </p>
                     </div>
 
-                    <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                    {/* Số phát hành / Số seri Giấy chứng nhận (Bắt buộc) */}
+                    <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">
+                            Số phát hành / Số seri Giấy chứng nhận <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                            type="text"
+                            value={issueNum}
+                            onChange={(e) => setIssueNum(e.target.value)}
+                            placeholder="Nhập số phát hành GCN (VD: CD 123456)..."
+                            className="w-full px-3 py-2 border border-gray-300 rounded-xl text-xs font-bold text-gray-800 focus:ring-2 focus:ring-orange-500 outline-none"
+                        />
+                        <p className="text-[11px] text-orange-600 mt-1 italic">
+                            * Bắt buộc nhập Số phát hành GCN trước khi xác nhận trình kiểm tra.
+                        </p>
+                    </div>
+
+                    <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                         {finalCheckEmployees.map(emp => (
                             <label
                                 key={emp.id}
@@ -2854,15 +2971,114 @@ const SubmitCheckDangKyModal: React.FC<SubmitCheckDangKyModalProps> = ({
                         <button
                             type="button"
                             onClick={handleConfirm}
-                            disabled={!selectedChecker}
+                            disabled={!selectedChecker || !issueNum.trim()}
                             className={`flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs font-bold text-white transition-all shadow-md ${
-                                selectedChecker
+                                selectedChecker && issueNum.trim()
                                     ? 'bg-orange-600 hover:bg-orange-700 cursor-pointer shadow-orange-600/20 active:scale-95'
                                     : 'bg-gray-300 cursor-not-allowed'
                             }`}
                         >
                             <CheckCircle2 size={14} />
                             Xác nhận trình kiểm tra ({selectedCount})
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// ==========================================
+// MODAL: CHUYỂN THUẾ KV7 ĐĂNG KÝ
+// ==========================================
+interface TaxKV7TransferModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    selectedCount: number;
+    initialTaxTransferNumber?: string;
+    onConfirm: (taxTransferNumber: string, dateStr?: string) => void;
+}
+
+const TaxKV7TransferModal: React.FC<TaxKV7TransferModalProps> = ({
+    isOpen,
+    onClose,
+    selectedCount,
+    initialTaxTransferNumber = '',
+    onConfirm
+}) => {
+    const [taxTransferNum, setTaxTransferNum] = useState<string>(initialTaxTransferNumber);
+
+    useEffect(() => {
+        setTaxTransferNum(initialTaxTransferNumber);
+    }, [initialTaxTransferNumber, isOpen]);
+
+    if (!isOpen) return null;
+
+    const handleConfirm = () => {
+        if (!taxTransferNum || !taxTransferNum.trim()) {
+            alert('Vui lòng nhập Số phiếu chuyển thuế trước khi xác nhận chuyển thuế KV7!');
+            return;
+        }
+        const realtimeDate = new Date().toISOString().split('T')[0];
+        onConfirm(taxTransferNum.trim(), realtimeDate);
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-gray-100 animate-scale-up">
+                <div className="bg-amber-600 p-4 flex justify-between items-center text-white">
+                    <h2 className="text-base font-bold flex items-center gap-2">
+                        <FileText size={20} />
+                        Xác Nhận Chuyển Thuế KV7
+                    </h2>
+                    <button onClick={onClose} className="text-amber-200 hover:text-white transition-colors cursor-pointer">
+                        <X size={20} />
+                    </button>
+                </div>
+
+                <div className="p-5 space-y-4">
+                    <div>
+                        <p className="text-gray-700 text-xs font-medium mb-1">
+                            Bạn đang chuyển bước Thuế KV7 cho <span className="font-bold text-amber-600 text-sm">{selectedCount}</span> hồ sơ Đăng ký.
+                        </p>
+                    </div>
+
+                    <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">
+                            Số phiếu chuyển thuế <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                            type="text"
+                            value={taxTransferNum}
+                            onChange={(e) => setTaxTransferNum(e.target.value)}
+                            placeholder="Nhập số phiếu chuyển thuế (VD: PC-2026/001)..."
+                            className="w-full px-3 py-2 border border-gray-300 rounded-xl text-xs font-bold text-gray-800 focus:ring-2 focus:ring-amber-500 outline-none"
+                        />
+                        <p className="text-[11px] text-amber-600 mt-1 italic">
+                            * Bắt buộc phải có Số phiếu chuyển thuế trước khi chuyển bước.
+                        </p>
+                    </div>
+
+                    <div className="flex justify-end gap-2.5 pt-3 border-t border-gray-100">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="px-4 py-2 text-xs text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl font-semibold transition-colors cursor-pointer"
+                        >
+                            Hủy
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleConfirm}
+                            disabled={!taxTransferNum.trim()}
+                            className={`flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs font-bold text-white transition-all shadow-md ${
+                                taxTransferNum.trim()
+                                    ? 'bg-amber-600 hover:bg-amber-700 cursor-pointer shadow-amber-600/20 active:scale-95'
+                                    : 'bg-gray-300 cursor-not-allowed'
+                            }`}
+                        >
+                            <CheckCircle2 size={14} />
+                            Xác nhận chuyển Thuế KV7
                         </button>
                     </div>
                 </div>

@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { RecordFile, Holiday, RecordStatus, User, Employee, DangKyParty } from '../../types';
 import { RECORD_TYPES, EXTENDED_RECORD_TYPES, getShortRecordType, getWardLabel } from '../../constants';
-import { detectProcedureId } from '../../constants/procedures';
+import { detectProcedureId, getDefaultDocsForProcedure } from '../../constants/procedures';
 import { addActivityLog } from '../../services/activityLogService';
 import { AutoResizeTextarea } from '../AutoResizeTextarea';
 import { Save, User as UserIcon, Calendar, MapPin, FileCheck, Loader2, Printer, RotateCcw, XCircle, CheckCircle, AlertCircle, X, Phone, FileText, BookOpen, Clock, Hash, Map, ChevronDown, ChevronUp, Users, UserPlus, Plus, Shield } from 'lucide-react';
@@ -209,11 +209,13 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
                 setAttachedDocs(defaultDocs);
                 newData.otherDocs = JSON.stringify(defaultDocs);
             } else if (value.startsWith('3.')) {
-                // Đăng ký hồ sơ - mặc định giấy tờ
-                const defaultDkDocs: AttachedDocItem[] = [
-                    { id: '1', name: 'Giấy chứng nhận QSD đất', type: 'Bản chính' },
-                    { id: '2', name: 'Đơn đăng ký biến động', type: 'Bản chính' }
-                ];
+                // Đăng ký hồ sơ - mặc định giấy tờ theo quy định
+                const defaultDocsList = getDefaultDocsForProcedure(value, prev.code);
+                const defaultDkDocs: AttachedDocItem[] = defaultDocsList.map((d, idx) => ({
+                    id: String(idx + 1),
+                    name: d.name,
+                    type: d.type === 'Bản sao' ? 'Bản sao' : 'Bản chính'
+                }));
                 setAttachedDocs(defaultDkDocs);
                 newData.otherDocs = JSON.stringify(defaultDkDocs);
 

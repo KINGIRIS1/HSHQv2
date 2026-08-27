@@ -288,7 +288,56 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
                 record.deadline = calculateDeadline(record.recordType, record.receivedDate);
             }
 
-            // 4. THÔNG TIN XUẤT (QUAN TRỌNG CHO VIỆC TỰ ĐỘNG HANDOVER)
+            // 4. THÔNG TIN ĐO ĐẠC & LƯU TRỮ CHUYÊN BIỆT
+            const contractNumRaw = getVal(['SỐ HỢP ĐỒNG', 'SỐ HĐ', 'CONTRACT', 'contractNumber', 'contract_number']);
+            if (contractNumRaw !== undefined) record.contractNumber = String(contractNumRaw);
+
+            const priceRaw = getVal(['GIÁ TIỀN', 'GIÁ ĐO ĐẠC', 'TỔNG TIỀN', 'PRICE', 'price']);
+            if (priceRaw !== undefined && priceRaw !== null && priceRaw !== '') {
+                const parsedPrice = parseFloat(String(priceRaw).replace(/[^0-9.]/g, ''));
+                if (!isNaN(parsedPrice)) record.price = parsedPrice;
+            }
+
+            const paidRaw = getVal(['SỐ TIỀN ĐÃ THU', 'ĐÃ THU', 'TIỀN THU', 'paidAmount', 'paid_amount']);
+            if (paidRaw !== undefined && paidRaw !== null && paidRaw !== '') {
+                const parsedPaid = parseFloat(String(paidRaw).replace(/[^0-9.]/g, ''));
+                if (!isNaN(parsedPaid)) record.paidAmount = parsedPaid;
+            }
+
+            const settlementRaw = getVal(['THANH TOÁN', 'TIỀN THANH TOÁN', 'settlementAmount', 'settlement_amount']);
+            if (settlementRaw !== undefined && settlementRaw !== null && settlementRaw !== '') {
+                const parsedSet = parseFloat(String(settlementRaw).replace(/[^0-9.]/g, ''));
+                if (!isNaN(parsedSet)) record.settlementAmount = parsedSet;
+            }
+
+            const drawingExportRaw = getVal(['NGÀY XUẤT BẢN VẼ', 'NGÀY XUẤT TRÍCH ĐO', 'drawingExportDate', 'drawing_export_date']);
+            if (drawingExportRaw !== undefined) record.drawingExportDate = parseExcelDate(drawingExportRaw);
+
+            const surveyorRaw = getVal(['CÁN BỘ ĐO ĐẠC', 'NGƯỜI ĐO', 'SURVEYOR', 'surveyor']);
+            if (surveyorRaw !== undefined) record.surveyor = String(surveyorRaw);
+
+            const noticeNumRaw = getVal(['SỐ THÔNG BÁO ĐO ĐẠC', 'SỐ TB ĐO ĐẠC', 'measurementNoticeNumber', 'measurement_notice_number']);
+            if (noticeNumRaw !== undefined) record.measurementNoticeNumber = String(noticeNumRaw);
+
+            const excerptNumRaw = getVal(['SỐ CÔNG VĂN', 'SỐ SAO LỤC', 'SỐ THÔNG BÁO', 'excerptNumber', 'excerpt_number']);
+            if (excerptNumRaw !== undefined) record.excerptNumber = String(excerptNumRaw);
+
+            const reqTypeRaw = getVal(['LOẠI YÊU CẦU', 'DẠNG YÊU CẦU', 'requestType', 'request_type']);
+            if (reqTypeRaw !== undefined) record.requestType = String(reqTypeRaw);
+
+            const providedContentRaw = getVal(['NỘI DUNG CUNG CẤP', 'NỘI DUNG TRẢ', 'providedContent', 'provided_content']);
+            if (providedContentRaw !== undefined) record.providedContent = String(providedContentRaw);
+
+            const requesterRaw = getVal(['NGƯỜI YÊU CẦU', 'ĐƠN VỊ YÊU CẦU', 'requester']);
+            if (requesterRaw !== undefined) record.requester = String(requesterRaw);
+
+            const resultDeliveryRaw = getVal(['NGÀY TRẢ KẾT QUẢ', 'resultDeliveryDate', 'result_delivery_date']);
+            if (resultDeliveryRaw !== undefined) record.resultDeliveryDate = parseExcelDate(resultDeliveryRaw);
+
+            const archiveLocRaw = getVal(['VỊ TRÍ LƯU TRỮ', 'KỆ/GIÁ/HỘP', 'archiveLocation', 'archive_location']);
+            if (archiveLocRaw !== undefined) record.archiveLocation = String(archiveLocRaw);
+
+            // 5. THÔNG TIN XUẤT (QUAN TRỌNG CHO VIỆC TỰ ĐỘNG HANDOVER)
             const exportBatchRaw = getVal(['ĐỢT', 'BATCH', 'exportbatch', 'export_batch', 'exportBatch']);
             if (exportBatchRaw !== undefined) {
                 const numStr = String(exportBatchRaw).replace(/[^0-9]/g, '');
@@ -452,28 +501,42 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
           headers = [
               'MÃ HỒ SƠ', 'CHỦ SỬ DỤNG', 'CCCD', 'SĐT', 'ĐỊA CHỈ', 'NGƯỜI ỦY QUYỀN', 
               'XÃ', 'THỬA', 'TỜ', 'DIỆN TÍCH', 'ĐẤT Ở', 'SỐ PHÁT HÀNH', 'SỐ VÀO SỔ', 'NGÀY CẤP', 
-              'LOẠI HỒ SƠ', 'NỘI DUNG', 'GIẤY TỜ KÈM THEO', 'NGÀY NHẬN', 'HẸN TRẢ', 
-              'TRẠNG THÁI', 'NGÀY XUẤT', 'ĐỢT', 'NGƯỜI XỬ LÝ', 'NGÀY GIAO'
+              'LOẠI HỒ SƠ', 'NỘI DUNG', 'GIẤY TỜ KÈM THEO', 'SỐ HỢP ĐỒNG', 'GIÁ TIỀN', 'SỐ TIỀN ĐÃ THU', 'CÁN BỘ ĐO ĐẠC',
+              'SỐ CÔNG VĂN', 'NỘI DUNG CUNG CẤP', 'NGƯỜI YÊU CẦU',
+              'NGÀY NHẬN', 'HẸN TRẢ', 'TRẠNG THÁI', 'NGÀY XUẤT', 'ĐỢT', 'NGƯỜI XỬ LÝ', 'NGÀY GIAO'
           ];
           sampleData = [
-              ['HS001', 'Nguyễn Văn A', '070012345678', '0901234567', 'Tổ 1, KP 2', 'Lê Văn C', 
+              ['2.2.001', 'Nguyễn Văn A', '070012345678', '0901234567', 'Tổ 1, KP 2', 'Lê Văn C', 
                'Tân Khải', '123', '45', '100.5', '50', 'CD 123456', 'CH 01234', '2024-01-01', 
-               '2.1 Trích Lục', 'cấp đổi', 'Sổ đỏ | Bản chính', '2024-01-01', '2024-01-15', 
-               'Đã giao 1 cửa', '2024-01-20', '1', '', '']
+               '2.2 Trích đo', 'Trích đo địa chính', 'Sổ đỏ | Bản chính', 'HĐ-2024/01', '1500000', '1500000', 'Nguyễn Văn B',
+               '', '', '',
+               '2024-01-01', '2024-01-15', 'Đã giao 1 cửa', '2024-01-20', '1', '', ''],
+              ['1.1.002', 'Trần Thị B', '079098765432', '0912345678', 'Tổ 3, Phường 1', '', 
+               'Tân Khải', '456', '12', '200', '100', '', '', '', 
+               '1.1 Trích lục sao lục', 'Cung cấp thông tin địa chính', 'Đơn xin trích lục', '', '', '', '',
+               'CV-102/UBND', 'Cung cấp trích lục tờ 12 thửa 456', 'UBND Phường',
+               '2024-01-02', '2024-01-10', 'Đã trả', '2024-01-09', '1', '', '']
           ];
       } else {
           headers = [
               'MÃ HỒ SƠ', 'CHỦ SỬ DỤNG', 'CCCD', 'SĐT', 'ĐỊA CHỈ', 'NGƯỜI ỦY QUYỀN', 'LOẠI ỦY QUYỀN', 
               'XÃ', 'THỬA', 'TỜ', 'DIỆN TÍCH', 'ĐẤT Ở', 'SỐ PHÁT HÀNH', 'SỐ VÀO SỔ', 'NGÀY CẤP', 
-              'LOẠI HỒ SƠ', 'NỘI DUNG', 'GIẤY TỜ KÈM THEO', 'NGÀY NHẬN', 'HẸN TRẢ', 
-              'TRẠNG THÁI', 'NGÀY THỰC HIỆN', 'NGÀY TRÌNH KIỂM TRA', 'NGÀY ĐÃ KIỂM TRA', 'NGÀY TRÌNH KÝ', 
+              'LOẠI HỒ SƠ', 'NỘI DUNG', 'GIẤY TỜ KÈM THEO', 'SỐ HỢP ĐỒNG', 'GIÁ TIỀN', 'SỐ TIỀN ĐÃ THU', 'CÁN BỘ ĐO ĐẠC',
+              'SỐ CÔNG VĂN', 'NỘI DUNG CUNG CẤP', 'NGƯỜI YÊU CẦU',
+              'NGÀY NHẬN', 'HẸN TRẢ', 'TRẠNG THÁI', 'NGÀY THỰC HIỆN', 'NGÀY TRÌNH KIỂM TRA', 'NGÀY ĐÃ KIỂM TRA', 'NGÀY TRÌNH KÝ', 
               'NGÀY KÝ DUYỆT', 'NGÀY HOÀN THÀNH', 'NGÀY TRẢ DÂN', 'NGÀY XUẤT', 'ĐỢT', 'NGƯỜI XỬ LÝ', 'NGÀY GIAO'
           ];
           sampleData = [
-              ['HS001', 'Nguyễn Văn A', '070012345678', '0901234567', 'Tổ 1, KP 2', 'Lê Văn C', 'Giấy ủy quyền', 
-               'Tân Khai', '123', '45', '100.5', '50', 'CD 123456', 'CH 01234', '2024-01-01', 
-               'Đo đạc', 'Đo đạc cắm mốc', 'Sổ đỏ|Bản chính', '2024-01-01', '2024-01-15', 
-               'Đã nhận', '', '', '', '', '', '', '', '', '', '', '']
+              ['2.1.001', 'Nguyễn Văn A', '070012345678', '0901234567', 'Tổ 1, KP 2', 'Lê Văn C', 'Giấy ủy quyền', 
+               'Tân Khải', '123', '45', '100.5', '50', 'CD 123456', 'CH 01234', '2024-01-01', 
+               '2.1 Trích lục', 'Trích lục bản đồ', 'Sổ đỏ|Bản chính', 'HĐ-2024/01', '1500000', '1500000', 'Trần Văn C',
+               '', '', '',
+               '2024-01-01', '2024-01-15', 'Mới tiếp nhận', '', '', '', '', '', '', '', '', '', '', ''],
+              ['1.2.001', 'Lê Văn D', '075012345678', '0987654321', 'Khu phố 4', '', '', 
+               'Tân Khải', '789', '88', '350', '150', '', '', '', 
+               '1.2 Cung cấp thông tin', 'Cung cấp thông tin quy hoạch', 'Đơn yêu cầu', '', '', '', '',
+               'CV-55/PTNMT', 'Sao lục hồ sơ cấp GCN năm 2018', 'Tòa án nhân dân',
+               '2024-01-02', '2024-01-08', 'Mới tiếp nhận', '', '', '', '', '', '', '', '', '', '', '']
           ];
       }
 
@@ -484,219 +547,289 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
       XLSX.writeFile(wb, fileName);
   };
 
+  const validRecords = previewData.filter(r => !r._errors || r._errors.length === 0);
+  const validCount = validRecords.length;
+  const errorCount = previewData.length - validCount;
+
+  const filteredPreview = previewData.filter(r => {
+      const hasError = r._errors && r._errors.length > 0;
+      if (viewFilter === 'valid') return !hasError;
+      if (viewFilter === 'errors') return hasError;
+      return true;
+  });
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100] p-4 backdrop-blur-sm">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-5xl h-[85vh] flex flex-col animate-fade-in-up">
-        {/* HEADER */}
-        <div className="flex justify-between items-center p-5 border-b shrink-0">
-          <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-            {mode === 'create' ? (
-              <>
-                <FileSpreadsheet className="text-green-600" />
-                Tiếp nhận hàng loạt từ Excel
-              </>
-            ) : (
-              <>
-                <RefreshCw className="text-amber-600" />
-                Cập nhật thông tin từ Excel
-              </>
-            )}
-          </h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-red-600">
-            <X size={24} />
+    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl overflow-hidden border border-gray-100 animate-scale-up flex flex-col max-h-[90vh]">
+        {/* Modal Header */}
+        <div className="bg-gradient-to-r from-blue-700 to-indigo-800 px-6 py-4 flex items-center justify-between text-white shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-white/15 rounded-xl backdrop-blur-xs">
+              <FileSpreadsheet size={22} className="text-white" />
+            </div>
+            <div>
+              <h3 className="font-bold text-base leading-tight">
+                {mode === 'create' ? 'Tiếp nhận hàng loạt từ Excel (Đo đạc / Lưu trữ)' : 'Cập nhật hàng loạt từ file Excel (Đo đạc / Lưu trữ)'}
+              </h3>
+              <p className="text-xs text-blue-100 mt-0.5">
+                {mode === 'create' 
+                  ? 'Thêm mới hàng loạt hồ sơ Đo đạc & Lưu trữ từ file Excel' 
+                  : 'Cập nhật tự động trạng thái quy trình, cán bộ thụ lý, hạn trả... dựa theo Mã hồ sơ'}
+              </p>
+            </div>
+          </div>
+          <button 
+            onClick={onClose}
+            className="p-1 rounded-lg text-blue-200 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+          >
+            <X size={20} />
           </button>
         </div>
 
-        {/* MODE INFO & FILE CONTROLS */}
-        <div className="p-4 border-b bg-slate-50 shrink-0 space-y-3">
-            {/* Show mode switcher only when initialMode is not explicitly provided */}
-            {!initialMode && (
-              <div className="flex justify-center">
-                  <div className="bg-white border border-gray-300 rounded-lg p-1 flex shadow-sm">
-                      <button 
-                          onClick={() => { setMode('create'); setPreviewData([]); setFileName(''); }}
-                          className={`flex items-center gap-2 px-6 py-1.5 rounded-md font-medium text-sm transition-all ${mode === 'create' ? 'bg-blue-600 text-white shadow' : 'text-gray-600 hover:bg-gray-100'}`}
-                      >
-                          <PlusCircle size={16} /> Nhập hồ sơ mới
-                      </button>
-                      <button 
-                          onClick={() => { setMode('update'); setPreviewData([]); setFileName(''); }}
-                          className={`flex items-center gap-2 px-6 py-1.5 rounded-md font-medium text-sm transition-all ${mode === 'update' ? 'bg-orange-500 text-white shadow' : 'text-gray-600 hover:bg-gray-100'}`}
-                      >
-                          <RefreshCw size={16} /> Cập nhật thông tin
-                      </button>
-                  </div>
+        {/* Modal Controls Bar */}
+        <div className="p-5 bg-gray-50 border-b border-gray-200 flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            {/* Toggle Mode */}
+            <div className="flex rounded-xl bg-gray-200 p-1 border border-gray-300 shadow-2xs">
+              <button
+                type="button"
+                onClick={() => { setMode('update'); setPreviewData([]); setFileName(''); }}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  mode === 'update' 
+                    ? 'bg-white text-blue-700 shadow-xs' 
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <RefreshCw size={14} /> Cập nhật dữ liệu
+              </button>
+              <button
+                type="button"
+                onClick={() => { setMode('create'); setPreviewData([]); setFileName(''); }}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  mode === 'create' 
+                    ? 'bg-white text-blue-700 shadow-xs' 
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <PlusCircle size={14} /> Nhập mới hàng loạt
+              </button>
+            </div>
+
+            {/* Download Template */}
+            <button
+              type="button"
+              onClick={handleDownloadTemplate}
+              className="px-3.5 py-1.5 bg-white border border-gray-300 hover:border-blue-500 hover:text-blue-600 text-gray-700 rounded-xl text-xs font-semibold shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer"
+            >
+              <FileSpreadsheet size={14} /> Tải file mẫu Excel
+            </button>
+          </div>
+
+          {/* Upload File Input & Notice */}
+          <div className="flex items-center gap-2.5">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".xlsx, .xls"
+              onChange={handleFileChange}
+              className="hidden"
+              id="excel-file-input-dOdac"
+            />
+            <label
+              htmlFor="excel-file-input-dOdac"
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-600/20 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+            >
+              <Upload size={15} /> {fileName ? 'Chọn file khác' : 'Tải lên file Excel'}
+            </label>
+            <button 
+              onClick={() => setShowNoticeModal(true)} 
+              className="w-7 h-7 rounded-full bg-red-500 hover:bg-red-600 text-white font-extrabold text-xs flex items-center justify-center shadow-sm border border-red-400 transition-all active:scale-90 cursor-pointer shrink-0"
+              title="Xem hướng dẫn Cập nhật thông minh"
+            >
+              !
+            </button>
+            {fileName && (
+              <span className="text-xs font-medium text-slate-600 max-w-[180px] truncate" title={fileName}>
+                📄 {fileName}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Modal Body / Table Preview */}
+        <div className="flex-1 overflow-y-auto p-5">
+          {loading && !progress && (
+            <div className="flex flex-col items-center justify-center py-16 text-slate-500 gap-3">
+              <Loader2 className="animate-spin text-blue-600" size={36} />
+              <p className="text-sm font-medium">Đang đọc và xử lý cấu trúc file Excel...</p>
+            </div>
+          )}
+
+          {!loading && previewData.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-16 border-2 border-dashed border-gray-200 rounded-2xl bg-gray-50/50 text-center">
+              <FileSpreadsheet size={48} className="text-gray-300 mb-3" />
+              <h4 className="text-sm font-bold text-gray-700">Chưa có dữ liệu xem trước</h4>
+              <p className="text-xs text-gray-500 max-w-md mt-1 mb-4">
+                Vui lòng tải lên file Excel (.xlsx hoặc .xls) chứa danh sách hồ sơ cần {mode === 'create' ? 'tiếp nhận' : 'cập nhật'}.
+              </p>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="px-4 py-2 bg-white border border-gray-300 hover:border-blue-500 text-blue-600 font-bold text-xs rounded-xl shadow-2xs transition-all cursor-pointer"
+              >
+                Chọn file từ máy tính
+              </button>
+            </div>
+          )}
+
+          {previewData.length > 0 && (
+            <div className="space-y-4">
+              {/* Summary Badges & Filter Tabs */}
+              <div className="flex items-center justify-between gap-3 bg-blue-50/60 p-3 rounded-xl border border-blue-100">
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="font-bold text-blue-900">Tổng cộng:</span>
+                  <span className="px-2 py-0.5 bg-blue-600 text-white font-extrabold rounded-md">{previewData.length}</span>
+                  <span className="text-emerald-700 font-semibold ml-2">✓ Hợp lệ: {validCount}</span>
+                  {errorCount > 0 && <span className="text-rose-600 font-bold ml-2">⚠ Lỗi: {errorCount}</span>}
+                </div>
+
+                <div className="flex items-center gap-1 bg-white p-1 rounded-lg border border-gray-200 shadow-2xs text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setViewFilter('all')}
+                    className={`px-2.5 py-1 rounded-md font-medium cursor-pointer ${viewFilter === 'all' ? 'bg-blue-600 text-white font-bold' : 'text-gray-600 hover:text-gray-900'}`}
+                  >
+                    Tất cả ({previewData.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setViewFilter('valid')}
+                    className={`px-2.5 py-1 rounded-md font-medium cursor-pointer ${viewFilter === 'valid' ? 'bg-emerald-600 text-white font-bold' : 'text-gray-600 hover:text-gray-900'}`}
+                  >
+                    Hợp lệ ({validCount})
+                  </button>
+                  {errorCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setViewFilter('errors')}
+                      className={`px-2.5 py-1 rounded-md font-medium cursor-pointer ${viewFilter === 'errors' ? 'bg-rose-600 text-white font-bold' : 'text-gray-600 hover:text-gray-900'}`}
+                    >
+                      Bị lỗi ({errorCount})
+                    </button>
+                  )}
+                </div>
               </div>
-            )}
 
-            {/* BAR ROW: FILTERS ON LEFT | ACTION BUTTONS ON RIGHT */}
-            <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-xl border border-slate-200 shadow-xs">
-                {/* Left Side: Filter Pills or Status */}
-                <div className="flex flex-wrap items-center gap-2">
-                    {previewData.length > 0 && !loading ? (
-                        <>
-                            <button 
-                                onClick={() => setViewFilter('all')}
-                                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${viewFilter === 'all' ? 'bg-slate-800 text-white shadow-xs' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
-                            >
-                                Tất cả ({previewData.length})
-                            </button>
-                            <button 
-                                onClick={() => setViewFilter('valid')}
-                                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${viewFilter === 'valid' ? 'bg-emerald-600 text-white shadow-xs' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'}`}
-                            >
-                                Hợp lệ ({previewData.filter(r => !r._errors?.length).length})
-                            </button>
-                            <button 
-                                onClick={() => setViewFilter('errors')}
-                                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${viewFilter === 'errors' ? 'bg-red-600 text-white shadow-xs' : 'bg-red-50 text-red-700 hover:bg-red-100 border border-red-200'}`}
-                            >
-                                Không hợp lệ ({previewData.filter(r => r._errors?.length).length})
-                            </button>
-                        </>
-                    ) : (
-                        <div className="flex items-center gap-2 text-xs font-semibold text-slate-600">
-                            <FileSpreadsheet size={16} className="text-blue-600" />
-                            {fileName ? (
-                                <span>File đã chọn: <strong className="text-blue-700">{fileName}</strong></span>
-                            ) : (
-                                <span>{mode === 'create' ? 'Tải file mẫu hoặc chọn file Excel để nhập hồ sơ mới' : 'Tải file mẫu hoặc chọn file Excel để cập nhật thông tin hồ sơ'}</span>
-                            )}
-                        </div>
-                    )}
-                </div>
-
-                {/* Right Side: Action Buttons: Tải mẫu -> Chọn File -> [!] */}
-                <div className="flex items-center gap-2 ml-auto">
-                    <button 
-                        onClick={handleDownloadTemplate} 
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-1.5 rounded-lg font-bold text-xs flex items-center gap-1.5 shadow-xs transition-all cursor-pointer"
-                        title="Tải file Excel mẫu"
-                    >
-                        <FileSpreadsheet size={15} /> Tải mẫu
-                    </button>
-
-                    <input type="file" ref={fileInputRef} accept=".xlsx, .xls" onChange={handleFileChange} className="hidden" />
-                    
-                    <button 
-                        onClick={() => fileInputRef.current?.click()} 
-                        className={`text-white px-3.5 py-1.5 rounded-lg font-bold text-xs flex items-center gap-1.5 shadow-xs transition-all cursor-pointer ${mode === 'create' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-orange-600 hover:bg-orange-700'}`}
-                        title="Chọn file Excel từ máy tính"
-                    >
-                        <Upload size={15} /> Chọn File
-                    </button>
-
-                    <button 
-                        onClick={() => setShowNoticeModal(true)} 
-                        className="w-6 h-6 rounded-full bg-red-500 hover:bg-red-600 text-white font-extrabold text-xs flex items-center justify-center shadow-sm border border-red-400 transition-all active:scale-90 cursor-pointer ml-0.5 shrink-0"
-                        title="Xem nhắc nhở & hướng dẫn Cập nhật thông minh"
-                    >
-                        !
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        {/* PREVIEW TABLE */}
-        <div className="flex-1 overflow-auto p-0">
-            {loading ? (
-                <div className="h-full flex flex-col items-center justify-center text-gray-500">
-                    <Loader2 className="w-10 h-10 animate-spin mb-2 text-blue-500" />
-                    <p>Đang xử lý dữ liệu...</p>
-                </div>
-            ) : previewData.length > 0 ? (
-                <table className="w-full text-left border-collapse">
-                    <thead className="bg-gray-100 sticky top-0 shadow-sm z-10 text-xs uppercase font-bold text-gray-600">
-                        <tr>
-                            <th className="p-3 border-b">#</th>
-                            <th className="p-3 border-b">Mã HS</th>
-                            <th className="p-3 border-b">Chủ Sử Dụng</th>
-                            <th className="p-3 border-b">Trạng Thái (Dự kiến)</th>
-                            <th className="p-3 border-b">Ngày Xuất</th>
-                            <th className="p-3 border-b">Đợt</th>
-                            <th className="p-3 border-b">Kiểm duyệt lỗi</th>
-                        </tr>
+              {/* Table Preview */}
+              <div className="border border-gray-200 rounded-xl overflow-hidden shadow-2xs">
+                <div className="overflow-x-auto max-h-[420px]">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-gray-100 text-gray-700 font-bold border-b border-gray-200 sticky top-0 z-10 select-none uppercase text-[11px]">
+                        <th className="p-2.5 text-center border-r border-gray-200 w-10">STT</th>
+                        <th className="p-2.5 border-r border-gray-200 min-w-[160px]">Mã Hồ Sơ</th>
+                        <th className="p-2.5 border-r border-gray-200 min-w-[180px]">Chủ Sử Dụng / Người Yêu Cầu</th>
+                        <th className="p-2.5 border-r border-gray-200 min-w-[110px]">Xã / Phường</th>
+                        <th className="p-2.5 border-r border-gray-200 text-center min-w-[80px]">Thửa / Tờ</th>
+                        <th className="p-2.5 border-r border-gray-200 min-w-[150px]">Loại Hồ Sơ</th>
+                        <th className="p-2.5 border-r border-gray-200 min-w-[130px]">Trạng Thái</th>
+                        <th className="p-2.5 border-r border-gray-200 text-center min-w-[100px]">Hẹn Trả / Ngày Xuất</th>
+                        <th className="p-2.5 border-r border-gray-200 text-center min-w-[90px]">Đợt Bàn Giao</th>
+                        <th className="p-2.5 text-center min-w-[120px]">Kiểm duyệt lỗi</th>
+                      </tr>
                     </thead>
-                    <tbody className="text-sm text-gray-700 divide-y divide-gray-100">
-                        {previewData.filter(r => {
-                            if (viewFilter === 'valid') return !r._errors?.length;
-                            if (viewFilter === 'errors') return r._errors && r._errors.length > 0;
-                            return true;
-                        }).map((record, idx) => {
-                            const hasError = record._errors && record._errors.length > 0;
-                            // Find original index for display
-                            const originalIdx = previewData.indexOf(record) + 1;
-                            return (
-                                <tr key={originalIdx} className={`hover:bg-blue-50 ${hasError ? 'bg-red-50' : ''}`}>
-                                    <td className="p-3">{originalIdx}</td>
-                                    <td className="p-3 font-medium text-blue-600">{record.code}</td>
-                                    <td className="p-3 font-medium text-gray-500">{record.customerName || <span className="text-gray-300 italic">(Giữ nguyên)</span>}</td>
-                                    <td className="p-3">
-                                        {record.status ? (
-                                            <span className={`text-xs px-2.5 py-1 rounded-full font-bold inline-block shadow-2xs ${STATUS_COLORS[record.status as RecordStatus] || 'bg-gray-100 text-gray-700'}`}>
-                                                {STATUS_LABELS[record.status as RecordStatus] || record.status}
-                                            </span>
-                                        ) : (
-                                            <span className="text-gray-300 italic">(Giữ nguyên)</span>
-                                        )}
-                                    </td>
-                                    <td className="p-3 font-mono text-green-700">{record.exportDate ? record.exportDate.split('T')[0] : '-'}</td>
-                                    <td className="p-3 font-bold">{record.exportBatch || '-'}</td>
-                                    <td className="p-3">
-                                        {hasError ? (
-                                            <ul className="text-red-600 list-disc pl-4 text-xs font-medium">
-                                                {record._errors!.map((err, i) => <li key={i}>{err}</li>)}
-                                            </ul>
-                                        ) : (
-                                            <span className="text-green-600 text-xs flex items-center gap-1 font-medium"><Check size={14} /> Hợp lệ</span>
-                                        )}
-                                    </td>
-                                </tr>
-                            );
-                        })}
+                    <tbody className="divide-y divide-gray-200">
+                      {filteredPreview.map((rec, idx) => {
+                        const hasErr = rec._errors && rec._errors.length > 0;
+                        const originalIdx = previewData.indexOf(rec) + 1;
+                        return (
+                          <tr key={idx} className={`hover:bg-blue-50/40 transition-colors ${hasErr ? 'bg-rose-50/50' : 'bg-white'}`}>
+                            <td className="p-2.5 text-center text-gray-500 border-r border-gray-200 font-mono">{originalIdx}</td>
+                            <td className="p-2.5 border-r border-gray-200 font-bold text-blue-700 font-mono">
+                              {rec.code || <span className="text-gray-400 italic">Tự sinh</span>}
+                            </td>
+                            <td className="p-2.5 border-r border-gray-200 font-semibold text-gray-800">
+                              {rec.customerName || (rec as any).requester || '-'}
+                            </td>
+                            <td className="p-2.5 border-r border-gray-200 text-gray-700">
+                              {rec.ward || '-'}
+                            </td>
+                            <td className="p-2.5 border-r border-gray-200 text-center text-gray-600 font-mono">
+                              {rec.landPlot || '-'}/{rec.mapSheet || '-'}
+                            </td>
+                            <td className="p-2.5 border-r border-gray-200 text-gray-700 font-medium">
+                              {rec.recordType || '-'}
+                            </td>
+                            <td className="p-2.5 border-r border-gray-200 font-semibold text-amber-700">
+                              {rec.status ? (STATUS_LABELS[rec.status as RecordStatus] || rec.status) : '-'}
+                            </td>
+                            <td className="p-2.5 border-r border-gray-200 text-center font-mono text-gray-600">
+                              {rec.deadline ? rec.deadline.split('T')[0] : rec.exportDate ? rec.exportDate.split('T')[0] : '-'}
+                            </td>
+                            <td className="p-2.5 border-r border-gray-200 text-center text-gray-700 font-medium">
+                              {rec.exportBatch || '-'}
+                            </td>
+                            <td className="p-2.5 text-center">
+                              {hasErr ? (
+                                <ul className="text-rose-600 list-disc pl-4 text-xs font-medium text-left">
+                                  {rec._errors!.map((err, i) => <li key={i}>{err}</li>)}
+                                </ul>
+                              ) : (
+                                <span className="text-emerald-600 text-xs inline-flex items-center gap-1 font-bold">
+                                  <Check size={14} /> Hợp lệ
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
-                </table>
-            ) : (
-                <div className="h-full flex flex-col items-center justify-center text-gray-400">
-                    <FileSpreadsheet size={48} className="mb-2 opacity-50" />
-                    <p>Chưa có dữ liệu. Vui lòng chọn file Excel.</p>
+                  </table>
                 </div>
-            )}
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* FOOTER */}
-        <div className="p-5 border-t bg-white flex justify-between items-center shrink-0 rounded-b-lg">
-            {previewData.length > 0 ? (
-                <div className="flex gap-4 text-sm font-medium">
-                    <span className="text-green-600">✅ Hợp lệ: {previewData.filter(r => !r._errors?.length).length}</span>
-                    {previewData.some(r => r._errors?.length) && <span className="text-red-500">❌ Lỗi: {previewData.filter(r => r._errors?.length).length} (Vui lòng sửa Excel và tải lại)</span>}
-                </div>
-            ) : <div />}
-            <div className="flex gap-3 items-center">
-                {progress && (
-                    <div className="w-48 bg-gray-200 rounded-full h-2.5 mr-4 overflow-hidden">
-                        <div className="bg-blue-600 h-2.5 rounded-full transition-all duration-300" style={{ width: `${Math.max(5, (progress.processed / progress.total) * 100)}%` }}></div>
-                    </div>
-                )}
-                <button onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 font-medium disabled:opacity-50" disabled={loading}>Hủy bỏ</button>
-                <button 
-                    onClick={handleSave} 
-                    disabled={previewData.length === 0 || previewData.some(r => r._errors?.length) || loading} 
-                    className={`flex items-center gap-2 px-6 py-2 text-white rounded-md disabled:opacity-50 font-medium shadow-sm transition-all ${mode === 'create' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-orange-600 hover:bg-orange-700'}`}>
-                    {loading ? (
-                        <>
-                            <Loader2 size={18} className="animate-spin" />
-                            {progress ? `Đang lưu... ${Math.round((progress.processed / progress.total) * 100)}%` : 'Đang xử lý...'}
-                        </>
-                    ) : (
-                        <>
-                            <Save size={18} /> {mode === 'create' ? 'Lưu vào hệ thống' : 'Tiến hành cập nhật'}
-                        </>
-                    )}
-                </button>
+        {/* Progress Bar if processing */}
+        {progress && (
+          <div className="px-6 py-2 bg-blue-50 border-t border-blue-100 flex items-center gap-3">
+            <Loader2 className="animate-spin text-blue-600 shrink-0" size={16} />
+            <div className="flex-1">
+              <div className="flex justify-between text-xs font-semibold text-blue-900 mb-1">
+                <span>Đang xử lý lưu dữ liệu...</span>
+                <span>{progress.processed} / {progress.total}</span>
+              </div>
+              <div className="w-full bg-blue-200 h-1.5 rounded-full overflow-hidden">
+                <div 
+                  className="bg-blue-600 h-full transition-all duration-150"
+                  style={{ width: `${(progress.processed / progress.total) * 100}%` }}
+                />
+              </div>
             </div>
+          </div>
+        )}
+
+        {/* Modal Footer */}
+        <div className="p-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-200 rounded-xl transition-colors cursor-pointer"
+          >
+            Đóng / Hủy
+          </button>
+          
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={validCount === 0 || loading}
+            className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-md shadow-blue-600/20 transition-all flex items-center gap-2 active:scale-95 cursor-pointer"
+          >
+            <Check size={16} /> {mode === 'create' ? `Tiếp nhận ${validCount} hồ sơ` : `Cập nhật ${validCount} hồ sơ`}
+          </button>
         </div>
       </div>
 

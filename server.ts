@@ -132,6 +132,11 @@ server.use((req: Request, res: Response, next: NextFunction) => {
     next();
 });
 
+// API routes FIRST
+server.get('/api/health', (req: Request, res: Response) => {
+    res.json({ status: 'ok', timestamp: Date.now() });
+});
+
 // Custom Routes
 server.post('/api/backup', (req: Request, res: Response) => {
     try {

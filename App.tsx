@@ -12,7 +12,7 @@ import { DEFAULT_VISIBLE_COLUMNS, confirmAction, COLUMN_DEFS, processAssignmentT
 import { exportReportToExcel, exportReturnedListToExcel } from './utils/excelExport';
 import { generateReport } from './services/geminiService';
 import { syncTemplatesFromCloud, generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from './services/docxService'; 
-import { updateRecordApi, saveEmployeeApi, saveUserApi, forceUpdateRecordsBatchApi, updateRecordsBatchById } from './services/api';
+import { updateRecordApi, saveEmployeeApi, saveUserApi, forceUpdateRecordsBatchApi, updateRecordsBatchById, migrateMisplacedDangKyRecords } from './services/api';
 import { migrateArchiveRecordsFromLandRecords } from './services/apiArchive';
 import { ReturnOptionType } from './components/RejectReturnStepModal';
 import { addActivityLog } from './services/activityLogService';
@@ -30,6 +30,7 @@ import UpdateRequiredModal from './components/UpdateRequiredModal';
 import SubmitModal from './components/receive-record/SubmitModal';
 import GlobalConfirmModal from './components/GlobalConfirmModal';
 import GlobalAlertModal from './components/GlobalAlertModal';
+import NetworkOfflineModal from './components/NetworkOfflineModal';
 import { checkAndTriggerWeeklyBackup, downloadBackupAsFile } from './services/backupService';
 import CloudDatabaseInspector from './components/CloudDatabaseInspector';
 
@@ -160,10 +161,11 @@ function App() {
   // Sync Templates
   useEffect(() => { syncTemplatesFromCloud(); }, []);
 
-  // Run migration for archive records from land_records to archive_records
+  // Run migration for archive records & misplaced dangky records
   useEffect(() => {
       if (currentUser) {
           migrateArchiveRecordsFromLandRecords();
+          migrateMisplacedDangKyRecords();
       }
   }, [currentUser]);
 
@@ -363,6 +365,19 @@ function App() {
           const result = await handleImportRecords(data, onProgress);
           if (result) {
               setToast({ type: 'success', message: `Đã nhập thành công ${data.length} hồ sơ mới.` });
+              try {
+                  addActivityLog({
+                      performerName: currentUser?.fullName || currentUser?.name || currentUser?.username || 'Cán bộ',
+                      performerRole: currentUser?.role || 'ONEDOOR',
+                      actionType: 'CREATE',
+                      actionLabel: 'Tiếp nhận hàng loạt',
+                      targetType: 'Hồ sơ',
+                      referenceCode: `${data.length} hồ sơ`,
+                      details: `Tiếp nhận hàng loạt ${data.length} hồ sơ từ file Excel.`
+                  });
+              } catch (err) {
+                  console.warn('Failed to add activity log:', err);
+              }
               loadData();
               return true;
           } else {
@@ -373,6 +388,19 @@ function App() {
           const result = await forceUpdateRecordsBatchApi(data, onProgress);
           if (result.success) {
               setToast({ type: 'success', message: `Đã cập nhật thành công ${result.count} hồ sơ.` });
+              try {
+                  addActivityLog({
+                      performerName: currentUser?.fullName || currentUser?.name || currentUser?.username || 'Cán bộ',
+                      performerRole: currentUser?.role || 'ONEDOOR',
+                      actionType: 'UPDATE',
+                      actionLabel: 'Cập nhật hàng loạt',
+                      targetType: 'Hồ sơ',
+                      referenceCode: `${result.count} hồ sơ`,
+                      details: `Cập nhật thông tin hàng loạt ${result.count} hồ sơ từ file Excel.`
+                  });
+              } catch (err) {
+                  console.warn('Failed to add activity log:', err);
+              }
               loadData();
               return true;
           } else {
@@ -1298,6 +1326,7 @@ function App() {
 
   if (!currentUser) return (
     <>
+      <NetworkOfflineModal onOnlineRestored={loadData} />
       <UpdateRequiredModal 
         visible={isUpdateAvailable && !updateDeferred}
         version={latestVersion}
@@ -1320,6 +1349,7 @@ function App() {
   if (isMobile) {
     return (
       <>
+        <NetworkOfflineModal onOnlineRestored={loadData} />
         <UpdateRequiredModal 
           visible={isUpdateAvailable && !updateDeferred}
           version={latestVersion}
@@ -1767,6 +1797,7 @@ function App() {
         )}
         <GlobalConfirmModal />
         <GlobalAlertModal />
+        <NetworkOfflineModal onOnlineRestored={loadData} />
         <CloudDatabaseInspector isOpen={isCloudDatabaseInspectorOpen} onClose={() => setIsCloudDatabaseInspectorOpen(false)} />
     </MainLayout>
   );

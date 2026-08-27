@@ -9,7 +9,7 @@ import DocxPreviewModal from './DocxPreviewModal';
 import { updateRecordApi, fetchContracts } from '../services/api';
 import SystemReceiptTemplate from './receive-record/SystemReceiptTemplate';
 import SystemAnnexTemplate from './receive-record/SystemAnnexTemplate';
-import { getEmployeeName as getEmpNameHelper, extractBatchOnly } from '../utils/appHelpers';
+import { getEmployeeName as getEmpNameHelper, extractBatchOnly, formatStaffInfoHelper } from '../utils/appHelpers';
 import { AutoResizeTextarea } from './AutoResizeTextarea';
 
 

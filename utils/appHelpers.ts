@@ -290,9 +290,9 @@ export const calculateDeadlineHelper = (type: string, receivedDateStr: string, h
             daysToAdd = 10;
         } else if (lowerType.includes('cấp lại') || lowerType.includes('3.3.1')) {
             daysToAdd = 10;
-        } else if (lowerType.includes('chuyển mục đích') || lowerType.includes('3.6.1')) {
-            daysToAdd = 7;
-        } else if (lowerType.includes('gia hạn') || lowerType.includes('3.5.1') || lowerType.includes('đính chính') || lowerType.includes('3.7.1') || lowerType.includes('3.7.2') || lowerType.includes('thay đổi thông tin')) {
+        } else if (lowerType.includes('gia hạn') || lowerType.includes('3.5.1')) {
+            daysToAdd = 12;
+        } else if (lowerType.includes('chuyển mục đích') || lowerType.includes('3.6.1') || lowerType.includes('đính chính') || lowerType.includes('3.7.1') || lowerType.includes('3.7.2') || lowerType.includes('thay đổi thông tin')) {
             daysToAdd = 7;
         } else if (lowerType.includes('xóa thế chấp') || lowerType.includes('xóa đk gdbd') || lowerType.includes('xóa gdbd') || lowerType.includes('3.8.2')) {
             daysToAdd = 1;
@@ -1018,6 +1018,37 @@ export function calculateEmployeeWorkload(
 
     return { inProgressPlots, completedPlots };
 }
+
+export const formatStaffInfoHelper = (staffNameOrId?: string | null, employees: Employee[] = [], users: any[] = []): string | null => {
+  if (!staffNameOrId) return null;
+  const val = String(staffNameOrId).trim();
+  
+  const emp = employees.find(e => 
+    e.id === val || 
+    e.name?.toLowerCase() === val.toLowerCase() || 
+    (e as any).fullName?.toLowerCase() === val.toLowerCase()
+  );
+  if (emp) {
+    const pos = emp.position || '';
+    return pos ? `${emp.name} (${pos})` : emp.name;
+  }
+
+  const user = users.find(u => 
+    u.employeeId === val || 
+    u.username?.toLowerCase() === val.toLowerCase() || 
+    u.name?.toLowerCase() === val.toLowerCase() || 
+    u.fullName?.toLowerCase() === val.toLowerCase()
+  );
+  if (user) {
+    const matchedEmp = employees.find(e => e.id === user.employeeId || e.name === user.name);
+    const name = user.fullName || user.name || user.username;
+    const pos = matchedEmp?.position || user.role || '';
+    return pos ? `${name} (${pos})` : name;
+  }
+
+  return val;
+};
+
 
 
 
