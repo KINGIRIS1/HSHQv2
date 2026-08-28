@@ -57,10 +57,10 @@ export const getFromCacheAsync = async <T>(key: string, fallback: T): Promise<T>
         return memoryCache.get(key) as T;
     }
     try {
-        const idbData = await getFromIdb<T>(key, fallback);
-        if (idbData && (!Array.isArray(idbData) || idbData.length > 0)) {
+        const idbData = await getFromIdb<any>(key, null);
+        if (idbData !== null && idbData !== undefined) {
             memoryCache.set(key, idbData);
-            return idbData;
+            return idbData as T;
         }
         return getFromCache(key, fallback);
     } catch {
@@ -75,7 +75,7 @@ export const getFromCache = <T>(key: string, fallback: T): T => {
     try {
         if (typeof window !== 'undefined') {
             const cached = localStorage.getItem(key);
-            if (cached) {
+            if (cached !== null) {
                 const parsed = JSON.parse(cached);
                 memoryCache.set(key, parsed);
                 return parsed;

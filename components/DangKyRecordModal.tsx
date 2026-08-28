@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { DangKyRecord, DangKyStatusType, DangKyParty, Employee, User, DANG_KY_STATUS_LIST, DANG_KY_RECORD_TYPES } from '../types';
+import { EXTENDED_RECORD_TYPES } from '../constants/procedures';
 import { 
   X, Save, FileText, Users, UserPlus, Shield, 
   Calendar, Plus, Trash2, MapPin, FileCheck,
@@ -536,7 +537,7 @@ export const DangKyRecordModal: React.FC<DangKyRecordModalProps> = ({
                     className={`${inputClass} font-semibold`}
                   >
                     <option value="">-- Chọn loại hồ sơ --</option>
-                    {DANG_KY_RECORD_TYPES.map(type => (
+                    {EXTENDED_RECORD_TYPES.map(type => (
                       <option key={type} value={type}>
                         {type}
                       </option>

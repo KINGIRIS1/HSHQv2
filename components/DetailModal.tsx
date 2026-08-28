@@ -1,16 +1,19 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { RecordFile, Employee, User, UserRole, SplitItem, RecordStatus } from '../types';
 import { getNormalizedWard, getShortRecordType, isArchiveRecordType, getCanonicalRecordType } from '../constants';
 import StatusBadge from './StatusBadge';
-import { X, MapPin, FileText, User as UserIcon, Receipt, DollarSign, CheckCircle2, Circle, Send, FileSignature, CheckSquare, CalendarClock, FileCheck, Calculator, Loader2, StickyNote, Save, Bell, Printer, Pencil, Trash2, Info, FileDown, Undo2 } from 'lucide-react';
+import { X, MapPin, FileText, User as UserIcon, Receipt, DollarSign, CheckCircle2, Circle, Send, FileSignature, CheckSquare, CalendarClock, FileCheck, Calculator, Loader2, StickyNote, Save, Bell, Printer, Pencil, Trash2, Info, FileDown, Undo2, Clock } from 'lucide-react';
 import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../services/docxService';
 import DocxPreviewModal from './DocxPreviewModal';
 import { updateRecordApi, fetchContracts } from '../services/api';
+import { getDepartmentConfigs, getCoordinationWorkflows, executeStartCoordination, executeAdvanceCoordinationStep } from '../services/apiCoordination';
 import SystemReceiptTemplate from './receive-record/SystemReceiptTemplate';
 import SystemAnnexTemplate from './receive-record/SystemAnnexTemplate';
-import { getEmployeeName as getEmpNameHelper, extractBatchOnly, formatStaffInfoHelper, resolveRecordStatus } from '../utils/appHelpers';
+import { getEmployeeName as getEmpNameHelper, extractBatchOnly, formatStaffInfoHelper, resolveRecordStatus, getDepartmentForRecord } from '../utils/appHelpers';
+import { calculateRecordStepDeadlines, StepDeadlineInfo, getStepIcon, getStepPerformerInfo } from '../utils/stepDeadlineEngine';
 import { AutoResizeTextarea } from './AutoResizeTextarea';
+import { ArrowRight, Layers, Share2, Sparkles, Building2, Users } from 'lucide-react';
 
 
 const parseAuthDocType = (str: string | null | undefined) => {
@@ -113,6 +116,143 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
   const [isAnnexModalOpen, setIsAnnexModalOpen] = useState(false);
   const [contracts, setContracts] = useState<any[]>([]);
   const [matchedContract, setMatchedContract] = useState<any | null>(null);
+
+  // State cho Phối hợp liên tổ
+  const [showCoordinationModal, setShowCoordinationModal] = useState(false);
+  const [availableDepartments, setAvailableDepartments] = useState(getDepartmentConfigs());
+  const [availableWorkflows, setAvailableWorkflows] = useState(getCoordinationWorkflows());
+  const [selectedCoordWorkflowId, setSelectedCoordWorkflowId] = useState('');
+  const [coordinationTargetDept, setCoordinationTargetDept] = useState('Tổ Đo đạc');
+  const [coordinationNoteInput, setCoordinationNoteInput] = useState('');
+  const [isSubmittingCoordination, setIsSubmittingCoordination] = useState(false);
+
+  // State cho Modal Chuyển bước
+  const [showAdvanceStepModal, setShowAdvanceStepModal] = useState(false);
+  const [advanceStepNote, setAdvanceStepNote] = useState('');
+  const [advanceStepDoc, setAdvanceStepDoc] = useState('');
+
+  // Tải danh sách quy trình & tổ chuyên môn khi mở modal
+  useEffect(() => {
+    const depts = getDepartmentConfigs();
+    const wfs = getCoordinationWorkflows();
+    setAvailableDepartments(depts);
+    setAvailableWorkflows(wfs);
+    if (wfs.length > 0 && !selectedCoordWorkflowId) {
+      setSelectedCoordWorkflowId(wfs[0].id);
+      setCoordinationTargetDept(wfs[0].targetDept);
+    }
+  }, [showCoordinationModal]);
+
+  const handleStartCoordination = async () => {
+      if (!record) return;
+      if (!coordinationNoteInput.trim()) {
+          alert('Vui lòng nhập nội dung/yêu cầu phối hợp.');
+          return;
+      }
+      setIsSubmittingCoordination(true);
+      const userLabel = currentUser ? currentUser.name : 'Cán bộ thụ lý';
+      const origDept = record.originalDept || getDepartmentForRecord(record);
+
+      const res = await executeStartCoordination(record, {
+        workflowId: selectedCoordWorkflowId || undefined,
+        sourceDept: origDept,
+        targetDept: coordinationTargetDept,
+        notes: coordinationNoteInput.trim(),
+        user: { name: userLabel, username: currentUser?.username, role: currentUser?.role }
+      });
+
+      setIsSubmittingCoordination(false);
+      if (res.success) {
+        alert(res.message);
+        setShowCoordinationModal(false);
+        setCoordinationNoteInput('');
+        if (onRefreshData) onRefreshData();
+        // Update local modal object
+        Object.assign(record, res.record);
+      } else {
+        alert(res.message);
+      }
+  };
+
+  const handleAdvanceCoordinationStep = async () => {
+    if (!record) return;
+    setIsSubmittingCoordination(true);
+    const userLabel = currentUser ? currentUser.name : 'Cán bộ thụ lý';
+    const currentIdx = record.coordinationCurrentStepIndex ?? 0;
+    const nextIdx = currentIdx + 1;
+
+    const res = await executeAdvanceCoordinationStep(record, {
+      nextStepIndex: nextIdx,
+      note: advanceStepNote.trim() || undefined,
+      attachedDocs: advanceStepDoc.trim() ? [advanceStepDoc.trim()] : undefined,
+      user: { name: userLabel, username: currentUser?.username, role: currentUser?.role }
+    });
+
+    setIsSubmittingCoordination(false);
+    if (res.success) {
+      alert(res.message);
+      setShowAdvanceStepModal(false);
+      setAdvanceStepNote('');
+      setAdvanceStepDoc('');
+      if (onRefreshData) onRefreshData();
+      Object.assign(record, res.record);
+    } else {
+      alert(res.message);
+    }
+  };
+
+  const handleCompleteCoordination = async () => {
+      if (!record || !record.coordinationDept) return;
+      if (!confirm(`Xác nhận hoàn thành phối hợp và chuyển trả hồ sơ về tổ ban đầu (${record.originalDept || 'Tổ ban đầu'})?`)) return;
+
+      setIsSubmittingCoordination(true);
+      const nowStr = new Date().toLocaleString('vi-VN');
+      const userLabel = currentUser ? `${currentUser.name}` : 'Hệ thống';
+      const origDept = record.originalDept || 'Tổ ban đầu';
+      const coordDept = record.coordinationDept;
+      const logMsg = `[Phối hợp liên tổ] ${coordDept} đã hoàn thành phối hợp và bàn giao trả về ${origDept} bởi ${userLabel} lúc ${nowStr}.`;
+      const newPrivateNotes = record.privateNotes ? `${record.privateNotes}\n${logMsg}` : logMsg;
+
+      const updatedRecord: RecordFile = {
+          ...record,
+          coordinationStatus: 'completed',
+          coordinationDept: null as any,
+          coordinationCurrentStepId: null,
+          privateNotes: newPrivateNotes
+      };
+
+      try {
+          const res = await updateRecordApi(updatedRecord);
+          if (res) {
+              alert(`Đã hoàn thành phối hợp và chuyển trả hồ sơ về ${origDept} thành công!`);
+              if (onRefreshData) onRefreshData();
+              record.coordinationStatus = 'completed';
+              record.coordinationDept = null as any;
+              record.coordinationCurrentStepId = null;
+              record.privateNotes = newPrivateNotes;
+          } else {
+              alert('Lỗi khi hoàn thành phối hợp.');
+          }
+      } catch (e) {
+          console.error(e);
+          alert('Có lỗi xảy ra.');
+      } finally {
+          setIsSubmittingCoordination(false);
+      }
+  };
+
+  // State to refresh SLA workflow on external changes
+  const [wfVersion, setWfVersion] = useState(0);
+  useEffect(() => {
+    const handleWfUpdated = () => setWfVersion(v => v + 1);
+    window.addEventListener('workflow_config_updated', handleWfUpdated);
+    return () => window.removeEventListener('workflow_config_updated', handleWfUpdated);
+  }, []);
+
+  // Compute dynamic SLA deadlines for every step in the procedure workflow
+  const stepDeadlines = useMemo(() => {
+    return record ? calculateRecordStepDeadlines(record) : [];
+  }, [record, wfVersion]);
 
   useEffect(() => {
       if (record) {
@@ -492,27 +632,90 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
     }
   };
 
-  // Helper cho Timeline
-  // Updated: Hỗ trợ forceActive cho các bước không có ngày tháng cụ thể
-  const TimelineItem = ({ date, label, icon: Icon, isLast, colorClass, forceActive, subText }: any) => {
-      const isActive = !!date || !!forceActive;
+  // Helper cho Timeline Step Item
+  const TimelineStepItem = ({ 
+    step, 
+    icon: Icon, 
+    isLast, 
+    colorClass, 
+    subText 
+  }: { 
+    step: StepDeadlineInfo; 
+    icon: any; 
+    isLast: boolean; 
+    colorClass: { text: string; border: string; bg: string }; 
+    subText?: string; 
+  }) => {
+      const isCompleted = step.status === 'completed';
+      const isCurrent = step.isCurrentStep;
+      const isActive = isCompleted || isCurrent || !!step.endDate || !!step.startDate;
+
+      let dateDisplay = 'Chưa thực hiện';
+      if (step.endDate) {
+        dateDisplay = formatDate(step.endDate);
+      } else if (step.startDate && (isCurrent || isCompleted)) {
+        dateDisplay = isCurrent ? `Bắt đầu: ${formatDate(step.startDate)}` : formatDate(step.startDate);
+      } else if (isCurrent) {
+        dateDisplay = 'Đang thực hiện';
+      }
+
       return (
           <div className="relative flex gap-4">
               <div className="flex flex-col items-center">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 z-10 bg-white ${isActive ? colorClass.border : 'border-gray-200'}`}>
-                      {isActive ? <CheckCircle2 size={16} className={colorClass.text} /> : <Circle size={16} className="text-gray-300" />}
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 z-10 bg-white transition-all ${
+                      isCompleted 
+                        ? `${colorClass.border} ${colorClass.text}` 
+                        : isCurrent 
+                          ? `${colorClass.border} ring-4 ring-indigo-50 ${colorClass.text}` 
+                          : 'border-gray-200 text-gray-300'
+                  }`}>
+                      {isCompleted ? (
+                        <CheckCircle2 size={16} className={colorClass.text} />
+                      ) : isCurrent ? (
+                        <Icon size={15} className={colorClass.text} />
+                      ) : (
+                        <Circle size={15} className="text-gray-300" />
+                      )}
                   </div>
-                  {!isLast && <div className={`w-0.5 grow ${isActive ? colorClass.bg : 'bg-gray-100'} my-1`}></div>}
+                  {!isLast && (
+                    <div className={`w-0.5 grow ${isCompleted ? colorClass.bg : 'bg-gray-100'} my-1 min-h-[32px]`}></div>
+                  )}
               </div>
-              <div className={`pb-6 ${!isLast ? '' : ''}`}>
-                  <p className={`text-xs font-bold uppercase mb-0.5 ${isActive ? colorClass.text : 'text-gray-400'}`}>{label}</p>
-                  <div className="flex items-center gap-2">
-                      <Icon size={14} className={isActive ? 'text-gray-500' : 'text-gray-300'} />
-                      <span className={`text-sm font-medium ${isActive ? 'text-gray-800' : 'text-gray-400 italic'}`}>
-                          {date ? formatDate(date) : (forceActive ? 'Đã hoàn tất' : 'Chưa thực hiện')}
+              <div className="pb-5 flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2 flex-wrap mb-1">
+                      <p className={`text-xs font-bold uppercase tracking-wide ${isActive ? colorClass.text : 'text-gray-400'}`}>
+                          {step.stepName}
+                      </p>
+                      <span className={`text-[10px] px-2 py-0.5 rounded border ${step.slaStatus.badgeClass}`}>
+                          {step.slaStatus.label}
                       </span>
                   </div>
-                  {subText && <p className="text-[11px] text-indigo-600 mt-1 italic">{subText}</p>}
+
+                  <div className="flex items-center gap-2 text-xs">
+                      <Icon size={13} className={isActive ? 'text-gray-500' : 'text-gray-300'} />
+                      <span className={`font-medium ${isActive ? 'text-gray-800' : 'text-gray-400 italic'}`}>
+                          {dateDisplay}
+                      </span>
+                  </div>
+
+                  {/* SLA Info & Target Step Deadline */}
+                  <div className="mt-1 flex items-center gap-2 flex-wrap text-[11px] text-gray-500">
+                      <span className="bg-gray-100 px-1.5 py-0.5 rounded text-gray-600 font-medium">
+                          SLA: {step.slaDisplay}
+                      </span>
+                      {step.deadlineDate && (isCurrent || isCompleted) && (
+                          <span className="text-gray-400">
+                              • Hạn bước: {formatDate(step.deadlineDate)}
+                          </span>
+                      )}
+                      {step.timeRemainingText && isCurrent && (
+                          <span className={`font-semibold ${step.slaStatus.colorClass}`}>
+                              ({step.timeRemainingText})
+                          </span>
+                      )}
+                  </div>
+
+                  {subText && <p className="text-[11px] text-indigo-600 mt-1 font-medium italic">{subText}</p>}
               </div>
           </div>
       );
@@ -560,6 +763,16 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
             </div>
             
             <div className="flex items-center gap-2">
+                {record && (!record.coordinationDept || record.coordinationStatus === 'completed') && (
+                    <button
+                        onClick={() => setShowCoordinationModal(true)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 border border-purple-200 text-purple-700 rounded hover:bg-purple-100 transition-colors text-sm font-bold shadow-sm"
+                        title="Chuyển phối hợp chuyên môn sang tổ khác"
+                    >
+                        <Users size={16} /> Phối hợp liên tổ
+                    </button>
+                )}
+
                 {onOpenRejectReturnModal && record && (record.status === RecordStatus.PENDING_CHECK || record.status === RecordStatus.CHECKED || record.status === RecordStatus.PENDING_SIGN || record.status === RecordStatus.SIGNED) && (
                     <button
                         onClick={() => { onClose(); onOpenRejectReturnModal(record); }}
@@ -645,6 +858,75 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                 </button>
             </div>
         </div>
+
+        {/* ACTIVE COORDINATION BANNER */}
+        {record.coordinationDept && record.coordinationStatus !== 'completed' && (() => {
+            const activeWf = availableWorkflows.find(w => w.id === record.coordinationWorkflowId);
+            const steps = activeWf?.steps || [];
+            const curStepIdx = record.coordinationCurrentStepIndex ?? 0;
+            const curStep = steps[curStepIdx];
+
+            return (
+                <div className="bg-gradient-to-r from-purple-50 via-indigo-50/50 to-purple-50 border-b border-purple-200 px-6 py-3.5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shrink-0 shadow-xs">
+                    <div className="flex items-start gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-purple-600 text-white flex items-center justify-center font-bold shrink-0 mt-0.5 shadow-xs">
+                            <Layers size={18} />
+                        </div>
+                        <div className="space-y-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-xs font-extrabold uppercase px-2 py-0.5 rounded bg-purple-200 text-purple-900 border border-purple-300">
+                                    Đang phối hợp
+                                </span>
+                                <span className="font-extrabold text-sm text-gray-900">
+                                    {record.originalDept || 'Tổ ban đầu'} ➔ <span className="text-purple-700">{record.coordinationDept}</span>
+                                </span>
+                                {activeWf && (
+                                    <span className="text-xs text-purple-600 font-semibold">({activeWf.name})</span>
+                                )}
+                            </div>
+
+                            {/* STEPS TIMELINE MINI */}
+                            {curStep && (
+                                <div className="flex items-center gap-2 text-xs text-gray-700 pt-0.5">
+                                    <span className="font-bold text-purple-800 bg-purple-100 px-2 py-0.5 rounded-full text-[11px]">
+                                        Bước {curStepIdx + 1}/{steps.length}: {curStep.name}
+                                    </span>
+                                    {curStep.slaDisplay && (
+                                        <span className="text-[11px] text-gray-500 font-medium flex items-center gap-1">
+                                            <Clock size={12} /> Hạn SLA: {curStep.slaDisplay}
+                                        </span>
+                                    )}
+                                </div>
+                            )}
+
+                            {record.coordinationNotes && (
+                                <p className="text-xs text-gray-600 italic">
+                                    Nội dung: {record.coordinationNotes}
+                                </p>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 self-end md:self-center shrink-0">
+                        <button
+                            onClick={() => setShowAdvanceStepModal(true)}
+                            className="flex items-center gap-1.5 px-3.5 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg shadow-sm text-xs transition-colors"
+                        >
+                            <ArrowRight size={14} /> Chuyển bước tiếp theo
+                        </button>
+                        <button
+                            onClick={handleCompleteCoordination}
+                            disabled={isSubmittingCoordination}
+                            className="flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-gray-100 text-purple-800 border border-purple-300 font-bold rounded-lg text-xs transition-colors disabled:opacity-50"
+                            title="Hoàn tất và chuyển trả ngay lập tức"
+                        >
+                            {isSubmittingCoordination ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle2 size={13} />}
+                            Chuyển trả về {record.originalDept || 'Tổ ban đầu'}
+                        </button>
+                    </div>
+                </div>
+            );
+        })()}
 
         {/* BODY */}
         <div className="flex-1 overflow-y-auto p-6">
@@ -1051,80 +1333,41 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                         </div>
 
                         <div className="p-6 space-y-0">
-                             <TimelineItem 
-                                date={record.receivedDate} 
-                                label="TIẾP NHẬN MỚI" 
-                                icon={UserIcon}
-                                colorClass={{text: 'text-emerald-700', border: 'border-emerald-600', bg: 'bg-emerald-600'}}
-                                subText={record.receivedBy ? (() => {
-                                    const receiver = users.find(u => u.employeeId === record.receivedBy);
-                                    if (!receiver) return undefined;
-                                    const emp = employees.find(e => e.id === receiver.employeeId);
-                                    return `${receiver.name} (${emp?.position || 'Nhân viên'})`;
-                                })() : undefined}
-                            />
+                            {stepDeadlines.map((step, idx) => {
+                                const StepIcon = getStepIcon(step.stepCode);
+                                const subText = getStepPerformerInfo(record, step.stepCode, employees, users);
+                                const isLast = idx === stepDeadlines.length - 1;
 
-                            <TimelineItem 
-                                date={record.assignedDate || record.completedWorkDate} 
-                                forceActive={isWorkDone || !!record.assignedDate}
-                                label="ĐANG THỰC HIỆN" 
-                                icon={UserIcon}
-                                colorClass={{text: 'text-blue-700', border: 'border-blue-600', bg: 'bg-blue-600'}}
-                                subText={record.assignedTo ? (() => {
-                                    const emp = employees.find(e => e.id === record.assignedTo);
-                                    if (!emp) return undefined;
-                                    return emp.position ? `${emp.name} (${emp.position})` : emp.name;
-                                })() : undefined}
-                            />
+                                let colorClass = { text: 'text-indigo-700', border: 'border-indigo-600', bg: 'bg-indigo-600' };
+                                if (step.stepCode === 'tiep_nhan') {
+                                    colorClass = { text: 'text-emerald-700', border: 'border-emerald-600', bg: 'bg-emerald-600' };
+                                } else if (step.stepCode === 'dang_thuc_hien' || step.stepCode === 'tham_dinh') {
+                                    colorClass = { text: 'text-blue-700', border: 'border-blue-600', bg: 'bg-blue-600' };
+                                } else if (step.stepCode === 'trinh_kiem_tra') {
+                                    colorClass = { text: 'text-orange-700', border: 'border-orange-600', bg: 'bg-orange-600' };
+                                } else if (step.stepCode === 'trinh_ky') {
+                                    colorClass = { text: 'text-purple-700', border: 'border-purple-600', bg: 'bg-purple-600' };
+                                } else if (step.stepCode === 'hoan_thanh') {
+                                    colorClass = {
+                                        text: record.status === RecordStatus.REJECTED ? 'text-red-700' : 'text-green-700',
+                                        border: record.status === RecordStatus.REJECTED ? 'border-red-600' : 'border-green-600',
+                                        bg: record.status === RecordStatus.REJECTED ? 'bg-red-600' : 'bg-green-600'
+                                    };
+                                } else if (step.stepCode === 'tra_ket_qua') {
+                                    colorClass = { text: 'text-emerald-700', border: 'border-emerald-600', bg: 'bg-emerald-600' };
+                                }
 
-                            {/* Ẩn mốc kiểm tra cho một số loại hồ sơ */}
-                            {!(record.recordType === 'Cung cấp tài liệu đất đai' || record.recordType === 'Sao lục' || record.recordType === 'Công văn') && (
-                                <TimelineItem 
-                                    date={record.pendingCheckDate || record.checkedDate} 
-                                    forceActive={isPendingCheckActive || isCheckedActive}
-                                    label="TRÌNH KIỂM TRA" 
-                                    icon={Send}
-                                    colorClass={{text: 'text-orange-700', border: 'border-orange-600', bg: 'bg-orange-600'}}
-                                    subText={record.checkedBy ? (() => {
-                                        const checker = employees.find(e => e.id === record.checkedBy);
-                                        if (!checker) return undefined;
-                                        return `${checker.name} (${checker?.position || 'Người kiểm tra'})`;
-                                    })() : undefined}
-                                />
-                            )}
-
-                            <TimelineItem 
-                                date={record.submissionDate || record.approvalDate} 
-                                forceActive={isPendingSignActive || isSignedActive}
-                                label="TRÌNH KÝ DUYỆT" 
-                                icon={Send}
-                                colorClass={{text: 'text-purple-700', border: 'border-purple-600', bg: 'bg-purple-600'}}
-                                subText={record.submittedTo ? (() => {
-                                    const director = users.find(u => u.employeeId === record.submittedTo);
-                                    if (!director) return undefined;
-                                    const emp = employees.find(e => e.id === director.employeeId);
-                                    return `${director.name} (${emp?.position || (director.role === UserRole.ADMIN ? 'Giám đốc' : 'Phó giám đốc')})`;
-                                })() : undefined}
-                            />
-                            
-                            <TimelineItem 
-                                date={record.completedDate || record.exportDate} 
-                                forceActive={!!record.completedDate || !!record.exportDate || !!record.exportBatch}
-                                label={record.status === RecordStatus.REJECTED ? "TRẢ HỒ SƠ" : record.status === RecordStatus.WITHDRAWN ? "CSD RÚT HỒ SƠ" : "HOÀN THÀNH"} 
-                                icon={CheckSquare}
-                                isLast={false}
-                                colorClass={{text: record.status === RecordStatus.REJECTED ? 'text-red-700' : 'text-green-700', border: record.status === RecordStatus.REJECTED ? 'border-red-600' : 'border-green-600', bg: record.status === RecordStatus.REJECTED ? 'bg-red-600' : 'bg-green-600'}}
-                                subText={record.exportBatch ? `Đợt xuất: ${extractBatchOnly(record.exportBatch)}` : undefined}
-                            />
-                            
-                            <TimelineItem 
-                                date={record.resultReturnedDate} 
-                                label="TRẢ KẾT QUẢ" 
-                                icon={FileCheck}
-                                isLast={true}
-                                colorClass={{text: 'text-emerald-700', border: 'border-emerald-600', bg: 'bg-emerald-600'}}
-                                subText={record.resultReturnedDate && record.receiverName ? `Người nhận: ${record.receiverName}` : undefined}
-                            />
+                                return (
+                                    <TimelineStepItem
+                                        key={step.stepCode}
+                                        step={step}
+                                        icon={StepIcon}
+                                        isLast={isLast}
+                                        colorClass={colorClass}
+                                        subText={subText}
+                                    />
+                                );
+                            })}
                         </div>
                     </div>
                 </div>
@@ -1166,6 +1409,206 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                     setIsAnnexModalOpen(false);
                 }}
             />
+        )}
+
+        {/* MODAL: KHỞI TẠO PHỐI HỢP LIÊN TỔ */}
+        {showCoordinationModal && (
+            <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+                <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden border border-gray-100 p-6 animate-in fade-in zoom-in duration-200">
+                    <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-100">
+                        <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                            <Users size={18} className="text-purple-600" />
+                            Khởi tạo Phối hợp Liên tổ Chuyên môn
+                        </h3>
+                        <button onClick={() => setShowCoordinationModal(false)} className="text-gray-400 hover:text-gray-600">
+                            <X size={20} />
+                        </button>
+                    </div>
+
+                    <div className="space-y-4">
+                        {/* CHỌN QUY TRÌNH MẪU NẾU CÓ */}
+                        {availableWorkflows.length > 0 && (
+                            <div>
+                                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">
+                                    Mẫu Quy trình phối hợp (Tự động tải các bước & SLA)
+                                </label>
+                                <select
+                                    value={selectedCoordWorkflowId}
+                                    onChange={(e) => {
+                                        const wfId = e.target.value;
+                                        setSelectedCoordWorkflowId(wfId);
+                                        const wf = availableWorkflows.find(w => w.id === wfId);
+                                        if (wf) {
+                                            setCoordinationTargetDept(wf.targetDept);
+                                        }
+                                    }}
+                                    className="w-full border border-gray-300 rounded-lg p-2.5 text-xs font-bold text-gray-900 outline-none focus:ring-2 focus:ring-purple-500 bg-purple-50/50"
+                                >
+                                    {availableWorkflows.map(wf => (
+                                        <option key={wf.id} value={wf.id}>
+                                            {wf.name} ({wf.sourceDept} ➔ {wf.targetDept})
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
+
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Tổ Khởi tạo (Gốc)</label>
+                                <div className="p-2 bg-gray-100 border border-gray-200 rounded-lg text-xs font-bold text-gray-700">
+                                    {record.originalDept || getDepartmentForRecord(record)}
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Tổ Nhận phối hợp</label>
+                                <select
+                                    value={coordinationTargetDept}
+                                    onChange={(e) => setCoordinationTargetDept(e.target.value)}
+                                    className="w-full border border-gray-300 rounded-lg p-2 text-xs font-semibold text-gray-800 outline-none focus:ring-2 focus:ring-purple-500"
+                                >
+                                    {availableDepartments.map(d => (
+                                        <option key={d.id} value={d.name}>{d.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+
+                        {/* WORKFLOW STEPS PREVIEW */}
+                        {(() => {
+                            const selWf = availableWorkflows.find(w => w.id === selectedCoordWorkflowId);
+                            if (!selWf) return null;
+                            return (
+                                <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl space-y-2">
+                                    <div className="text-[11px] font-bold text-purple-900 flex items-center justify-between">
+                                        <span>Các bước trong quy trình ({selWf.steps.length} bước):</span>
+                                        {selWf.autoReturnToOrigin && (
+                                            <span className="text-emerald-700 font-extrabold flex items-center gap-1 text-[10px]">
+                                                <CheckCircle2 size={12} /> Tự động chuyển trả về tổ gốc
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="space-y-1 max-h-32 overflow-y-auto">
+                                        {selWf.steps.map((st, i) => (
+                                            <div key={st.id || i} className="flex items-center justify-between text-[11px] text-gray-700 bg-white px-2.5 py-1 rounded border border-gray-100">
+                                                <span className="font-medium">{i + 1}. {st.name}</span>
+                                                <span className="text-[10px] font-bold text-gray-500">{st.slaDisplay}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            );
+                        })()}
+
+                        <div>
+                            <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Nội dung / Yêu cầu phối hợp *</label>
+                            <textarea
+                                value={coordinationNoteInput}
+                                onChange={(e) => setCoordinationNoteInput(e.target.value)}
+                                placeholder="Nhập yêu cầu chuyên môn cụ thể (VD: Đo đạc kiểm tra hiện trạng ranh giới, trích lục hồ sơ địa chính năm 2015...)"
+                                rows={3}
+                                className="w-full border border-gray-300 rounded-lg p-2.5 text-xs text-gray-800 outline-none focus:ring-2 focus:ring-purple-500"
+                            />
+                        </div>
+
+                        <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100">
+                            <button
+                                type="button"
+                                onClick={() => setShowCoordinationModal(false)}
+                                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-xs font-medium"
+                            >
+                                Hủy
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleStartCoordination}
+                                disabled={isSubmittingCoordination}
+                                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold shadow-md flex items-center gap-1.5 disabled:opacity-50"
+                            >
+                                {isSubmittingCoordination && <Loader2 size={14} className="animate-spin" />}
+                                Bắt đầu Phối hợp
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )}
+
+        {/* MODAL: CHUYỂN BƯỚC TIẾP THEO TRONG QUY TRÌNH PHỐI HỢP */}
+        {showAdvanceStepModal && (
+            <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+                <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border border-gray-100 p-6 animate-in fade-in zoom-in duration-200">
+                    <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-100">
+                        <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                            <ArrowRight size={18} className="text-purple-600" />
+                            Chuyển bước Phối hợp tiếp theo
+                        </h3>
+                        <button onClick={() => setShowAdvanceStepModal(false)} className="text-gray-400 hover:text-gray-600">
+                            <X size={20} />
+                        </button>
+                    </div>
+
+                    <div className="space-y-4">
+                        <div className="p-3 bg-purple-50 border border-purple-200 rounded-xl text-xs space-y-1">
+                            <div className="font-bold text-purple-900">
+                                Hồ sơ: <span className="font-mono text-purple-700">{record.code}</span> - {record.customerName}
+                            </div>
+                            <div className="text-purple-800">
+                                Tổ phối hợp: <strong>{record.coordinationDept}</strong>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Kết quả xử lý bước / Ghi chú</label>
+                            <textarea
+                                value={advanceStepNote}
+                                onChange={(e) => setAdvanceStepNote(e.target.value)}
+                                placeholder="Ghi chú kết quả (VD: Đã đo vẽ hoàn tất bản vẽ hiện trạng, đã đối soát dữ liệu...)"
+                                rows={3}
+                                className="w-full border border-gray-300 rounded-lg p-2.5 text-xs text-gray-800 outline-none focus:ring-2 focus:ring-purple-500"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Tài liệu / Bản vẽ đính kèm</label>
+                            <input
+                                type="text"
+                                value={advanceStepDoc}
+                                onChange={(e) => setAdvanceStepDoc(e.target.value)}
+                                placeholder="Tên tệp đính kèm (VD: Bản vẽ trích đo 2026.pdf)"
+                                className="w-full border border-gray-300 rounded-lg p-2 text-xs text-gray-800 outline-none focus:ring-2 focus:ring-purple-500"
+                            />
+                        </div>
+
+                        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-[11px] text-amber-800 flex items-start gap-2">
+                            <CheckCircle2 size={16} className="text-amber-600 shrink-0 mt-0.5" />
+                            <span>
+                                Khi duyệt bước cuối, hệ thống sẽ <strong>tự động bàn giao và chuyển trả hồ sơ về {record.originalDept || 'Tổ ban đầu'}</strong>.
+                            </span>
+                        </div>
+
+                        <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100">
+                            <button
+                                type="button"
+                                onClick={() => setShowAdvanceStepModal(false)}
+                                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-xs font-medium"
+                            >
+                                Hủy
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleAdvanceCoordinationStep}
+                                disabled={isSubmittingCoordination}
+                                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold shadow-md flex items-center gap-1.5 disabled:opacity-50"
+                            >
+                                {isSubmittingCoordination && <Loader2 size={14} className="animate-spin" />}
+                                Xác nhận Chuyển bước
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
         )}
       </div>
     </div>

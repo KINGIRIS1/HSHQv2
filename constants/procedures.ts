@@ -312,7 +312,7 @@ export const DANG_KY_DEADLINE_MAP: Record<string, number> = PROCEDURE_CATALOG
     'Tách thửa': 17,
     'Hợp thửa': 17,
     'Tách thửa chuyển quyền': 17,
-    'Gia hạn': 7,
+    'Gia hạn': 12,
     'Chuyển mục đích không xin phép': 7,
     'Chuyển mục đích': 7,
     'Đính chính GCN': 7,
@@ -338,10 +338,20 @@ export const detectProcedureId = (code?: string | null, recordType?: string | nu
   const codeStr = (code || '').trim().toUpperCase();
   const typeStr = (recordType || '').trim().toUpperCase();
 
-  // 1. Check direct prefix matching for 1.x, 2.x, 3.x
-  if (codeStr.startsWith('1.') || typeStr.startsWith('1.')) return '1.1';
-  if (codeStr.startsWith('2.') || typeStr.startsWith('2.')) return '2.1';
-  if (codeStr.startsWith('3.') || typeStr.startsWith('3.')) return '3.1.1';
+  // 1. Try exact procedure ID match or ID prefix match (sorted by ID length descending)
+  const sortedProcs = [...PROCEDURE_CATALOG].sort((a, b) => b.id.length - a.id.length);
+  for (const proc of sortedProcs) {
+    const pId = proc.id.toUpperCase();
+    if (codeStr === pId || typeStr === pId ||
+        codeStr.startsWith(pId + ' ') || typeStr.startsWith(pId + ' ') ||
+        codeStr.startsWith(pId + '-') || typeStr.startsWith(pId + '-') ||
+        codeStr.startsWith(pId + '_') || typeStr.startsWith(pId + '_') ||
+        codeStr.startsWith(pId + ':') || typeStr.startsWith(pId + ':') ||
+        codeStr.startsWith(pId + '.') || typeStr.startsWith(pId + '.') ||
+        typeStr.startsWith(proc.shortName.toUpperCase()) || typeStr.startsWith(proc.name.toUpperCase())) {
+      return proc.id;
+    }
+  }
 
   // 2. Check clear Survey (Đo đạc) prefixes: YC, YCDD, TD, TL, CM, DD
   if (codeStr.startsWith('YC-') || codeStr.startsWith('YCDD-') || codeStr.startsWith('YC_') || codeStr.startsWith('YC/') || /^YC[0-9\-_\/]/.test(codeStr)) {
@@ -357,20 +367,18 @@ export const detectProcedureId = (code?: string | null, recordType?: string | nu
   if (codeStr.startsWith('CV-') || codeStr.startsWith('CV_') || codeStr.startsWith('CONGVAN')) return '1.2';
   if (codeStr.startsWith('CCDL-') || codeStr.startsWith('CCDL_')) return '1.1';
 
-  // 4. Check procedure catalog definition
+  // 4. Check procedure catalog definition prefixes and keywords
   for (const proc of PROCEDURE_CATALOG) {
-    if (codeStr.includes(proc.id) || typeStr.startsWith(proc.id)) {
+    if (codeStr.includes(proc.id) || typeStr.includes(proc.id)) {
       return proc.id;
     }
     for (const prefix of proc.prefixes) {
       const pUpper = prefix.toUpperCase();
-      // Match if prefix is long or matched with boundary (start with prefix, or prefix + delimiter)
       if (pUpper.length > 2) {
         if (codeStr.includes(pUpper) || typeStr.includes(pUpper)) {
           return proc.id;
         }
       } else {
-        // Short 2-letter prefix: check exact prefix or boundary to avoid matching inside random words
         if (codeStr.startsWith(pUpper + '-') || codeStr.startsWith(pUpper + '_') || codeStr.startsWith(pUpper + '.') || codeStr.startsWith(pUpper + '/') ||
             typeStr.startsWith(pUpper + ' ') || typeStr.startsWith(pUpper + '-') || typeStr.startsWith(pUpper + '.')) {
           return proc.id;
@@ -385,10 +393,28 @@ export const detectProcedureId = (code?: string | null, recordType?: string | nu
     }
   }
 
-  // 5. Check keywords in text
-  if (typeStr.includes('SAO LỤC') || typeStr.includes('CÔNG VĂN') || typeStr.includes('LƯU TRỮ')) return '1.1';
-  if (typeStr.includes('TRÍCH ĐO') || typeStr.includes('ĐO ĐẠC') || typeStr.includes('TRÍCH LỤC') || typeStr.includes('CẮM MỐC') || typeStr.includes('SỐ THỬA')) return '2.1';
-  if (typeStr.includes('CHUYỂN NHƯỢNG') || typeStr.includes('TẶNG CHO') || typeStr.includes('THỪA KẾ') || typeStr.includes('CẤP ĐỔI') || typeStr.includes('CẤP LẠI') || typeStr.includes('THẾ CHẤP')) return '3.1.1';
+  // 5. Specific keyword fallback
+  if (typeStr.includes('CẮM MỐC')) return '2.4';
+  if (typeStr.includes('DUYỆT ĐƠN') || typeStr.includes('CUNG CẤP SỐ THỬA') || typeStr.includes('SỐ THỬA')) return '2.3';
+  if (typeStr.includes('TRÍCH ĐO TÁCH') || typeStr.includes('TRÍCH ĐO TÁCH - HỢP THỬA')) return '2.5';
+  if (typeStr.includes('TRÍCH ĐO') || typeStr.includes('ĐO ĐẠC')) return '2.2';
+  if (typeStr.includes('TRÍCH LỤC')) return '2.1';
+  if (typeStr.includes('CÔNG VĂN')) return '1.2';
+  if (typeStr.includes('SAO LỤC') || typeStr.includes('LƯU TRỮ')) return '1.1';
+  if (typeStr.includes('GIA HẠN')) return '3.5.1';
+  if (typeStr.includes('ĐÍNH CHÍNH')) return '3.7.1';
+  if (typeStr.includes('THAY ĐỔI THÔNG TIN') || typeStr.includes('ĐỔI THÔNG TIN')) return '3.7.2';
+  if (typeStr.includes('XÓA THẾ CHẤP') || typeStr.includes('XÓA GDBD')) return '3.8.2';
+  if (typeStr.includes('THẾ CHẤP') || typeStr.includes('GDBD')) return '3.8.1';
+  if (typeStr.includes('CHUYỂN MỤC ĐÍCH')) return '3.6.1';
+  if (typeStr.includes('TÁCH THỬA') || typeStr.includes('HỢP THỬA') || typeStr.includes('TÁCH - HỢP THỬA')) return '3.4.1';
+  if (typeStr.includes('CẤP ĐỔI')) return '3.2.1';
+  if (typeStr.includes('CẤP LẠI')) return '3.3.1';
+  if (typeStr.includes('CHUYỂN NHƯỢNG') || typeStr.includes('TẶNG CHO') || typeStr.includes('THỪA KẾ')) return '3.1.1';
+
+  if (codeStr.startsWith('1.') || typeStr.startsWith('1.')) return '1.1';
+  if (codeStr.startsWith('2.') || typeStr.startsWith('2.')) return '2.1';
+  if (codeStr.startsWith('3.') || typeStr.startsWith('3.')) return '3.1.1';
 
   return '3.9.9';
 };
@@ -420,30 +446,36 @@ export const getCanonicalRecordType = (type?: string | null, code?: string | nul
 };
 
 // Check if a record type belongs to Archive module (Lưu trữ - Mã 1.x)
-export const isArchiveRecordType = (type?: string | null, code?: string | null): boolean => {
-  const c = (code || '').trim().toUpperCase();
-  const t = (type || '').trim().toUpperCase();
+export const isArchiveRecordType = (param1?: string | null, param2?: string | null): boolean => {
+  const s1 = (param1 || '').trim().toUpperCase();
+  const s2 = (param2 || '').trim().toUpperCase();
 
-  if (c.startsWith('1.') || t.startsWith('1.')) return true;
-  if (c.startsWith('SL-') || c.startsWith('CV-') || c.startsWith('CCDL-')) return true;
-  if (t.includes('SAO LỤC') || t.includes('CÔNG VĂN') || t.includes('LƯU TRỮ') || t.includes('CUNG CẤP THÔNG TIN')) return true;
+  if (s1.startsWith('1.') || s2.startsWith('1.')) return true;
+  if (s1.startsWith('SL-') || s1.startsWith('CV-') || s1.startsWith('CCDL-') || s2.startsWith('SL-') || s2.startsWith('CV-') || s2.startsWith('CCDL-')) return true;
+  if (s1.includes('SAO LỤC') || s1.includes('CÔNG VĂN') || s1.includes('LƯU TRỮ') || s1.includes('CUNG CẤP THÔNG TIN') || s1.includes('CUNG CẤP TÀI LIỆU') || s1.includes('CCDL')) return true;
+  if (s2.includes('SAO LỤC') || s2.includes('CÔNG VĂN') || s2.includes('LƯU TRỮ') || s2.includes('CUNG CẤP THÔNG TIN') || s2.includes('CUNG CẤP TÀI LIỆU') || s2.includes('CCDL')) return true;
 
-  const procId = detectProcedureId(c, t);
-  return procId.startsWith('1.');
+  const procId1 = detectProcedureId(s1, s2);
+  const procId2 = detectProcedureId(s2, s1);
+  return procId1.startsWith('1.') || procId2.startsWith('1.');
 };
 
 // Check if a record type belongs to Survey module (Đo đạc - Mã 2.x)
-export const isDoDacRecordType = (type?: string | null, code?: string | null): boolean => {
-  const c = (code || '').trim().toUpperCase();
-  const t = (type || '').trim().toUpperCase();
+export const isDoDacRecordType = (param1?: string | null, param2?: string | null): boolean => {
+  const s1 = (param1 || '').trim().toUpperCase();
+  const s2 = (param2 || '').trim().toUpperCase();
 
-  if (c.startsWith('2.') || t.startsWith('2.')) return true;
-  if (c.startsWith('YC-') || c.startsWith('YCDD-') || c.startsWith('YC_') || c.startsWith('YC/') || /^YC[0-9\-_\/]/.test(c)) return true;
-  if (c.startsWith('TL-') || c.startsWith('TD-') || c.startsWith('CM-') || c.startsWith('DD-')) return true;
-  if (t.includes('ĐO ĐẠC') || t.includes('TRÍCH ĐO') || t.includes('TRÍCH LỤC') || t.includes('CẮM MỐC') || t.includes('DUYỆT ĐƠN') || t.includes('SỐ THỬA')) return true;
+  if (s1.startsWith('2.') || s2.startsWith('2.')) return true;
+  if (s1.startsWith('YC-') || s1.startsWith('YCDD-') || s1.startsWith('YC_') || s1.startsWith('YC/') || /^YC[0-9\-_\/]/.test(s1) ||
+      s2.startsWith('YC-') || s2.startsWith('YCDD-') || s2.startsWith('YC_') || s2.startsWith('YC/') || /^YC[0-9\-_\/]/.test(s2)) return true;
+  if (s1.startsWith('TL-') || s1.startsWith('TD-') || s1.startsWith('CM-') || s1.startsWith('DD-') ||
+      s2.startsWith('TL-') || s2.startsWith('TD-') || s2.startsWith('CM-') || s2.startsWith('DD-')) return true;
+  if (s1.includes('ĐO ĐẠC') || s1.includes('TRÍCH ĐO') || s1.includes('TRÍCH LỤC') || s1.includes('CẮM MỐC') || s1.includes('DUYỆT ĐƠN') || s1.includes('SỐ THỬA') ||
+      s2.includes('ĐO ĐẠC') || s2.includes('TRÍCH ĐO') || s2.includes('TRÍCH LỤC') || s2.includes('CẮM MỐC') || s2.includes('DUYỆT ĐƠN') || s2.includes('SỐ THỬA')) return true;
 
-  const procId = detectProcedureId(c, t);
-  return procId.startsWith('2.');
+  const procId1 = detectProcedureId(s1, s2);
+  const procId2 = detectProcedureId(s2, s1);
+  return procId1.startsWith('2.') || procId2.startsWith('2.');
 };
 
 // Check if a record type belongs to Registration module (Đăng ký - Mã 3.x)

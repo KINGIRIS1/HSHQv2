@@ -3,6 +3,7 @@
 export * from './apiCore';
 export * from './apiSystem';
 export * from './apiRecords';
+export * from './apiDangKy';
 export * from './apiPeople';
 export * from './apiContracts';
 export * from './apiExcerpts';

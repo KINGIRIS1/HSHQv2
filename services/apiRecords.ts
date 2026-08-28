@@ -22,18 +22,19 @@ const RECORD_DB_COLUMNS = [
 export const getTargetTable = (record: Partial<RecordFile>): 'dangky_records' | 'land_records' | 'luutru_records' => {
     const code = (record.code || '').trim();
     const type = (record.recordType || '').trim();
+    const content = (record.content || '').trim();
 
-    if (code.startsWith('1.') || isArchiveRecordType(type, code)) return 'luutru_records';
+    if (code.startsWith('1.') || isArchiveRecordType(type, code) || isArchiveRecordType(content) || record.sourceTable === 'luutru_records' || record.sourceTable === 'archive_records') return 'luutru_records';
+    if (code.startsWith('3.') || isDangKyRecordType(type, code) || isDangKyRecordType(content) || record.sourceTable === 'dangky_records') return 'dangky_records';
     if (code.startsWith('2.') || isDoDacRecordType(type, code)) return 'land_records';
-    if (code.startsWith('3.') || isDangKyRecordType(type, code)) return 'dangky_records';
 
-    if (record.sourceTable === 'luutru_records' || record.sourceTable === 'archive_records') return 'luutru_records';
-    if (record.sourceTable === 'dangky_records') return 'dangky_records';
     if (record.sourceTable === 'land_records') return 'land_records';
 
-    // Check if recordType or content is an archive type
     if (isArchiveRecordType(record.recordType) || isArchiveRecordType(record.content)) {
         return 'luutru_records';
+    }
+    if (isDangKyRecordType(record.recordType) || isDangKyRecordType(record.content)) {
+        return 'dangky_records';
     }
 
     if (record.id) {
@@ -41,10 +42,8 @@ export const getTargetTable = (record: Partial<RecordFile>): 'dangky_records' | 
         const found = cached.find(r => r.id === record.id);
         if (found) {
             if (found.sourceTable === 'luutru_records' || found.sourceTable === 'archive_records') return 'luutru_records';
-            if (found.sourceTable === 'dangky_records' || found.sourceTable === 'land_records') return found.sourceTable;
-            if (isArchiveRecordType(found.recordType) || isArchiveRecordType(found.content)) {
-                return 'luutru_records';
-            }
+            if (found.sourceTable === 'dangky_records' || isDangKyRecordType(found.recordType, found.code)) return 'dangky_records';
+            if (found.sourceTable === 'land_records') return 'land_records';
         }
     }
     return 'land_records';
@@ -402,7 +401,6 @@ const syncCacheOnBatchUpdate = (batchUpdates: Partial<RecordFile>[]) => {
 };
 
 export const createRecordApi = async (record: RecordFile): Promise<RecordFile | null> => {
-    if (!isConfigured) return record;
     let recordToSave: RecordFile = record;
     try {
         let finalCode = record.code;
@@ -418,6 +416,17 @@ export const createRecordApi = async (record: RecordFile): Promise<RecordFile | 
         }
         
         const targetTable = getTargetTable(recordToSave);
+        if (targetTable === 'dangky_records') {
+            const { saveDangKyRecordApi } = await import('./apiDangKy');
+            const saved = await saveDangKyRecordApi(recordToSave as any);
+            if (saved) {
+                const result = { ...recordToSave, ...saved, sourceTable: 'dangky_records' } as unknown as RecordFile;
+                syncCacheOnCreate(result);
+                return result;
+            }
+        }
+
+        if (!isConfigured) return recordToSave;
         const payload = sanitizeData(recordToSave, RECORD_DB_COLUMNS);
         let { data, error } = await supabase.from(targetTable).insert([payload]).select();
         
@@ -456,9 +465,19 @@ export const createRecordApi = async (record: RecordFile): Promise<RecordFile | 
 };
 
 export const updateRecordApi = async (record: RecordFile): Promise<RecordFile | null> => {
-    if (!isConfigured) return record;
     try {
         const targetTable = getTargetTable(record);
+        if (targetTable === 'dangky_records') {
+            const { saveDangKyRecordApi } = await import('./apiDangKy');
+            const saved = await saveDangKyRecordApi(record as any);
+            if (saved) {
+                const result = { ...record, ...saved, sourceTable: 'dangky_records' } as unknown as RecordFile;
+                syncCacheOnUpdate(result);
+                return result;
+            }
+        }
+
+        if (!isConfigured) return record;
         const payload = sanitizeData(record, RECORD_DB_COLUMNS);
         let { data, error } = await supabase.from(targetTable).update(payload).eq('id', record.id).select();
         
@@ -497,13 +516,26 @@ export const updateRecordApi = async (record: RecordFile): Promise<RecordFile | 
 };
 
 export const updateRecordFieldsApi = async (id: string, fields: Partial<RecordFile>): Promise<RecordFile | null> => {
-    if (!isConfigured) {
-        const fallbackRecord = { id, ...fields } as RecordFile;
-        syncCacheOnUpdate(fallbackRecord);
-        return fallbackRecord;
-    }
     try {
         const targetTable = getTargetTable({ id, ...fields });
+        if (targetTable === 'dangky_records') {
+            const { fetchDangKyRecords, saveDangKyRecordApi } = await import('./apiDangKy');
+            const all = await fetchDangKyRecords();
+            const existing = all.find(r => r.id === id);
+            const updated = existing ? { ...existing, ...fields } : { id, ...fields };
+            const saved = await saveDangKyRecordApi(updated as any);
+            if (saved) {
+                const result = { ...updated, ...saved, sourceTable: 'dangky_records' } as unknown as RecordFile;
+                syncCacheOnUpdate(result);
+                return result;
+            }
+        }
+
+        if (!isConfigured) {
+            const fallbackRecord = { id, ...fields } as RecordFile;
+            syncCacheOnUpdate(fallbackRecord);
+            return fallbackRecord;
+        }
         const payload = sanitizeData({ id, ...fields } as any, RECORD_DB_COLUMNS);
         delete payload.id;
         let { data, error } = await supabase.from(targetTable).update(payload).eq('id', id).select();

@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { RecordFile, RecordStatus, Employee, User, UserRole, Message, RecordStatusLog } from './types';
 import { DEFAULT_WARDS as STATIC_WARDS, isArchiveRecordType, STATUS_LABELS, APP_VERSION, getNormalizedWard, getCanonicalRecordType } from './constants';
+import { procedureHasStep } from './services/apiWorkflow';
 import { isUserAdminOrSubadmin, isUserTeamLeader, isUserOneDoor, isUserEmployee, canUserPerformGeneralAction } from './constants/permissions';
 import Login from './components/Login'; 
 import MainLayout from './components/layout/MainLayout';
@@ -836,7 +837,14 @@ function App() {
           return; 
       }
       if (record.status === RecordStatus.ASSIGNED || record.status === RecordStatus.IN_PROGRESS) {
-          // Các loại đi thẳng sang trình kiểm tra (bỏ qua bước trung gian là đã thực hiện)
+          const hasCheckStep = procedureHasStep(record, 'trinh_kiem_tra');
+          if (!hasCheckStep) {
+              // Bỏ qua trình kiểm tra, chuyển thẳng sang Trình ký duyệt (Áp dụng cho Lưu trữ và các thủ tục đã loại bỏ Trình kiểm tra tại SLA)
+              setSubmitTargetRecords([record]);
+              setIsSubmitModalOpen(true);
+              return;
+          }
+          // Các loại có bước kiểm tra: đi sang trình kiểm tra (bỏ qua bước trung gian là đã thực hiện)
           setSubmitTargetRecords([record]);
           setIsSubmitCheckModalOpen(true);
           return;
@@ -850,7 +858,11 @@ function App() {
       const flow = [RecordStatus.RECEIVED, RecordStatus.ASSIGNED, RecordStatus.IN_PROGRESS, RecordStatus.COMPLETED_WORK, RecordStatus.PENDING_CHECK, RecordStatus.CHECKED, RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER];
       const idx = flow.indexOf(record.status);
       if (idx < flow.length - 1) {
-          const nextStatus = flow[idx + 1];
+          let nextStatus = flow[idx + 1];
+          const hasCheckStep = procedureHasStep(record, 'trinh_kiem_tra');
+          if (!hasCheckStep && (nextStatus === RecordStatus.PENDING_CHECK || nextStatus === RecordStatus.CHECKED)) {
+              nextStatus = RecordStatus.PENDING_SIGN;
+          }
           if (nextStatus === RecordStatus.HANDOVER) {
               // Bắt buộc chốt đợt, không được giao lẻ!
               setSelectedRecordIds(new Set([record.id]));

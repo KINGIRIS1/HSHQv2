@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import * as XLSX from "xlsx-js-style";
 import { getShortRecordType, isArchiveRecordType } from "../constants";
+import { procedureHasStep } from "../services/apiWorkflow";
 import { confirmAction, cleanSyncNotes, extractBatchNumber } from "../utils/appHelpers";
 import { updateRecordApi, fetchContracts } from "../services/api";
 import {
@@ -1671,7 +1672,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
 
                               {/* Logic nút chuyển trạng thái theo từng Tab */}
                               {activeTab === "pending" &&
-                                (isArchiveRecordType(r.recordType) ? (
+                                (!procedureHasStep(r, 'trinh_kiem_tra') ? (
                                   <button
                                     onClick={() => handleForwardToSign(r)}
                                     title="Trình ký"
@@ -1843,7 +1844,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                           )}
 
                           {activeTab === "pending" &&
-                            (isArchiveType ? (
+                            (!procedureHasStep(r, 'trinh_kiem_tra') ? (
                               <button
                                 onClick={() => handleForwardToSign(r)}
                                 className="px-2.5 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold flex items-center gap-1"

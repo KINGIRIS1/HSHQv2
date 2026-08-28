@@ -32,6 +32,7 @@ import {
 } from '../utils/appHelpers';
 import { isDangKyStepOverdue, isDangKyStepApproaching } from '../utils/stepDeadlineEngine';
 import { detectProcedureId, getShortRecordType, isDoDacRecordType, isArchiveRecordType } from '../constants/procedures';
+import { procedureHasStep } from '../services/apiWorkflow';
 import { addActivityLog } from '../services/activityLogService';
 import { saveDangKyRecordsBatchApi } from '../services/apiDangKy';
 
@@ -895,7 +896,12 @@ const RegistrationRecords: React.FC<RegistrationRecordsProps> = ({ currentUser, 
         } else if (normStatus === 'Chờ kiểm tra' || nextStatus === 'Chờ ký duyệt') {
             setIsSubmitSignModalOpen(true);
         } else if (nextStatus === 'Chờ kiểm tra') {
-            setIsSubmitCheckModalOpen(true);
+            if (!procedureHasStep(r, 'trinh_kiem_tra')) {
+                // Thủ tục không có bước kiểm tra, chuyển thẳng sang Trình ký duyệt
+                setIsSubmitSignModalOpen(true);
+            } else {
+                setIsSubmitCheckModalOpen(true);
+            }
         } else if (['Thẩm định', 'Phiếu chuyển thuế', 'Chờ In GCN'].includes(normStatus) || ['Thẩm định', 'Phiếu chuyển thuế', 'Chờ In GCN'].includes(nextStatus)) {
             setAssignStaffModalOpen(true);
         } else {

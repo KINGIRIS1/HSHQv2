@@ -1,6 +1,6 @@
 
 import { RecordFile, RecordStatus, Employee, DangKyRecord } from '../types';
-import { detectProcedureId, getProcedureById, DANG_KY_DEADLINE_MAP } from '../constants/procedures';
+import { detectProcedureId, getProcedureById, DANG_KY_DEADLINE_MAP, isDangKyRecordType, isArchiveRecordType, isDoDacRecordType } from '../constants/procedures';
 
 // --- HÀM TIỆN ÍCH XỬ LÝ CHUỖI TIẾNG VIỆT ---
 export function removeVietnameseTones(str: string): string {
@@ -649,16 +649,17 @@ export function processAssignmentTimelineCheck(
 export function getDepartmentForRecord(r: RecordFile): string {
     const code = (r.code || '').trim();
     const type = (r.recordType || '').trim();
+    const content = (r.content || '').trim();
     const procId = detectProcedureId(code, type);
 
-    if (code.startsWith('1.') || type.startsWith('1.') || procId.startsWith('1.')) {
+    if (code.startsWith('1.') || type.startsWith('1.') || procId.startsWith('1.') || isArchiveRecordType(type, code) || isArchiveRecordType(content)) {
         return 'Tổ Lưu trữ';
     }
-    if (code.startsWith('2.') || type.startsWith('2.') || procId.startsWith('2.')) {
-        return 'Tổ Đo đạc';
-    }
-    if (code.startsWith('3.') || type.startsWith('3.') || procId.startsWith('3.')) {
+    if (code.startsWith('3.') || type.startsWith('3.') || procId.startsWith('3.') || isDangKyRecordType(type, code) || isDangKyRecordType(content) || r.sourceTable === 'dangky_records') {
         return 'Tổ Cấp giấy';
+    }
+    if (code.startsWith('2.') || type.startsWith('2.') || procId.startsWith('2.') || isDoDacRecordType(type, code)) {
+        return 'Tổ Đo đạc';
     }
 
     if (r.returnHandoverDept) {

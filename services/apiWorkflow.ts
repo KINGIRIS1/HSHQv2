@@ -1,5 +1,5 @@
 import { WorkflowStep, ProcedureWorkflow } from '../types';
-import { PROCEDURE_CATALOG } from '../constants/procedures';
+import { PROCEDURE_CATALOG, detectProcedureId, isArchiveRecordType } from '../constants/procedures';
 
 const STORAGE_KEY = 'APP_PROCEDURE_WORKFLOWS_V1';
 
@@ -253,6 +253,13 @@ export function saveProcedureWorkflow(workflow: ProcedureWorkflow): boolean {
     const all = getAllProcedureWorkflows();
     all[workflow.procedureId] = workflow;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+    
+    // Dispatch event to synchronize timeline modals & views across the app
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('workflow_config_updated', { 
+        detail: { procedureId: workflow.procedureId, workflow } 
+      }));
+    }
     return true;
   } catch (e) {
     console.error('Error saving workflow:', e);
@@ -283,9 +290,64 @@ export function resetProcedureWorkflowToDefault(procedureId: string): ProcedureW
     };
     all[procedureId] = newWorkflow;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+
+    // Dispatch event to synchronize timeline modals & views across the app
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('workflow_config_updated', { 
+        detail: { procedureId, workflow: newWorkflow } 
+      }));
+    }
     return newWorkflow;
   } catch (e) {
     console.error('Error resetting workflow:', e);
     return getProcedureWorkflow(procedureId);
   }
+}
+
+/**
+ * Checks if a specific step (e.g. 'trinh_kiem_tra') is configured and active in the procedure SLA workflow.
+ */
+export function procedureHasStep(recordOrTypeOrProcId: any, stepCode: string = 'trinh_kiem_tra'): boolean {
+  if (!recordOrTypeOrProcId) return false;
+
+  let procId: string = '';
+  if (typeof recordOrTypeOrProcId === 'string') {
+    const s = recordOrTypeOrProcId.trim();
+    if (s.startsWith('1.') || s === '1.1' || s === '1.2' || isArchiveRecordType(s)) {
+      procId = (s.includes('1.2') || s.toUpperCase().includes('CÔNG VĂN') || s.toUpperCase().startsWith('CV')) ? '1.2' : '1.1';
+    } else {
+      procId = detectProcedureId(s, s);
+    }
+  } else if (typeof recordOrTypeOrProcId === 'object') {
+    const rec = recordOrTypeOrProcId;
+    const codeStr = (rec.code || rec.so_hieu || '').trim();
+    const typeStr = (rec.recordType || rec.type || '').trim();
+    const sourceTable = rec.sourceTable || '';
+
+    if (isArchiveRecordType(typeStr, codeStr) || sourceTable === 'luutru_records' || typeStr === 'saoluc' || typeStr === 'congvan') {
+      procId = (typeStr.includes('Công văn') || typeStr === 'congvan' || codeStr.toUpperCase().startsWith('CV')) ? '1.2' : '1.1';
+    } else {
+      procId = detectProcedureId(codeStr, typeStr);
+    }
+  }
+
+  if (!procId) procId = '1.1';
+
+  const wf = getProcedureWorkflow(procId);
+  if (!wf || !wf.steps || wf.steps.length === 0) {
+    // If no custom workflow is found, fallback based on procedure prefix
+    if (procId.startsWith('1.')) return false; // Archive default has no trinh_kiem_tra
+    if (procId === '2.3' || procId === '3.8.1' || procId === '3.8.2') return false;
+    return true;
+  }
+
+  return wf.steps.some(s => {
+    if (s.active === false) return false;
+    const c = (s.stepCode || '').toLowerCase();
+    const n = (s.stepName || '').toLowerCase();
+    if (stepCode === 'trinh_kiem_tra') {
+      return c === 'trinh_kiem_tra' || c === 'kiem_tra' || n.includes('kiểm tra');
+    }
+    return c === stepCode.toLowerCase() || n.includes(stepCode.toLowerCase());
+  });
 }

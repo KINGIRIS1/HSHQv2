@@ -121,22 +121,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
     "director_completed",
   ].includes(currentView || "");
 
-  let allowedRecordTypes: string[] = [];
-  if (isOtherView) {
-    allowedRecordTypes = ['CMD', 'Thi hành án', 'Tòa án'];
-  } else if (isArchiveView) {
-    allowedRecordTypes = [...RECORD_TYPES_LuuTru];
-  } else if (isMeasurementView) {
-    allowedRecordTypes = [...RECORD_TYPES_DoDac];
-  } else {
-    allowedRecordTypes = [
-      ...RECORD_TYPES_LuuTru,
-      ...RECORD_TYPES_DoDac,
-      'CMD',
-      'Thi hành án',
-      'Tòa án'
-    ];
-  }
+  let allowedRecordTypes: string[] = [...EXTENDED_RECORD_TYPES];
 
   if (formData.recordType) {
     const currentCanonical = getCanonicalRecordType(formData.recordType, formData.code);

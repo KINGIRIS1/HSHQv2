@@ -725,3 +725,192 @@ export const exportOverdueStatsToExcel = (records: any[], employees: Employee[],
     const fileName = `Danh_Sach_Tre_Han_${filterType}_${new Date().getTime()}.xlsx`;
     XLSX.writeFile(wb, fileName);
 };
+
+export const exportDangKyReportToExcel = async (
+    records: any[],
+    fromDateStr: string,
+    toDateStr: string,
+    ward: string,
+    employees: Employee[],
+    customTitle?: string
+) => {
+    if (!records || records.length === 0) {
+        alert("Không có dữ liệu hồ sơ Đăng ký để xuất báo cáo.");
+        return;
+    }
+
+    const from = new Date(fromDateStr);
+    from.setHours(0, 0, 0, 0);
+    const to = new Date(toDateStr);
+    to.setHours(23, 59, 59, 999);
+
+    const formatDate = (d: string | undefined | null) => {
+        if (!d) return '';
+        const date = new Date(d);
+        if (isNaN(date.getTime())) return '';
+        return `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getFullYear()}`;
+    };
+
+    const getEmpName = (idOrName?: string) => {
+        if (!idOrName) return '';
+        const emp = employees.find(e => e.id === idOrName);
+        return emp ? emp.name : idOrName;
+    };
+
+    const wb = XLSX.utils.book_new();
+
+    // 1. TỔNG HỢP THEO LOẠI THỦ TỤC
+    const procMap = new Map<string, { total: number; inProgress: number; completedOnTime: number; completedOverdue: number; overduePending: number; fee: number }>();
+    
+    records.forEach(r => {
+        const type = r.recordType || 'Chưa phân loại';
+        if (!procMap.has(type)) {
+            procMap.set(type, { total: 0, inProgress: 0, completedOnTime: 0, completedOverdue: 0, overduePending: 0, fee: 0 });
+        }
+        const stats = procMap.get(type)!;
+        stats.total++;
+        const fee = Number(r.feeAmount || r.price || 0) || 0;
+        stats.fee += fee;
+
+        const isDone = ['Đã giao 1 cửa', 'Đã trả kết quả', 'Hoàn thành'].includes(r.status);
+        const isWithdrawn = ['CSD rút HS', 'Trả hủy hồ sơ'].includes(r.status);
+
+        if (isDone) {
+            const dl = r.deadline ? new Date(r.deadline).getTime() : 0;
+            const comp = r.completedDate || r.resultReturnedDate ? new Date(r.completedDate || r.resultReturnedDate).getTime() : 0;
+            if (dl && comp && comp > dl) {
+                stats.completedOverdue++;
+            } else {
+                stats.completedOnTime++;
+            }
+        } else if (!isWithdrawn) {
+            const dl = r.deadline ? new Date(r.deadline).getTime() : 0;
+            const now = new Date().getTime();
+            if (dl && now > dl) {
+                stats.overduePending++;
+            } else {
+                stats.inProgress++;
+            }
+        }
+    });
+
+    const summaryRows = Array.from(procMap.entries()).map(([type, s], idx) => {
+        const onTimeRate = s.total > 0 ? `${(((s.completedOnTime + s.inProgress) / s.total) * 100).toFixed(1)}%` : '100%';
+        return [
+            idx + 1,
+            type,
+            s.total,
+            s.inProgress,
+            s.completedOnTime,
+            s.completedOverdue,
+            s.overduePending,
+            s.fee.toLocaleString('vi-VN'),
+            onTimeRate
+        ];
+    });
+
+    // 2. DANH SÁCH CHI TIẾT HỒ SƠ
+    const detailRows = records.map((r, idx) => {
+        const owners = Array.isArray(r.owners) ? r.owners.map((o: any) => o.name).filter(Boolean).join(', ') : (r.customerName || '');
+        const transferees = Array.isArray(r.transferees) ? r.transferees.map((t: any) => t.name).filter(Boolean).join(', ') : '';
+        const parties = transferees ? `${owners} -> ${transferees}` : owners;
+        const fee = Number(r.feeAmount || r.price || 0);
+
+        return [
+            idx + 1,
+            r.code || '',
+            parties,
+            r.landPlot || '',
+            r.mapSheet || '',
+            r.ward || '',
+            r.recordType || '',
+            formatDate(r.receivedDate),
+            formatDate(r.deadline),
+            r.status || '',
+            getEmpName(r.appraisalStaff || r.assignedTo),
+            getEmpName(r.taxFormStaff || r.taxKV7Staff),
+            getEmpName(r.printStaff),
+            fee > 0 ? fee.toLocaleString('vi-VN') : '0',
+            r.receiptNumber || r.invoiceNumber || '',
+            r.notes || ''
+        ];
+    });
+
+    // Tạo Sheet Báo Cáo Tổng Hợp
+    const wardTitle = ward && ward !== 'all' ? `ĐỊA BÀN: ${ward.toUpperCase()}` : 'TOÀN BỘ ĐỊA BÀN';
+    const dateTitle = fromDateStr === '1970-01-01' ? 'TẤT CẢ THỜI GIAN' : `TỪ NGÀY ${formatDate(fromDateStr)} ĐẾN NGÀY ${formatDate(toDateStr)}`;
+
+    const wsData = [
+        ["ỦY BAN NHÂN DÂN / VP ĐĂNG KÝ ĐẤT ĐAI", "", "", "", "", "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM"],
+        ["CHI NHÁNH VĂN PHÒNG ĐĂNG KÝ ĐẤT ĐAI", "", "", "", "", "Độc lập - Tự do - Hạnh phúc"],
+        [],
+        [customTitle || "BÁO CÁO KẾT QUẢ THỰC HIỆN THỦ TỤC ĐĂNG KÝ ĐẤT ĐAI & CẤP GCN"],
+        [`${wardTitle} - ${dateTitle}`],
+        [],
+        ["I. TỔNG HỢP THEO LOẠI THỦ TỤC ĐĂNG KÝ"],
+        ["STT", "Loại thủ tục đăng ký", "Tổng tiếp nhận", "Đang xử lý trong hạn", "Hoàn thành đúng hạn", "Hoàn thành trễ", "Quá hạn tồn đọng", "Tổng tiền thu (VNĐ)", "Tỷ lệ đúng hạn"],
+        ...summaryRows,
+        [],
+        ["II. DANH SÁCH CHI TIẾT HỒ SƠ ĐĂNG KÝ ĐẤT ĐAI"],
+        [
+            "STT", "Mã hồ sơ", "Chủ sử dụng / Nhận chuyển quyền", "Số thửa", "Số tờ", "Xã/Phường", 
+            "Loại thủ tục", "Ngày nhận", "Ngày hẹn", "Khâu hiện tại", "NV Thẩm định", "NV Thuế", "NV In GCN", 
+            "Lệ phí thu (VNĐ)", "Số chứng từ", "Ghi chú"
+        ],
+        ...detailRows,
+        [],
+        ["", "", "", "", "", "", "", "", "..., ngày ... tháng ... năm ..."],
+        ["", "NGƯỜI LẬP BÁO CÁO", "", "", "", "", "", "TRƯỞNG BỘ PHẬN ĐĂNG KÝ", ""],
+        ["", "(Ký, ghi rõ họ tên)", "", "", "", "", "", "(Ký, ghi rõ họ tên)", ""]
+    ];
+
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+    // Styling
+    const headerStyle = { 
+        font: { name: "Times New Roman", sz: 11, bold: true }, 
+        border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }, 
+        fill: { fgColor: { rgb: "D9E1F2" } }, 
+        alignment: { horizontal: "center", vertical: "center", wrapText: true } 
+    };
+    const cellStyle = { 
+        font: { name: "Times New Roman", sz: 10 }, 
+        border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } },
+        alignment: { vertical: "center", wrapText: true }
+    };
+    const centerStyle = { ...cellStyle, alignment: { horizontal: "center", vertical: "center" } };
+
+    // Format summary table header (Row 8)
+    for (let c = 0; c < 9; c++) {
+        const ref = XLSX.utils.encode_cell({ r: 7, c });
+        if (ws[ref]) ws[ref].s = headerStyle;
+    }
+    // Format detail table header (Row 12)
+    for (let c = 0; c < 16; c++) {
+        const ref = XLSX.utils.encode_cell({ r: 11, c });
+        if (ws[ref]) ws[ref].s = { ...headerStyle, fill: { fgColor: { rgb: "C6E0B4" } } };
+    }
+
+    ws['!cols'] = [
+        { wch: 6 },  // STT
+        { wch: 25 }, // Mã HS
+        { wch: 32 }, // Chủ sử dụng
+        { wch: 10 }, // Thửa
+        { wch: 10 }, // Tờ
+        { wch: 20 }, // Xã
+        { wch: 26 }, // Loại thủ tục
+        { wch: 13 }, // Ngày nhận
+        { wch: 13 }, // Ngày hẹn
+        { wch: 18 }, // Khâu
+        { wch: 18 }, // NV Thẩm định
+        { wch: 18 }, // NV Thuế
+        { wch: 18 }, // NV In GCN
+        { wch: 16 }, // Tiền thu
+        { wch: 16 }, // Số CT
+        { wch: 24 }  // Ghi chú
+    ];
+
+    XLSX.utils.book_append_sheet(wb, ws, "BaoCaoDangKy");
+    const fileName = `Bao_Cao_Dang_Ky_Dat_Dai_${new Date().toISOString().split('T')[0]}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+};
