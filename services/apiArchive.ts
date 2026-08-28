@@ -242,6 +242,13 @@ export const mapRecordFileToArchiveDb = (r: RecordFile | Partial<RecordFile>): a
 export const migrateArchiveRecordsFromLandRecords = async () => {
     // Di chuyển và đồng bộ dữ liệu hồ sơ lưu trữ từ land_records sang luutru_records
     if (!isConfigured) return;
+    if (typeof window !== 'undefined' && sessionStorage.getItem('archive_records_migrated_done')) {
+        return;
+    }
+    if (typeof window !== 'undefined') {
+        sessionStorage.setItem('archive_records_migrated_done', 'true');
+    }
+
     try {
         const { data: landData, error: fetchError } = await supabase
             .from('land_records')

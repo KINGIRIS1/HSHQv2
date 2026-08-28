@@ -40,36 +40,7 @@ export const useAppData = (currentUser: User | null) => {
 
     const loadData = useCallback(async () => {
         try {
-            // 1. Thử kết nối Server nội bộ (LAN Server / Express API) với timeout cực nhanh (500ms)
-            try {
-                const [recRes, empRes, userRes, holRes] = await Promise.all([
-                    fetch('/records', { signal: AbortSignal.timeout(500) }).then(r => r.ok ? r.json() : null).catch(() => null),
-                    fetch('/employees', { signal: AbortSignal.timeout(500) }).then(r => r.ok ? r.json() : null).catch(() => null),
-                    fetch('/users', { signal: AbortSignal.timeout(500) }).then(r => r.ok ? r.json() : null).catch(() => null),
-                    fetch('/holidays', { signal: AbortSignal.timeout(500) }).then(r => r.ok ? r.json() : null).catch(() => null),
-                ]);
-
-                if (recRes !== null || empRes !== null || userRes !== null) {
-                    const rawRecs = Array.isArray(recRes) ? recRes : (recRes?.records || []);
-                    const { migratedRecords } = migrateUnbatchedRecords(rawRecs);
-                    setRecords(migratedRecords);
-                    if (Array.isArray(empRes)) setEmployees(empRes);
-                    else if (empRes?.employees && Array.isArray(empRes.employees)) setEmployees(empRes.employees);
-                    
-                    if (Array.isArray(userRes)) setUsers(userRes);
-                    else if (userRes?.users && Array.isArray(userRes.users)) setUsers(userRes.users);
-
-                    if (Array.isArray(holRes)) setHolidays(holRes);
-                    else if (holRes?.holidays && Array.isArray(holRes.holidays)) setHolidays(holRes.holidays);
-
-                    setConnectionStatus('connected');
-                    return;
-                }
-            } catch (localErr) {
-                // Tiếp tục sang Supabase Cloud
-            }
-
-            // 2. Tải song song toàn bộ dữ liệu từ Supabase Cloud
+            // Tải song song toàn bộ dữ liệu từ Supabase Cloud
             const timeoutPromise = new Promise((_, reject) => 
                 setTimeout(() => reject(new Error("Timeout Supabase")), 10000)
             );

@@ -962,6 +962,13 @@ export const migrateMisplacedDangKyRecords = async () => {
     migrateLocalCacheMisplacedRecords();
 
     if (!isConfigured) return;
+    if (typeof window !== 'undefined' && sessionStorage.getItem('misplaced_records_migrated_done')) {
+        return;
+    }
+    if (typeof window !== 'undefined') {
+        sessionStorage.setItem('misplaced_records_migrated_done', 'true');
+    }
+
     try {
         // 1. Quét dangky_records
         const { data: dangkyData } = await supabase.from('dangky_records').select('*');
@@ -1135,6 +1142,13 @@ export const migrateLocalCacheMisplacedRecords = () => {
 
 export const recalibrateAllRecordDeadlinesInDb = async (holidays: any[] = []) => {
     if (!isConfigured) return;
+    if (typeof window !== 'undefined' && sessionStorage.getItem('recalibrated_deadlines_done')) {
+        return;
+    }
+    if (typeof window !== 'undefined') {
+        sessionStorage.setItem('recalibrated_deadlines_done', 'true');
+    }
+
     try {
         const { calculateDeadlineHelper } = await import('../utils/appHelpers');
         const tables: ('land_records' | 'dangky_records' | 'luutru_records')[] = ['land_records', 'dangky_records', 'luutru_records'];
@@ -1159,8 +1173,16 @@ export const recalibrateAllRecordDeadlinesInDb = async (holidays: any[] = []) =>
             if (updates.length > 0) {
                 console.log(`[Deadline Migration] Cập nhật ${updates.length} ngày hẹn chuẩn cho bảng ${tableName}.`);
                 totalUpdated += updates.length;
-                for (const updateItem of updates) {
-                    await supabase.from(tableName).update({ deadline: updateItem.deadline }).eq('id', updateItem.id);
+                
+                // Batch updates in parallel chunks of 10
+                const chunkSize = 10;
+                for (let i = 0; i < updates.length; i += chunkSize) {
+                    const chunk = updates.slice(i, i + chunkSize);
+                    await Promise.all(
+                        chunk.map(updateItem => 
+                            supabase.from(tableName).update({ deadline: updateItem.deadline }).eq('id', updateItem.id)
+                        )
+                    );
                 }
             }
         }

@@ -821,39 +821,36 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
 
   const handleConfirmSubmit = async (directorId: string) => {
     try {
+      const nowIso = new Date().toISOString();
       for (const record of submitTargetRecords) {
-        if (
-          record.recordType === "Sao lục" ||
-          record.recordType === "Công văn"
-        ) {
+        const isArchive = isArchiveRecordType(record.recordType, record.code) || record.sourceTable === "luutru_records" || (record.code || "").trim().startsWith("1.");
+        if (isArchive) {
           // Handle Archive Record
           const historyEntry = {
             action: "Trình ký",
             status: "pending_sign",
-            timestamp: new Date().toISOString(),
+            timestamp: nowIso,
             user: user.name,
           };
 
           const currentArchive = archiveRecords.find((r) => r.id === record.id);
-          if (currentArchive) {
-            const oldHistory = Array.isArray(currentArchive.data?.history)
-              ? currentArchive.data.history
-              : [];
-            const newHistory = [...oldHistory, historyEntry];
+          const oldHistory = Array.isArray(currentArchive?.data?.history)
+            ? currentArchive!.data.history
+            : [];
+          const newHistory = [...oldHistory, historyEntry];
 
-            await saveArchiveRecord({
-              id: record.id,
-              status: "pending_sign",
-              data: {
-                ...currentArchive.data,
-                history: newHistory,
-                submitted_to: directorId,
-              },
-            });
-          }
+          await saveArchiveRecord({
+            id: record.id,
+            status: "pending_sign",
+            data: {
+              ...(currentArchive?.data || {}),
+              history: newHistory,
+              submitted_to: directorId,
+              submissionDate: nowIso,
+            },
+          });
         } else {
           // Normal Record
-          const nowIso = new Date().toISOString();
           const updatedRecord = {
             ...record,
             status: RecordStatus.PENDING_SIGN,
@@ -1957,47 +1954,51 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
         isCheckMode={true}
         onConfirm={async (checkerId) => {
           try {
+            const nowIso = new Date().toISOString();
             for (const record of submitTargetRecords) {
-              if (
-                isArchiveRecordType(record.recordType)
-              ) {
+              const isArchive = isArchiveRecordType(record.recordType, record.code) || record.sourceTable === "luutru_records" || (record.code || "").trim().startsWith("1.");
+              if (isArchive) {
                 // Xử lý hồ sơ lưu trữ
                 const historyEntry = {
                   action: "Trình kiểm tra",
                   status: "pending_check",
-                  timestamp: new Date().toISOString(),
+                  timestamp: nowIso,
                   user: user.name,
                 };
 
                 const currentArchive = archiveRecords.find(
                   (r) => r.id === record.id,
                 );
-                if (currentArchive) {
-                  const oldHistory = Array.isArray(currentArchive.data?.history)
-                    ? currentArchive.data.history
-                    : [];
-                  const newHistory = [...oldHistory, historyEntry];
+                const oldHistory = Array.isArray(currentArchive?.data?.history)
+                  ? currentArchive!.data.history
+                  : [];
+                const newHistory = [...oldHistory, historyEntry];
 
-                  await saveArchiveRecord({
-                    id: record.id,
-                    status: "pending_check",
-                    data: {
-                      ...currentArchive.data,
-                      history: newHistory,
-                      checked_by: checkerId,
-                    },
-                  });
-                }
+                await saveArchiveRecord({
+                  id: record.id,
+                  status: "pending_check",
+                  data: {
+                    ...(currentArchive?.data || {}),
+                    history: newHistory,
+                    checked_by: checkerId,
+                    pendingCheckDate: nowIso,
+                  },
+                });
               } else {
                 // Hồ sơ Đo đạc thường
-                const nowIso = new Date().toISOString();
-                await onUpdateRecord?.({
+                const updatedRecord = {
                   ...record,
                   status: RecordStatus.PENDING_CHECK,
                   completedWorkDate: record.completedWorkDate || nowIso,
                   pendingCheckDate: nowIso,
                   checkedBy: checkerId,
-                });
+                };
+                if (onUpdateRecord) {
+                  await onUpdateRecord(updatedRecord);
+                } else {
+                  await updateRecordApi(updatedRecord);
+                  onUpdateStatus(record, RecordStatus.PENDING_CHECK);
+                }
               }
             }
 

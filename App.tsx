@@ -13,8 +13,8 @@ import { DEFAULT_VISIBLE_COLUMNS, confirmAction, COLUMN_DEFS, processAssignmentT
 import { exportReportToExcel, exportReturnedListToExcel } from './utils/excelExport';
 import { generateReport } from './services/geminiService';
 import { syncTemplatesFromCloud, generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from './services/docxService'; 
-import { updateRecordApi, saveEmployeeApi, saveUserApi, forceUpdateRecordsBatchApi, updateRecordsBatchById, migrateMisplacedDangKyRecords, recalibrateAllRecordDeadlinesInDb } from './services/api';
-import { migrateArchiveRecordsFromLandRecords } from './services/apiArchive';
+import { updateRecordApi, saveEmployeeApi, saveUserApi, forceUpdateRecordsBatchApi, updateRecordsBatchById, migrateMisplacedDangKyRecords } from './services/api';
+import { migrateArchiveRecordsFromLandRecords, saveArchiveRecord } from './services/apiArchive';
 import { ReturnOptionType } from './components/RejectReturnStepModal';
 import { addActivityLog } from './services/activityLogService';
 import * as XLSX from 'xlsx-js-style';
@@ -174,14 +174,16 @@ function App() {
       handleSaveEmployee, handleDeleteEmployee, handleDeleteAllData, handleUpdateUser, handleDeleteUser
   } = useAppData(currentUser);
 
-  // Run migration for archive records, misplaced dangky records & recalibrate deadlines
+  // Run background migration for archive records & misplaced dangky records asynchronously after UI render
   useEffect(() => {
       if (currentUser) {
-          migrateArchiveRecordsFromLandRecords();
-          migrateMisplacedDangKyRecords();
-          recalibrateAllRecordDeadlinesInDb(holidays);
+          const timer = setTimeout(() => {
+              migrateArchiveRecordsFromLandRecords();
+              migrateMisplacedDangKyRecords();
+          }, 1500);
+          return () => clearTimeout(timer);
       }
-  }, [currentUser, holidays]);
+  }, [currentUser]);
 
   // Khi có phiên bản mới hoặc admin phát hành bản mới, tự động mở lại popup cập nhật ngay lập tức
   useEffect(() => {
@@ -1721,12 +1723,35 @@ function App() {
                         submissionDate: nowIso,
                         submittedTo: directorId
                     }));
+
+                    // Cập nhật state tức thì (optimistic update) để giao diện hiển thị chuyển bước ngay lập tức
+                    setRecords(prev => prev.map(r => {
+                        const match = updates.find(u => u.id === r.id);
+                        return match ? match : r;
+                    }));
+
                     await updateRecordsBatchById(updates);
+
+                    // Đồng bộ thêm bảng lưu trữ nếu có hồ sơ thuộc module Lưu trữ
+                    for (const r of submitTargetRecords) {
+                        if (isArchiveRecordType(r.recordType, r.code) || r.sourceTable === 'luutru_records' || (r.code || '').trim().startsWith('1.')) {
+                            await saveArchiveRecord({
+                                id: r.id,
+                                status: 'pending_sign',
+                                data: {
+                                    submissionDate: nowIso,
+                                    submitted_to: directorId,
+                                    submittedTo: directorId
+                                }
+                            });
+                        }
+                    }
+
                     setToast({ type: 'success', message: `Đã trình ký ${updates.length} hồ sơ thành công!` });
                     setIsSubmitModalOpen(false);
                     setSubmitTargetRecords([]);
                     setSelectedRecordIds(new Set());
-                    loadData();
+                    await loadData();
                 } catch (error) {
                     console.error("Lỗi khi trình ký:", error);
                     setToast({ type: 'error', message: 'Có lỗi xảy ra khi trình ký.' });
@@ -1751,12 +1776,35 @@ function App() {
                         pendingCheckDate: nowIso,
                         checkedBy: checkerId
                     }));
+
+                    // Cập nhật state tức thì (optimistic update) để giao diện hiển thị chuyển bước ngay lập tức
+                    setRecords(prev => prev.map(r => {
+                        const match = updates.find(u => u.id === r.id);
+                        return match ? match : r;
+                    }));
+
                     await updateRecordsBatchById(updates);
+
+                    // Đồng bộ thêm bảng lưu trữ nếu có hồ sơ thuộc module Lưu trữ
+                    for (const r of submitTargetRecords) {
+                        if (isArchiveRecordType(r.recordType, r.code) || r.sourceTable === 'luutru_records' || (r.code || '').trim().startsWith('1.')) {
+                            await saveArchiveRecord({
+                                id: r.id,
+                                status: 'pending_check',
+                                data: {
+                                    pendingCheckDate: nowIso,
+                                    checked_by: checkerId,
+                                    checkedBy: checkerId
+                                }
+                            });
+                        }
+                    }
+
                     setToast({ type: 'success', message: `Đã trình kiểm tra ${updates.length} hồ sơ thành công!` });
                     setIsSubmitCheckModalOpen(false);
                     setSubmitTargetRecords([]);
                     setSelectedRecordIds(new Set());
-                    loadData();
+                    await loadData();
                 } catch (error) {
                     console.error("Lỗi khi trình kiểm tra:", error);
                     setToast({ type: 'error', message: 'Có lỗi xảy ra khi trình kiểm tra.' });
