@@ -27,6 +27,22 @@ export const STANDARD_STEPS_TEMPLATE = {
     { stepCode: 'hoan_thanh', stepName: 'Hoàn thành', slaHours: 8, slaDisplay: '1 ngày', excludeFromTotalSla: false },
     { stepCode: 'tra_ket_qua', stepName: 'Trả kết quả', slaHours: 4, slaDisplay: '4 giờ', excludeFromTotalSla: true },
   ],
+  DO_DAC_2_4: [
+    { stepCode: 'tiep_nhan', stepName: 'Tiếp nhận mới', slaHours: 8, slaDisplay: '1 ngày', excludeFromTotalSla: false },
+    { stepCode: 'dang_thuc_hien', stepName: 'Đang thực hiện', slaHours: 208, slaDisplay: '26 ngày', excludeFromTotalSla: false },
+    { stepCode: 'trinh_kiem_tra', stepName: 'Trình kiểm tra', slaHours: 8, slaDisplay: '1 ngày', excludeFromTotalSla: false },
+    { stepCode: 'trinh_ky', stepName: 'Trình ký duyệt', slaHours: 8, slaDisplay: '1 ngày', excludeFromTotalSla: false },
+    { stepCode: 'hoan_thanh', stepName: 'Hoàn thành', slaHours: 8, slaDisplay: '1 ngày', excludeFromTotalSla: false },
+    { stepCode: 'tra_ket_qua', stepName: 'Trả kết quả', slaHours: 4, slaDisplay: '4 giờ', excludeFromTotalSla: true },
+  ],
+  DO_DAC_2_5: [
+    { stepCode: 'tiep_nhan', stepName: 'Tiếp nhận mới', slaHours: 8, slaDisplay: '1 ngày', excludeFromTotalSla: false },
+    { stepCode: 'dang_thuc_hien', stepName: 'Đang thực hiện', slaHours: 208, slaDisplay: '26 ngày', excludeFromTotalSla: false },
+    { stepCode: 'trinh_kiem_tra', stepName: 'Trình kiểm tra', slaHours: 8, slaDisplay: '1 ngày', excludeFromTotalSla: false },
+    { stepCode: 'trinh_ky', stepName: 'Trình ký duyệt', slaHours: 8, slaDisplay: '1 ngày', excludeFromTotalSla: false },
+    { stepCode: 'hoan_thanh', stepName: 'Hoàn thành', slaHours: 8, slaDisplay: '1 ngày', excludeFromTotalSla: false },
+    { stepCode: 'tra_ket_qua', stepName: 'Trả kết quả', slaHours: 4, slaDisplay: '4 giờ', excludeFromTotalSla: true },
+  ],
   DO_DAC_2_3: [
     { stepCode: 'tiep_nhan', stepName: 'Tiếp nhận mới', slaHours: 8, slaDisplay: '1 ngày', excludeFromTotalSla: false },
     { stepCode: 'dang_thuc_hien', stepName: 'Đang thực hiện', slaHours: 72, slaDisplay: '9 ngày', excludeFromTotalSla: false },
@@ -163,6 +179,12 @@ export function getDefaultStepsForProcedure(procId: string): Partial<WorkflowSte
     }
     if (procId === '2.3' || procId.startsWith('2.3.')) {
       return STANDARD_STEPS_TEMPLATE.DO_DAC_2_3;
+    }
+    if (procId === '2.4' || procId.startsWith('2.4.')) {
+      return STANDARD_STEPS_TEMPLATE.DO_DAC_2_4;
+    }
+    if (procId === '2.5' || procId.startsWith('2.5.')) {
+      return STANDARD_STEPS_TEMPLATE.DO_DAC_2_5;
     }
     return STANDARD_STEPS_TEMPLATE.DO_DAC_2_2;
   }

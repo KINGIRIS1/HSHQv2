@@ -1132,3 +1132,42 @@ export const migrateLocalCacheMisplacedRecords = () => {
         console.warn('Lỗi khi migrate local cache misplaced records:', err);
     }
 };
+
+export const recalibrateAllRecordDeadlinesInDb = async (holidays: any[] = []) => {
+    if (!isConfigured) return;
+    try {
+        const { calculateDeadlineHelper } = await import('../utils/appHelpers');
+        const tables: ('land_records' | 'dangky_records' | 'luutru_records')[] = ['land_records', 'dangky_records', 'luutru_records'];
+        let totalUpdated = 0;
+
+        for (const tableName of tables) {
+            const { data, error } = await supabase.from(tableName).select('id, code, recordType, receivedDate, deadline');
+            if (error || !data || data.length === 0) continue;
+
+            const updates: { id: string; deadline: string }[] = [];
+            for (const item of data) {
+                if (!item.receivedDate || !item.recordType) continue;
+                const recDateStr = String(item.receivedDate).split('T')[0];
+                if (!recDateStr) continue;
+
+                const correctDeadline = calculateDeadlineHelper(item.recordType, recDateStr, holidays, item.code);
+                if (correctDeadline && item.deadline !== correctDeadline) {
+                    updates.push({ id: item.id, deadline: correctDeadline });
+                }
+            }
+
+            if (updates.length > 0) {
+                console.log(`[Deadline Migration] Cập nhật ${updates.length} ngày hẹn chuẩn cho bảng ${tableName}.`);
+                totalUpdated += updates.length;
+                for (const updateItem of updates) {
+                    await supabase.from(tableName).update({ deadline: updateItem.deadline }).eq('id', updateItem.id);
+                }
+            }
+        }
+        if (totalUpdated > 0) {
+            console.log(`[Deadline Migration] Đã đồng bộ lại thành công ${totalUpdated} ngày hẹn trả về chuẩn quy định.`);
+        }
+    } catch (err) {
+        console.warn('Lỗi khi recalibrate deadlines trong DB:', err);
+    }
+};

@@ -367,7 +367,23 @@ export const detectProcedureId = (code?: string | null, recordType?: string | nu
   if (codeStr.startsWith('CV-') || codeStr.startsWith('CV_') || codeStr.startsWith('CONGVAN')) return '1.2';
   if (codeStr.startsWith('CCDL-') || codeStr.startsWith('CCDL_')) return '1.1';
 
-  // 4. Check procedure catalog definition prefixes and keywords
+  // 4. Specific keyword checks (prioritize multi-word specific terms first)
+  if (typeStr.includes('CẮM MỐC') || typeStr.includes('TRÍCH ĐO CẮM MỐC')) return '2.4';
+  if (typeStr.includes('DUYỆT ĐƠN') || typeStr.includes('CUNG CẤP SỐ THỬA') || typeStr.includes('SỐ THỬA')) return '2.3';
+  if (typeStr.includes('TRÍCH ĐO TÁCH') || typeStr.includes('TRÍCH ĐO TÁCH - HỢP THỬA') || typeStr.includes('TÁCH HỢP THỬA ĐO ĐẠC')) return '2.5';
+  if (typeStr.includes('TRÍCH ĐO') || typeStr.includes('YÊU CẦU ĐO ĐẠC') || typeStr.includes('ĐO ĐẠC ĐỊA CHÍNH')) return '2.2';
+  if (typeStr.includes('TRÍCH LỤC')) return '2.1';
+  if (typeStr.includes('CÔNG VĂN')) return '1.2';
+  if (typeStr.includes('SAO LỤC') || typeStr.includes('LƯU TRỮ')) return '1.1';
+  if (typeStr.includes('GIA HẠN')) return '3.5.1';
+  if (typeStr.includes('ĐÍNH CHÍNH')) return '3.7.1';
+  if (typeStr.includes('THAY ĐỔI THÔNG TIN') || typeStr.includes('ĐỔI THÔNG TIN')) return '3.7.2';
+  if (typeStr.includes('XÓA THẾ CHẤP') || typeStr.includes('XÓA GDBD')) return '3.8.2';
+  if (typeStr.includes('THẾ CHẤP') || typeStr.includes('GDBD')) return '3.8.1';
+  if (typeStr.includes('CHUYỂN MỤC ĐÍCH')) return '3.6.1';
+  if (typeStr.includes('TÁCH THỬA') || typeStr.includes('HỢP THỬA') || typeStr.includes('TÁCH - HỢP THỬA')) return '3.4.1';
+
+  // 5. Check procedure catalog definition prefixes and keywords
   for (const proc of PROCEDURE_CATALOG) {
     if (codeStr.includes(proc.id) || typeStr.includes(proc.id)) {
       return proc.id;
@@ -392,22 +408,6 @@ export const detectProcedureId = (code?: string | null, recordType?: string | nu
       }
     }
   }
-
-  // 5. Specific keyword fallback
-  if (typeStr.includes('CẮM MỐC')) return '2.4';
-  if (typeStr.includes('DUYỆT ĐƠN') || typeStr.includes('CUNG CẤP SỐ THỬA') || typeStr.includes('SỐ THỬA')) return '2.3';
-  if (typeStr.includes('TRÍCH ĐO TÁCH') || typeStr.includes('TRÍCH ĐO TÁCH - HỢP THỬA')) return '2.5';
-  if (typeStr.includes('TRÍCH ĐO') || typeStr.includes('ĐO ĐẠC')) return '2.2';
-  if (typeStr.includes('TRÍCH LỤC')) return '2.1';
-  if (typeStr.includes('CÔNG VĂN')) return '1.2';
-  if (typeStr.includes('SAO LỤC') || typeStr.includes('LƯU TRỮ')) return '1.1';
-  if (typeStr.includes('GIA HẠN')) return '3.5.1';
-  if (typeStr.includes('ĐÍNH CHÍNH')) return '3.7.1';
-  if (typeStr.includes('THAY ĐỔI THÔNG TIN') || typeStr.includes('ĐỔI THÔNG TIN')) return '3.7.2';
-  if (typeStr.includes('XÓA THẾ CHẤP') || typeStr.includes('XÓA GDBD')) return '3.8.2';
-  if (typeStr.includes('THẾ CHẤP') || typeStr.includes('GDBD')) return '3.8.1';
-  if (typeStr.includes('CHUYỂN MỤC ĐÍCH')) return '3.6.1';
-  if (typeStr.includes('TÁCH THỬA') || typeStr.includes('HỢP THỬA') || typeStr.includes('TÁCH - HỢP THỬA')) return '3.4.1';
   if (typeStr.includes('CẤP ĐỔI')) return '3.2.1';
   if (typeStr.includes('CẤP LẠI')) return '3.3.1';
   if (typeStr.includes('CHUYỂN NHƯỢNG') || typeStr.includes('TẶNG CHO') || typeStr.includes('THỪA KẾ')) return '3.1.1';

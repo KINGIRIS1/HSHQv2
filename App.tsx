@@ -13,7 +13,7 @@ import { DEFAULT_VISIBLE_COLUMNS, confirmAction, COLUMN_DEFS, processAssignmentT
 import { exportReportToExcel, exportReturnedListToExcel } from './utils/excelExport';
 import { generateReport } from './services/geminiService';
 import { syncTemplatesFromCloud, generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from './services/docxService'; 
-import { updateRecordApi, saveEmployeeApi, saveUserApi, forceUpdateRecordsBatchApi, updateRecordsBatchById, migrateMisplacedDangKyRecords } from './services/api';
+import { updateRecordApi, saveEmployeeApi, saveUserApi, forceUpdateRecordsBatchApi, updateRecordsBatchById, migrateMisplacedDangKyRecords, recalibrateAllRecordDeadlinesInDb } from './services/api';
 import { migrateArchiveRecordsFromLandRecords } from './services/apiArchive';
 import { ReturnOptionType } from './components/RejectReturnStepModal';
 import { addActivityLog } from './services/activityLogService';
@@ -162,14 +162,6 @@ function App() {
   // Sync Templates
   useEffect(() => { syncTemplatesFromCloud(); }, []);
 
-  // Run migration for archive records & misplaced dangky records
-  useEffect(() => {
-      if (currentUser) {
-          migrateArchiveRecordsFromLandRecords();
-          migrateMisplacedDangKyRecords();
-      }
-  }, [currentUser]);
-
   // Save visible columns
   useEffect(() => { localStorage.setItem('visible_columns', JSON.stringify(visibleColumns)); }, [visibleColumns]);
 
@@ -181,6 +173,15 @@ function App() {
       loadData, handleAddOrUpdateRecord, handleDeleteRecord, handleImportRecords,
       handleSaveEmployee, handleDeleteEmployee, handleDeleteAllData, handleUpdateUser, handleDeleteUser
   } = useAppData(currentUser);
+
+  // Run migration for archive records, misplaced dangky records & recalibrate deadlines
+  useEffect(() => {
+      if (currentUser) {
+          migrateArchiveRecordsFromLandRecords();
+          migrateMisplacedDangKyRecords();
+          recalibrateAllRecordDeadlinesInDb(holidays);
+      }
+  }, [currentUser, holidays]);
 
   // Khi có phiên bản mới hoặc admin phát hành bản mới, tự động mở lại popup cập nhật ngay lập tức
   useEffect(() => {

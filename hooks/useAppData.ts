@@ -88,7 +88,7 @@ export const useAppData = (currentUser: User | null) => {
             const [recData, empData, userData, updateInfo, holidayData, permsData, deptPermsData] = await Promise.race([dataPromise, timeoutPromise]) as any;
 
             const rawRecList = Array.isArray(recData) ? recData : [];
-            const { migratedRecords } = migrateUnbatchedRecords(rawRecList);
+            const { migratedRecords } = migrateUnbatchedRecords(rawRecList, holidayData || holidays);
             setRecords(migratedRecords);
 
             setEmployees(empData);

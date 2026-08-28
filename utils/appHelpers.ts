@@ -815,7 +815,7 @@ export function extractBatchNumber(batch: number | string | null | undefined): n
  * Tự động gom các hồ sơ trước đây chưa chốt đợt (exportBatch rỗng/null)
  * hoặc hồ sơ có chữ "Đợt Cuối" thành đợt có số lớn nhất trong ngày.
  */
-export function migrateUnbatchedRecords(records: RecordFile[]): { migratedRecords: RecordFile[], hasChanges: boolean } {
+export function migrateUnbatchedRecords(records: RecordFile[], holidays: any[] = []): { migratedRecords: RecordFile[], hasChanges: boolean } {
     let hasChanges = false;
 
     // Pass 1: Build map of existing batches by date (YYYY-MM-DD)
@@ -857,6 +857,18 @@ export function migrateUnbatchedRecords(records: RecordFile[]): { migratedRecord
     const migratedRecords = records.map(r => {
         let currentBatch = r.exportBatch;
         let item = { ...r };
+
+        // Tự động kiểm tra và hiệu chỉnh Ngày hẹn trả (deadline) đúng theo quy định (nếu từng bị sai lệch trước đây)
+        if (item.receivedDate && item.recordType) {
+            const recDateStr = String(item.receivedDate).split('T')[0];
+            if (recDateStr) {
+                const correctDeadline = calculateDeadlineHelper(item.recordType, recDateStr, holidays, item.code, item.procedureId || undefined);
+                if (correctDeadline && item.deadline !== correctDeadline) {
+                    item.deadline = correctDeadline;
+                    hasChanges = true;
+                }
+            }
+        }
 
         // Tự động kiểm tra và chuẩn hóa trạng thái chuẩn theo mốc thời gian thực tế
         const resolvedStatus = resolveRecordStatus(item);
