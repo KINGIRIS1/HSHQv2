@@ -165,34 +165,26 @@ const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, e
       if (filterDept) {
           const normFilter = filterDept.toLowerCase();
           if (normFilter.includes('đo đạc') || normFilter.includes('đo dạc')) return 'Tổ Đo đạc';
-          if (normFilter.includes('cấp giấy') || normFilter.includes('đăng ký')) return 'Tổ Cấp giấy';
+          if (normFilter.includes('cấp giấy') || normFilter.includes('đăng ký')) return 'Tổ Đo đạc';
           if (normFilter.includes('lưu trữ')) return 'Tổ Lưu trữ';
           if (normFilter.includes('hành chính') || normFilter.includes('một cửa')) return 'Tổ Hành chính';
       }
 
-      // 2. Nếu có hồ sơ chọn, kiểm tra nếu có hồ sơ thuộc thủ tục 3.x / đăng ký -> ưu tiên gợi ý Tổ Cấp giấy
-      if (records && records.length > 0) {
-          for (const r of records) {
-              const dept = getDepartmentForRecord(r);
-              if (dept === 'Tổ Cấp giấy') return 'Tổ Cấp giấy';
-          }
-      }
-
-      // 3. Ưu tiên kiểm tra tab/view chuyên môn đang làm việc
+      // 2. Ưu tiên kiểm tra tab/view chuyên môn đang làm việc
       if (view) {
           const normView = view.toLowerCase();
           if (normView.includes('archive') || normView.includes('saoluc') || normView.includes('congvan')) {
               return 'Tổ Lưu trữ';
           }
-          if (normView.includes('registration') || normView.includes('dangky') || normView.includes('cap_giay') || normView.includes('3.')) {
-              return 'Tổ Cấp giấy';
-          }
           if (normView.includes('other')) {
+              return 'Tổ Đo đạc';
+          }
+          if (normView.includes('all_records') || normView.includes('assign_tasks') || normView.includes('check_list') || normView.includes('handover_list') || normView.includes('completed')) {
               return 'Tổ Đo đạc';
           }
       }
 
-      // 4. Nếu có hồ sơ chọn, kiểm tra theo loại hồ sơ
+      // 3. Nếu có hồ sơ chọn, kiểm tra theo loại hồ sơ
       if (records && records.length > 0) {
           return getDepartmentForRecord(records[0]);
       }

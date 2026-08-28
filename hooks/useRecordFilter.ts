@@ -2,7 +2,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { RecordFile, User, UserRole, RecordStatus, Employee } from '../types';
 import { removeVietnameseTones, isRecordOverdue, isRecordApproaching, resolveRecordStatus } from '../utils/appHelpers';
-import { getShortRecordType, isArchiveRecordType } from '../constants';
+import { getShortRecordType, isArchiveRecordType, isDoDacRecordType } from '../constants';
 
 export function getRecordDateForStatus(r: any, targetStatus?: string): string | null {
     if (!r) return null;
@@ -227,7 +227,7 @@ export const useRecordFilter = (
         const isMeasurementView = ['all_records', 'assign_tasks', 'completed_list', 'pending_supplement_list', 'pending_check_list', 'check_list', 'handover_list', 'director_completed'].includes(currentView);
         
         if (isArchiveMeasurementView) {
-            result = result.filter(r => isArchiveRecordType(r.recordType));
+            result = result.filter(r => isArchiveRecordType(r.recordType, r.code) || r.sourceTable === 'luutru_records');
             if (filterRecordType !== 'all') {
                 result = result.filter(r => getShortRecordType(r.recordType) === filterRecordType);
             }
@@ -240,7 +240,8 @@ export const useRecordFilter = (
             result = result.filter(r => {
                 const shortType = getShortRecordType(r.recordType);
                 return (
-                    !isArchiveRecordType(r.recordType) &&
+                    !isArchiveRecordType(r.recordType, r.code) &&
+                    r.sourceTable !== 'luutru_records' &&
                     !['CMD', 'Tòa án', 'Thi hành án'].includes(shortType)
                 );
             });

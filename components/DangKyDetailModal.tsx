@@ -92,16 +92,9 @@ export const DangKyDetailModal: React.FC<DangKyDetailModalProps> = ({
     }
   }, [record, isOpen]);
 
-  const [wfVersion, setWfVersion] = useState(0);
-  useEffect(() => {
-    const handleWfUpdated = () => setWfVersion(v => v + 1);
-    window.addEventListener('workflow_config_updated', handleWfUpdated);
-    return () => window.removeEventListener('workflow_config_updated', handleWfUpdated);
-  }, []);
-
   const stepDeadlines = useMemo(() => {
     return record ? calculateRecordStepDeadlines(record) : [];
-  }, [record, wfVersion]);
+  }, [record]);
 
   if (!isOpen || !record) return null;
 

@@ -30,6 +30,9 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (typeof performance !== 'undefined' && performance.mark) {
+      performance.mark('app-start');
+    }
     setIsLoading(true);
     setError('');
     
@@ -152,7 +155,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* Username Input */}
               <div className="relative group">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-600">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-700">
                   <UserIcon size={18} />
                 </div>
                 <input
@@ -160,7 +163,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
                   name="username"
                   autoComplete="username"
                   required
-                  className="w-full pl-10 pr-4 py-3 bg-white/90 hover:bg-white focus:bg-white border border-slate-300 focus:border-blue-600 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all text-slate-900 font-bold placeholder-slate-500 shadow-md backdrop-blur-md"
+                  className="w-full pl-10 pr-4 py-3 bg-white/90 hover:bg-white/95 focus:bg-white border border-white/80 focus:border-blue-500 rounded-xl focus:ring-2 focus:ring-blue-400 outline-none transition-all text-slate-900 font-bold placeholder-slate-500 shadow-md backdrop-blur-md"
                   placeholder="Tài khoản đăng nhập"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
@@ -169,7 +172,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
 
               {/* Password Input */}
               <div className="relative group">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-600">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-700">
                   <Lock size={18} />
                 </div>
                 <input
@@ -177,7 +180,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
                   name="password"
                   autoComplete="current-password"
                   required
-                  className="w-full pl-10 pr-12 py-3 bg-white/90 hover:bg-white focus:bg-white border border-slate-300 focus:border-blue-600 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all text-slate-900 font-bold placeholder-slate-500 shadow-md backdrop-blur-md"
+                  className="w-full pl-10 pr-4 py-3 bg-white/90 hover:bg-white/95 focus:bg-white border border-white/80 focus:border-blue-500 rounded-xl focus:ring-2 focus:ring-blue-400 outline-none transition-all text-slate-900 font-bold placeholder-slate-500 shadow-md backdrop-blur-md"
                   placeholder="Mật khẩu"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -185,7 +188,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-800 hover:text-black transition-colors"
+                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-900 hover:text-black transition-colors"
                 >
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>

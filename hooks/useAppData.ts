@@ -40,9 +40,68 @@ export const useAppData = (currentUser: User | null) => {
 
     const loadData = useCallback(async () => {
         try {
-            // Tải song song toàn bộ dữ liệu từ Supabase Cloud
+            // 0. Instant Render từ IndexedDB Cache (< 50ms)
+            try {
+                const { getFromCacheAsync } = await import('../services/apiCore');
+                const [idbRecords, idbEmps, idbUsers, idbHolidays] = await Promise.all([
+                    getFromCacheAsync<RecordFile[]>(CACHE_KEYS.RECORDS, []),
+                    getFromCacheAsync<Employee[]>(CACHE_KEYS.EMPLOYEES, []),
+                    getFromCacheAsync<User[]>(CACHE_KEYS.USERS, []),
+                    getFromCacheAsync<Holiday[]>(CACHE_KEYS.HOLIDAYS, [])
+                ]);
+
+                if (idbRecords && idbRecords.length > 0) {
+                    const { migratedRecords } = migrateUnbatchedRecords(idbRecords);
+                    setRecords(migratedRecords);
+                }
+                if (idbEmps && idbEmps.length > 0) setEmployees(idbEmps);
+                if (idbUsers && idbUsers.length > 0) setUsers(idbUsers);
+                if (idbHolidays && idbHolidays.length > 0) setHolidays(idbHolidays);
+                
+                if (typeof performance !== 'undefined' && performance.mark) {
+                    performance.mark('cache-rendered');
+                }
+            } catch (cacheErr) {
+                console.warn("Async cache load warning:", cacheErr);
+            }
+
+            // 1. Thử kết nối Server nội bộ (chỉ khi chạy localhost/LAN) để tránh timeout 500ms trên Cloud Web
+            const isLocalhost = typeof window !== 'undefined' && 
+                (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
+            if (isLocalhost) {
+                try {
+                    const [recRes, empRes, userRes, holRes] = await Promise.all([
+                        fetch('/records', { signal: AbortSignal.timeout(300) }).then(r => r.ok ? r.json() : null).catch(() => null),
+                        fetch('/employees', { signal: AbortSignal.timeout(300) }).then(r => r.ok ? r.json() : null).catch(() => null),
+                        fetch('/users', { signal: AbortSignal.timeout(300) }).then(r => r.ok ? r.json() : null).catch(() => null),
+                        fetch('/holidays', { signal: AbortSignal.timeout(300) }).then(r => r.ok ? r.json() : null).catch(() => null),
+                    ]);
+
+                    if (recRes !== null || empRes !== null || userRes !== null) {
+                        const rawRecs = Array.isArray(recRes) ? recRes : (recRes?.records || []);
+                        const { migratedRecords } = migrateUnbatchedRecords(rawRecs);
+                        setRecords(migratedRecords);
+                        if (Array.isArray(empRes)) setEmployees(empRes);
+                        else if (empRes?.employees && Array.isArray(empRes.employees)) setEmployees(empRes.employees);
+                        
+                        if (Array.isArray(userRes)) setUsers(userRes);
+                        else if (userRes?.users && Array.isArray(userRes.users)) setUsers(userRes.users);
+
+                        if (Array.isArray(holRes)) setHolidays(holRes);
+                        else if (holRes?.holidays && Array.isArray(holRes.holidays)) setHolidays(holRes.holidays);
+
+                        setConnectionStatus('connected');
+                        return;
+                    }
+                } catch (localErr) {
+                    // Tiếp tục sang Supabase Cloud
+                }
+            }
+
+            // 2. Tải song song toàn bộ dữ liệu từ Supabase Cloud
             const timeoutPromise = new Promise((_, reject) => 
-                setTimeout(() => reject(new Error("Timeout Supabase")), 10000)
+                setTimeout(() => reject(new Error("Timeout Supabase")), 12000)
             );
 
             const dataPromise = Promise.all([
@@ -59,12 +118,21 @@ export const useAppData = (currentUser: User | null) => {
             const [recData, empData, userData, updateInfo, holidayData, permsData, deptPermsData] = await Promise.race([dataPromise, timeoutPromise]) as any;
 
             const rawRecList = Array.isArray(recData) ? recData : [];
-            const { migratedRecords } = migrateUnbatchedRecords(rawRecList, holidayData || holidays);
+            const { migratedRecords } = migrateUnbatchedRecords(rawRecList);
             setRecords(migratedRecords);
 
             setEmployees(empData);
             setUsers(userData);
             setHolidays(holidayData); // Cập nhật state holidays
+            
+            if (typeof performance !== 'undefined' && performance.mark) {
+                performance.mark('cloud-synced');
+                try {
+                    performance.measure('App Init Time', 'app-start', 'cloud-synced');
+                } catch (e) {
+                    // ignore if app-start not set yet
+                }
+            }
             if (permsData) {
                 try {
                     const parsed = JSON.parse(permsData);

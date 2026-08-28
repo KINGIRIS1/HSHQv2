@@ -242,63 +242,60 @@ export const mapRecordFileToArchiveDb = (r: RecordFile | Partial<RecordFile>): a
 export const migrateArchiveRecordsFromLandRecords = async () => {
     // Di chuyển và đồng bộ dữ liệu hồ sơ lưu trữ từ land_records sang luutru_records
     if (!isConfigured) return;
-    if (typeof window !== 'undefined' && sessionStorage.getItem('archive_records_migrated_done')) {
-        return;
-    }
-    if (typeof window !== 'undefined') {
-        sessionStorage.setItem('archive_records_migrated_done', 'true');
-    }
-
     try {
-        const { data: landData, error: fetchError } = await supabase
+        // Chỉ chọn id, recordType, code, content để lọc nhanh light-weight
+        const { data: landMeta, error: fetchError } = await supabase
             .from('land_records')
-            .select('*');
+            .select('id, recordType, code, content');
             
-        if (fetchError) {
-            console.warn('Lỗi khi kiểm tra land_records cho migration lưu trữ:', fetchError);
-            return;
-        }
-        if (!landData || landData.length === 0) return;
+        if (fetchError || !landMeta || landMeta.length === 0) return;
 
         // Lọc các hồ sơ thuộc loại Lưu trữ
-        const archiveRecordsToMigrate = landData.filter((r: any) => 
+        const candidateIds = landMeta.filter((r: any) => 
             isArchiveRecordType(r.recordType) || 
             isArchiveRecordType(r.content) || 
+            (r.code || '').startsWith('1.') ||
             r.recordType === 'Cung cấp tài liệu đất đai' ||
             r.recordType === 'Cung cấp dữ liệu đất đai' ||
             r.recordType === '1.1 Sao lục' ||
             r.recordType === '1.2 Công văn' ||
             r.recordType === '1.1 Sao lục hồ sơ' ||
             r.recordType === '1.1 Cung cấp dữ liệu đất đai'
-        );
+        ).map((r: any) => r.id);
 
-        if (archiveRecordsToMigrate.length === 0) return;
-        console.log(`[Archive Migration] Tìm thấy ${archiveRecordsToMigrate.length} hồ sơ lưu trữ trong land_records để chuyển sang luutru_records.`);
+        if (candidateIds.length === 0) return;
+        console.log(`[Archive Migration] Tìm thấy ${candidateIds.length} hồ sơ lưu trữ trong land_records để chuyển sang luutru_records.`);
+
+        // Lấy chi tiết đầy đủ chỉ cho các hồ sơ cần di chuyển
+        const { data: archiveRecordsToMigrate } = await supabase
+            .from('land_records')
+            .select('*')
+            .in('id', candidateIds);
+
+        if (!archiveRecordsToMigrate || archiveRecordsToMigrate.length === 0) return;
 
         const luutruPayloads = archiveRecordsToMigrate.map((r: any) => {
             return sanitizeData(r, ARCHIVE_DB_COLUMNS);
         });
 
-        // Upsert vào luutru_records với cơ chế tự động lọc các cột chưa có trên DB
-        const { error: insertError } = await executeSupabaseOperationWithAutoClean(
-            async (p) => await supabase.from('luutru_records').upsert(p),
-            luutruPayloads
-        );
-
-        if (insertError) {
-            console.error('Lỗi khi upsert vào luutru_records trong migration:', insertError);
-            return;
+        // Upsert theo Batch (100 items/lần)
+        const batchSize = 100;
+        for (let i = 0; i < luutruPayloads.length; i += batchSize) {
+            const chunk = luutruPayloads.slice(i, i + batchSize);
+            const { error: insertError } = await executeSupabaseOperationWithAutoClean(
+                async (p) => await supabase.from('luutru_records').upsert(p),
+                chunk
+            );
+            if (insertError) {
+                console.error('Lỗi khi upsert chunk vào luutru_records trong migration:', insertError);
+            }
         }
 
-        // Xóa các hồ sơ này khỏi land_records để tránh phân mảnh và trùng lặp dữ liệu
+        // Xóa các hồ sơ này khỏi land_records
         const idsToDelete = archiveRecordsToMigrate.map((r: any) => r.id);
-        const { error: deleteError } = await supabase
-            .from('land_records')
-            .delete()
-            .in('id', idsToDelete);
-            
-        if (deleteError) {
-            console.warn('Cảnh báo khi xóa hồ sơ lưu trữ khỏi land_records:', deleteError);
+        for (let i = 0; i < idsToDelete.length; i += batchSize) {
+            const chunkIds = idsToDelete.slice(i, i + batchSize);
+            await supabase.from('land_records').delete().in('id', chunkIds);
         }
 
         console.log(`[Archive Migration] Đã di chuyển thành công ${archiveRecordsToMigrate.length} hồ sơ lưu trữ sang luutru_records.`);

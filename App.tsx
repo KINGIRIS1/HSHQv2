@@ -2,7 +2,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { RecordFile, RecordStatus, Employee, User, UserRole, Message, RecordStatusLog } from './types';
 import { DEFAULT_WARDS as STATIC_WARDS, isArchiveRecordType, STATUS_LABELS, APP_VERSION, getNormalizedWard, getCanonicalRecordType } from './constants';
-import { procedureHasStep } from './services/apiWorkflow';
 import { isUserAdminOrSubadmin, isUserTeamLeader, isUserOneDoor, isUserEmployee, canUserPerformGeneralAction } from './constants/permissions';
 import Login from './components/Login'; 
 import MainLayout from './components/layout/MainLayout';
@@ -14,7 +13,7 @@ import { exportReportToExcel, exportReturnedListToExcel } from './utils/excelExp
 import { generateReport } from './services/geminiService';
 import { syncTemplatesFromCloud, generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from './services/docxService'; 
 import { updateRecordApi, saveEmployeeApi, saveUserApi, forceUpdateRecordsBatchApi, updateRecordsBatchById, migrateMisplacedDangKyRecords } from './services/api';
-import { migrateArchiveRecordsFromLandRecords, saveArchiveRecord } from './services/apiArchive';
+import { migrateArchiveRecordsFromLandRecords } from './services/apiArchive';
 import { ReturnOptionType } from './components/RejectReturnStepModal';
 import { addActivityLog } from './services/activityLogService';
 import * as XLSX from 'xlsx-js-style';
@@ -162,6 +161,36 @@ function App() {
   // Sync Templates
   useEffect(() => { syncTemplatesFromCloud(); }, []);
 
+  // Run background migration for archive records & misplaced dangky records (Non-blocking)
+  useEffect(() => {
+      if (!currentUser) return;
+
+      const todayStr = new Date().toISOString().slice(0, 10);
+      const lockKey = `bg_migration_v2_${todayStr}`;
+      
+      if (sessionStorage.getItem(lockKey)) {
+          return; // Already executed today in this session, skip
+      }
+
+      const runBgTasks = () => {
+          sessionStorage.setItem(lockKey, 'true');
+          Promise.all([
+              migrateArchiveRecordsFromLandRecords(),
+              migrateMisplacedDangKyRecords()
+          ]).catch(err => {
+              console.warn("Background migration warning:", err);
+          });
+      };
+
+      if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+          const idleId = (window as any).requestIdleCallback(runBgTasks, { timeout: 5000 });
+          return () => (window as any).cancelIdleCallback(idleId);
+      } else {
+          const timerId = setTimeout(runBgTasks, 3000);
+          return () => clearTimeout(timerId);
+      }
+  }, [currentUser]);
+
   // Save visible columns
   useEffect(() => { localStorage.setItem('visible_columns', JSON.stringify(visibleColumns)); }, [visibleColumns]);
 
@@ -173,17 +202,6 @@ function App() {
       loadData, handleAddOrUpdateRecord, handleDeleteRecord, handleImportRecords,
       handleSaveEmployee, handleDeleteEmployee, handleDeleteAllData, handleUpdateUser, handleDeleteUser
   } = useAppData(currentUser);
-
-  // Run background migration for archive records & misplaced dangky records asynchronously after UI render
-  useEffect(() => {
-      if (currentUser) {
-          const timer = setTimeout(() => {
-              migrateArchiveRecordsFromLandRecords();
-              migrateMisplacedDangKyRecords();
-          }, 1500);
-          return () => clearTimeout(timer);
-      }
-  }, [currentUser]);
 
   // Khi có phiên bản mới hoặc admin phát hành bản mới, tự động mở lại popup cập nhật ngay lập tức
   useEffect(() => {
@@ -840,14 +858,7 @@ function App() {
           return; 
       }
       if (record.status === RecordStatus.ASSIGNED || record.status === RecordStatus.IN_PROGRESS) {
-          const hasCheckStep = procedureHasStep(record, 'trinh_kiem_tra');
-          if (!hasCheckStep) {
-              // Bỏ qua trình kiểm tra, chuyển thẳng sang Trình ký duyệt (Áp dụng cho Lưu trữ và các thủ tục đã loại bỏ Trình kiểm tra tại SLA)
-              setSubmitTargetRecords([record]);
-              setIsSubmitModalOpen(true);
-              return;
-          }
-          // Các loại có bước kiểm tra: đi sang trình kiểm tra (bỏ qua bước trung gian là đã thực hiện)
+          // Các loại đi thẳng sang trình kiểm tra (bỏ qua bước trung gian là đã thực hiện)
           setSubmitTargetRecords([record]);
           setIsSubmitCheckModalOpen(true);
           return;
@@ -861,11 +872,7 @@ function App() {
       const flow = [RecordStatus.RECEIVED, RecordStatus.ASSIGNED, RecordStatus.IN_PROGRESS, RecordStatus.COMPLETED_WORK, RecordStatus.PENDING_CHECK, RecordStatus.CHECKED, RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER];
       const idx = flow.indexOf(record.status);
       if (idx < flow.length - 1) {
-          let nextStatus = flow[idx + 1];
-          const hasCheckStep = procedureHasStep(record, 'trinh_kiem_tra');
-          if (!hasCheckStep && (nextStatus === RecordStatus.PENDING_CHECK || nextStatus === RecordStatus.CHECKED)) {
-              nextStatus = RecordStatus.PENDING_SIGN;
-          }
+          const nextStatus = flow[idx + 1];
           if (nextStatus === RecordStatus.HANDOVER) {
               // Bắt buộc chốt đợt, không được giao lẻ!
               setSelectedRecordIds(new Set([record.id]));
@@ -1723,35 +1730,12 @@ function App() {
                         submissionDate: nowIso,
                         submittedTo: directorId
                     }));
-
-                    // Cập nhật state tức thì (optimistic update) để giao diện hiển thị chuyển bước ngay lập tức
-                    setRecords(prev => prev.map(r => {
-                        const match = updates.find(u => u.id === r.id);
-                        return match ? match : r;
-                    }));
-
                     await updateRecordsBatchById(updates);
-
-                    // Đồng bộ thêm bảng lưu trữ nếu có hồ sơ thuộc module Lưu trữ
-                    for (const r of submitTargetRecords) {
-                        if (isArchiveRecordType(r.recordType, r.code) || r.sourceTable === 'luutru_records' || (r.code || '').trim().startsWith('1.')) {
-                            await saveArchiveRecord({
-                                id: r.id,
-                                status: 'pending_sign',
-                                data: {
-                                    submissionDate: nowIso,
-                                    submitted_to: directorId,
-                                    submittedTo: directorId
-                                }
-                            });
-                        }
-                    }
-
                     setToast({ type: 'success', message: `Đã trình ký ${updates.length} hồ sơ thành công!` });
                     setIsSubmitModalOpen(false);
                     setSubmitTargetRecords([]);
                     setSelectedRecordIds(new Set());
-                    await loadData();
+                    loadData();
                 } catch (error) {
                     console.error("Lỗi khi trình ký:", error);
                     setToast({ type: 'error', message: 'Có lỗi xảy ra khi trình ký.' });
@@ -1776,35 +1760,12 @@ function App() {
                         pendingCheckDate: nowIso,
                         checkedBy: checkerId
                     }));
-
-                    // Cập nhật state tức thì (optimistic update) để giao diện hiển thị chuyển bước ngay lập tức
-                    setRecords(prev => prev.map(r => {
-                        const match = updates.find(u => u.id === r.id);
-                        return match ? match : r;
-                    }));
-
                     await updateRecordsBatchById(updates);
-
-                    // Đồng bộ thêm bảng lưu trữ nếu có hồ sơ thuộc module Lưu trữ
-                    for (const r of submitTargetRecords) {
-                        if (isArchiveRecordType(r.recordType, r.code) || r.sourceTable === 'luutru_records' || (r.code || '').trim().startsWith('1.')) {
-                            await saveArchiveRecord({
-                                id: r.id,
-                                status: 'pending_check',
-                                data: {
-                                    pendingCheckDate: nowIso,
-                                    checked_by: checkerId,
-                                    checkedBy: checkerId
-                                }
-                            });
-                        }
-                    }
-
                     setToast({ type: 'success', message: `Đã trình kiểm tra ${updates.length} hồ sơ thành công!` });
                     setIsSubmitCheckModalOpen(false);
                     setSubmitTargetRecords([]);
                     setSelectedRecordIds(new Set());
-                    await loadData();
+                    loadData();
                 } catch (error) {
                     console.error("Lỗi khi trình kiểm tra:", error);
                     setToast({ type: 'error', message: 'Có lỗi xảy ra khi trình kiểm tra.' });

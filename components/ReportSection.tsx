@@ -1,19 +1,16 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { BarChart3, FileSpreadsheet, Loader2, Sparkles, Download, CalendarDays, Printer, Layout, FileText, ListFilter, CheckCircle2, Clock, AlertTriangle, Settings, Key, X, Save, MapPin, UserCheck, ChevronLeft, ChevronRight, PieChart, CheckCircle, Ruler, FolderArchive, CalendarRange, DollarSign, BookOpen } from 'lucide-react';
-import { RecordFile, RecordStatus, Employee, User, DangKyRecord } from '../types';
+import { BarChart3, FileSpreadsheet, Loader2, Sparkles, Download, CalendarDays, Printer, Layout, FileText, ListFilter, CheckCircle2, Clock, AlertTriangle, Settings, Key, X, Save, MapPin, UserCheck, ChevronLeft, ChevronRight, PieChart, CheckCircle, Ruler, FolderArchive, CalendarRange, DollarSign } from 'lucide-react';
+import { RecordFile, RecordStatus, Employee, User } from '../types';
 import { getNormalizedWard, STATUS_LABELS, getShortRecordType, isArchiveRecordType } from '../constants';
 import { isRecordOverdue, removeVietnameseTones, isRecordApproaching, parseSafeDate, cleanSyncNotes } from '../utils/appHelpers';
 import { saveGeminiKey, getGeminiKey } from '../services/geminiService';
 import { fetchArchiveRecords } from '../services/apiArchive';
-import { fetchDangKyRecords } from '../services/apiDangKy';
-import { exportDangKyReportToExcel } from '../utils/excelExport';
 import EmployeeStatsView from './report/EmployeeStatsView';
 import WardStatsView from './report/WardStatsView';
 import DailyStatsView from './report/DailyStatsView';
 import OverdueStatsView from './report/OverdueStatsView';
 import RevenueStatsView from './report/RevenueStatsView';
-import DangKyStatsView from './report/DangKyStatsView';
 import FlexibleDateInput from './FlexibleDateInput';
 
 interface ReportSectionProps {
@@ -100,19 +97,15 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
         return currentUser.role === 'ADMIN' || currentUser.role === 'SUBADMIN';
     }, [currentUser]);
 
-    const [mainTab, setMainTab] = useState<'measurement' | 'archive' | 'dangky'>('measurement');
+    const [mainTab, setMainTab] = useState<'measurement' | 'archive'>('measurement');
     const [archiveRecords, setArchiveRecords] = useState<RecordFile[]>([]);
     const [isArchiveLoading, setIsArchiveLoading] = useState<boolean>(false);
-    const [dangKyRecords, setDangKyRecords] = useState<DangKyRecord[]>([]);
-    const [isDangKyLoading, setIsDangKyLoading] = useState<boolean>(false);
 
     // Tự động chuyển tab chính nếu người dùng bị giới hạn quyền theo tổ (Chỉ Admin/Subadmin xem được tất cả tổ)
     useEffect(() => {
         if (!canSeeAllDepts && userDept) {
             const deptLower = userDept.toLowerCase();
-            if (deptLower.includes('đăng ký') || deptLower.includes('đkđđ') || deptLower.includes('cấp gcn')) {
-                if (mainTab !== 'dangky') setMainTab('dangky');
-            } else if (deptLower.includes('lưu trữ') && !deptLower.includes('đo đạc')) {
+            if (deptLower.includes('lưu trữ') && !deptLower.includes('đo đạc')) {
                 if (mainTab !== 'archive') setMainTab('archive');
             } else {
                 if (mainTab !== 'measurement') setMainTab('measurement');
@@ -209,19 +202,6 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                 }
             };
             loadArchive();
-        } else if (mainTab === 'dangky') {
-            const loadDangKy = async () => {
-                setIsDangKyLoading(true);
-                try {
-                    const data = await fetchDangKyRecords();
-                    setDangKyRecords(data);
-                } catch (e) {
-                    console.error("Error loading dang ky records for report", e);
-                } finally {
-                    setIsDangKyLoading(false);
-                }
-            };
-            loadDangKy();
         }
     }, [mainTab, records]);
 
@@ -458,11 +438,6 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
     const handleExportExcelClick = () => {
         if (!fromDate || !toDate) { alert("Vui lòng chọn đầy đủ thời gian."); return; }
         
-        if (mainTab === 'dangky') {
-            exportDangKyReportToExcel(dangKyRecords, fromDate, toDate, selectedWard, employees);
-            return;
-        }
-
         let title = mainTab === 'measurement' ? "BÁO CÁO KẾT QUẢ CÔNG TÁC ĐO ĐẠC" : "BÁO CÁO KẾT QUẢ CÔNG TÁC LƯU TRỮ";
         
         if (activeTab === 'daily_stats') {
@@ -548,51 +523,25 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
     return (
         <div className="flex flex-col h-full overflow-y-auto md:overflow-hidden relative bg-slate-50">
             {/* MAIN TAB SWITCHER */}
-            <div className="bg-white border-b border-gray-200 flex px-4 pt-2 gap-1 shrink-0 overflow-x-auto no-scrollbar">
-                {(canSeeAllDepts || (userDept && !userDept.toLowerCase().includes('lưu trữ') && !userDept.toLowerCase().includes('đăng ký'))) && (
+            <div className="bg-white border-b border-gray-200 flex px-4 pt-2 gap-1 shrink-0">
+                {(canSeeAllDepts || (userDept && !userDept.toLowerCase().includes('lưu trữ'))) && (
                     <button 
                         onClick={() => setMainTab('measurement')}
-                        className={`px-5 py-3 text-sm font-bold rounded-t-lg border-t border-l border-r transition-all flex items-center gap-2 whitespace-nowrap ${mainTab === 'measurement' ? 'bg-blue-50 border-gray-200 text-blue-700 border-b-transparent relative top-[1px]' : 'bg-gray-50 border-transparent text-gray-500 hover:bg-gray-100'}`}
+                        className={`px-6 py-3 text-sm font-bold rounded-t-lg border-t border-l border-r transition-all flex items-center gap-2 ${mainTab === 'measurement' ? 'bg-blue-50 border-gray-200 text-blue-700 border-b-transparent relative top-[1px]' : 'bg-gray-50 border-transparent text-gray-500 hover:bg-gray-100'}`}
                     >
                         <Ruler size={18} /> Báo cáo Đo đạc
-                    </button>
-                )}
-                {(canSeeAllDepts || (userDept && (userDept.toLowerCase().includes('đăng ký') || userDept.toLowerCase().includes('đkđđ') || userDept.toLowerCase().includes('cấp gcn')))) && (
-                    <button 
-                        onClick={() => setMainTab('dangky')}
-                        className={`px-5 py-3 text-sm font-bold rounded-t-lg border-t border-l border-r transition-all flex items-center gap-2 whitespace-nowrap ${mainTab === 'dangky' ? 'bg-indigo-50 border-gray-200 text-indigo-700 border-b-transparent relative top-[1px]' : 'bg-gray-50 border-transparent text-gray-500 hover:bg-gray-100'}`}
-                    >
-                        <BookOpen size={18} /> Báo cáo Đăng ký đất đai
                     </button>
                 )}
                 {(canSeeAllDepts || (userDept && userDept.toLowerCase().includes('lưu trữ'))) && (
                     <button 
                         onClick={() => setMainTab('archive')}
-                        className={`px-5 py-3 text-sm font-bold rounded-t-lg border-t border-l border-r transition-all flex items-center gap-2 whitespace-nowrap ${mainTab === 'archive' ? 'bg-orange-50 border-gray-200 text-orange-700 border-b-transparent relative top-[1px]' : 'bg-gray-50 border-transparent text-gray-500 hover:bg-gray-100'}`}
+                        className={`px-6 py-3 text-sm font-bold rounded-t-lg border-t border-l border-r transition-all flex items-center gap-2 ${mainTab === 'archive' ? 'bg-orange-50 border-gray-200 text-orange-700 border-b-transparent relative top-[1px]' : 'bg-gray-50 border-transparent text-gray-500 hover:bg-gray-100'}`}
                     >
                         <FolderArchive size={18} /> Báo cáo Lưu trữ
                     </button>
                 )}
             </div>
 
-            {mainTab === 'dangky' ? (
-                isDangKyLoading ? (
-                    <div className="flex-1 flex flex-col items-center justify-center p-12 bg-slate-50">
-                        <Loader2 className="animate-spin text-indigo-600 mb-3" size={32} />
-                        <p className="text-sm font-bold text-slate-700">Đang tải và tổng hợp dữ liệu Đăng ký đất đai & Cấp GCN...</p>
-                    </div>
-                ) : (
-                    <DangKyStatsView 
-                        records={dangKyRecords}
-                        employees={employees}
-                        wards={wards}
-                        fromDate={fromDate}
-                        toDate={toDate}
-                        currentUser={currentUser}
-                    />
-                )
-            ) : (
-                <>
             {/* ROW 1: Content Sub-Tabs Navigation */}
             <div className="flex bg-white border-b border-gray-200 px-2 md:px-4 justify-between md:justify-start gap-1 overflow-x-auto no-scrollbar shrink-0">
                 <button 
@@ -1107,8 +1056,6 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                 )}
 
             </div>
-            </>
-            )}
 
             {/* API Key Modal */}
             {isKeyModalOpen && (

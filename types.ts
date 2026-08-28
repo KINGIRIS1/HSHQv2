@@ -246,17 +246,6 @@ export interface RecordFile {
 
   // Phân loại bảng Cloud Database
   sourceTable?: 'dangky_records' | 'land_records' | 'archive_records' | 'luutru_records';
-
-  // Tính năng Phối hợp liên tổ chuyên môn
-  originalDept?: string | null;
-  coordinationDept?: string | null;
-  coordinationWorkflowId?: string | null;
-  coordinationStatus?: 'pending' | 'in_progress' | 'completed' | 'rejected' | null;
-  coordinationCurrentStepId?: string | null;
-  coordinationCurrentStepIndex?: number | null;
-  coordinationNotes?: string | null;
-  coordinationStepLogs?: CoordinationStepLog[];
-  coordinationDocs?: { name: string; url?: string; uploadedAt?: string; uploadedBy?: string }[];
 }
 
 export interface RecordStatusLog {
@@ -530,17 +519,6 @@ export interface DangKyRecord {
   attachedDocuments?: { name: string; type: string }[]; // Giấy tờ kèm theo khác
   createdAt?: string;
   updatedAt?: string;
-
-  // Tính năng Phối hợp liên tổ chuyên môn
-  originalDept?: string | null;
-  coordinationDept?: string | null;
-  coordinationWorkflowId?: string | null;
-  coordinationStatus?: 'pending' | 'in_progress' | 'completed' | 'rejected' | null;
-  coordinationCurrentStepId?: string | null;
-  coordinationCurrentStepIndex?: number | null;
-  coordinationNotes?: string | null;
-  coordinationStepLogs?: CoordinationStepLog[];
-  sourceTable?: 'dangky_records' | 'land_records' | 'archive_records' | 'luutru_records';
 }
 
 export interface WorkflowStep {
@@ -561,70 +539,6 @@ export interface ProcedureWorkflow {
   procedureName: string;
   totalSlaHours?: number;
   steps: WorkflowStep[];
-}
-
-// Cấu hình Tổ chuyên môn
-export interface DepartmentConfig {
-  id: string;
-  code: string;
-  name: string;
-  leaderName?: string;
-  contactPhone?: string;
-  description?: string;
-  active: boolean;
-  memberCount?: number;
-  createdAt?: string;
-  updatedAt?: string;
-}
-
-// Loại bước nghiệp vụ phối hợp liên tổ
-export type CoordinationStepType = 'reception' | 'verification' | 'inspection' | 'signing' | 'handover';
-
-// Cấu hình từng bước trong quy trình phối hợp
-export interface CoordinationWorkflowStep {
-  id: string;
-  name: string;
-  type: CoordinationStepType;
-  responsibleDept?: string;
-  slaHours: number;
-  slaDisplay: string;
-  order: number;
-  requireDocs?: boolean;
-  docDescription?: string;
-  allowRejection?: boolean;
-  description?: string;
-  active: boolean;
-}
-
-// Cấu hình Quy trình phối hợp liên tổ & Luồng tự động
-export interface CoordinationWorkflow {
-  id: string;
-  name: string;
-  code: string;
-  sourceDept: string;              // Tổ khởi tạo
-  targetDept: string;              // Tổ nhận phối hợp
-  description?: string;
-  autoReturnToOrigin: boolean;     // Tự động chuyển hồ sơ về tổ ban đầu khi hoàn thành
-  targetStatusOnReturn?: string;   // Trạng thái khi chuyển trả về tổ ban đầu
-  notifyOnReturn?: boolean;        // Thông báo cho chuyên viên tổ ban đầu
-  steps: CoordinationWorkflowStep[];
-  active: boolean;
-  createdAt?: string;
-  updatedAt?: string;
-}
-
-// Lịch sử thực hiện từng bước phối hợp
-export interface CoordinationStepLog {
-  id: string;
-  stepId: string;
-  stepName: string;
-  stepType: CoordinationStepType;
-  performer: string;
-  dept: string;
-  completedAt: string;
-  note?: string;
-  status: 'completed' | 'returned' | 'rejected' | 'in_progress';
-  docs?: string[];
 }
 
 import { DANG_KY_RECORD_TYPES, DANG_KY_DEADLINE_MAP } from './constants/procedures';

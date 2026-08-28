@@ -695,6 +695,8 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
       if (tempHolidayType === 'specific') {
           if (!tempDate) { alert("Vui lòng chọn ngày nghỉ cụ thể"); return; }
           newHoliday.date = tempDate;
+          const yVal = parseInt(tempDate.split('-')[0], 10);
+          if (!isNaN(yVal)) newHoliday.year = yVal;
       } else {
           if (tempDay < 1 || tempDay > 31 || tempMonth < 1 || tempMonth > 12) { alert("Ngày tháng không hợp lệ"); return; }
           newHoliday.day = tempDay;
@@ -708,6 +710,7 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
       setTempDay(1);
       setTempMonth(1);
       setTempIsLunar(false);
+      setTempDate(new Date().toISOString().split('T')[0]);
   };
 
   const handleDeleteHoliday = async (id: string) => {

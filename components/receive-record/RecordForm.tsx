@@ -586,7 +586,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
                     </label>
                     <select className={`${inputClass} font-semibold`} value={formData.recordType || ''} onChange={(e) => handleChange('recordType', e.target.value)}>
                         <option value="">-- Chọn loại hồ sơ --</option>
-                        {EXTENDED_RECORD_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                        {RECORD_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                     </select>
                 </div>
 

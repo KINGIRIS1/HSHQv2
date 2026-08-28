@@ -291,7 +291,7 @@ export const fetchDangKyRecords = async (onProgress?: (loadedRecords: DangKyReco
 
   // Fallback to cache or mock via async IDB
   const cached = await getFromCacheAsync<DangKyRecord[] | null>(CACHE_KEYS.DANGKY_RECORDS, null);
-  if (cached !== null && Array.isArray(cached)) {
+  if (cached !== null && Array.isArray(cached) && cached.length > 0) {
     const uniqueMap = new Map<string, DangKyRecord>();
     cached.forEach((r) => {
       if (r && r.id) {

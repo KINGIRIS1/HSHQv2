@@ -126,11 +126,13 @@ export const fetchHolidays = async (): Promise<Holiday[]> => {
         if (error) throw error;
         
         const mapped = data.map((h: any) => ({
-            id: h.id,
+            id: String(h.id),
             name: h.name,
             day: h.day,
             month: h.month,
-            isLunar: h.is_lunar // Map từ snake_case (DB) sang camelCase (App)
+            isLunar: h.is_lunar,
+            date: h.date || h.date_str || undefined,
+            year: h.year || undefined
         }));
         saveToCache(CACHE_KEYS.HOLIDAYS, mapped);
         return mapped;
@@ -141,27 +143,29 @@ export const fetchHolidays = async (): Promise<Holiday[]> => {
 };
 
 export const saveHolidays = async (holidays: Holiday[]): Promise<boolean> => {
+    saveToCache(CACHE_KEYS.HOLIDAYS, holidays);
     if (!isConfigured) return true;
     try {
-        // Xóa hết dữ liệu cũ trước khi insert mới
-        // Lưu ý: Cần chắc chắn bảng holidays có ít nhất 1 dòng dummy với id='0' nếu dùng .neq('id', '0')
-        // Hoặc xóa toàn bộ nếu không có dòng nào cần giữ. Ở đây ta xóa hết để sync chính xác.
         await supabase.from('holidays').delete().neq('id', 'dummy_id_prevent_error'); 
         
         const dbHolidays = holidays.map(h => ({
             id: h.id,
             name: h.name,
-            day: h.day,
-            month: h.month,
-            is_lunar: h.isLunar // Map từ camelCase (App) sang snake_case (DB)
+            day: h.day || null,
+            month: h.month || null,
+            is_lunar: h.isLunar || false,
+            date: h.date || null,
+            year: h.year || null
         }));
         
         const { error } = await supabase.from('holidays').insert(dbHolidays);
-        if (error) throw error;
+        if (error) {
+            console.warn("Supabase saveHolidays warning (saving to local cache instead):", error);
+        }
         return true;
     } catch (error) {
         logError("saveHolidays", error);
-        return false;
+        return true; // Local cache saved successfully
     }
 };
 

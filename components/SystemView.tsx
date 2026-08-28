@@ -4,9 +4,7 @@ import UserManagement from './UserManagement';
 import EmployeeManagement from './EmployeeManagement';
 import SystemSettingsView from './SystemSettingsView';
 import ActivityLogView from './ActivityLogView';
-import { WorkflowConfigView } from './WorkflowConfigView';
-import InterDeptCoordinationView from './coordination/InterDeptCoordinationView';
-import { Shield, Users, Settings2, History, GitBranch, ArrowLeftRight } from 'lucide-react';
+import { Shield, Users, Settings2, History } from 'lucide-react';
 import { fetchDangKyRecords } from '../services/apiDangKy';
 
 interface SystemViewProps {
@@ -46,7 +44,7 @@ const SystemView: React.FC<SystemViewProps> = ({
 }) => {
     const isAdmin = currentUser.role === UserRole.ADMIN;
     const isManager = isAdmin || currentUser.role === UserRole.SUBADMIN;
-    const [activeTab, setActiveTab] = useState<'users' | 'employees' | 'coordination-mgmt' | 'logs' | 'settings' | 'workflow-sla'>('coordination-mgmt');
+    const [activeTab, setActiveTab] = useState<'users' | 'employees' | 'logs' | 'settings'>(isAdmin ? 'users' : 'employees');
     const [loadedDangKyRecords, setLoadedDangKyRecords] = useState<DangKyRecord[]>(dangKyRecords);
 
     useEffect(() => {
@@ -67,12 +65,6 @@ const SystemView: React.FC<SystemViewProps> = ({
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col flex-1 h-full animate-fade-in-up">
             {/* TABS */}
             <div className="flex border-b border-gray-200 bg-gray-50 px-4 overflow-x-auto">
-                <button 
-                    onClick={() => setActiveTab('coordination-mgmt')}
-                    className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'coordination-mgmt' ? 'border-purple-600 text-purple-700 bg-white' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-                >
-                    <ArrowLeftRight size={16}/> Quản lý Liên Tổ
-                </button>
                 {isAdmin && (
                     <button 
                         onClick={() => setActiveTab('users')}
@@ -86,12 +78,6 @@ const SystemView: React.FC<SystemViewProps> = ({
                     className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'employees' ? 'border-teal-600 text-teal-700 bg-white' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
                 >
                     <Users size={16}/> DS Nhân sự
-                </button>
-                <button 
-                    onClick={() => setActiveTab('workflow-sla')}
-                    className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'workflow-sla' ? 'border-blue-600 text-blue-700 bg-white' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-                >
-                    <GitBranch size={16}/> Quy trình & SLA
                 </button>
                 <button 
                     onClick={() => setActiveTab('logs')}
@@ -111,15 +97,6 @@ const SystemView: React.FC<SystemViewProps> = ({
 
             {/* CONTENT */}
             <div className="flex-1 overflow-hidden flex flex-col p-4">
-                {activeTab === 'coordination-mgmt' && (
-                    <InterDeptCoordinationView
-                        currentUser={currentUser}
-                        records={records}
-                        dangKyRecords={loadedDangKyRecords}
-                        onViewRecord={onViewRecord}
-                        onRefreshData={onHolidaysChanged}
-                    />
-                )}
                 {activeTab === 'users' && isAdmin && (
                     <UserManagement 
                         users={users} 
@@ -137,9 +114,6 @@ const SystemView: React.FC<SystemViewProps> = ({
                         wards={wards} 
                         currentUser={currentUser} 
                     />
-                )}
-                {activeTab === 'workflow-sla' && (
-                    <WorkflowConfigView currentUser={currentUser} />
                 )}
                 {activeTab === 'logs' && (
                     <ActivityLogView

@@ -31,7 +31,6 @@ import {
 } from "lucide-react";
 import * as XLSX from "xlsx-js-style";
 import { getShortRecordType, isArchiveRecordType } from "../constants";
-import { procedureHasStep } from "../services/apiWorkflow";
 import { confirmAction, cleanSyncNotes, extractBatchNumber } from "../utils/appHelpers";
 import { updateRecordApi, fetchContracts } from "../services/api";
 import {
@@ -821,36 +820,39 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
 
   const handleConfirmSubmit = async (directorId: string) => {
     try {
-      const nowIso = new Date().toISOString();
       for (const record of submitTargetRecords) {
-        const isArchive = isArchiveRecordType(record.recordType, record.code) || record.sourceTable === "luutru_records" || (record.code || "").trim().startsWith("1.");
-        if (isArchive) {
+        if (
+          record.recordType === "Sao lục" ||
+          record.recordType === "Công văn"
+        ) {
           // Handle Archive Record
           const historyEntry = {
             action: "Trình ký",
             status: "pending_sign",
-            timestamp: nowIso,
+            timestamp: new Date().toISOString(),
             user: user.name,
           };
 
           const currentArchive = archiveRecords.find((r) => r.id === record.id);
-          const oldHistory = Array.isArray(currentArchive?.data?.history)
-            ? currentArchive!.data.history
-            : [];
-          const newHistory = [...oldHistory, historyEntry];
+          if (currentArchive) {
+            const oldHistory = Array.isArray(currentArchive.data?.history)
+              ? currentArchive.data.history
+              : [];
+            const newHistory = [...oldHistory, historyEntry];
 
-          await saveArchiveRecord({
-            id: record.id,
-            status: "pending_sign",
-            data: {
-              ...(currentArchive?.data || {}),
-              history: newHistory,
-              submitted_to: directorId,
-              submissionDate: nowIso,
-            },
-          });
+            await saveArchiveRecord({
+              id: record.id,
+              status: "pending_sign",
+              data: {
+                ...currentArchive.data,
+                history: newHistory,
+                submitted_to: directorId,
+              },
+            });
+          }
         } else {
           // Normal Record
+          const nowIso = new Date().toISOString();
           const updatedRecord = {
             ...record,
             status: RecordStatus.PENDING_SIGN,
@@ -1669,7 +1671,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
 
                               {/* Logic nút chuyển trạng thái theo từng Tab */}
                               {activeTab === "pending" &&
-                                (!procedureHasStep(r, 'trinh_kiem_tra') ? (
+                                (isArchiveRecordType(r.recordType) ? (
                                   <button
                                     onClick={() => handleForwardToSign(r)}
                                     title="Trình ký"
@@ -1841,7 +1843,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                           )}
 
                           {activeTab === "pending" &&
-                            (!procedureHasStep(r, 'trinh_kiem_tra') ? (
+                            (isArchiveType ? (
                               <button
                                 onClick={() => handleForwardToSign(r)}
                                 className="px-2.5 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold flex items-center gap-1"
@@ -1954,51 +1956,47 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
         isCheckMode={true}
         onConfirm={async (checkerId) => {
           try {
-            const nowIso = new Date().toISOString();
             for (const record of submitTargetRecords) {
-              const isArchive = isArchiveRecordType(record.recordType, record.code) || record.sourceTable === "luutru_records" || (record.code || "").trim().startsWith("1.");
-              if (isArchive) {
+              if (
+                isArchiveRecordType(record.recordType)
+              ) {
                 // Xử lý hồ sơ lưu trữ
                 const historyEntry = {
                   action: "Trình kiểm tra",
                   status: "pending_check",
-                  timestamp: nowIso,
+                  timestamp: new Date().toISOString(),
                   user: user.name,
                 };
 
                 const currentArchive = archiveRecords.find(
                   (r) => r.id === record.id,
                 );
-                const oldHistory = Array.isArray(currentArchive?.data?.history)
-                  ? currentArchive!.data.history
-                  : [];
-                const newHistory = [...oldHistory, historyEntry];
+                if (currentArchive) {
+                  const oldHistory = Array.isArray(currentArchive.data?.history)
+                    ? currentArchive.data.history
+                    : [];
+                  const newHistory = [...oldHistory, historyEntry];
 
-                await saveArchiveRecord({
-                  id: record.id,
-                  status: "pending_check",
-                  data: {
-                    ...(currentArchive?.data || {}),
-                    history: newHistory,
-                    checked_by: checkerId,
-                    pendingCheckDate: nowIso,
-                  },
-                });
+                  await saveArchiveRecord({
+                    id: record.id,
+                    status: "pending_check",
+                    data: {
+                      ...currentArchive.data,
+                      history: newHistory,
+                      checked_by: checkerId,
+                    },
+                  });
+                }
               } else {
                 // Hồ sơ Đo đạc thường
-                const updatedRecord = {
+                const nowIso = new Date().toISOString();
+                await onUpdateRecord?.({
                   ...record,
                   status: RecordStatus.PENDING_CHECK,
                   completedWorkDate: record.completedWorkDate || nowIso,
                   pendingCheckDate: nowIso,
                   checkedBy: checkerId,
-                };
-                if (onUpdateRecord) {
-                  await onUpdateRecord(updatedRecord);
-                } else {
-                  await updateRecordApi(updatedRecord);
-                  onUpdateStatus(record, RecordStatus.PENDING_CHECK);
-                }
+                });
               }
             }
 

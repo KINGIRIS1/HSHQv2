@@ -1,6 +1,6 @@
 
 import { RecordFile, RecordStatus, Employee, DangKyRecord } from '../types';
-import { detectProcedureId, getProcedureById, DANG_KY_DEADLINE_MAP, isDangKyRecordType, isArchiveRecordType, isDoDacRecordType } from '../constants/procedures';
+import { detectProcedureId, getProcedureById, DANG_KY_DEADLINE_MAP, isArchiveRecordType, isDoDacRecordType } from '../constants/procedures';
 
 // --- HÀM TIỆN ÍCH XỬ LÝ CHUỖI TIẾNG VIỆT ---
 export function removeVietnameseTones(str: string): string {
@@ -138,6 +138,9 @@ export function resolveRecordStatus(r: RecordFile | null | undefined): RecordSta
 
     // 2.8. Đã hoàn thành công việc / đo đạc (COMPLETED_WORK)
     if (r.completedWorkDate || r.status === RecordStatus.COMPLETED_WORK) {
+        if (isArchiveRecordType(r.recordType, r.code) || r.sourceTable === 'luutru_records' || isDoDacRecordType(r.recordType, r.code)) {
+            return RecordStatus.PENDING_CHECK;
+        }
         return RecordStatus.COMPLETED_WORK;
     }
 
@@ -649,17 +652,16 @@ export function processAssignmentTimelineCheck(
 export function getDepartmentForRecord(r: RecordFile): string {
     const code = (r.code || '').trim();
     const type = (r.recordType || '').trim();
-    const content = (r.content || '').trim();
     const procId = detectProcedureId(code, type);
 
-    if (code.startsWith('1.') || type.startsWith('1.') || procId.startsWith('1.') || isArchiveRecordType(type, code) || isArchiveRecordType(content)) {
+    if (code.startsWith('1.') || type.startsWith('1.') || procId.startsWith('1.')) {
         return 'Tổ Lưu trữ';
     }
-    if (code.startsWith('3.') || type.startsWith('3.') || procId.startsWith('3.') || isDangKyRecordType(type, code) || isDangKyRecordType(content) || r.sourceTable === 'dangky_records') {
-        return 'Tổ Cấp giấy';
-    }
-    if (code.startsWith('2.') || type.startsWith('2.') || procId.startsWith('2.') || isDoDacRecordType(type, code)) {
+    if (code.startsWith('2.') || type.startsWith('2.') || procId.startsWith('2.')) {
         return 'Tổ Đo đạc';
+    }
+    if (code.startsWith('3.') || type.startsWith('3.') || procId.startsWith('3.')) {
+        return 'Tổ Cấp giấy';
     }
 
     if (r.returnHandoverDept) {
@@ -815,7 +817,7 @@ export function extractBatchNumber(batch: number | string | null | undefined): n
  * Tự động gom các hồ sơ trước đây chưa chốt đợt (exportBatch rỗng/null)
  * hoặc hồ sơ có chữ "Đợt Cuối" thành đợt có số lớn nhất trong ngày.
  */
-export function migrateUnbatchedRecords(records: RecordFile[], holidays: any[] = []): { migratedRecords: RecordFile[], hasChanges: boolean } {
+export function migrateUnbatchedRecords(records: RecordFile[]): { migratedRecords: RecordFile[], hasChanges: boolean } {
     let hasChanges = false;
 
     // Pass 1: Build map of existing batches by date (YYYY-MM-DD)
@@ -857,18 +859,6 @@ export function migrateUnbatchedRecords(records: RecordFile[], holidays: any[] =
     const migratedRecords = records.map(r => {
         let currentBatch = r.exportBatch;
         let item = { ...r };
-
-        // Tự động kiểm tra và hiệu chỉnh Ngày hẹn trả (deadline) đúng theo quy định (nếu từng bị sai lệch trước đây)
-        if (item.receivedDate && item.recordType) {
-            const recDateStr = String(item.receivedDate).split('T')[0];
-            if (recDateStr) {
-                const correctDeadline = calculateDeadlineHelper(item.recordType, recDateStr, holidays, item.code, item.procedureId || undefined);
-                if (correctDeadline && item.deadline !== correctDeadline) {
-                    item.deadline = correctDeadline;
-                    hasChanges = true;
-                }
-            }
-        }
 
         // Tự động kiểm tra và chuẩn hóa trạng thái chuẩn theo mốc thời gian thực tế
         const resolvedStatus = resolveRecordStatus(item);
