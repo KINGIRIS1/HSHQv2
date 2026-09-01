@@ -26,6 +26,7 @@ import MobileLayout from './components/layout/MobileLayout';
 import MobileRoutes from './components/mobile/MobileRoutes';
 import UpdateRequiredModal from './components/UpdateRequiredModal';
 import SubmitModal from './components/receive-record/SubmitModal';
+import BulkSignConfirmModal from './components/BulkSignConfirmModal';
 import GlobalConfirmModal from './components/GlobalConfirmModal';
 import GlobalAlertModal from './components/GlobalAlertModal';
 import { checkAndTriggerWeeklyBackup, downloadBackupAsFile } from './services/backupService';
@@ -134,6 +135,8 @@ function App() {
   const [rejectReturnTargetRecords, setRejectReturnTargetRecords] = useState<RecordFile[]>([]);
   const [isExtendModalOpen, setIsExtendModalOpen] = useState(false);
   const [extendTargetRecords, setExtendTargetRecords] = useState<RecordFile[]>([]);
+  const [isBulkSignModalOpen, setIsBulkSignModalOpen] = useState(false);
+  const [bulkSignPendingRecords, setBulkSignPendingRecords] = useState<RecordFile[]>([]);
 
   // Report States
   const [globalReportContent, setGlobalReportContent] = useState('');
@@ -908,31 +911,36 @@ function App() {
       if (selectedRecordIds.size === 0) { alert("Vui lòng chọn ít nhất một hồ sơ để ký duyệt."); return; }
       const pendingSign = recordFilterProps.filteredRecords.filter(r => r.status === RecordStatus.PENDING_SIGN && selectedRecordIds.has(r.id));
       if (pendingSign.length === 0) { alert("Các hồ sơ được chọn không ở trạng thái chờ ký."); return; }
-      if(await confirmAction(`Xác nhận chuyển ${pendingSign.length} hồ sơ đang chọn sang "Đã ký"?`)) {
-          const nowStr = new Date().toISOString();
-          const updatedTargets = pendingSign.map(r => ({
-              ...r,
-              status: RecordStatus.SIGNED,
-              approvalDate: nowStr,
-              completedDate: null,
-              statusLogs: createStatusLog(r, RecordStatus.SIGNED, 'Ký duyệt đợt')
-          }));
-          setRecords(prev => prev.map(r => {
-              const updated = updatedTargets.find(p => p.id === r.id);
-              return updated ? updated : r;
-          }));
-          setSelectedRecordIds(new Set());
-          setToast({ type: 'success', message: `Đã chuyển ${pendingSign.length} hồ sơ sang "Đã ký".` });
+      
+      setBulkSignPendingRecords(pendingSign);
+      setIsBulkSignModalOpen(true);
+  };
 
-          try {
-              const res = await updateRecordsBatchById(updatedTargets);
-              if (!res.success) {
-                  await Promise.all(updatedTargets.map(r => updateRecordApi(r)));
-              }
-          } catch (e) {
-              console.error("Batch sign error:", e);
+  const handleExecuteSignBatch = async () => {
+      const nowStr = new Date().toISOString();
+      const updatedTargets = bulkSignPendingRecords.map(r => ({
+          ...r,
+          status: RecordStatus.SIGNED,
+          approvalDate: nowStr,
+          completedDate: null,
+          statusLogs: createStatusLog(r, RecordStatus.SIGNED, 'Ký duyệt đợt')
+      }));
+      setRecords(prev => prev.map(r => {
+          const updated = updatedTargets.find(p => p.id === r.id);
+          return updated ? updated : r;
+      }));
+      setSelectedRecordIds(new Set());
+      setToast({ type: 'success', message: `Đã chuyển ${bulkSignPendingRecords.length} hồ sơ sang "Đã ký".` });
+      setIsBulkSignModalOpen(false);
+
+      try {
+          const res = await updateRecordsBatchById(updatedTargets);
+          if (!res.success) {
               await Promise.all(updatedTargets.map(r => updateRecordApi(r)));
           }
+      } catch (e) {
+          console.error("Batch sign error:", e);
+          await Promise.all(updatedTargets.map(r => updateRecordApi(r)));
       }
   };
 
@@ -1497,6 +1505,13 @@ function App() {
             canPerformAction={canPerformAction}
             selectedRecordsForBulk={selectedRecordsForBulk}
             currentView={currentView}
+        />
+
+        <BulkSignConfirmModal 
+            isOpen={isBulkSignModalOpen}
+            onClose={() => setIsBulkSignModalOpen(false)}
+            onConfirm={handleExecuteSignBatch}
+            count={bulkSignPendingRecords.length}
         />
 
          <SubmitModal 
