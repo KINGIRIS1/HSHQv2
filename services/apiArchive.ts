@@ -1,5 +1,5 @@
 import { supabase, isConfigured } from './supabaseClient';
-import { logError, getFromCache, saveToCache, sanitizeData, sanitizePayloadFor22P02, executeSupabaseOperationWithAutoClean } from './apiCore';
+import { logError, getFromCache, saveToCache, sanitizeData, sanitizePayloadFor22P02 } from './apiCore';
 import { RecordFile, RecordStatus } from '../types';
 import { isArchiveRecordType, getShortRecordType } from '../constants';
 
@@ -29,7 +29,7 @@ const ARCHIVE_DB_COLUMNS = [
     'assignedDate', 'submissionDate', 'approvalDate', 'completedDate', 'status', 'assignedTo', 'submittedTo', 'checkedBy',
     'pendingCheckDate', 'checkedDate', 'completedWorkDate',
     'notes', 'privateNotes', 'personalNotes', 
-    'authorizedBy', 'authorizedPersonName', 'authorizedPersonId', 'authorizedPersonPhone', 'authorizedPersonAddress', 'authDocType', 'otherDocs', 'exportBatch', 'exportDate', 'handoverWard',
+    'authorizedBy', 'authDocType', 'otherDocs', 'exportBatch', 'exportDate', 'handoverWard',
     'measurementNumber', 'excerptNumber',
     'reminderDate', 'lastRemindedAt',
     'receiptNumber', 'resultReturnedDate', 'receiverName',
@@ -73,10 +73,6 @@ export const mapArchiveDbToRecordFile = (row: any): RecordFile => {
         privateNotes: row.privateNotes || null,
         personalNotes: row.personalNotes || null,
         authorizedBy: row.authorizedBy || null,
-        authorizedPersonName: row.authorizedPersonName || row.authorized_person_name || null,
-        authorizedPersonId: row.authorizedPersonId || row.authorized_person_id || null,
-        authorizedPersonPhone: row.authorizedPersonPhone || row.authorized_person_phone || null,
-        authorizedPersonAddress: row.authorizedPersonAddress || row.authorized_person_address || null,
         authDocType: row.authDocType || null,
         otherDocs: row.otherDocs || null,
         exportBatch: row.exportBatch || null,
@@ -243,59 +239,60 @@ export const migrateArchiveRecordsFromLandRecords = async () => {
     // Di chuyển và đồng bộ dữ liệu hồ sơ lưu trữ từ land_records sang luutru_records
     if (!isConfigured) return;
     try {
-        // Chỉ chọn id, recordType, code, content để lọc nhanh light-weight
-        const { data: landMeta, error: fetchError } = await supabase
+        const { data: landData, error: fetchError } = await supabase
             .from('land_records')
-            .select('id, recordType, code, content');
+            .select('*');
             
-        if (fetchError || !landMeta || landMeta.length === 0) return;
+        if (fetchError) {
+            console.warn('Lỗi khi kiểm tra land_records cho migration lưu trữ:', fetchError);
+            return;
+        }
+        if (!landData || landData.length === 0) return;
 
         // Lọc các hồ sơ thuộc loại Lưu trữ
-        const candidateIds = landMeta.filter((r: any) => 
+        const archiveRecordsToMigrate = landData.filter((r: any) => 
             isArchiveRecordType(r.recordType) || 
             isArchiveRecordType(r.content) || 
-            (r.code || '').startsWith('1.') ||
             r.recordType === 'Cung cấp tài liệu đất đai' ||
             r.recordType === 'Cung cấp dữ liệu đất đai' ||
             r.recordType === '1.1 Sao lục' ||
             r.recordType === '1.2 Công văn' ||
             r.recordType === '1.1 Sao lục hồ sơ' ||
             r.recordType === '1.1 Cung cấp dữ liệu đất đai'
-        ).map((r: any) => r.id);
+        );
 
-        if (candidateIds.length === 0) return;
-        console.log(`[Archive Migration] Tìm thấy ${candidateIds.length} hồ sơ lưu trữ trong land_records để chuyển sang luutru_records.`);
-
-        // Lấy chi tiết đầy đủ chỉ cho các hồ sơ cần di chuyển
-        const { data: archiveRecordsToMigrate } = await supabase
-            .from('land_records')
-            .select('*')
-            .in('id', candidateIds);
-
-        if (!archiveRecordsToMigrate || archiveRecordsToMigrate.length === 0) return;
+        if (archiveRecordsToMigrate.length === 0) return;
+        console.log(`[Archive Migration] Tìm thấy ${archiveRecordsToMigrate.length} hồ sơ lưu trữ trong land_records để chuyển sang luutru_records.`);
 
         const luutruPayloads = archiveRecordsToMigrate.map((r: any) => {
             return sanitizeData(r, ARCHIVE_DB_COLUMNS);
         });
 
-        // Upsert theo Batch (100 items/lần)
-        const batchSize = 100;
-        for (let i = 0; i < luutruPayloads.length; i += batchSize) {
-            const chunk = luutruPayloads.slice(i, i + batchSize);
-            const { error: insertError } = await executeSupabaseOperationWithAutoClean(
-                async (p) => await supabase.from('luutru_records').upsert(p),
-                chunk
-            );
-            if (insertError) {
-                console.error('Lỗi khi upsert chunk vào luutru_records trong migration:', insertError);
-            }
+        // Upsert vào luutru_records
+        let { error: insertError } = await supabase
+            .from('luutru_records')
+            .upsert(luutruPayloads);
+            
+        if (insertError && (insertError.code === '22P02' || String(insertError.message || '').includes('22P02'))) {
+            const clean = sanitizePayloadFor22P02(luutruPayloads);
+            const res = await supabase.from('luutru_records').upsert(clean);
+            insertError = res.error;
         }
 
-        // Xóa các hồ sơ này khỏi land_records
+        if (insertError) {
+            console.error('Lỗi khi upsert vào luutru_records trong migration:', insertError);
+            return;
+        }
+
+        // Xóa các hồ sơ này khỏi land_records để tránh phân mảnh và trùng lặp dữ liệu
         const idsToDelete = archiveRecordsToMigrate.map((r: any) => r.id);
-        for (let i = 0; i < idsToDelete.length; i += batchSize) {
-            const chunkIds = idsToDelete.slice(i, i + batchSize);
-            await supabase.from('land_records').delete().in('id', chunkIds);
+        const { error: deleteError } = await supabase
+            .from('land_records')
+            .delete()
+            .in('id', idsToDelete);
+            
+        if (deleteError) {
+            console.warn('Cảnh báo khi xóa hồ sơ lưu trữ khỏi land_records:', deleteError);
         }
 
         console.log(`[Archive Migration] Đã di chuyển thành công ${archiveRecordsToMigrate.length} hồ sơ lưu trữ sang luutru_records.`);
@@ -307,17 +304,16 @@ export const migrateArchiveRecordsFromLandRecords = async () => {
 // Giữ alias tương thích
 export const migrateCungCapTaiLieu = migrateArchiveRecordsFromLandRecords;
 
-export const fetchArchiveRecords = async (type: 'saoluc' | 'vaoso' | 'congvan', onProgress?: (loaded: ArchiveRecord[]) => void): Promise<ArchiveRecord[]> => {
+export const fetchArchiveRecords = async (type: 'saoluc' | 'vaoso' | 'congvan'): Promise<ArchiveRecord[]> => {
     if (!isConfigured) {
-        const { getFromCacheAsync } = await import('./apiCore');
-        const cached = await getFromCacheAsync<ArchiveRecord[]>(CACHE_KEY_ARCHIVE, []);
+        const cached = getFromCache<ArchiveRecord[]>(CACHE_KEY_ARCHIVE, []);
         if (MOCK_ARCHIVE.length === 0 && cached.length > 0) MOCK_ARCHIVE = cached;
         return MOCK_ARCHIVE.filter(r => r.type === type);
     }
     try {
         let allData: ArchiveRecord[] = [];
         let page = 0;
-        const pageSize = 500;
+        const pageSize = 1000;
         let hasMore = true;
 
         while (hasMore) {
@@ -336,21 +332,16 @@ export const fetchArchiveRecords = async (type: 'saoluc' | 'vaoso' | 'congvan', 
                 const mapped = data.map(item => mapLuutruDbToArchiveRecord(item));
                 const filtered = mapped.filter(r => r.type === type);
                 allData = [...allData, ...filtered];
-                if (onProgress) {
-                    onProgress(allData);
-                }
                 if (data.length < pageSize) hasMore = false;
                 else page++;
             } else {
                 hasMore = false;
             }
         }
-        saveToCache(CACHE_KEY_ARCHIVE, allData);
         return allData;
     } catch (error: any) {
         logError(`fetchArchiveRecords-${type}`, error, true);
-        const { getFromCacheAsync } = await import('./apiCore');
-        const cached = await getFromCacheAsync<ArchiveRecord[]>(CACHE_KEY_ARCHIVE, []);
+        const cached = getFromCache<ArchiveRecord[]>(CACHE_KEY_ARCHIVE, []);
         if (MOCK_ARCHIVE.length === 0 && cached.length > 0) MOCK_ARCHIVE = cached;
         return MOCK_ARCHIVE.filter(r => r.type === type);
     }
@@ -381,17 +372,27 @@ export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise
         const payload = mapArchiveRecordToLuutruDb(record);
 
         if (record.id) {
-            const { data, error } = await executeSupabaseOperationWithAutoClean(
-                async (p) => await supabase.from('luutru_records').update(p).eq('id', record.id!).select(),
-                payload
-            );
+            let { data, error } = await supabase.from('luutru_records').update(payload).eq('id', record.id).select();
+            
+            if (error && (error.code === '22P02' || String(error.message || '').includes('22P02'))) {
+                const cleanPayload = sanitizePayloadFor22P02(payload);
+                const res = await supabase.from('luutru_records').update(cleanPayload).eq('id', record.id).select();
+                data = res.data;
+                error = res.error;
+            }
+
             if (error) throw error;
             return data && data.length > 0 ? mapLuutruDbToArchiveRecord(data[0]) : null;
         } else {
-            const { data, error } = await executeSupabaseOperationWithAutoClean(
-                async (p) => await supabase.from('luutru_records').insert([p]).select(),
-                payload
-            );
+            let { data, error } = await supabase.from('luutru_records').insert([payload]).select();
+            
+            if (error && (error.code === '22P02' || String(error.message || '').includes('22P02'))) {
+                const cleanPayload = sanitizePayloadFor22P02(payload);
+                const res = await supabase.from('luutru_records').insert([cleanPayload]).select();
+                data = res.data;
+                error = res.error;
+            }
+
             if (error) throw error;
             return data && data.length > 0 ? mapLuutruDbToArchiveRecord(data[0]) : null;
         }
@@ -437,10 +438,12 @@ export const importArchiveRecords = async (records: Partial<ArchiveRecord>[]): P
     try {
         const payload = records.map(r => mapArchiveRecordToLuutruDb(r));
 
-        const { error } = await executeSupabaseOperationWithAutoClean(
-            async (p) => await supabase.from('luutru_records').insert(p),
-            payload
-        );
+        let { error } = await supabase.from('luutru_records').insert(payload);
+        if (error && (error.code === '22P02' || String(error.message || '').includes('22P02'))) {
+            const cleanPayload = sanitizePayloadFor22P02(payload);
+            const res = await supabase.from('luutru_records').insert(cleanPayload);
+            error = res.error;
+        }
         if (error) throw error;
         return true;
     } catch (error) {
@@ -485,10 +488,12 @@ export const updateArchiveRecordsBatch = async (ids: string[], updates: Partial<
             return mapArchiveRecordToLuutruDb(mergedArch);
         });
 
-        const { error: upsertError } = await executeSupabaseOperationWithAutoClean(
-            async (p) => await supabase.from('luutru_records').upsert(p),
-            updatedPayloads
-        );
+        let { error: upsertError } = await supabase.from('luutru_records').upsert(updatedPayloads);
+        if (upsertError && (upsertError.code === '22P02' || String(upsertError.message || '').includes('22P02'))) {
+            const cleanPayload = sanitizePayloadFor22P02(updatedPayloads);
+            const res = await supabase.from('luutru_records').upsert(cleanPayload);
+            upsertError = res.error;
+        }
 
         if (upsertError) throw upsertError;
         return true;

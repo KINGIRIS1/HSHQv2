@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
 import Barcode from 'react-barcode';
 import { RecordFile } from '../../types';
-import { getNormalizedWard, getShortRecordType, getWardFullLabel, getCanonicalRecordType } from '../../constants';
+import { getNormalizedWard, getShortRecordType, getFullRecordType, getWardFullLabel } from '../../constants';
 import { Printer, FileSignature } from 'lucide-react';
 
 interface SystemReceiptTemplateProps {
@@ -154,17 +154,6 @@ const SystemReceiptTemplate: React.FC<SystemReceiptTemplateProps> = ({ data, rec
     const currentUserName = currentUser?.name || currentUser?.username || 'NGUYỄN HỮU TRÍ';
     const wardName = getNormalizedWard(data.ward || '');
 
-    const isTrichDo22 = (() => {
-        const rawType = (data.recordType || '').trim().toLowerCase();
-        const rawCode = (data.code || '').trim().toUpperCase();
-        const shortType = getShortRecordType(data.recordType, data.code).toLowerCase();
-
-        if (shortType.startsWith('2.2') || rawType.startsWith('2.2')) return true;
-        if (rawCode.startsWith('2.2') || rawCode.startsWith('TD-') || rawCode.startsWith('TD_') || rawCode.startsWith('YC-') || rawCode.startsWith('YCDD-') || rawCode.startsWith('TRICHDO')) return true;
-        if ((rawType.includes('trích đo') || rawType.includes('trich do')) && !rawType.includes('cắm mốc') && !rawType.includes('tách') && !rawType.includes('chỉnh lý') && !rawType.includes('trích lục')) return true;
-        return false;
-    })();
-
     const getDisplayLandAddress = () => {
         let addr = '';
         if (data.address) {
@@ -276,9 +265,9 @@ const SystemReceiptTemplate: React.FC<SystemReceiptTemplateProps> = ({ data, rec
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
                 <div className="flex justify-between items-center p-4 border-b">
-                    <h2 className="text-xl font-bold">In Biên Nhận & Phiếu Kiểm Soát</h2>
+                    <h2 className="text-xl font-bold">In Biên Nhận & Quy trình</h2>
                     <div className="flex space-x-2">
-                        {onCreateContract && data && data.recordType && (getShortRecordType(data.recordType).startsWith('2.1') || getShortRecordType(data.recordType).startsWith('2.2') || getShortRecordType(data.recordType).startsWith('2.4') || getShortRecordType(data.recordType).startsWith('2.5')) && (
+                        {onCreateContract && data && data.recordType && (getShortRecordType(data.recordType).startsWith('2.2') || getShortRecordType(data.recordType).startsWith('2.4')) && (
                             <button onClick={() => { onCreateContract(data); onClose(); }} className="flex items-center px-4 py-2 bg-amber-600 text-white rounded hover:bg-amber-700">
                                 <FileSignature className="w-4 h-4 mr-2" /> Lập Hợp Đồng
                             </button>
@@ -287,7 +276,7 @@ const SystemReceiptTemplate: React.FC<SystemReceiptTemplateProps> = ({ data, rec
                             <Printer className="w-4 h-4 mr-2" /> In Biên Nhận
                         </button>
                         <button onClick={handlePrintControlSlip} className="flex items-center px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700">
-                            <Printer className="w-4 h-4 mr-2" /> In Phiếu Quy Trình
+                            <Printer className="w-4 h-4 mr-2" /> In Quy Trình
                         </button>
                         <button onClick={handlePrintAll} className="flex items-center px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
                             <Printer className="w-4 h-4 mr-2" /> In Tất Cả
@@ -340,7 +329,7 @@ const SystemReceiptTemplate: React.FC<SystemReceiptTemplateProps> = ({ data, rec
                                     <div>Thửa: {data.landPlot}</div>
                                 </div>
                                 <div>Địa chỉ thửa đất: <span className="font-bold">{getDisplayLandAddress()}</span></div>
-                                <div>Thủ tục hành chính cần giải quyết: <span className="font-bold">{getCanonicalRecordType(data.recordType, data.code)}</span></div>
+                                <div>Thủ tục hành chính cần giải quyết: <span className="font-bold">{getFullRecordType(data.recordType)}</span></div>
                                 
                                 <div>1. Thành phần hồ sơ, yêu cầu và số lượng mỗi loại giấy tờ gồm:</div>
                                 <table className="w-full border-collapse border border-black mt-1 mb-2">
@@ -367,7 +356,7 @@ const SystemReceiptTemplate: React.FC<SystemReceiptTemplateProps> = ({ data, rec
                                 <div>2. Số lượng hồ sơ: 01 (bộ)</div>
                                 <div>3. Thời gian nhận hồ sơ: <span className="font-bold">{formatDateTime(rDate)}</span></div>
                                 <div>4. Thời gian dự kiến trả kết quả giải quyết hồ sơ: <span className="font-bold">{formatDateTime(dDate)}</span></div>
-                                {isTrichDo22 ? (
+                                {data.recordType && (getShortRecordType(data.recordType) === '2.2 Trích đo' || data.recordType.includes('2.2')) ? (
                                     <>
                                         <div className="font-bold">5. YÊU CẦU CHỦ SỬ DỤNG ĐẤT CẮM RANH THỬA ĐẤT CẦN ĐO, MỜI LIÊN RANH LIỀN KỀ XÁC MINH RANH MỐC VÀ KÝ RANH TẠI THỬA ĐẤT</div>
                                         <div>6. Đăng ký trả kết quả tại: Trung tâm phục vụ hành chính công {getWardFullLabel(receivingWard)}</div>

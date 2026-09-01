@@ -1,26 +1,26 @@
 import React, { useState } from 'react';
-import { RecordFile, RecordStatus, Employee, User, UserRole } from '../../types';
-import { STATUS_LABELS } from '../../constants';
-import { getShortRecordType } from '../../constants/procedures';
+import { RecordFile, RecordStatus, Employee } from '../../types';
+import { STATUS_LABELS, SELECTABLE_STATUSES, RECORD_TYPES, getShortRecordType } from '../../constants';
 import StatusBadge from '../StatusBadge';
 import { 
   Search, 
   Filter, 
   ChevronRight, 
   MapPin, 
-  User as UserIcon, 
+  User, 
   Phone, 
   Calendar,
   Clock,
   MoreVertical,
   Plus,
-  Map
+  Map,
+  SlidersHorizontal,
+  X
 } from 'lucide-react';
 
 interface MobileRecordListProps {
   records: RecordFile[];
   employees: Employee[];
-  currentUser?: User;
   onViewRecord: (r: RecordFile) => void;
   onEditRecord: (r: RecordFile) => void;
   onDeleteRecord: (r: RecordFile) => void;
@@ -30,20 +30,26 @@ interface MobileRecordListProps {
 const MobileRecordList: React.FC<MobileRecordListProps> = ({ 
   records, 
   employees, 
-  currentUser,
   onViewRecord, 
   onEditRecord, 
   onDeleteRecord,
   onAddRecord
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+  const [filterRecordType, setFilterRecordType] = useState('all');
+  const [filterStatus, setFilterStatus] = useState('all');
+  const [filterEmployee, setFilterEmployee] = useState('all');
+  const [filterWard, setFilterWard] = useState('all');
+  const [showAdvancedFilter, setShowAdvancedFilter] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
 
   // Reset page when filtering
   React.useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm]);
+  }, [searchTerm, fromDate, toDate, filterRecordType, filterStatus, filterEmployee, filterWard]);
 
   const formatDateDDMMYYYY = (dateStr?: string | null) => {
     if (!dateStr) return 'N/A';
@@ -59,20 +65,51 @@ const MobileRecordList: React.FC<MobileRecordListProps> = ({
     }
   };
 
-  // Restrict records for employee role
-  const accessibleRecords = React.useMemo(() => {
-    if (currentUser?.role === UserRole.EMPLOYEE && currentUser?.employeeId) {
-      return records.filter(r => r.assignedTo === currentUser.employeeId);
-    }
-    return records;
-  }, [records, currentUser]);
-
-  const filtered = accessibleRecords.filter(r => {
+  const filtered = records.filter(r => {
+    // 1. Tìm kiếm
     const matchesSearch = 
       r.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       r.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (r.phoneNumber && r.phoneNumber.includes(searchTerm));
-    return matchesSearch;
+    if (!matchesSearch) return false;
+
+    // 2. Thời gian
+    if (fromDate || toDate) {
+      const datesToCheck: string[] = [];
+      if (r.receivedDate) datesToCheck.push(r.receivedDate.split('T')[0]);
+      if (r.assignedDate) datesToCheck.push(r.assignedDate.split('T')[0]);
+      if (r.resultReturnedDate) datesToCheck.push(r.resultReturnedDate.split('T')[0]);
+      if (r.completedDate) datesToCheck.push(r.completedDate.split('T')[0]);
+
+      if (datesToCheck.length === 0) return false;
+
+      const matchesDate = datesToCheck.some(d => {
+        if (fromDate && d < fromDate) return false;
+        if (toDate && d > toDate) return false;
+        return true;
+      });
+      if (!matchesDate) return false;
+    }
+
+    // 3. Loại hồ sơ
+    if (filterRecordType !== 'all') {
+      const shortType = getShortRecordType(r.recordType);
+      if (shortType !== filterRecordType && r.recordType !== filterRecordType) return false;
+    }
+
+    // 4. Trạng thái hồ sơ
+    if (filterStatus !== 'all' && r.status !== filterStatus) return false;
+
+    // 5. Cán bộ xử lý
+    if (filterEmployee !== 'all') {
+      if (filterEmployee === 'unassigned' && r.assignedTo) return false;
+      if (filterEmployee !== 'unassigned' && r.assignedTo !== filterEmployee) return false;
+    }
+
+    // 6. Xã / Phường
+    if (filterWard !== 'all' && r.ward !== filterWard) return false;
+
+    return true;
   });
 
   const getStatusColor = (status: RecordStatus) => {
@@ -111,12 +148,120 @@ const MobileRecordList: React.FC<MobileRecordListProps> = ({
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-            <div className="text-xs font-bold text-slate-500 whitespace-nowrap px-3 py-2 bg-slate-100 rounded-xl border border-slate-200">
+          <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
+            <button
+              onClick={() => setShowAdvancedFilter(!showAdvancedFilter)}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-colors ${
+                showAdvancedFilter || fromDate || toDate || filterRecordType !== 'all' || filterStatus !== 'all' || filterEmployee !== 'all' || filterWard !== 'all'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+              }`}
+            >
+              <Filter size={14} />
+              <span>Bộ lọc</span>
+            </button>
+
+            <div className="text-xs font-bold text-slate-500 whitespace-nowrap px-2 bg-slate-100 py-2 rounded-xl border border-slate-200 ml-auto">
               {filtered.length} hồ sơ
             </div>
           </div>
         </div>
+
+        {/* Expandable Unified Filter Panel */}
+        {showAdvancedFilter && (
+          <div className="mt-3 pt-3 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5 bg-slate-50 p-3 rounded-xl border border-slate-200">
+            {/* 1. Thời gian */}
+            <div>
+              <label className="text-[11px] font-bold text-slate-600 mb-1 flex items-center gap-1">
+                <Calendar size={12} /> Thời gian:
+              </label>
+              <div className="flex items-center gap-1">
+                <input
+                  type="date"
+                  value={fromDate}
+                  onChange={(e) => setFromDate(e.target.value)}
+                  className="w-full text-xs p-1.5 border border-slate-200 rounded-lg bg-white"
+                />
+                <span className="text-slate-400 text-xs">-</span>
+                <input
+                  type="date"
+                  value={toDate}
+                  onChange={(e) => setToDate(e.target.value)}
+                  className="w-full text-xs p-1.5 border border-slate-200 rounded-lg bg-white"
+                />
+              </div>
+            </div>
+
+            {/* 2. Loại hồ sơ */}
+            <div>
+              <label className="text-[11px] font-bold text-slate-600 mb-1 flex items-center gap-1">
+                <Filter size={12} /> Loại hồ sơ:
+              </label>
+              <select
+                value={filterRecordType}
+                onChange={(e) => setFilterRecordType(e.target.value)}
+                className="w-full text-xs p-1.5 border border-slate-200 rounded-lg bg-white font-medium"
+              >
+                <option value="all">Tất cả loại HS</option>
+                {RECORD_TYPES.map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* 3. Trạng thái hồ sơ */}
+            <div>
+              <label className="text-[11px] font-bold text-slate-600 mb-1 flex items-center gap-1">
+                <SlidersHorizontal size={12} /> Trạng thái hồ sơ:
+              </label>
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="w-full text-xs p-1.5 border border-slate-200 rounded-lg bg-white font-medium"
+              >
+                <option value="all">Mọi trạng thái</option>
+                {SELECTABLE_STATUSES.map((item) => (
+                  <option key={item.key} value={item.key}>{item.label}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* 4. Cán bộ xử lý */}
+            <div>
+              <label className="text-[11px] font-bold text-slate-600 mb-1 flex items-center gap-1">
+                <User size={12} /> Cán bộ xử lý:
+              </label>
+              <select
+                value={filterEmployee}
+                onChange={(e) => setFilterEmployee(e.target.value)}
+                className="w-full text-xs p-1.5 border border-slate-200 rounded-lg bg-white font-medium"
+              >
+                <option value="all">Tất cả cán bộ</option>
+                <option value="unassigned">Chưa giao</option>
+                {employees.map((emp) => (
+                  <option key={emp.id} value={emp.id}>{emp.name}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* 5. Xã / Phường */}
+            <div>
+              <label className="text-[11px] font-bold text-slate-600 mb-1 flex items-center gap-1">
+                <MapPin size={12} /> Xã / Phường:
+              </label>
+              <select
+                value={filterWard}
+                onChange={(e) => setFilterWard(e.target.value)}
+                className="w-full text-xs p-1.5 border border-slate-200 rounded-lg bg-white font-medium"
+              >
+                <option value="all">Tất cả Xã/Phường</option>
+                {Array.from(new Set(records.map(r => r.ward).filter((w): w is string => !!w))).map(w => (
+                  <option key={w} value={w}>{w}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Record List Grid */}
@@ -157,7 +302,7 @@ const MobileRecordList: React.FC<MobileRecordListProps> = ({
                         {record.recordType && (
                           <div className="flex items-center gap-1.5 col-span-2">
                             <span className="text-slate-400 font-bold" title="Loại hồ sơ">📄</span>
-                            <span className="truncate text-slate-700" title={record.recordType || ''}>{getShortRecordType(record.recordType, record.code)}</span>
+                            <span className="truncate text-slate-700">{record.recordType}</span>
                           </div>
                         )}
 

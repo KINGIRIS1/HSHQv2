@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { RecordFile, RecordStatus, User } from '../types';
-import { getWardLabel } from '../constants';
-import { formatDateDDMMYYYY, formatBatchName, extractDateFromBatch } from '../utils/appHelpers';
+import { getWardLabel, GROUPS } from '../constants';
+import { formatDateDDMMYYYY, formatBatchName, parseSafeDate, formatDateKey, getPureBatchNumber } from '../utils/appHelpers';
 import { fetchChinhLyRecords } from '../services/apiUtilities';
 
 interface AddToBatchModalProps {
@@ -34,13 +34,10 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
   // Ngày hiện tại cho đợt mới (YYYY-MM-DD)
   const todayStr = new Date().toISOString().split('T')[0];
 
-  useEffect(() => {
-      if (isOpen) {
-          setSelectedHandoverWard('');
-          setNeedsCorrectionConfirm(false);
-          setMode('new');
-      }
-  }, [isOpen]);
+  const availableWards = useMemo(() => {
+    const list = wards && wards.length > 0 ? wards : GROUPS;
+    return Array.from(new Set(list));
+  }, [wards]);
 
   // State danh sách cảnh báo thực tế
   const [filteredWarningList, setFilteredWarningList] = useState<RecordFile[]>([]);
@@ -49,6 +46,147 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
     if (!isOpen || !targetRecords) return '';
     return targetRecords.map(r => `${r.id}_${r.needsMapCorrection ? 1 : 0}`).join(',');
   }, [isOpen, targetRecords]);
+
+  // Tính số đợt tiếp theo trong ngày hôm nay
+  const nextBatchInfo = useMemo(() => {
+      let maxBatch = 0;
+      records.forEach(r => {
+          if (!r.exportDate || !r.exportDate.startsWith(todayStr)) return;
+
+          if (r.exportBatch) {
+              const batchStr = String(r.exportBatch);
+              const match = batchStr.match(/Đợt\s*(\d+)/i) || batchStr.match(/^(\d+)$/);
+              if (match && match[1]) {
+                  const num = parseInt(match[1], 10);
+                  if (num > maxBatch) maxBatch = num;
+              }
+          }
+      });
+
+      const nextNum = maxBatch + 1;
+      const todayFmt = formatDateDDMMYYYY(todayStr);
+      const fullBatchName = `Đợt ${nextNum} - Ngày ${todayFmt}`;
+
+      return {
+          batchNum: nextNum,
+          batchName: fullBatchName,
+          date: new Date().toISOString()
+      };
+  }, [records, todayStr]);
+
+  // Danh sách đợt đã có (Sắp xếp theo ngày và đợt từ lớn đến nhỏ - mới nhất xếp đầu)
+  const historyBatches = useMemo(() => {
+      const batches: Record<string, { label: string, date: string, count: number, fullDate: string, timestamp: number }> = {};
+      
+      records.forEach(r => {
+          if (r.exportBatch && String(r.exportBatch).trim() !== '' && String(r.exportBatch) !== 'NOT_BATCHED') {
+              const rawDate = r.exportDate || r.completedDate || r.receivedDate;
+              const datePart = rawDate ? String(rawDate).split('T')[0] : '';
+              const label = formatBatchName(r.exportBatch, '', datePart);
+              
+              if (!batches[label]) {
+                  // Trích xuất ngày chuẩn từ nhãn label hoặc rawDate
+                  let parsedDate: Date | null = null;
+                  
+                  // 1. Lấy ngày dạng DD/MM/YYYY từ nhãn (ví dụ: "Đợt 1 - Ngày 28/08/2026")
+                  const dmyMatch = label.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+                  if (dmyMatch) {
+                      const day = parseInt(dmyMatch[1], 10);
+                      const month = parseInt(dmyMatch[2], 10) - 1;
+                      const year = parseInt(dmyMatch[3], 10);
+                      parsedDate = new Date(year, month, day);
+                  }
+                  
+                  // 2. Lấy ngày dạng YYYY-MM-DD từ nhãn
+                  if (!parsedDate || isNaN(parsedDate.getTime())) {
+                      const ymdMatch = label.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+                      if (ymdMatch) {
+                          const year = parseInt(ymdMatch[1], 10);
+                          const month = parseInt(ymdMatch[2], 10) - 1;
+                          const day = parseInt(ymdMatch[3], 10);
+                          parsedDate = new Date(year, month, day);
+                      }
+                  }
+
+                  // 3. Nếu label không chứa thông tin ngày, lấy từ rawDate
+                  if ((!parsedDate || isNaN(parsedDate.getTime())) && rawDate) {
+                      parsedDate = parseSafeDate(rawDate);
+                  }
+
+                  const timestamp = (parsedDate && !isNaN(parsedDate.getTime())) ? parsedDate.getTime() : 0;
+                  const dateIsoStr = (parsedDate && !isNaN(parsedDate.getTime())) ? formatDateKey(parsedDate) : (datePart || '');
+
+                  batches[label] = { 
+                      label,
+                      date: dateIsoStr, 
+                      count: 0,
+                      fullDate: rawDate || new Date().toISOString(),
+                      timestamp
+                  };
+              }
+              batches[label].count++;
+          }
+      });
+
+      const nowEnd = new Date();
+      nowEnd.setHours(23, 59, 59, 999);
+      const nowTimestamp = nowEnd.getTime();
+
+      const getBatchNum = (batchStr: string) => {
+          const match = String(batchStr).match(/Đợt\s*0*(\d+)/i) || String(batchStr).match(/^(\d+)$/);
+          return match && match[1] ? parseInt(match[1], 10) : 0;
+      };
+
+      return Object.values(batches).sort((a, b) => {
+          const aIsFuture = a.timestamp > nowTimestamp;
+          const bIsFuture = b.timestamp > nowTimestamp;
+
+          // 1. Ưu tiên các đợt từ hôm nay trở về trước (không vượt quá ngày hiện tại) lên trên các đợt tương lai
+          if (aIsFuture !== bIsFuture) {
+              return aIsFuture ? 1 : -1;
+          }
+
+          // 2. So sánh ngày giảm dần (ngày mới nhất trước dựa trên timestamp Unix)
+          if (a.timestamp !== b.timestamp) {
+              return b.timestamp - a.timestamp;
+          }
+          // 3. Nếu cùng ngày, so sánh số đợt giảm dần (từ lớn đến nhỏ)
+          const numA = getBatchNum(a.label);
+          const numB = getBatchNum(b.label);
+          if (numA !== numB) {
+              return numB - numA;
+          }
+          return b.label.localeCompare(a.label, undefined, { numeric: true });
+      });
+  }, [records]);
+
+  const selectExistingMode = () => {
+      setMode('existing');
+      if (historyBatches.length > 0) {
+          setSelectedExistingBatch(historyBatches[0].label);
+      }
+  };
+
+  useEffect(() => {
+      if (isOpen) {
+          setSelectedHandoverWard('');
+          setNeedsCorrectionConfirm(false);
+          setMode('new');
+          if (historyBatches.length > 0) {
+              setSelectedExistingBatch(historyBatches[0].label);
+          } else {
+              setSelectedExistingBatch('');
+          }
+      }
+  }, [isOpen, historyBatches]);
+
+  useEffect(() => {
+      if (mode === 'existing' && historyBatches.length > 0) {
+          if (!selectedExistingBatch || !historyBatches.some(h => h.label === selectedExistingBatch)) {
+              setSelectedExistingBatch(historyBatches[0].label);
+          }
+      }
+  }, [mode, historyBatches, selectedExistingBatch]);
 
   useEffect(() => {
       const checkWarnings = async () => {
@@ -78,106 +216,30 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
       checkWarnings();
   }, [isOpen, targetIdsKey]);
 
-  // Tính số đợt tiếp theo trong ngày hôm nay
-  const nextBatchInfo = useMemo(() => {
-      let maxBatch = 0;
-      records.forEach(r => {
-          if (!r.exportDate || !r.exportDate.startsWith(todayStr)) return;
-
-          if (r.exportBatch) {
-              const batchStr = String(r.exportBatch);
-              const match = batchStr.match(/Đợt\s*(\d+)/i) || batchStr.match(/^(\d+)$/);
-              if (match && match[1]) {
-                  const num = parseInt(match[1], 10);
-                  if (num > maxBatch) maxBatch = num;
-              }
-          }
-      });
-
-      const nextNum = maxBatch + 1;
-      const todayFmt = formatDateDDMMYYYY(todayStr);
-      const fullBatchName = `Đợt ${nextNum} - Ngày ${todayFmt}`;
-
-      return {
-          batchNum: nextNum,
-          batchName: fullBatchName,
-          date: new Date().toISOString()
-      };
-  }, [records, todayStr]);
-
-  // Danh sách đợt đã có
-  const historyBatches = useMemo(() => {
-      const batches: Record<string, { label: string, date: string, count: number, fullDate: string }> = {};
-      
-      records.forEach(r => {
-          if ((r.status === RecordStatus.HANDOVER || r.status === RecordStatus.SIGNED || r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED || r.exportBatch) && r.exportBatch) {
-              let datePart = r.exportDate ? r.exportDate.split('T')[0] : extractDateFromBatch(r.exportBatch);
-              if (!datePart) {
-                  datePart = (r.completedDate || r.receivedDate || new Date().toISOString()).split('T')[0];
-              }
-              const label = formatBatchName(r.exportBatch, '', datePart);
-              
-              if (!batches[label]) {
-                  batches[label] = { 
-                      label,
-                      date: datePart, 
-                      count: 0,
-                      fullDate: r.exportDate || new Date(datePart).toISOString() 
-                  };
-              }
-              batches[label].count++;
-          }
-      });
-
-      // Sắp xếp giảm dần theo ngày chuyển, sau đó giảm dần theo số thứ tự đợt
-      return Object.values(batches).sort((a, b) => {
-          const dateCompare = b.date.localeCompare(a.date);
-          if (dateCompare !== 0) return dateCompare;
-          
-          const getBatchNum = (batchVal: string) => {
-              const match = batchVal.match(/Đợt\s*(\d+)/i) || batchVal.match(/^(\d+)$/);
-              return match ? parseInt(match[1], 10) : 0;
-          };
-          return getBatchNum(b.label) - getBatchNum(a.label);
-      });
-  }, [records]);
-
-  useEffect(() => {
-      if (mode === 'existing') {
-          if (historyBatches.length > 0) {
-              const exists = historyBatches.some(h => h.label === selectedExistingBatch);
-              if (!exists) {
-                  setSelectedExistingBatch(historyBatches[0].label);
-              }
-          } else {
-              setSelectedExistingBatch('');
-          }
-      }
-  }, [mode, historyBatches, selectedExistingBatch]);
-
   if (!isOpen) return null;
 
   const todayFmt = formatDateDDMMYYYY(todayStr);
 
   const handleConfirm = () => {
-      if (!selectedHandoverWard) {
-          alert('Vui lòng chọn địa giới hành chính trước khi chốt danh sách bàn giao!');
+      if (!selectedHandoverWard || !selectedHandoverWard.trim()) {
+          alert('Vui lòng chọn Xã/phường nhận kết quả.');
           return;
       }
       const handoverWard = selectedHandoverWard;
 
       if (mode === 'new') {
-          onConfirm(nextBatchInfo.batchName, nextBatchInfo.date, handoverWard);
+          onConfirm(String(nextBatchInfo.batchNum), nextBatchInfo.date, handoverWard);
       } else {
           if (!selectedExistingBatch) {
               alert('Vui lòng chọn một đợt cũ.');
               return;
           }
           const found = historyBatches.find(h => h.label === selectedExistingBatch);
+          const pureNum = getPureBatchNumber(selectedExistingBatch);
           if (found) {
-              onConfirm(found.label, found.fullDate, handoverWard);
+              onConfirm(pureNum || found.label, found.fullDate, handoverWard);
           } else {
-              onConfirm(selectedExistingBatch, new Date().toISOString(), handoverWard);
+              onConfirm(pureNum || selectedExistingBatch, new Date().toISOString(), handoverWard);
           }
       }
       setNeedsCorrectionConfirm(false);
@@ -231,7 +293,7 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
 
             {/* Option 2: Thêm vào đợt cũ */}
             <div 
-                onClick={() => setMode('existing')}
+                onClick={selectExistingMode}
                 className={`flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition-all ${
                     mode === 'existing' 
                     ? 'bg-green-50/50 border-green-500 shadow-sm ring-1 ring-green-500/20' 
@@ -242,7 +304,7 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
                     type="radio" 
                     name="batchMode" 
                     checked={mode === 'existing'} 
-                    onChange={() => setMode('existing')}
+                    onChange={selectExistingMode}
                     className="mt-1 w-4 h-4 text-green-600 focus:ring-green-500"
                 />
                 <div className="flex-1 space-y-2">
@@ -260,7 +322,7 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
                         {historyBatches.length > 0 ? (
                             historyBatches.map(h => (
                                 <option key={h.label} value={h.label}>
-                                    {h.label} - Ngày {formatDateDDMMYYYY(h.date)} (Đã có {h.count} HS)
+                                    {h.label} (Đã có {h.count} HS)
                                 </option>
                             ))
                         ) : (
@@ -270,18 +332,32 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
                 </div>
             </div>
 
-            {/* Giao khác địa bàn */}
-            <div className="space-y-1.5 pt-2">
-                <label className="block text-xs font-bold text-gray-800">
-                    Chọn địa giới bàn giao <span className="text-red-500">*</span>
+            {/* Xã/phường nhận kết quả */}
+            <div className="space-y-2 pt-2 border-t border-gray-100">
+                <label className="block text-xs font-bold text-gray-800 flex items-center justify-between">
+                    <span className="flex items-center gap-1">
+                        <span>Xã/phường nhận kết quả</span>
+                        <span className="text-red-500 font-bold">*</span>
+                    </span>
+                    {selectedHandoverWard ? (
+                        <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                            Đã chọn: {getWardLabel(selectedHandoverWard)}
+                        </span>
+                    ) : (
+                        <span className="text-[11px] font-normal text-amber-600 italic">
+                            Chưa chọn xã/phường
+                        </span>
+                    )}
                 </label>
+
+                {/* Select chọn Xã/Phường (sử dụng tên rút gọn) */}
                 <select 
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-blue-500 outline-none font-medium bg-white text-gray-800"
                     value={selectedHandoverWard}
                     onChange={(e) => setSelectedHandoverWard(e.target.value)}
                 >
-                    <option value="">-- Chọn địa giới (Bắt buộc) --</option>
-                    {wards.map(w => (
+                    <option value="">-- Chọn Xã/phường nhận kết quả --</option>
+                    {availableWards.map(w => (
                         <option key={w} value={w}>{getWardLabel(w)}</option>
                     ))}
                 </select>
@@ -299,7 +375,6 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
             </button>
             <button 
                 onClick={handleConfirm} 
-                disabled={!selectedHandoverWard}
                 className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold text-sm shadow-sm transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
             >
                 Xác nhận chốt
@@ -312,3 +387,4 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
 };
 
 export default AddToBatchModal;
+

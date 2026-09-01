@@ -7,9 +7,7 @@ import cors from 'cors';
 import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const appDirname = __dirname || process.cwd();
+const appDirname = typeof __dirname !== 'undefined' ? __dirname : process.cwd();
 
 const server = jsonServer.create();
 let dbFile = process.env.DB_PATH || path.join(process.cwd(), 'server/db.json');
@@ -130,11 +128,6 @@ server.use((req: Request, res: Response, next: NextFunction) => {
         }
     });
     next();
-});
-
-// API routes FIRST
-server.get('/api/health', (req: Request, res: Response) => {
-    res.json({ status: 'ok', timestamp: Date.now() });
 });
 
 // Custom Routes
@@ -290,7 +283,7 @@ const startServer = async () => {
         server.use(express.static(distPath));
         
         // SPA fallback for HTML and client routes in production
-        server.get('*all', (req: Request, res: Response, next: NextFunction) => {
+        server.get('*', (req: Request, res: Response, next: NextFunction) => {
             const isApi = ['/api', '/custom', '/system', '/updates', '/records', '/excerpt_history', '/excerpt_counters', '/employees', '/users'].some(p => req.path.startsWith(p));
             if (isApi) {
                 return next();

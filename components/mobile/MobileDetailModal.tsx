@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { RecordFile, Employee, User, UserRole, SplitItem, RecordStatus } from '../../types';
-import { getNormalizedWard, getShortRecordType, getCanonicalRecordType } from '../../constants';
+import AutoResizeTextarea from '../AutoResizeTextarea';
+import { getNormalizedWard, getShortRecordType } from '../../constants';
 import StatusBadge from '../StatusBadge';
 import { 
   X, MapPin, FileText, User as UserIcon, Receipt, DollarSign, 
@@ -15,7 +16,7 @@ import DocxPreviewModal from '../DocxPreviewModal';
 import { updateRecordApi, fetchContracts } from '../../services/api';
 import SystemReceiptTemplate from '../receive-record/SystemReceiptTemplate';
 import SystemAnnexTemplate from '../receive-record/SystemAnnexTemplate';
-import { cleanSyncNotes, formatStaffInfoHelper, resolveRecordStatus } from '../../utils/appHelpers';
+import { cleanSyncNotes, isProcedure2_3, getPureBatchNumber } from '../../utils/appHelpers';
 
 interface MobileDetailModalProps {
   isOpen: boolean;
@@ -168,7 +169,9 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
           }
         } else {
           setMatchedContract(null);
-          setContractPrice(null);
+          const type = (record.recordType || '').toLowerCase();
+          if (type.includes('trích lục')) setContractPrice(53163);
+          else setContractPrice(null);
           setContractSplitItems(null);
           setLiquidationInfo(null);
         }
@@ -358,8 +361,8 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
         USER: val(currentUser?.name),
         NOI_DUNG: val(record.content),
         CONTENT: val(record.content),
-        LOAI_HS: val(getCanonicalRecordType(record.recordType, record.code)), 
-        RECORD_TYPE: val(getCanonicalRecordType(record.recordType, record.code)),
+        LOAI_HS: val(record.recordType), 
+        RECORD_TYPE: val(record.recordType),
         GIAY_TO_KHAC: val(record.otherDocs),
         NGUOI_UY_QUYEN: "",
         UY_QUYEN: "",
@@ -495,7 +498,7 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
             <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
               <div className="flex justify-between items-center mb-4">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Trạng thái</span>
-                <StatusBadge status={resolveRecordStatus(record)} />
+                <StatusBadge status={record.status} />
               </div>
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
@@ -503,7 +506,7 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                 </div>
                 <div>
                   <p className="text-[10px] text-slate-400 font-bold uppercase">Loại hồ sơ</p>
-                  <p className="text-sm font-bold text-slate-800">{getShortRecordType(record.recordType, record.code)}</p>
+                  <p className="text-sm font-bold text-slate-800">{getShortRecordType(record.recordType)}</p>
                 </div>
               </div>
             </div>
@@ -598,28 +601,70 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                 <DollarSign size={16} /> Tài chính & Biên lai
               </h3>
               <div className="space-y-3">
-                <div className="flex justify-between items-center p-3 bg-blue-50 rounded-xl border border-blue-100">
-                  <div className="flex items-center gap-2">
-                    <Receipt size={16} className="text-blue-600" />
-                    <span className="text-xs font-bold text-blue-700">
-                      {record.receiptType === 'Biên Lai' ? 'SỐ BIÊN LAI' : record.receiptType === 'Hóa Đơn' ? 'SỐ HÓA ĐƠN' : 'SỐ BIÊN LAI / HÓA ĐƠN'}
-                    </span>
-                  </div>
-                  <span className="text-sm font-bold text-blue-800">{record.receiptNumber || '---'}</span>
-                </div>
-                <div className="flex justify-between items-center p-3 bg-green-50 rounded-xl border border-green-100">
-                  <div className="flex items-center gap-2">
-                    <DollarSign size={16} className="text-green-600" />
-                    <span className="text-xs font-bold text-green-700">Số Tiền</span>
-                  </div>
-                  <span className="text-sm font-bold text-green-800">
-                    {record.returnedPrice !== undefined && record.returnedPrice !== null
-                      ? record.returnedPrice.toLocaleString('vi-VN') + ' đ'
-                      : (record.price !== undefined && record.price !== null && record.price > 0
-                          ? record.price.toLocaleString('vi-VN') + ' đ'
-                          : (contractPrice !== null ? contractPrice.toLocaleString('vi-VN') + ' đ' : '---'))}
-                  </span>
-                </div>
+                {(() => {
+                  const isExemptRecord = Boolean(
+                    record.status === RecordStatus.REJECTED || 
+                    record.status === RecordStatus.WITHDRAWN ||
+                    isProcedure2_3(record.recordType) ||
+                    (record.returnedPrice === 0 && !record.receiptNumber && record.status === RecordStatus.RETURNED) ||
+                    (record.statusLogs && record.statusLogs.some(l => 
+                      l.newStatus === RecordStatus.REJECTED || 
+                      l.newStatus === RecordStatus.WITHDRAWN || 
+                      l.note?.includes('Trả hủy') || 
+                      l.note?.includes('rút hồ sơ') || 
+                      l.note?.includes('Miễn thu phí') ||
+                      l.note?.includes('Thủ tục 2.3')
+                    ))
+                  );
+
+                  if (isExemptRecord) {
+                    return (
+                      <div className="p-3.5 bg-amber-50 rounded-xl border border-amber-200 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <span className="px-2 py-0.5 bg-amber-200 text-amber-900 font-bold text-[10px] rounded uppercase tracking-wide border border-amber-300">
+                            {record.status === RecordStatus.WITHDRAWN ? 'CSD RÚT HỒ SƠ' : record.status === RecordStatus.REJECTED ? 'HỒ SƠ TRẢ HỦY' : 'THỦ TỤC 2.3'}
+                          </span>
+                          <span className="text-xs font-bold text-amber-950">
+                            {isProcedure2_3(record.recordType) && record.status !== RecordStatus.WITHDRAWN && record.status !== RecordStatus.REJECTED
+                              ? 'Thủ tục 2.3 (Duyệt Đơn & Cung cấp số thửa) - Miễn thu phí'
+                              : 'Hồ sơ trả hủy / CSD rút HS (Không thu phí)'}
+                          </span>
+                        </div>
+                        <div className="text-xs font-bold text-emerald-800 bg-white p-2 rounded-lg border border-amber-200 flex justify-between items-center shadow-xs">
+                          <span>Số tiền thu:</span>
+                          <span>0 đ (Miễn thu phí)</span>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <>
+                      <div className="flex justify-between items-center p-3 bg-blue-50 rounded-xl border border-blue-100">
+                        <div className="flex items-center gap-2">
+                          <Receipt size={16} className="text-blue-600" />
+                          <span className="text-xs font-bold text-blue-700">
+                            {record.receiptType === 'Biên Lai' ? 'SỐ BIÊN LAI' : record.receiptType === 'Hóa Đơn' ? 'SỐ HÓA ĐƠN' : 'SỐ BIÊN LAI / HÓA ĐƠN'}
+                          </span>
+                        </div>
+                        <span className="text-sm font-bold text-blue-800">{record.receiptNumber || '---'}</span>
+                      </div>
+                      <div className="flex justify-between items-center p-3 bg-green-50 rounded-xl border border-green-100">
+                        <div className="flex items-center gap-2">
+                          <DollarSign size={16} className="text-green-600" />
+                          <span className="text-xs font-bold text-green-700">Số Tiền</span>
+                        </div>
+                        <span className="text-sm font-bold text-green-800">
+                          {record.returnedPrice !== undefined && record.returnedPrice !== null
+                            ? record.returnedPrice.toLocaleString('vi-VN') + ' đ'
+                            : (record.recordType === 'Cung cấp tài liệu đất đai'
+                                ? (record.price ? record.price.toLocaleString('vi-VN') + ' đ' : '310.000 đ')
+                                : (contractPrice !== null ? contractPrice.toLocaleString('vi-VN') + ' đ' : '---'))}
+                        </span>
+                      </div>
+                    </>
+                  );
+                })()}
                 {liquidationInfo && (
                   <div className="flex justify-between items-center p-3 bg-orange-50 rounded-xl border border-orange-100">
                     <div className="flex items-center gap-2">
@@ -631,11 +676,7 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                 )}
 
                 {/* LIÊN KẾT HỢP ĐỒNG */}
-                {record && record.recordType && (() => {
-                  const st = getShortRecordType(record.recordType);
-                  const rt = (record.recordType || '').toLowerCase();
-                  return st.startsWith('2.1') || st.startsWith('2.2') || st.startsWith('2.4') || st.startsWith('2.5') || rt.includes('2.1') || rt.includes('2.2') || rt.includes('2.4') || rt.includes('2.5') || rt.includes('trích lục') || rt.includes('trích đo') || rt.includes('cắm mốc') || rt.includes('tách thửa');
-                })() && (
+                {record && record.recordType && (getShortRecordType(record.recordType).startsWith('2.2') || getShortRecordType(record.recordType).startsWith('2.4')) && (
                   <div className="pt-3 border-t border-dashed border-slate-100">
                     {matchedContract ? (
                       <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3 flex flex-col gap-2.5">
@@ -747,7 +788,12 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                   label="TIẾP NHẬN MỚI" 
                   icon={UserIcon}
                   colorClass={{text: 'text-emerald-600', border: 'border-emerald-600', bg: 'bg-emerald-600'}}
-                  subText={formatStaffInfoHelper(record.receivedBy, employees, users)}
+                  subText={record.receivedBy ? (() => {
+                      const receiver = users.find(u => u.employeeId === record.receivedBy);
+                      if (!receiver) return undefined;
+                      const emp = employees.find(e => e.id === receiver.employeeId);
+                      return `${receiver.name} (${emp?.position || 'Nhân viên'})`;
+                  })() : undefined}
                 />
                 <TimelineItem 
                   date={record.assignedDate || record.completedWorkDate} 
@@ -798,6 +844,7 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                   icon={CheckSquare}
                   isLast={false}
                   colorClass={{text: record.status === RecordStatus.REJECTED ? 'text-red-700' : 'text-green-700', border: record.status === RecordStatus.REJECTED ? 'border-red-600' : 'border-green-600', bg: record.status === RecordStatus.REJECTED ? 'bg-red-600' : 'bg-green-600'}}
+                  subText={record.exportBatch ? `Đợt xuất: ${getPureBatchNumber(record.exportBatch)}` : undefined}
                 />
 
                 <TimelineItem 
@@ -820,11 +867,22 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
               <h3 className="text-xs font-bold text-purple-600 uppercase flex items-center gap-2">
                 <FileText size={16} /> Nội dung chi tiết (Trích yếu)
               </h3>
-              <div className="bg-slate-50 px-3 py-2 rounded-xl border border-slate-200/80 text-slate-800 text-sm font-medium leading-relaxed whitespace-pre-line">
-                {cleanSyncNotes(record.content) ? cleanSyncNotes(record.content) : <span className="text-slate-400 italic">Không có nội dung chi tiết.</span>}
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-slate-800 text-sm font-semibold leading-relaxed whitespace-pre-line">
+                {cleanSyncNotes(record.content) || 'Không có nội dung chi tiết.'}
               </div>
             </div>
 
+            {/* Ghi chú hồ sơ */}
+            {cleanSyncNotes(record.notes) && (
+              <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 space-y-3">
+                <h3 className="text-xs font-bold text-blue-600 uppercase flex items-center gap-2">
+                  <StickyNote size={16} /> Ghi chú hồ sơ
+                </h3>
+                <div className="bg-blue-50/40 p-4 rounded-xl border border-blue-100 text-slate-800 text-sm font-medium leading-relaxed whitespace-pre-line">
+                  {cleanSyncNotes(record.notes)}
+                </div>
+              </div>
+            )}
 
             {/* Giấy tờ kèm theo */}
             {record.otherDocs && (() => {
@@ -913,8 +971,7 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                   {isSavingNote ? <Loader2 size={12} className="animate-spin" /> : 'Lưu'}
                 </button>
               </div>
-              <textarea
-                rows={5}
+              <AutoResizeTextarea
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-100"
                 placeholder="Nhập ghi chú riêng của bạn..."
                 value={personalNote}

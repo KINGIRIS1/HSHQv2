@@ -336,7 +336,7 @@ export const MeasurementAndArchiveSyncTab: React.FC<MeasurementAndArchiveSyncTab
                                     <tr>
                                         <th className="p-3 w-10 text-center">#</th>
                                         <th className="p-3">Mã HS</th>
-                                        <th className="p-3">Thông tin khách hàng</th>
+                                        <th className="p-3">Chủ sử dụng</th>
                                         <th className="p-3">Xã/Phường</th>
                                         <th className="p-3">Trạng thái</th>
                                         <th className="p-3 text-center">Thiếu Ngày KT</th>

@@ -1,8 +1,7 @@
 
 import React, { useMemo, useState, useEffect } from 'react';
-import { RecordFile, RecordStatus, RolePermissions, DepartmentPermissions } from '../types';
+import { RecordFile, RecordStatus } from '../types';
 import { getNormalizedWard, getShortRecordType } from '../constants';
-import { isViewAllowedForUser } from '../config/roleConfig';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { FileText, RotateCcw, CheckCircle, ArchiveX, MapPin, Layers, CalendarRange, Filter, CalendarDays, Calendar, SlidersHorizontal, ArrowLeft, ArrowRight, Eye, EyeOff, RefreshCw, HelpCircle, Shield, Headphones, X, CheckCircle2, Phone, Mail, Clock, MessageSquare, UserCheck, FolderInput, BarChart3, User } from 'lucide-react';
 
@@ -10,14 +9,12 @@ interface DashboardViewProps {
     records: RecordFile[];
     currentUser?: any;
     employees?: any[];
-    rolePermissions?: RolePermissions;
-    departmentPermissions?: DepartmentPermissions;
     setCurrentView?: (view: string) => void;
 }
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#6366f1', '#14b8a6'];
 
-const DashboardView: React.FC<DashboardViewProps> = ({ records, currentUser, employees, rolePermissions, departmentPermissions, setCurrentView }) => {
+const DashboardView: React.FC<DashboardViewProps> = ({ records, currentUser, employees, setCurrentView }) => {
     // --- KHAI BÁO TẤT CẢ HOOKS Ở ĐẦU COMPONENT (Rules of Hooks) ---
     const linkedEmployee = useMemo(() => {
         if (!currentUser?.employeeId || !employees) return null;
@@ -214,7 +211,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ records, currentUser, emp
         ];
 
         // Thêm quyền Chuyên môn cho Một cửa
-        if (currentUser.role === 'ONEDOOR' && isViewAllowedForUser(currentUser, employees || [], 'receive_record', rolePermissions, departmentPermissions)) {
+        if (currentUser.role === 'ONEDOOR') {
             modules.unshift({
                 id: 'receive_record',
                 label: 'Tiếp nhận hồ sơ',
@@ -222,20 +219,27 @@ const DashboardView: React.FC<DashboardViewProps> = ({ records, currentUser, emp
                 icon: FolderInput,
                 color: 'text-amber-600 bg-amber-50/50 border-amber-100 hover:border-amber-300 hover:bg-amber-50',
             });
+            modules.push({
+                id: 'all_records',
+                label: 'Quản lý Hồ sơ 1 cửa',
+                description: 'Theo dõi tiến độ, trao trả kết quả, quản lý biên lai hóa đơn và bàn giao hồ sơ.',
+                icon: FileText,
+                color: 'text-rose-600 bg-rose-50/50 border-rose-100 hover:border-rose-300 hover:bg-rose-50',
+            });
         }
 
-        // Thêm quyền Chuyên môn cho Team Leader & Nhân viên dựa theo phân quyền và phòng ban
-        if (currentUser.role === 'TEAM_LEADER' || currentUser.role === 'EMPLOYEE') {
+        // Thêm quyền Chuyên môn cho Team Leader dựa theo phòng ban
+        if (currentUser.role === 'TEAM_LEADER') {
             const dept = linkedEmployee?.department?.toLowerCase() || '';
-            if ((dept.includes('đo đạc') || dept.includes('ky thuat')) && isViewAllowedForUser(currentUser, employees || [], 'all_records', rolePermissions, departmentPermissions)) {
+            if (dept.includes('đo đạc') || dept.includes('ky thuat')) {
                 modules.push({
                     id: 'all_records',
                     label: 'Quản lý Hồ sơ Đo đạc',
-                    description: 'Theo dõi tiến độ đo đạc thực địa, ký kiểm duyệt/báo cáo và giao nộp hồ sơ chuyên môn.',
+                    description: 'Phân công nhiệm vụ, ký kiểm duyệt bản vẽ, theo dõi tiến độ đo đạc thực địa và giao hồ sơ cho bộ phận một cửa.',
                     icon: FileText,
                     color: 'text-rose-600 bg-rose-50/50 border-rose-100 hover:border-rose-300 hover:bg-rose-50',
                 });
-            } else if ((dept.includes('đăng ký') || dept.includes('cap giay')) && isViewAllowedForUser(currentUser, employees || [], 'registration_records', rolePermissions, departmentPermissions)) {
+            } else if (dept.includes('đăng ký') || dept.includes('cap giay')) {
                 modules.push({
                     id: 'registration_records',
                     label: 'Quản lý Hồ sơ Đăng ký',
@@ -243,7 +247,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ records, currentUser, emp
                     icon: FileText,
                     color: 'text-purple-600 bg-purple-50/50 border-purple-100 hover:border-purple-300 hover:bg-purple-50',
                 });
-            } else if ((dept.includes('lưu trữ') || dept.includes('thông tin') || dept.includes('van thu')) && isViewAllowedForUser(currentUser, employees || [], 'archive_records', rolePermissions, departmentPermissions)) {
+            } else if (dept.includes('lưu trữ') || dept.includes('thông tin') || dept.includes('van thu')) {
                 modules.push({
                     id: 'archive_records',
                     label: 'Quản lý Hồ sơ Lưu trữ',
@@ -253,9 +257,6 @@ const DashboardView: React.FC<DashboardViewProps> = ({ records, currentUser, emp
                 });
             }
         }
-
-        // Lọc tất cả modules để đảm bảo tuân thủ nghiêm ngặt isViewAllowedForUser
-        const allowedModules = modules.filter(mod => isViewAllowedForUser(currentUser, employees || [], mod.id, rolePermissions, departmentPermissions));
 
         return (
             <div className="w-full flex flex-col p-4 max-w-7xl mx-auto space-y-4 lg:h-full lg:overflow-hidden">
@@ -303,7 +304,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ records, currentUser, emp
                         <span>Phân hệ công việc của bạn</span>
                     </h2>
                     <div className="grid grid-cols-1 w-full gap-2.5 lg:overflow-y-auto lg:flex-1 pr-1 custom-scrollbar">
-                        {allowedModules.map(mod => {
+                        {modules.map(mod => {
                             const Icon = mod.icon;
                             return (
                                 <div 

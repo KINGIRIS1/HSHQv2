@@ -4,9 +4,8 @@ import { User, RecordFile, RecordStatus, Employee } from '../../types';
 import { ArchiveRecord, fetchArchiveRecords, saveArchiveRecord, deleteArchiveRecord, updateArchiveRecordsBatch, importArchiveRecords } from '../../services/apiArchive';
 import { useArchiveRealtime } from '../../hooks/useArchiveRealtime';
 import { fetchEmployees, saveEmployeeApi, fetchUsers, saveUserApi } from '../../services/apiPeople';
-import { Search, Plus, ListChecks, FileCheck, Send, Trash2, Edit, Save, X, RotateCcw, Users, User as UserIcon, LayoutGrid, CheckCircle, PenTool, Eye, Calendar, FileDown, FileSpreadsheet, UserX } from 'lucide-react';
+import { Search, Plus, ListChecks, FileCheck, Send, Trash2, Edit, Save, X, RotateCcw, Users, User as UserIcon, LayoutGrid, CheckCircle, PenTool, Eye, Calendar, FileDown, FileSpreadsheet } from 'lucide-react';
 import { confirmAction, toTitleCase } from '../../utils/appHelpers';
-import { AutoResizeTextarea } from '../AutoResizeTextarea';
 import AssignModal from '../AssignModal';
 import ArchiveDetailModal from './ArchiveDetailModal';
 import HandoverListModal from './HandoverListModal';
@@ -352,23 +351,10 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
         e.preventDefault();
         if (!formData.so_hieu || !formData.trich_yeu) { alert('Vui lòng nhập Số hiệu và Trích yếu.'); return; }
         
-        const existingRecord = editingId ? records.find(r => r.id === editingId) : null;
-        const existingHistory = Array.isArray(existingRecord?.data?.history) ? existingRecord.data.history : [];
-        const history = existingHistory.length > 0 ? existingHistory : [{
-            action: 'Tiếp nhận mới',
-            status: formData.status || 'draft',
-            timestamp: new Date().toISOString(),
-            user: currentUser.name || currentUser.username || currentUser.employeeId || 'Cán bộ'
-        }];
-
         const success = await saveArchiveRecord({
             ...formData,
             id: editingId || undefined,
-            data: {
-                ...(formData.data || {}),
-                history
-            },
-            created_by: currentUser.username || currentUser.name || ''
+            created_by: currentUser.username
         });
 
         if (success) {
@@ -396,9 +382,6 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
             case 'executed': confirmMsg = 'Xác nhận đã thực hiện xong?'; actionName = 'Thực hiện xong'; break;
             case 'pending_sign': confirmMsg = 'Trình ký công văn này?'; actionName = 'Trình ký'; break;
             case 'signed': confirmMsg = 'Xác nhận đã ký duyệt?'; actionName = 'Ký duyệt'; break;
-            case 'withdrawn': confirmMsg = 'Xác nhận CSD rút hồ sơ?'; actionName = 'CSD rút hồ sơ'; break;
-            case 'pending_supplement': confirmMsg = 'Xác nhận trả chờ bổ sung?'; actionName = 'Trả chờ bổ sung'; break;
-            case 'rejected': confirmMsg = 'Xác nhận trả hủy hồ sơ?'; actionName = 'Trả hủy hồ sơ'; break;
             default: confirmMsg = 'Chuyển trạng thái?'; actionName = 'Chuyển trạng thái';
         }
 
@@ -715,16 +698,7 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
                         <form onSubmit={handleSave} className="space-y-3 flex-1 overflow-y-auto">
                             <div><label className="text-xs font-bold text-gray-500 uppercase">Số hiệu</label><input className="w-full border rounded px-3 py-2 text-sm" value={formData.so_hieu} onChange={e => setFormData({...formData, so_hieu: e.target.value})} placeholder="Số CV..." /></div>
                             <div><label className="text-xs font-bold text-gray-500 uppercase">Ngày tháng</label><input type="date" className="w-full border rounded px-3 py-2 text-sm" value={formData.ngay_thang || ''} onChange={e => setFormData({...formData, ngay_thang: e.target.value})} /></div>
-                            <div>
-                                <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Trích yếu</label>
-                                <AutoResizeTextarea
-                                    minRows={1}
-                                    className="w-full border rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none leading-relaxed"
-                                    value={formData.trich_yeu}
-                                    onChange={e => setFormData({...formData, trich_yeu: e.target.value})}
-                                    placeholder="Nội dung..."
-                                />
-                            </div>
+                            <div><label className="text-xs font-bold text-gray-500 uppercase">Trích yếu</label><textarea rows={3} className="w-full border rounded px-3 py-2 text-sm" value={formData.trich_yeu} onChange={e => setFormData({...formData, trich_yeu: e.target.value})} placeholder="Nội dung..." /></div>
                             <div><label className="text-xs font-bold text-gray-500 uppercase">Cơ quan phát hành</label><input className="w-full border rounded px-3 py-2 text-sm" value={formData.noi_nhan_gui} onChange={e => setFormData({...formData, noi_nhan_gui: toTitleCase(e.target.value)})} placeholder="Đơn vị..." /></div>
                             
                             {formData.status === 'completed' && (

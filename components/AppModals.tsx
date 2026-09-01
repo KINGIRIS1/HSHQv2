@@ -5,11 +5,7 @@ import ImportModal from './ImportModal';
 import AssignModal from './AssignModal';
 import { DetailModal } from './DetailModal';
 import { MobileDetailModal } from './mobile/MobileDetailModal';
-import DangKyRecordModal from './DangKyRecordModal';
-import DangKyDetailModal from './DangKyDetailModal';
-import { saveDangKyRecordApi } from '../services/apiDangKy';
 import { useIsMobile } from '../hooks/useIsMobile';
-import { isArchiveRecordType, isDoDacRecordType, isDangKyRecordType } from '../constants';
 import DeleteConfirmModal from './DeleteConfirmModal';
 import ExportModal from './ExportModal';
 import AddToBatchModal from './AddToBatchModal';
@@ -20,8 +16,6 @@ import ReturnResultModal from './ReturnResultModal';
 import BatchErrorDiagnosticModal from './BatchErrorDiagnosticModal';
 import RejectReturnStepModal, { ReturnOptionType } from './RejectReturnStepModal';
 import ExtendDeadlineModal from './ExtendDeadlineModal';
-import DocxPreviewModal from './DocxPreviewModal';
-import SystemReceiptTemplate from './receive-record/SystemReceiptTemplate';
 import * as XLSX from 'xlsx-js-style';
 
 interface AppModalsProps {
@@ -41,7 +35,6 @@ interface AppModalsProps {
     isDiagnosticModalOpen?: boolean;
     isRejectReturnStepModalOpen?: boolean;
     isExtendModalOpen?: boolean;
-    isPreviewOpen?: boolean;
     
     // Data States
     editingRecord: RecordFile | null;
@@ -56,9 +49,6 @@ interface AppModalsProps {
     // Preview Data
     previewWorkbook: XLSX.WorkBook | null;
     previewExcelName: string;
-    previewBlob?: Blob | null;
-    previewFileName?: string;
-    systemReceiptData?: RecordFile | null;
 
     // Setters
     setIsModalOpen: (v: boolean) => void;
@@ -75,8 +65,6 @@ interface AppModalsProps {
     setIsDiagnosticModalOpen?: (v: boolean) => void;
     setIsRejectReturnStepModalOpen?: (v: boolean) => void;
     setIsExtendModalOpen?: (v: boolean) => void;
-    setIsPreviewOpen?: (v: boolean) => void;
-    setSystemReceiptData?: (r: RecordFile | null) => void;
     
     setEditingRecord: (r: RecordFile | null) => void;
     setViewingRecord: (r: RecordFile | null) => void;
@@ -100,7 +88,7 @@ interface AppModalsProps {
     onCreateContract?: (record: Partial<RecordFile>) => void;
     handleBulkUpdate: (field: keyof RecordFile, value: any, customDateStr?: string, targetRecordIds?: string[]) => Promise<void>;
     handleBatchUpdateRecords?: (updates: Partial<RecordFile>[]) => Promise<void>;
-    confirmReturnResult: (receiptNumber: string, receiverName: string, returnedPrice: number, receiptType?: 'Biên Lai' | 'Hóa Đơn') => void;
+    confirmReturnResult: (receiptNumber: string, receiverName: string, returnedPrice: number, receiptType?: 'Biên Lai' | 'Hóa Đơn', returnReason?: string) => void;
     onConfirmRejectReturnStep?: (optionType: ReturnOptionType, reason: string, returnDateStr: string) => Promise<void>;
     onOpenRejectReturnModal?: (record: RecordFile) => void;
     onConfirmExtendDeadline?: (newDeadline: string, reason: string, executionDateStr: string) => Promise<void>;
@@ -125,61 +113,19 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
     const targetRecordsForBatch = props.selectedRecordsForBulk.length > 0 ? props.selectedRecordsForBulk : props.filteredRecords;
     const isMobile = useIsMobile();
 
-    const editingRec = props.editingRecord;
-    const viewingRec = props.viewingRecord;
-
-    const isDoDacEdit = editingRec ? ((editingRec.code || '').trim().startsWith('2.') || isDoDacRecordType(editingRec.recordType, editingRec.code)) : false;
-    const isArchiveEdit = editingRec ? ((editingRec.code || '').trim().startsWith('1.') || isArchiveRecordType(editingRec.recordType, editingRec.code) || editingRec.sourceTable === 'luutru_records') : false;
-
-    // Hồ sơ Đo đạc (Mã 2.x) hoặc Lưu trữ (Mã 1.x) TUYỆT ĐỐI KHÔNG mở DangKyRecordModal kể cả khi sourceTable ghi nhầm dangky_records
-    const isDangKyEditing = editingRec ? (
-        (isDangKyRecordType(editingRec.recordType, editingRec.code) || editingRec.sourceTable === 'dangky_records') && 
-        !isDoDacEdit && 
-        !isArchiveEdit &&
-        !(editingRec.code || '').trim().startsWith('2.')
-    ) : false;
-
-    const isDoDacView = viewingRec ? ((viewingRec.code || '').trim().startsWith('2.') || isDoDacRecordType(viewingRec.recordType, viewingRec.code)) : false;
-    const isArchiveView = viewingRec ? ((viewingRec.code || '').trim().startsWith('1.') || isArchiveRecordType(viewingRec.recordType, viewingRec.code) || viewingRec.sourceTable === 'luutru_records') : false;
-
-    const isDangKyViewing = viewingRec ? (
-        (isDangKyRecordType(viewingRec.recordType, viewingRec.code) || viewingRec.sourceTable === 'dangky_records') && 
-        !isDoDacView && 
-        !isArchiveView &&
-        !(viewingRec.code || '').trim().startsWith('2.')
-    ) : false;
-
     return (
         <>
-            {isDangKyEditing ? (
-                <DangKyRecordModal
-                    isOpen={props.isModalOpen && isDangKyEditing}
-                    onClose={() => { props.setIsModalOpen(false); props.setEditingRecord(null); }}
-                    initialData={props.editingRecord as any}
-                    employees={props.employees}
-                    currentUser={props.currentUser}
-                    wards={props.wards}
-                    holidays={props.holidays}
-                    onSave={async (record) => {
-                        await saveDangKyRecordApi(record);
-                        props.onRefreshData?.();
-                        props.setIsModalOpen(false);
-                        props.setEditingRecord(null);
-                    }}
-                />
-            ) : (
-                <RecordModal 
-                    isOpen={props.isModalOpen && !isDangKyEditing}
-                    onClose={() => { props.setIsModalOpen(false); props.setEditingRecord(null); }}
-                    onSubmit={props.handleAddOrUpdate}
-                    initialData={props.editingRecord}
-                    employees={props.employees}
-                    currentUser={props.currentUser}
-                    wards={props.wards}
-                    currentView={props.currentView}
-                    holidays={props.holidays}
-                />
-            )}
+            <RecordModal 
+                isOpen={props.isModalOpen}
+                onClose={() => { props.setIsModalOpen(false); props.setEditingRecord(null); }}
+                onSubmit={props.handleAddOrUpdate}
+                initialData={props.editingRecord}
+                employees={props.employees}
+                currentUser={props.currentUser}
+                wards={props.wards}
+                currentView={props.currentView}
+                holidays={props.holidays}
+            />
             
             <ImportModal 
                 isOpen={props.isImportModalOpen} 
@@ -210,23 +156,9 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
                 })()}
             />
             
-            {isDangKyViewing ? (
-                <DangKyDetailModal
-                    isOpen={!!props.viewingRecord && isDangKyViewing}
-                    onClose={() => props.setViewingRecord(null)}
-                    record={props.viewingRecord as any}
-                    employees={props.employees}
-                    currentUser={props.currentUser}
-                    onEdit={(r) => {
-                        props.setViewingRecord(null);
-                        props.setEditingRecord(r as any);
-                        props.setIsModalOpen(true);
-                    }}
-                    onRefreshData={props.onRefreshData}
-                />
-            ) : isMobile ? (
+            {isMobile ? (
                 <MobileDetailModal 
-                    isOpen={!!props.viewingRecord && !isDangKyViewing} 
+                    isOpen={!!props.viewingRecord} 
                     onClose={() => props.setViewingRecord(null)} 
                     record={props.viewingRecord} 
                     employees={props.employees} 
@@ -240,7 +172,7 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
                 />
             ) : (
                 <DetailModal 
-                    isOpen={!!props.viewingRecord && !isDangKyViewing} 
+                    isOpen={!!props.viewingRecord} 
                     onClose={() => props.setViewingRecord(null)} 
                     record={props.viewingRecord} 
                     employees={props.employees} 
@@ -350,22 +282,6 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
                 users={props.users}
                 onConfirm={props.onConfirmExtendDeadline || (async () => {})}
             />
-
-            <DocxPreviewModal
-                isOpen={!!props.isPreviewOpen}
-                onClose={() => props.setIsPreviewOpen && props.setIsPreviewOpen(false)}
-                docxBlob={props.previewBlob || null}
-                fileName={props.previewFileName || ''}
-            />
-
-            {props.systemReceiptData && (
-                <SystemReceiptTemplate
-                    data={props.systemReceiptData}
-                    receivingWard={props.systemReceiptData.ward || ''}
-                    onClose={() => props.setSystemReceiptData && props.setSystemReceiptData(null)}
-                    currentUser={props.currentUser}
-                />
-            )}
         </>
     );
 };

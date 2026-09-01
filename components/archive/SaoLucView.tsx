@@ -4,9 +4,8 @@ import { User, RecordFile, RecordStatus, Employee } from '../../types';
 import { ArchiveRecord, fetchArchiveRecords, saveArchiveRecord, deleteArchiveRecord, updateArchiveRecordsBatch, importArchiveRecords } from '../../services/apiArchive';
 import { useArchiveRealtime } from '../../hooks/useArchiveRealtime';
 import { fetchEmployees, saveEmployeeApi, fetchUsers, saveUserApi } from '../../services/apiPeople';
-import { Search, Plus, ListChecks, FileCheck, Send, Trash2, Edit, Save, X, RotateCcw, MapPin, Calendar, User as UserIcon, Users, CheckCircle2, LayoutGrid, PenTool, CheckCircle, Eye, FileSpreadsheet, FileDown } from 'lucide-react';
-import { confirmAction, toTitleCase, calculateDeadlineHelper } from '../../utils/appHelpers';
-import { AutoResizeTextarea } from '../AutoResizeTextarea';
+import { Search, Plus, ListChecks, FileCheck, Send, Trash2, Edit, Save, X, RotateCcw, MapPin, Calendar, User as UserIcon, Users, CheckCircle2, LayoutGrid, PenTool, CheckCircle, Eye, FileSpreadsheet, FileDown, Filter, SlidersHorizontal } from 'lucide-react';
+import { confirmAction, toTitleCase } from '../../utils/appHelpers';
 import AssignModal from '../AssignModal';
 import ArchiveDetailModal from './ArchiveDetailModal';
 import HandoverListModal from './HandoverListModal';
@@ -17,7 +16,6 @@ import * as XLSX from 'xlsx-js-style';
 interface SaoLucViewProps {
     currentUser: User;
     wards?: string[];
-    holidays?: any[];
 }
 
 // Định nghĩa form state riêng để dễ quản lý các trường trong JSON data
@@ -36,7 +34,7 @@ interface SaoLucFormData {
     danh_sach?: string;
 }
 
-const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Tân Quan', 'Tân Khai', 'Minh Đức', 'Tân Hưng'], holidays = [] }) => {
+const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Tân Quan', 'Tân Khai', 'Minh Đức', 'Tân Hưng'] }) => {
     const [subTab, setSubTab] = useState<'all' | 'draft' | 'assigned' | 'executed' | 'sign' | 'signed' | 'result'>('all');
     const [records, setRecords] = useState<ArchiveRecord[]>([]);
     const [employees, setEmployees] = useState<Employee[]>([]);
@@ -46,8 +44,10 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Tân Qua
     // Filters
     const [fromDate, setFromDate] = useState('');
     const [toDate, setToDate] = useState('');
-    const [filterWard, setFilterWard] = useState('');
+    const [filterRecordType, setFilterRecordType] = useState('');
+    const [filterStatus, setFilterStatus] = useState('');
     const [filterEmployee, setFilterEmployee] = useState('');
+    const [filterWard, setFilterWard] = useState('');
     
     // Detail Modal State
     const [detailRecord, setDetailRecord] = useState<ArchiveRecord | null>(null);
@@ -123,11 +123,17 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Tân Qua
         if (fromDate) list = list.filter(r => r.ngay_thang >= fromDate);
         if (toDate) list = list.filter(r => r.ngay_thang <= toDate);
 
-        // Filter by Ward
-        if (filterWard) list = list.filter(r => r.data?.xa_phuong === filterWard);
+        // Filter by Record Type
+        if (filterRecordType) list = list.filter(r => (r.trich_yeu || '').includes(filterRecordType) || (r.data?.loai_ho_so || '').includes(filterRecordType));
+
+        // Filter by Status
+        if (filterStatus) list = list.filter(r => r.status === filterStatus);
 
         // Filter by Employee
         if (filterEmployee) list = list.filter(r => r.data?.assigned_to === filterEmployee);
+
+        // Filter by Ward
+        if (filterWard) list = list.filter(r => r.data?.xa_phuong === filterWard);
 
         // Filter by Search
         if (searchTerm) {
@@ -224,15 +230,6 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Tân Qua
             return; 
         }
         
-        const existingRecord = editingId ? records.find(r => r.id === editingId) : null;
-        const existingHistory = Array.isArray(existingRecord?.data?.history) ? existingRecord.data.history : [];
-        const history = existingHistory.length > 0 ? existingHistory : [{
-            action: 'Tiếp nhận mới',
-            status: formData.status || 'draft',
-            timestamp: new Date().toISOString(),
-            user: currentUser.name || currentUser.username || currentUser.employeeId || 'Cán bộ'
-        }];
-
         // Map form data về cấu trúc ArchiveRecord
         const recordToSave: Partial<ArchiveRecord> = {
             id: editingId || undefined,
@@ -248,10 +245,9 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Tân Qua
                 thua_dat: formData.thua_dat,
                 hen_tra: formData.hen_tra,
                 ngay_hoan_thanh: formData.ngay_hoan_thanh,
-                danh_sach: formData.danh_sach,
-                history
+                danh_sach: formData.danh_sach
             },
-            created_by: currentUser.username || currentUser.name || ''
+            created_by: currentUser.username
         };
 
         const success = await saveArchiveRecord(recordToSave);
@@ -700,6 +696,7 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Tân Qua
 
                 {/* Filters & Actions */}
                 <div className="flex flex-wrap gap-3 items-center bg-gray-50 p-2 rounded-lg border border-gray-100 relative">
+                    {/* 1. Thời gian */}
                     <div className="flex items-center gap-2 bg-white px-2 py-1.5 rounded-md border border-gray-200 shadow-sm">
                         <Calendar size={16} className="text-gray-500"/>
                         <input type="date" className="text-sm outline-none bg-transparent text-gray-700 w-28" value={fromDate} onChange={e => setFromDate(e.target.value)} placeholder="Từ ngày" />
@@ -708,19 +705,45 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Tân Qua
                         {(fromDate || toDate) && (<button onClick={() => { setFromDate(''); setToDate(''); }} className="text-gray-400 hover:text-red-500"><X size={14} /></button>)}
                     </div>
 
+                    {/* 2. Loại hồ sơ */}
+                    <div className="flex items-center gap-2 bg-white px-2 py-1.5 rounded-md border border-gray-200 shadow-sm">
+                        <Filter size={16} className="text-gray-500"/>
+                        <select className="text-sm outline-none bg-transparent text-gray-700 font-medium cursor-pointer border-none focus:ring-0 min-w-[120px]" value={filterRecordType} onChange={e => setFilterRecordType(e.target.value)}>
+                            <option value="">Tất cả loại HS</option>
+                            <option value="1.1 Sao lục">1.1 Sao lục</option>
+                            <option value="1.2 Công văn">1.2 Công văn</option>
+                        </select>
+                    </div>
+
+                    {/* 3. Trạng thái hồ sơ */}
+                    <div className="flex items-center gap-2 bg-white px-2 py-1.5 rounded-md border border-gray-200 shadow-sm">
+                        <SlidersHorizontal size={16} className="text-gray-500"/>
+                        <select className="text-sm outline-none bg-transparent text-gray-700 font-medium cursor-pointer border-none focus:ring-0 min-w-[120px]" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+                            <option value="">Mọi trạng thái</option>
+                            <option value="draft">Chưa phân công</option>
+                            <option value="assigned">Đã phân công</option>
+                            <option value="executed">Đã thực hiện</option>
+                            <option value="pending_sign">Chờ ký duyệt</option>
+                            <option value="signed">Đã ký duyệt</option>
+                            <option value="completed">Đã hoàn thành</option>
+                        </select>
+                    </div>
+
+                    {/* 4. Cán bộ xử lý */}
+                    <div className="flex items-center gap-2 bg-white px-2 py-1.5 rounded-md border border-gray-200 shadow-sm">
+                        <Users size={16} className="text-gray-500"/>
+                        <select className="text-sm outline-none bg-transparent text-gray-700 font-medium cursor-pointer border-none focus:ring-0 min-w-[120px]" value={filterEmployee} onChange={e => setFilterEmployee(e.target.value)}>
+                            <option value="">Tất cả Cán bộ</option>
+                            {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+                        </select>
+                    </div>
+
+                    {/* 5. Xã / Phường */}
                     <div className="flex items-center gap-2 bg-white px-2 py-1.5 rounded-md border border-gray-200 shadow-sm">
                         <MapPin size={16} className="text-gray-500"/>
                         <select className="text-sm outline-none bg-transparent text-gray-700 font-medium cursor-pointer border-none focus:ring-0 min-w-[120px]" value={filterWard} onChange={e => setFilterWard(e.target.value)}>
                             <option value="">Tất cả Xã/Phường</option>
                             {wards.map(w => <option key={w} value={w}>{w}</option>)}
-                        </select>
-                    </div>
-
-                    <div className="flex items-center gap-2 bg-white px-2 py-1.5 rounded-md border border-gray-200 shadow-sm">
-                        <Users size={16} className="text-gray-500"/>
-                        <select className="text-sm outline-none bg-transparent text-gray-700 font-medium cursor-pointer border-none focus:ring-0 min-w-[120px]" value={filterEmployee} onChange={e => setFilterEmployee(e.target.value)}>
-                            <option value="">Tất cả Nhân viên</option>
-                            {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
                         </select>
                     </div>
                 </div>
@@ -849,36 +872,10 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Tân Qua
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
                                     <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Ngày nhận</label>
-                                    <input 
-                                        type="date" 
-                                        className="w-full border border-gray-300 rounded-lg px-2 py-2 text-sm outline-none" 
-                                        value={formData.ngay_nhan} 
-                                        onChange={e => {
-                                            const newRecDate = e.target.value;
-                                            const newDeadline = calculateDeadlineHelper('Sao lục', newRecDate, holidays || []);
-                                            setFormData(prev => ({
-                                                ...prev, 
-                                                ngay_nhan: newRecDate,
-                                                hen_tra: newDeadline || prev.hen_tra
-                                            }));
-                                        }} 
-                                    />
+                                    <input type="date" className="w-full border border-gray-300 rounded-lg px-2 py-2 text-sm outline-none" value={formData.ngay_nhan} onChange={e => setFormData({...formData, ngay_nhan: e.target.value})} />
                                 </div>
                                 <div>
-                                    <div className="flex justify-between items-center mb-1">
-                                        <label className="text-xs font-bold text-purple-600 uppercase block">Hẹn trả</label>
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                const d = calculateDeadlineHelper('Sao lục', formData.ngay_nhan, holidays || []);
-                                                if (d) setFormData(prev => ({ ...prev, hen_tra: d }));
-                                            }}
-                                            className="text-[10px] text-purple-700 hover:text-purple-900 bg-purple-100 hover:bg-purple-200 px-1.5 py-0.5 rounded cursor-pointer transition-colors"
-                                            title="Tự động tính lại hạn trả dựa trên ngày nghỉ lễ"
-                                        >
-                                            Tính lại
-                                        </button>
-                                    </div>
+                                    <label className="text-xs font-bold text-purple-600 uppercase mb-1 block">Hẹn trả</label>
                                     <input type="date" className="w-full border border-purple-200 bg-purple-50 rounded-lg px-2 py-2 text-sm outline-none text-purple-700 font-medium" value={formData.hen_tra} onChange={e => setFormData({...formData, hen_tra: e.target.value})} />
                                 </div>
                             </div>
@@ -898,13 +895,7 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Tân Qua
 
                             <div>
                                 <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Nội dung yêu cầu</label>
-                                <AutoResizeTextarea
-                                    minRows={1}
-                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none leading-relaxed"
-                                    value={formData.noi_dung}
-                                    onChange={e => setFormData({...formData, noi_dung: e.target.value})}
-                                    placeholder="Nhập nội dung..."
-                                />
+                                <textarea rows={4} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none resize-none" value={formData.noi_dung} onChange={e => setFormData({...formData, noi_dung: e.target.value})} placeholder="Nhập nội dung..." />
                             </div>
                             
                             <div className="pt-2 flex gap-2 justify-end border-t border-gray-100">
@@ -925,7 +916,7 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Tân Qua
                                     </th>
                                     <th className="p-3 w-10 text-center">#</th>
                                     <th className="p-3 w-32 text-center">Mã HS</th>
-                                    <th className="p-3 w-48 text-center">Thông tin khách hàng</th>
+                                    <th className="p-3 w-48 text-center">Chủ sử dụng</th>
                                     <th className="p-3 w-32 text-center">Xã/Phường</th>
                                     <th className="p-3 w-20 text-center">Tờ / Thửa</th>
                                     <th className="p-3 w-24 text-center">Ngày nhận</th>

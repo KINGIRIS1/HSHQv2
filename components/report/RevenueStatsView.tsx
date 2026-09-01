@@ -1,7 +1,7 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { RecordFile, RecordStatus, Employee } from '../../types';
 import { getShortRecordType } from '../../constants';
-import { removeVietnameseTones } from '../../utils/appHelpers';
+import { removeVietnameseTones, isProcedure2_3 } from '../../utils/appHelpers';
 import { FileSpreadsheet, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import * as XLSX from 'xlsx-js-style';
 
@@ -41,7 +41,7 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
         return 'Hóa Đơn';
     };
 
-    // Calculate revenue records: CHỈ KHI trạng thái "Đã trả kết quả" (RETURNED) và có Số Biên lai / Hóa đơn > 0 và có số tiền > 0
+    // Calculate revenue records filtered strictly by resultReturnedDate / exportDate
     const revenueRecords = useMemo(() => {
         let dateStart: Date | null = null;
         let dateEnd: Date | null = null;
@@ -56,25 +56,33 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
 
         return records
             .filter(r => {
-                // 1. Chỉ khi hồ sơ nằm trạng thái "Đã trả kết quả"
-                if (r.status !== RecordStatus.RETURNED) return false;
-
-                // 2. Có Số Biên lai / Hóa đơn > 0
-                if (!r.receiptNumber) return false;
-                const rawReceipt = String(r.receiptNumber).trim();
-                if (!rawReceipt) return false;
-                const numMatch = rawReceipt.match(/\d+/);
-                if (!numMatch || parseInt(numMatch[0], 10) <= 0) return false;
-
-                // 3. Có số tiền > 0 tại Số tiền (VNĐ)
-                const price = Number(r.returnedPrice) || Number(r.price) || 0;
-                if (price <= 0) return false;
-
-                return true;
+                if (r.status === RecordStatus.RETURNED) return true;
+                if (r.status === RecordStatus.HANDOVER) {
+                    const hasReturnDate = !!(r.resultReturnedDate || r.exportDate || r.completedDate);
+                    const hasReceipt = !!(r.receiptNumber && r.receiptNumber.trim() !== '');
+                    const hasReturnedPrice = r.returnedPrice !== undefined && r.returnedPrice !== null && String(r.returnedPrice).trim() !== '' && Number(r.returnedPrice) > 0;
+                    return hasReturnDate || hasReceipt || hasReturnedPrice;
+                }
+                return false;
             })
             .map(r => {
-                // Lấy số tiền tại ô Số tiền (VNĐ) trong tab Cập nhật thông tin hồ sơ
-                const price = Number(r.returnedPrice) || Number(r.price) || 0;
+                const contractP = (r as any).contractPrice;
+                const price = Number(r.price) || Number(contractP) || 0;
+                let returned = 0;
+                if (isProcedure2_3(r.recordType)) {
+                    returned = 0;
+                } else if (r.returnedPrice !== undefined && r.returnedPrice !== null && String(r.returnedPrice).trim() !== '' && !isNaN(Number(r.returnedPrice))) {
+                    returned = Number(r.returnedPrice);
+                } else if (r.recordType === 'Cung cấp tài liệu đất đai') {
+                    returned = 310000;
+                } else if (contractP !== undefined && contractP !== null && !isNaN(Number(contractP)) && Number(contractP) > 0) {
+                    returned = Number(contractP);
+                } else if (r.price !== undefined && r.price !== null && !isNaN(Number(r.price)) && Number(r.price) > 0) {
+                    returned = Number(r.price);
+                } else if (r.status === RecordStatus.RETURNED || r.status === RecordStatus.HANDOVER) {
+                    returned = price;
+                }
+                
                 const receiptType = getRecordReceiptType(r);
 
                 // Determine assigned ward for resolving the record
@@ -98,34 +106,16 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
                     assignedWard = 'Chưa phân công';
                 }
 
-                // Determine fee collector (staff/user who returned result and collected fee)
-                let feeCollector = r.feeCollector || '';
-                if (!feeCollector && r.statusLogs && Array.isArray(r.statusLogs)) {
-                    const returnLog = r.statusLogs.find(log => 
-                        log.newStatus === RecordStatus.RETURNED || 
-                        (log.note && log.note.toLowerCase().includes('trả kết quả'))
-                    );
-                    if (returnLog && returnLog.changedBy) {
-                        feeCollector = returnLog.changedBy;
-                    }
-                }
-                if (!feeCollector && r.employeeName) {
-                    feeCollector = r.employeeName;
-                }
-                if (!feeCollector && r.assignedTo) {
-                    const emp = employees.find(e => e.id === r.assignedTo || e.name === r.assignedTo);
-                    if (emp) feeCollector = emp.name;
-                }
-
                 return {
                     ...r,
                     calcPrice: price,
-                    calcReturned: price,
+                    calcReturned: returned,
                     computedReceiptType: receiptType,
-                    assignedWard,
-                    feeCollector: feeCollector || '---'
+                    assignedWard
                 };
             })
+            // Only include records with revenue or receipt/invoice recorded
+            .filter(r => r.calcReturned > 0 || (r.receiptNumber && r.receiptNumber.trim() !== ''))
             // Filter strictly by resultReturnedDate or exportDate or completedDate
             .filter(r => {
                 if (!dateStart || !dateEnd) return true;
@@ -248,11 +238,6 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
         return filteredRecords.slice(start, start + pageSize);
     }, [filteredRecords, currentPage, pageSize]);
 
-    // Sync filtered records with parent for global export
-    useEffect(() => {
-        onFilteredRecordsChange?.(filteredRecords);
-    }, [filteredRecords, onFilteredRecordsChange]);
-
     // Reset page when filters change
     const handleCardFilterChange = (type: 'all' | 'bien_lai' | 'hoa_don') => {
         setActiveCardFilter(type);
@@ -265,13 +250,12 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
         const rows = filteredRecords.map((r, index) => ({
             STT: index + 1,
             'Mã hồ sơ': r.code || '',
-            'Thông tin khách hàng': r.customerName || '',
+            'Thông tin chủ sử dụng': r.customerName || '',
             'Loại hồ sơ': getShortRecordType(r.recordType) || '',
             'Ngày thu tiền': r.resultReturnedDate ? new Date(r.resultReturnedDate).toLocaleDateString('vi-VN') : '—',
             'Loại chứng từ': r.computedReceiptType,
             'Số BL/HĐ': r.receiptNumber || '—',
             'Số tiền thu (Đ)': r.calcReturned,
-            'Người thu tiền': r.feeCollector || '—',
             'Xã phân công giải quyết': r.assignedWard
         }));
 
@@ -339,8 +323,8 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
                         </div>
                     </div>
 
-                    {/* Search Input */}
-                    <div className="flex items-center gap-2.5 w-full sm:w-auto">
+                    {/* Search Input & Export Button */}
+                    <div className="flex items-center gap-3 w-full sm:w-auto">
                         <div className="relative flex-1 sm:w-56">
                             <Search size={14} className="absolute left-3 top-3 text-slate-400" />
                             <input 
@@ -351,6 +335,8 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
                                 className="w-full pl-8 pr-3 py-1.5 text-xs border border-slate-300 rounded-xl outline-none focus:border-emerald-500 bg-white h-[38px] font-medium"
                             />
                         </div>
+
+                        {/* Single shared Excel button is on top toolbar */}
                     </div>
                 </div>
 
@@ -360,33 +346,21 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
                         <thead className="bg-slate-100/95 backdrop-blur-sm text-slate-600 font-bold uppercase tracking-wider text-[11px] border-b border-slate-200/80 sticky top-0 z-20 shadow-xs">
                             <tr>
                                 <th className="p-3.5 w-12 text-center">STT</th>
-                                <th className="p-3.5 w-28">MÃ HỒ SƠ</th>
-                                <th className="p-3.5 min-w-[160px]">CHỦ SỬ DỤNG</th>
-                                <th className="p-3.5 w-32">LOẠI HỒ SƠ</th>
-                                <th className="p-3.5 w-16 text-center">TỜ</th>
-                                <th className="p-3.5 w-16 text-center">THỬA</th>
-                                <th className="p-3.5 w-28">XÃ/PHƯỜNG</th>
-                                <th className="p-3.5 w-28 text-center">SỐ BL/HĐ</th>
-                                <th className="p-3.5 w-28 text-right">SỐ TIỀN THU</th>
-                                <th className="p-3.5 w-28 text-center">NGÀY TRẢ KQ</th>
-                                <th className="p-3.5 w-36">NGƯỜI THU TIỀN</th>
+                                <th className="p-3.5 w-32">MÃ HỒ SƠ</th>
+                                <th className="p-3.5 min-w-[180px]">THÔNG TIN CHỦ SỬ DỤNG</th>
+                                <th className="p-3.5 w-36">LOẠI HỒ SƠ</th>
+                                <th className="p-3.5 w-32 text-center">NGÀY THU TIỀN</th>
+                                <th className="p-3.5 w-32 text-center">LOẠI CHỨNG TỪ</th>
+                                <th className="p-3.5 w-32 text-center">SỐ BIÊN LAI/HĐ</th>
+                                <th className="p-3.5 w-36 text-right">SỐ TIỀN THU</th>
+                                <th className="p-3.5 w-44">XÃ PHÂN CÔNG GIẢI QUYẾT</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {paginatedRecords.length > 0 ? (
                                 paginatedRecords.map((r, idx) => {
                                     const itemNumber = (currentPage - 1) * pageSize + idx + 1;
-                                    const dateStr = (() => {
-                                        const dStr = r.resultReturnedDate || r.exportDate || r.completedDate;
-                                        if (!dStr) return '-';
-                                        if (dStr.includes('/')) return dStr;
-                                        const cleanStr = dStr.split('T')[0];
-                                        const parts = cleanStr.split('-');
-                                        if (parts.length === 3) {
-                                            return `${parts[2].padStart(2, '0')}/${parts[1].padStart(2, '0')}/${parts[0]}`;
-                                        }
-                                        return dStr;
-                                    })();
+                                    const isHoaDon = r.computedReceiptType === 'Hóa Đơn';
 
                                     return (
                                         <tr key={r.id || idx} className="hover:bg-slate-50/80 transition-colors group">
@@ -400,16 +374,29 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
                                             <td className="p-3.5 text-slate-600 font-medium">
                                                 {getShortRecordType(r.recordType)}
                                             </td>
-                                            <td className="p-3.5 text-center text-slate-600 font-medium font-mono">
-                                                {r.mapSheet || '—'}
+                                            <td className="p-3.5 text-center text-slate-500 font-medium">
+                                                {(() => {
+                                                    const dStr = r.resultReturnedDate || r.exportDate || r.completedDate;
+                                                    if (!dStr) return '-';
+                                                    if (dStr.includes('/')) return dStr;
+                                                    const cleanStr = dStr.split('T')[0];
+                                                    const parts = cleanStr.split('-');
+                                                    if (parts.length === 3) {
+                                                        return `${parts[2].padStart(2, '0')}/${parts[1].padStart(2, '0')}/${parts[0]}`;
+                                                    }
+                                                    return dStr;
+                                                })()}
                                             </td>
-                                            <td className="p-3.5 text-center text-slate-600 font-medium font-mono">
-                                                {r.landPlot || '—'}
-                                            </td>
-                                            <td className="p-3.5 text-slate-700 font-medium">
-                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
-                                                    {r.assignedWard}
-                                                </span>
+                                            <td className="p-3.5 text-center">
+                                                {isHoaDon ? (
+                                                    <span className="px-2.5 py-1 rounded-md text-[10px] font-bold uppercase bg-orange-50 text-orange-600 border border-orange-200/60 inline-block tracking-wider">
+                                                        HÓA ĐƠN
+                                                    </span>
+                                                ) : (
+                                                    <span className="px-2.5 py-1 rounded-md text-[10px] font-bold uppercase bg-blue-50 text-blue-600 border border-blue-200/60 inline-block tracking-wider">
+                                                        BIÊN LAI
+                                                    </span>
+                                                )}
                                             </td>
                                             <td className="p-3.5 text-center font-mono font-bold text-slate-700">
                                                 {r.receiptNumber || '---'}
@@ -417,18 +404,17 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
                                             <td className="p-3.5 text-right font-mono font-bold text-emerald-600 text-sm">
                                                 {r.calcReturned.toLocaleString('vi-VN')} đ
                                             </td>
-                                            <td className="p-3.5 text-center text-slate-500 font-medium font-mono">
-                                                {dateStr}
-                                            </td>
                                             <td className="p-3.5 text-slate-700 font-medium">
-                                                {r.feeCollector || '—'}
+                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+                                                    {r.assignedWard}
+                                                </span>
                                             </td>
                                         </tr>
                                     );
                                 })
                             ) : (
                                 <tr>
-                                    <td colSpan={11} className="p-12 text-center text-slate-400 italic">
+                                    <td colSpan={9} className="p-12 text-center text-slate-400 italic">
                                         Không tìm thấy dữ liệu nguồn thu phù hợp.
                                     </td>
                                 </tr>

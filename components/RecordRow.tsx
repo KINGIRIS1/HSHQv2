@@ -2,7 +2,7 @@
 import React from 'react';
 import { RecordFile, RecordStatus, Employee, UserRole } from '../types';
 import { getNormalizedWard, getShortRecordType, getWardLabel, isArchiveRecordType } from '../constants';
-import { isRecordOverdue, isRecordApproaching, toTitleCase, formatBatchName, getBatchDisplayParts, resolveRecordStatus } from '../utils/appHelpers';
+import { isRecordOverdue, isRecordApproaching, toTitleCase, formatBatchName, getBatchDisplayParts } from '../utils/appHelpers';
 import StatusBadge from './StatusBadge';
 import { CheckSquare, Square, AlertCircle, Clock, Eye, ArrowRight, Pencil, Trash2, Bell, FileCheck, Phone, Map } from 'lucide-react';
 
@@ -67,14 +67,25 @@ const RecordRow: React.FC<RecordRowProps> = ({
 
   const resultReturnedDateStr = record.resultReturnedDate ? formatDate(record.resultReturnedDate) : '';
 
-  // Tự động xác định trạng thái hiển thị chuẩn xác
-  const displayStatus = resolveRecordStatus(record);
+  // LOGIC MỚI: Tự động xác định trạng thái hiển thị
+  // Nếu có thông tin xuất (Batch/Date) và chưa hoàn thành (Trả/Rút/Từ chối), coi như là Đã giao 1 cửa
+  const getDisplayStatus = (r: RecordFile) => {
+      if (r.resultReturnedDate) {
+          return RecordStatus.RETURNED;
+      }
+      if ((r.exportBatch || r.exportDate) && r.status !== RecordStatus.WITHDRAWN && r.status !== RecordStatus.RETURNED && r.status !== RecordStatus.REJECTED) {
+          return RecordStatus.HANDOVER;
+      }
+      return r.status;
+  };
+  
+  const displayStatus = getDisplayStatus(record);
 
   // Class chung cho các ô: Căn giữa cho sự cân đối, tăng padding thông thoáng hơn trên PC
   const cellClass = "p-3 md:p-3.5 align-middle text-slate-700 border-b border-slate-100/80 transition-colors duration-200";
 
   const orderedKeys = React.useMemo(() => {
-    const defaultOrder = ['code', 'customer', 'type', 'deadline', 'ward', 'mapSheet', 'landPlot', 'assigned', 'completed', 'status'];
+    const defaultOrder = ['code', 'customer', 'deadline', 'ward', 'mapSheet', 'landPlot', 'assigned', 'completed', 'type', 'tech', 'receipt', 'status'];
     if (columnOrder && columnOrder.length > 0) {
       return columnOrder;
     }
@@ -187,7 +198,7 @@ const RecordRow: React.FC<RecordRowProps> = ({
                </div>
             ) : record.status === RecordStatus.REJECTED ? (
                <div className="flex flex-col items-center">
-                  <span className="text-xs font-bold bg-red-100 text-red-700 border border-red-200 px-2 py-0.5 rounded mb-1">Trả hủy HS</span>
+                  <span className="text-xs font-bold bg-red-100 text-red-700 border border-red-200 px-2 py-0.5 rounded mb-1">Trả hồ sơ</span>
                   <span className="text-sm font-bold text-red-700">{formatDate(record.completedDate)}</span>
                </div>
             ) : (
@@ -316,7 +327,7 @@ const RecordRow: React.FC<RecordRowProps> = ({
             <div className="flex items-center gap-1">
               <button onClick={(e) => { e.stopPropagation(); onView(record); }} className="p-1 text-slate-600 hover:text-green-700 hover:bg-green-100/80 rounded transition-colors border border-slate-200/80 bg-white" title="Xem chi tiết"><Eye size={15} /></button>
               
-              {onReturnResult && displayStatus === RecordStatus.HANDOVER && !record.resultReturnedDate && (
+              {onReturnResult && (displayStatus === RecordStatus.HANDOVER || displayStatus === RecordStatus.SIGNED) && !record.resultReturnedDate && (
                   <button onClick={(e) => { e.stopPropagation(); onReturnResult(record); }} className="p-1 text-emerald-700 hover:bg-emerald-100 rounded transition-colors border border-emerald-200 bg-emerald-50" title="Trả kết quả">
                       <FileCheck size={15} />
                   </button>

@@ -7,7 +7,6 @@ import BarcodeGeneratorView from '../BarcodeGeneratorView';
 import PersonalProfile from '../PersonalProfile';
 import WorkScheduleView from '../WorkScheduleView';
 import ReportSection from '../ReportSection';
-import RecordLookupView from '../records/RecordLookupView';
 
 interface MobileRoutesProps {
   currentView: string;
@@ -79,7 +78,6 @@ const MobileRoutes: React.FC<MobileRoutesProps> = (props) => {
         <MobileRecordList 
           records={records} 
           employees={employees}
-          currentUser={currentUser}
           onViewRecord={props.handleViewRecord}
           onEditRecord={(r) => { props.setEditingRecord(r); props.setIsModalOpen(true); }}
           onDeleteRecord={(r) => { props.setDeletingRecord(r); props.setIsDeleteModalOpen(true); }}
@@ -91,18 +89,7 @@ const MobileRoutes: React.FC<MobileRoutesProps> = (props) => {
       return <BarcodeGeneratorView />;
 
     case 'personal_profile':
-      const emp = employees.find(e => e.id === currentUser.employeeId);
-      const isDirector = 
-        currentUser.role === UserRole.ADMIN || 
-        currentUser.role === UserRole.SUBADMIN || 
-        (currentUser.role as string) === 'DIRECTOR' ||
-        (emp && (
-          (emp.department || '').toLowerCase().includes('giám đốc') ||
-          (emp.department || '').toLowerCase().includes('lãnh đạo') ||
-          (emp.position || '').toLowerCase().includes('giám đốc') ||
-          (emp.position || '').toLowerCase().includes('phó giám đốc') ||
-          (emp.position || '').toLowerCase().includes('lãnh đạo')
-        ));
+      const isDirector = currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.SUBADMIN;
       return (
         <PersonalProfile
           user={currentUser}
@@ -146,18 +133,6 @@ const MobileRoutes: React.FC<MobileRoutesProps> = (props) => {
     case 'work_schedule':
       return (
         <WorkScheduleView currentUser={currentUser} />
-      );
-
-    case 'lookup_records':
-      return (
-        <RecordLookupView
-          records={records}
-          employees={employees}
-          wards={wards}
-          currentUser={currentUser}
-          onViewRecord={props.handleViewRecord}
-          onEditRecord={(r) => { props.setEditingRecord(r); props.setIsModalOpen(true); }}
-        />
       );
 
     case 'reports':

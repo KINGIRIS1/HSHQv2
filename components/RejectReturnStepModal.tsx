@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { X, Undo2, AlertCircle, Calendar, MessageSquare, PauseCircle, Ban, RefreshCw, CheckSquare, UserX } from 'lucide-react';
+import AutoResizeTextarea from './AutoResizeTextarea';
+import { X, Undo2, AlertCircle, Calendar, MessageSquare, PauseCircle, Ban, RefreshCw, CheckSquare } from 'lucide-react';
 import { RecordFile, User, Employee } from '../types';
 
-export type ReturnOptionType = 'pause_supplement' | 'cancel_reject' | 'return_handler' | 'csd_withdraw';
+export type ReturnOptionType = 'pause_supplement' | 'cancel_reject' | 'return_handler';
 
 interface RejectReturnStepModalProps {
   isOpen: boolean;
@@ -40,8 +41,7 @@ export const RejectReturnStepModal: React.FC<RejectReturnStepModalProps> = ({
     setErrorMsg('');
     setIsSubmitting(true);
     try {
-      const currentActionDate = new Date().toISOString();
-      await onConfirm(returnOption, reason.trim(), currentActionDate);
+      await onConfirm(returnOption, reason.trim(), returnDate);
       setReason('');
       onClose();
     } catch (err) {
@@ -67,7 +67,7 @@ export const RejectReturnStepModal: React.FC<RejectReturnStepModalProps> = ({
         <div className="bg-rose-600 px-5 py-3.5 text-white flex justify-between items-center shadow-sm">
           <div className="flex items-center gap-2.5 font-bold text-lg">
             <Undo2 size={22} className="shrink-0" />
-            <span>Trả Hồ Sơ</span>
+            <span>Thao Tác Trả Hồ Sơ</span>
           </div>
           <button 
             type="button"
@@ -134,7 +134,7 @@ export const RejectReturnStepModal: React.FC<RejectReturnStepModalProps> = ({
                 />
                 <PauseCircle size={18} className="text-amber-600 shrink-0" />
                 <span className="text-xs sm:text-sm">
-                  <strong>1. Trả chờ bổ sung</strong>
+                  <strong>1. Trả dừng quy trình (Chờ người dân bổ sung)</strong>
                 </span>
               </label>
 
@@ -156,7 +156,7 @@ export const RejectReturnStepModal: React.FC<RejectReturnStepModalProps> = ({
                 />
                 <Ban size={18} className="text-rose-600 shrink-0" />
                 <span className="text-xs sm:text-sm">
-                  <strong>2. Trả hủy hồ sơ</strong>
+                  <strong>2. Trả hủy hồ sơ (Tạm dừng / Từ chối hoàn trả 1 cửa)</strong>
                 </span>
               </label>
 
@@ -178,29 +178,7 @@ export const RejectReturnStepModal: React.FC<RejectReturnStepModalProps> = ({
                 />
                 <RefreshCw size={18} className="text-blue-600 shrink-0" />
                 <span className="text-xs sm:text-sm">
-                  <strong>3. Trả về cán bộ thụ lý</strong>
-                </span>
-              </label>
-
-              {/* Option 4 */}
-              <label 
-                className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
-                  returnOption === 'csd_withdraw' 
-                    ? 'border-2 border-purple-500 bg-purple-50/60 text-purple-950 font-bold shadow-xs' 
-                    : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-medium'
-                }`}
-              >
-                <input 
-                  type="radio" 
-                  name="returnOption" 
-                  value="csd_withdraw"
-                  checked={returnOption === 'csd_withdraw'}
-                  onChange={() => setReturnOption('csd_withdraw')}
-                  className="w-4 h-4 text-purple-600 focus:ring-purple-500"
-                />
-                <UserX size={18} className="text-purple-600 shrink-0" />
-                <span className="text-xs sm:text-sm">
-                  <strong>4. Trả do CSD rút hồ sơ</strong>
+                  <strong>3. Trả về cán bộ thụ lý (Yêu cầu sửa chữa / hoàn thiện)</strong>
                 </span>
               </label>
             </div>
@@ -213,13 +191,26 @@ export const RejectReturnStepModal: React.FC<RejectReturnStepModalProps> = ({
               <span>Ghi chú lý do trả hồ sơ</span>
               <span className="text-red-500">*</span>
             </label>
-            <textarea
-              rows={3}
+            <AutoResizeTextarea
               required
-              className="w-full border border-slate-300 rounded-xl p-3 text-sm focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none font-medium text-slate-800 placeholder:text-slate-400 resize-none"
+              className="w-full border border-slate-300 rounded-xl p-3 text-sm focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none font-medium text-slate-800 placeholder:text-slate-400"
               placeholder="Nhập chi tiết ghi chú lý do..."
               value={reason}
               onChange={(e) => setReason(e.target.value)}
+            />
+          </div>
+
+          {/* Section 4: Execution Date */}
+          <div>
+            <label className="block text-xs font-bold text-slate-800 mb-1.5 flex items-center gap-1.5">
+              <Calendar size={15} className="text-indigo-600" />
+              <span>Ngày thực hiện</span>
+            </label>
+            <input
+              type="date"
+              className="w-full border border-slate-300 rounded-xl px-3.5 py-2 text-sm focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none font-semibold text-slate-700 bg-slate-50"
+              value={returnDate}
+              onChange={(e) => setReturnDate(e.target.value)}
             />
           </div>
 

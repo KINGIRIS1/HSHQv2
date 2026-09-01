@@ -65,7 +65,7 @@ export const fetchVphcRecords = async (): Promise<VphcRecord[]> => {
         if (error) throw error;
         return data as VphcRecord[];
     } catch (error) {
-        logError("fetchVphcRecords", error, true);
+        logError("fetchVphcRecords", error);
         return MOCK_VPHC;
     }
 };
@@ -402,7 +402,7 @@ export const fetchMapSheetConversions = async (): Promise<MapSheetConversion[]> 
         if (error) throw error;
         return data as MapSheetConversion[];
     } catch (error) {
-        logError("fetchMapSheetConversions", error, true);
+        logError("fetchMapSheetConversions", error);
         return MOCK_MAP_CONVERSIONS;
     }
 };

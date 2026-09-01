@@ -1,17 +1,17 @@
 
 import React, { useState, useEffect } from 'react';
-import { Database, AlertTriangle, Cloud, Loader2, CheckCircle, Save, Globe, Calendar, Plus, Trash2, ShieldAlert, Key, FolderArchive, Upload, Download, RefreshCw, FolderOpen, LayoutDashboard, SlidersHorizontal, Eye, EyeOff, ArrowLeft, ArrowRight, ChevronUp, ChevronDown, Search, RotateCcw } from 'lucide-react';
-import { Holiday, UserRole, RolePermissions, DepartmentPermissions, DEFAULT_ROLE_PERMISSIONS, AVAILABLE_PERMISSIONS, Employee } from '../types';
-import { fetchHolidays, saveHolidays, testDatabaseConnection, saveUpdateInfo, fetchUpdateInfo, getSystemSetting, saveSystemSetting } from '../services/api';
-import { APP_VERSION } from '../constants';
+import { Database, AlertTriangle, Cloud, Loader2, CheckCircle, Save, Globe, Calendar, Plus, Trash2, ShieldAlert, Key, FolderArchive, Upload, Download, RefreshCw, FolderOpen, LayoutDashboard, SlidersHorizontal, Eye, EyeOff, ArrowLeft, ArrowRight, ChevronUp, ChevronDown, Search, RotateCcw, History } from 'lucide-react';
+import { Holiday, UserRole, RolePermissions, DepartmentPermissions, DEFAULT_ROLE_PERMISSIONS, AVAILABLE_PERMISSIONS, Employee, RecordStatus, User } from '../types';
+import { fetchHolidays, saveHolidays, testDatabaseConnection, saveUpdateInfo, fetchUpdateInfo, getSystemSetting, saveSystemSetting, fetchSystemEvents } from '../services/api';
+import { fetchRecords } from '../services/apiRecords';
+import { APP_VERSION, DEFAULT_HOLIDAYS, STATUS_LABELS } from '../constants';
 import { confirmAction, calculateDeadlineHelper, matchDepartmentKey } from '../utils/appHelpers';
 import { createFullBackupData, downloadBackupAsFile, saveBackupToServer, restoreFullBackupToSupabase } from '../services/backupService';
 import { isConfigured } from '../services/supabaseClient';
 
 const PERMISSION_DEPARTMENTS = [
-  { id: 'Tổ Cấp Giấy', name: 'Tổ Cấp Giấy', label: 'Tổ Cấp Giấy', desc: 'Bộ phận phụ trách tiếp nhận, xử lý và đăng ký cấp GCN' },
-  { id: 'Tổ Đo đạc', name: 'Tổ Đo đạc', label: 'Tổ Đo đạc', desc: 'Bộ phận phụ trách đo đạc, chỉnh lý bản đồ và trích đo địa chính' },
-  { id: 'Tổ Lưu trữ', name: 'Tổ Lưu trữ', label: 'Tổ Lưu trữ', desc: 'Bộ phận phụ trách lưu trữ, khai thác thông tin đất đai và hồ sơ lưu trữ' }
+  { id: 'Tổ Lưu trữ', name: 'Tổ Lưu trữ', label: 'Tổ Lưu trữ', desc: 'Bộ phận phụ trách lưu trữ, khai thác thông tin đất đai và hồ sơ lưu trữ' },
+  { id: 'Tổ Đo đạc', name: 'Tổ Đo đạc', label: 'Tổ Đo đạc', desc: 'Bộ phận phụ trách đo đạc, chỉnh lý bản đồ và trích đo địa chính' }
 ];
 
 const ROLES_FOR_DEPARTMENT = [
@@ -31,36 +31,20 @@ const ROLE_OPTIONS = [
 const PERMISSION_GROUPS = [
   {
     id: 'group_onedoor',
-    title: '1. Tiếp nhận',
-    desc: 'Các chức năng giao dịch và quản lý hồ sơ tiếp nhận',
+    title: '1. Phân hệ Tổ Tiếp nhận & Một cửa',
+    desc: 'Quyền xem Tab Tiếp nhận & các chức năng giao dịch một cửa',
     items: [
+      { id: 'receive_record', label: 'Xem & Truy cập Tab Tiếp nhận hồ sơ' },
       { id: 'ADD_RECORDS', label: 'Thêm / Nhập mới hồ sơ' },
       { id: 'EXPORT_RECORDS', label: 'Xuất danh sách hồ sơ (Excel)' },
     ]
   },
   {
-    id: 'group_dangky',
-    title: '4. Tổ Cấp Giấy (Module Đăng ký)',
-    desc: 'Các chức năng xử lý hồ sơ đăng ký, cấp GCN',
-    items: [
-      { id: 'dangky_BTN_ASSIGN_STAFF', label: 'Giao việc' },
-      { id: 'dangky_BTN_SUBMIT_CHECK', label: 'Trình kiểm tra' },
-      { id: 'dangky_BTN_SUBMIT_SIGN', label: 'Trình ký' },
-      { id: 'dangky_BTN_APPROVE_SIGN', label: 'Ký duyệt' },
-      { id: 'dangky_BTN_REJECT_RECORD', label: 'Trả hồ sơ' },
-      { id: 'dangky_HANDOVER_RECORDS', label: 'Bàn giao 1 cửa' },
-      { id: 'dangky_BTN_RETURN_RESULT', label: 'Trả kết quả hồ sơ' },
-      { id: 'dangky_BTN_EXTEND_DEADLINE', label: 'Gia hạn' },
-      { id: 'dangky_EDIT_RECORDS', label: 'Sửa thông tin hồ sơ' },
-      { id: 'dangky_DELETE_RECORDS', label: 'Xóa hồ sơ' },
-      { id: 'dangky_VIEW_DETAILS', label: 'Xem chi tiết hồ sơ' },
-    ]
-  },
-  {
     id: 'group_dodac',
     title: '2. Tổ Đo đạc',
-    desc: 'Các chức năng xử lý hồ sơ kỹ thuật & đo đạc',
+    desc: 'Quyền xem Tab Đo đạc & các chức năng xử lý hồ sơ kỹ thuật',
     items: [
+      { id: 'all_records', label: 'Xem & Truy cập Tab Đo đạc (Hồ sơ kỹ thuật)' },
       { id: 'dodac_BTN_ASSIGN_STAFF', label: 'Giao việc' },
       { id: 'dodac_BTN_SUBMIT_CHECK', label: 'Trình kiểm tra' },
       { id: 'dodac_BTN_SUBMIT_SIGN', label: 'Trình ký' },
@@ -79,8 +63,9 @@ const PERMISSION_GROUPS = [
   {
     id: 'group_luutru',
     title: '3. Tổ Lưu trữ',
-    desc: 'Các chức năng quản lý kho tài liệu & hồ sơ lưu trữ',
+    desc: 'Quyền xem Tab Lưu trữ & các chức năng quản lý kho tài liệu',
     items: [
+      { id: 'archive_records', label: 'Xem & Truy cập Tab Lưu trữ (Hồ sơ & Công văn)' },
       { id: 'luutru_BTN_ASSIGN_STAFF', label: 'Giao việc' },
       { id: 'luutru_BTN_SUBMIT_CHECK', label: 'Trình kiểm tra' },
       { id: 'luutru_BTN_SUBMIT_SIGN', label: 'Trình ký' },
@@ -98,9 +83,11 @@ const PERMISSION_GROUPS = [
   },
   {
     id: 'group_hopdong',
-    title: '5. Hợp đồng dịch vụ',
-    desc: 'Các chức năng quản lý hợp đồng',
+    title: '4. Phân hệ Tổ Hợp đồng dịch vụ',
+    desc: 'Quyền xem Tab Hợp đồng & các chức năng quản lý hợp đồng',
     items: [
+      { id: 'receive_contract', label: 'Xem & Truy cập Tab Hợp đồng dịch vụ' },
+      { id: 'VIEW_CONTRACTS', label: 'Xem danh sách hợp đồng' },
       { id: 'ADD_CONTRACTS', label: 'Thêm mới hợp đồng' },
       { id: 'EDIT_CONTRACTS', label: 'Sửa thông tin hợp đồng' },
       { id: 'LIQUIDATE_CONTRACTS', label: 'Thanh lý / Lập quyết toán hợp đồng' },
@@ -110,7 +97,7 @@ const PERMISSION_GROUPS = [
   },
   {
     id: 'group_system_management',
-    title: '6. Tiện ích, Báo cáo & Quản trị Hệ thống',
+    title: '5. Phân hệ Tiện ích, Báo cáo & Quản trị Hệ thống',
     desc: 'Lịch công tác, Báo cáo, Chat nội bộ, Nhân sự, Tài khoản & Cài đặt',
     items: [
       { id: 'VIEW_SCHEDULE', label: 'Xem lịch công tác tuần' },
@@ -129,6 +116,7 @@ interface SystemSettingsViewProps {
   onDeleteAllData: () => Promise<boolean>;
   onHolidaysChanged?: () => void;
   employees: Employee[];
+  users: User[];
   onOpenCloudInspector?: () => void;
 }
 
@@ -136,12 +124,114 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
   onDeleteAllData,
   onHolidaysChanged,
   employees,
+  users,
   onOpenCloudInspector
 }) => {
-  const [activeTab, setActiveTab] = useState<'general' | 'holidays' | 'permissions' | 'data'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'holidays' | 'permissions' | 'data' | 'logs'>('general');
   const [isDeletingData, setIsDeletingData] = useState(false);
   const [dbTestStatus, setDbTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [dbTestMsg, setDbTestMsg] = useState('');
+
+  // System Log States
+  const [systemLogs, setSystemLogs] = useState<any[]>([]);
+  const [isLoadingLogs, setIsLoadingLogs] = useState(false);
+  const [logSearchQuery, setLogSearchQuery] = useState('');
+  const [selectedLogUser, setSelectedLogUser] = useState('');
+  const [selectedLogStatus, setSelectedLogStatus] = useState('');
+
+  const loadSystemLogs = async () => {
+    setIsLoadingLogs(true);
+    try {
+      const [records, authEvents] = await Promise.all([
+        fetchRecords(),
+        fetchSystemEvents()
+      ]);
+      const allLogs: any[] = [];
+      records.forEach(r => {
+        if (Array.isArray(r.statusLogs)) {
+          r.statusLogs.forEach(log => {
+            allLogs.push({
+              ...log,
+              recordCode: r.code,
+              customerName: r.customerName,
+              recordType: r.recordType,
+              ward: r.ward,
+              recordObj: r
+            });
+          });
+        }
+      });
+
+      if (Array.isArray(authEvents)) {
+        authEvents.forEach(evt => {
+          allLogs.push({
+            ...evt,
+            recordCode: '—',
+            customerName: '—',
+            recordType: 'SYSTEM',
+            ward: '—'
+          });
+        });
+      }
+
+      allLogs.sort((a, b) => new Date(b.changedAt).getTime() - new Date(a.changedAt).getTime());
+      setSystemLogs(allLogs);
+    } catch (err) {
+      console.error("Error loading system logs:", err);
+    } finally {
+      setIsLoadingLogs(false);
+    }
+  };
+
+  const uniqueUsersFromLogs = React.useMemo(() => {
+    const users = new Set<string>();
+    systemLogs.forEach(l => {
+      if (l.changedBy) users.add(l.changedBy);
+    });
+    return Array.from(users);
+  }, [systemLogs]);
+
+  const resolveName = React.useCallback((changedBy: string) => {
+    if (!changedBy) return 'Hệ thống';
+    if (changedBy === 'system' || changedBy === 'Hệ thống') return 'Hệ thống';
+    const emp = employees.find(e => e.id === changedBy || e.name === changedBy);
+    if (emp) return emp.name;
+    const usr = users.find(u => u.username === changedBy || u.id === changedBy || u.name === changedBy);
+    if (usr) {
+      if (usr.name) return usr.name;
+      if (usr.employeeId) {
+        const emp2 = employees.find(e => e.id === usr.employeeId);
+        if (emp2) return emp2.name;
+      }
+    }
+    return changedBy;
+  }, [employees, users]);
+
+  const filteredSystemLogs = React.useMemo(() => {
+    return systemLogs.filter(log => {
+      const matchSearch = !logSearchQuery ? true : (
+        (log.recordCode && log.recordCode.toLowerCase().includes(logSearchQuery.toLowerCase())) ||
+        (log.customerName && log.customerName.toLowerCase().includes(logSearchQuery.toLowerCase())) ||
+        (log.note && log.note.toLowerCase().includes(logSearchQuery.toLowerCase())) ||
+        (log.changedBy && log.changedBy.toLowerCase().includes(logSearchQuery.toLowerCase()))
+      );
+      const matchUser = !selectedLogUser ? true : log.changedBy === selectedLogUser;
+      const matchStatus = !selectedLogStatus ? true : log.newStatus === selectedLogStatus;
+      return matchSearch && matchUser && matchStatus;
+    });
+  }, [systemLogs, logSearchQuery, selectedLogUser, selectedLogStatus]);
+
+  const [logPage, setLogPage] = useState(1);
+  const logsPerPage = 15;
+  const totalLogPages = Math.ceil(filteredSystemLogs.length / logsPerPage) || 1;
+  
+  const paginatedSystemLogs = React.useMemo(() => {
+    return filteredSystemLogs.slice((logPage - 1) * logsPerPage, logPage * logsPerPage);
+  }, [filteredSystemLogs, logPage]);
+
+  React.useEffect(() => {
+    setLogPage(1);
+  }, [logSearchQuery, selectedLogUser, selectedLogStatus]);
   
   // Update State (Manual Config)
   const [manualVersion, setManualVersion] = useState('');
@@ -152,11 +242,9 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   // Form thêm mới ngày lễ
   const [tempName, setTempName] = useState('');
-  const [tempHolidayType, setTempHolidayType] = useState<'recurring' | 'specific'>('recurring');
   const [tempDay, setTempDay] = useState<number>(1);
   const [tempMonth, setTempMonth] = useState<number>(1);
   const [tempIsLunar, setTempIsLunar] = useState(false);
-  const [tempDate, setTempDate] = useState(new Date().toISOString().split('T')[0]);
   
   const [savingHolidays, setSavingHolidays] = useState(false);
 
@@ -191,7 +279,6 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
       let standardName = trimmed;
       if (matchDepartmentKey('đo đạc', trimmed)) standardName = 'Tổ Đo đạc';
       else if (matchDepartmentKey('lưu trữ', trimmed)) standardName = 'Tổ Lưu trữ';
-      else if (matchDepartmentKey('cấp giấy', trimmed) || matchDepartmentKey('đăng ký', trimmed)) standardName = 'Tổ Cấp Giấy';
 
       if (!resultList.includes(standardName)) {
         resultList.push(standardName);
@@ -276,6 +363,12 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
       loadContractSettings();
       loadBackupSettings();
   }, []);
+
+  useEffect(() => {
+      if (activeTab === 'logs') {
+          loadSystemLogs();
+      }
+  }, [activeTab]);
 
   const loadBackupSettings = async () => {
       const savedDir = await getSystemSetting('backup_directory');
@@ -428,11 +521,14 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
       if (savedPerms) {
           try {
               const parsed = JSON.parse(savedPerms);
-              const cleanPerms: RolePermissions = { ...DEFAULT_ROLE_PERMISSIONS, ...parsed };
-              setRolePermissions(cleanPerms);
+              Object.keys(DEFAULT_ROLE_PERMISSIONS).forEach(roleKey => {
+                  const defPerms = DEFAULT_ROLE_PERMISSIONS[roleKey as UserRole] || [];
+                  const existingPerms = (parsed[roleKey] || []).filter((p: string) => p !== 'CHECK_RECORDS' && p !== 'BTN_CLOSE_BATCH');
+                  parsed[roleKey] = Array.from(new Set([...existingPerms, ...defPerms]));
+              });
+              setRolePermissions(parsed);
           } catch (e) {
               console.error("Failed to parse role_permissions", e);
-              setRolePermissions(DEFAULT_ROLE_PERMISSIONS);
           }
       } else {
           setRolePermissions(DEFAULT_ROLE_PERMISSIONS);
@@ -441,7 +537,12 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
       if (savedDeptPerms) {
           try {
               const parsedDept = JSON.parse(savedDeptPerms);
-              setDepartmentPermissions(parsedDept || {});
+              Object.keys(parsedDept).forEach(key => {
+                  if (Array.isArray(parsedDept[key])) {
+                      parsedDept[key] = parsedDept[key].filter((p: string) => p !== 'CHECK_RECORDS' && p !== 'BTN_CLOSE_BATCH');
+                  }
+              });
+              setDepartmentPermissions(parsedDept);
           } catch (e) {
               console.error("Failed to parse department_permissions", e);
           }
@@ -471,34 +572,19 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
 
   const getDefaultDeptPerms = (deptName: string, role: string): string[] => {
       const basePerms = rolePermissions[role] || DEFAULT_ROLE_PERMISSIONS[role as UserRole] || [];
-      const isCapGiay = matchDepartmentKey('cấp giấy', deptName) || matchDepartmentKey('đăng ký', deptName);
-      const isDodac = matchDepartmentKey('đo đạc', deptName);
-      const isLuutru = matchDepartmentKey('lưu trữ', deptName);
-
-      if (isCapGiay) {
-          const OTHER_PERMS = [
-              'dodac_BTN_ASSIGN_STAFF', 'dodac_BTN_SUBMIT_CHECK', 'dodac_BTN_SUBMIT_SIGN', 'dodac_BTN_APPROVE_SIGN', 'dodac_BTN_REJECT_RECORD', 'dodac_HANDOVER_RECORDS', 'dodac_BTN_RETURN_RESULT', 'dodac_VIEW_EXCERPTS', 'dodac_MANAGE_EXCERPTS', 'dodac_BTN_EXTEND_DEADLINE', 'dodac_EDIT_RECORDS', 'dodac_DELETE_RECORDS', 'dodac_VIEW_DETAILS',
-              'luutru_BTN_ASSIGN_STAFF', 'luutru_BTN_SUBMIT_CHECK', 'luutru_BTN_SUBMIT_SIGN', 'luutru_BTN_APPROVE_SIGN', 'luutru_BTN_REJECT_RECORD', 'luutru_HANDOVER_RECORDS', 'luutru_BTN_RETURN_RESULT', 'luutru_VIEW_ARCHIVE', 'luutru_MANAGE_ARCHIVE', 'luutru_BTN_EXTEND_DEADLINE', 'luutru_EDIT_RECORDS', 'luutru_DELETE_RECORDS', 'luutru_VIEW_DETAILS',
-              'all_records', 'all_sub_all', 'assign_tasks', 'completed_list', 'pending_check_list', 'check_list', 'handover_list', 'director_completed', 'survey_list',
-              'archive_records', 'archive_sub_all', 'archive_assign_tasks', 'archive_completed_list', 'archive_pending_check_list', 'archive_check_list', 'archive_handover_list', 'archive_director_completed', 'VIEW_ARCHIVE', 'MANAGE_ARCHIVE'
+      if (matchDepartmentKey('đo đạc', deptName)) {
+          const ARCHIVE_PERMS = [
+              'archive_records', 'archive_sub_all', 'archive_assign_tasks',
+              'archive_completed_list', 'archive_pending_check_list', 'archive_check_list',
+              'archive_handover_list', 'archive_director_completed', 'VIEW_ARCHIVE', 'MANAGE_ARCHIVE'
           ];
-          return basePerms.filter(p => !OTHER_PERMS.includes(p) && !p.startsWith('dodac_') && !p.startsWith('luutru_'));
-      } else if (isDodac) {
-          const OTHER_PERMS = [
-              'dangky_BTN_ASSIGN_STAFF', 'dangky_BTN_SUBMIT_CHECK', 'dangky_BTN_SUBMIT_SIGN', 'dangky_BTN_APPROVE_SIGN', 'dangky_BTN_REJECT_RECORD', 'dangky_HANDOVER_RECORDS', 'dangky_BTN_RETURN_RESULT', 'dangky_BTN_EXTEND_DEADLINE', 'dangky_EDIT_RECORDS', 'dangky_DELETE_RECORDS', 'dangky_VIEW_DETAILS',
-              'luutru_BTN_ASSIGN_STAFF', 'luutru_BTN_SUBMIT_CHECK', 'luutru_BTN_SUBMIT_SIGN', 'luutru_BTN_APPROVE_SIGN', 'luutru_BTN_REJECT_RECORD', 'luutru_HANDOVER_RECORDS', 'luutru_BTN_RETURN_RESULT', 'luutru_VIEW_ARCHIVE', 'luutru_MANAGE_ARCHIVE', 'luutru_BTN_EXTEND_DEADLINE', 'luutru_EDIT_RECORDS', 'luutru_DELETE_RECORDS', 'luutru_VIEW_DETAILS',
-              'registration_records', 'vaoso_records',
-              'archive_records', 'archive_sub_all', 'archive_assign_tasks', 'archive_completed_list', 'archive_pending_check_list', 'archive_check_list', 'archive_handover_list', 'archive_director_completed', 'VIEW_ARCHIVE', 'MANAGE_ARCHIVE'
+          return basePerms.filter(p => !ARCHIVE_PERMS.includes(p));
+      } else if (matchDepartmentKey('lưu trữ', deptName)) {
+          const SURVEY_PERMS = [
+              'all_records', 'all_sub_all', 'assign_tasks', 'completed_list',
+              'pending_check_list', 'check_list', 'handover_list', 'director_completed', 'survey_list'
           ];
-          return basePerms.filter(p => !OTHER_PERMS.includes(p) && !p.startsWith('dangky_') && !p.startsWith('luutru_'));
-      } else if (isLuutru) {
-          const OTHER_PERMS = [
-              'dangky_BTN_ASSIGN_STAFF', 'dangky_BTN_SUBMIT_CHECK', 'dangky_BTN_SUBMIT_SIGN', 'dangky_BTN_APPROVE_SIGN', 'dangky_BTN_REJECT_RECORD', 'dangky_HANDOVER_RECORDS', 'dangky_BTN_RETURN_RESULT', 'dangky_BTN_EXTEND_DEADLINE', 'dangky_EDIT_RECORDS', 'dangky_DELETE_RECORDS', 'dangky_VIEW_DETAILS',
-              'dodac_BTN_ASSIGN_STAFF', 'dodac_BTN_SUBMIT_CHECK', 'dodac_BTN_SUBMIT_SIGN', 'dodac_BTN_APPROVE_SIGN', 'dodac_BTN_REJECT_RECORD', 'dodac_HANDOVER_RECORDS', 'dodac_BTN_RETURN_RESULT', 'dodac_VIEW_EXCERPTS', 'dodac_MANAGE_EXCERPTS', 'dodac_BTN_EXTEND_DEADLINE', 'dodac_EDIT_RECORDS', 'dodac_DELETE_RECORDS', 'dodac_VIEW_DETAILS',
-              'registration_records', 'vaoso_records',
-              'all_records', 'all_sub_all', 'assign_tasks', 'completed_list', 'pending_check_list', 'check_list', 'handover_list', 'director_completed', 'survey_list'
-          ];
-          return basePerms.filter(p => !OTHER_PERMS.includes(p) && !p.startsWith('dangky_') && !p.startsWith('dodac_'));
+          return basePerms.filter(p => !SURVEY_PERMS.includes(p));
       }
       return basePerms;
   };
@@ -608,17 +694,8 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
   const loadHolidays = async () => {
       const data = await fetchHolidays();
       // Nếu data rỗng, hiển thị list mặc định nhưng chưa lưu
-      if (data.length === 0) {
-          setHolidays([
-              { id: '1', name: 'Tết Dương Lịch', day: 1, month: 1, isLunar: false },
-              { id: '2', name: 'Giỗ Tổ Hùng Vương', day: 10, month: 3, isLunar: true },
-              { id: '3', name: 'Giải phóng Miền Nam', day: 30, month: 4, isLunar: false },
-              { id: '4', name: 'Quốc tế Lao động', day: 1, month: 5, isLunar: false },
-              { id: '5', name: 'Quốc Khánh', day: 2, month: 9, isLunar: false },
-              { id: '6', name: 'Tết Nguyên Đán (Mùng 1)', day: 1, month: 1, isLunar: true },
-              { id: '7', name: 'Tết Nguyên Đán (Mùng 2)', day: 2, month: 1, isLunar: true },
-              { id: '8', name: 'Tết Nguyên Đán (Mùng 3)', day: 3, month: 1, isLunar: true },
-          ]);
+      if (!data || data.length === 0) {
+          setHolidays(DEFAULT_HOLIDAYS);
       } else {
           setHolidays(data);
       }
@@ -685,24 +762,16 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
   // --- HOLIDAY HANDLERS ---
   const handleAddHoliday = () => {
       if (!tempName.trim()) { alert("Vui lòng nhập tên ngày lễ"); return; }
+      if (tempDay < 1 || tempDay > 31 || tempMonth < 1 || tempMonth > 12) { alert("Ngày tháng không hợp lệ"); return; }
 
       const newId = Math.random().toString(36).substr(2, 9);
       const newHoliday: Holiday = {
           id: newId,
           name: tempName,
+          day: tempDay,
+          month: tempMonth,
+          isLunar: tempIsLunar
       };
-
-      if (tempHolidayType === 'specific') {
-          if (!tempDate) { alert("Vui lòng chọn ngày nghỉ cụ thể"); return; }
-          newHoliday.date = tempDate;
-          const yVal = parseInt(tempDate.split('-')[0], 10);
-          if (!isNaN(yVal)) newHoliday.year = yVal;
-      } else {
-          if (tempDay < 1 || tempDay > 31 || tempMonth < 1 || tempMonth > 12) { alert("Ngày tháng không hợp lệ"); return; }
-          newHoliday.day = tempDay;
-          newHoliday.month = tempMonth;
-          newHoliday.isLunar = tempIsLunar;
-      }
 
       setHolidays(prev => [...prev, newHoliday]);
       // Reset form
@@ -710,7 +779,6 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
       setTempDay(1);
       setTempMonth(1);
       setTempIsLunar(false);
-      setTempDate(new Date().toISOString().split('T')[0]);
   };
 
   const handleDeleteHoliday = async (id: string) => {
@@ -759,10 +827,17 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
             >
                 <AlertTriangle size={16} /> Dữ liệu
             </button>
+            <button 
+                onClick={() => setActiveTab('logs')}
+                className={`px-4 py-3 text-xs md:text-sm font-black uppercase tracking-widest flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'logs' ? 'border-teal-600 text-teal-700 bg-white' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
+                id="tab-system-logs"
+            >
+                <History size={16} /> Log Lịch sử
+            </button>
         </div>
 
         <div className={`flex-1 bg-slate-50/30 min-h-0 ${
-            activeTab === 'permissions' ? 'p-2 md:p-3 overflow-hidden flex flex-col' : 'p-4 md:p-6 overflow-y-auto'
+            (activeTab === 'permissions' || activeTab === 'logs') ? 'p-2 md:p-3 overflow-hidden flex flex-col' : 'p-4 md:p-6 overflow-y-auto'
         }`}>
             {activeTab === 'general' && (
                 <div className="space-y-6 max-w-4xl mx-auto">
@@ -838,54 +913,28 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
 
                         {/* Form thêm mới */}
                         <div className="flex flex-col gap-4 mb-8 bg-orange-50/50 p-5 rounded-2xl border border-orange-100">
-                            <div className="flex items-center justify-between">
-                                <p className="text-sm font-medium text-orange-800">Thêm ngày lễ mới</p>
-                                <div className="flex gap-2 bg-white p-1 rounded-xl border border-orange-200">
-                                    <button
-                                        onClick={() => setTempHolidayType('recurring')}
-                                        className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${tempHolidayType === 'recurring' ? 'bg-orange-600 text-white' : 'text-gray-600 hover:text-gray-900'}`}
-                                    >
-                                        Lặp lại hàng năm
-                                    </button>
-                                    <button
-                                        onClick={() => setTempHolidayType('specific')}
-                                        className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${tempHolidayType === 'specific' ? 'bg-orange-600 text-white' : 'text-gray-600 hover:text-gray-900'}`}
-                                    >
-                                        Ngày cụ thể (Nghỉ bù)
-                                    </button>
-                                </div>
-                            </div>
+                            <p className="text-sm font-medium text-orange-800 mb-1">Thêm ngày lễ mới</p>
                             <div className="grid grid-cols-1 sm:grid-cols-12 gap-4">
                                 <div className="sm:col-span-6">
-                                    <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Tên ngày lễ / Nghỉ bù</label>
-                                    <input type="text" className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-orange-500 outline-none transition-all" placeholder="VD: Nghỉ bù lễ 2/9" value={tempName || ''} onChange={e => setTempName(e.target.value)} />
+                                    <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Tên ngày lễ</label>
+                                    <input type="text" className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-orange-500 outline-none transition-all" placeholder="VD: Giỗ tổ" value={tempName || ''} onChange={e => setTempName(e.target.value)} />
                                  </div>
-
-                                 {tempHolidayType === 'specific' ? (
-                                     <div className="sm:col-span-6">
-                                         <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Chọn ngày cụ thể</label>
-                                         <input type="date" className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-orange-500 outline-none transition-all bg-white" value={tempDate} onChange={e => setTempDate(e.target.value)} />
-                                     </div>
-                                 ) : (
-                                     <>
-                                         <div className="sm:col-span-2">
-                                             <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Ngày</label>
-                                             <input type="number" min="1" max="31" className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-center font-bold text-slate-700 focus:ring-2 focus:ring-orange-500 outline-none transition-all" value={tempDay ?? 1} onChange={e => setTempDay(parseInt(e.target.value) || 1)} />
-                                         </div>
-                                         <div className="sm:col-span-2">
-                                             <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Tháng</label>
-                                             <input type="number" min="1" max="12" className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-center font-bold text-slate-700 focus:ring-2 focus:ring-orange-500 outline-none transition-all" value={tempMonth ?? 1} onChange={e => setTempMonth(parseInt(e.target.value) || 1)} />
-                                         </div>
-                                         <div className="sm:col-span-2 flex items-end">
-                                             <label className="flex items-center cursor-pointer select-none bg-white border border-gray-200 rounded-xl px-3 py-2.5 w-full justify-center hover:bg-gray-50 transition-colors">
-                                                 <input type="checkbox" className="mr-2 w-4 h-4 text-orange-600 rounded focus:ring-orange-500" checked={tempIsLunar} onChange={e => setTempIsLunar(e.target.checked)} />
-                                                 <span className="text-xs text-gray-700 font-black uppercase tracking-wider">Âm</span>
-                                             </label>
-                                         </div>
-                                     </>
-                                 )}
+                                 <div className="sm:col-span-2">
+                                     <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Ngày</label>
+                                     <input type="number" min="1" max="31" className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-center font-bold text-slate-700 focus:ring-2 focus:ring-orange-500 outline-none transition-all" value={tempDay ?? 1} onChange={e => setTempDay(parseInt(e.target.value) || 1)} />
+                                 </div>
+                                 <div className="sm:col-span-2">
+                                     <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Tháng</label>
+                                     <input type="number" min="1" max="12" className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-center font-bold text-slate-700 focus:ring-2 focus:ring-orange-500 outline-none transition-all" value={tempMonth ?? 1} onChange={e => setTempMonth(parseInt(e.target.value) || 1)} />
+                                 </div>
+                                <div className="sm:col-span-2 flex items-end">
+                                    <label className="flex items-center cursor-pointer select-none bg-white border border-gray-200 rounded-xl px-3 py-2.5 w-full justify-center hover:bg-gray-50 transition-colors">
+                                        <input type="checkbox" className="mr-2 w-4 h-4 text-orange-600 rounded focus:ring-orange-500" checked={tempIsLunar} onChange={e => setTempIsLunar(e.target.checked)} />
+                                        <span className="text-xs text-gray-700 font-black uppercase tracking-wider">Âm</span>
+                                    </label>
+                                </div>
                             </div>
-                            <button onClick={handleAddHoliday} className="w-full bg-green-600 text-white px-4 py-3 rounded-xl text-sm font-medium hover:bg-green-700 flex items-center justify-center gap-2 shadow-md transition-all active:scale-95 cursor-pointer">
+                            <button onClick={handleAddHoliday} className="w-full bg-green-600 text-white px-4 py-3 rounded-xl text-sm font-medium hover:bg-green-700 flex items-center justify-center gap-2 shadow-md transition-all active:scale-95">
                                 <Plus size={16} /> Thêm vào danh sách
                             </button>
                         </div>
@@ -905,14 +954,10 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                                     {holidays.map(h => (
                                         <tr key={h.id} className="hover:bg-orange-50/30 transition-colors">
                                             <td className="p-4 font-bold text-slate-700">{h.name}</td>
-                                            <td className="p-4 text-center font-black text-slate-600">
-                                                {h.date ? h.date : `${h.day}/${h.month}`}
-                                            </td>
+                                            <td className="p-4 text-center font-black text-slate-600">{h.day}/{h.month}</td>
                                             <td className="p-4 text-center">
-                                                <span className={`px-2 py-1 rounded-lg text-xs font-semibold uppercase tracking-wider border ${
-                                                    h.date ? 'bg-amber-50 text-amber-700 border-amber-200' : (h.isLunar ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-green-50 text-green-700 border-green-200')
-                                                }`}>
-                                                    {h.date ? 'Ngày cụ thể (Nghỉ bù)' : (h.isLunar ? 'Âm lịch' : 'Dương lịch')}
+                                                <span className={`px-2 py-1 rounded-lg text-xs font-semibold uppercase tracking-wider border ${h.isLunar ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-green-50 text-green-700 border-green-200'}`}>
+                                                    {h.isLunar ? 'Âm lịch' : 'Dương lịch'}
                                                 </span>
                                             </td>
                                             <td className="p-4 text-center">
@@ -934,11 +979,9 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                                     <div className="flex-1 min-w-0 pr-4">
                                         <h4 className="font-black text-slate-800 text-sm truncate tracking-tight">{h.name}</h4>
                                         <div className="flex items-center gap-3 mt-1">
-                                            <span className="text-xs font-black text-slate-500">{h.date ? h.date : `${h.day}/${h.month}`}</span>
-                                            <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-wider border ${
-                                                h.date ? 'bg-amber-50 text-amber-700 border-amber-200' : (h.isLunar ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-green-50 text-green-700 border-green-200')
-                                            }`}>
-                                                {h.date ? 'Nghỉ bù' : (h.isLunar ? 'Âm' : 'Dương')}
+                                            <span className="text-xs font-black text-slate-500">{h.day}/{h.month}</span>
+                                            <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-wider border ${h.isLunar ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-green-50 text-green-700 border-green-200'}`}>
+                                                {h.isLunar ? 'Âm' : 'Dương'}
                                             </span>
                                         </div>
                                     </div>
@@ -1273,6 +1316,231 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                                 </button>
                             </div>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {activeTab === 'logs' && (
+                <div className="space-y-6 max-w-6xl mx-auto flex flex-col h-full min-h-0">
+                    {/* FILTER CARD */}
+                    <div className="bg-white border border-slate-200/60 rounded-2xl p-4 md:p-5 shadow-sm flex flex-col gap-4 shrink-0">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-3 border-slate-100">
+                            <div>
+                                <h3 className="font-black text-slate-800 flex items-center gap-2 tracking-tight text-base">
+                                    <History className="text-teal-600" size={18} /> Nhật ký hoạt động & Thao tác phần mềm
+                                </h3>
+                                <p className="text-xs text-slate-500 font-medium mt-0.5">
+                                    Ghi nhận toàn bộ các tác vụ chuyển trạng thái, cập nhật hồ sơ từ các tài khoản đăng nhập
+                                </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs bg-slate-100 text-slate-600 font-black px-2.5 py-1 rounded-full uppercase tracking-wider">
+                                    Tổng: {filteredSystemLogs.length} logs
+                                </span>
+                                <button
+                                    onClick={loadSystemLogs}
+                                    disabled={isLoadingLogs}
+                                    className="p-2 text-slate-500 hover:text-teal-600 hover:bg-slate-50 rounded-lg border border-slate-200/80 transition-all disabled:opacity-50 cursor-pointer shadow-xs"
+                                    title="Tải lại logs"
+                                >
+                                    <RefreshCw size={14} className={isLoadingLogs ? 'animate-spin' : ''} />
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* FILTERS INPUT */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div className="relative">
+                                <Search className="absolute left-3 top-2.5 text-slate-400" size={16} />
+                                <input
+                                    type="text"
+                                    placeholder="Tìm mã hồ sơ, chủ HS, ghi chú..."
+                                    value={logSearchQuery}
+                                    onChange={(e) => setLogSearchQuery(e.target.value)}
+                                    className="w-full pl-9 pr-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-hidden focus:border-teal-500 focus:ring-1 focus:ring-teal-500 bg-white text-slate-800 font-medium"
+                                />
+                            </div>
+
+                            <div>
+                                <select
+                                    value={selectedLogUser}
+                                    onChange={(e) => setSelectedLogUser(e.target.value)}
+                                    className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-hidden focus:border-teal-500 bg-white text-slate-800 font-medium"
+                                >
+                                    <option value="">-- Tất cả tài khoản --</option>
+                                    {uniqueUsersFromLogs.map(user => (
+                                        <option key={user} value={user}>{resolveName(user)}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div>
+                                <select
+                                    value={selectedLogStatus}
+                                    onChange={(e) => setSelectedLogStatus(e.target.value)}
+                                    className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-hidden focus:border-teal-500 bg-white text-slate-800 font-medium"
+                                >
+                                    <option value="">-- Tất cả trạng thái mới --</option>
+                                    <option value="LOGIN">Đăng nhập</option>
+                                    <option value="LOGOUT">Đăng xuất</option>
+                                    {Object.entries(STATUS_LABELS).map(([statusKey, statusLabel]) => (
+                                        <option key={statusKey} value={statusKey}>{statusLabel}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+
+                        {(logSearchQuery || selectedLogUser || selectedLogStatus) && (
+                            <div className="flex justify-end shrink-0">
+                                <button
+                                    onClick={() => {
+                                        setLogSearchQuery('');
+                                        setSelectedLogUser('');
+                                        setSelectedLogStatus('');
+                                    }}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-red-600 hover:text-red-700 font-bold hover:bg-red-50 border border-red-200 rounded-lg transition-colors cursor-pointer"
+                                >
+                                    <RotateCcw size={12} /> Xóa bộ lọc
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* TABLE CONTAINER */}
+                    <div className="bg-white border border-slate-200/60 rounded-2xl shadow-sm flex-1 min-h-0 flex flex-col overflow-hidden">
+                        {isLoadingLogs ? (
+                            <div className="flex flex-col items-center justify-center py-24 text-slate-500 flex-1">
+                                <Loader2 className="animate-spin text-teal-600 mb-3" size={32} />
+                                <span className="text-sm font-bold">Đang tải nhật ký thao tác...</span>
+                                <span className="text-xs text-slate-400 mt-1">Truy vấn dữ liệu từ máy chủ an toàn</span>
+                            </div>
+                        ) : filteredSystemLogs.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center py-20 text-slate-400 flex-1">
+                                <History size={48} className="stroke-1 text-slate-300 mb-3" />
+                                <span className="text-sm font-bold">Không tìm thấy bản ghi nhật ký phù hợp</span>
+                                <span className="text-xs text-slate-400 mt-1">Vui lòng thay đổi từ khóa tìm kiếm hoặc bộ lọc</span>
+                            </div>
+                        ) : (
+                            <div className="overflow-y-auto flex-1">
+                                <table className="w-full text-xs text-left border-collapse table-fixed">
+                                    <thead className="bg-slate-50 border-b border-slate-100 sticky top-0 z-10">
+                                        <tr>
+                                            <th className="p-3 font-bold uppercase tracking-wider text-[10px] text-slate-500 w-[160px]">Thời gian</th>
+                                            <th className="p-3 font-bold uppercase tracking-wider text-[10px] text-slate-500 w-[140px]">Tài khoản</th>
+                                            <th className="p-3 font-bold uppercase tracking-wider text-[10px] text-slate-500 w-[200px]">Hồ sơ liên quan</th>
+                                            <th className="p-3 font-bold uppercase tracking-wider text-[10px] text-slate-500 w-[240px]">Chuyển trạng thái</th>
+                                            <th className="p-3 font-bold uppercase tracking-wider text-[10px] text-slate-500">Ghi chú / Thao tác</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {paginatedSystemLogs.map((log, idx) => (
+                                            <tr key={log.id || idx} className="hover:bg-slate-50/40 transition-colors">
+                                                <td className="p-3 whitespace-nowrap text-slate-500 font-mono">
+                                                    {log.changedAt ? new Date(log.changedAt).toLocaleString('vi-VN') : '—'}
+                                                </td>
+                                                <td className="p-3 font-bold text-slate-800">
+                                                    {resolveName(log.changedBy)}
+                                                </td>
+                                                <td className="p-3">
+                                                    {log.isAuthEvent ? (
+                                                        <span className="text-slate-400 font-medium italic">—</span>
+                                                    ) : (
+                                                        <div className="space-y-0.5">
+                                                            <span className="font-mono font-black text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded text-[10px]">
+                                                                {log.recordCode || 'N/A'}
+                                                            </span>
+                                                            <div className="font-bold text-slate-600 truncate text-[11px]" title={log.customerName}>
+                                                                {log.customerName || 'N/A'}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </td>
+                                                <td className="p-3">
+                                                    {log.isAuthEvent ? (
+                                                        <div className="flex items-center">
+                                                            {log.newStatus === 'LOGIN' ? (
+                                                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                                                    ĐĂNG NHẬP
+                                                                </span>
+                                                            ) : (
+                                                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                                                    ĐĂNG XUẤT
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    ) : (
+                                                        <div className="flex items-center gap-1 flex-wrap">
+                                                            {log.previousStatus ? (
+                                                                <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-600 border border-slate-200">
+                                                                    {STATUS_LABELS[log.previousStatus as RecordStatus] || log.previousStatus}
+                                                                </span>
+                                                            ) : (
+                                                                <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-teal-50 text-teal-700 border border-teal-100">
+                                                                    Mới tạo
+                                                                </span>
+                                                            )}
+                                                            <ArrowRight size={10} className="text-slate-400 shrink-0" />
+                                                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                                                {STATUS_LABELS[log.newStatus as RecordStatus] || log.newStatus}
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                </td>
+                                                <td className="p-3 text-slate-600 font-medium italic break-words">
+                                                    {log.note || '—'}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+
+                        {/* PAGINATION FOOTER */}
+                        {!isLoadingLogs && totalLogPages > 1 && (
+                            <div className="flex items-center justify-between px-4 py-3 bg-slate-50 border-t border-slate-100 select-none shrink-0">
+                                <span className="text-xs text-slate-500 font-medium">
+                                    Trang <strong className="font-bold text-slate-700">{logPage}</strong> / {totalLogPages} (Tổng {filteredSystemLogs.length} logs)
+                                </span>
+                                <div className="flex items-center gap-1">
+                                    <button
+                                        disabled={logPage === 1}
+                                        onClick={() => setLogPage(prev => Math.max(1, prev - 1))}
+                                        className="p-1 text-slate-500 hover:text-teal-600 hover:bg-white rounded-md border border-slate-200 disabled:opacity-40 transition-colors cursor-pointer"
+                                    >
+                                        <ArrowLeft size={14} />
+                                    </button>
+                                    {Array.from({ length: totalLogPages }, (_, i) => i + 1).map(p => {
+                                        if (totalLogPages > 8 && Math.abs(logPage - p) > 2 && p !== 1 && p !== totalLogPages) {
+                                            if (p === 2 || p === totalLogPages - 1) {
+                                                return <span key={p} className="text-slate-400 px-1 text-[10px] select-none">...</span>;
+                                            }
+                                            return null;
+                                        }
+                                        return (
+                                            <button
+                                                key={p}
+                                                onClick={() => setLogPage(p)}
+                                                className={`w-6 h-6 flex items-center justify-center text-[10px] font-bold rounded transition-colors border ${
+                                                    logPage === p
+                                                        ? 'bg-teal-600 border-teal-600 text-white shadow-xs'
+                                                        : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-800'
+                                                }`}
+                                            >
+                                                {p}
+                                            </button>
+                                        );
+                                    })}
+                                    <button
+                                        disabled={logPage === totalLogPages}
+                                        onClick={() => setLogPage(prev => Math.min(totalLogPages, prev + 1))}
+                                        className="p-1 text-slate-500 hover:text-teal-600 hover:bg-white rounded-md border border-slate-200 disabled:opacity-40 transition-colors cursor-pointer"
+                                    >
+                                        <ArrowRight size={14} />
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}

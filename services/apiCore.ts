@@ -2,9 +2,7 @@
 import { supabase, isConfigured } from './supabaseClient';
 import { Contract, PriceItem, Employee, User } from '../types';
 import { API_BASE_URL } from '../constants'; 
-import { getFromIdb, saveToIdb } from './indexedDbService';
-import { networkMonitor, isNetworkError } from './networkMonitor';
-import { resolveRecordStatus } from '../utils/appHelpers';
+import { connectionManager } from './connectionService'; 
 
 // --- CACHE KEYS ---
 export const CACHE_KEYS = {
@@ -18,68 +16,37 @@ export const CACHE_KEYS = {
     TRICHDO_COUNTERS: 'offline_trichdo_counters',
     PRICE_LIST: 'offline_price_list',
     HOLIDAYS: 'offline_holidays',
-    SYSTEM_CONFIG: 'offline_system_config',
-    DANGKY_RECORDS: 'offline_dangky_records'
+    SYSTEM_CONFIG: 'offline_system_config'
 };
-
-// In-memory cache map for ultra-fast synchronous lookups
-const memoryCache = new Map<string, any>();
 
 // --- HELPERS ---
 export const saveToCache = (key: string, data: any) => {
     try {
-        // 1. Save into RAM memory
-        memoryCache.set(key, data);
-
-        // 2. Save full payload into IndexedDB (asynchronous, high capacity)
-        saveToIdb(key, data).catch((err: any) => {
-            console.warn(`[IndexedDB Sync] Failed to persist ${key}:`, err);
-        });
-
-        // 3. Fallback to localStorage if size allows
-        if (typeof window !== 'undefined') {
-            try {
-                localStorage.setItem(key, JSON.stringify(data));
-            } catch (storageErr) {
-                // If localStorage is full, IndexedDB holds the 100% full dataset
-            }
-        }
+        localStorage.setItem(key, JSON.stringify(data));
     } catch (e: any) {
-        console.warn('Cache save warning:', e);
-    }
-};
-
-/**
- * Async cache loader that retrieves full 100% dataset from IndexedDB with fallback
- */
-export const getFromCacheAsync = async <T>(key: string, fallback: T): Promise<T> => {
-    if (memoryCache.has(key)) {
-        return memoryCache.get(key) as T;
-    }
-    try {
-        const idbData = await getFromIdb<T>(key, fallback);
-        if (idbData && (!Array.isArray(idbData) || idbData.length > 0)) {
-            memoryCache.set(key, idbData);
-            return idbData;
+        if (e.name === 'QuotaExceededError' || e?.message?.includes('quota')) {
+            console.warn(`LocalStorage full when saving ${key}. Attempting to truncate...`);
+            if (Array.isArray(data) && data.length > 500) {
+                try {
+                    const truncated = data.slice(0, 500);
+                    localStorage.setItem(key, JSON.stringify(truncated));
+                    console.info(`Successfully saved truncated ${key} (500 items) to free space.`);
+                } catch (err) {
+                    console.warn(`Failed to save even truncated ${key}`, err);
+                }
+            }
+        } else {
+            console.warn('LocalStorage full or error:', e);
         }
-        return getFromCache(key, fallback);
-    } catch {
-        return getFromCache(key, fallback);
     }
 };
 
 export const getFromCache = <T>(key: string, fallback: T): T => {
-    if (memoryCache.has(key)) {
-        return memoryCache.get(key) as T;
-    }
     try {
-        if (typeof window !== 'undefined') {
-            const cached = localStorage.getItem(key);
-            if (cached) {
-                const parsed = JSON.parse(cached);
-                memoryCache.set(key, parsed);
-                return parsed;
-            }
+        const cached = localStorage.getItem(key);
+        if (cached) {
+            console.log(`[Offline Mode] Loaded data from cache: ${key}`);
+            return JSON.parse(cached);
         }
     } catch (e) {
         console.warn('Error reading cache:', e);
@@ -142,10 +109,9 @@ export const logError = (context: string, error: any, silent: boolean = false) =
          return; 
     }
 
-    if (isNetworkError(error) || msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('configuration') || msg.includes('Load failed')) {
-        console.error(`❌ [Lỗi kết nối] ${context}: Không thể kết nối tới máy chủ. Kích hoạt khóa ngoại tuyến an toàn.`);
-        // Trigger instant OFFLINE LOCK in 0.05s
-        networkMonitor.triggerConnectionLost();
+    if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('configuration') || msg.includes('Load failed') || msg.includes('ERR_INTERNET_DISCONNECTED')) {
+        console.error(`❌ [Lỗi kết nối] ${context}: Không thể kết nối tới cơ sở dữ liệu Cloud Supabase. Vui lòng kiểm tra lại mạng.`);
+        connectionManager.reportNetworkError(context, error);
     } else if (code === '42P01' || code === 'PGRST205' || (typeof msg === 'string' && msg.includes('schema cache'))) {
         console.error(`❌ Lỗi tại ${context}: Bảng dữ liệu chưa tồn tại trên Supabase! (Code: ${code || 'PGRST205'})`);
         if (!silent) {
@@ -333,90 +299,6 @@ export const sanitizePayloadFor22P02 = (payload: any): any => {
     return clean;
 };
 
-export const stripColumnFromPayload = (payload: any, columnName: string): any => {
-    if (!payload || !columnName) return payload;
-    if (Array.isArray(payload)) {
-        return payload.map(item => stripColumnFromPayload(item, columnName));
-    }
-    if (typeof payload === 'object' && payload !== null) {
-        const clean = { ...payload };
-        delete clean[columnName];
-        
-        // Match snake_case and lowercased versions as well
-        const snakeCase = columnName.replace(/([A-Z])/g, "_$1").toLowerCase();
-        delete clean[snakeCase];
-        delete clean[columnName.toLowerCase()];
-        
-        return clean;
-    }
-    return payload;
-};
-
-export const executeSupabaseOperationWithAutoClean = async <T = any>(
-    operationFn: (currentPayload: any) => Promise<{ data: T | null; error: any }>,
-    initialPayload: any,
-    maxRetries = 10
-): Promise<{ data: T | null; error: any }> => {
-    let currentPayload = initialPayload;
-    let attempts = 0;
-
-    while (attempts < maxRetries) {
-        attempts++;
-        let res: { data: T | null; error: any };
-        try {
-            res = await operationFn(currentPayload);
-        } catch (catchedErr: any) {
-            res = { data: null, error: catchedErr };
-        }
-
-        if (!res.error) {
-            return res;
-        }
-
-        const err = res.error;
-        const msg = String(err.message || err.details || err.hint || (typeof err === 'string' ? err : ''));
-        const code = String(err.code || '');
-
-        // Check for 22P02 data type error
-        if (code === '22P02' || msg.includes('22P02')) {
-            currentPayload = sanitizePayloadFor22P02(currentPayload);
-            continue;
-        }
-
-        // Check for missing column error: PGRST204, 42703, schema cache, missing column
-        if (
-            code === 'PGRST204' || 
-            code === '42703' || 
-            msg.includes('schema cache') || 
-            msg.includes('Could not find the') || 
-            msg.includes('column') ||
-            msg.includes('does not exist')
-        ) {
-            // Extracts column name from common PostgREST error patterns:
-            // "Could not find the 'authorizedPersonAddress' column of 'luutru_records' in the schema cache"
-            // "column "authorizedPersonAddress" of relation "luutru_records" does not exist"
-            const match = msg.match(/Could not find the '([^']+)' column/) || 
-                          msg.match(/column "([^"]+)"/) ||
-                          msg.match(/column '([^']+)'/);
-            
-            if (match && match[1]) {
-                const missingCol = match[1];
-                console.warn(`[Auto-Clean DB Sync] Cột '${missingCol}' không tồn tại trên Supabase schema cache. Đang tự động loại bỏ và thử lại (lần ${attempts})...`);
-                currentPayload = stripColumnFromPayload(currentPayload, missingCol);
-                continue;
-            }
-        }
-
-        return res;
-    }
-
-    try {
-        return await operationFn(currentPayload);
-    } catch (finalErr: any) {
-        return { data: null, error: finalErr };
-    }
-};
-
 // --- MAPPERS ---
 export const mapRecordFromDb = (item: any): any => {
     if (!item) return item;
@@ -429,6 +311,9 @@ export const mapRecordFromDb = (item: any): any => {
         if (snake !== undefined && snake !== null) return snake;
         return camel;
     };
+
+    // Ưu tiên 100% trạng thái status chính thức được lưu trong cơ sở dữ liệu
+    r.status = val(r.status, r.STATUS, r.status);
 
     // Normalization mapping from potential snake_case or lowercase
     r.receivedDate = keepOnlyDate(val(r.receivedDate, r.receiveddate, r.received_date));
@@ -447,8 +332,8 @@ export const mapRecordFromDb = (item: any): any => {
     r.recordType = val(r.recordType, r.recordtype, r.record_type);
     if (r.recordType === '2.3 Trích đo' || r.recordType === 'Trích đo bản đồ địa chính') {
         r.recordType = '2.2 Trích đo';
-    } else if (r.recordType && (r.recordType === '2.3 Duyệt đơn-số thửa' || r.recordType.startsWith('2.6') || r.recordType.includes('CN số thửa') || r.recordType.includes('Cập số thửa') || r.recordType.includes('Cập nhập số thửa') || r.recordType.includes('Cập nhật số thửa') || r.recordType.includes('Duyệt đơn') || r.recordType.includes('duyệt đơn'))) {
-        r.recordType = '2.3 Duyệt đơn & Cung cấp số thửa';
+    } else if (r.recordType && (r.recordType.startsWith('2.6') || r.recordType.includes('CN số thửa') || r.recordType.includes('Cập số thửa') || r.recordType.includes('Cập nhập số thửa') || r.recordType.includes('Cập nhật số thửa') || r.recordType.includes('Duyệt đơn') || r.recordType.includes('duyệt đơn') || r.recordType.includes('Duyệt Đơn') || r.recordType.includes('Duyệt đơn-số thửa') || r.recordType.includes('Duyệt Đơn & Cung cấp số thửa'))) {
+        r.recordType = '2.3 Duyệt đơn';
     }
     
     r.receivedBy = val(r.receivedBy, r.receivedby, r.received_by);
@@ -467,10 +352,6 @@ export const mapRecordFromDb = (item: any): any => {
     r.completedDate = keepOnlyDate(val(r.completedDate, r.completeddate, r.completed_date));
     
     r.authorizedBy = val(r.authorizedBy, r.authorizedby, r.authorized_by);
-    r.authorizedPersonName = val(r.authorizedPersonName, r.authorizedpersonname, r.authorized_person_name);
-    r.authorizedPersonId = val(r.authorizedPersonId, r.authorizedpersonid, r.authorized_person_id);
-    r.authorizedPersonPhone = val(r.authorizedPersonPhone, r.authorizedpersonphone, r.authorized_person_phone);
-    r.authorizedPersonAddress = val(r.authorizedPersonAddress, r.authorizedpersonaddress, r.authorized_person_address);
     r.authDocType = val(r.authDocType, r.authdoctype, r.auth_doc_type);
     r.otherDocs = val(r.otherDocs, r.otherdocs, r.other_docs);
     
@@ -499,28 +380,6 @@ export const mapRecordFromDb = (item: any): any => {
     r.statusLogs = Array.isArray(rawLogs) ? rawLogs : [];
     r.archiveHandoverDate = keepOnlyDate(val(r.archiveHandoverDate, r.archivehandoverdate, r.archive_handover_date));
     r.archiveHandoverBatch = val(r.archiveHandoverBatch, r.archivehandoverbatch, r.archive_handover_batch);
-
-    // Xử lý các trường của hồ sơ Đăng ký (3.x.x)
-    let rawOwners = val(r.owners, r.owners, r.owners);
-    if (typeof rawOwners === 'string') {
-        try { rawOwners = JSON.parse(rawOwners); } catch (e) { rawOwners = []; }
-    }
-    r.owners = Array.isArray(rawOwners) ? rawOwners : (r.owners || []);
-
-    let rawTransferees = val(r.transferees, r.transferees, r.transferees);
-    if (typeof rawTransferees === 'string') {
-        try { rawTransferees = JSON.parse(rawTransferees); } catch (e) { rawTransferees = []; }
-    }
-    r.transferees = Array.isArray(rawTransferees) ? rawTransferees : (r.transferees || []);
-
-    r.applicantIsOwner = val(r.applicantIsOwner, r.applicantisowner, r.applicant_is_owner);
-    r.applicantName = val(r.applicantName, r.applicantname, r.applicant_name);
-    r.applicantCccd = val(r.applicantCccd, r.applicantcccd, r.applicant_cccd);
-    r.applicantPhone = val(r.applicantPhone, r.applicantphone, r.applicant_phone);
-    r.applicantAddress = val(r.applicantAddress, r.applicantaddress, r.applicant_address);
-
-    // Tự động suy luận trạng thái chuẩn của hồ sơ theo các mốc quy trình thực tế
-    r.status = resolveRecordStatus(r);
 
     return r;
 };

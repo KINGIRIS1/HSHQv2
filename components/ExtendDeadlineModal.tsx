@@ -1,13 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { Clock, AlertCircle } from 'lucide-react';
-import { RecordFile, User, Employee } from '../types';
-import { getShortRecordType } from '../constants';
+import React, { useState } from 'react';
+import { RecordFile, Employee, User } from '../types';
+import { X, Clock, Calendar } from 'lucide-react';
 
 interface ExtendDeadlineModalProps {
   isOpen: boolean;
   onClose: () => void;
   records: RecordFile[];
-  currentUser: User | null;
+  currentUser: User;
   employees: Employee[];
   users?: User[];
   onConfirm: (newDeadline: string, reason: string, executionDateStr: string) => Promise<void>;
@@ -17,27 +16,24 @@ export const ExtendDeadlineModal: React.FC<ExtendDeadlineModalProps> = ({
   isOpen,
   onClose,
   records,
-  onConfirm
+  currentUser,
+  employees,
+  onConfirm,
 }) => {
-  const [newDeadline, setNewDeadline] = useState('');
-  const [executionDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const record = records[0] || null;
+  const [newDeadline, setNewDeadline] = useState<string>(() => {
+    if (record && record.deadline) {
+      return record.deadline.split('T')[0];
+    }
+    return '';
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  const target = records && records.length > 0 ? records[0] : null;
-
-  useEffect(() => {
-    if (target && target.deadline) {
-      setNewDeadline(target.deadline.split('T')[0]);
-    } else {
-      setNewDeadline(new Date().toISOString().split('T')[0]);
-    }
-  }, [target]);
-
-  if (!isOpen || !target) return null;
+  if (!isOpen || !record) return null;
 
   const formatDateVN = (dStr?: string | null) => {
-    if (!dStr) return 'Chưa có';
+    if (!dStr) return '--';
     try {
       const d = new Date(dStr);
       if (isNaN(d.getTime())) return dStr;
@@ -53,99 +49,112 @@ export const ExtendDeadlineModal: React.FC<ExtendDeadlineModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newDeadline) {
-      setErrorMsg('Vui lòng chọn ngày hẹn trả mới!');
+      setErrorMsg('Vui lòng chọn ngày gia hạn mới!');
       return;
     }
     setErrorMsg('');
     setIsSubmitting(true);
     try {
-      await onConfirm(newDeadline, '', executionDate);
+      const todayStr = new Date().toISOString().split('T')[0];
+      await onConfirm(newDeadline, 'Gia hạn thời gian nhận kết quả', todayStr);
       onClose();
     } catch (err) {
       console.error(err);
-      setErrorMsg('Có lỗi xảy ra khi thực hiện gia hạn. Vui lòng thử lại.');
+      setErrorMsg('Có lỗi xảy ra khi thực hiện gia hạn.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-[70] p-4 animate-fade-in">
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col border border-slate-100 p-6 space-y-5 animate-fade-in-up">
-        {/* Header matching image */}
-        <div className="flex items-start gap-3.5">
-          <div className="w-11 h-11 rounded-full bg-amber-100/80 text-amber-600 flex items-center justify-center shrink-0 mt-0.5">
-            <Clock size={22} className="text-amber-600" />
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[70] p-4 select-none">
+      <div className="bg-white rounded-[24px] shadow-2xl w-full max-w-[480px] p-6 flex flex-col gap-6 animate-in zoom-in-95 duration-150">
+        
+        {/* Header matched perfectly to image */}
+        <div className="flex items-start gap-4">
+          <div className="w-12 h-12 rounded-full bg-[#fef3c7] text-[#d97706] flex items-center justify-center shrink-0">
+            <Clock size={24} className="stroke-[2.5]" />
           </div>
-          <div>
-            <h2 className="text-lg font-bold text-slate-800 leading-snug">Gia hạn thời gian nhận kết quả</h2>
-            <p className="text-xs text-slate-500 font-medium mt-0.5">Đặt thêm ngày hẹn mới trả kết quả cho người dân</p>
+          <div className="flex-1 min-w-0">
+            <h3 className="font-bold text-[#1e293b] text-lg leading-snug">
+              Gia hạn thời gian nhận kết quả
+            </h3>
+            <p className="text-xs text-[#64748b] font-medium mt-0.5">
+              Đặt thêm ngày hẹn mới trả kết quả cho người dân
+            </p>
+          </div>
+          <button 
+            type="button"
+            onClick={onClose}
+            className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-1 rounded-full transition-colors self-start"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Record Details Container matched perfectly to image */}
+        <div className="bg-[#f8fafc] border border-[#f1f5f9] rounded-2xl p-4 space-y-3">
+          <div className="flex justify-between items-center text-sm font-semibold">
+            <span className="text-[#64748b]">Mã hồ sơ:</span>
+            <span className="text-[#1e293b] font-mono tracking-tight">{record.code}</span>
+          </div>
+          <div className="flex justify-between items-center text-sm font-semibold">
+            <span className="text-[#64748b]">Khách hàng:</span>
+            <span className="text-[#1e293b] uppercase truncate max-w-[280px]">{record.customerName || '--'}</span>
+          </div>
+          <div className="flex justify-between items-center text-sm font-semibold">
+            <span className="text-[#64748b]">Loại hồ sơ:</span>
+            <span className="text-[#1e293b] truncate max-w-[280px]">{record.recordType || '--'}</span>
+          </div>
+          <div className="flex justify-between items-center text-sm font-semibold">
+            <span className="text-[#64748b]">Hẹn trả gốc:</span>
+            <span className="text-[#2563eb] font-bold">{formatDateVN(record.deadline)}</span>
           </div>
         </div>
 
-        {errorMsg && (
-          <div className="p-3 bg-red-50 border border-red-200 text-red-600 text-xs font-bold rounded-xl flex items-center gap-2">
-            <AlertCircle size={16} className="shrink-0" />
-            <span>{errorMsg}</span>
-          </div>
-        )}
-
-        {/* Info card matching image */}
-        <div className="bg-slate-50/80 border border-slate-100 rounded-2xl p-4 space-y-2.5 text-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-slate-500 font-medium">Mã hồ sơ:</span>
-            <span className="font-bold text-slate-900 font-mono text-sm">{target.code}</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-slate-500 font-medium">Khách hàng:</span>
-            <span className="font-bold text-slate-900 uppercase">{target.customerName}</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-slate-500 font-medium">Loại hồ sơ:</span>
-            <span className="font-semibold text-slate-800 text-right">{getShortRecordType(target.recordType) || target.recordType}</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-slate-500 font-medium">Hẹn trả gốc:</span>
-            <span className="font-bold text-blue-600 text-sm">{formatDateVN(target.originalDeadline || target.deadline)}</span>
-          </div>
-        </div>
-
-        {/* New deadline date picker */}
+        {/* Input New Date */}
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+          {errorMsg && (
+            <div className="text-xs text-red-500 font-bold bg-red-50 border border-red-100 px-3 py-2 rounded-lg">
+              {errorMsg}
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <label className="block text-[11px] font-extrabold text-[#64748b] tracking-wider uppercase">
               NGÀY GIA HẠN MỚI
             </label>
             <div className="relative">
               <input
                 type="date"
                 required
-                className="w-full border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none font-medium text-slate-800 bg-white shadow-xs"
+                className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none font-semibold text-slate-700 bg-white"
                 value={newDeadline}
                 onChange={(e) => setNewDeadline(e.target.value)}
               />
             </div>
           </div>
 
-          {/* Action buttons matching image */}
-          <div className="flex items-center justify-between gap-3 pt-2">
+          {/* Footer Action Buttons matched perfectly to image */}
+          <div className="flex items-center gap-3 pt-2">
             <button
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="flex-1 py-3 border border-slate-200 rounded-2xl text-slate-700 font-bold text-sm hover:bg-slate-50 transition-colors cursor-pointer text-center"
+              className="w-1/2 py-3 bg-white border border-slate-200 hover:bg-slate-50 text-[#334155] rounded-xl font-bold text-sm transition-all active:scale-95 cursor-pointer text-center shadow-xs"
             >
               Hủy bỏ
             </button>
             <button
               type="submit"
               disabled={isSubmitting || !newDeadline}
-              className="flex-1 py-3 bg-amber-500 hover:bg-amber-600 text-white font-bold text-sm rounded-2xl shadow-md transition-all active:scale-95 cursor-pointer text-center disabled:opacity-50"
+              className="w-1/2 py-3 bg-[#f59e0b] hover:bg-[#d97706] disabled:opacity-50 text-white rounded-xl font-bold text-sm shadow-md transition-all active:scale-95 cursor-pointer text-center"
             >
               {isSubmitting ? 'Đang lưu...' : 'Lưu và in'}
             </button>
           </div>
         </form>
+
       </div>
     </div>
   );

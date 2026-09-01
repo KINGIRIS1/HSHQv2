@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import * as XLSX from 'xlsx-js-style';
 import { RecordFile, RecordStatus } from '../../types';
-import { RECORD_TYPES } from '../../constants';
+import { RECORD_TYPES, EXTENDED_RECORD_TYPES, getShortRecordType } from '../../constants';
 import { Upload, FileSpreadsheet, Wand2, Save, Printer, X, Check, Download } from 'lucide-react';
 import { confirmAction } from '../../utils/appHelpers';
 
@@ -93,11 +93,11 @@ const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calc
               'TD': '2.2 Trích đo',
               'TRÍCH ĐO': '2.2 Trích đo',
               '2.2': '2.2 Trích đo',
-              'CN SỐ THỬA': '2.3 Duyệt đơn & Cung cấp số thửa',
-              'CẬP NHẬT SỐ THỬA': '2.3 Duyệt đơn & Cung cấp số thửa',
-              'CẬP NHẬP SỐ THỬA': '2.3 Duyệt đơn & Cung cấp số thửa',
-              '2.3': '2.3 Duyệt đơn & Cung cấp số thửa',
-              '2.6': '2.3 Duyệt đơn & Cung cấp số thửa',
+              'CN SỐ THỬA': '2.3 Duyệt đơn',
+              'CẬP NHẬT SỐ THỬA': '2.3 Duyệt đơn',
+              'CẬP NHẬP SỐ THỬA': '2.3 Duyệt đơn',
+              '2.3': '2.3 Duyệt đơn',
+              '2.6': '2.3 Duyệt đơn',
               'ĐĐ': '2.4 Trích đo Cắm mốc',
               'DD': '2.4 Trích đo Cắm mốc',
               'ĐO ĐẠC': '2.4 Trích đo Cắm mốc',
@@ -135,7 +135,7 @@ const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calc
                   if (lower.includes('1.2') || lower.includes('công văn') || lower.includes('cong van') || lower.includes('cung cấp tài liệu')) recordType = '1.2 Công văn';
                   else if (lower.includes('trích lục')) recordType = '2.1 Trích lục';
                   else if (lower.includes('chỉnh lý') || lower.includes('hiến đường')) recordType = 'Trích đo chỉnh lý bản đồ địa chính';
-                  else if (lower.includes('số thửa') || lower.includes('cập nhật') || lower.includes('cập nhập') || lower.includes('2.6') || lower.includes('duyệt đơn')) recordType = '2.3 Duyệt đơn & Cung cấp số thửa';
+                  else if (lower.includes('số thửa') || lower.includes('cập nhật') || lower.includes('cập nhập') || lower.includes('2.6') || lower.includes('duyệt đơn')) recordType = '2.3 Duyệt đơn';
                   else if (lower.includes('tách thửa')) recordType = '2.5 Trích đo Tách - Hợp thửa';
                   else if (lower.includes('trích đo') || lower.includes('hợp thửa')) recordType = '2.2 Trích đo';
                   else if (lower.includes('đo đạc') || lower.includes('cắm mốc')) recordType = '2.4 Trích đo Cắm mốc';
@@ -282,7 +282,7 @@ const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calc
                                     </div>
                                 </td>
                                 <td className="p-3"><input type="text" className="w-full border border-gray-300 rounded px-2 py-1 text-sm" value={item.customerName ?? ''} onChange={(e) => updateBulkRecord(idx, 'customerName', e.target.value)} readOnly={item.isSaved} /></td>
-                                <td className="p-3"><select className="w-full border border-gray-300 rounded px-2 py-1 text-sm outline-none" value={item.recordType ?? ''} onChange={(e) => updateBulkRecord(idx, 'recordType', e.target.value)} disabled={item.isSaved}> {RECORD_TYPES.map(t => <option key={t} value={t}>{t}</option>)} </select></td>
+                                <td className="p-3"><select className="w-full border border-gray-300 rounded px-2 py-1 text-sm outline-none" value={item.recordType ? getShortRecordType(item.recordType) : ''} onChange={(e) => updateBulkRecord(idx, 'recordType', e.target.value)} disabled={item.isSaved}> {EXTENDED_RECORD_TYPES.map(t => <option key={t} value={t}>{t}</option>)} </select></td>
                                 <td className="p-3"><input type="text" className="w-full border border-gray-300 rounded px-2 py-1 text-sm" value={item.ward ?? ''} onChange={(e) => updateBulkRecord(idx, 'ward', e.target.value)} readOnly={item.isSaved} /></td>
                                 <td className="p-3"><input type="date" className="w-full border border-gray-300 rounded px-2 py-1 text-sm" value={dateVal(item.deadline)} onChange={(e) => updateBulkRecord(idx, 'deadline', e.target.value)} readOnly={item.isSaved} /></td>
                                 <td className="p-3 text-center">

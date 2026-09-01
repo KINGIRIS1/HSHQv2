@@ -1,5 +1,5 @@
-import React, { useMemo, useState, useEffect } from 'react';
-import { RecordFile, RecordStatus, Employee, User } from '../../types';
+import React, { useMemo, useState } from 'react';
+import { RecordFile, RecordStatus, Employee } from '../../types';
 import { getNormalizedWard, STATUS_LABELS } from '../../constants';
 import { isRecordOverdue } from '../../utils/appHelpers';
 import { exportOverdueStatsToExcel } from '../../utils/excelExport';
@@ -8,10 +8,9 @@ import { AlertTriangle, CheckCircle2, Clock, MapPin, ChevronLeft, ChevronRight, 
 interface OverdueStatsViewProps {
     records: RecordFile[];
     employees: Employee[];
-    currentUser?: User;
 }
 
-const OverdueStatsView: React.FC<OverdueStatsViewProps> = ({ records, employees, currentUser }) => {
+const OverdueStatsView: React.FC<OverdueStatsViewProps> = ({ records, employees }) => {
     const [filterType, setFilterType] = useState<'all' | 'completed' | 'pending'>('all');
     const [selectedEmployee, setSelectedEmployee] = useState<string>('all');
     const [currentPage, setCurrentPage] = useState(1);
@@ -168,7 +167,7 @@ const OverdueStatsView: React.FC<OverdueStatsViewProps> = ({ records, employees,
                             <tr>
                                 <th className="p-3 w-10 text-center">#</th>
                                 <th className="p-3">Mã HS</th>
-                                <th className="p-3">Thông tin khách hàng</th>
+                                <th className="p-3">Chủ sử dụng</th>
                                 <th className="p-3">Xã/Phường</th>
                                 <th className="p-3">Loại trễ</th>
                                 <th className="p-3">Ngày nhận</th>

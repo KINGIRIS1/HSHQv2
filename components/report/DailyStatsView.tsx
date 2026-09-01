@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { RecordFile, Employee, RecordStatus, User } from '../../types';
+import { RecordFile, Employee, RecordStatus } from '../../types';
 import { 
     Download, 
     Search, 
@@ -24,7 +24,6 @@ interface DailyStatsViewProps {
     selectedWard?: string;
     fromDate?: string;
     toDate?: string;
-    currentUser?: User;
     onFilteredRecordsChange?: (records: RecordFile[]) => void;
     onResetDates?: () => void;
 }
@@ -36,7 +35,6 @@ const DailyStatsView: React.FC<DailyStatsViewProps> = ({
     selectedWard = 'all',
     fromDate,
     toDate,
-    currentUser,
     onFilteredRecordsChange,
     onResetDates
 }) => {
@@ -295,7 +293,7 @@ const DailyStatsView: React.FC<DailyStatsViewProps> = ({
                             <tr>
                                 <th className="p-3.5 w-12 text-center">STT</th>
                                 <th className="p-3.5 w-36">Mã biên nhận</th>
-                                <th className="p-3.5 w-52">Thông tin khách hàng</th>
+                                <th className="p-3.5 w-52">Chủ sử dụng đất</th>
                                 <th className="p-3.5 w-32">Xã / Phường</th>
                                 <th className="p-3.5 w-32">
                                     {activeTabType === 'received' && 'Ngày tiếp nhận'}

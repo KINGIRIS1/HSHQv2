@@ -11,34 +11,31 @@ export const APP_VERSION = '2.1.1';
 
 export const STATUS_LABELS: Record<RecordStatus, string> = {
   [RecordStatus.RECEIVED]: 'Tiếp nhận mới',
-  [RecordStatus.ASSIGNED]: 'Đã giao việc',
+  [RecordStatus.ASSIGNED]: 'Đang thực hiện',
   [RecordStatus.IN_PROGRESS]: 'Đang thực hiện',
-  [RecordStatus.COMPLETED_WORK]: 'Đã xong việc',
+  [RecordStatus.COMPLETED_WORK]: 'Đang thực hiện',
   [RecordStatus.PENDING_SUPPLEMENT]: 'Chờ bổ sung',
-  [RecordStatus.PENDING_CHECK]: 'Trình kiểm tra',
+  [RecordStatus.PENDING_CHECK]: 'Chờ kiểm tra',
   [RecordStatus.CHECKED]: 'Đã kiểm tra',
-  [RecordStatus.PENDING_SIGN]: 'Trình ký duyệt',
+  [RecordStatus.PENDING_SIGN]: 'Chờ ký duyệt',
   [RecordStatus.SIGNED]: 'Chờ bàn giao',
   [RecordStatus.HANDOVER]: 'Đã giao 1 cửa',
   [RecordStatus.RETURNED]: 'Đã trả kết quả',
   [RecordStatus.WITHDRAWN]: 'CSD rút hồ sơ',
-  [RecordStatus.REJECTED]: 'Trả hủy hồ sơ',
+  [RecordStatus.REJECTED]: 'Trả hồ sơ',
 };
 
 export const SELECTABLE_STATUSES: { key: RecordStatus; label: string }[] = [
   { key: RecordStatus.RECEIVED, label: 'Tiếp nhận mới' },
-  { key: RecordStatus.ASSIGNED, label: 'Đã giao việc' },
   { key: RecordStatus.IN_PROGRESS, label: 'Đang thực hiện' },
-  { key: RecordStatus.COMPLETED_WORK, label: 'Đã xong việc' },
   { key: RecordStatus.PENDING_SUPPLEMENT, label: 'Chờ bổ sung' },
-  { key: RecordStatus.PENDING_CHECK, label: 'Trình kiểm tra' },
-  { key: RecordStatus.CHECKED, label: 'Đã kiểm tra' },
-  { key: RecordStatus.PENDING_SIGN, label: 'Trình ký duyệt' },
+  { key: RecordStatus.PENDING_CHECK, label: 'Chờ kiểm tra' },
+  { key: RecordStatus.PENDING_SIGN, label: 'Chờ ký duyệt' },
   { key: RecordStatus.SIGNED, label: 'Chờ bàn giao' },
   { key: RecordStatus.HANDOVER, label: 'Đã giao 1 cửa' },
   { key: RecordStatus.RETURNED, label: 'Đã trả kết quả' },
   { key: RecordStatus.WITHDRAWN, label: 'CSD rút hồ sơ' },
-  { key: RecordStatus.REJECTED, label: 'Trả hủy hồ sơ' },
+  { key: RecordStatus.REJECTED, label: 'Trả hồ sơ' },
 ];
 
 export const STATUS_COLORS: Record<RecordStatus, string> = {
@@ -68,8 +65,36 @@ export const DEFAULT_WARDS = [
 
 export const WARDS = DEFAULT_WARDS;
 
-// Export centralized procedure configurations
-export * from './constants/procedures';
+// Danh sách ngày nghỉ lễ mặc định chuẩn quốc gia (Dương lịch & Âm lịch)
+export const DEFAULT_HOLIDAYS = [
+  { id: '1', name: 'Tết Dương Lịch', day: 1, month: 1, isLunar: false },
+  { id: '2', name: 'Giỗ Tổ Hùng Vương', day: 10, month: 3, isLunar: true },
+  { id: '3', name: 'Giải phóng Miền Nam', day: 30, month: 4, isLunar: false },
+  { id: '4', name: 'Quốc tế Lao động', day: 1, month: 5, isLunar: false },
+  { id: '5', name: 'Quốc Khánh', day: 2, month: 9, isLunar: false },
+  { id: '6', name: 'Tết Nguyên Đán (Mùng 1)', day: 1, month: 1, isLunar: true },
+  { id: '7', name: 'Tết Nguyên Đán (Mùng 2)', day: 2, month: 1, isLunar: true },
+  { id: '8', name: 'Tết Nguyên Đán (Mùng 3)', day: 3, month: 1, isLunar: true },
+];
+
+// Danh sách loại hồ sơ CƠ BẢN (Dùng cho form Tiếp nhận hồ sơ thường xuyên)
+export const RECORD_TYPES = [
+  '1.1 Sao lục',
+  '1.2 Công văn',
+  '2.1 Trích lục',
+  '2.2 Trích đo',
+  '2.3 Duyệt đơn',
+  '2.4 Cắm mốc',
+  '2.5 Tách-Hợp thửa'
+];
+
+// Danh sách loại hồ sơ MỞ RỘNG (Dùng cho form Thêm mới trong "Tất cả hồ sơ" - Admin/Nội bộ)
+export const EXTENDED_RECORD_TYPES = [
+  ...RECORD_TYPES,
+  'CMD',
+  'Thi hành án',
+  'Tòa án'
+];
 
 // Hàm chuẩn hóa hiển thị tên Xã/Phường (Xóa Xã/Phường/TT)
 export const getNormalizedWard = (ward: string | null | undefined): string => {
@@ -105,6 +130,58 @@ export const getWardFullLabel = (ward: string | null | undefined): string => {
 export const getWardLabel = (ward: string | null | undefined): string => {
   if (!ward) return '';
   return getNormalizedWard(ward);
+};
+
+// Hàm rút gọn tên loại hồ sơ để hiển thị trong Danh sách (Table), Bộ lọc, Modal & Toàn bộ phần mềm
+export const getShortRecordType = (type: string | null | undefined): string => {
+  if (!type) return '---';
+  const t = type.toLowerCase().trim();
+  
+  if (t.startsWith('1.1') || t === 'cung cấp tài liệu đất đai' || t === 'cung cấp dữ liệu đất đai' || t === 'sao lục' || t === 'sao luc' || t === 'sao lục hồ sơ' || t === '1.1 cc dl đđ' || t === '1.1 sao lục') return '1.1 Sao lục';
+  if (t.startsWith('1.2') || t === 'công văn') return '1.2 Công văn';
+  if (t.startsWith('2.1') || t === 'trích lục' || t === 'trích lục quy hoạch' || t === 'trích lục qh') return '2.1 Trích lục';
+  if (t.startsWith('2.2') || t === '2.3 trích đo' || t === 'trích đo') return '2.2 Trích đo';
+  if (t.startsWith('2.3') || t.startsWith('2.6') || t === 'cung cấp số thửa đất' || t === 'cung cấp số thửa' || t === 'cc số thửa' || t === 'cập nhập số thửa' || t === 'cập nhật số thửa' || t === 'cn số thửa' || t.includes('duyệt đơn') || t.includes('duyet don') || t.includes('số thửa') || t.includes('so thua') || t.includes('duyệt đơn & cung cấp số thửa') || t.includes('duyệt đơn-số thửa')) return '2.3 Duyệt đơn';
+  if (t.startsWith('2.4') || t === 'cắm mốc' || t === 'trích đo cắm mốc') return '2.4 Cắm mốc';
+  if (t.startsWith('2.5') || t === 'tách thửa' || t === 'tách-hợp thửa' || t === 'trích đo tách - hợp thửa') return '2.5 Tách-Hợp thửa';
+
+  // Fallbacks for legacy other categories
+  if (t.includes('cung cấp tài liệu đất đai') || t.includes('cung cấp dữ liệu') || t.includes('sao lục') || t.includes('sao luc') || t.includes('cc dl đđ')) return '1.1 Sao lục';
+  if (t.includes('trích lục quy hoạch')) return '2.1 Trích lục';
+  if (t.includes('cung cấp số thửa đất') || t.includes('số thửa') || t.includes('cập nhập số thửa') || t.includes('cập nhật số thửa') || t.includes('2.6') || t.includes('duyệt đơn')) return '2.3 Duyệt đơn';
+  if (t.includes('trích đo') && t.includes('cắm mốc')) return '2.4 Cắm mốc';
+  if (t.includes('trích đo') && (t.includes('tách') || t.includes('hợp'))) return '2.5 Tách-Hợp thửa';
+  if (t.includes('trích đo') || t.includes('2.2')) return '2.2 Trích đo';
+  if (t.includes('cắm mốc')) return '2.4 Cắm mốc';
+  if (t.includes('trích lục')) return '2.1 Trích lục';
+  if (t.includes('tách thửa')) return '2.5 Tách-Hợp thửa';
+  if (t.includes('hợp thửa')) return '2.5 Tách-Hợp thửa';
+
+  // Legacy fallback
+  if (t.includes('thi hành án')) return 'Thi hành án';
+  if (t.includes('tòa án')) return 'Tòa án';
+  if (t.includes('cmd')) return 'CMD';
+
+  return type; // Trả về nguyên bản nếu không khớp quy tắc rút gọn
+};
+
+// Hàm hiển thị tên đầy đủ pháp lý của loại hồ sơ - CHỈ DÙNG KHI IN GIẤY TIẾP NHẬN / GIẤY HẸN TRẢ KẾT QUẢ
+export const getFullRecordType = (type: string | null | undefined): string => {
+  if (!type) return '';
+  const short = getShortRecordType(type);
+  if (short === '1.1 Sao lục') return '1.1 Cung cấp dữ liệu đất đai (Sao lục hồ sơ)';
+  if (short === '1.2 Công văn') return '1.2 Công văn';
+  if (short === '2.1 Trích lục') return '2.1 Trích lục bản đồ địa chính';
+  if (short === '2.2 Trích đo') return '2.2 Đo đạc chỉnh lý bản đồ địa chính (Trích đo)';
+  if (short === '2.3 Duyệt đơn') return '2.3 Cung cấp số thửa đất và duyệt đơn';
+  if (short === '2.4 Cắm mốc') return '2.4 Trích đo Cắm mốc ranh giới thửa đất';
+  if (short === '2.5 Tách-Hợp thửa') return '2.5 Trích đo Tách thửa - Hợp thửa đất';
+  return type;
+};
+
+export const isArchiveRecordType = (type: string | null | undefined): boolean => {
+  const short = getShortRecordType(type);
+  return short === '1.1 Sao lục' || short === '1.2 Công văn';
 };
 
 export const MOCK_EMPLOYEES: Employee[] = [

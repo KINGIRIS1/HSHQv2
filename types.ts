@@ -31,23 +31,47 @@ export const DEFAULT_ROLE_PERMISSIONS: RolePermissions = {
   [UserRole.ADMIN]: ['*'],
   [UserRole.SUBADMIN]: ['*'],
   [UserRole.TEAM_LEADER]: [
-    'ADD_RECORDS', 'EXPORT_RECORDS',
-    'ADD_CONTRACTS', 'EDIT_CONTRACTS', 'LIQUIDATE_CONTRACTS', 'DELETE_CONTRACTS', 'EXPORT_CONTRACTS',
-    'dangky_BTN_ASSIGN_STAFF', 'dangky_BTN_SUBMIT_CHECK', 'dangky_BTN_SUBMIT_SIGN', 'dangky_BTN_APPROVE_SIGN', 'dangky_BTN_REJECT_RECORD', 'dangky_HANDOVER_RECORDS', 'dangky_BTN_RETURN_RESULT', 'dangky_BTN_EXTEND_DEADLINE', 'dangky_EDIT_RECORDS', 'dangky_DELETE_RECORDS', 'dangky_VIEW_DETAILS',
+    'receive_record', 'receive_sub_create', 'receive_sub_bulk', 'receive_sub_list', 'receive_sub_vphc',
+    'receive_contract', 'VIEW_CONTRACTS', 'ADD_CONTRACTS', 'EDIT_CONTRACTS', 'LIQUIDATE_CONTRACTS', 'EXPORT_CONTRACTS',
+    'all_records', 'all_sub_all', 'assign_tasks', 'completed_list', 'pending_check_list', 'check_list', 'handover_list', 'director_completed',
+    'archive_records', 'archive_sub_all', 'archive_assign_tasks', 'archive_completed_list', 'archive_pending_check_list', 'archive_check_list', 'archive_handover_list', 'archive_director_completed',
+    'registration_records',
+    'other_records', 'other_sub_all', 'other_assign_tasks', 'other_check_list', 'other_handover_list', 'other_director_completed',
+    'excerpt_management', 'MANAGE_EXCERPTS', 'VIEW_EXCERPTS',
+    'reports', 'VIEW_REPORTS',
+    'work_schedule', 'VIEW_SCHEDULE',
+    'utilities',
+    'BTN_ASSIGN_STAFF', 'BTN_SUBMIT_SIGN', 'BTN_APPROVE_SIGN', 'BTN_SUBMIT_CHECK', 'BTN_REJECT_RECORD', 'HANDOVER_RECORDS', 'BTN_RETURN_RESULT', 'BTN_EXTEND_DEADLINE', 'EDIT_RECORDS', 'DELETE_RECORDS', 'VIEW_DETAILS',
     'dodac_BTN_ASSIGN_STAFF', 'dodac_BTN_SUBMIT_CHECK', 'dodac_BTN_SUBMIT_SIGN', 'dodac_BTN_APPROVE_SIGN', 'dodac_BTN_REJECT_RECORD', 'dodac_HANDOVER_RECORDS', 'dodac_BTN_RETURN_RESULT', 'dodac_VIEW_EXCERPTS', 'dodac_MANAGE_EXCERPTS', 'dodac_BTN_EXTEND_DEADLINE', 'dodac_EDIT_RECORDS', 'dodac_DELETE_RECORDS', 'dodac_VIEW_DETAILS',
-    'luutru_BTN_ASSIGN_STAFF', 'luutru_BTN_SUBMIT_CHECK', 'luutru_BTN_SUBMIT_SIGN', 'luutru_BTN_APPROVE_SIGN', 'luutru_BTN_REJECT_RECORD', 'luutru_HANDOVER_RECORDS', 'luutru_BTN_RETURN_RESULT', 'luutru_VIEW_ARCHIVE', 'luutru_MANAGE_ARCHIVE', 'luutru_BTN_EXTEND_DEADLINE', 'luutru_EDIT_RECORDS', 'luutru_DELETE_RECORDS', 'luutru_VIEW_DETAILS',
-    'VIEW_SCHEDULE', 'MANAGE_SCHEDULE', 'VIEW_REPORTS', 'VIEW_CHAT', 'VIEW_PERSONAL_PROFILE'
+    'luutru_BTN_ASSIGN_STAFF', 'luutru_BTN_SUBMIT_CHECK', 'luutru_BTN_SUBMIT_SIGN', 'luutru_BTN_APPROVE_SIGN', 'luutru_BTN_REJECT_RECORD', 'luutru_HANDOVER_RECORDS', 'luutru_BTN_RETURN_RESULT', 'luutru_VIEW_ARCHIVE', 'luutru_MANAGE_ARCHIVE', 'luutru_BTN_EXTEND_DEADLINE', 'luutru_EDIT_RECORDS', 'luutru_DELETE_RECORDS', 'luutru_VIEW_DETAILS'
   ],
   [UserRole.ONEDOOR]: [
-    'ADD_RECORDS', 'EXPORT_RECORDS',
-    'ADD_CONTRACTS', 'EDIT_CONTRACTS', 'LIQUIDATE_CONTRACTS', 'EXPORT_CONTRACTS',
-    'VIEW_SCHEDULE', 'VIEW_CHAT', 'VIEW_PERSONAL_PROFILE'
+    'receive_record', 'receive_sub_create', 'receive_sub_bulk', 'receive_sub_list', 'receive_sub_vphc', 'ADD_RECORDS',
+    'receive_contract', 'VIEW_CONTRACTS', 'ADD_CONTRACTS', 'EDIT_CONTRACTS', 'EXPORT_CONTRACTS',
+    'all_records', 'all_sub_all', 'handover_list', 'VIEW_RECORDS', 'HANDOVER_RECORDS', 'RETURN_RECORDS', 'EXPORT_RECORDS',
+    'archive_records', 'archive_sub_all', 'VIEW_ARCHIVE',
+    'registration_records',
+    'other_records', 'other_sub_all', 'other_handover_list',
+    'excerpt_management', 'VIEW_EXCERPTS',
+    'reports', 'VIEW_REPORTS',
+    'work_schedule', 'VIEW_SCHEDULE',
+    'utilities', 'VIEW_CHAT', 'VIEW_PERSONAL_PROFILE',
+    'BTN_ASSIGN_STAFF', 'BTN_SUBMIT_SIGN', 'BTN_APPROVE_SIGN', 'BTN_SUBMIT_CHECK', 'BTN_REJECT_RECORD', 'HANDOVER_RECORDS', 'BTN_RETURN_RESULT', 'BTN_EXTEND_DEADLINE', 'EDIT_RECORDS', 'DELETE_RECORDS', 'VIEW_DETAILS',
+    'dodac_BTN_ASSIGN_STAFF', 'dodac_BTN_SUBMIT_CHECK', 'dodac_BTN_SUBMIT_SIGN', 'dodac_BTN_APPROVE_SIGN', 'dodac_BTN_REJECT_RECORD', 'dodac_HANDOVER_RECORDS', 'dodac_BTN_RETURN_RESULT', 'dodac_VIEW_EXCERPTS', 'dodac_MANAGE_EXCERPTS', 'dodac_BTN_EXTEND_DEADLINE', 'dodac_EDIT_RECORDS', 'dodac_DELETE_RECORDS', 'dodac_VIEW_DETAILS',
+    'luutru_BTN_ASSIGN_STAFF', 'luutru_BTN_SUBMIT_CHECK', 'luutru_BTN_SUBMIT_SIGN', 'luutru_BTN_APPROVE_SIGN', 'luutru_BTN_REJECT_RECORD', 'luutru_HANDOVER_RECORDS', 'luutru_BTN_RETURN_RESULT', 'luutru_VIEW_ARCHIVE', 'luutru_MANAGE_ARCHIVE', 'luutru_BTN_EXTEND_DEADLINE', 'luutru_EDIT_RECORDS', 'luutru_DELETE_RECORDS', 'luutru_VIEW_DETAILS'
   ],
   [UserRole.EMPLOYEE]: [
-    'dangky_BTN_ASSIGN_STAFF', 'dangky_BTN_SUBMIT_CHECK', 'dangky_BTN_SUBMIT_SIGN', 'dangky_BTN_APPROVE_SIGN', 'dangky_BTN_REJECT_RECORD', 'dangky_HANDOVER_RECORDS', 'dangky_BTN_RETURN_RESULT', 'dangky_BTN_EXTEND_DEADLINE', 'dangky_EDIT_RECORDS', 'dangky_DELETE_RECORDS', 'dangky_VIEW_DETAILS',
+    'receive_contract', 'VIEW_CONTRACTS', 'LIQUIDATE_CONTRACTS',
+    'all_records', 'all_sub_all', 'completed_list',
+    'archive_records', 'archive_sub_all', 'archive_completed_list',
+    'registration_records',
+    'other_records', 'other_sub_all',
+    'excerpt_management', 'VIEW_EXCERPTS',
+    'work_schedule', 'VIEW_SCHEDULE',
+    'utilities',
+    'BTN_ASSIGN_STAFF', 'BTN_SUBMIT_SIGN', 'BTN_APPROVE_SIGN', 'BTN_SUBMIT_CHECK', 'BTN_REJECT_RECORD', 'HANDOVER_RECORDS', 'BTN_RETURN_RESULT', 'BTN_EXTEND_DEADLINE', 'EDIT_RECORDS', 'DELETE_RECORDS', 'VIEW_DETAILS',
     'dodac_BTN_ASSIGN_STAFF', 'dodac_BTN_SUBMIT_CHECK', 'dodac_BTN_SUBMIT_SIGN', 'dodac_BTN_APPROVE_SIGN', 'dodac_BTN_REJECT_RECORD', 'dodac_HANDOVER_RECORDS', 'dodac_BTN_RETURN_RESULT', 'dodac_VIEW_EXCERPTS', 'dodac_MANAGE_EXCERPTS', 'dodac_BTN_EXTEND_DEADLINE', 'dodac_EDIT_RECORDS', 'dodac_DELETE_RECORDS', 'dodac_VIEW_DETAILS',
-    'luutru_BTN_ASSIGN_STAFF', 'luutru_BTN_SUBMIT_CHECK', 'luutru_BTN_SUBMIT_SIGN', 'luutru_BTN_APPROVE_SIGN', 'luutru_BTN_REJECT_RECORD', 'luutru_HANDOVER_RECORDS', 'luutru_BTN_RETURN_RESULT', 'luutru_VIEW_ARCHIVE', 'luutru_MANAGE_ARCHIVE', 'luutru_BTN_EXTEND_DEADLINE', 'luutru_EDIT_RECORDS', 'luutru_DELETE_RECORDS', 'luutru_VIEW_DETAILS',
-    'VIEW_SCHEDULE', 'VIEW_CHAT', 'VIEW_PERSONAL_PROFILE'
+    'luutru_BTN_ASSIGN_STAFF', 'luutru_BTN_SUBMIT_CHECK', 'luutru_BTN_SUBMIT_SIGN', 'luutru_BTN_APPROVE_SIGN', 'luutru_BTN_REJECT_RECORD', 'luutru_HANDOVER_RECORDS', 'luutru_BTN_RETURN_RESULT', 'luutru_VIEW_ARCHIVE', 'luutru_MANAGE_ARCHIVE', 'luutru_BTN_EXTEND_DEADLINE', 'luutru_EDIT_RECORDS', 'luutru_DELETE_RECORDS', 'luutru_VIEW_DETAILS'
   ]
 };
 
@@ -92,10 +116,10 @@ export const AVAILABLE_PERMISSIONS = [
 ];
 
 export interface User {
+  id?: string;
   username: string;
   password?: string;
   name: string;
-  fullName?: string;
   role: UserRole;
   employeeId?: string;
 }
@@ -106,13 +130,6 @@ export interface Employee {
   department: string;
   position?: string; // MỚI: Tách riêng chức vụ
   managedWards: string[];
-}
-
-export interface AttachedDoc {
-  id?: string;
-  name: string;
-  type: string;
-  note?: string;
 }
 
 export interface RecordFile {
@@ -130,17 +147,13 @@ export interface RecordFile {
   address?: string | null;       
   group?: string | null;         
   
-  issueNumber?: string | null;   // Số phát hành (certificate_code)
-  certificateCode?: string | null;
-  entryNumber?: string | null;   // Số vào sổ (book_number)
-  bookNumber?: string | null;
-  issueDate?: string | null;     // Ngày cấp (issue_date)
-  residentialArea?: number | null; // Đất ở (residential_area)
-  totalArea?: number | null;     // Tổng diện tích (total_area)
+  issueNumber?: string | null;   // Số phát hành
+  entryNumber?: string | null;   // Số vào sổ
+  issueDate?: string | null;     // Ngày cấp
+  residentialArea?: number | null; // Đất ở
 
   content?: string | null;        
   recordType?: string | null;    
-  procedureId?: string | null;    
   
   receivedDate?: string | null;   
   receivedBy?: string | null; // Người nhận hồ sơ (ID của user)
@@ -148,54 +161,42 @@ export interface RecordFile {
   assignedDate?: string | null;  
   
   submissionDate?: string | null; // Ngày trình ký
-  submittedTo?: string | null;    // Người được trình ký
+  submittedTo?: string | null;    // Người được trình ký (ID của giám đốc)
   pendingCheckDate?: string | null; // Ngày trình kiểm tra
-  checkedBy?: string | null;      // Người kiểm tra
+  checkedBy?: string | null;      // Người kiểm tra (ID của tổ trưởng/tổ phó)
   checkedDate?: string | null;    // Ngày đã kiểm tra
-  pendingSignDate?: string | null; // Ngày Trình ký
   completedWorkDate?: string | null; // Ngày đã thực hiện
   approvalDate?: string | null;   // Ngày ký duyệt
   completedDate?: string | null; 
   
-  // Nhân sự phụ trách theo từng bước
-  appraisalStaff?: string | null;
-  taxFormStaff?: string | null;
-  taxKV7Staff?: string | null;
-  taxNoticeStaff?: string | null;
-  printStaff?: string | null; 
-  
   status: RecordStatus;   
-  assignedTo?: string | null; 
-  employeeName?: string | null;  // NV Xử lý   
+  assignedTo?: string | null;    
   notes?: string | null;         
   privateNotes?: string | null;  
   personalNotes?: string | null; // Ghi chú cá nhân của nhân viên
   
-  // Người ủy quyền (authorized_person)
   authorizedBy?: string | null;  
-  authorizedPersonName?: string | null; // Họ và tên người ủy quyền
-  authorizedPersonId?: string | null;   // CCCD người ủy quyền
-  authorizedPersonPhone?: string | null; // SĐT người ủy quyền
-  authorizedPersonAddress?: string | null; // Địa chỉ người ủy quyền
   authDocType?: string | null;   
   otherDocs?: string | null;     
 
   exportBatch?: number | string | null;   
   exportDate?: string | null;    
-  handoverWard?: string | null; // Nơi giao trả kết quả
+  handoverWard?: string | null; // Nơi giao trả kết quả (nếu khác địa chỉ thửa đất)
   
   measurementNumber?: string | null; 
   excerptNumber?: string | null;
   
-  // Tính năng trả kết quả & Chứng từ
-  receiptNumber?: string | null;     // Số biên lai
-  invoiceNumber?: string | null;     // Số hóa đơn
-  receiptType?: 'Biên Lai' | 'Hóa Đơn' | string | null; 
-  receiverName?: string | null;      // Người nhận kết quả
+  // Tính năng nhắc nhở
+  reminderDate?: string | null;      // Thời gian đặt lịch nhắc
+  lastRemindedAt?: string | null;    // Thời gian đã thông báo lần cuối
+  deadlineReminded?: boolean | null; // Đã nhắc nhở hết hạn giải quyết (nhắc 1 lần)
+
+  // Tính năng trả kết quả
+  receiptNumber?: string | null;     // Số biên lai/hóa đơn
+  receiptType?: 'Biên Lai' | 'Hóa Đơn' | string | null; // Loại chứng từ (Biên lai hay Hóa đơn)
+  receiverName?: string | null;      // Người nhận kết quả (Mới)
   resultReturnedDate?: string | null; // Ngày trả kết quả cho dân
-  feeAmount?: number | null;         // Số tiền thu
-  returnedPrice?: number | null;     // Số tiền thực tế khi trả kết quả
-  feeCollector?: string | null;      // Cán bộ/nhân viên thực hiện thu tiền (tài khoản trả kết quả)
+  returnedPrice?: number | null;     // Số tiền thực tế khi trả kết quả (Mới)
 
   // Tính năng Chốt danh sách bàn giao về phòng chuyên môn (Dành cho hồ sơ đã trả kết quả)
   returnBatch?: number | null;
@@ -206,38 +207,15 @@ export interface RecordFile {
   needsMapCorrection?: boolean; // True nếu cần lập danh sách chỉnh lý
   explanationPlan?: string | null; // Phương án giải trình (Mới)
 
-  // Trường dành riêng cho Hồ sơ Đăng ký (3.x.x)
-  owners?: DangKyParty[] | null;
-  transferees?: DangKyParty[] | null;
-  attachedDocs?: AttachedDoc[] | null;
-  applicantIsOwner?: boolean | null;
-  applicantName?: string | null;
-  applicantCccd?: string | null;
-  applicantPhone?: string | null;
-  applicantAddress?: string | null;
-
   // Đã xuất danh sách giao (Hồ sơ tiếp nhận trong ngày)
   isHandedOver?: boolean;
   is_handover?: boolean;
+  handover_date?: string | null;
   data?: Record<string, any>;
 
   // Giá trực tiếp cho hồ sơ
   price?: number | null;
   advancePayment?: number | null;
-
-  // Gia hạn hồ sơ & Nhắc nhở
-  originalDeadline?: string | null;  // Hạn gốc ban đầu
-  extendedBy?: string | null;        // Người thực hiện gia hạn
-  extendedAt?: string | null;        // Thời gian thực hiện gia hạn
-  reminderDate?: string | null;      // Ngày hẹn nhắc nhở
-  lastRemindedAt?: string | null;    // Lần nhắc nhở cuối
-  deadlineReminded?: boolean | null;
-
-  // Bàn giao kho lưu / Danh sách trả kết quả
-  archiveBatchName?: string | null;  // Tên đợt lưu kho (ví dụ: Đợt 1)
-  archiveExportDate?: string | null; // Ngày xuất danh sách lưu kho
-  archiveBatchDate?: string | null;  // Ngày chốt đợt lưu kho
-  updatedAt?: string | null;
 
   // Lịch sử trạng thái và Bàn giao kho lưu
   statusLogs?: RecordStatusLog[];
@@ -258,19 +236,6 @@ export interface RecordStatusLog {
   note?: string | null;
 }
 
-export interface SystemActivityLog {
-  id: string;
-  timestamp: string;
-  performerName: string;
-  performerRole?: string;
-  actionType: 'CREATE' | 'UPDATE' | 'DELETE' | 'RETURN_RESULT' | 'APPROVE' | 'ASSIGN' | 'HANDOVER' | string;
-  actionLabel: string;
-  targetType: string;
-  referenceCode?: string;
-  details: string;
-  recordId?: string;
-}
-
 // Interface cho Item tách thửa
 export interface SplitItem {
   serviceName: string; // Loại sản phẩm (VD: Tách thửa < 100m2)
@@ -287,7 +252,6 @@ export interface Contract {
   code: string;           
   customerName: string;
   phoneNumber?: string | null;
-  cccd?: string | null;            // Số CCCD/CMND chủ sử dụng
   customerAddress?: string | null;
   ward?: string | null;
   address?: string | null;
@@ -299,32 +263,27 @@ export interface Contract {
   contractType: 'Đo đạc' | 'Tách thửa' | 'Cắm mốc' | 'Trích lục'; // Đã bổ sung Trích lục
   serviceType: string;    // Tên dịch vụ chi tiết (VD: Đo đạc tòa án)
   areaType: string;       // Khu vực (Đất đô thị / Nông thôn)
-  recordType?: string | null; // Loại hồ sơ liên kết
-
-  // Cán bộ & Ghi chú
-  assignedTo?: string | null; // Cán bộ phụ trách
-  notes?: string | null;      // Ghi chú hợp đồng / thanh lý
 
   // Số lượng đặc thù
   plotCount?: number | null;     // Số thửa (cho Đo đạc)
   markerCount?: number | null;   // Số mốc (cho Cắm mốc)
   splitItems?: SplitItem[]; // Danh sách tách thửa (lưu JSON)
 
-  // Tài chính (Thu tiền 1 lần khi hoàn tất)
+  // Tài chính
   quantity: number;       // Số lượng chung (để tính tiền cơ bản)
   unitPrice: number;      
   vatRate: number;        // % Thuế
   vatAmount: number;      // Tiền thuế
   totalAmount: number;    
-  deposit: number;        // Luôn = 0 (Thu 1 lần)
+  deposit: number;        
   content?: string | null;       
   
   createdDate: string;    
   status: 'PENDING' | 'COMPLETED';
 
-  // Thanh lý (Liên kết theo Mã HĐ / Hồ sơ)
+  // Thanh lý
   liquidationArea?: number | null; // Diện tích thanh lý thực tế
-  liquidationAmount?: number | null; // Giá trị thanh lý thực tế (tiền)
+  liquidationAmount?: number | null; // MỚI: Giá trị thanh lý thực tế (tiền)
   liquidationDate?: string | null; // Ngày thanh lý hợp đồng thực tế
 }
 
@@ -382,12 +341,10 @@ export interface Message {
 // Interface cho Ngày nghỉ lễ
 export interface Holiday {
   id: string;
-  name: string;       // Tên ngày lễ (VD: Tết Nguyên Đán, Nghỉ bù 2/9)
-  day?: number;        // Ngày
-  month?: number;      // Tháng
-  isLunar?: boolean;   // true = Âm lịch, false = Dương lịch
-  date?: string;      // Tùy chọn: Ngày cụ thể YYYY-MM-DD (dành cho ngày nghỉ bù / lễ một lần)
-  year?: number;      // Tùy chọn: Năm cụ thể
+  name: string;       // Tên ngày lễ (VD: Tết Nguyên Đán)
+  day: number;        // Ngày
+  month: number;      // Tháng
+  isLunar: boolean;   // true = Âm lịch, false = Dương lịch
 }
 
 // Interface cho Lịch công tác
@@ -404,145 +361,6 @@ export interface WorkSchedule {
 // Interface Notification (Chuyển từ UtilitiesView sang đây để tránh Circular Dependency)
 export type NotifyType = 'success' | 'error' | 'info';
 export type NotifyFunction = (message: string, type?: NotifyType) => void;
-
-// Module Đăng ký Hồ sơ - 14 Trạng thái quy trình
-export type DangKyStatusType =
-  | 'Tiếp nhận mới'
-  | 'Thẩm định'
-  | 'Phiếu chuyển thuế'
-  | 'Chờ Thuế KV7'
-  | 'Chờ giấy nộp tiền'
-  | 'Chờ In GCN'
-  | 'Chờ kiểm tra'
-  | 'Chờ ký duyệt'
-  | 'Chờ bàn giao'
-  | 'Đã giao 1 cửa'
-  | 'Đã trả kết quả'
-  | 'Chờ bổ sung'
-  | 'CSD rút HS'
-  | 'Trả hủy hồ sơ';
-
-export const DANG_KY_STATUS_LIST: DangKyStatusType[] = [
-  'Tiếp nhận mới',
-  'Thẩm định',
-  'Phiếu chuyển thuế',
-  'Chờ Thuế KV7',
-  'Chờ giấy nộp tiền',
-  'Chờ In GCN',
-  'Chờ kiểm tra',
-  'Chờ ký duyệt',
-  'Chờ bàn giao',
-  'Đã giao 1 cửa',
-  'Đã trả kết quả',
-  'Chờ bổ sung',
-  'CSD rút HS',
-  'Trả hủy hồ sơ'
-];
-
-// Cấu trúc Chủ sử dụng & Người nhận chuyển nhượng
-export interface DangKyParty {
-  name: string;
-  cccd?: string;
-  phone?: string;
-  address?: string;
-}
-
-// Interface chính cho Hồ sơ Đăng ký (39 Cột dữ liệu)
-export interface DangKyRecord {
-  id: string;
-  code: string;                             // Mã hồ sơ
-  owners: DangKyParty[];                    // Chủ sử dụng (Nhiều chủ)
-  transferees: DangKyParty[];               // Người nhận chuyển quyền (Nhiều người)
-  authorizedPersonName?: string;            // Họ tên người ủy quyền
-  authorizedPersonId?: string;              // CCCD người ủy quyền
-  authorizedPersonPhone?: string;           // SĐT người ủy quyền
-  authorizedPersonAddress?: string;         // Địa chỉ người ủy quyền
-  landPlot?: string;                        // Số thửa
-  mapSheet?: string;                        // Số tờ
-  issueNumber?: string;                     // Số phát hành GCN
-  entryNumber?: string;                     // Số vào sổ
-  totalArea?: number | string;              // Tổng diện tích (m2)
-  residentialArea?: number | string;        // Diện tích ONT/ODT (m2)
-  ward?: string;                            // Xã/Phường
-  recordType?: string;                      // Loại hồ sơ
-  receivedDate?: string;                    // Ngày nhận
-  receivedBy?: string;                      // Người tiếp nhận hồ sơ
-  deadline?: string;                        // Hẹn trả
-  appraisalDate?: string;                   // Ngày Thẩm định
-  appraisalStaff?: string;                  // NV Thẩm định
-  taxFormDate?: string;                     // Ngày Phiếu chuyển thuế
-  taxFormNumber?: string;                   // Số phiếu chuyển thuế
-  taxFormStaff?: string;                    // NV Phiếu chuyển
-  taxKV7TransferDate?: string;              // Ngày Chuyển Thuế KV7
-  taxKV7Staff?: string;                     // NV Thuế KV7
-  taxNoticeDate?: string;                   // Ngày TBT
-  taxNoticeStaff?: string;                  // NV Thông báo thuế
-  taxPaymentReceiptDate?: string;           // Ngày GNT
-  printDate?: string;                       // Ngày In GCN
-  printStaff?: string;                      // NV In GCN
-  pendingCheckDate?: string;                // Ngày Trình KT
-  checkedBy?: string;                       // Người Kiểm tra
-  submissionDate?: string;                  // Ngày Trình ký
-  submittedTo?: string;                     // Người ký
-  approvalDate?: string;                    // Ngày Ký duyệt
-  completedDate?: string;                   // Hoàn thành
-  exportBatch?: string;                     // Đợt xuất
-  handoverWard?: string;                    // Nơi giao trả kết quả
-  resultReturnedDate?: string;              // Ngày Trả kết quả
-  receiptNumber?: string;                   // Số Biên lai
-  invoiceNumber?: string;                   // Số Hóa đơn
-  feeAmount?: number | string;              // Số tiền thu (VNĐ)
-  status: DangKyStatusType;                 // Trạng thái quy trình (1 trong 14 trạng thái)
-  notes?: string;                           // Ghi chú
-  personalNotes?: string;                   // Ghi chú cá nhân
-  reminderDate?: string;                     // Hẹn giờ nhắc việc
-  privateNotes?: string;                    // Ghi chú nội bộ
-  otherDocs?: string;                       // Giấy tờ khác / Chi tiết
-  explanationPlan?: string;                 // Phương án giải trình
-  price?: number | null;                    // Đơn giá
-  returnedPrice?: number | null;            // Số tiền thực tế khi trả kết quả
-  receiptType?: 'Biên Lai' | 'Hóa Đơn' | string | null; // Loại chứng từ
-  exportDate?: string;                      // Ngày xuất bàn giao
-  receiverName?: string;                    // Người nhận kết quả
-  applicantIsOwner?: boolean;               // Người nộp hồ sơ là chủ hồ sơ
-  applicantName?: string;                   // Họ tên người nộp
-  applicantCccd?: string;                   // CCCD/Số Giấy người nộp
-  applicantPhone?: string;                  // SĐT người nộp
-  applicantAddress?: string;                // Địa chỉ thường trú người nộp
-  assignedDate?: string;                    // Ngày giao NV
-  issueDate?: string;                       // Ngày cấp GCN
-  assignedTo?: string;                      // NV xử lý
-  nonBoundaryWard?: string;                 // Phi địa giới xã
-  isNonBoundary?: boolean;                  // Có phải phi địa giới không
-  deliveryDate?: string;                    // Ngày giao trả kết quả
-  attachedDocs?: AttachedDoc[];             // Giấy tờ kèm theo
-  attachedDocuments?: { name: string; type: string }[]; // Giấy tờ kèm theo khác
-  createdAt?: string;
-  updatedAt?: string;
-}
-
-export interface WorkflowStep {
-  id: string;
-  procedureId: string;
-  stepCode: string;
-  stepName: string;
-  order: number;
-  slaHours: number;
-  slaDisplay: string;
-  excludeFromTotalSla: boolean;
-  role?: string;
-  active: boolean;
-}
-
-export interface ProcedureWorkflow {
-  procedureId: string;
-  procedureName: string;
-  totalSlaHours?: number;
-  steps: WorkflowStep[];
-}
-
-import { DANG_KY_RECORD_TYPES, DANG_KY_DEADLINE_MAP } from './constants/procedures';
-export { DANG_KY_RECORD_TYPES, DANG_KY_DEADLINE_MAP };
 
 declare global {
   interface Window {

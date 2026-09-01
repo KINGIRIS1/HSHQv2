@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Database, CheckCircle2, AlertTriangle, RefreshCw, Layers, FileText, FolderArchive, Server, ShieldCheck, X } from 'lucide-react';
 import { supabase, isConfigured } from '../services/supabaseClient';
+import { getShortRecordType } from '../constants';
 
 interface CloudDatabaseInspectorProps {
   isOpen: boolean;
@@ -309,7 +310,7 @@ const SampleTable: React.FC<{ records: any[]; tableName: string; emptyMessage: s
           <tr key={r.id || idx} className="hover:bg-gray-50/80">
             <td className="p-2.5 font-mono font-bold text-purple-700">{r.code || '---'}</td>
             <td className="p-2.5 font-medium text-gray-800">{r.customerName || '---'}</td>
-            <td className="p-2.5 text-gray-600">{r.recordType || '---'}</td>
+            <td className="p-2.5 text-gray-600">{getShortRecordType(r.recordType) || '---'}</td>
             <td className="p-2.5 text-gray-600">{r.ward || '---'}</td>
             <td className="p-2.5 text-gray-500">{r.receivedDate ? new Date(r.receivedDate).toLocaleDateString('vi-VN') : '---'}</td>
             <td className="p-2.5">

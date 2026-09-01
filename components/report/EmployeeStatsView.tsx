@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { RecordFile, Employee, RecordStatus, User } from '../../types';
+import { RecordFile, Employee, RecordStatus } from '../../types';
 import { generateEmployeeEvaluation } from '../../services/geminiService';
 import { User as UserIcon, AlertOctagon, Sparkles, Loader2, ListFilter, CheckCircle2, Clock, AlertTriangle, Briefcase, FileSpreadsheet } from 'lucide-react';
 import * as XLSX from 'xlsx-js-style';
@@ -15,17 +15,14 @@ interface EmployeeStatsViewProps {
     selectedEmpId: string;
     setSelectedEmpId: (id: string) => void;
     defaultDeptFilter?: 'all' | 'archive' | 'onedoor' | 'measurement';
-    currentUser?: User;
 }
 
 const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({ 
-    records, employees, fromDate, toDate, selectedEmpId, setSelectedEmpId, defaultDeptFilter = 'all', currentUser
+    records, employees, fromDate, toDate, selectedEmpId, setSelectedEmpId, defaultDeptFilter = 'all' 
 }) => {
     const [aiEvaluation, setAiEvaluation] = useState<string>('');
     const [isGenerating, setIsGenerating] = useState(false);
     const [deptFilter, setDeptFilter] = useState<'all' | 'archive' | 'onedoor' | 'measurement'>(defaultDeptFilter);
-
-    const isRegularEmployee = currentUser && (currentUser.role === 'EMPLOYEE' || currentUser.role === 'ONEDOOR');
 
     // Synchronize deptFilter if defaultDeptFilter changes
     React.useEffect(() => {
@@ -518,20 +515,14 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
                     <div className="relative flex-1">
                         <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                         <select 
-                            className={`w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm font-bold text-gray-700 outline-none transition-shadow shadow-sm ${isRegularEmployee ? 'bg-slate-100 cursor-not-allowed opacity-90' : 'focus:ring-2 focus:ring-indigo-500 cursor-pointer hover:border-indigo-300 bg-white'}`}
+                            className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-500 bg-white transition-shadow shadow-sm cursor-pointer hover:border-indigo-300"
                             value={selectedEmpId}
-                            disabled={Boolean(isRegularEmployee)}
                             onChange={(e) => { setSelectedEmpId(e.target.value); setAiEvaluation(''); }}
                         >
-                            {!isRegularEmployee && <option value="">-- Tổng hợp tất cả nhân viên --</option>}
+                            <option value="">-- Tổng hợp tất cả nhân viên --</option>
                             {filteredEmployeesByDept.map(emp => (
                                 <option key={emp.id} value={emp.id}>{emp.name} - {emp.department}</option>
                             ))}
-                            {isRegularEmployee && currentUser?.employeeId && !filteredEmployeesByDept.some(e => e.id === currentUser.employeeId) && (
-                                <option value={currentUser.employeeId}>
-                                    {employees.find(e => e.id === currentUser.employeeId)?.name || currentUser.name}
-                                </option>
-                            )}
                         </select>
                     </div>
                     {/* Single shared Excel button is on top toolbar */}

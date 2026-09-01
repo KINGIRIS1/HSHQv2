@@ -5,6 +5,16 @@ CREATE TABLE IF NOT EXISTS system_settings (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Tạo bảng holidays chuyên dụng cho cấu hình ngày nghỉ lễ
+CREATE TABLE IF NOT EXISTS holidays (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    day INTEGER NOT NULL,
+    month INTEGER NOT NULL,
+    is_lunar BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- Thêm dữ liệu khởi tạo cho số vào sổ (nếu chưa có)
 INSERT INTO system_settings (key, value) 
 VALUES ('vaoso_current_book_number', '000000') 

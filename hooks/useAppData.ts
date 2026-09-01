@@ -6,23 +6,16 @@ import { fetchRecords, fetchEmployees, fetchUsers, fetchUpdateInfo, fetchHoliday
     saveEmployeeApi, deleteEmployeeApi, saveUserApi, deleteUserApi, deleteAllDataApi, getSystemSetting
 } from '../services/api';
 import { supabase } from '../services/supabaseClient';
-import { mapRecordFromDb, getFromCache, CACHE_KEYS } from '../services/apiCore';
-import { DEFAULT_WARDS as STATIC_WARDS, APP_VERSION, MOCK_EMPLOYEES, MOCK_USERS } from '../constants';
+import { mapRecordFromDb } from '../services/apiCore';
+import { DEFAULT_WARDS as STATIC_WARDS, APP_VERSION } from '../constants';
 import { migrateUnbatchedRecords } from '../utils/appHelpers';
+import { connectionManager } from '../services/connectionService';
 
 export const useAppData = (currentUser: User | null) => {
-    // 0ms First Paint from Persistent Cache / LocalStorage
-    const [records, setRecords] = useState<RecordFile[]>(() => {
-        const cached = getFromCache(CACHE_KEYS.RECORDS, []);
-        if (cached && cached.length > 0) {
-            const { migratedRecords } = migrateUnbatchedRecords(cached);
-            return migratedRecords;
-        }
-        return [];
-    });
-    const [employees, setEmployees] = useState<Employee[]>(() => getFromCache(CACHE_KEYS.EMPLOYEES, MOCK_EMPLOYEES));
-    const [users, setUsers] = useState<User[]>(() => getFromCache(CACHE_KEYS.USERS, MOCK_USERS));
-    const [holidays, setHolidays] = useState<Holiday[]>(() => getFromCache(CACHE_KEYS.HOLIDAYS, []));
+    const [records, setRecords] = useState<RecordFile[]>([]);
+    const [employees, setEmployees] = useState<Employee[]>([]);
+    const [users, setUsers] = useState<User[]>([]);
+    const [holidays, setHolidays] = useState<Holiday[]>([]); // State mới cho ngày nghỉ
     const [rolePermissions, setRolePermissions] = useState<RolePermissions>(DEFAULT_ROLE_PERMISSIONS);
     const [departmentPermissions, setDepartmentPermissions] = useState<DepartmentPermissions>({});
     const [connectionStatus, setConnectionStatus] = useState<'connected' | 'offline'>('connected');
@@ -40,107 +33,59 @@ export const useAppData = (currentUser: User | null) => {
 
     const loadData = useCallback(async () => {
         try {
-            // 0. Instant Render từ IndexedDB Cache (< 50ms)
-            try {
-                const { getFromCacheAsync } = await import('../services/apiCore');
-                const [idbRecords, idbEmps, idbUsers, idbHolidays] = await Promise.all([
-                    getFromCacheAsync<RecordFile[]>(CACHE_KEYS.RECORDS, []),
-                    getFromCacheAsync<Employee[]>(CACHE_KEYS.EMPLOYEES, []),
-                    getFromCacheAsync<User[]>(CACHE_KEYS.USERS, []),
-                    getFromCacheAsync<Holiday[]>(CACHE_KEYS.HOLIDAYS, [])
-                ]);
-
-                if (idbRecords && idbRecords.length > 0) {
-                    const { migratedRecords } = migrateUnbatchedRecords(idbRecords);
-                    setRecords(migratedRecords);
-                }
-                if (idbEmps && idbEmps.length > 0) setEmployees(idbEmps);
-                if (idbUsers && idbUsers.length > 0) setUsers(idbUsers);
-                if (idbHolidays && idbHolidays.length > 0) setHolidays(idbHolidays);
-                
-                if (typeof performance !== 'undefined' && performance.mark) {
-                    performance.mark('cache-rendered');
-                }
-            } catch (cacheErr) {
-                console.warn("Async cache load warning:", cacheErr);
-            }
-
-            // 1. Thử kết nối Server nội bộ (chỉ khi chạy localhost/LAN) để tránh timeout 500ms trên Cloud Web
-            const isLocalhost = typeof window !== 'undefined' && 
-                (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-
-            if (isLocalhost) {
-                try {
-                    const [recRes, empRes, userRes, holRes] = await Promise.all([
-                        fetch('/records', { signal: AbortSignal.timeout(300) }).then(r => r.ok ? r.json() : null).catch(() => null),
-                        fetch('/employees', { signal: AbortSignal.timeout(300) }).then(r => r.ok ? r.json() : null).catch(() => null),
-                        fetch('/users', { signal: AbortSignal.timeout(300) }).then(r => r.ok ? r.json() : null).catch(() => null),
-                        fetch('/holidays', { signal: AbortSignal.timeout(300) }).then(r => r.ok ? r.json() : null).catch(() => null),
-                    ]);
-
-                    if (recRes !== null || empRes !== null || userRes !== null) {
-                        const rawRecs = Array.isArray(recRes) ? recRes : (recRes?.records || []);
-                        const { migratedRecords } = migrateUnbatchedRecords(rawRecs);
-                        setRecords(migratedRecords);
-                        if (Array.isArray(empRes)) setEmployees(empRes);
-                        else if (empRes?.employees && Array.isArray(empRes.employees)) setEmployees(empRes.employees);
-                        
-                        if (Array.isArray(userRes)) setUsers(userRes);
-                        else if (userRes?.users && Array.isArray(userRes.users)) setUsers(userRes.users);
-
-                        if (Array.isArray(holRes)) setHolidays(holRes);
-                        else if (holRes?.holidays && Array.isArray(holRes.holidays)) setHolidays(holRes.holidays);
-
-                        setConnectionStatus('connected');
-                        return;
-                    }
-                } catch (localErr) {
-                    // Tiếp tục sang Supabase Cloud
-                }
-            }
-
-            // 2. Tải song song toàn bộ dữ liệu từ Supabase Cloud
+            // Tạo timeout promise để phòng trường hợp mạng mất kết nối hoàn toàn
             const timeoutPromise = new Promise((_, reject) => 
-                setTimeout(() => reject(new Error("Timeout Supabase")), 12000)
+                setTimeout(() => reject(new Error("Timeout")), 45000)
             );
 
             const dataPromise = Promise.all([
-                fetchRecords(),
-                fetchEmployees(),
-                fetchUsers(),
-                fetchUpdateInfo(),
-                fetchHolidays(),
-                getSystemSetting('role_permissions'),
-                getSystemSetting('department_permissions')
+                fetchRecords().catch(err => {
+                    console.warn("fetchRecords failed:", err);
+                    return [];
+                }),
+                fetchEmployees().catch(err => {
+                    console.warn("fetchEmployees failed:", err);
+                    return [];
+                }),
+                fetchUsers().catch(err => {
+                    console.warn("fetchUsers failed:", err);
+                    return [];
+                }),
+                fetchUpdateInfo().catch(() => ({ version: null, url: null })),
+                fetchHolidays().catch(() => []),
+                getSystemSetting('role_permissions').catch(() => null),
+                getSystemSetting('department_permissions').catch(() => null)
             ]);
 
             // Race giữa fetch data và timeout
             const [recData, empData, userData, updateInfo, holidayData, permsData, deptPermsData] = await Promise.race([dataPromise, timeoutPromise]) as any;
 
-            const rawRecList = Array.isArray(recData) ? recData : [];
-            const { migratedRecords } = migrateUnbatchedRecords(rawRecList);
+            const validRecs = Array.isArray(recData) && recData.length > 0 
+                ? recData 
+                : (typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('app_records_cache_v1') || '[]') : []);
+
+            const { migratedRecords } = migrateUnbatchedRecords(validRecs);
             setRecords(migratedRecords);
 
-            setEmployees(empData);
-            setUsers(userData);
-            setHolidays(holidayData); // Cập nhật state holidays
-            
-            if (typeof performance !== 'undefined' && performance.mark) {
-                performance.mark('cloud-synced');
-                try {
-                    performance.measure('App Init Time', 'app-start', 'cloud-synced');
-                } catch (e) {
-                    // ignore if app-start not set yet
-                }
+            if (Array.isArray(empData) && empData.length > 0) {
+                setEmployees(empData);
             }
+            if (Array.isArray(userData) && userData.length > 0) {
+                setUsers(userData);
+            }
+            if (Array.isArray(holidayData)) {
+                setHolidays(holidayData);
+            }
+
             if (permsData) {
                 try {
                     const parsed = JSON.parse(permsData);
-                    const sanitized: RolePermissions = {};
-                    Object.keys(parsed).forEach(roleKey => {
-                        sanitized[roleKey] = (parsed[roleKey] || []).filter((p: string) => p !== 'CHECK_RECORDS' && p !== 'BTN_CLOSE_BATCH');
+                    Object.keys(DEFAULT_ROLE_PERMISSIONS).forEach(roleKey => {
+                        const defPerms = DEFAULT_ROLE_PERMISSIONS[roleKey as UserRole] || [];
+                        const existingPerms = (parsed[roleKey] || []).filter((p: string) => p !== 'CHECK_RECORDS' && p !== 'BTN_CLOSE_BATCH');
+                        parsed[roleKey] = Array.from(new Set([...existingPerms, ...defPerms]));
                     });
-                    setRolePermissions(sanitized);
+                    setRolePermissions(parsed);
                 } catch (e) {
                     console.error("Failed to parse role_permissions", e);
                 }
@@ -166,24 +111,41 @@ export const useAppData = (currentUser: User | null) => {
                 setUpdateUrl(updateInfo.url);
             }
         } catch (error) {
-            console.warn("Không thể kết nối Server nội bộ lẫn Supabase, chuyển sang chế độ Offline/Cache mượt mà:", error);
+            console.error("Lỗi tải dữ liệu hoặc Timeout:", error);
+            // Báo lỗi cho connectionManager
+            connectionManager.reportNetworkError('Tải dữ liệu ứng dụng', error);
             setConnectionStatus('offline');
             
-            // Đọc ngay lập tức dữ liệu từ Cache để người dùng tiếp tục làm việc bình thường không bị gián đoạn
-            const cachedRecords = getFromCache(CACHE_KEYS.RECORDS, []);
-            const cachedEmployees = getFromCache(CACHE_KEYS.EMPLOYEES, MOCK_EMPLOYEES);
-            const cachedUsers = getFromCache(CACHE_KEYS.USERS, MOCK_USERS);
-            const cachedHolidays = getFromCache(CACHE_KEYS.HOLIDAYS, []);
-
-            if (cachedRecords.length > 0) {
-                const { migratedRecords } = migrateUnbatchedRecords(cachedRecords);
-                setRecords(migratedRecords);
-            }
-            if (cachedEmployees.length > 0) setEmployees(cachedEmployees);
-            if (cachedUsers.length > 0) setUsers(cachedUsers);
-            if (cachedHolidays.length > 0) setHolidays(cachedHolidays);
+            // Nếu cache cũng rỗng (lần đầu chạy) hoặc bị timeout nên không nhận được data, 
+            // ta sẽ chủ động đọc lại từ Cache để người dùng có thể Đăng nhập và làm việc.
+            import('../services/apiCore').then(({ getFromCache, CACHE_KEYS }) => {
+                import('../constants').then(({ MOCK_EMPLOYEES, MOCK_USERS }) => {
+                    setRecords((prev) => prev.length > 0 ? prev : getFromCache(CACHE_KEYS.RECORDS, []));
+                    setEmployees((prev) => prev.length > 0 ? prev : getFromCache(CACHE_KEYS.EMPLOYEES, MOCK_EMPLOYEES));
+                    setUsers((prev) => prev.length > 0 ? prev : getFromCache(CACHE_KEYS.USERS, MOCK_USERS));
+                    setHolidays((prev) => prev.length > 0 ? prev : getFromCache(CACHE_KEYS.HOLIDAYS, []));
+                });
+            });
         }
     }, []);
+
+    // Lắng nghe sự kiện khôi phục kết nối từ connectionManager để reload data ngầm
+    useEffect(() => {
+        const unsubscribe = connectionManager.subscribe((state) => {
+            setConnectionStatus(state.isOnline ? 'connected' : 'offline');
+        });
+
+        const handleRestored = () => {
+            console.log("🔄 Phát hiện mạng đã kết nối lại, đang tự động đồng bộ dữ liệu...");
+            loadData();
+        };
+
+        window.addEventListener('app_connection_restored', handleRestored);
+        return () => {
+            unsubscribe();
+            window.removeEventListener('app_connection_restored', handleRestored);
+        };
+    }, [loadData]);
 
     // Initial Load & Fallback Auto-polling (Realtime handles instant updates)
     useEffect(() => {

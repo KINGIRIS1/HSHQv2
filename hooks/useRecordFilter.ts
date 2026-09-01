@@ -1,50 +1,8 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { RecordFile, User, UserRole, RecordStatus, Employee } from '../types';
-import { removeVietnameseTones, isRecordOverdue, isRecordApproaching, resolveRecordStatus } from '../utils/appHelpers';
-import { getShortRecordType, isArchiveRecordType, isDoDacRecordType } from '../constants';
-
-export function getRecordDateForStatus(r: any, targetStatus?: string): string | null {
-    if (!r) return null;
-    const statusStr = (targetStatus && targetStatus !== 'all') ? targetStatus : (r.status || '');
-
-    // Check specific status date fields
-    if (statusStr === 'RETURNED' || statusStr === 'Đã trả kết quả') {
-        const d = r.returnDate || r.actualReturnDate || r.resultReturnDate;
-        if (d) return String(d).split('T')[0];
-    }
-    if (statusStr === 'HANDOVER' || statusStr === 'Chờ bàn giao' || statusStr === 'SUBMITTED' || statusStr === 'APPROVED' || statusStr === 'Đã giao 1 cửa') {
-        const d = r.handoverDate || r.submittedDate || r.signingDate;
-        if (d) return String(d).split('T')[0];
-    }
-    if (statusStr === 'IN_PROGRESS' || statusStr === 'ASSIGNED' || statusStr === 'Thẩm định') {
-        const d = r.assignedDate || r.assessmentDate;
-        if (d) return String(d).split('T')[0];
-    }
-    if (statusStr === 'Phiếu chuyển thuế' || statusStr === 'Chờ Thuế KV7' || statusStr === 'Chờ giấy nộp tiền') {
-        const d = r.taxTransferDate || r.taxReceiptDate;
-        if (d) return String(d).split('T')[0];
-    }
-    if (statusStr === 'Chờ In GCN' || statusStr === 'Chờ ký duyệt' || statusStr === 'Chờ kiểm tra') {
-        const d = r.signingDate || r.printDate;
-        if (d) return String(d).split('T')[0];
-    }
-
-    // Check statusLogs
-    if (Array.isArray(r.statusLogs)) {
-        const matchLog = r.statusLogs.find((l: any) => l.status === statusStr);
-        if (matchLog && matchLog.date) return String(matchLog.date).split('T')[0];
-    }
-    // Check history (Đăng ký)
-    if (Array.isArray(r.history)) {
-        const matchHist = r.history.find((h: any) => h.stepName === statusStr || h.status === statusStr);
-        if (matchHist && matchHist.date) return String(matchHist.date).split('T')[0];
-    }
-
-    // Default fallback
-    const fallback = r.receivedDate || r.assignedDate || r.createdAt || r.updatedAt;
-    return fallback ? String(fallback).split('T')[0] : null;
-}
+import { removeVietnameseTones, isRecordOverdue, isRecordApproaching } from '../utils/appHelpers';
+import { getShortRecordType, isArchiveRecordType } from '../constants';
 
 export const useRecordFilter = (
     records: RecordFile[],
@@ -227,7 +185,7 @@ export const useRecordFilter = (
         const isMeasurementView = ['all_records', 'assign_tasks', 'completed_list', 'pending_supplement_list', 'pending_check_list', 'check_list', 'handover_list', 'director_completed'].includes(currentView);
         
         if (isArchiveMeasurementView) {
-            result = result.filter(r => isArchiveRecordType(r.recordType, r.code) || r.sourceTable === 'luutru_records');
+            result = result.filter(r => isArchiveRecordType(r.recordType));
             if (filterRecordType !== 'all') {
                 result = result.filter(r => getShortRecordType(r.recordType) === filterRecordType);
             }
@@ -240,8 +198,7 @@ export const useRecordFilter = (
             result = result.filter(r => {
                 const shortType = getShortRecordType(r.recordType);
                 return (
-                    !isArchiveRecordType(r.recordType, r.code) &&
-                    r.sourceTable !== 'luutru_records' &&
+                    !isArchiveRecordType(r.recordType) &&
                     !['CMD', 'Tòa án', 'Thi hành án'].includes(shortType)
                 );
             });
@@ -270,58 +227,42 @@ export const useRecordFilter = (
                 return removeVietnameseTones(targetWard || '').includes(wardSearch);
             });
         }
-        if (filterStatus !== 'all' && currentView !== 'handover_list' && currentView !== 'other_handover_list' && currentView !== 'archive_handover_list') {
-            result = result.filter(r => (r.status === filterStatus || resolveRecordStatus(r) === filterStatus));
+        const isStatusFilterHidden = [
+            'assign_tasks', 'other_assign_tasks', 'archive_assign_tasks',
+            'completed_list', 'archive_completed_list',
+            'pending_check_list', 'archive_pending_check_list', 'check_list', 'other_check_list', 'archive_check_list',
+            'director_completed', 'other_director_completed', 'archive_director_completed',
+            'handover_list', 'other_handover_list', 'archive_handover_list'
+        ].includes(currentView || '');
+
+        if (!isStatusFilterHidden && filterStatus !== 'all') {
+            result = result.filter(r => r.status === filterStatus);
         }
-        if (filterEmployee !== 'all' && currentView !== 'assign_tasks') {
-            if (filterEmployee === 'unassigned') {
-                result = result.filter(r => !r.assignedTo && !(r as any).appraisalStaff && !(r as any).checkedBy);
-            } else {
-                const empObj = employees.find(e => e.id === filterEmployee || e.name === filterEmployee);
-                const empName = empObj?.name?.toLowerCase();
-                const empId = filterEmployee.toLowerCase();
-
-                result = result.filter(r => {
-                    const aTo = r.assignedTo ? r.assignedTo.toLowerCase() : '';
-                    const appSt = (r as any).appraisalStaff ? (r as any).appraisalStaff.toLowerCase() : '';
-                    const chkBy = (r as any).checkedBy ? (r as any).checkedBy.toLowerCase() : '';
-                    const subTo = (r as any).submittedTo ? (r as any).submittedTo.toLowerCase() : '';
-
-                    return (
-                        aTo === empId || (empName && aTo === empName) ||
-                        appSt === empId || (empName && appSt === empName) ||
-                        chkBy === empId || (empName && chkBy === empName) ||
-                        subTo === empId || (empName && subTo === empName)
-                    );
-                });
-            }
+        if (filterEmployee !== 'all') {
+            if (filterEmployee === 'unassigned') result = result.filter(r => !r.assignedTo);
+            else result = result.filter(r => r.assignedTo === filterEmployee);
         }
 
-        // Date Filters (General for other views)
-        if (currentView !== 'handover_list' && currentView !== 'other_handover_list' && currentView !== 'archive_handover_list') {
-            if (filterSpecificDate) {
-                result = result.filter(r => r.receivedDate && r.receivedDate.startsWith(filterSpecificDate));
-            } else if (filterFromDate || filterToDate) {
-                result = result.filter(r => {
-                    const targetDateStr = getRecordDateForStatus(r, filterStatus);
-                    if (!targetDateStr) return false;
-                    if (filterFromDate && targetDateStr < filterFromDate) return false;
-                    if (filterToDate && targetDateStr > filterToDate) return false;
+        // Unified Date Filters (Áp dụng bộ lọc Thời gian chung cho tất cả các view/modal)
+        if (filterSpecificDate) {
+            result = result.filter(r => r.receivedDate && r.receivedDate.startsWith(filterSpecificDate));
+        } else if (filterFromDate || filterToDate) {
+            result = result.filter(r => {
+                const datesToCheck: string[] = [];
+                if (r.receivedDate) datesToCheck.push(r.receivedDate.split('T')[0]);
+                if (r.assignedDate) datesToCheck.push(r.assignedDate.split('T')[0]);
+                if (r.resultReturnedDate) datesToCheck.push(r.resultReturnedDate.split('T')[0]);
+                if (r.completedDate) datesToCheck.push(r.completedDate.split('T')[0]);
+                if (r.exportDate) datesToCheck.push(r.exportDate.split('T')[0]);
+
+                if (datesToCheck.length === 0) return false;
+
+                return datesToCheck.some(d => {
+                    if (filterFromDate && d < filterFromDate) return false;
+                    if (filterToDate && d > filterToDate) return false;
                     return true;
                 });
-            }
-            
-            if (filterAssignedFromDate || filterAssignedToDate) {
-                result = result.filter(r => {
-                    if (!r.assignedDate) return false;
-                    const aDateOnly = r.assignedDate.split('T')[0];
-                    if (filterAssignedFromDate && aDateOnly < filterAssignedFromDate) return false;
-                    if (filterAssignedToDate && aDateOnly > filterAssignedToDate) return false;
-                    return true;
-                });
-            } else if (filterAssignedDate) {
-                result = result.filter(r => r.assignedDate && r.assignedDate.startsWith(filterAssignedDate));
-            }
+            });
         }
 
         // Warning Filters

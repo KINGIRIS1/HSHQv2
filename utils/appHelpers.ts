@@ -1,6 +1,6 @@
 
-import { RecordFile, RecordStatus, Employee, DangKyRecord } from '../types';
-import { detectProcedureId, getProcedureById, DANG_KY_DEADLINE_MAP, isArchiveRecordType, isDoDacRecordType } from '../constants/procedures';
+import { RecordFile, RecordStatus, Employee } from '../types';
+import { DEFAULT_HOLIDAYS } from '../constants';
 
 // --- HÀM TIỆN ÍCH XỬ LÝ CHUỖI TIẾNG VIỆT ---
 export function removeVietnameseTones(str: string): string {
@@ -54,106 +54,37 @@ export const confirmAction = async (message: string, title: string = 'Xác nhậ
 };
 
 // --- ĐỊNH NGHĨA CÁC CỘT HIỂN THỊ ---
-// Updated: Thứ tự chuẩn theo quy định (MÃ HỒ SƠ, CHỦ SỬ DỤNG, LOẠI HỒ SƠ, THỜI HẠN XỬ LÝ, XÃ PHƯỜNG, TỜ, THỬA, GIAO NHÂN VIÊN, HOÀN THÀNH ĐỢT, TRẠNG THÁI)
+// Updated: Căn giữa tiêu đề và điều chỉnh độ rộng theo yêu cầu
+// Updated: Gộp cột Đợt vào cột Hoàn thành
 export const COLUMN_DEFS = [
   { key: 'code', label: 'MÃ HỒ SƠ', sortKey: 'code', className: 'w-[110px] text-center' },
   { key: 'customer', label: 'THÔNG TIN CHỦ SỬ DỤNG', sortKey: 'customerName', className: 'w-64 text-center' }, 
   { key: 'type', label: 'LOẠI HỒ SƠ', sortKey: 'recordType', className: 'w-[115px] text-center' },
-  { key: 'deadline', label: 'THỜI HẠN XỬ LÝ', sortKey: 'deadline', className: 'w-48 text-center' },
   { key: 'ward', label: 'XÃ PHƯỜNG', sortKey: 'ward', className: 'w-32 text-center' },
+  { key: 'deadline', label: 'THỜI HẠN XỬ LÝ', sortKey: 'deadline', className: 'w-48 text-center' },
   { key: 'mapSheet', label: 'TỜ', sortKey: 'mapSheet', className: 'w-16 text-center' }, 
   { key: 'landPlot', label: 'THỬA', sortKey: 'landPlot', className: 'w-16 text-center' }, 
   { key: 'assigned', label: 'GIAO NHÂN VIÊN', sortKey: 'assignedDate', className: 'w-48 text-center' },
-  { key: 'completed', label: 'HOÀN THÀNH ĐỢT', sortKey: 'completedDate', className: 'w-32 text-center' },
+  { key: 'completed', label: 'HOÀN THÀNH / ĐỢT', sortKey: 'completedDate', className: 'w-32 text-center' },
+  { key: 'tech', label: 'TĐ / TL', sortKey: 'measurementNumber', className: 'w-20 text-center' },
+  { key: 'receipt', label: 'BIÊN LAI', sortKey: 'receiptNumber', className: 'w-20 text-center' },
   { key: 'status', label: 'TRẠNG THÁI', sortKey: 'status', className: 'w-32 text-center' },
 ];
 
 export const DEFAULT_VISIBLE_COLUMNS = {
     code: true, 
     customer: true, 
-    type: true,
     deadline: true,
     ward: true, 
     mapSheet: true, 
     landPlot: true, 
     assigned: true, 
-    completed: true, 
-    status: true,
+    completed: true, // Mặc định hiện cột gộp này
+    type: true, 
     tech: false, 
-    receipt: false
+    receipt: true, 
+    status: true
 };
-
-// --- HÀM TỰ ĐỘNG SUY LUẬN VÀ CHUẨN HÓA TRẠNG THÁI HỒ SƠ ---
-/**
- * Chuẩn hóa và tự động suy luận trạng thái chính xác của hồ sơ dựa trên các mốc thời gian thực tế.
- * Giải quyết dứt điểm tình trạng hồ sơ đã qua các bước (chờ kiểm tra, đã kiểm tra, trình ký, đã ký, chốt đợt, trả kết quả)
- * nhưng vẫn hiển thị nhầm là "Đang thực hiện".
- */
-export function resolveRecordStatus(r: RecordFile | null | undefined): RecordStatus {
-    if (!r) return RecordStatus.RECEIVED;
-
-    // 1. Trạng thái kết thúc / dừng đặc biệt
-    if (r.status === RecordStatus.WITHDRAWN) {
-        return RecordStatus.WITHDRAWN;
-    }
-    if (r.status === RecordStatus.REJECTED) {
-        return RecordStatus.REJECTED;
-    }
-
-    // 2. Xét theo độ ưu tiên từ mốc hoàn thành cao nhất đến thấp nhất
-    // 2.1. Đã trả kết quả (RETURNED)
-    if (r.resultReturnedDate || r.status === RecordStatus.RETURNED) {
-        return RecordStatus.RETURNED;
-    }
-
-    // 2.2. Đã giao 1 cửa / Đã chốt đợt xuất (HANDOVER)
-    if (r.exportBatch || r.exportDate || r.status === RecordStatus.HANDOVER) {
-        return RecordStatus.HANDOVER;
-    }
-
-    // 2.3. Đã ký duyệt (SIGNED)
-    if (r.approvalDate || r.status === RecordStatus.SIGNED) {
-        return RecordStatus.SIGNED;
-    }
-
-    // 2.4. Trình ký duyệt (PENDING_SIGN)
-    if (r.submissionDate || r.status === RecordStatus.PENDING_SIGN) {
-        return RecordStatus.PENDING_SIGN;
-    }
-
-    // 2.5. Đã kiểm tra (CHECKED)
-    if (r.checkedDate || r.status === RecordStatus.CHECKED) {
-        return RecordStatus.CHECKED;
-    }
-
-    // 2.6. Trình kiểm tra (PENDING_CHECK)
-    if (r.pendingCheckDate || r.status === RecordStatus.PENDING_CHECK) {
-        return RecordStatus.PENDING_CHECK;
-    }
-
-    // 2.7. Chờ bổ sung (PENDING_SUPPLEMENT)
-    if (r.status === RecordStatus.PENDING_SUPPLEMENT) {
-        return RecordStatus.PENDING_SUPPLEMENT;
-    }
-
-    // 2.8. Đã hoàn thành công việc / đo đạc (COMPLETED_WORK)
-    if (r.completedWorkDate || r.status === RecordStatus.COMPLETED_WORK) {
-        if (isArchiveRecordType(r.recordType, r.code) || r.sourceTable === 'luutru_records' || isDoDacRecordType(r.recordType, r.code)) {
-            return RecordStatus.PENDING_CHECK;
-        }
-        return RecordStatus.COMPLETED_WORK;
-    }
-
-    // 2.9. Đang thực hiện / Đã giao việc (IN_PROGRESS / ASSIGNED)
-    if (r.assignedTo || r.assignedDate || r.status === RecordStatus.IN_PROGRESS || r.status === RecordStatus.ASSIGNED) {
-        return RecordStatus.IN_PROGRESS;
-    }
-
-    // 2.10. Mặc định tiếp nhận mới (RECEIVED)
-    return RecordStatus.RECEIVED;
-}
-
-export const getDisplayStatus = resolveRecordStatus;
 
 // --- CÁC HÀM CHECK LOGIC ---
 export const isRecordOverdue = (record: RecordFile): boolean => {
@@ -166,8 +97,7 @@ export const isRecordOverdue = (record: RecordFile): boolean => {
       RecordStatus.SIGNED
   ];
 
-  const currentStatus = resolveRecordStatus(record);
-  if (completedStatuses.includes(currentStatus)) return false;
+  if (completedStatuses.includes(record.status)) return false;
   
   // 2. [QUAN TRỌNG] Kiểm tra dữ liệu thực tế (Fix lỗi trạng thái chưa cập nhật)
   // Nếu đã có ngày xuất (đã giao 1 cửa) hoặc đã có ngày trả kết quả -> Coi như đã xong -> Không quá hạn
@@ -192,8 +122,7 @@ export const isRecordApproaching = (record: RecordFile): boolean => {
       RecordStatus.SIGNED
   ];
 
-  const currentStatus = resolveRecordStatus(record);
-  if (completedStatuses.includes(currentStatus)) return false;
+  if (completedStatuses.includes(record.status)) return false;
   
   // Kiểm tra dữ liệu thực tế: Nếu đã xong thì không báo sắp đến hạn
   if (record.exportDate || record.exportBatch || record.resultReturnedDate) {
@@ -212,72 +141,7 @@ export const isRecordApproaching = (record: RecordFile): boolean => {
   return diffDays >= 0 && diffDays <= 3;
 };
 
-export const isDangKyRecordOverdue = (record: DangKyRecord): boolean => {
-  const completedStatuses = [
-    'Đã giao 1 cửa',
-    'Đã trả kết quả',
-    'CSD rút HS',
-    'Trả hủy hồ sơ'
-  ];
-  if (record.status && completedStatuses.includes(record.status)) return false;
-  
-  if (record.exportBatch || record.resultReturnedDate || record.completedDate) {
-    return false;
-  }
-  
-  const deadline = parseSafeDate(record.deadline);
-  if (!deadline) return false;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  deadline.setHours(0, 0, 0, 0);
-  return deadline < today;
-};
-
-export const isDangKyRecordApproaching = (record: DangKyRecord): boolean => {
-  const completedStatuses = [
-    'Đã giao 1 cửa',
-    'Đã trả kết quả',
-    'CSD rút HS',
-    'Trả hủy hồ sơ'
-  ];
-  if (record.status && completedStatuses.includes(record.status)) return false;
-  if (record.exportBatch || record.resultReturnedDate || record.completedDate) {
-    return false;
-  }
-  if (isDangKyRecordOverdue(record)) return false;
-  
-  const deadline = parseSafeDate(record.deadline);
-  if (!deadline) return false;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  deadline.setHours(0, 0, 0, 0);
-  const diffTime = deadline.getTime() - today.getTime();
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  return diffDays >= 0 && diffDays <= 3;
-};
-
-export const getDangKyOverdueDays = (record: DangKyRecord): number => {
-  const deadline = parseSafeDate(record.deadline);
-  if (!deadline) return 0;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  deadline.setHours(0, 0, 0, 0);
-  const diffTime = today.getTime() - deadline.getTime();
-  return Math.max(1, Math.floor(diffTime / (1000 * 60 * 60 * 24)));
-};
-
-export const getDangKyRemainingDays = (record: DangKyRecord): number => {
-  const deadline = parseSafeDate(record.deadline);
-  if (!deadline) return 0;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  deadline.setHours(0, 0, 0, 0);
-  const diffTime = deadline.getTime() - today.getTime();
-  return Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
-};
-
 // Chuyển đổi Âm lịch sang Dương lịch (Cố định cho các ngày lễ chính 2024-2026)
-// Chuyển đổi Âm lịch sang Dương lịch (Cố định cho các ngày lễ chính 2024-2030)
 export const getSolarDateFromLunar = (lunarDay: number, lunarMonth: number, year: number): Date | null => {
     const lunarMapping: Record<number, Record<string, string>> = {
         2024: { 
@@ -291,35 +155,19 @@ export const getSolarDateFromLunar = (lunarDay: number, lunarMonth: number, year
         2026: { 
             "1/1": "2026-02-17", "2/1": "2026-02-18", "3/1": "2026-02-19", 
             "10/3": "2026-04-26"
-        },
-        2027: {
-            "1/1": "2027-02-06", "2/1": "2027-02-07", "3/1": "2027-02-08",
-            "10/3": "2027-04-16"
-        },
-        2028: {
-            "1/1": "2028-01-26", "2/1": "2028-01-27", "3/1": "2028-01-28",
-            "10/3": "2028-04-04"
-        },
-        2029: {
-            "1/1": "2029-02-13", "2/1": "2029-02-14", "3/1": "2029-02-15",
-            "10/3": "2029-04-22"
-        },
-        2030: {
-            "1/1": "2030-02-02", "2/1": "2030-02-03", "3/1": "2030-02-04",
-            "10/3": "2030-04-12"
         }
     };
 
     const key = `${lunarDay}/${lunarMonth}`;
     if (lunarMapping[year] && lunarMapping[year][key]) {
-        const parts = lunarMapping[year][key].split('-').map(Number);
-        return new Date(parts[0], parts[1] - 1, parts[2]);
+        return new Date(lunarMapping[year][key]);
     }
     return null;
 };
 
 // Định dạng ngày chuẩn YYYY-MM-DD theo giờ địa phương (tránh lệch múi giờ)
 export const formatDateKey = (date: Date): string => {
+    if (!date || isNaN(date.getTime())) return '';
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
@@ -327,76 +175,24 @@ export const formatDateKey = (date: Date): string => {
 };
 
 // Tính hạn trả (deadline) dựa trên loại hồ sơ, ngày nhận, danh sách ngày nghỉ lễ
-export const calculateDeadlineHelper = (type: string, receivedDateStr: string, holidays: any[], code?: string, procedureId?: string): string => {
+export const calculateDeadlineHelper = (type: string, receivedDateStr: string, holidays: any[]): string => {
     if (!receivedDateStr) return '';
     let daysToAdd = 30; 
-    
-    const targetProcId = procedureId || detectProcedureId(code, type);
-    const procDef = getProcedureById(targetProcId);
+    const lowerType = (type || '').toLowerCase();
 
-    if (procDef) {
-        daysToAdd = procDef.defaultDeadline;
-    } else {
-        const cleanType = (type || '').trim();
-        const lowerType = cleanType.toLowerCase();
-
-        // 1. Kiểm tra mã định danh 3.4.1 (Tách - hợp thửa đăng ký) -> 17 ngày chuẩn
-        if (lowerType.includes('3.4.1')) {
-            daysToAdd = 17;
-        }
-        // 2. Kiểm tra mã định danh 2.5 (Trích đo tách - hợp thửa đo đạc) -> 30 ngày chuẩn
-        else if (lowerType.includes('2.5') || lowerType.includes('trích đo tách')) {
-            daysToAdd = 30;
-        }
-        // 3. Khớp chính xác với DANG_KY_DEADLINE_MAP
-        else if (DANG_KY_DEADLINE_MAP[cleanType]) {
-            daysToAdd = DANG_KY_DEADLINE_MAP[cleanType];
-        }
-        // 4. Tra cứu cụ thể cho các loại hồ sơ Đăng ký (3.x.x)
-        else if (lowerType.includes('cấp đổi (có thuế)') || lowerType.includes('3.2.2')) {
-            daysToAdd = 15;
-        } else if (lowerType.includes('cấp lại (có thuế)') || lowerType.includes('3.3.2')) {
-            daysToAdd = 15;
-        } else if (lowerType.includes('3.1.1') || lowerType.includes('3.1.2') || lowerType.includes('3.1.3') ||
-                   lowerType.includes('chuyển nhượng') || lowerType.includes('tặng cho') || lowerType.includes('thừa kế') || lowerType.includes('thỏa thuận') || lowerType.includes('phân chia')) {
-            daysToAdd = 13;
-        } else if (lowerType.includes('cấp đổi') || lowerType.includes('3.2.1')) {
-            daysToAdd = 10;
-        } else if (lowerType.includes('cấp lại') || lowerType.includes('3.3.1')) {
-            daysToAdd = 10;
-        } else if (lowerType.includes('gia hạn') || lowerType.includes('3.5.1')) {
-            daysToAdd = 12;
-        } else if (lowerType.includes('chuyển mục đích') || lowerType.includes('3.6.1') || lowerType.includes('đính chính') || lowerType.includes('3.7.1') || lowerType.includes('3.7.2') || lowerType.includes('thay đổi thông tin')) {
-            daysToAdd = 7;
-        } else if (lowerType.includes('xóa thế chấp') || lowerType.includes('xóa đk gdbd') || lowerType.includes('xóa gdbd') || lowerType.includes('3.8.2')) {
-            daysToAdd = 1;
-        } else if (lowerType.includes('thế chấp') || lowerType.includes('giao dịch bảo đảm') || lowerType.includes('gdbd') || lowerType.includes('3.8.1')) {
-            daysToAdd = 3;
-        } else if (lowerType.includes('cấp mới') || lowerType.includes('cấp lần đầu') || lowerType.includes('cấp gcn lần đầu') || lowerType.includes('công nhận') || lowerType.includes('3.9.1')) {
-            daysToAdd = 30;
-        } else if (lowerType.includes('tách - hợp thửa') || lowerType.includes('tách thửa') || lowerType.includes('hợp thửa') || lowerType.includes('3.4.1') || lowerType.includes('3.4.2')) {
-            daysToAdd = 17;
-        }
-        // 5. Nhóm Đo đạc & Cung cấp số thửa
-        else if (lowerType.includes('2.3') || lowerType.includes('duyệt đơn & cung cấp số thửa') || lowerType.includes('dđ & cc số thửa') || lowerType.includes('dd & cc số thửa') || lowerType.includes('duyệt đơn-số thửa') || lowerType.includes('duyệt đơn') || lowerType.includes('cung cấp số thửa') || lowerType.includes('cập nhật số thửa') || lowerType.includes('cập nhập số thửa') || lowerType.includes('2.6')) {
-            daysToAdd = 12;
-        }
-        // 6. Nhóm Sao lục / Cung cấp thông tin / Lưu trữ / Quy hoạch
-        else if (lowerType.includes('1.1') || lowerType.includes('sao lục') || lowerType.includes('cung cấp tài liệu đất đai') || lowerType.includes('cung cấp dữ liệu') ||
-            lowerType.includes('2.1') || lowerType.includes('trích lục') || 
-            lowerType.includes('quy hoạch') || lowerType.includes('lưu trữ') || lowerType.includes('cung cấp thông tin')) {
-            daysToAdd = 10;
-        } 
-        // 7. Nhóm Trích đo chỉnh lý / Chỉnh lý bản đồ
-        else if (lowerType.includes('trích đo chỉnh lý') || lowerType.includes('chỉnh lý bản đồ')) {
-            daysToAdd = 15;
-        } 
-        // 8. Nhóm Trích đo / Đo đạc địa chính / Cắm mốc (bao gồm 2.5)
-        else if (lowerType.includes('2.2') || lowerType.includes('trích đo') || 
-                   lowerType.includes('2.4') || lowerType.includes('cắm mốc') || 
-                   lowerType.includes('2.5') || lowerType.includes('đo đạc')) {
-            daysToAdd = 30;
-        }
+    if (lowerType.includes('1.1') || lowerType.includes('cung cấp tài liệu đất đai') || lowerType.includes('cung cấp dữ liệu') ||
+        lowerType.includes('2.1') || lowerType.includes('trích lục') || 
+        lowerType.includes('quy hoạch')) {
+        daysToAdd = 10;
+    } else if (lowerType.includes('2.3') || lowerType.includes('duyệt đơn') || lowerType.includes('duyet don') || lowerType.includes('số thửa') || lowerType.includes('so thua') || lowerType.includes('cung cấp số thửa') || lowerType.includes('cập nhật số thửa') || lowerType.includes('cập nhập số thửa') || lowerType.includes('2.6')) {
+        daysToAdd = 12;
+    } else if (lowerType.includes('trích đo chỉnh lý') || lowerType.includes('chỉnh lý bản đồ')) {
+        daysToAdd = 15;
+    } else if (lowerType.includes('2.2') || lowerType.includes('trích đo') || 
+               lowerType.includes('2.4') || lowerType.includes('cắm mốc') || 
+               lowerType.includes('2.5') || lowerType.includes('tách') || lowerType.includes('hợp') ||
+               lowerType.includes('đo đạc') || lowerType.includes('tách thửa')) {
+        daysToAdd = 30;
     }
     
     // Áp dụng quy ước thời gian: nếu nhận sau 15h dời ngày trả qua sáng hôm sau (tức là cộng thêm 1 ngày làm việc)
@@ -417,44 +213,28 @@ export const calculateDeadlineHelper = (type: string, receivedDateStr: string, h
         daysToAdd += 1;
     }
 
-    // Phân tích ngày bắt đầu chuẩn theo local time tránh lệch timezone
-    const cleanDateStr = receivedDateStr.includes('T') ? receivedDateStr.split('T')[0] : receivedDateStr;
-    const dateParts = cleanDateStr.split('-');
-    let startDate: Date;
-    if (dateParts.length === 3) {
-        startDate = new Date(parseInt(dateParts[0], 10), parseInt(dateParts[1], 10) - 1, parseInt(dateParts[2], 10));
-    } else {
-        startDate = parseSafeDate(receivedDateStr) || new Date();
-    }
-
+    const startDate = new Date(receivedDateStr);
     let count = 0;
-    let currentDate = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+    let currentDate = new Date(startDate);
     
     // Tạo Set chứa chuỗi ngày nghỉ (YYYY-MM-DD) để tra cứu nhanh và chính xác
     const holidaySet = new Set<string>();
     const currentYear = startDate.getFullYear();
-    const yearsToCheck = [currentYear - 1, currentYear, currentYear + 1, currentYear + 2];
+    const yearsToCheck = [currentYear, currentYear + 1];
 
-    if (holidays && holidays.length > 0) {
-        holidays.forEach(h => {
-            if (h.date) {
-                holidaySet.add(h.date);
-            } else if (h.day !== undefined && h.month !== undefined) {
-                if (h.year) {
-                    const solarDate = new Date(h.year, h.month - 1, h.day);
-                    holidaySet.add(formatDateKey(solarDate));
+    const effectiveHolidays = (Array.isArray(holidays) && holidays.length > 0) ? holidays : DEFAULT_HOLIDAYS;
+
+    if (effectiveHolidays && effectiveHolidays.length > 0) {
+        effectiveHolidays.forEach(h => {
+            yearsToCheck.forEach(year => {
+                if (h.isLunar) {
+                    const solarDate = getSolarDateFromLunar(h.day, h.month, year);
+                    if (solarDate) holidaySet.add(formatDateKey(solarDate));
                 } else {
-                    yearsToCheck.forEach(year => {
-                        if (h.isLunar) {
-                            const solarDate = getSolarDateFromLunar(h.day, h.month, year);
-                            if (solarDate) holidaySet.add(formatDateKey(solarDate));
-                        } else {
-                            const solarDate = new Date(year, h.month - 1, h.day);
-                            holidaySet.add(formatDateKey(solarDate));
-                        }
-                    });
+                    const solarDate = new Date(year, h.month - 1, h.day);
+                    holidaySet.add(formatDateKey(solarDate));
                 }
-            }
+            });
         });
     }
 
@@ -650,33 +430,34 @@ export function processAssignmentTimelineCheck(
 // --- HÀM XỬ LÝ VÀ ĐỊNH DẠNG ĐỢT GIAO 1 CỬA ---
 
 export function getDepartmentForRecord(r: RecordFile): string {
-    const code = (r.code || '').trim();
-    const type = (r.recordType || '').trim();
-    const procId = detectProcedureId(code, type);
+    if (r.returnHandoverDept) {
+        const d = r.returnHandoverDept.toLowerCase();
+        if (d.includes('lưu trữ') || d.includes('thông tin')) return 'Tổ Lưu trữ';
+        if (d.includes('đo đạc') || d.includes('đo dạc')) return 'Tổ Đo đạc';
+        if (d.includes('cấp giấy') || d.includes('đăng ký')) return 'Tổ Cấp giấy';
+    }
+    const type = (r.recordType || '').toLowerCase();
+    const code = (r.code || '').toLowerCase();
 
-    if (code.startsWith('1.') || type.startsWith('1.') || procId.startsWith('1.')) {
+    if (type.includes('1.1') || type.includes('1.2') || type.includes('công văn') || type.includes('sao lục') || code.startsWith('1.')) {
         return 'Tổ Lưu trữ';
     }
-    if (code.startsWith('2.') || type.startsWith('2.') || procId.startsWith('2.')) {
+    if (type.includes('2.3') || type.includes('2.4') || type.includes('2.5') || type.includes('2.6') || type.includes('số thửa') || type.includes('trích đo') || type.includes('đo đạc') || code.startsWith('2.')) {
         return 'Tổ Đo đạc';
     }
-    if (code.startsWith('3.') || type.startsWith('3.') || procId.startsWith('3.')) {
+    if (type.includes('2.1') || type.includes('2.2') || type.includes('trích lục')) {
         return 'Tổ Cấp giấy';
     }
-
-    if (r.returnHandoverDept) {
-        return r.returnHandoverDept;
-    }
-
     return 'Tổ Đo đạc';
 }
 
 export function getDeptAbbr(deptName: string): string {
-    if (!deptName) return 'DD';
+    if (!deptName) return 'CG';
     const d = deptName.toLowerCase();
     if (d.includes('lưu trữ') || d.includes('thông tin') || d === 'lt') return 'LT';
-    if (d.includes('đo đạc') || d.includes('đo dạc') || d.includes('kỹ thuật') || d.includes('cấp giấy') || d.includes('đăng ký') || d === 'dd' || d === 'cg') return 'DD';
-    return 'DD';
+    if (d.includes('đo đạc') || d.includes('đo dạc') || d.includes('kỹ thuật') || d === 'dd') return 'DD';
+    if (d.includes('cấp giấy') || d.includes('đăng ký') || d === 'cg') return 'CG';
+    return deptName;
 }
 
 export function formatDateDDMMYYYY(d?: string | null): string {
@@ -693,18 +474,7 @@ export function formatDateDDMMYYYY(d?: string | null): string {
 }
 
 export function formatDateDDMMYY(d?: string | null): string {
-    if (!d) {
-        const today = new Date();
-        const yy = String(today.getFullYear()).slice(-2);
-        return `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${yy}`;
-    }
-    const clean = d.split('T')[0];
-    const parts = clean.split('-');
-    if (parts.length === 3) {
-        const yy = parts[0].length === 4 ? parts[0].slice(-2) : parts[0];
-        return `${parts[2]}/${parts[1]}/${yy}`;
-    }
-    return d;
+    return formatDateDDMMYYYY(d);
 }
 
 export function getPureBatchNumber(batch: number | string | null | undefined): string {
@@ -718,99 +488,79 @@ export function getPureBatchNumber(batch: number | string | null | undefined): s
     return bStr;
 }
 
-export function extractDateFromBatch(batch: number | string | null | undefined): string | null {
-    if (!batch) return null;
-    const bStr = String(batch);
-    const match = bStr.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
-    if (match) {
-        const day = match[1].padStart(2, '0');
-        const month = match[2].padStart(2, '0');
-        const year = match[3];
-        return `${year}-${month}-${day}`;
-    }
-    return null;
-}
-
 export function formatBatchName(batch: number | string | null | undefined, _deptName?: string, dateStr?: string | null): string {
     if (!batch && batch !== 0) return '';
     let bStr = String(batch).trim();
     if (!bStr) return '';
 
-    // 1. Loại bỏ các mã tổ chuyên môn cũ nếu có (-CG-, -LT-, -DD-, -Tổ Cấp giấy-)
+    // Loại bỏ các mã tổ chuyên môn cũ nếu có (-CG-, -LT-, -DD-, -Tổ Cấp giấy-)
     bStr = bStr.replace(/-(CG|LT|DD|Tổ\s*[^-\s]+)-/gi, '-');
 
-    // 2. Trích xuất số đợt
-    let batchNum: string = '';
-    const numMatch = bStr.match(/Đợt\s*0*(\d+)/i) || bStr.match(/^(\d+)$/);
-    if (numMatch && numMatch[1]) {
-        batchNum = numMatch[1];
-    } else {
-        const fallbackMatch = bStr.match(/(\d+)/);
-        if (fallbackMatch) {
-            batchNum = fallbackMatch[1];
-        }
-    }
-
-    // 3. Trích xuất ngày
     let dateFormatted = formatDateDDMMYYYY(dateStr);
-    const dateInBatchMatch = bStr.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+    const dateInBatchMatch = bStr.match(/(\d{1,2}\/\d{1,2}\/\d{2,4})/);
     if (dateInBatchMatch) {
-        let day = dateInBatchMatch[1].padStart(2, '0');
-        let month = dateInBatchMatch[2].padStart(2, '0');
-        let year = dateInBatchMatch[3];
-        if (year.length === 2) year = '20' + year;
-        dateFormatted = `${day}/${month}/${year}`;
+        let matchedDate = dateInBatchMatch[1];
+        const parts = matchedDate.split('/');
+        if (parts.length === 3) {
+            if (parts[2].length === 2) parts[2] = '20' + parts[2];
+            matchedDate = `${parts[0].padStart(2, '0')}/${parts[1].padStart(2, '0')}/${parts[2]}`;
+        }
+        dateFormatted = matchedDate;
     }
 
-    // 4. Trả về định dạng duy nhất, sạch sẽ
-    if (batchNum) {
-        const num = parseInt(batchNum, 10);
+    const match = bStr.match(/Đợt\s*0*(\d+)/i) || bStr.match(/^(\d+)$/);
+    if (match && match[1]) {
+        const num = parseInt(match[1], 10);
         return dateFormatted ? `Đợt ${num} - Ngày ${dateFormatted}` : `Đợt ${num}`;
     }
 
-    let cleanStr = bStr;
-    cleanStr = cleanStr.split(/\s*-\s*Ngày/i)[0];
-    cleanStr = cleanStr.split(/\s*-\s*Ngày/)[0];
-    
-    return dateFormatted ? `${cleanStr} - Ngày ${dateFormatted}` : cleanStr;
+    if (bStr.startsWith('Đợt')) {
+        if (!bStr.includes('Ngày') && dateFormatted) {
+            const cleanStr = bStr.replace(/Đợt\s*0*(\d+).*/i, 'Đợt $1');
+            return `${cleanStr} - Ngày ${dateFormatted}`;
+        }
+        return bStr;
+    }
+
+    const num = isNaN(Number(bStr)) ? bStr : parseInt(bStr, 10);
+    return `Đợt ${num}${dateFormatted ? ` - Ngày ${dateFormatted}` : ''}`;
 }
 
 export function getBatchDisplayParts(batch: number | string | null | undefined, dateStr?: string | null): { batchName: string; dateName: string } {
     if (!batch && batch !== 0) return { batchName: '', dateName: '' };
-    const bStr = String(batch).trim();
+    let bStr = String(batch).trim();
     if (!bStr) return { batchName: '', dateName: '' };
 
-    const formatted = formatBatchName(bStr, '', dateStr);
-    const parts = formatted.split(/\s*-\s*Ngày\s*/i);
-    
+    // Loại bỏ mã tổ chuyên môn cũ nếu có
+    bStr = bStr.replace(/-(CG|LT|DD|Tổ\s*[^-\s]+)-/gi, '-');
+
+    let dateFormatted = formatDateDDMMYYYY(dateStr);
+    const dateInBatchMatch = bStr.match(/(\d{1,2}\/\d{1,2}\/\d{2,4})/);
+    if (dateInBatchMatch) {
+        let matchedDate = dateInBatchMatch[1];
+        const parts = matchedDate.split('/');
+        if (parts.length === 3) {
+            if (parts[2].length === 2) parts[2] = '20' + parts[2];
+            matchedDate = `${parts[0].padStart(2, '0')}/${parts[1].padStart(2, '0')}/${parts[2]}`;
+        }
+        dateFormatted = matchedDate;
+    }
+
+    const match = bStr.match(/Đợt\s*0*(\d+)/i) || bStr.match(/^(\d+)$/);
+    let batchName = '';
+    if (match && match[1]) {
+        batchName = `Đợt ${parseInt(match[1], 10)}`;
+    } else if (bStr.startsWith('Đợt')) {
+        batchName = bStr.split('-')[0].replace(/Ngày.*/i, '').trim();
+    } else {
+        const num = isNaN(Number(bStr)) ? bStr : parseInt(bStr, 10);
+        batchName = `Đợt ${num}`;
+    }
+
     return {
-        batchName: parts[0] || 'Đợt lẻ',
-        dateName: parts[1] ? `Ngày ${parts[1]}` : ''
+        batchName,
+        dateName: dateFormatted ? `Ngày ${dateFormatted}` : ''
     };
-}
-
-export function extractBatchOnly(batch: number | string | null | undefined): string {
-    if (!batch && batch !== 0) return '';
-    const bStr = String(batch).trim();
-    if (!bStr) return '';
-    
-    const numMatch = bStr.match(/Đợt\s*0*(\d+)/i) || bStr.match(/^(\d+)$/);
-    if (numMatch && numMatch[1]) {
-        return `${parseInt(numMatch[1], 10)}`;
-    }
-    const cleanStr = bStr.split(/\s*-\s*Ngày/i)[0].replace(/^Đợt\s*/i, '').trim();
-    return cleanStr;
-}
-
-export function extractBatchNumber(batch: number | string | null | undefined): number | string {
-    if (!batch && batch !== 0) return '';
-    const bStr = String(batch).trim();
-    if (!bStr) return '';
-    const numMatch = bStr.match(/Đợt\s*0*(\d+)/i) || bStr.match(/^(\d+)$/);
-    if (numMatch && numMatch[1]) {
-        return parseInt(numMatch[1], 10);
-    }
-    return bStr.split(/\s*-\s*Ngày/i)[0].replace(/^Đợt\s*/i, '').trim();
 }
 
 /**
@@ -846,93 +596,52 @@ export function migrateUnbatchedRecords(records: RecordFile[]): { migratedRecord
         }
     });
 
-    const getFallbackBatchName = (rawDate: string) => {
+    const getFallbackBatchNum = (rawDate: string) => {
         const dateKey = String(rawDate).split('T')[0];
-        const dateFmt = formatDateDDMMYYYY(rawDate);
         if (existingBatchesByDate[dateKey]) {
-            return formatBatchName(existingBatchesByDate[dateKey], '', dateKey);
+            return getPureBatchNumber(existingBatchesByDate[dateKey]) || '1';
         }
         const maxNum = existingMaxBatchNumByDate[dateKey] || 1;
-        return `Đợt ${maxNum} - Ngày ${dateFmt}`;
+        return String(maxNum);
     };
 
     const migratedRecords = records.map(r => {
         let currentBatch = r.exportBatch;
-        let item = { ...r };
 
-        // Tự động kiểm tra và chuẩn hóa trạng thái chuẩn theo mốc thời gian thực tế
-        const resolvedStatus = resolveRecordStatus(item);
-        if (item.status !== resolvedStatus) {
-            item.status = resolvedStatus;
-            hasChanges = true;
-        }
-
-        // Tự động làm sạch các tên đợt cũ bị lặp chữ "Đợt"
-        if (typeof currentBatch === 'string' && /^Đợt\s+Đợt/i.test(currentBatch)) {
-            currentBatch = currentBatch.replace(/^Đợt\s+/i, '');
-            hasChanges = true;
-        }
-
-        // Tự động làm sạch các mã tổ chuyên môn thừa trong tên đợt (vd: Đợt 01-CG-30/07/2026 -> Đợt 1 - Ngày 30/07/2026)
-        if (typeof currentBatch === 'string' && /-(CG|LT|DD|Tổ\s*[^-\s]+)-/i.test(currentBatch)) {
-            currentBatch = currentBatch.replace(/-(CG|LT|DD|Tổ\s*[^-\s]+)-/gi, '-');
-            hasChanges = true;
-        }
-
-        // Tự động đổi tên "Đợt Cuối" / "Đợt cuối" thành đợt số lớn nhất trong ngày
-        if (typeof currentBatch === 'string' && /cuối/i.test(currentBatch)) {
-            hasChanges = true;
-            const rawDate = item.exportDate || item.completedDate || item.receivedDate || new Date().toISOString();
-            currentBatch = getFallbackBatchName(rawDate);
-        }
-
-        // Chuẩn hóa tên đợt sang dạng "Đợt X - Ngày DD/MM/YYYY"
+        // Chuẩn hóa tên đợt xuất chỉ lưu duy nhất số đợt
         if (currentBatch && currentBatch !== 'NOT_BATCHED') {
-            const rawDate = item.exportDate || item.completedDate || item.receivedDate;
-            const formatted = formatBatchName(currentBatch, '', rawDate);
-            if (formatted && formatted !== currentBatch) {
-                currentBatch = formatted;
+            const pureNum = getPureBatchNumber(currentBatch);
+            if (pureNum && pureNum !== String(currentBatch)) {
+                currentBatch = pureNum;
                 hasChanges = true;
             }
         }
 
-        const isHandedOver = item.status === RecordStatus.HANDOVER || item.status === RecordStatus.RETURNED || Boolean((item as any).is_handover);
+        const isHandedOver = r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED || Boolean((r as any).is_handover);
         const missingBatch = !currentBatch || String(currentBatch).trim() === '' || currentBatch === 'NOT_BATCHED';
 
         if (isHandedOver && missingBatch) {
             hasChanges = true;
-            const rawDate = item.exportDate || item.completedDate || item.receivedDate || new Date().toISOString();
-            const defaultBatchName = getFallbackBatchName(rawDate);
+            const rawDate = r.exportDate || r.completedDate || r.receivedDate || new Date().toISOString();
+            const defaultBatchNum = getFallbackBatchNum(rawDate);
 
             return {
-                ...item,
-                exportBatch: defaultBatchName,
-                exportDate: item.exportDate || rawDate,
-                completedDate: item.completedDate || rawDate,
-                status: item.status === RecordStatus.HANDOVER || item.status === RecordStatus.RETURNED ? item.status : RecordStatus.HANDOVER
+                ...r,
+                exportBatch: defaultBatchNum,
+                exportDate: r.exportDate || rawDate,
+                completedDate: r.completedDate || rawDate,
+                status: r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED ? r.status : RecordStatus.HANDOVER
             };
         }
 
-        // Tự động chuẩn hóa đợt số cũ (ví dụ: exportBatch = 1) thành chuỗi tên đợt chuẩn
-        if (currentBatch && typeof currentBatch === 'number') {
-            hasChanges = true;
-            const rawDate = item.exportDate || item.completedDate || item.receivedDate || new Date().toISOString();
-            const dateFmt = formatDateDDMMYYYY(rawDate);
-            const numStr = String(currentBatch).padStart(2, '0');
+        if (currentBatch !== r.exportBatch) {
             return {
-                ...item,
-                exportBatch: `Đợt ${numStr}-${dateFmt}`
-            };
-        }
-
-        if (currentBatch !== item.exportBatch) {
-            return {
-                ...item,
+                ...r,
                 exportBatch: currentBatch
             };
         }
 
-        return item;
+        return r;
     });
 
     return { migratedRecords, hasChanges };
@@ -1101,35 +810,251 @@ export function calculateEmployeeWorkload(
     return { inProgressPlots, completedPlots };
 }
 
-export const formatStaffInfoHelper = (staffNameOrId?: string | null, employees: Employee[] = [], users: any[] = []): string | null => {
-  if (!staffNameOrId) return null;
-  const val = String(staffNameOrId).trim();
-  
-  const emp = employees.find(e => 
-    e.id === val || 
-    e.name?.toLowerCase() === val.toLowerCase() || 
-    (e as any).fullName?.toLowerCase() === val.toLowerCase()
-  );
-  if (emp) {
-    const pos = emp.position || '';
-    return pos ? `${emp.name} (${pos})` : emp.name;
-  }
+// Kiểm tra thủ tục 2.3 (Duyệt Đơn & Cung cấp số thửa) - Miễn thu phí
+export function isProcedure2_3(recordType: string | null | undefined): boolean {
+    if (!recordType) return false;
+    const lower = recordType.toLowerCase().trim();
+    return lower.startsWith('2.3') || 
+           lower.startsWith('2.6') || 
+           lower.includes('duyệt đơn') || 
+           lower.includes('duyet don') || 
+           lower.includes('số thửa') || 
+           lower.includes('so thua') || 
+           lower.includes('cung cấp số thửa') || 
+           lower.includes('cập nhật số thửa') || 
+           lower.includes('cập nhập số thửa') ||
+           lower === '2.3';
+}
 
-  const user = users.find(u => 
-    u.employeeId === val || 
-    u.username?.toLowerCase() === val.toLowerCase() || 
-    u.name?.toLowerCase() === val.toLowerCase() || 
-    u.fullName?.toLowerCase() === val.toLowerCase()
-  );
-  if (user) {
-    const matchedEmp = employees.find(e => e.id === user.employeeId || e.name === user.name);
-    const name = user.fullName || user.name || user.username;
-    const pos = matchedEmp?.position || user.role || '';
-    return pos ? `${name} (${pos})` : name;
-  }
+export interface StatusTransitionOptions {
+    targetDate?: string;
+    reason?: string;
+    userName?: string;
+    userId?: string;
+    assignedTo?: string | null;
+    checkedBy?: string | null;
+    submittedTo?: string | null;
+    receivedBy?: string | null;
+    customDates?: {
+        receivedDate?: string | null;
+        assignedDate?: string | null;
+        completedWorkDate?: string | null;
+        pendingCheckDate?: string | null;
+        checkedDate?: string | null;
+        submissionDate?: string | null;
+        approvalDate?: string | null;
+        completedDate?: string | null;
+        exportDate?: string | null;
+        resultReturnedDate?: string | null;
+    };
+    exportBatch?: number | string | null;
+    exportDate?: string | null;
+    handoverWard?: string | null;
+    resultReturnedDate?: string | null;
+    receiverName?: string | null;
+    receiptNumber?: string | null;
+    returnedPrice?: number | null;
+}
 
-  return val;
+const STATUS_RANK: Record<string, number> = {
+    [RecordStatus.RECEIVED]: 0,
+    [RecordStatus.ASSIGNED]: 1,
+    [RecordStatus.IN_PROGRESS]: 1,
+    [RecordStatus.COMPLETED_WORK]: 2,
+    [RecordStatus.PENDING_CHECK]: 3,
+    [RecordStatus.CHECKED]: 4,
+    [RecordStatus.PENDING_SIGN]: 5,
+    [RecordStatus.SIGNED]: 6,
+    [RecordStatus.HANDOVER]: 7,
+    [RecordStatus.RETURNED]: 8,
+    [RecordStatus.WITHDRAWN]: 99,
+    [RecordStatus.REJECTED]: 99,
+    [RecordStatus.PENDING_SUPPLEMENT]: 1.5
 };
+
+/**
+ * Hàm đồng bộ trạng thái trung tâm: Đảm bảo khi một hồ sơ thay đổi trạng thái tại bất kỳ module nào,
+ * tất cả các trường ngày tháng, người thực hiện, nhật ký statusLogs và tiến độ hiển thị đều được dọn dẹp sạch sẽ
+ * và đồng bộ nhất quán ngay lập tức.
+ */
+export function syncRecordStatusTransition(
+    currentRecord: Partial<RecordFile>,
+    newStatus: RecordStatus,
+    options?: StatusTransitionOptions
+): Partial<RecordFile> {
+    const prevStatus = currentRecord.status;
+    const targetDate = options?.targetDate || new Date().toISOString();
+    const updates: Partial<RecordFile> = { status: newStatus };
+
+    // Cập nhật người thực hiện nếu có truyền vào
+    if (options?.assignedTo) updates.assignedTo = options.assignedTo;
+    if (options?.checkedBy) updates.checkedBy = options.checkedBy;
+    if (options?.submittedTo) updates.submittedTo = options.submittedTo;
+    if (options?.receivedBy) updates.receivedBy = options.receivedBy;
+    if (options?.handoverWard) updates.handoverWard = options.handoverWard;
+
+    const newRank = STATUS_RANK[newStatus] ?? 0;
+
+    if (newStatus === RecordStatus.WITHDRAWN || newStatus === RecordStatus.REJECTED) {
+        updates.completedDate = options?.customDates?.completedDate || currentRecord.completedDate || targetDate;
+        updates.resultReturnedDate = undefined;
+        updates.receiverName = undefined;
+    } else {
+        // DỌN DẸP NẾU QUAY LÙI BƯỚC (Xóa sạch các mốc ngày/thao tác của bước tương lai)
+        if (newRank < 1) {
+            updates.assignedDate = undefined;
+            updates.completedWorkDate = undefined;
+            updates.pendingCheckDate = undefined;
+            updates.checkedDate = undefined;
+            updates.submissionDate = undefined;
+            updates.approvalDate = undefined;
+            updates.completedDate = undefined;
+            updates.exportDate = undefined;
+            updates.exportBatch = undefined;
+            updates.is_handover = false;
+            updates.handover_date = undefined;
+            updates.resultReturnedDate = undefined;
+            updates.receiverName = undefined;
+        } else if (newRank < 2) {
+            updates.completedWorkDate = undefined;
+            updates.pendingCheckDate = undefined;
+            updates.checkedDate = undefined;
+            updates.submissionDate = undefined;
+            updates.approvalDate = undefined;
+            updates.completedDate = undefined;
+            updates.exportDate = undefined;
+            updates.exportBatch = undefined;
+            updates.is_handover = false;
+            updates.handover_date = undefined;
+            updates.resultReturnedDate = undefined;
+            updates.receiverName = undefined;
+        } else if (newRank < 3) {
+            updates.pendingCheckDate = undefined;
+            updates.checkedDate = undefined;
+            updates.submissionDate = undefined;
+            updates.approvalDate = undefined;
+            updates.completedDate = undefined;
+            updates.exportDate = undefined;
+            updates.exportBatch = undefined;
+            updates.is_handover = false;
+            updates.handover_date = undefined;
+            updates.resultReturnedDate = undefined;
+            updates.receiverName = undefined;
+        } else if (newRank < 4) {
+            updates.checkedDate = undefined;
+            updates.submissionDate = undefined;
+            updates.approvalDate = undefined;
+            updates.completedDate = undefined;
+            updates.exportDate = undefined;
+            updates.exportBatch = undefined;
+            updates.is_handover = false;
+            updates.handover_date = undefined;
+            updates.resultReturnedDate = undefined;
+            updates.receiverName = undefined;
+        } else if (newRank < 5) {
+            updates.submissionDate = undefined;
+            updates.approvalDate = undefined;
+            updates.completedDate = undefined;
+            updates.exportDate = undefined;
+            updates.exportBatch = undefined;
+            updates.is_handover = false;
+            updates.handover_date = undefined;
+            updates.resultReturnedDate = undefined;
+            updates.receiverName = undefined;
+        } else if (newRank < 6) {
+            updates.approvalDate = undefined;
+            updates.completedDate = undefined;
+            updates.exportDate = undefined;
+            updates.exportBatch = undefined;
+            updates.is_handover = false;
+            updates.handover_date = undefined;
+            updates.resultReturnedDate = undefined;
+            updates.receiverName = undefined;
+        } else if (newRank < 7) {
+            updates.completedDate = undefined;
+            updates.exportDate = undefined;
+            updates.exportBatch = undefined;
+            updates.is_handover = false;
+            updates.handover_date = undefined;
+            updates.resultReturnedDate = undefined;
+            updates.receiverName = undefined;
+        } else if (newRank < 8) {
+            updates.resultReturnedDate = undefined;
+            updates.receiverName = undefined;
+        }
+
+        // TỰ ĐỘNG BÙ NGÀY HOẶC SET NGÀY THEO BƯỚC HIỆN TẠI NẾU TIẾN TỚI
+        if (newRank >= 1 && !updates.assignedDate && !currentRecord.assignedDate) {
+            updates.assignedDate = options?.customDates?.assignedDate || targetDate;
+        } else if (options?.customDates?.assignedDate) {
+            updates.assignedDate = options.customDates.assignedDate;
+        }
+
+        if (newRank >= 2 && !updates.completedWorkDate && !currentRecord.completedWorkDate) {
+            updates.completedWorkDate = options?.customDates?.completedWorkDate || targetDate;
+        } else if (options?.customDates?.completedWorkDate) {
+            updates.completedWorkDate = options.customDates.completedWorkDate;
+        }
+
+        if (newRank >= 3 && !updates.pendingCheckDate && !currentRecord.pendingCheckDate) {
+            updates.pendingCheckDate = options?.customDates?.pendingCheckDate || targetDate;
+        } else if (options?.customDates?.pendingCheckDate) {
+            updates.pendingCheckDate = options.customDates.pendingCheckDate;
+        }
+
+        if (newRank >= 4 && !updates.checkedDate && !currentRecord.checkedDate) {
+            updates.checkedDate = options?.customDates?.checkedDate || targetDate;
+        } else if (options?.customDates?.checkedDate) {
+            updates.checkedDate = options.customDates.checkedDate;
+        }
+
+        if (newRank >= 5 && !updates.submissionDate && !currentRecord.submissionDate) {
+            updates.submissionDate = options?.customDates?.submissionDate || targetDate;
+        } else if (options?.customDates?.submissionDate) {
+            updates.submissionDate = options.customDates.submissionDate;
+        }
+
+        if (newRank >= 6 && !updates.approvalDate && !currentRecord.approvalDate) {
+            updates.approvalDate = options?.customDates?.approvalDate || targetDate;
+        } else if (options?.customDates?.approvalDate) {
+            updates.approvalDate = options.customDates.approvalDate;
+        }
+
+        if (newRank >= 7) {
+            updates.completedDate = options?.customDates?.completedDate || currentRecord.completedDate || targetDate;
+            updates.exportDate = options?.exportDate || options?.customDates?.exportDate || currentRecord.exportDate || targetDate;
+            if (options?.exportBatch !== undefined) updates.exportBatch = options.exportBatch;
+            updates.is_handover = true;
+            updates.handover_date = updates.exportDate;
+        }
+
+        if (newRank >= 8) {
+            updates.resultReturnedDate = options?.resultReturnedDate || options?.customDates?.resultReturnedDate || currentRecord.resultReturnedDate || targetDate;
+            if (!updates.completedDate) updates.completedDate = updates.resultReturnedDate;
+            if (options?.receiverName) updates.receiverName = options.receiverName;
+            if (options?.receiptNumber) updates.receiptNumber = options.receiptNumber;
+            if (options?.returnedPrice !== undefined) updates.returnedPrice = options.returnedPrice;
+        }
+    }
+
+    // Ghi nhật ký statusLogs
+    if (prevStatus !== newStatus) {
+        const existingLogs = Array.isArray(currentRecord.statusLogs) ? [...currentRecord.statusLogs] : [];
+        const newLog = {
+            id: 'LOG_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+            recordId: currentRecord.id || '',
+            previousStatus: prevStatus || null,
+            newStatus: newStatus,
+            changedAt: targetDate,
+            changedBy: options?.userName || 'Hệ thống',
+            userId: options?.userId,
+            reason: options?.reason || 'Cập nhật trạng thái'
+        };
+        updates.statusLogs = [...existingLogs, newLog];
+    }
+
+    return updates;
+}
 
 
 

@@ -63,15 +63,51 @@ export const fetchContracts = async (): Promise<Contract[]> => {
     
     try {
         let cloudContracts: Contract[] = [];
-        const { data, error } = await supabase.from('contracts').select('*').order('createdDate', { ascending: false });
+        const step = 1000;
+        let { data: firstData, count, error } = await supabase
+            .from('contracts')
+            .select('*', { count: 'exact' })
+            .order('createdDate', { ascending: false })
+            .range(0, step - 1);
+
+        let orderCol = 'createdDate';
         if (error) {
             // Thử lại nếu bảng contracts sử dụng cột created_date theo chuẩn snake_case
-            const { data: dataSnake, error: errSnake } = await supabase.from('contracts').select('*').order('created_date', { ascending: false });
-            if (!errSnake && dataSnake) {
-                cloudContracts = dataSnake.map(mapContractFromDb);
+            const resSnake = await supabase
+                .from('contracts')
+                .select('*', { count: 'exact' })
+                .order('created_date', { ascending: false })
+                .range(0, step - 1);
+            if (!resSnake.error && resSnake.data) {
+                firstData = resSnake.data;
+                count = resSnake.count;
+                orderCol = 'created_date';
             }
-        } else if (data) {
-            cloudContracts = data.map(mapContractFromDb);
+        }
+
+        if (firstData && firstData.length > 0) {
+            let allContractRows = [...firstData];
+            if (count && count > step) {
+                const promises = [];
+                for (let from = step; from < count; from += step) {
+                    const to = Math.min(from + step - 1, count - 1);
+                    promises.push((async () => {
+                        try {
+                            const { data } = await supabase
+                                .from('contracts')
+                                .select('*')
+                                .order(orderCol, { ascending: false })
+                                .range(from, to);
+                            return data || [];
+                        } catch (err: any) {
+                            return [];
+                        }
+                    })());
+                }
+                const remaining = await Promise.all(promises);
+                allContractRows = [firstData, ...remaining].flat();
+            }
+            cloudContracts = allContractRows.map(mapContractFromDb);
         }
 
         if (cloudContracts.length > 0) {
@@ -86,7 +122,7 @@ export const fetchContracts = async (): Promise<Contract[]> => {
             return merged;
         }
     } catch (error) {
-        logError("fetchContracts", error, true);
+        logError("fetchContracts", error);
     }
 
     return localContracts;
@@ -203,7 +239,7 @@ export const fetchPriceList = async (): Promise<PriceItem[]> => {
         if (error) throw error;
         return (data || []).map(mapPriceFromDb);
     } catch (error) {
-        logError("fetchPriceList", error, true);
+        logError("fetchPriceList", error);
         return [];
     }
 };

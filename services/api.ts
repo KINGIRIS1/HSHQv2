@@ -8,5 +8,3 @@ export * from './apiContracts';
 export * from './apiExcerpts';
 export * from './apiWorkSchedule';
 export * from './apiArchive';
-export * from './networkMonitor';
-export * from './indexedDbService';

@@ -1,21 +1,19 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { RecordFile, RecordStatus, Employee, User, UserRole, Message, RecordStatusLog } from './types';
-import { DEFAULT_WARDS as STATIC_WARDS, isArchiveRecordType, STATUS_LABELS, APP_VERSION, getNormalizedWard, getCanonicalRecordType } from './constants';
-import { isUserAdminOrSubadmin, isUserTeamLeader, isUserOneDoor, isUserEmployee, canUserPerformGeneralAction } from './constants/permissions';
+import { DEFAULT_WARDS as STATIC_WARDS, isArchiveRecordType, STATUS_LABELS, APP_VERSION } from './constants';
 import Login from './components/Login'; 
 import MainLayout from './components/layout/MainLayout';
 import AppRoutes from './components/AppRoutes';
 import AppModals from './components/AppModals';
 
-import { DEFAULT_VISIBLE_COLUMNS, confirmAction, COLUMN_DEFS, processAssignmentTimelineCheck } from './utils/appHelpers';
+import { DEFAULT_VISIBLE_COLUMNS, confirmAction, COLUMN_DEFS, processAssignmentTimelineCheck, isProcedure2_3, syncRecordStatusTransition, getDepartmentForRecord, getPureBatchNumber } from './utils/appHelpers';
 import { exportReportToExcel, exportReturnedListToExcel } from './utils/excelExport';
 import { generateReport } from './services/geminiService';
-import { syncTemplatesFromCloud, generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from './services/docxService'; 
-import { updateRecordApi, saveEmployeeApi, saveUserApi, forceUpdateRecordsBatchApi, updateRecordsBatchById, migrateMisplacedDangKyRecords } from './services/api';
+import { syncTemplatesFromCloud } from './services/docxService'; 
+import { updateRecordApi, saveEmployeeApi, saveUserApi, forceUpdateRecordsBatchApi, updateRecordsBatchById, logSystemEvent } from './services/api';
 import { migrateArchiveRecordsFromLandRecords } from './services/apiArchive';
 import { ReturnOptionType } from './components/RejectReturnStepModal';
-import { addActivityLog } from './services/activityLogService';
 import * as XLSX from 'xlsx-js-style';
 import { CheckCircle, AlertTriangle } from 'lucide-react';
 
@@ -30,13 +28,28 @@ import UpdateRequiredModal from './components/UpdateRequiredModal';
 import SubmitModal from './components/receive-record/SubmitModal';
 import GlobalConfirmModal from './components/GlobalConfirmModal';
 import GlobalAlertModal from './components/GlobalAlertModal';
-import NetworkOfflineModal from './components/NetworkOfflineModal';
 import { checkAndTriggerWeeklyBackup, downloadBackupAsFile } from './services/backupService';
 import CloudDatabaseInspector from './components/CloudDatabaseInspector';
+import ConnectionGuardOverlay from './components/ConnectionGuardOverlay';
 
 function App() {
   const isMobile = useIsMobile(768);
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+    try {
+      const saved = localStorage.getItem('current_user_session');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  useEffect(() => {
+    if (currentUser) {
+      localStorage.setItem('current_user_session', JSON.stringify(currentUser));
+    } else {
+      localStorage.removeItem('current_user_session');
+    }
+  }, [currentUser]);
   const [backupNotification, setBackupNotification] = useState<{ show: boolean, filePath?: string, backupData?: any } | null>(null);
   const [isCloudDatabaseInspectorOpen, setIsCloudDatabaseInspectorOpen] = useState(false);
 
@@ -120,10 +133,6 @@ function App() {
   const [rejectReturnTargetRecords, setRejectReturnTargetRecords] = useState<RecordFile[]>([]);
   const [isExtendModalOpen, setIsExtendModalOpen] = useState(false);
   const [extendTargetRecords, setExtendTargetRecords] = useState<RecordFile[]>([]);
-  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-  const [previewBlob, setPreviewBlob] = useState<Blob | null>(null);
-  const [previewFileName, setPreviewFileName] = useState('');
-  const [systemReceiptData, setSystemReceiptData] = useState<RecordFile | null>(null);
 
   // Report States
   const [globalReportContent, setGlobalReportContent] = useState('');
@@ -161,33 +170,10 @@ function App() {
   // Sync Templates
   useEffect(() => { syncTemplatesFromCloud(); }, []);
 
-  // Run background migration for archive records & misplaced dangky records (Non-blocking)
+  // Run migration for archive records from land_records to archive_records
   useEffect(() => {
-      if (!currentUser) return;
-
-      const todayStr = new Date().toISOString().slice(0, 10);
-      const lockKey = `bg_migration_v2_${todayStr}`;
-      
-      if (sessionStorage.getItem(lockKey)) {
-          return; // Already executed today in this session, skip
-      }
-
-      const runBgTasks = () => {
-          sessionStorage.setItem(lockKey, 'true');
-          Promise.all([
-              migrateArchiveRecordsFromLandRecords(),
-              migrateMisplacedDangKyRecords()
-          ]).catch(err => {
-              console.warn("Background migration warning:", err);
-          });
-      };
-
-      if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
-          const idleId = (window as any).requestIdleCallback(runBgTasks, { timeout: 5000 });
-          return () => (window as any).cancelIdleCallback(idleId);
-      } else {
-          const timerId = setTimeout(runBgTasks, 3000);
-          return () => clearTimeout(timerId);
+      if (currentUser) {
+          migrateArchiveRecordsFromLandRecords();
       }
   }, [currentUser]);
 
@@ -261,10 +247,10 @@ function App() {
   }, [currentView]);
 
   // Permissions
-  const isAdmin = isUserAdminOrSubadmin(currentUser);
+  const isAdmin = currentUser?.role === UserRole.ADMIN;
   const isSubadmin = currentUser?.role === UserRole.SUBADMIN;
-  const isTeamLeader = isUserTeamLeader(currentUser);
-  const canPerformAction = canUserPerformGeneralAction(currentUser);
+  const isTeamLeader = currentUser?.role === UserRole.TEAM_LEADER;
+  const canPerformAction = isAdmin || isSubadmin || isTeamLeader || currentUser?.role === UserRole.ONEDOOR;
 
   // --- UPDATE HANDLERS ---
   
@@ -327,7 +313,7 @@ function App() {
   useEffect(() => {
       if (
           currentView === 'handover_list' && 
-          isUserOneDoor(currentUser) && 
+          currentUser?.role === UserRole.ONEDOOR && 
           recordFilterProps.handoverTab === 'today' &&
           !autoSwitchedHandoverRef.current
       ) {
@@ -361,21 +347,33 @@ function App() {
       return true;
   };
 
+  const handleLogout = useCallback(() => {
+      if (currentUser) {
+          logSystemEvent(currentUser.username, 'LOGOUT', `Đăng xuất khỏi hệ thống (${currentUser.name})`).catch(e => console.error(e));
+      }
+      setCurrentUser(null);
+  }, [currentUser]);
+
   const handleGlobalGenerateReport = async (fromDateStr: string, toDateStr: string, title?: string, data?: RecordFile[]) => {
       if (!currentUser) return;
       setIsGeneratingReport(true);
       setGlobalReportContent(''); 
-      const from = new Date(fromDateStr); from.setHours(0, 0, 0, 0); 
-      const to = new Date(toDateStr); to.setHours(23, 59, 59, 999); 
+      let from = new Date(fromDateStr);
+      if (isNaN(from.getTime())) from = new Date();
+      from.setHours(0, 0, 0, 0);
+
+      let to = new Date(toDateStr);
+      if (isNaN(to.getTime())) to = new Date();
+      to.setHours(23, 59, 59, 999);
       
       let filtered = data;
       if (!filtered) {
-          filtered = records.filter(r => { if(!r.receivedDate) return false; const rDate = new Date(r.receivedDate); return rDate >= from && rDate <= to; });
+          filtered = records.filter(r => { if(!r.receivedDate) return false; const rDate = new Date(r.receivedDate); return !isNaN(rDate.getTime()) && rDate >= from && rDate <= to; });
       }
 
-      const formatDateVN = (d: Date) => `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}`;
+      const formatDateVN = (d: Date) => !isNaN(d.getTime()) ? `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}` : '';
       try {
-          const scope = isUserEmployee(currentUser) ? 'personal' : 'general';
+          const scope = currentUser.role === UserRole.EMPLOYEE ? 'personal' : 'general';
           const result = await generateReport(filtered!, `Từ ngày ${formatDateVN(from)} đến ngày ${formatDateVN(to)}`, scope, currentUser.name, title);
           setGlobalReportContent(result);
       } catch (error) { setGlobalReportContent("Không thể tạo báo cáo. Vui lòng kiểm tra API Key."); } 
@@ -387,19 +385,6 @@ function App() {
           const result = await handleImportRecords(data, onProgress);
           if (result) {
               setToast({ type: 'success', message: `Đã nhập thành công ${data.length} hồ sơ mới.` });
-              try {
-                  addActivityLog({
-                      performerName: currentUser?.fullName || currentUser?.name || currentUser?.username || 'Cán bộ',
-                      performerRole: currentUser?.role || 'ONEDOOR',
-                      actionType: 'CREATE',
-                      actionLabel: 'Tiếp nhận hàng loạt',
-                      targetType: 'Hồ sơ',
-                      referenceCode: `${data.length} hồ sơ`,
-                      details: `Tiếp nhận hàng loạt ${data.length} hồ sơ từ file Excel.`
-                  });
-              } catch (err) {
-                  console.warn('Failed to add activity log:', err);
-              }
               loadData();
               return true;
           } else {
@@ -410,19 +395,6 @@ function App() {
           const result = await forceUpdateRecordsBatchApi(data, onProgress);
           if (result.success) {
               setToast({ type: 'success', message: `Đã cập nhật thành công ${result.count} hồ sơ.` });
-              try {
-                  addActivityLog({
-                      performerName: currentUser?.fullName || currentUser?.name || currentUser?.username || 'Cán bộ',
-                      performerRole: currentUser?.role || 'ONEDOOR',
-                      actionType: 'UPDATE',
-                      actionLabel: 'Cập nhật hàng loạt',
-                      targetType: 'Hồ sơ',
-                      referenceCode: `${result.count} hồ sơ`,
-                      details: `Cập nhật thông tin hàng loạt ${result.count} hồ sơ từ file Excel.`
-                  });
-              } catch (err) {
-                  console.warn('Failed to add activity log:', err);
-              }
               loadData();
               return true;
           } else {
@@ -488,79 +460,25 @@ function App() {
       }
   };
 
-  const getUpdatesForStatusChange = (newStatus: RecordStatus, customDateStr?: string) => {
+  const getUpdatesForStatusChange = (newStatus: RecordStatus, customDateStr?: string, existingRecord?: Partial<RecordFile>) => {
       const targetDateStr = customDateStr || new Date().toISOString();
-      const updates: any = { status: newStatus };
-
-      switch (newStatus) {
-          case RecordStatus.RECEIVED:
-              updates.assignedDate = null;
-              updates.submissionDate = null;
-              updates.approvalDate = null;
-              updates.completedDate = null;
-              updates.resultReturnedDate = null;
-              updates.exportBatch = null;
-              updates.exportDate = null;
-              break;
-          case RecordStatus.ASSIGNED:
-          case RecordStatus.IN_PROGRESS:
-              updates.assignedDate = targetDateStr;
-              updates.submissionDate = null;
-              updates.approvalDate = null;
-              updates.completedDate = null;
-              updates.resultReturnedDate = null;
-              updates.exportBatch = null;
-              updates.exportDate = null;
-              break;
-          // MỚI: Trạng thái Đã thực hiện
-          case RecordStatus.COMPLETED_WORK:
-              // Giữ nguyên assignedDate
-              updates.completedWorkDate = targetDateStr;
-              updates.pendingCheckDate = null;
-              updates.checkedDate = null;
-              updates.submissionDate = null; 
-              updates.approvalDate = null;
-              updates.completedDate = null;
-              break;
-          case RecordStatus.PENDING_CHECK:
-              updates.pendingCheckDate = targetDateStr;
-              updates.checkedDate = null;
-              updates.submissionDate = null;
-              updates.approvalDate = null;
-              updates.completedDate = null;
-              updates.resultReturnedDate = null;
-              break;
-          case RecordStatus.CHECKED:
-              updates.checkedDate = targetDateStr;
-              updates.submissionDate = null;
-              updates.approvalDate = null;
-              updates.completedDate = null;
-              updates.resultReturnedDate = null;
-              break;
-          case RecordStatus.PENDING_SIGN:
-              updates.submissionDate = targetDateStr; 
-              updates.approvalDate = null;
-              updates.completedDate = null;
-              updates.resultReturnedDate = null;
-              break;
-          case RecordStatus.SIGNED:
-              updates.approvalDate = targetDateStr; 
-              updates.completedDate = null;
-              updates.resultReturnedDate = null;
-              break;
-          case RecordStatus.HANDOVER:
-              updates.completedDate = targetDateStr; 
-              updates.exportDate = targetDateStr;
-              updates.is_handover = true;
-              updates.handover_date = targetDateStr;
-              updates.resultReturnedDate = null;
-              break;
-          case RecordStatus.RETURNED:
-              updates.resultReturnedDate = targetDateStr;
-              if (!updates.completedDate) updates.completedDate = targetDateStr;
-              break;
-      }
-      return updates;
+      const synced = syncRecordStatusTransition(existingRecord || {}, newStatus, {
+          userName: currentUser?.name || currentUser?.username || 'Hệ thống',
+          userId: currentUser?.id,
+          customDates: {
+              receivedDate: targetDateStr,
+              assignedDate: targetDateStr,
+              completedWorkDate: targetDateStr,
+              pendingCheckDate: targetDateStr,
+              checkedDate: targetDateStr,
+              submissionDate: targetDateStr,
+              approvalDate: targetDateStr,
+              completedDate: targetDateStr,
+              exportDate: targetDateStr,
+              resultReturnedDate: targetDateStr
+          }
+      });
+      return synced;
   };
 
   const handleBulkUpdate = async (field: keyof RecordFile, value: any, customDateStr?: string, targetRecordIds?: string[], extraData?: { assignedTo?: string; customDate?: string }) => {
@@ -679,21 +597,33 @@ function App() {
           } else if (field === 'checkedBy' || field === 'submittedTo') {
               recordUpdates[field] = value;
           } else if (field === 'assignedDate') {
-              const formattedDate = value ? (value.includes('T') ? value : new Date(value + 'T12:00:00').toISOString()) : targetDateStr;
-              recordUpdates.assignedDate = formattedDate;
+              const parseDateSafeISO = (v: any) => {
+                  if (!v) return targetDateStr;
+                  if (typeof v === 'string' && v.includes('T')) return v;
+                  const d = new Date(v + 'T12:00:00');
+                  return !isNaN(d.getTime()) ? d.toISOString() : targetDateStr;
+              };
+              recordUpdates.assignedDate = parseDateSafeISO(value);
           } else if (field === 'exportDate') {
-              const formattedDate = value ? (value.includes('T') ? value : new Date(value + 'T12:00:00').toISOString()) : targetDateStr;
+              const parseDateSafeISO = (v: any) => {
+                  if (!v) return targetDateStr;
+                  if (typeof v === 'string' && v.includes('T')) return v;
+                  const d = new Date(v + 'T12:00:00');
+                  return !isNaN(d.getTime()) ? d.toISOString() : targetDateStr;
+              };
+              const formattedDate = parseDateSafeISO(value);
               recordUpdates.exportDate = formattedDate;
               recordUpdates.handover_date = formattedDate;
           } else if (field === 'exportBatch') {
-              recordUpdates.exportBatch = value;
-          } else if (field === 'archiveBatchName') {
-              recordUpdates.archiveBatchName = value;
-              recordUpdates.archiveBatchDate = extraData?.customDate || customDateStr || targetDateStr;
-              recordUpdates.archiveExportDate = extraData?.customDate || customDateStr || targetDateStr;
+              recordUpdates.exportBatch = value ? getPureBatchNumber(value) : null;
           } else if (field === 'deadline' || field === 'receivedDate' || field === 'resultReturnedDate' || field === 'checkedDate' || field === 'approvalDate') {
-              const formattedDate = value ? (value.includes('T') ? value : new Date(value + 'T12:00:00').toISOString()) : targetDateStr;
-              recordUpdates[field] = formattedDate;
+              const parseDateSafeISO = (v: any) => {
+                  if (!v) return targetDateStr;
+                  if (typeof v === 'string' && v.includes('T')) return v;
+                  const d = new Date(v + 'T12:00:00');
+                  return !isNaN(d.getTime()) ? d.toISOString() : targetDateStr;
+              };
+              recordUpdates[field] = parseDateSafeISO(value);
           } else if (field === 'returnedPrice') {
               recordUpdates[field] = value !== '' && value !== null && value !== undefined ? Number(value) : null;
           } else {
@@ -710,16 +640,6 @@ function App() {
       setToast({ type: 'success', message: `Đã cập nhật ${updatedTargets.length} hồ sơ thành công!` });
       setIsBulkUpdateModalOpen(false);
       setSelectedRecordIds(new Set()); 
-
-      addActivityLog({
-          performerName: currentUser?.fullName || currentUser?.name || currentUser?.username || 'Cán bộ',
-          performerRole: currentUser?.role || 'ONEDOOR',
-          actionType: 'UPDATE',
-          actionLabel: 'Cập nhật hàng loạt',
-          targetType: 'Hồ sơ',
-          referenceCode: `${updatedTargets.length} hồ sơ`,
-          details: `Cập nhật trường "${String(field)}" cho ${updatedTargets.length} hồ sơ`
-      });
 
       try {
           const res = await updateRecordsBatchById(updatedTargets);
@@ -778,44 +698,43 @@ function App() {
       setIsReturnModalOpen(true);
   }, []);
 
-  const handleConfirmReturnResult = useCallback(async (receiptNumber: string, receiverName: string, returnedPrice: number, receiptType?: 'Biên Lai' | 'Hóa Đơn', customReason?: string) => {
+  const handleConfirmReturnResult = useCallback(async (receiptNumber: string, receiverName: string, returnedPrice: number, receiptType?: 'Biên Lai' | 'Hóa Đơn', returnReason?: string) => {
       if (!returnRecord) return;
       const nowStr = new Date().toISOString();
-      const typeLabel = receiptType || (receiptNumber ? 'Biên Lai' : '');
-      const performer = currentUser?.fullName || currentUser?.name || currentUser?.username || 'Cán bộ trả';
+      const typeLabel = receiptType || 'Biên Lai';
+      const isExempt = returnRecord.status === RecordStatus.REJECTED || returnRecord.status === RecordStatus.WITHDRAWN || isProcedure2_3(returnRecord.recordType);
+      
+      let logMsg = '';
+      if (isExempt) {
+          let exemptType = '';
+          if (returnRecord.status === RecordStatus.WITHDRAWN) exemptType = 'CSD rút hồ sơ';
+          else if (returnRecord.status === RecordStatus.REJECTED) exemptType = 'Trả hủy hồ sơ';
+          else if (isProcedure2_3(returnRecord.recordType)) exemptType = 'Thủ tục 2.3 (Duyệt Đơn & Cung cấp số thửa)';
+          else exemptType = 'Miễn thu phí';
 
-      const feeDetailText = returnedPrice > 0 
-          ? `(${typeLabel || 'Biên lai'} số: ${receiptNumber}, Số tiền: ${returnedPrice.toLocaleString('vi-VN')}đ)`
-          : (receiptNumber ? `(${typeLabel || 'Phiếu'} số: ${receiptNumber}, Miễn thu phí)` : '(Không thu phí / Không phát hành HĐ/BL)');
+          logMsg = `Bàn giao trả hồ sơ (${exemptType}) cho: ${receiverName} (Miễn thu phí)${returnReason ? ` - Lý do/Nội dung: ${returnReason}` : ''}`;
+      } else {
+          logMsg = `Trả kết quả cho người dân: ${receiverName} (${typeLabel} số: ${receiptNumber}, Số tiền: ${returnedPrice.toLocaleString('vi-VN')}đ)${returnReason ? ` - Ghi chú: ${returnReason}` : ''}`;
+      }
 
-      const statusLogs = createStatusLog(returnRecord, RecordStatus.RETURNED, `Trả kết quả cho người dân: ${receiverName} ${feeDetailText}`);
-      const updates: Partial<RecordFile> = { 
+      const statusLogs = createStatusLog(returnRecord, RecordStatus.RETURNED, logMsg);
+      const updates = { 
           resultReturnedDate: nowStr, 
           status: RecordStatus.RETURNED, 
-          receiptNumber: receiptNumber, 
-          receiptType: typeLabel,
+          receiptNumber: receiptNumber || null, 
+          receiptType: isExempt ? null : typeLabel,
           receiverName: receiverName,
-          feeCollector: performer,
           returnedPrice: returnedPrice,
-          price: returnedPrice,
-          feeAmount: returnedPrice,
+          privateNotes: returnReason 
+              ? (returnRecord.privateNotes ? `${returnRecord.privateNotes}\n[Nội dung trả HS]: ${returnReason}` : `[Nội dung trả HS]: ${returnReason}`)
+              : returnRecord.privateNotes,
           statusLogs
       }; 
       setRecords(prev => prev.map(r => r.id === returnRecord.id ? { ...r, ...updates } : r));
       await updateRecordApi({ ...returnRecord, ...updates });
-      addActivityLog({
-          performerName: performer,
-          performerRole: currentUser?.role || 'ONEDOOR',
-          actionType: 'RETURN_RESULT',
-          actionLabel: 'Trả kết quả',
-          targetType: 'Hồ sơ',
-          referenceCode: returnRecord.code,
-          details: `Xác nhận trả kết quả hồ sơ ${returnRecord.code} cho ${receiverName} ${feeDetailText}`,
-          recordId: returnRecord.id
-      });
       setToast({ type: 'success', message: `Đã ghi nhận trả kết quả hồ sơ ${returnRecord.code} cho ${receiverName}.` });
       setReturnRecord(null);
-  }, [returnRecord, createStatusLog, currentUser]);
+  }, [returnRecord, createStatusLog]);
 
   const handleMapCorrectionRequest = useCallback(async (record: RecordFile) => {
       const isArchive = isArchiveRecordType(record.recordType || '') || record.sourceTable === 'luutru_records';
@@ -857,8 +776,15 @@ function App() {
           setIsAssignModalOpen(true); 
           return; 
       }
+      const isArchive = isArchiveRecordType(record.recordType) || (getDepartmentForRecord(record).toLowerCase().includes('lưu trữ'));
       if (record.status === RecordStatus.ASSIGNED || record.status === RecordStatus.IN_PROGRESS) {
-          // Các loại đi thẳng sang trình kiểm tra (bỏ qua bước trung gian là đã thực hiện)
+          if (isArchive) {
+              // Module Lưu trữ bỏ qua bước Trình kiểm tra -> Đi thẳng sang Trình ký!
+              setSubmitTargetRecords([record]);
+              setIsSubmitModalOpen(true);
+              return;
+          }
+          // Các loại đo đạc đi sang trình kiểm tra (bỏ qua bước trung gian là đã thực hiện)
           setSubmitTargetRecords([record]);
           setIsSubmitCheckModalOpen(true);
           return;
@@ -879,15 +805,18 @@ function App() {
               setIsAddToBatchModalOpen(true);
               return;
           }
-          const updates = getUpdatesForStatusChange(nextStatus);
-          updates.statusLogs = createStatusLog(record, nextStatus, 'Chuyển trạng thái kế tiếp');
+          const updates = syncRecordStatusTransition(record, nextStatus, {
+              userName: currentUser?.name || currentUser?.username || 'Hệ thống',
+              userId: currentUser?.id
+          });
           setRecords(prev => prev.map(r => r.id === record.id ? { ...r, ...updates } : r));
           await updateRecordApi({ ...record, ...updates });
       }
-  }, [createStatusLog]);
+  }, [currentUser]);
 
   const executeBatchExport = async (batchNumber: number | string, batchDate: string, handoverWard?: string) => {
       const nowStr = new Date().toISOString();
+      const pureBatch = getPureBatchNumber(batchNumber) || String(batchNumber);
       const candidates = selectedRecordIds.size > 0 ? records.filter(r => selectedRecordIds.has(r.id)) : recordFilterProps.filteredRecords;
       const recordsToExport = selectedRecordIds.size > 0 
           ? candidates 
@@ -895,9 +824,9 @@ function App() {
       if (recordsToExport.length === 0) return;
       const updatesToApply = recordsToExport.map(r => {
           const nextStatus = r.status === RecordStatus.WITHDRAWN ? RecordStatus.WITHDRAWN : r.status === RecordStatus.REJECTED ? RecordStatus.REJECTED : RecordStatus.HANDOVER;
-          const statusLogs = createStatusLog(r, nextStatus, `Chốt xuất giao 1 cửa - ${batchNumber}`);
+          const statusLogs = createStatusLog(r, nextStatus, `Chốt xuất giao 1 cửa - Đợt ${pureBatch}`);
           const actualHandoverWard = (handoverWard === 'SAME_AS_WARD' || !handoverWard) ? r.ward : handoverWard;
-          return { ...r, exportBatch: batchNumber, exportDate: batchDate, status: nextStatus, completedDate: r.completedDate || nowStr, handoverWard: actualHandoverWard, statusLogs };
+          return { ...r, exportBatch: pureBatch, exportDate: batchDate, status: nextStatus, completedDate: r.completedDate || nowStr, handoverWard: actualHandoverWard, statusLogs };
       });
       setRecords(prev => prev.map(r => {
           const updated = updatesToApply.find(u => u.id === r.id);
@@ -909,15 +838,6 @@ function App() {
           return;
       }
       setSelectedRecordIds(new Set()); 
-      addActivityLog({
-          performerName: currentUser?.fullName || currentUser?.name || currentUser?.username || 'Cán bộ 1 cửa',
-          performerRole: currentUser?.role || 'ONEDOOR',
-          actionType: 'EXPORT',
-          actionLabel: 'Chốt xuất giao',
-          targetType: 'Hồ sơ',
-          referenceCode: `Đợt ${batchNumber}`,
-          details: `Chốt danh sách xuất giao 1 cửa - Đợt ${batchNumber} (${updatesToApply.length} hồ sơ)`
-      });
       setToast({ type: 'success', message: `Đã chốt danh sách ${batchNumber} thành công.` });
   };
 
@@ -948,15 +868,6 @@ function App() {
           return;
       }
       setSelectedRecordIds(new Set());
-      addActivityLog({
-          performerName: currentUser?.fullName || currentUser?.name || currentUser?.username || 'Cán bộ 1 cửa',
-          performerRole: currentUser?.role || 'ONEDOOR',
-          actionType: 'EXPORT',
-          actionLabel: 'Bàn giao phòng CM',
-          targetType: 'Hồ sơ',
-          referenceCode: `Đợt ${batchNumber}`,
-          details: `Chốt danh sách bàn giao ĐỢT ${batchNumber} về ${deptName} (${recordsToHandover.length} hồ sơ)`
-      });
       setToast({ type: 'success', message: `Đã chốt danh sách bàn giao ĐỢT ${batchNumber} về ${deptName} thành công.` });
   };
 
@@ -979,15 +890,6 @@ function App() {
               return updated ? updated : r;
           }));
           setSelectedRecordIds(new Set());
-          addActivityLog({
-              performerName: currentUser?.fullName || currentUser?.name || currentUser?.username || 'Lãnh đạo ký duyệt',
-              performerRole: currentUser?.role || 'ADMIN',
-              actionType: 'APPROVE',
-              actionLabel: 'Ký duyệt đợt',
-              targetType: 'Hồ sơ',
-              referenceCode: `${pendingSign.length} hồ sơ`,
-              details: `Ký duyệt đợt cho ${pendingSign.length} hồ sơ (${pendingSign.map(p => p.code).slice(0, 3).join(', ')}${pendingSign.length > 3 ? '...' : ''})`
-          });
           setToast({ type: 'success', message: `Đã chuyển ${pendingSign.length} hồ sơ sang "Đã ký".` });
 
           try {
@@ -1069,8 +971,13 @@ function App() {
 
   const handleConfirmExtendDeadline = useCallback(async (newDeadline: string, reason: string, executionDateStr: string) => {
       if (extendTargetRecords.length === 0) return;
-      const executionDateISO = executionDateStr ? new Date(executionDateStr).toISOString() : new Date().toISOString();
-      const newDeadlineISO = new Date(newDeadline).toISOString();
+      const safeParseISO = (s?: string) => {
+          if (!s) return new Date().toISOString();
+          const d = new Date(s);
+          return !isNaN(d.getTime()) ? d.toISOString() : new Date().toISOString();
+      };
+      const executionDateISO = safeParseISO(executionDateStr);
+      const newDeadlineISO = safeParseISO(newDeadline);
       
       const formatDateVN = (dStr: string) => {
           try {
@@ -1089,18 +996,14 @@ function App() {
           const newDeadlineVN = formatDateVN(newDeadline);
           const execDateVN = formatDateVN(executionDateISO);
           const userLabel = currentUser?.name || currentUser?.username || 'Hệ thống';
-          const reasonSuffix = reason && reason.trim() ? `. Lý do: ${reason.trim()}` : '';
-          const extensionLog = `[GIA HẠN HẸN TRẢ - ${execDateVN}] Hạn cũ: ${oldDeadlineVN} -> Hạn mới: ${newDeadlineVN}${reasonSuffix} (Thực hiện bởi: ${userLabel})`;
+          const extensionLog = `[GIA HẠN HẸN TRẢ - ${execDateVN}] Hạn cũ: ${oldDeadlineVN} -> Hạn mới: ${newDeadlineVN}. Lý do: ${reason} (Thực hiện bởi: ${userLabel})`;
 
           const existingNotes = r.privateNotes || '';
           const updatedPrivateNotes = existingNotes ? `${existingNotes}\n${extensionLog}` : extensionLog;
 
           return {
               ...r,
-              originalDeadline: r.originalDeadline || r.deadline,
               deadline: newDeadlineISO,
-              extendedBy: currentUser?.employeeId || currentUser?.name || currentUser?.username || 'Hệ thống',
-              extendedAt: executionDateISO,
               privateNotes: updatedPrivateNotes
           };
       });
@@ -1115,141 +1018,15 @@ function App() {
       setExtendTargetRecords([]);
       setSelectedRecordIds(new Set());
       setToast({ type: 'success', message: `Đã gia hạn ngày hẹn cho ${updatedTargets.length} hồ sơ thành công!` });
-
-      const targetRecord = updatedTargets[0];
-      if (targetRecord && currentUser) {
-          const rDate = targetRecord.receivedDate ? new Date(targetRecord.receivedDate) : new Date();
-          const dDate = new Date(newDeadlineISO);
-          
-          let standardDays = "30"; 
-          const type = (targetRecord.recordType || '').toLowerCase();
-          if (type.includes('trích lục')) {
-              standardDays = "10";
-          } else if (type.includes('trích đo chỉnh lý')) {
-              standardDays = "15"; 
-          } else if (type.includes('trích đo') || type.includes('đo đạc') || type.includes('cắm mốc')) {
-              standardDays = "30";
-          }
-
-          let tp1Value = 'Phiếu yêu cầu';
-          if (type.includes('chỉnh lý') || type.includes('trích đo') || type.includes('trích lục')) {
-              tp1Value = 'Phiếu yêu cầu trích lục, trích đo';
-          } else if (type.includes('đo đạc') || type.includes('cắm mốc')) {
-              tp1Value = 'Phiếu yêu cầu Đo đạc, cắm mốc';
-          }
-          if (targetRecord.ward) {
-              tp1Value += ` tại ${getNormalizedWard(targetRecord.ward)}`;
-          }
-
-          let sdtLienHe = "";
-          const wRaw = (targetRecord.ward || "").toLowerCase();
-          if (wRaw.includes("minh hưng") || wRaw.includes("minh hung")) {
-              sdtLienHe = "Nhân viên phụ trách Nguyễn Thìn Trung: 0886 385 757";
-          } else if (wRaw.includes("nha bích") || wRaw.includes("nha bich")) {
-              sdtLienHe = "Nhân viên phụ trách Lê Văn Hạnh: 0919 334 344";
-          } else if (wRaw.includes("chơn thành") || wRaw.includes("chon thanh")) {
-              sdtLienHe = "Nhân viên phụ trách Phạm Hoài Sơn: 0972 219 691";
-          }
-
-          const day = rDate.getDate().toString().padStart(2, '0');
-          const month = (rDate.getMonth() + 1).toString().padStart(2, '0');
-          const year = rDate.getFullYear();
-          const dateFullString = `ngày ${day} tháng ${month} năm ${year}`;
-          const dateShortString = `${day}/${month}/${year}`;
-          
-          const dayDead = dDate.getDate().toString().padStart(2, '0');
-          const monthDead = (dDate.getMonth() + 1).toString().padStart(2, '0');
-          const yearDead = dDate.getFullYear();
-          const deadlineFullString = `ngày ${dayDead} tháng ${monthDead} năm ${yearDead}`;
-          const deadlineShortString = `${dayDead}/${monthDead}/${yearDead}`;
-
-          const val = (v: any) => (v === undefined || v === null) ? "" : String(v);
-
-          const printData = {
-              code: val(targetRecord.code),
-              customerName: val(targetRecord.customerName),
-              landPlot: val(targetRecord.landPlot),
-              mapSheet: val(targetRecord.mapSheet),
-              XAPHUONG: val(getNormalizedWard(targetRecord.ward)),
-              NGAYNHAN: dateFullString,
-              NGAY_NHAN: dateShortString, 
-              LOAI_GIAY_TO_UY_QUYEN: "",
-              DIA_CHI_CHI_TIET: val(targetRecord.address),
-              MA: val(targetRecord.code), 
-              SO_HS: val(targetRecord.code), 
-              MA_HO_SO: val(targetRecord.code),
-              CODE: val(targetRecord.code),
-              TEN: val(targetRecord.customerName).toUpperCase(), 
-              HO_TEN: val(targetRecord.customerName).toUpperCase(),
-              CHU_SU_DUNG: val(targetRecord.customerName).toUpperCase(),
-              KHACH_HANG: val(targetRecord.customerName).toUpperCase(),
-              ONG_BA: val(targetRecord.customerName).toUpperCase(), 
-              SDT: val(targetRecord.phoneNumber), 
-              DIEN_THOAI: val(targetRecord.phoneNumber),
-              PHONE: val(targetRecord.phoneNumber),
-              CCCD: val(targetRecord.cccd), 
-              CMND: val(targetRecord.cccd),
-              DIA_CHI_CHU_SU_DUNG: val(targetRecord.customerAddress),
-              DIA_CHI: val(targetRecord.address || getNormalizedWard(targetRecord.ward)),
-              DC: val(targetRecord.address || getNormalizedWard(targetRecord.ward)),
-              ADDRESS: val(targetRecord.address || getNormalizedWard(targetRecord.ward)),
-              XA: val(getNormalizedWard(targetRecord.ward)), 
-              PHUONG: val(getNormalizedWard(targetRecord.ward)),
-              WARD: val(getNormalizedWard(targetRecord.ward)),
-              TO: val(targetRecord.mapSheet), 
-              SO_TO: val(targetRecord.mapSheet),
-              THUA: val(targetRecord.landPlot), 
-              SO_THUA: val(targetRecord.landPlot),
-              DT: val(targetRecord.area), 
-              DIEN_TICH: val(targetRecord.area),
-              NGAY_NHAN_FULL: dateFullString,
-              NGAY: day, 
-              THANG: month, 
-              NAM: year,
-              RECEIVED_DATE: dateShortString,
-              HEN_TRA: deadlineShortString, 
-              NGAY_HEN: deadlineShortString,
-              DEADLINE: deadlineShortString,
-              HEN_TRA_FULL: deadlineFullString,
-              NGAY_HEN_FULL: deadlineFullString,
-              NGUOI_NHAN: val(currentUser?.name), 
-              CAN_BO: val(currentUser?.name),
-              USER: val(currentUser?.name),
-              NOI_DUNG: val(targetRecord.content),
-              CONTENT: val(targetRecord.content),
-              LOAI_HS: val(getCanonicalRecordType(targetRecord.recordType, targetRecord.code)), 
-              RECORD_TYPE: val(getCanonicalRecordType(targetRecord.recordType, targetRecord.code)),
-              GIAY_TO_KHAC: val(targetRecord.otherDocs),
-              GIA: targetRecord.price ? targetRecord.price.toLocaleString('vi-VN') + ' đ' : '',
-              PRICE: targetRecord.price ? targetRecord.price.toLocaleString('vi-VN') + ' đ' : '',
-              NGUOI_UY_QUYEN: "",
-              UY_QUYEN: "",
-              LOAI_UY_QUYEN: "",
-              TGTRA: standardDays, 
-              SO_NGAY: standardDays,
-              TP1: tp1Value, 
-              TIEU_DE: tp1Value,
-              SDTLH: sdtLienHe, 
-              TINH: "Bình Phước", 
-              HUYEN: "huyện Hớn Quản"
-          };
-
-          if (!hasTemplate(STORAGE_KEYS.RECEIPT_TEMPLATE)) {
-              setSystemReceiptData(targetRecord);
-          } else {
-              const blob = await generateDocxBlobAsync(STORAGE_KEYS.RECEIPT_TEMPLATE, printData);
-              if (blob) {
-                  setPreviewBlob(blob);
-                  setPreviewFileName(`BienNhan_${targetRecord.code}`);
-                  setIsPreviewOpen(true);
-              }
-          }
-      }
   }, [extendTargetRecords, currentUser]);
 
   const handleConfirmRejectReturnStep = useCallback(async (optionType: ReturnOptionType, reason: string, returnDateStr: string) => {
       if (rejectReturnTargetRecords.length === 0) return;
-      const targetDateISO = returnDateStr ? new Date(returnDateStr).toISOString() : new Date().toISOString();
+      let targetDateISO = new Date().toISOString();
+      if (returnDateStr) {
+          const d = new Date(returnDateStr);
+          if (!isNaN(d.getTime())) targetDateISO = d.toISOString();
+      }
       
       const formatDateVN = (dStr: string) => {
           try {
@@ -1273,16 +1050,14 @@ function App() {
 
           if (optionType === 'pause_supplement') {
               newStatus = RecordStatus.PENDING_SUPPLEMENT;
-              internalLogNote = `Trả bổ sung: ${reason || 'Không có lý do'} (Người trả: ${userLabel})`;
+              internalLogNote = `[TRẢ DỪNG QUY TRÌNH (CHỜ BỔ SUNG) - ${formattedReturnDate}] Lý do: ${reason} (Người trả: ${userLabel})`;
           } else if (optionType === 'cancel_reject') {
               newStatus = RecordStatus.REJECTED;
-              internalLogNote = `Trả hủy hồ sơ: ${reason || 'Không có lý do'} (Người trả: ${userLabel})`;
-          } else if (optionType === 'csd_withdraw') {
-              newStatus = RecordStatus.WITHDRAWN;
-              internalLogNote = `Trả do CSD rút hồ sơ: ${reason || 'Không có lý do'} (Người trả: ${userLabel})`;
+              internalLogNote = `[TRẢ HỦY HỒ SƠ (TẠM DỪNG / TỪ CHỐI 1 CỬA) - ${formattedReturnDate}] Lý do: ${reason} (Người trả: ${userLabel})`;
           } else {
               newStatus = RecordStatus.IN_PROGRESS;
-              internalLogNote = `Trả về cán bộ thụ lý: ${reason || 'Không có lý do'} (Người trả: ${userLabel})`;
+              const prevStatusLabel = STATUS_LABELS[r.status] || r.status;
+              internalLogNote = `[TRẢ VỀ CÁN BỘ THỤ LÝ - ${formattedReturnDate}] Trả từ bước "${prevStatusLabel}" về Đang thực hiện. Lý do: ${reason} (Người trả: ${userLabel})`;
           }
 
           const existingNotes = r.privateNotes || '';
@@ -1298,21 +1073,10 @@ function App() {
               note: `Trả hồ sơ (${optionType}). Lý do: ${reason}`
           };
 
-          addActivityLog({
-              performerName: userLabel,
-              performerRole: currentUser?.role || 'ONEDOOR',
-              actionType: optionType === 'cancel_reject' || optionType === 'csd_withdraw' ? 'DELETE' : 'UPDATE',
-              actionLabel: optionType === 'pause_supplement' ? 'Chờ bổ sung' : optionType === 'cancel_reject' ? 'Trả hủy hồ sơ' : optionType === 'csd_withdraw' ? 'CSD rút hồ sơ' : 'Trả cán bộ',
-              targetType: 'Hồ sơ',
-              referenceCode: r.code || r.id,
-              details: `Trả hồ sơ ${r.code} (${optionType === 'pause_supplement' ? 'Trả chờ bổ sung' : optionType === 'cancel_reject' ? 'Trả hủy hồ sơ' : optionType === 'csd_withdraw' ? 'Trả do CSD rút hồ sơ' : 'Trả về cán bộ thụ lý'}). Lý do: ${reason}`,
-              recordId: r.id
-          });
-
           return {
               ...r,
               status: newStatus,
-              ...(optionType === 'cancel_reject' || optionType === 'csd_withdraw' ? { completedDate: targetDateISO } : {}),
+              ...(optionType === 'cancel_reject' ? { completedDate: targetDateISO } : {}),
               ...(optionType === 'return_handler' ? { pendingCheckDate: null, submissionDate: null, checkedDate: null, approvalDate: null } : {}),
               privateNotes: updatedPrivateNotes,
               statusLogs: [...(r.statusLogs || []), newLog]
@@ -1324,34 +1088,21 @@ function App() {
           return found ? found : r;
       }));
 
-      if (viewingRecord) {
-          const updatedViewing = updatedTargets.find(u => u.id === viewingRecord.id);
-          if (updatedViewing) {
-              setViewingRecord(updatedViewing);
-          }
-      }
-
       await Promise.all(updatedTargets.map(u => updateRecordApi(u)));
       setIsRejectReturnStepModalOpen(false);
       setRejectReturnTargetRecords([]);
       setSelectedRecordIds(new Set());
-
-      let toastMsg = `Đã thực hiện trả ${updatedTargets.length} hồ sơ thành công!`;
-      if (optionType === 'cancel_reject') {
-          toastMsg = `Đã trả hủy ${updatedTargets.length} hồ sơ thành công! Hồ sơ đã chuyển sang danh sách Chờ bàn giao 1 cửa.`;
-      } else if (optionType === 'pause_supplement') {
-          toastMsg = `Đã chuyển ${updatedTargets.length} hồ sơ sang trạng thái Chờ bổ sung!`;
-      } else if (optionType === 'csd_withdraw') {
-          toastMsg = `Đã ghi nhận ${updatedTargets.length} hồ sơ do CSD rút! Hồ sơ đã chuyển sang trạng thái CSD rút hồ sơ.`;
-      } else if (optionType === 'return_handler') {
-          toastMsg = `Đã trả ${updatedTargets.length} hồ sơ về cho Cán bộ thụ lý!`;
-      }
-      setToast({ type: 'success', message: toastMsg });
-  }, [rejectReturnTargetRecords, currentUser, viewingRecord]);
+      setToast({ type: 'success', message: `Đã thực hiện trả ${updatedTargets.length} hồ sơ thành công!` });
+  }, [rejectReturnTargetRecords, currentUser]);
 
   if (!currentUser) return (
     <>
-      <NetworkOfflineModal onOnlineRestored={loadData} />
+      <ConnectionGuardOverlay 
+        onRestored={() => {
+          setToast({ type: 'success', message: 'Đã khôi phục kết nối mạng & máy chủ thành công!' });
+          loadData();
+        }}
+      />
       <UpdateRequiredModal 
         visible={isUpdateAvailable && !updateDeferred}
         version={latestVersion}
@@ -1365,6 +1116,7 @@ function App() {
         onLogin={(user) => {
           setCurrentUser(user);
           setCurrentView('dashboard');
+          logSystemEvent(user.username, 'LOGIN', `Đăng nhập vào hệ thống (${user.name})`).catch(e => console.error(e));
         }} 
         users={users} 
       />
@@ -1374,7 +1126,12 @@ function App() {
   if (isMobile) {
     return (
       <>
-        <NetworkOfflineModal onOnlineRestored={loadData} />
+        <ConnectionGuardOverlay 
+          onRestored={() => {
+            setToast({ type: 'success', message: 'Đã khôi phục kết nối mạng & máy chủ thành công!' });
+            loadData();
+          }}
+        />
         <UpdateRequiredModal 
           visible={isUpdateAvailable && !updateDeferred}
           version={latestVersion}
@@ -1388,7 +1145,7 @@ function App() {
         currentUser={currentUser}
         currentView={currentView}
         setCurrentView={handleSetCurrentView}
-        onLogout={() => setCurrentUser(null)}
+        onLogout={handleLogout}
         unreadMessages={unreadMessages}
         activeRemindersCount={activeRemindersCount}
       >
@@ -1410,7 +1167,7 @@ function App() {
           notificationEnabled={notificationEnabled}
           setNotificationEnabled={setNotificationEnabled}
           setUnreadMessages={setUnreadMessages}
-          onLogout={() => setCurrentUser(null)}
+          onLogout={handleLogout}
           onAddUser={(u) => { saveUserApi(u, false).then(res => { if(res) { setUsers(prev => [...prev, res]); loadData(); } }); }}
           onUpdateUser={(u) => handleUpdateUser(u, true)}
           onDeleteUser={handleDeleteUser}
@@ -1541,7 +1298,7 @@ function App() {
         currentUser={currentUser}
         currentView={currentView}
         setCurrentView={handleSetCurrentView}
-        onLogout={() => setCurrentUser(null)}
+        onLogout={handleLogout}
         isMobileMenuOpen={isMobileMenuOpen}
         setIsMobileMenuOpen={setIsMobileMenuOpen}
         isGeneratingReport={isGeneratingReport}
@@ -1663,9 +1420,6 @@ function App() {
             isDiagnosticModalOpen={isDiagnosticModalOpen} setIsDiagnosticModalOpen={setIsDiagnosticModalOpen}
             isRejectReturnStepModalOpen={isRejectReturnStepModalOpen} setIsRejectReturnStepModalOpen={setIsRejectReturnStepModalOpen}
             isExtendModalOpen={isExtendModalOpen} setIsExtendModalOpen={setIsExtendModalOpen}
-            isPreviewOpen={isPreviewOpen} setIsPreviewOpen={setIsPreviewOpen}
-            previewBlob={previewBlob} previewFileName={previewFileName}
-            systemReceiptData={systemReceiptData} setSystemReceiptData={setSystemReceiptData}
             
             editingRecord={editingRecord} setEditingRecord={setEditingRecord}
             viewingRecord={viewingRecord} setViewingRecord={setViewingRecord}
@@ -1822,8 +1576,13 @@ function App() {
         )}
         <GlobalConfirmModal />
         <GlobalAlertModal />
-        <NetworkOfflineModal onOnlineRestored={loadData} />
         <CloudDatabaseInspector isOpen={isCloudDatabaseInspectorOpen} onClose={() => setIsCloudDatabaseInspectorOpen(false)} />
+        <ConnectionGuardOverlay 
+          onRestored={() => {
+            setToast({ type: 'success', message: 'Đã khôi phục kết nối mạng & máy chủ thành công!' });
+            loadData();
+          }}
+        />
     </MainLayout>
   );
 }

@@ -1,16 +1,8 @@
 
 import { supabase, isConfigured } from './supabaseClient';
 import { Holiday } from '../types';
+import { DEFAULT_HOLIDAYS } from '../constants';
 import { logError, getFromCache, saveToCache, CACHE_KEYS } from './apiCore';
-import { networkMonitor } from './networkMonitor';
-
-/**
- * Realtime health-check to probe server connectivity.
- * Uses networkMonitor with single-flight checking.
- */
-export const healthCheck = async (): Promise<boolean> => {
-    return await networkMonitor.checkBackendNow();
-};
 
 export const testDatabaseConnection = async (): Promise<{ status: string, message: string }> => {
     if (!isConfigured) {
@@ -120,53 +112,100 @@ export const updateLatestVersion = async (version: string): Promise<boolean> => 
 
 // --- HOLIDAYS ---
 export const fetchHolidays = async (): Promise<Holiday[]> => {
-    if (!isConfigured) return getFromCache(CACHE_KEYS.HOLIDAYS, []);
+    // 1. Nếu không có kết nối DB, đọc từ cache hoặc danh sách mặc định
+    if (!isConfigured) {
+        const cached = getFromCache(CACHE_KEYS.HOLIDAYS, []);
+        return (Array.isArray(cached) && cached.length > 0) ? cached : DEFAULT_HOLIDAYS;
+    }
+    
     try {
-        const { data, error } = await supabase.from('holidays').select('*');
-        if (error) throw error;
-        
-        const mapped = data.map((h: any) => ({
-            id: String(h.id),
-            name: h.name,
-            day: h.day,
-            month: h.month,
-            isLunar: h.is_lunar,
-            date: h.date || h.date_str || undefined,
-            year: h.year || undefined
-        }));
-        saveToCache(CACHE_KEYS.HOLIDAYS, mapped);
-        return mapped;
+        // Ưu tiên 1: Đọc từ system_settings (key: holidays_config) - rất bền bỉ, an toàn trên mọi database
+        const settingVal = await getSystemSetting('holidays_config');
+        if (settingVal) {
+            try {
+                const parsed = JSON.parse(settingVal);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    saveToCache(CACHE_KEYS.HOLIDAYS, parsed);
+                    return parsed;
+                }
+            } catch (e) {
+                console.warn("Lỗi parse holidays_config từ system_settings:", e);
+            }
+        }
+
+        // Ưu tiên 2: Thử đọc từ bảng holidays chuyên dụng nếu có
+        try {
+            const { data, error } = await supabase.from('holidays').select('*');
+            if (!error && Array.isArray(data) && data.length > 0) {
+                const mapped: Holiday[] = data.map((h: any) => ({
+                    id: String(h.id),
+                    name: h.name,
+                    day: Number(h.day),
+                    month: Number(h.month),
+                    isLunar: Boolean(h.is_lunar ?? h.isLunar)
+                }));
+                saveToCache(CACHE_KEYS.HOLIDAYS, mapped);
+                // Đồng bộ ngược lại system_settings để lưu trữ kép
+                saveSystemSetting('holidays_config', JSON.stringify(mapped)).catch(() => {});
+                return mapped;
+            }
+        } catch (tableErr) {
+            // Bỏ qua nếu bảng chưa tồn tại
+        }
+
+        // Ưu tiên 3: Đọc từ local cache
+        const cached = getFromCache(CACHE_KEYS.HOLIDAYS, []);
+        if (Array.isArray(cached) && cached.length > 0) return cached;
+
+        // Mặc định: trả về DEFAULT_HOLIDAYS chuẩn
+        return DEFAULT_HOLIDAYS;
     } catch (error) {
         logError("fetchHolidays", error, true);
-        return getFromCache(CACHE_KEYS.HOLIDAYS, []);
+        const cached = getFromCache(CACHE_KEYS.HOLIDAYS, []);
+        return (Array.isArray(cached) && cached.length > 0) ? cached : DEFAULT_HOLIDAYS;
     }
 };
 
 export const saveHolidays = async (holidays: Holiday[]): Promise<boolean> => {
+    // 1. Luôn lưu cache cục bộ trước để giao diện và tính toán hạn trả hoạt động ngay lập tức
     saveToCache(CACHE_KEYS.HOLIDAYS, holidays);
-    if (!isConfigured) return true;
     try {
-        await supabase.from('holidays').delete().neq('id', 'dummy_id_prevent_error'); 
-        
-        const dbHolidays = holidays.map(h => ({
-            id: h.id,
-            name: h.name,
-            day: h.day || null,
-            month: h.month || null,
-            is_lunar: h.isLunar || false,
-            date: h.date || null,
-            year: h.year || null
-        }));
-        
-        const { error } = await supabase.from('holidays').insert(dbHolidays);
-        if (error) {
-            console.warn("Supabase saveHolidays warning (saving to local cache instead):", error);
-        }
-        return true;
-    } catch (error) {
-        logError("saveHolidays", error);
-        return true; // Local cache saved successfully
+        localStorage.setItem('cached_holidays', JSON.stringify(holidays));
+    } catch (e) {}
+
+    if (!isConfigured) return true;
+
+    let savedToSystemSettings = false;
+    try {
+        // 2. Lưu vào bảng system_settings (key: holidays_config) - Lưu trữ dạng JSON nguyên vẹn
+        savedToSystemSettings = await saveSystemSetting('holidays_config', JSON.stringify(holidays));
+    } catch (err) {
+        console.warn("Lỗi lưu holidays vào system_settings:", err);
     }
+
+    try {
+        // 3. Đồng thời lưu vào bảng holidays (nếu người dùng đã tạo bảng holidays trên Supabase)
+        await supabase.from('holidays').delete().not('name', 'is', null);
+        
+        if (holidays.length > 0) {
+            const dbHolidays = holidays.map(h => ({
+                id: String(h.id),
+                name: h.name,
+                day: Number(h.day),
+                month: Number(h.month),
+                is_lunar: Boolean(h.isLunar)
+            }));
+            const { error: insErr } = await supabase.from('holidays').insert(dbHolidays);
+            if (insErr) {
+                console.warn("Lưu bảng holidays gặp thông báo (đã có system_settings dự phòng):", insErr.message);
+            }
+        }
+    } catch (error: any) {
+        console.warn("Ghi bảng holidays bỏ qua nếu bảng chưa tạo:", error?.message);
+    }
+
+    // Thông báo thành công nếu đã lưu được vào system_settings hoặc local cache
+    return savedToSystemSettings || true;
 };
 
 export const deleteAllDataApi = async (): Promise<boolean> => {
@@ -719,6 +758,97 @@ export const updateHDKTSequence = async (year: number, nextSeq: number): Promise
         console.error("Lỗi khi cập nhật số thứ tự HĐKT:", e);
         saveToCache(`offline_seq_hdkt_${year}`, finalSeq);
     }
+};
+
+export const logSystemEvent = async (userCode: string, actionType: 'LOGIN' | 'LOGOUT', note: string): Promise<void> => {
+    try {
+        const key = 'login_logout_logs';
+        let existingLogs: any[] = [];
+        
+        const cached = getFromCache<any[]>(key, []);
+        if (Array.isArray(cached) && cached.length > 0) {
+            existingLogs = cached;
+        } else if (isConfigured) {
+            const { data } = await supabase
+                .from('system_settings')
+                .select('value')
+                .eq('key', key)
+                .single();
+            if (data && data.value) {
+                try {
+                    existingLogs = JSON.parse(data.value);
+                } catch {
+                    existingLogs = [];
+                }
+            }
+        }
+
+        if (!Array.isArray(existingLogs)) {
+            existingLogs = [];
+        }
+
+        const newLog = {
+            id: 'auth_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+            changedAt: new Date().toISOString(),
+            changedBy: userCode,
+            previousStatus: null,
+            newStatus: actionType,
+            note: note,
+            isAuthEvent: true
+        };
+
+        existingLogs = [newLog, ...existingLogs];
+
+        if (existingLogs.length > 1000) {
+            existingLogs = existingLogs.slice(0, 1000);
+        }
+
+        saveToCache(key, existingLogs);
+
+        if (isConfigured) {
+            const { data: checkData } = await supabase
+                .from('system_settings')
+                .select('key')
+                .eq('key', key);
+            const exists = checkData && checkData.length > 0;
+            if (exists) {
+                await supabase
+                    .from('system_settings')
+                    .update({ value: JSON.stringify(existingLogs) })
+                    .eq('key', key);
+            } else {
+                await supabase
+                    .from('system_settings')
+                    .insert([{ key: key, value: JSON.stringify(existingLogs) }]);
+            }
+        }
+    } catch (e) {
+        console.error("Lỗi khi ghi nhận nhật ký hệ thống:", e);
+    }
+};
+
+export const fetchSystemEvents = async (): Promise<any[]> => {
+    const key = 'login_logout_logs';
+    if (!isConfigured) {
+        return getFromCache<any[]>(key, []);
+    }
+    try {
+        const { data } = await supabase
+            .from('system_settings')
+            .select('value')
+            .eq('key', key)
+            .single();
+        if (data && data.value) {
+            try {
+                const parsed = JSON.parse(data.value);
+                if (Array.isArray(parsed)) {
+                    saveToCache(key, parsed);
+                    return parsed;
+                }
+            } catch {}
+        }
+    } catch (e) {}
+    return getFromCache<any[]>(key, []);
 };
 
 

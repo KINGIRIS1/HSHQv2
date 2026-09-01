@@ -3,22 +3,21 @@ import React, { useState, useEffect, useMemo } from 'react';
 import * as XLSX from 'xlsx-js-style';
 import { RecordFile, RecordStatus } from '../types';
 import { isArchiveRecordType, getShortRecordType } from '../constants';
-import { formatBatchName, cleanSyncNotes, extractDateFromBatch } from '../utils/appHelpers';
-import { X, FileDown, Calendar, Layers, MapPin, Printer, Eye, Filter } from 'lucide-react';
+import { formatBatchName, cleanSyncNotes } from '../utils/appHelpers';
+import { X, FileDown, Calendar, Layers, Printer, Eye } from 'lucide-react';
 
 interface ExportModalProps {
   isOpen: boolean;
   onClose: () => void;
   records: RecordFile[];
-  wards: string[];
+  wards?: string[];
   type: 'handover' | 'check_list'; // Phân loại danh sách
   onPreview: (workbook: XLSX.WorkBook, fileName: string) => void; // Callback để mở Preview
   currentView?: string;
 }
 
-const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, wards, type, onPreview, currentView }) => {
+const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, type, onPreview, currentView }) => {
   const [selectedBatchKey, setSelectedBatchKey] = useState<string>('');
-  const [selectedWard, setSelectedWard] = useState<string>('all');
   const [recordCategory, setRecordCategory] = useState<'all' | 'measurement' | 'archive'>('all');
 
   // Initialize category based on currentView
@@ -53,11 +52,8 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
       if (type === 'handover') {
           // Logic cho Giao 1 cửa
           if (r.status === RecordStatus.HANDOVER || r.status === RecordStatus.SIGNED || r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED || r.exportBatch) {
-              if (r.exportBatch) {
-                  let dateStr = r.exportDate ? r.exportDate.split('T')[0] : extractDateFromBatch(r.exportBatch);
-                  if (!dateStr) {
-                      dateStr = (r.completedDate || r.receivedDate || new Date().toISOString()).split('T')[0];
-                  }
+              if (r.exportBatch && r.exportDate) {
+                  const dateStr = r.exportDate.split('T')[0];
                   const key = `${dateStr}_${r.exportBatch}`;
                   if (!batches[key]) {
                       batches[key] = { date: dateStr, batch: r.exportBatch, count: 0 };
@@ -88,23 +84,13 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
       }
     });
 
-    // Sắp xếp giảm dần theo ngày chuyển, sau đó giảm dần theo số thứ tự đợt
+    // Sắp xếp giảm dần theo ngày
     return Object.entries(batches)
         .map(([key, value]) => ({ key, ...value }))
-        .sort((a, b) => {
-            const dateCompare = b.date.localeCompare(a.date);
-            if (dateCompare !== 0) return dateCompare;
-            
-            const getBatchNum = (batchVal: any) => {
-                const bStr = String(batchVal);
-                const match = bStr.match(/Đợt\s*(\d+)/i) || bStr.match(/^(\d+)$/);
-                return match ? parseInt(match[1], 10) : 0;
-            };
-            return getBatchNum(b.batch) - getBatchNum(a.batch);
-        });
-  }, [categoryRecords, isOpen, type]);
+        .sort((a, b) => b.date.localeCompare(a.date));
+  }, [categoryRecords, type]);
 
-  // Synchronize filters and selected batch key stably to prevent resetting selection
+  // Synchronize selected batch key stably to prevent resetting selection
   useEffect(() => {
     if (isOpen) {
       if (batchOptions.length > 0) {
@@ -117,7 +103,6 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
       }
     } else {
       setSelectedBatchKey('');
-      setSelectedWard('all');
     }
   }, [isOpen, batchOptions]);
 
@@ -130,15 +115,6 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
       return `${day}/${month}/${year}`;
   };
 
-  const removeVietnameseTones = (str: string): string => {
-    if (!str) return '';
-    str = str.toLowerCase();
-    str = str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    str = str.replace(/đ/g, "d");
-    str = str.replace(/\s+/g, "_");
-    return str.toUpperCase();
-  };
-
   // Hàm tạo Workbook chung (cho cả Preview và Download)
   const generateWorkbook = (): { wb: XLSX.WorkBook, fileName: string } | null => {
     if (!selectedBatchKey) return null;
@@ -148,36 +124,29 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
     let subTitle = "";
     let fileName = "";
 
-    // Xử lý tên xã phường để hiển thị
-    // NẾU selectedWard là 'all' thì hiển thị "TOÀN BỘ", ngược lại hiển thị tên xã
-    const wardTitle = selectedWard === 'all' ? "" : ` - ${selectedWard.toUpperCase()}`;
-
     if (type === 'handover') {
         const parts = selectedBatchKey.split('_');
         const dateStr = parts[0];
         const batchStr = parts.slice(1).join('_');
         
         recordsToExport = categoryRecords.filter(r => {
-            const targetWard = r.handoverWard || r.ward;
-            const matchWard = selectedWard === 'all' || targetWard === selectedWard;
-            
             if (batchStr === 'NOT_BATCHED') {
                 const rDateObj = (r.completedDate || r.receivedDate || new Date().toISOString()).split('T')[0];
-                return r.status === RecordStatus.HANDOVER && !r.exportBatch && rDateObj === dateStr && matchWard;
+                return r.status === RecordStatus.HANDOVER && !r.exportBatch && rDateObj === dateStr;
             } else {
                 const rDateObj = r.exportDate ? r.exportDate.split('T')[0] : '';
                 const matchDate = !dateStr || rDateObj === dateStr;
                 const matchBatch = String(r.exportBatch ?? '').trim() === String(batchStr ?? '').trim();
-                return matchDate && matchBatch && matchWard;
+                return matchDate && matchBatch;
             }
         });
 
         if (recordCategory === 'archive') {
-            title = `DANH SÁCH BÀN GIAO HỒ SƠ LƯU TRỮ 1 CỬA${wardTitle}`;
+            title = `DANH SÁCH BÀN GIAO HỒ SƠ LƯU TRỮ 1 CỬA`;
         } else if (recordCategory === 'measurement') {
-            title = `DANH SÁCH BÀN GIAO HỒ SƠ ĐO ĐẠC 1 CỬA${wardTitle}`;
+            title = `DANH SÁCH BÀN GIAO HỒ SƠ ĐO ĐẠC 1 CỬA`;
         } else {
-            title = `DANH SÁCH BÀN GIAO HỒ SƠ 1 CỬA${wardTitle}`;
+            title = `DANH SÁCH BÀN GIAO HỒ SƠ 1 CỬA`;
         }
 
         const displayBatch = batchStr === 'NOT_BATCHED' 
@@ -199,11 +168,10 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
             const rDateStr = r.receivedDate ? r.receivedDate.split('T')[0] : null;
             const matchDate = rDateStr === dateStr;
             const matchStatus = r.status === RecordStatus.PENDING_SIGN || r.status === RecordStatus.SIGNED;
-            const matchWard = selectedWard === 'all' || r.ward === selectedWard;
-            return matchDate && matchStatus && matchWard;
+            return matchDate && matchStatus;
         });
 
-        title = `DANH SÁCH HỒ SƠ TRÌNH KÝ${wardTitle}`;
+        title = `DANH SÁCH HỒ SƠ TRÌNH KÝ`;
         subTitle = `NGÀY TIẾP NHẬN: ${formatDate(dateStr)}  -  SỐ LƯỢNG: ${recordsToExport.length}`;
         const safeDate = dateStr.replace(/-/g, '');
         fileName = `Trinh_Ky_Ngay_${safeDate}`;
@@ -214,12 +182,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
         return null;
     }
 
-    if (selectedWard !== 'all') {
-        fileName += `_${removeVietnameseTones(selectedWard)}`;
-    }
-
     // --- TẠO EXCEL ---
-    // Tiêu đề ngày tháng (dùng ngày hiện tại hoặc ngày của đợt)
     const exportDateParts = type === 'handover' 
         ? selectedBatchKey.split('_')[0].split('-') 
         : selectedBatchKey.replace('date_', '').split('-');
@@ -228,18 +191,9 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
 
     // --- CẤU HÌNH CỘT ĐỘNG ---
     const isHandover = type === 'handover';
-    const isSpecificWard = selectedWard !== 'all';
 
-    // 1. Header Array
-    let tableHeader = ["STT", "Mã Hồ Sơ", "Chủ Sử Dụng"];
-    
-    // Nếu là Giao 1 cửa và chọn xã cụ thể thì BỎ cột Địa Chỉ
-    // Nếu là Trình ký hoặc Tất cả xã thì GIỮ cột Địa Chỉ
-    if (!(isHandover && isSpecificWard)) {
-        tableHeader.push("Địa Chỉ (Xã)");
-    }
-
-    tableHeader.push("Thửa", "Tờ", "Loại Hồ Sơ");
+    // 1. Header Array - Luôn bao gồm cột Địa Chỉ (Xã)
+    let tableHeader = ["STT", "Mã Hồ Sơ", "Chủ Sử Dụng", "Địa Chỉ (Xã)", "Thửa", "Tờ", "Loại Hồ Sơ"];
 
     // Chỉ hiện Số TĐ, Số TL ở danh sách Trình Ký (Check List)
     if (!isHandover) {
@@ -248,7 +202,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
 
     tableHeader.push("Hẹn Trả");
 
-    // Thêm cột cho Giao 1 cửa
+    // Thêm cột Ghi chú
     tableHeader.push(isHandover ? "Ghi chú" : "Ghi Chú");
 
     // 2. Data Mapping
@@ -261,18 +215,12 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
         const row = [
             index + 1,
             r.code || '',
-            r.customerName || ''
-        ];
-
-        if (!(isHandover && isSpecificWard)) {
-            row.push(r.handoverWard || r.ward || '');
-        }
-
-        row.push(
+            r.customerName || '',
+            r.handoverWard || r.ward || '',
             r.landPlot || '',
             r.mapSheet || '',
             r.recordType || ''
-        );
+        ];
 
         if (!isHandover) {
             row.push(
@@ -301,6 +249,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
         ["Độc lập - Tự do - Hạnh phúc"],
         [""],
         [title],
+        [displayDate.toUpperCase()],
         [subTitle],
     ];
 
@@ -330,7 +279,6 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
     const rightStart = midPoint + 1; // Để lại 1 cột trống ở giữa
     const rightEnd = totalCols - 1;
 
-    // Nếu không đủ cột để chia đôi đẹp, footer sẽ tự điều chỉnh
     const footerRow1 = new Array(totalCols).fill("");
     footerRow1[leftStart] = "BÊN GIAO HỒ SƠ";
     footerRow1[rightStart] = "BÊN NHẬN HỒ SƠ";
@@ -341,22 +289,16 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
 
     XLSX.utils.sheet_add_aoa(ws, [footerRow1, footerRow2], { origin: `A${footerStartRow + 1}` });
 
-    // Cấu hình độ rộng cột (Cần mapping với tableHeader)
+    // Cấu hình độ rộng cột
     const wscols = [
         { wch: 5 },  // STT
         { wch: 18 }, // Mã HS
         { wch: 22 }, // Chủ SD
-    ];
-
-    if (!(isHandover && isSpecificWard)) {
-        wscols.push({ wch: 15 }); // Địa Chỉ (Xã)
-    }
-
-    wscols.push(
+        { wch: 16 }, // Địa Chỉ (Xã)
         { wch: 7 },  // Thửa
         { wch: 7 },  // Tờ
         { wch: 20 }  // Loại
-    );
+    ];
 
     if (!isHandover) {
         wscols.push(
@@ -369,7 +311,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
 
     if (isHandover) {
         wscols.push(
-            { wch: 35 }  // Ghi chú (Rộng rãi để hiển thị thông tin)
+            { wch: 35 }  // Ghi chú
         );
     } else {
         wscols.push({ wch: 15 }); // Ghi chú
@@ -378,7 +320,6 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
     ws['!cols'] = wscols;
 
     // --- CẤU HÌNH CHIỀU CAO DÒNG (ROWS HEIGHT) ---
-    // Đây là phần quan trọng để tăng chiều cao dòng cho việc ký tên
     const wsrows = [];
     
     // Các dòng tiêu đề và header bảng: Cao 30px
@@ -386,16 +327,14 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
         wsrows.push({ hpx: 30 }); 
     }
     
-    // Các dòng dữ liệu: Cao 25px nếu là bàn giao (không cần ký tên), 60px cho các trường hợp khác
+    // Các dòng dữ liệu: Cao 25px nếu là bàn giao, 60px cho các trường hợp khác
     for(let i=0; i < dataRows.length; i++) {
         wsrows.push({ hpx: isHandover ? 25 : 60 });
     }
 
     // Các dòng trống và Footer
-    // lastDataRow là dòng trống đầu tiên sau dữ liệu.
-    // Footer bắt đầu từ lastDataRow + 2.
     wsrows.push({ hpx: 25 }); // Dòng trống sát dữ liệu
-    wsrows.push({ hpx: 25 }); // Dòng trống tiếp theo (để tạo khoảng cách)
+    wsrows.push({ hpx: 25 }); // Dòng trống tiếp theo
     
     wsrows.push({ hpx: 30 }); // Dòng tiêu đề Footer (BÊN GIAO...)
     wsrows.push({ hpx: 30 }); // Dòng ghi chú Footer (Ký và ghi rõ...)
@@ -408,6 +347,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
         { s: { r: 1, c: 0 }, e: { r: 1, c: totalCols - 1 } },
         { s: { r: 3, c: 0 }, e: { r: 3, c: totalCols - 1 } },
         { s: { r: 4, c: 0 }, e: { r: 4, c: totalCols - 1 } },
+        { s: { r: 5, c: 0 }, e: { r: 5, c: totalCols - 1 } },
     ];
 
     if (handoverNoteRowIndex !== null) {
@@ -428,9 +368,9 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
     // Styles
     const borderStyle = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
     const styles = {
-        nationalTitle: { font: { name: "Times New Roman", sz: 14, bold: true }, alignment: { horizontal: "center", vertical: "center" } },
+        nationalTitle: { font: { name: "Times New Roman", sz: 12, bold: true }, alignment: { horizontal: "center", vertical: "center" } },
         nationalSlogan: { font: { name: "Times New Roman", sz: 12, bold: true, underline: true }, alignment: { horizontal: "center", vertical: "center" } },
-        reportTitle: { font: { name: "Times New Roman", sz: 16, bold: true }, alignment: { horizontal: "center", vertical: "center" } },
+        reportTitle: { font: { name: "Times New Roman", sz: 14, bold: true }, alignment: { horizontal: "center", vertical: "center" } },
         reportSubTitle: { font: { name: "Times New Roman", sz: 12, italic: true }, alignment: { horizontal: "center", vertical: "center" } },
         tableHeader: { font: { name: "Times New Roman", sz: 11, bold: true }, alignment: { horizontal: "center", vertical: "center", wrapText: true }, border: borderStyle, fill: { fgColor: { rgb: "E0E0E0" } } },
         tableData: { font: { name: "Times New Roman", sz: 11 }, border: borderStyle, alignment: { vertical: "center", wrapText: true } },
@@ -459,7 +399,6 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
             const cellRef = XLSX.utils.encode_cell({ r: r, c: c });
             if (!ws[cellRef]) ws[cellRef] = { v: "", t: "s" };
             
-            // Tìm tên cột hiện tại để apply style
             const colName = tableHeader[c];
             const centerCols = ["STT", "Thửa", "Tờ", "Số TĐ", "Số TL", "Hẹn Trả", "Đợt Xuất", "Ngày nhận hồ sơ"];
             
@@ -516,7 +455,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
 
         <div className="p-6 space-y-4">
             <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">1. Chọn đợt / ngày xuất</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Chọn đợt / ngày xuất</label>
                 {batchOptions.length > 0 ? (
                     <div className="relative">
                         <select
@@ -546,28 +485,9 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
                 )}
             </div>
 
-            {batchOptions.length > 0 && (
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">2. Lọc theo Xã / Phường (Tùy chọn)</label>
-                    <div className="relative">
-                        <select
-                            className="w-full appearance-none border border-gray-300 rounded-lg px-4 py-3 pr-10 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white text-gray-700 font-medium"
-                            value={selectedWard}
-                            onChange={(e) => setSelectedWard(e.target.value)}
-                        >
-                            <option value="all">-- Tất cả Xã / Phường --</option>
-                            {wards.map(w => (
-                                <option key={w} value={w}>{w}</option>
-                            ))}
-                        </select>
-                        <MapPin className="absolute right-3 top-3.5 text-gray-400 pointer-events-none" size={18} />
-                    </div>
-                </div>
-            )}
-
             <div className="text-xs text-gray-500 bg-blue-50 p-3 rounded border border-blue-100 flex gap-2 items-start">
                 <Calendar size={14} className="mt-0.5 text-blue-500 shrink-0" />
-                <p>Hệ thống sẽ tạo file Excel chuẩn A4 Ngang (Landscape) để in ấn.</p>
+                <p>Hệ thống sẽ tự động tổng hợp toàn bộ hồ sơ trong đợt và tạo file Excel chuẩn A4 Ngang (Landscape) để in ấn.</p>
             </div>
 
             <div className="pt-4 flex justify-between gap-3 border-t">
@@ -582,7 +502,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
                     <button 
                         onClick={handlePreview}
                         disabled={batchOptions.length === 0}
-                        className="flex items-center gap-2 px-4 py-2 bg-blue-100 text-blue-700 border border-blue-200 rounded-md hover:bg-blue-200 disabled:opacity-50 font-medium text-sm transition-colors"
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-100 text-blue-700 border border-blue-200 rounded-md hover:bg-blue-200 disabled:opacity-50 font-medium text-sm transition-colors cursor-pointer"
                     >
                         <Eye size={18} />
                         Xem trước & In
@@ -590,7 +510,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
                     <button 
                         onClick={handleDownload}
                         disabled={batchOptions.length === 0}
-                        className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 font-medium text-sm shadow-sm transition-colors"
+                        className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 font-medium text-sm shadow-sm transition-colors cursor-pointer"
                     >
                         <FileDown size={18} />
                         Tải Excel
@@ -604,3 +524,4 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, war
 };
 
 export default ExportModal;
+

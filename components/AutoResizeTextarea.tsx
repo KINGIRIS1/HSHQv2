@@ -1,57 +1,39 @@
-import React, { useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 
-export interface AutoResizeTextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
-    minRows?: number;
-    maxRows?: number;
+interface AutoResizeTextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
+    value: string;
 }
 
-export const AutoResizeTextarea = forwardRef<HTMLTextAreaElement, AutoResizeTextareaProps>(({
-    value,
-    minRows = 1,
-    className = '',
-    onChange,
-    onInput,
-    rows = 1,
-    style,
-    ...props
-}, ref) => {
-    const internalRef = useRef<HTMLTextAreaElement | null>(null);
-
-    useImperativeHandle(ref, () => internalRef.current as HTMLTextAreaElement);
+const AutoResizeTextarea: React.FC<AutoResizeTextareaProps> = ({ value, onChange, className, ...props }) => {
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
 
     const adjustHeight = () => {
-        const el = internalRef.current;
-        if (!el) return;
-        el.style.height = 'auto';
-        el.style.height = `${el.scrollHeight}px`;
+        const textarea = textareaRef.current;
+        if (textarea) {
+            textarea.style.height = 'auto';
+            // ScrollHeight includes padding. To avoid growing infinitely, we set height to scrollHeight.
+            textarea.style.height = `${textarea.scrollHeight}px`;
+        }
     };
 
     useEffect(() => {
         adjustHeight();
+        // Add a small event listener for window resize to adjust height
+        const handleResize = () => adjustHeight();
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
     }, [value]);
 
     return (
         <textarea
-            ref={internalRef}
-            rows={minRows}
+            ref={textareaRef}
             value={value}
-            onChange={(e) => {
-                adjustHeight();
-                if (onChange) onChange(e);
-            }}
-            onInput={(e) => {
-                adjustHeight();
-                if (onInput) onInput(e);
-            }}
-            className={`resize-none overflow-hidden transition-all duration-100 ${className}`}
-            style={{
-                minHeight: '36px',
-                ...style
-            }}
+            onChange={onChange}
+            rows={1}
+            className={`${className || ''} resize-none overflow-hidden min-h-[38px]`}
             {...props}
         />
     );
-});
+};
 
-AutoResizeTextarea.displayName = 'AutoResizeTextarea';
 export default AutoResizeTextarea;

@@ -1,11 +1,9 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { RecordFile, Holiday, RecordStatus, User, Employee, DangKyParty } from '../../types';
+import { RecordFile, Holiday, RecordStatus, User, Employee } from '../../types';
+import AutoResizeTextarea from '../AutoResizeTextarea';
 import { RECORD_TYPES, EXTENDED_RECORD_TYPES, getShortRecordType, getWardLabel } from '../../constants';
-import { detectProcedureId, getDefaultDocsForProcedure } from '../../constants/procedures';
-import { addActivityLog } from '../../services/activityLogService';
-import { AutoResizeTextarea } from '../AutoResizeTextarea';
-import { Save, User as UserIcon, Calendar, MapPin, FileCheck, Loader2, Printer, RotateCcw, XCircle, CheckCircle, AlertCircle, X, Phone, FileText, BookOpen, Clock, Hash, Map, ChevronDown, ChevronUp, Users, UserPlus, Plus, Shield } from 'lucide-react';
+import { Save, User as UserIcon, Calendar, MapPin, FileCheck, Loader2, Printer, RotateCcw, XCircle, CheckCircle, AlertCircle, X, Phone, FileText, BookOpen, Clock, Hash, Map, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface AttachedDocItem {
   id: string;
@@ -39,11 +37,10 @@ const parseAttachedDocs = (otherDocsStr: string | null | undefined): AttachedDoc
 };
 
 const parseAuthDocType = (str: string | null | undefined) => {
-    if (!str) return { cccd: '', address: '', phone: '' };
+    if (!str) return { cccd: '', address: '' };
     const parts = str.split('|');
     const firstPart = parts[0] || '';
     const secondPart = parts[1] || '';
-    const thirdPart = parts[2] || '';
     
     // Check if first part is an old document type
     const knownDocTypes = ['Hợp đồng ủy quyền', 'Giấy ủy quyền', 'Văn bản ủy quyền', 'Hợp đồng uỷ quyền', 'Giấy uỷ quyền', 'Văn bản uỷ quyền', 'Khác'];
@@ -51,16 +48,15 @@ const parseAuthDocType = (str: string | null | undefined) => {
     
     if (isDocType) {
         if (parts.length >= 4) {
-            // Old format: Loại|Hình thức|CCCD|Địa chỉ/SĐT
-            return { cccd: parts[2] || '', address: parts[3] || '', phone: parts[4] || '' };
+            // Old format proposal: Loại|Hình thức|CCCD|SĐT
+            return { cccd: parts[2] || '', address: parts[3] || '' };
         }
-        return { cccd: '', address: '', phone: '' };
+        return { cccd: '', address: '' };
     } else {
-        // New format: CCCD|Address|Phone
+        // New format: CCCD|Address
         return {
             cccd: firstPart,
-            address: secondPart,
-            phone: thirdPart
+            address: secondPart
         };
     }
 };
@@ -95,48 +91,22 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
     code: '', customerName: '', phoneNumber: '', cccd: '', customerAddress: '', authorizedBy: '', authDocType: '', otherDocs: '', content: '',
     receivedDate: todayStr, deadline: '', ward: processingWard, landPlot: '', mapSheet: '', area: 0,
     address: '', recordType: '', status: RecordStatus.RECEIVED,
-    issueNumber: '', entryNumber: '', issueDate: '', residentialArea: 0,
-    owners: [{ name: '', cccd: '', address: '', phone: '' }],
-    transferees: [],
-    applicantIsOwner: false,
-    applicantName: '',
-    applicantCccd: '',
-    applicantPhone: '',
-    applicantAddress: ''
+    issueNumber: '', entryNumber: '', issueDate: '', residentialArea: 0
   });
 
   const [attachedDocs, setAttachedDocs] = useState<AttachedDocItem[]>([]);
   const [authCccd, setAuthCccd] = useState('');
   const [authAddress, setAuthAddress] = useState('');
-  const [authPhone, setAuthPhone] = useState('');
   const [isAuthOpen, setIsAuthOpen] = useState(false);
-
-  // Danh sách các thủ tục đơn phương / không có bên nhận chuyển nhượng (mặc định người nộp là chủ hồ sơ, ẩn bên nhận)
-  const isNoTransfereeProcedure = (rType?: string | null, code?: string | null) => {
-    const procId = detectProcedureId(code || undefined, rType || undefined);
-    const noTransfereeIds = ['3.2.1', '3.3.1', '3.4.1', '3.6.1', '3.7.2', '3.8.1', '3.8.2'];
-    if (procId && noTransfereeIds.includes(procId)) return true;
-    const lower = (rType || '').toLowerCase();
-    if (lower.includes('3.2.1') || lower.includes('3.3.1') || lower.includes('3.4.1') || lower.includes('3.6.1') || lower.includes('3.7.2') || lower.includes('3.8.1') || lower.includes('3.8.2')) return true;
-    if (lower.includes('cấp đổi gcn (ố nhòe') || lower.includes('cấp lại giấy chứng nhận do bị mất') || lower.includes('không đổi người sử dụng đất') || lower.includes('chuyển mục đích sử dụng đất không phải xin phép') || lower.includes('thay đổi thông tin cá nhân') || lower.includes('đăng ký gdbd') || lower.includes('xóa đk gdbd')) return true;
-    return false;
-  };
 
   useEffect(() => {
       if (initialData) {
-          setFormData({
-              ...initialData,
-              owners: initialData.owners && initialData.owners.length > 0 
-                  ? initialData.owners 
-                  : [{ name: initialData.customerName || '', cccd: initialData.cccd || '', address: initialData.customerAddress || '', phone: initialData.phoneNumber || '' }],
-              transferees: initialData.transferees || []
-          });
+          setFormData(initialData);
           setAttachedDocs(parseAttachedDocs(initialData.otherDocs));
           const parsed = parseAuthDocType(initialData.authDocType);
-          setAuthCccd(parsed.cccd || initialData.authorizedPersonId || '');
-          setAuthAddress(parsed.address || initialData.authorizedPersonAddress || '');
-          setAuthPhone(parsed.phone || initialData.authorizedPersonPhone || '');
-          setIsAuthOpen(!!(initialData.authorizedBy || initialData.authorizedPersonName || parsed.cccd || parsed.address || parsed.phone || initialData.authorizedPersonId || initialData.authorizedPersonPhone));
+          setAuthCccd(parsed.cccd);
+          setAuthAddress(parsed.address);
+          setIsAuthOpen(!!(initialData.authorizedBy || parsed.cccd || parsed.address));
           setNotification(null);
       } else {
           handleReset(false);
@@ -153,31 +123,15 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
       }
   }, [notification]);
 
-  // Kiểm tra loại hồ sơ 3.x.x Đăng ký
-  const isDangKy = formData.recordType ? (
-      formData.recordType.startsWith('3.') || 
-      formData.recordType.toLowerCase().includes('chuyển nhượng') || 
-      formData.recordType.toLowerCase().includes('tặng cho') || 
-      formData.recordType.toLowerCase().includes('thừa kế') || 
-      formData.recordType.toLowerCase().includes('cấp đổi') || 
-      formData.recordType.toLowerCase().includes('cấp lại') ||
-      formData.recordType.toLowerCase().includes('đăng ký')
-  ) : false;
-
   useEffect(() => {
     if (!initialData) {
-        if (!isDangKy) {
-            const newCode = generateCode(processingWard, formData.receivedDate || '');
-            setFormData(prev => {
-                if (prev.code === newCode) return prev;
-                return { ...prev, code: newCode };
-            });
-        } else if (!formData.code) {
-            const newCode = generateCode(processingWard, formData.receivedDate || '');
-            setFormData(prev => ({ ...prev, code: newCode }));
-        }
+        const newCode = generateCode(processingWard, formData.receivedDate || '');
+        setFormData(prev => {
+            if (prev.code === newCode) return prev;
+            return { ...prev, code: newCode };
+        });
     }
-  }, [processingWard, formData.receivedDate, records, initialData, isDangKy]);
+  }, [processingWard, formData.receivedDate, records, initialData]);
 
   const handleChange = (field: keyof RecordFile, value: any) => {
     setFormData(prev => {
@@ -195,8 +149,20 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
         }
         
         if (field === 'recordType') {
-            // Price is no longer defaulted to 310000 for procedure 1.1 / 1.2
-            if (!prev.price) {
+            const vLower = String(value || '').toLowerCase();
+            if (
+                value === '1.1 Sao lục' || 
+                value === '1.1 CC DL ĐĐ' || 
+                value === 'Cung cấp tài liệu đất đai' || 
+                value === '1.1 Cung cấp dữ liệu đất đai' ||
+                value === '1.1 Sao lục hồ sơ' ||
+                vLower.includes('sao lục') ||
+                vLower.includes('1.2') || 
+                vLower.includes('công văn') || 
+                vLower.includes('cong van')
+            ) {
+                newData.price = 310000;
+            } else {
                 newData.price = null;
             }
 
@@ -208,219 +174,12 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
                 ];
                 setAttachedDocs(defaultDocs);
                 newData.otherDocs = JSON.stringify(defaultDocs);
-            } else if (value.startsWith('3.')) {
-                // Đăng ký hồ sơ - mặc định giấy tờ theo quy định
-                const defaultDocsList = getDefaultDocsForProcedure(value, prev.code);
-                const defaultDkDocs: AttachedDocItem[] = defaultDocsList.map((d, idx) => ({
-                    id: String(idx + 1),
-                    name: d.name,
-                    type: d.type === 'Bản sao' ? 'Bản sao' : 'Bản chính'
-                }));
-                setAttachedDocs(defaultDkDocs);
-                newData.otherDocs = JSON.stringify(defaultDkDocs);
-
-                // Nếu là thủ tục đơn phương / không có bên nhận:
-                if (isNoTransfereeProcedure(value, prev.code)) {
-                    newData.applicantIsOwner = false;
-                    newData.transferees = [];
-                    const firstOwner = (prev.owners && prev.owners[0]) || { name: '', cccd: '', phone: '', address: '' };
-                    if (firstOwner.name) newData.applicantName = firstOwner.name;
-                    if (firstOwner.cccd) newData.applicantCccd = firstOwner.cccd;
-                    if (firstOwner.phone) newData.applicantPhone = firstOwner.phone;
-                    if (firstOwner.address) newData.applicantAddress = firstOwner.address;
-                }
             } else {
                 setAttachedDocs([]);
                 newData.otherDocs = '';
             }
         }
         return newData;
-    });
-  };
-
-  // Owners Handlers (Cho 3.x.x)
-  const addOwner = () => {
-    setFormData(prev => ({
-      ...prev,
-      owners: [...(prev.owners || []), { name: '', cccd: '', address: '', phone: '' }]
-    }));
-  };
-
-  const removeOwner = (index: number) => {
-    setFormData(prev => {
-      const remaining = (prev.owners || []).filter((_, idx) => idx !== index);
-      const nextOwners = remaining.length > 0 ? remaining : [{ name: '', cccd: '', address: '', phone: '' }];
-      return { ...prev, owners: nextOwners };
-    });
-  };
-
-  const updateOwner = (index: number, field: keyof DangKyParty, value: string) => {
-    setFormData(prev => {
-      const nextOwners = [...(prev.owners || [{ name: '', cccd: '', address: '', phone: '' }])];
-      nextOwners[index] = { ...nextOwners[index], [field]: value };
-      const updated: Partial<RecordFile> = { ...prev, owners: nextOwners };
-      
-      // Đồng bộ chủ đầu tiên với customerName / cccd / customerAddress / phoneNumber
-      if (index === 0) {
-        if (field === 'name') updated.customerName = value;
-        if (field === 'cccd') updated.cccd = value;
-        if (field === 'phone') updated.phoneNumber = value;
-        if (field === 'address') updated.customerAddress = value;
-        
-        // Nếu KHÔNG tích chọn "Người nộp là chủ" -> người nộp chính là người đứng tên GCN
-        if (!prev.applicantIsOwner) {
-          if (field === 'name') updated.applicantName = value;
-          if (field === 'cccd') updated.applicantCccd = value;
-          if (field === 'phone') updated.applicantPhone = value;
-          if (field === 'address') updated.applicantAddress = value;
-        }
-      }
-      return updated;
-    });
-  };
-
-  // Transferees Handlers (Cho 3.x.x)
-  const addTransferee = () => {
-    setFormData(prev => ({
-      ...prev,
-      transferees: [...(prev.transferees || []), { name: '', cccd: '', address: '', phone: '' }]
-    }));
-  };
-
-  const removeTransferee = (index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      transferees: (prev.transferees || []).filter((_, idx) => idx !== index)
-    }));
-  };
-
-  const updateTransferee = (index: number, field: keyof DangKyParty, value: string) => {
-    setFormData(prev => {
-      const nextTf = [...(prev.transferees || [])];
-      nextTf[index] = { ...nextTf[index], [field]: value };
-      const updated: Partial<RecordFile> = { ...prev, transferees: nextTf };
-
-      // Nếu ĐANG TÍCH "Người nộp là chủ" -> người nộp chính là người nhận quyền đầu tiên
-      if (index === 0 && prev.applicantIsOwner) {
-        if (field === 'name') updated.applicantName = value;
-        if (field === 'cccd') updated.applicantCccd = value;
-        if (field === 'phone') updated.applicantPhone = value;
-        if (field === 'address') updated.applicantAddress = value;
-      }
-      return updated;
-    });
-  };
-
-  // Xử lý thay đổi thông tin người nộp hồ sơ (Real-time auto-sync)
-  const handleApplicantFieldChange = (field: 'applicantName' | 'applicantCccd' | 'applicantPhone' | 'applicantAddress', value: string) => {
-    setFormData(prev => {
-      const updated: Partial<RecordFile> = {
-        ...prev,
-        [field]: value
-      };
-
-      if (prev.applicantIsOwner) {
-        // TÍCH CHỌN: Đưa thông tin vào NGƯỜI NHẬN (transferees[0])
-        const nextTf = [...(prev.transferees || [])];
-        const tfField: keyof DangKyParty = field === 'applicantName' ? 'name' : field === 'applicantCccd' ? 'cccd' : field === 'applicantPhone' ? 'phone' : 'address';
-        if (nextTf.length === 0) {
-          nextTf.push({ name: '', cccd: '', phone: '', address: '', [tfField]: value });
-        } else {
-          nextTf[0] = { ...nextTf[0], [tfField]: value };
-        }
-        updated.transferees = nextTf;
-      } else {
-        // KHÔNG TÍCH: Đưa thông tin vào NGƯỜI ĐỨNG TÊN GCN (owners[0])
-        const nextOwners = [...(prev.owners || [{ name: '', cccd: '', address: '', phone: '' }])];
-        const ownerField: keyof DangKyParty = field === 'applicantName' ? 'name' : field === 'applicantCccd' ? 'cccd' : field === 'applicantPhone' ? 'phone' : 'address';
-        if (nextOwners.length === 0) {
-          nextOwners.push({ name: '', cccd: '', phone: '', address: '', [ownerField]: value });
-        } else {
-          nextOwners[0] = { ...nextOwners[0], [ownerField]: value };
-        }
-        updated.owners = nextOwners;
-        if (field === 'applicantName') updated.customerName = value;
-        if (field === 'applicantCccd') updated.cccd = value;
-        if (field === 'applicantPhone') updated.phoneNumber = value;
-        if (field === 'applicantAddress') updated.customerAddress = value;
-      }
-
-      return updated;
-    });
-  };
-
-  // Sync applicant with Transferee (if checked) or Owner (if unchecked)
-  const handleApplicantIsOwnerToggle = (checked: boolean) => {
-    setFormData(prev => {
-      const updated: Partial<RecordFile> = {
-        ...prev,
-        applicantIsOwner: checked,
-      };
-
-      const curApplicantName = prev.applicantName || prev.customerName || '';
-      const curApplicantCccd = prev.applicantCccd || prev.cccd || '';
-      const curApplicantPhone = prev.applicantPhone || prev.phoneNumber || '';
-      const curApplicantAddress = prev.applicantAddress || prev.customerAddress || '';
-
-      if (checked) {
-        // TÍCH CHỌN: Đưa thông tin nhập vào NGƯỜI NHẬN (CHUYỂN NHƯỢNG, THỪA KẾ, TẶNG CHO, THỎA THUẬN)
-        const nextTf = [...(prev.transferees || [])];
-        if (nextTf.length === 0) {
-          nextTf.push({
-            name: curApplicantName,
-            cccd: curApplicantCccd,
-            phone: curApplicantPhone,
-            address: curApplicantAddress
-          });
-        } else {
-          nextTf[0] = {
-            ...nextTf[0],
-            name: curApplicantName || nextTf[0].name || '',
-            cccd: curApplicantCccd || nextTf[0].cccd || '',
-            phone: curApplicantPhone || nextTf[0].phone || '',
-            address: curApplicantAddress || nextTf[0].address || ''
-          };
-        }
-        updated.transferees = nextTf;
-
-        // Nếu thông tin người nộp đang trống nhưng người nhận đã có sẵn, kéo về người nộp
-        if (!curApplicantName && nextTf[0].name) updated.applicantName = nextTf[0].name;
-        if (!curApplicantCccd && nextTf[0].cccd) updated.applicantCccd = nextTf[0].cccd;
-        if (!curApplicantPhone && nextTf[0].phone) updated.applicantPhone = nextTf[0].phone;
-        if (!curApplicantAddress && nextTf[0].address) updated.applicantAddress = nextTf[0].address;
-      } else {
-        // KHÔNG TÍCH: Đưa thông tin vào Người đứng tên GCN (owners[0])
-        const nextOwners = [...(prev.owners || [{ name: '', cccd: '', address: '', phone: '' }])];
-        if (nextOwners.length === 0) {
-          nextOwners.push({
-            name: curApplicantName,
-            cccd: curApplicantCccd,
-            phone: curApplicantPhone,
-            address: curApplicantAddress
-          });
-        } else {
-          nextOwners[0] = {
-            ...nextOwners[0],
-            name: curApplicantName || nextOwners[0].name || '',
-            cccd: curApplicantCccd || nextOwners[0].cccd || '',
-            phone: curApplicantPhone || nextOwners[0].phone || '',
-            address: curApplicantAddress || nextOwners[0].address || ''
-          };
-        }
-        updated.owners = nextOwners;
-        updated.customerName = nextOwners[0].name;
-        updated.cccd = nextOwners[0].cccd;
-        updated.phoneNumber = nextOwners[0].phone;
-        updated.customerAddress = nextOwners[0].address;
-
-        // Nếu thông tin người nộp đang trống nhưng chủ GCN đã có sẵn, kéo về người nộp
-        if (!curApplicantName && nextOwners[0].name) updated.applicantName = nextOwners[0].name;
-        if (!curApplicantCccd && nextOwners[0].cccd) updated.applicantCccd = nextOwners[0].cccd;
-        if (!curApplicantPhone && nextOwners[0].phone) updated.applicantPhone = nextOwners[0].phone;
-        if (!curApplicantAddress && nextOwners[0].address) updated.applicantAddress = nextOwners[0].address;
-      }
-
-      return updated;
     });
   };
 
@@ -463,56 +222,20 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
     setNotification(null);
     const isCongVan = formData.recordType ? getShortRecordType(formData.recordType) === '1.2 Công văn' : false;
     const isDeadlineRequired = !isCongVan;
-    
-    // Tự động gán customerName từ người nộp hoặc chủ đầu tiên nếu đang ở chế độ 3.x.x
-    let effectiveCustomerName = formData.customerName || '';
-    if (isDangKy) {
-        if (formData.applicantName) {
-            effectiveCustomerName = formData.applicantName;
-        } else if (formData.owners && formData.owners.length > 0 && formData.owners[0].name) {
-            effectiveCustomerName = formData.owners[0].name;
-        }
-    }
-
-    if (!formData.code || (!effectiveCustomerName && !formData.applicantName) || (isDeadlineRequired && !formData.deadline) || !formData.recordType) { 
+    if (!formData.code || !formData.customerName || (isDeadlineRequired && !formData.deadline) || !formData.recordType) { 
         setNotification({ type: 'error', message: "Vui lòng điền các trường bắt buộc (*) và chọn Loại hồ sơ." });
         return; 
     }
     setLoading(true);
-    const isSingleParty = isNoTransfereeProcedure(formData.recordType, formData.code);
     const recordToSave: RecordFile = { 
         ...formData, 
-        transferees: isSingleParty ? [] : (formData.transferees || []),
-        applicantIsOwner: isSingleParty ? false : !!formData.applicantIsOwner,
-        customerName: effectiveCustomerName || formData.customerName || '',
-        applicantName: formData.applicantName || (isSingleParty ? formData.owners?.[0]?.name : formData.applicantName) || '',
-        applicantCccd: formData.applicantCccd || (isSingleParty ? formData.owners?.[0]?.cccd : formData.applicantCccd) || '',
-        applicantPhone: formData.applicantPhone || (isSingleParty ? formData.owners?.[0]?.phone : formData.applicantPhone) || '',
-        applicantAddress: formData.applicantAddress || (isSingleParty ? formData.owners?.[0]?.address : formData.applicantAddress) || '',
-        authorizedBy: formData.authorizedBy || formData.authorizedPersonName || '',
-        authorizedPersonName: formData.authorizedBy || formData.authorizedPersonName || '',
-        authorizedPersonId: authCccd || formData.authorizedPersonId || '',
-        authorizedPersonPhone: authPhone || formData.authorizedPersonPhone || '',
-        authorizedPersonAddress: authAddress || formData.authorizedPersonAddress || '',
-        authDocType: `${authCccd}|${authAddress}|${authPhone}`,
         id: formData.id || Math.random().toString(36).substr(2, 9), 
         status: formData.status || RecordStatus.RECEIVED,
-        receivedBy: formData.receivedBy || currentUser.employeeId,
-        sourceTable: isDangKy ? 'dangky_records' : (formData.sourceTable || 'land_records')
+        receivedBy: formData.receivedBy || currentUser.employeeId 
     } as RecordFile;
     const savedRecord = await onSave(recordToSave);
     setLoading(false);
     if (savedRecord) {
-        addActivityLog({
-            performerName: currentUser?.fullName || currentUser?.name || currentUser?.username || 'Cán bộ',
-            performerRole: currentUser?.role || 'ONEDOOR',
-            actionType: initialData ? 'UPDATE' : 'CREATE',
-            actionLabel: initialData ? 'Cập nhật' : 'Tiếp nhận mới',
-            targetType: isDangKy ? 'Đăng ký' : 'Hồ sơ',
-            referenceCode: savedRecord.code,
-            details: `${initialData ? 'Cập nhật thông tin' : 'Tiếp nhận mới'} hồ sơ ${savedRecord.code} - ${savedRecord.customerName || (savedRecord as any).owners?.[0]?.name || ''}`,
-            recordId: savedRecord.id
-        });
         setNotification({ type: 'success', message: initialData ? `Cập nhật thành công: ${savedRecord.code}` : `Đã tiếp nhận mới: ${savedRecord.code}` });
         if (!initialData && onPrint) {
             onPrint(savedRecord);
@@ -533,19 +256,11 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
           receivedDate: todayStrLocal, deadline: '', 
           ward: processingWard, landPlot: '', mapSheet: '', area: 0, address: '', 
           recordType: '', status: RecordStatus.RECEIVED,
-          issueNumber: '', entryNumber: '', issueDate: '', residentialArea: 0,
-          owners: [{ name: '', cccd: '', address: '', phone: '' }],
-          transferees: [],
-          applicantIsOwner: false,
-          applicantName: '',
-          applicantCccd: '',
-          applicantPhone: '',
-          applicantAddress: ''
+          issueNumber: '', entryNumber: '', issueDate: '', residentialArea: 0
       });
       setAttachedDocs([]);
       setAuthCccd('');
       setAuthAddress('');
-      setAuthPhone('');
       setIsAuthOpen(false);
       if (!keepNotification) setNotification(null);
       if (onCancelEdit && initialData) onCancelEdit();
@@ -584,15 +299,15 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
                         <span className="p-1 bg-blue-100 text-blue-600 rounded-md"><FileCheck size={14} /></span>
                         Loại hồ sơ <span className="text-red-500">*</span>
                     </label>
-                    <select className={`${inputClass} font-semibold`} value={formData.recordType || ''} onChange={(e) => handleChange('recordType', e.target.value)}>
+                    <select className={`${inputClass} font-semibold`} value={formData.recordType ? getShortRecordType(formData.recordType) : ''} onChange={(e) => handleChange('recordType', e.target.value)}>
                         <option value="">-- Chọn loại hồ sơ --</option>
-                        {RECORD_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                        {EXTENDED_RECORD_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                     </select>
                 </div>
 
                 <div>
                     <label className={labelClass}>Mã hồ sơ</label>
-                    <input type="text" readOnly={!initialData && !isDangKy} className={`${inputClass} font-mono ${(!initialData && isDangKy) || initialData ? 'bg-white font-bold text-blue-700' : 'bg-slate-100 text-slate-500 cursor-not-allowed'}`} value={formData.code || ''} onChange={(e) => (initialData || isDangKy) && handleChange('code', e.target.value)} />
+                    <input type="text" readOnly={!initialData} className={`${inputClass} font-mono ${initialData ? 'bg-white font-bold text-blue-700' : 'bg-slate-100 text-slate-500 cursor-not-allowed'}`} value={formData.code || ''} onChange={(e) => initialData && handleChange('code', e.target.value)} />
                 </div>
 
                 <div>
@@ -609,562 +324,19 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
             </div>
         </div>
 
-        {/* NỘI DUNG FORM: DYNAMIC TÙY THEO LOẠI HỒ SƠ */}
-        {isDangKy ? (
-            /* ================= GIAO DIỆN CHUYÊN BIỆT CHO HỒ SƠ 3.x.x ĐĂNG KÝ ================= */
-            <div className="space-y-3.5 sm:space-y-4">
-                {/* 1. THÔNG TIN NGƯỜI NỘP HỒ SƠ */}
-                <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200 shadow-xs">
-                    <div className="flex items-center justify-between border-b pb-2 mb-3 border-slate-100">
-                        <h3 className="text-xs sm:text-sm font-bold text-slate-800 uppercase flex items-center gap-1.5">
-                            <span className="p-1 bg-blue-100 text-blue-600 rounded-md">
-                                <UserIcon size={14} />
-                            </span>
-                            THÔNG TIN NGƯỜI NỘP HỒ SƠ
-                        </h3>
-                        {!isNoTransfereeProcedure(formData.recordType, formData.code) && (
-                            <label className="flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-blue-700 hover:text-blue-900 select-none">
-                                <input
-                                    type="checkbox"
-                                    checked={!!formData.applicantIsOwner}
-                                    onChange={e => handleApplicantIsOwnerToggle(e.target.checked)}
-                                    className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer"
-                                />
-                                Người nộp là chủ hồ sơ
-                            </label>
-                        )}
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        <div>
-                            <label className={labelClass}>
-                                Họ và tên người nộp <span className="text-red-500">*</span>
-                            </label>
-                            <input
-                                type="text"
-                                value={formData.applicantName || ''}
-                                onChange={e => handleApplicantFieldChange('applicantName', e.target.value)}
-                                className={inputClass}
-                                placeholder="Họ và tên..."
-                            />
-                        </div>
-
-                        <div>
-                            <label className={labelClass}>
-                                CCCD/Số Giấy <span className="text-red-500">*</span>
-                            </label>
-                            <input
-                                type="text"
-                                value={formData.applicantCccd || ''}
-                                onChange={e => handleApplicantFieldChange('applicantCccd', e.target.value)}
-                                className={`${inputClass} font-mono`}
-                                placeholder="CCCD..."
-                            />
-                        </div>
-
-                        <div>
-                            <label className={labelClass}>
-                                SĐT người nộp <span className="text-red-500">*</span>
-                            </label>
-                            <input
-                                type="text"
-                                value={formData.applicantPhone || ''}
-                                onChange={e => handleApplicantFieldChange('applicantPhone', e.target.value)}
-                                className={inputClass}
-                                placeholder="Số điện thoại..."
-                            />
-                        </div>
-
-                        <div className="md:col-span-3">
-                            <label className={labelClass}>
-                                Địa chỉ thường trú <span className="text-red-500">*</span>
-                            </label>
-                            <input
-                                type="text"
-                                value={formData.applicantAddress || ''}
-                                onChange={e => handleApplicantFieldChange('applicantAddress', e.target.value)}
-                                className={inputClass}
-                                placeholder="Nhập địa chỉ thường trú..."
-                            />
-                        </div>
-                    </div>
-                </div>
-
-                {/* 2. VỊ TRÍ & THỬA ĐẤT */}
-                <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200 shadow-xs">
-                    <h3 className="text-xs sm:text-sm font-bold text-slate-800 uppercase mb-3 flex items-center gap-1.5 border-b pb-2 border-slate-100">
-                        <span className="p-1 bg-green-100 text-green-600 rounded-md">
-                            <MapPin size={14} />
-                        </span>
-                        VỊ TRÍ & THỬA ĐẤT
-                    </h3>
-                    
-                    <div className="space-y-3">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                            <div>
-                                <label className={labelClass}>
-                                    Xã / Phường <span className="text-red-500">*</span>
-                                </label>
-                                <select
-                                    value={formData.ward || ''}
-                                    onChange={e => handleChange('ward', e.target.value)}
-                                    className={inputClass}
-                                >
-                                    <option value="">-- Chọn Xã/Phường --</option>
-                                    {wards.map(w => (
-                                        <option key={w} value={w}>
-                                            {getWardLabel(w)}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            <div>
-                                <label className={labelClass}>Số phát hành</label>
-                                <input
-                                    type="text"
-                                    value={formData.issueNumber || ''}
-                                    onChange={e => handleChange('issueNumber', e.target.value)}
-                                    className={inputClass}
-                                    placeholder="VD: CD 123456"
-                                />
-                            </div>
-
-                            <div>
-                                <label className={labelClass}>Số vào sổ</label>
-                                <input
-                                    type="text"
-                                    value={formData.entryNumber || ''}
-                                    onChange={e => handleChange('entryNumber', e.target.value)}
-                                    className={inputClass}
-                                    placeholder="VD: CH 01234"
-                                />
-                            </div>
-
-                            <div>
-                                <label className={labelClass}>Ngày cấp</label>
-                                <input
-                                    type="date"
-                                    value={dateVal(formData.issueDate)}
-                                    onChange={e => handleChange('issueDate', e.target.value)}
-                                    className={inputClass}
-                                />
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                            <div>
-                                <label className={labelClass}>Tờ bản đồ</label>
-                                <input
-                                    type="text"
-                                    value={formData.mapSheet || ''}
-                                    onChange={e => handleChange('mapSheet', e.target.value)}
-                                    className={`${inputClass} font-mono`}
-                                    placeholder="Tờ bản đồ"
-                                />
-                            </div>
-
-                            <div>
-                                <label className={labelClass}>Thửa đất</label>
-                                <input
-                                    type="text"
-                                    value={formData.landPlot || ''}
-                                    onChange={e => handleChange('landPlot', e.target.value)}
-                                    className={`${inputClass} font-mono`}
-                                    placeholder="Thửa đất"
-                                />
-                            </div>
-
-                            <div>
-                                <label className={labelClass}>Diện tích (m²)</label>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    value={formData.area ?? 0}
-                                    onChange={e => handleChange('area', e.target.value ? Number(e.target.value) : 0)}
-                                    className={`${inputClass} font-mono text-right`}
-                                    placeholder="0"
-                                />
-                            </div>
-
-                            <div>
-                                <label className={labelClass}>ONT/ODT (m²)</label>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    value={formData.residentialArea ?? 0}
-                                    onChange={e => handleChange('residentialArea', e.target.value ? Number(e.target.value) : 0)}
-                                    className={`${inputClass} font-mono text-right`}
-                                    placeholder="0"
-                                />
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* 3. NGƯỜI ĐỨNG TÊN GCN */}
-                <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200 shadow-xs">
-                    <div className="flex items-center justify-between border-b pb-2 mb-3 border-slate-100">
-                        <h3 className="text-xs sm:text-sm font-bold text-slate-800 uppercase flex items-center gap-1.5">
-                            <span className="p-1 bg-blue-100 text-blue-600 rounded-md">
-                                <Users size={14} />
-                            </span>
-                            NGƯỜI ĐỨNG TÊN GCN
-                        </h3>
-                        <button
-                            type="button"
-                            onClick={addOwner}
-                            className="text-xs bg-blue-50 text-blue-600 px-2.5 py-1 rounded-md border border-blue-200 hover:bg-blue-100 font-bold flex items-center gap-1 transition-all active:scale-95 cursor-pointer shadow-2xs"
-                        >
-                            <Plus size={14} /> THÊM MỚI
-                        </button>
-                    </div>
-                    
-                    <div className="overflow-x-auto border border-slate-200 rounded-xl">
-                        <table className="w-full text-left border-collapse bg-white text-xs sm:text-sm min-w-[500px]">
-                            <thead>
-                                <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                                    <th className="py-2 px-2.5 w-10 text-center">#</th>
-                                    <th className="py-2 px-2.5">HỌ TÊN NGƯỜI ĐỨNG TÊN GCN <span className="text-red-500">*</span></th>
-                                    <th className="py-2 px-2.5">GIẤY CMND/ CCCD <span className="text-red-500">*</span></th>
-                                    <th className="py-2 px-2.5">SỐ ĐIỆN THOẠI</th>
-                                    <th className="py-2 px-2.5 w-10 text-center">XÓA</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100 text-xs sm:text-sm">
-                                {(formData.owners || [{ name: '', cccd: '', address: '', phone: '' }]).map((owner, idx) => (
-                                    <tr key={idx} className="hover:bg-slate-50/50">
-                                        <td className="py-1.5 px-2.5 text-center font-bold text-slate-400">{idx + 1}</td>
-                                        <td className="py-1.5 px-2.5">
-                                            <input
-                                                type="text"
-                                                required={idx === 0}
-                                                value={owner.name}
-                                                onChange={e => updateOwner(idx, 'name', e.target.value)}
-                                                className="w-full px-2 py-1 text-xs sm:text-sm border border-slate-200 rounded-md focus:border-blue-500 outline-none text-slate-800 font-medium"
-                                                placeholder="Họ tên..."
-                                            />
-                                        </td>
-                                        <td className="py-1.5 px-2.5">
-                                            <input
-                                                type="text"
-                                                value={owner.cccd || ''}
-                                                onChange={e => updateOwner(idx, 'cccd', e.target.value)}
-                                                className="w-full px-2 py-1 text-xs sm:text-sm border border-slate-200 rounded-md focus:border-blue-500 outline-none font-mono text-slate-800"
-                                                placeholder="CCCD..."
-                                            />
-                                        </td>
-                                        <td className="py-1.5 px-2.5">
-                                            <input
-                                                type="text"
-                                                value={owner.phone || ''}
-                                                onChange={e => updateOwner(idx, 'phone', e.target.value)}
-                                                className="w-full px-2 py-1 text-xs sm:text-sm border border-slate-200 rounded-md focus:border-blue-500 outline-none text-slate-800"
-                                                placeholder="SĐT..."
-                                            />
-                                        </td>
-                                        <td className="py-1.5 px-2.5 text-center">
-                                            <button
-                                                type="button"
-                                                onClick={() => removeOwner(idx)}
-                                                disabled={(formData.owners || []).length <= 1}
-                                                className="p-1 text-slate-400 hover:text-red-500 rounded-md hover:bg-slate-100 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-                                                title="Xóa dòng"
-                                            >
-                                                <X size={14} />
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                {/* 4. NGƯỜI NHẬN (CHUYỂN NHƯỢNG, THỪA KẾ, TẶNG CHO, THỎA THUẬN) (NẾU CÓ) - Ẩn đối với các thủ tục không có bên nhận */}
-                {!isNoTransfereeProcedure(formData.recordType, formData.code) && (
-                    <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200 shadow-xs">
-                        <div className="flex items-center justify-between border-b pb-2 mb-3 border-slate-100">
-                            <h3 className="text-xs sm:text-sm font-bold text-slate-800 uppercase flex items-center gap-1.5">
-                                <span className="p-1 bg-blue-100 text-blue-600 rounded-md">
-                                    <UserPlus size={14} />
-                                </span>
-                                NGƯỜI NHẬN (CHUYỂN NHƯỢNG, THỪA KẾ, TẶNG CHO, THỎA THUẬN) (NẾU CÓ)
-                            </h3>
-                            <button
-                                type="button"
-                                onClick={addTransferee}
-                                className="text-xs bg-blue-50 text-blue-600 px-2.5 py-1 rounded-md border border-blue-200 hover:bg-blue-100 font-bold flex items-center gap-1 transition-all active:scale-95 cursor-pointer shadow-2xs"
-                            >
-                                <Plus size={14} /> THÊM MỚI
-                            </button>
-                        </div>
-                        
-                        {(formData.transferees || []).length === 0 ? (
-                            <div className="text-center py-3 text-xs text-slate-400 italic bg-slate-50/80 rounded-lg border border-dashed border-slate-200">
-                                Không có người nhận (Click nút "+ THÊM MỚI" để nhập liệu).
-                            </div>
-                        ) : (
-                            <div className="overflow-x-auto border border-slate-200 rounded-xl">
-                                <table className="w-full text-left border-collapse bg-white text-xs sm:text-sm min-w-[500px]">
-                                    <thead>
-                                        <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                                            <th className="py-2 px-2.5 w-10 text-center">#</th>
-                                            <th className="py-2 px-2.5">HỌ VÀ TÊN NGƯỜI NHẬN</th>
-                                            <th className="py-2 px-2.5">GIẤY CMND/ CCCD</th>
-                                            <th className="py-2 px-2.5">SỐ ĐIỆN THOẠI</th>
-                                            <th className="py-2 px-2.5 w-10 text-center">XÓA</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100 text-xs sm:text-sm">
-                                        {(formData.transferees || []).map((tf, idx) => (
-                                            <tr key={idx} className="hover:bg-slate-50/50">
-                                                <td className="py-1.5 px-2.5 text-center font-bold text-slate-400">{idx + 1}</td>
-                                                <td className="py-1.5 px-2.5">
-                                                    <input
-                                                        type="text"
-                                                        value={tf.name}
-                                                        onChange={e => updateTransferee(idx, 'name', e.target.value)}
-                                                        className="w-full px-2 py-1 text-xs sm:text-sm border border-slate-200 rounded-md focus:border-blue-500 outline-none text-slate-800 font-medium"
-                                                        placeholder="Họ tên..."
-                                                    />
-                                                </td>
-                                                <td className="py-1.5 px-2.5">
-                                                    <input
-                                                        type="text"
-                                                        value={tf.cccd || ''}
-                                                        onChange={e => updateTransferee(idx, 'cccd', e.target.value)}
-                                                        className="w-full px-2 py-1 text-xs sm:text-sm border border-slate-200 rounded-md focus:border-blue-500 outline-none font-mono text-slate-800"
-                                                        placeholder="CCCD..."
-                                                    />
-                                                </td>
-                                                <td className="py-1.5 px-2.5">
-                                                    <input
-                                                        type="text"
-                                                        value={tf.phone || ''}
-                                                        onChange={e => updateTransferee(idx, 'phone', e.target.value)}
-                                                        className="w-full px-2 py-1 text-xs sm:text-sm border border-slate-200 rounded-md focus:border-blue-500 outline-none text-slate-800"
-                                                        placeholder="SĐT..."
-                                                    />
-                                                </td>
-                                                <td className="py-1.5 px-2.5 text-center">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => removeTransferee(idx)}
-                                                        className="p-1 text-slate-400 hover:text-red-500 rounded-md hover:bg-slate-100 transition-colors cursor-pointer"
-                                                        title="Xóa dòng"
-                                                    >
-                                                        <X size={14} />
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {/* NỘI DUNG YÊU CẦU CHI TIẾT */}
-                <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200 shadow-xs">
-                    <h3 className="text-xs sm:text-sm font-bold text-slate-800 uppercase mb-2 flex items-center gap-1.5 border-b pb-2 border-slate-100">
-                        <span className="p-1 bg-purple-100 text-purple-600 rounded-md">
-                            <FileText size={14} />
-                        </span>
-                        NỘI DUNG YÊU CẦU CHI TIẾT
-                    </h3>
-                    <AutoResizeTextarea
-                        value={formData.content || formData.notes || ''}
-                        onChange={e => {
-                            handleChange('content', e.target.value);
-                            handleChange('notes', e.target.value);
-                        }}
-                        className={`${inputClass} font-medium leading-relaxed`}
-                        minRows={1}
-                        placeholder="Nhập nội dung yêu cầu chi tiết của hồ sơ..."
-                    />
-                </div>
-
-                {/* 5. GIẤY TỜ KÈM THEO (TOÀN KHUNG) */}
-                <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col">
-                    <div className="flex justify-between items-center mb-2.5 border-b pb-2 border-slate-100">
-                        <h3 className="text-xs sm:text-sm font-bold text-slate-800 uppercase flex items-center gap-1.5">
-                            <span className="p-1 bg-teal-100 text-teal-600 rounded-md"><FileText size={14} /></span> 
-                            Giấy tờ kèm theo
-                        </h3>
-                        <button
-                            type="button"
-                            onClick={handleAddDoc}
-                            className="text-xs bg-blue-50 text-blue-600 px-3 py-1 rounded-md border border-blue-200 hover:bg-blue-100 font-bold flex items-center gap-1 transition-all active:scale-95 cursor-pointer shadow-2xs"
-                        >
-                            + THÊM GIẤY TỜ
-                        </button>
-                    </div>
-                    
-                    {attachedDocs.length === 0 ? (
-                        <div className="text-center py-3 text-xs text-slate-400 italic bg-slate-50/80 rounded-lg border border-dashed border-slate-200">
-                            Chưa có giấy tờ kèm theo nào. (Nhấn "+ THÊM GIẤY TỜ" để thêm)
-                        </div>
-                    ) : (
-                        <div className="overflow-x-auto border border-slate-200 rounded-xl">
-                            <table className="w-full text-left border-collapse bg-white text-xs sm:text-sm">
-                                <thead>
-                                    <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                                        <th className="py-2 px-3 text-center w-10">#</th>
-                                        <th className="py-2 px-3">TÊN GIẤY TỜ</th>
-                                        <th className="py-2 px-3 w-36 text-center">HÌNH THỨC</th>
-                                        <th className="py-2 px-3 w-10 text-center">XÓA</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100 text-xs sm:text-sm">
-                                    {attachedDocs.map((doc, idx) => (
-                                        <tr key={doc.id} className="hover:bg-slate-50/50">
-                                            <td className="py-1 px-2 text-center font-bold text-slate-400 text-xs">{idx + 1}</td>
-                                            <td className="py-1 px-2">
-                                                <input
-                                                    type="text"
-                                                    required
-                                                    className="w-full px-2 py-1 text-xs sm:text-sm border border-slate-200 rounded-md focus:border-blue-500 outline-none"
-                                                    placeholder="Tên giấy tờ..."
-                                                    value={doc.name}
-                                                    onChange={(e) => handleUpdateDoc(idx, 'name', e.target.value)}
-                                                />
-                                            </td>
-                                            <td className="py-1 px-2">
-                                                <div className="flex items-center justify-center gap-1.5 text-xs">
-                                                    <label className="flex items-center gap-0.5 cursor-pointer">
-                                                         <input
-                                                             type="radio"
-                                                             name={`docType-${doc.id}`}
-                                                             value="Bản chính"
-                                                             checked={doc.type === 'Bản chính'}
-                                                             onChange={() => handleUpdateDoc(idx, 'type', 'Bản chính')}
-                                                         />
-                                                         Chính
-                                                     </label>
-                                                     <label className="flex items-center gap-0.5 cursor-pointer">
-                                                         <input
-                                                             type="radio"
-                                                             name={`docType-${doc.id}`}
-                                                             value="Bản sao"
-                                                             checked={doc.type === 'Bản sao'}
-                                                             onChange={() => handleUpdateDoc(idx, 'type', 'Bản sao')}
-                                                         />
-                                                         Sao
-                                                     </label>
-                                                </div>
-                                            </td>
-                                            <td className="py-1 px-2 text-center">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleDeleteDoc(idx)}
-                                                    className="p-1 text-slate-400 hover:text-red-500 rounded-md hover:bg-slate-100 cursor-pointer"
-                                                >
-                                                    <X size={14} />
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-                </div>
-
-                {/* 6. THÔNG TIN NGƯỜI ĐƯỢC ỦY QUYỀN (NẾU CÓ - TOÀN KHUNG) */}
-                <div className="bg-white rounded-xl border border-slate-200 shadow-xs">
-                    <div className="p-3.5 sm:p-4 flex items-center justify-between gap-2 bg-white rounded-xl">
-                        <h3 className="text-xs sm:text-sm font-bold text-slate-800 uppercase flex items-center gap-1.5">
-                            <span className="p-1 bg-indigo-100 text-indigo-600 rounded-md"><Shield size={14} /></span>
-                            Người ủy quyền (nếu có)
-                        </h3>
-                        <button
-                            type="button"
-                            onClick={() => setIsAuthOpen(!isAuthOpen)}
-                            className="text-xs font-bold uppercase rounded-md border border-slate-200 hover:bg-slate-50 px-2.5 py-1 text-slate-600 bg-white shadow-xs cursor-pointer"
-                        >
-                            {isAuthOpen ? '▲ ẨN' : '▼ HIỆN'}
-                        </button>
-                    </div>
-
-                    {isAuthOpen && (
-                        <div className="p-3.5 sm:p-4 bg-slate-50/50 space-y-3 animate-fade-in border-t border-slate-100 rounded-b-xl">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                                <div>
-                                    <label className={labelClass}>Họ và tên</label>
-                                    <input
-                                        type="text"
-                                        className={inputClass}
-                                        placeholder="Họ tên người UQ..."
-                                        value={formData.authorizedBy || ''}
-                                        onChange={(e) => {
-                                            handleChange('authorizedBy', e.target.value);
-                                            handleChange('authorizedPersonName', e.target.value);
-                                        }}
-                                    />
-                                </div>
-                                <div>
-                                    <label className={labelClass}>Số điện thoại</label>
-                                    <input
-                                        type="text"
-                                        className={inputClass}
-                                        placeholder="Số điện thoại..."
-                                        value={authPhone}
-                                        onChange={(e) => {
-                                            setAuthPhone(e.target.value);
-                                            handleChange('authorizedPersonPhone', e.target.value);
-                                            setFormData(prev => ({ ...prev, authDocType: `${authCccd}|${authAddress}|${e.target.value}` }));
-                                        }}
-                                    />
-                                </div>
-                                <div>
-                                    <label className={labelClass}>Số CCCD</label>
-                                    <input
-                                        type="text"
-                                        className={inputClass}
-                                        placeholder="Số CCCD..."
-                                        value={authCccd}
-                                        onChange={(e) => {
-                                            setAuthCccd(e.target.value);
-                                            handleChange('authorizedPersonId', e.target.value);
-                                            setFormData(prev => ({ ...prev, authDocType: `${e.target.value}|${authAddress}|${authPhone}` }));
-                                        }}
-                                    />
-                                </div>
-                                <div>
-                                    <label className={labelClass}>Địa chỉ thường trú</label>
-                                    <input
-                                        type="text"
-                                        className={inputClass}
-                                        placeholder="Địa chỉ thường trú..."
-                                        value={authAddress}
-                                        onChange={(e) => {
-                                            setAuthAddress(e.target.value);
-                                            handleChange('authorizedPersonAddress', e.target.value);
-                                            setFormData(prev => ({ ...prev, authDocType: `${authCccd}|${e.target.value}|${authPhone}` }));
-                                        }}
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            </div>
-        ) : (
-            /* ================= GIAO DIỆN CHUẨN ĐỒNG BỘ CHO HỒ SƠ 1.x (LƯU TRỮ) VÀ 2.x (ĐO ĐẠC) ================= */
-            <div className="space-y-3.5 sm:space-y-4">
-                {/* 1. NGƯỜI NỘP HỒ SƠ HOẶC NƠI GỬI / NHẬN */}
+        {/* PHÍA DƯỚI: LUỒNG DỌC TRÀN VIỀN 100% */}
+        <div className="space-y-3.5 sm:space-y-4 w-full">
+                {/* Người nộp hồ sơ hoặc Nơi gửi / nhận */}
                 <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200 shadow-xs">
                     <h3 className="text-xs sm:text-sm font-bold text-slate-800 uppercase mb-3 flex items-center gap-1.5 border-b pb-2 border-slate-100">
                         <span className="p-1 bg-blue-100 text-blue-600 rounded-md">
                             <UserIcon size={14} />
                         </span> 
-                        {isCongVan ? 'Thông tin nơi gửi / nhận' : 'THÔNG TIN NGƯỜI NỘP HỒ SƠ & CHỦ SỬ DỤNG'}
+                        {isCongVan ? 'Thông tin nơi gửi / nhận' : 'Người nộp hồ sơ'}
                     </h3>
                     
                     {isCongVan ? (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div>
                                 <label className={labelClass}>Số, ký hiệu Công văn <span className="text-red-500">*</span></label>
                                 <input type="text" required className={inputClass} placeholder="VD: 123/UBND-TH..." value={formData.customerName || ''} onChange={(e) => handleChange('customerName', e.target.value)} />
@@ -1173,44 +345,32 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
                                 <label className={labelClass}>Nơi nhận / Đơn vị xử lý</label>
                                 <input type="text" className={inputClass} placeholder="VD: Chi nhánh VPĐKĐD..." value={formData.customerAddress || ''} onChange={(e) => handleChange('customerAddress', e.target.value)} />
                             </div>
-                            <div>
+                            <div className="sm:col-span-2">
                                 <label className={labelClass}>Số điện thoại liên hệ</label>
                                 <input type="text" className={inputClass} placeholder="VD: 09xxxxxxxx" value={formData.phoneNumber || ''} onChange={(e) => handleChange('phoneNumber', e.target.value)} />
                             </div>
                         </div>
                     ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                            <div>
-                                <label className={labelClass}>Họ và tên / Chủ sử dụng <span className="text-red-500">*</span></label>
-                                <input type="text" required className={inputClass} placeholder="Nguyễn Văn A..." value={formData.customerName || ''} onChange={(e) => handleChange('customerName', e.target.value)} />
-                            </div>
-                            <div>
-                                <label className={labelClass}>CCCD / Số Giấy</label>
-                                <input type="text" className={`${inputClass} font-mono`} placeholder="0123456789..." value={formData.cccd || ''} onChange={(e) => handleChange('cccd', e.target.value)} />
-                            </div>
-                            <div>
-                                <label className={labelClass}>Số điện thoại</label>
-                                <input type="text" className={inputClass} placeholder="09xxxxxxxx..." value={formData.phoneNumber || ''} onChange={(e) => handleChange('phoneNumber', e.target.value)} />
-                            </div>
-                            <div className="md:col-span-3">
-                                <label className={labelClass}>Địa chỉ thường trú / Nơi ở hiện nay</label>
-                                <input type="text" className={inputClass} placeholder="Địa chỉ thường trú..." value={formData.customerAddress || ''} onChange={(e) => handleChange('customerAddress', e.target.value)} />
-                            </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                            <div><label className={labelClass}>Chủ sử dụng <span className="text-red-500">*</span></label><input type="text" required className={inputClass} placeholder="Nguyễn Văn A..." value={formData.customerName || ''} onChange={(e) => handleChange('customerName', e.target.value)} /></div>
+                            <div><label className={labelClass}>CCCD</label><input type="text" className={inputClass} placeholder="0123456789..." value={formData.cccd || ''} onChange={(e) => handleChange('cccd', e.target.value)} /></div>
+                            <div><label className={labelClass}>Địa chỉ chủ sử dụng</label><input type="text" className={inputClass} placeholder="Địa chỉ thường trú..." value={formData.customerAddress || ''} onChange={(e) => handleChange('customerAddress', e.target.value)} /></div>
+                            <div><label className={labelClass}>Số điện thoại</label><input type="text" className={inputClass} placeholder="09xxxxxxxx" value={formData.phoneNumber || ''} onChange={(e) => handleChange('phoneNumber', e.target.value)} /></div>
                         </div>
                     )}
                 </div>
 
-                {/* 2. VỊ TRÍ, THỬA ĐẤT & GIẤY CHỨNG NHẬN HOẶC VĂN BẢN CÔNG VĂN */}
+                {/* Thông tin giấy chứng nhận */}
                 <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col">
                     <h3 className="text-xs sm:text-sm font-bold text-slate-800 uppercase mb-3 flex items-center gap-1.5 border-b pb-2 border-slate-100">
                         <span className="p-1 bg-green-100 text-green-600 rounded-md">
                             <MapPin size={14} />
                         </span> 
-                        {isCongVan ? 'Văn bản Công văn' : 'VỊ TRÍ, THỬA ĐẤT & GIẤY CHỨNG NHẬN'}
+                        {isCongVan ? 'Văn bản Công văn' : 'Thông tin thửa đất & Giấy chứng nhận'}
                     </h3>
                     
                     {isCongVan ? (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div>
                                 <label className={labelClass}>Cơ quan ban hành / Nơi gửi</label>
                                 <input type="text" className={inputClass} placeholder="VD: UBND huyện, Tòa án..." value={formData.issueNumber || ''} onChange={(e) => handleChange('issueNumber', e.target.value)} />
@@ -1219,7 +379,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
                                 <label className={labelClass}>Ngày Công văn / Ngày ban hành</label>
                                 <input type="date" className={inputClass} value={dateVal(formData.issueDate)} onChange={(e) => handleChange('issueDate', e.target.value)} />
                             </div>
-                            <div>
+                            <div className="sm:col-span-2">
                                 <label className={labelClass}>Xã / Phường liên quan</label>
                                 <select className={inputClass} value={formData.ward || ''} onChange={(e) => handleChange('ward', e.target.value)}>
                                     <option value="">-- Chọn xã / phường --</option>
@@ -1229,97 +389,63 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
                         </div>
                     ) : (
                         <div className="space-y-3">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                                <div>
-                                    <label className={labelClass}>Xã / Phường <span className="text-red-500">*</span></label>
-                                    <select required className={inputClass} value={formData.ward || ''} onChange={(e) => handleChange('ward', e.target.value)}>
-                                        <option value="">-- Chọn xã / phường --</option>
-                                        {wards.map(w => <option key={w} value={w}>{getWardLabel(w)}</option>)}
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className={labelClass}>Số phát hành</label>
-                                    <input type="text" className={inputClass} placeholder="VD: CD 123456" value={formData.issueNumber || ''} onChange={(e) => handleChange('issueNumber', e.target.value)} />
-                                </div>
-                                <div>
-                                    <label className={labelClass}>Số vào sổ</label>
-                                    <input type="text" className={inputClass} placeholder="VD: CH 01234" value={formData.entryNumber || ''} onChange={(e) => handleChange('entryNumber', e.target.value)} />
-                                </div>
-                                <div>
-                                    <label className={labelClass}>Ngày cấp</label>
-                                    <input type="date" className={inputClass} value={dateVal(formData.issueDate)} onChange={(e) => handleChange('issueDate', e.target.value)} />
-                                </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                                <div><label className={labelClass}>Xã / Phường <span className="text-red-500">*</span></label><select required className={inputClass} value={formData.ward || ''} onChange={(e) => handleChange('ward', e.target.value)}><option value="">-- Chọn xã / phường --</option>{wards.map(w => <option key={w} value={w}>{getWardLabel(w)}</option>)}</select></div>
+                                <div><label className={labelClass}>Số phát hành</label><input type="text" className={inputClass} placeholder="VD: CD 123456" value={formData.issueNumber || ''} onChange={(e) => handleChange('issueNumber', e.target.value)} /></div>
+                                <div><label className={labelClass}>Số vào sổ</label><input type="text" className={inputClass} placeholder="VD: CH 01234" value={formData.entryNumber || ''} onChange={(e) => handleChange('entryNumber', e.target.value)} /></div>
+                                <div><label className={labelClass}>Ngày cấp</label><input type="date" className={inputClass} value={dateVal(formData.issueDate)} onChange={(e) => handleChange('issueDate', e.target.value)} /></div>
                             </div>
                             
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                                <div>
-                                    <label className={labelClass}>Tờ bản đồ</label>
-                                    <input type="text" className={`${inputClass} text-center font-semibold`} placeholder="0" value={formData.mapSheet || ''} onChange={(e) => handleChange('mapSheet', e.target.value)} />
-                                </div>
-                                <div>
-                                    <label className={labelClass}>Thửa đất</label>
-                                    <input type="text" className={`${inputClass} text-center font-semibold`} placeholder="0" value={formData.landPlot || ''} onChange={(e) => handleChange('landPlot', e.target.value)} />
-                                </div>
-                                <div>
-                                    <label className={labelClass}>Tổng diện tích (m²)</label>
-                                    <input type="number" className={`${inputClass} text-center font-semibold`} placeholder="0" value={formData.area || ''} onChange={(e) => handleChange('area', e.target.value)} />
-                                </div>
-                                <div>
-                                    <label className={labelClass}>ONT/ODT (m²)</label>
-                                    <input type="number" className={`${inputClass} text-center font-semibold`} placeholder="0" value={formData.residentialArea || ''} onChange={(e) => handleChange('residentialArea', e.target.value)} />
-                                </div>
+                            <div className="bg-green-50/60 p-2.5 rounded-xl border border-green-100 grid grid-cols-2 sm:grid-cols-4 gap-2 mt-1">
+                                <div><label className="block text-[10px] font-bold text-green-700 uppercase mb-1 text-center">Tờ bản đồ</label><input type="text" className="w-full border border-green-200 rounded-md px-2 py-1 text-center font-bold text-green-800 bg-white outline-none text-xs sm:text-sm" placeholder="0" value={formData.mapSheet || ''} onChange={(e) => handleChange('mapSheet', e.target.value)} /></div>
+                                <div><label className="block text-[10px] font-bold text-green-700 uppercase mb-1 text-center">Thửa đất</label><input type="text" className="w-full border border-green-200 rounded-md px-2 py-1 text-center font-bold text-green-800 bg-white outline-none text-xs sm:text-sm" placeholder="0" value={formData.landPlot || ''} onChange={(e) => handleChange('landPlot', e.target.value)} /></div>
+                                <div><label className="block text-[10px] font-bold text-green-700 uppercase mb-1 text-center">Tổng dt (m²)</label><input type="number" className="w-full border border-green-200 rounded-md px-2 py-1 text-center font-bold text-green-800 bg-white outline-none text-xs sm:text-sm" placeholder="0" value={formData.area || ''} onChange={(e) => handleChange('area', e.target.value)} /></div>
+                                <div><label className="block text-[10px] font-bold text-green-700 uppercase mb-1 text-center">ONT/ODT (m²)</label><input type="number" className="w-full border border-green-200 rounded-md px-2 py-1 text-center font-bold text-green-800 bg-white outline-none text-xs sm:text-sm" placeholder="0" value={formData.residentialArea || ''} onChange={(e) => handleChange('residentialArea', e.target.value)} /></div>
                             </div>
                         </div>
                     )}
                 </div>
-
-                {/* 3. NỘI DUNG YÊU CẦU / CHI TIẾT */}
+                {/* Nội dung chi tiết */}
                 <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col">
                     <h3 className="text-xs sm:text-sm font-bold text-slate-800 uppercase mb-2 flex items-center gap-1.5 border-b pb-2 border-slate-100">
                         <span className="p-1 bg-orange-100 text-orange-600 rounded-md"><FileCheck size={14} /></span> 
-                        {isCongVan ? 'Trích yếu nội dung công văn' : 'NỘI DUNG YÊU CẦU / CHI TIẾT'}
+                        Nội dung chi tiết
                     </h3>
                     
                     <div>
-                        <AutoResizeTextarea
-                            minRows={1}
-                            className="w-full p-2.5 border border-gray-300 rounded-lg text-xs sm:text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 transition-all font-medium text-slate-700 bg-white leading-relaxed"
-                            value={formData.content || ''}
-                            onChange={(e) => handleChange('content', e.target.value)}
-                            placeholder={isCongVan ? "Nhập trích yếu nội dung công văn hành chính..." : "Nhập nội dung yêu cầu trích lục, đo đạc, cung cấp dữ liệu, ghi chú hồ sơ..."}
-                        />
+                        <AutoResizeTextarea className="w-full p-2.5 border border-gray-300 rounded-lg text-xs sm:text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 transition-all font-medium text-slate-700 bg-white" value={formData.content || ''} onChange={(e) => handleChange('content', e.target.value)} placeholder={isCongVan ? "Nhập trích yếu nội dung công văn hành chính..." : "Nhập nội dung chi tiết / ghi chú..."} />
                     </div>
                 </div>
 
-                {/* 4. GIẤY TỜ KÈM THEO (TOÀN KHUNG) */}
+                {/* Giấy tờ kèm theo khác (nếu có) */}
                 <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col">
                     <div className="flex justify-between items-center mb-2.5 border-b pb-2 border-slate-100">
                         <h3 className="text-xs sm:text-sm font-bold text-slate-800 uppercase flex items-center gap-1.5">
                             <span className="p-1 bg-teal-100 text-teal-600 rounded-md"><FileText size={14} /></span> 
-                            {isCongVan ? 'Giấy tờ, văn bản kèm theo' : 'Giấy tờ kèm theo'}
+                            Giấy tờ kèm theo khác (nếu có)
                         </h3>
                         <button
                             type="button"
                             onClick={handleAddDoc}
-                            className="text-xs bg-blue-50 text-blue-600 px-3 py-1 rounded-md border border-blue-200 hover:bg-blue-100 font-bold flex items-center gap-1 transition-all active:scale-95 cursor-pointer shadow-2xs"
+                            className="text-xs bg-blue-50 text-blue-600 px-2.5 py-1 rounded-md border border-blue-200 hover:bg-blue-100 font-bold flex items-center gap-1 transition-all active:scale-95"
                         >
-                            + THÊM GIẤY TỜ
+                            + THÊM
                         </button>
                     </div>
                     
                     {attachedDocs.length === 0 ? (
                         <div className="text-center py-3 text-xs text-slate-400 italic bg-slate-50/80 rounded-lg border border-dashed border-slate-200">
-                            Không có giấy tờ kèm theo nào. (Nhấn "+ THÊM GIẤY TỜ" để thêm)
+                            Không có giấy tờ kèm theo nào.
                         </div>
                     ) : (
                         <div className="overflow-x-auto border border-slate-200 rounded-xl">
                             <table className="w-full text-left border-collapse bg-white text-xs sm:text-sm">
                                 <thead>
                                     <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                                        <th className="py-2 px-3 text-center w-10">#</th>
-                                        <th className="py-2 px-3">TÊN GIẤY TỜ</th>
-                                        <th className="py-2 px-3 w-36 text-center">HÌNH THỨC</th>
-                                        <th className="py-2 px-3 w-10 text-center">XÓA</th>
+                                        <th className="py-1.5 px-2 text-center w-8">#</th>
+                                        <th className="py-1.5 px-2">Tên giấy tờ</th>
+                                        <th className="py-1.5 px-2 w-28 text-center">Loại</th>
+                                        <th className="py-1.5 px-2 w-8 text-center">Xóa</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100 text-xs sm:text-sm">
@@ -1364,7 +490,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
                                                 <button
                                                     type="button"
                                                     onClick={() => handleDeleteDoc(idx)}
-                                                    className="p-1 text-slate-400 hover:text-red-500 rounded-md hover:bg-slate-100 cursor-pointer"
+                                                    className="p-1 text-slate-400 hover:text-red-500 rounded-md hover:bg-slate-100"
                                                 >
                                                     <X size={14} />
                                                 </button>
@@ -1377,86 +503,68 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
                     )}
                 </div>
 
-                {/* 5. THÔNG TIN NGƯỜI ĐƯỢC ỦY QUYỀN (NẾU CÓ - TOÀN KHUNG) */}
+                {/* Thông tin người được ủy quyền (nếu có) */}
                 <div className="bg-white rounded-xl border border-slate-200 shadow-xs">
-                    <div className="p-3.5 sm:p-4 flex items-center justify-between gap-2 bg-white rounded-xl">
+                    <div 
+                        onClick={() => setIsAuthOpen(!isAuthOpen)}
+                        className="p-3.5 sm:p-4 flex items-center justify-between gap-2 bg-white rounded-xl cursor-pointer hover:bg-slate-50 select-none"
+                    >
                         <h3 className="text-xs sm:text-sm font-bold text-slate-800 uppercase flex items-center gap-1.5">
-                            <span className="p-1 bg-indigo-100 text-indigo-600 rounded-md"><Shield size={14} /></span>
+                            <span className="p-1 bg-indigo-100 text-indigo-600 rounded-md"><UserIcon size={14} /></span>
                             Người ủy quyền (nếu có)
                         </h3>
                         <button
                             type="button"
-                            onClick={() => setIsAuthOpen(!isAuthOpen)}
-                            className="text-xs font-bold uppercase rounded-md border border-slate-200 hover:bg-slate-50 px-2.5 py-1 text-slate-600 bg-white shadow-xs cursor-pointer"
+                            className="text-xs font-bold uppercase rounded-md border border-slate-200 px-2.5 py-1 text-slate-600 bg-white shadow-xs pointer-events-none"
                         >
                             {isAuthOpen ? '▲ ẨN' : '▼ HIỆN'}
                         </button>
                     </div>
 
                     {isAuthOpen && (
-                        <div className="p-3.5 sm:p-4 bg-slate-50/50 space-y-3 animate-fade-in border-t border-slate-100 rounded-b-xl">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                        <div className="p-3.5 bg-slate-50/50 space-y-3 animate-fade-in border-t border-slate-100 rounded-b-xl">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div>
                                     <label className={labelClass}>Họ và tên</label>
                                     <input
                                         type="text"
                                         className={inputClass}
-                                        placeholder="Họ tên người UQ..."
+                                        placeholder="Họ tên..."
                                         value={formData.authorizedBy || ''}
-                                        onChange={(e) => {
-                                            handleChange('authorizedBy', e.target.value);
-                                            handleChange('authorizedPersonName', e.target.value);
-                                        }}
-                                    />
-                                </div>
-                                <div>
-                                    <label className={labelClass}>Số điện thoại</label>
-                                    <input
-                                        type="text"
-                                        className={inputClass}
-                                        placeholder="Số điện thoại..."
-                                        value={authPhone}
-                                        onChange={(e) => {
-                                            setAuthPhone(e.target.value);
-                                            handleChange('authorizedPersonPhone', e.target.value);
-                                            setFormData(prev => ({ ...prev, authDocType: `${authCccd}|${authAddress}|${e.target.value}` }));
-                                        }}
+                                        onChange={(e) => handleChange('authorizedBy', e.target.value)}
                                     />
                                 </div>
                                 <div>
                                     <label className={labelClass}>Số CCCD</label>
                                     <input
                                         type="text"
-                                        className={`${inputClass} font-mono`}
+                                        className={inputClass}
                                         placeholder="Số CCCD..."
                                         value={authCccd}
                                         onChange={(e) => {
                                             setAuthCccd(e.target.value);
-                                            handleChange('authorizedPersonId', e.target.value);
-                                            setFormData(prev => ({ ...prev, authDocType: `${e.target.value}|${authAddress}|${authPhone}` }));
+                                            setFormData(prev => ({ ...prev, authDocType: `${e.target.value}|${authAddress}` }));
                                         }}
                                     />
                                 </div>
-                                <div>
-                                    <label className={labelClass}>Địa chỉ thường trú</label>
-                                    <input
-                                        type="text"
-                                        className={inputClass}
-                                        placeholder="Địa chỉ thường trú..."
-                                        value={authAddress}
-                                        onChange={(e) => {
-                                            setAuthAddress(e.target.value);
-                                            handleChange('authorizedPersonAddress', e.target.value);
-                                            setFormData(prev => ({ ...prev, authDocType: `${authCccd}|${e.target.value}|${authPhone}` }));
-                                        }}
-                                    />
-                                </div>
+                            </div>
+                            <div>
+                                <label className={labelClass}>Địa chỉ</label>
+                                <input
+                                    type="text"
+                                    className={inputClass}
+                                    placeholder="Địa chỉ thường trú..."
+                                    value={authAddress}
+                                    onChange={(e) => {
+                                        setAuthAddress(e.target.value);
+                                        setFormData(prev => ({ ...prev, authDocType: `${authCccd}|${e.target.value}` }));
+                                    }}
+                                />
                             </div>
                         </div>
                     )}
                 </div>
             </div>
-        )}
 
         {/* BUTTONS CỐ ĐỊNH STICKY DƯỚI CÙNG */}
         <div className="sticky bottom-0 left-0 right-0 z-20 bg-slate-50/95 backdrop-blur-md border-t border-slate-200 py-2.5 px-4 2xl:py-3.5 2xl:px-8 -mx-4 flex flex-col sm:flex-row justify-end gap-2.5 2xl:gap-4 shadow-md rounded-b-xl mt-3 2xl:mt-6">

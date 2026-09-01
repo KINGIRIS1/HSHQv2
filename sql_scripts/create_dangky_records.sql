@@ -1,55 +1,48 @@
 -- ====================================================================
--- SCRIPT TẠO BẢNG DANGKY_RECORDS CHO MODULE ĐĂNG KÝ HỒ SƠ
--- Chạy trên Supabase SQL Editor
+-- SCRIPT TẠO BẢNG DANGKY_RECORDS CHO TỔ CẤP GIẤY / ĐĂNG KÝ
+-- Dùng cho dự án Supabase riêng (ví dụ: https://lrnfdksqepztnihrkgrr.supabase.co)
+-- hoặc chạy trên Supabase chung.
 -- ====================================================================
 
 CREATE TABLE IF NOT EXISTS dangky_records (
-    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-    code TEXT NOT NULL UNIQUE,                                -- Mã hồ sơ
+    id TEXT PRIMARY KEY,
+    code TEXT NOT NULL UNIQUE,
+    "customerName" TEXT NOT NULL,
+    "phoneNumber" TEXT,
+    cccd TEXT,
+    "customerAddress" TEXT,
+    ward TEXT,
+    "landPlot" TEXT,
+    "mapSheet" TEXT,
+    area NUMERIC,
+    address TEXT,
+    "group" TEXT,
     
-    -- Đa chủ sử dụng & Đa người nhận (Kiểu JSONB)
-    owners JSONB DEFAULT '[]'::jsonb,                        -- [{name, cccd, address}]
-    transferees JSONB DEFAULT '[]'::jsonb,                   -- [{name, cccd, address}]
+    -- Thông tin cấp giấy & kết quả
+    "issueNumber" TEXT,
+    "entryNumber" TEXT,
+    "issueDate" DATE,
+    "residentialArea" NUMERIC,
+    status TEXT DEFAULT 'RECEIVED',
     
-    -- Người ủy quyền
-    "authorizedPersonName" TEXT,                             -- Họ và tên người ủy quyền
-    "authorizedPersonId" TEXT,                               -- CCCD người ủy quyền
-    "authorizedPersonAddress" TEXT,                          -- Địa chỉ người ủy quyền
-    
-    -- Thửa đất & Giấy chứng nhận
-    "issueNumber" TEXT,                                      -- Số phát hành GCN
-    "entryNumber" TEXT,                                      -- Số vào sổ
-    "totalArea" NUMERIC,                                     -- Tổng diện tích (m2)
-    "residentialArea" NUMERIC,                               -- Diện tích ONT/ODT (m2)
-    ward TEXT,                                               -- Xã/Phường
-    "recordType" TEXT,                                       -- Loại hồ sơ
-    
-    -- Tiến độ Quy trình & Cán bộ
-    "receivedDate" TIMESTAMPTZ,                              -- Ngày nhận
-    deadline TIMESTAMPTZ,                                    -- Hẹn trả
-    "appraisalDate" TIMESTAMPTZ,                             -- Ngày Thẩm định
-    "appraisalStaff" TEXT,                                   -- NV Thẩm định
-    "taxFormDate" TIMESTAMPTZ,                               -- Ngày Phiếu chuyển thuế
-    "taxFormStaff" TEXT,                                     -- NV Phiếu chuyển
-    "taxKV7TransferDate" TIMESTAMPTZ,                        -- Ngày Chuyển Thuế KV7
-    "taxNoticeDate" TIMESTAMPTZ,                             -- Ngày TBT (Thông báo thuế)
-    "taxPaymentReceiptDate" TIMESTAMPTZ,                    -- Ngày GNT (Giấy nộp tiền)
-    "printDate" TIMESTAMPTZ,                                 -- Ngày In GCN
-    "pendingCheckDate" TIMESTAMPTZ,                          -- Ngày Trình KT
-    "checkedBy" TEXT,                                        -- Người Kiểm tra
-    "submissionDate" TIMESTAMPTZ,                            -- Ngày Trình ký
-    "submittedTo" TEXT,                                      -- Người ký
-    "completedDate" TIMESTAMPTZ,                             -- Hoàn thành
-    "exportBatch" TEXT,                                      -- Đợt xuất
-    "resultReturnedDate" TIMESTAMPTZ,                        -- Ngày Trả kết quả
+    -- Quy trình & Nhân sự
+    "receivedBy" TEXT,
+    "assignedTo" TEXT,
+    "checkedBy" TEXT,
+    "submissionDate" DATE,
+    "approvalDate" DATE,
+    "completedDate" DATE,
+    "assignedDate" DATE,
     
     -- Tài chính
-    "receiptNumber" TEXT,                                    -- Số Biên lai
-    "invoiceNumber" TEXT,                                    -- Số Hóa đơn
-    "feeAmount" NUMERIC DEFAULT 0,                           -- Số tiền thu (VNĐ)
+    price NUMERIC,
+    "advancePayment" NUMERIC,
     
-    status TEXT DEFAULT 'Tiếp nhận mới',                    -- Trạng thái (1 trong 14 bước)
-    notes TEXT,                                              -- Ghi chú
+    -- Lịch sử & Bàn giao
+    "statusLogs" JSONB DEFAULT '[]'::jsonb,
+    "isHandedOver" BOOLEAN DEFAULT FALSE,
+    "archiveHandoverDate" DATE,
+    "archiveHandoverBatch" TEXT,
     
     "createdAt" TIMESTAMPTZ DEFAULT NOW(),
     "updatedAt" TIMESTAMPTZ DEFAULT NOW()
@@ -59,5 +52,3 @@ CREATE TABLE IF NOT EXISTS dangky_records (
 CREATE INDEX IF NOT EXISTS idx_dangky_code ON dangky_records(code);
 CREATE INDEX IF NOT EXISTS idx_dangky_status ON dangky_records(status);
 CREATE INDEX IF NOT EXISTS idx_dangky_ward ON dangky_records(ward);
-CREATE INDEX IF NOT EXISTS idx_dangky_owners ON dangky_records USING gin (owners);
-CREATE INDEX IF NOT EXISTS idx_dangky_transferees ON dangky_records USING gin (transferees);

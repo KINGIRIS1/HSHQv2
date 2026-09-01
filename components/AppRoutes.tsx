@@ -27,10 +27,8 @@ import WorkScheduleView from "./WorkScheduleView";
 import SaoLucView from "./archive/SaoLucView";
 import CongVanView from "./archive/CongVanView";
 import RegistrationRecords from "./RegistrationRecords";
-import VaoSoView from "./archive/VaoSoView";
 import SystemView from "./SystemView";
 import BarcodeGeneratorView from "./BarcodeGeneratorView";
-import RecordLookupView from "./records/RecordLookupView";
 
 const formatDateDDMMYYYY = (isoStr: string) => {
   if (!isoStr) return "";
@@ -269,7 +267,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
   }, [props.handoverTab]);
 
   const hasPermission = (permissionId: string) => {
-    if (currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.SUBADMIN) return true;
+    if (currentUser.role === UserRole.ADMIN) return true;
 
     const rolePerms = (rolePermissions && rolePermissions[currentUser.role]) || DEFAULT_ROLE_PERMISSIONS[currentUser.role] || [];
     return rolePerms.includes("*") || rolePerms.includes(permissionId);
@@ -280,22 +278,13 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
 
   // Xác định xem user có thuộc Ban giám đốc không
   const isDirector = React.useMemo(() => {
-    if (currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.SUBADMIN || (currentUser.role as string) === 'DIRECTOR') return true;
     if (!currentUser.employeeId) return false;
     const emp = employees.find((e) => e.id === currentUser.employeeId);
-    if (!emp) return false;
-    const dept = (emp.department || '').trim().toLowerCase();
-    const pos = (emp.position || '').trim().toLowerCase();
-    return (
-      dept.includes("giám đốc") ||
-      dept.includes("lãnh đạo") ||
-      dept.includes("ban giám đốc") ||
-      dept.includes("ban lãnh đạo") ||
-      pos.includes("giám đốc") ||
-      pos.includes("phó giám đốc") ||
-      pos.includes("lãnh đạo")
-    );
-  }, [currentUser, employees]);
+    return emp
+      ? emp.department?.trim().toLowerCase() === "ban giám đốc" ||
+          emp.department?.trim().toLowerCase() === "ban lãnh đạo"
+      : false;
+  }, [currentUser.employeeId, employees]);
 
   // canPerformAction is kept for backward compatibility, but we should use hasPermission where possible
   const canPerformAction =
@@ -323,15 +312,23 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  const isStatusFilterHidden = [
+    'assign_tasks', 'other_assign_tasks', 'archive_assign_tasks',
+    'completed_list', 'archive_completed_list',
+    'pending_check_list', 'archive_pending_check_list', 'check_list', 'other_check_list', 'archive_check_list',
+    'director_completed', 'other_director_completed', 'archive_director_completed',
+    'handover_list', 'other_handover_list', 'archive_handover_list'
+  ].includes(props.currentView || '');
+
   const activeFilterCount = React.useMemo(() => {
     let count = 0;
     if (props.filterFromDate || props.filterToDate) count++;
     if (props.filterWard && props.filterWard !== 'all') count++;
     if (props.filterRecordType && props.filterRecordType !== 'all') count++;
-    if (props.filterStatus && props.filterStatus !== 'all') count++;
+    if (!isStatusFilterHidden && props.filterStatus && props.filterStatus !== 'all') count++;
     if (props.filterEmployee && props.filterEmployee !== 'all') count++;
     return count;
-  }, [props.filterFromDate, props.filterToDate, props.filterWard, props.filterRecordType, props.filterStatus, props.filterEmployee]);
+  }, [props.filterFromDate, props.filterToDate, props.filterWard, props.filterRecordType, props.filterStatus, props.filterEmployee, isStatusFilterHidden]);
 
   const navigateToReceiveRecordSubTab = (subTab: 'create' | 'list' | 'bulk' | 'update' | 'vphc') => {
     ignoreSubTabResetRef.current = true;
@@ -417,9 +414,10 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
     if (
       currentView === "check_list" ||
       currentView === "other_check_list" ||
+      currentView === "archive_check_list" ||
       currentView === "archive_check_list"
     )
-      title = "Danh sách Trình Ký";
+      title = isDirector ? "Danh sách Chờ ký" : "Danh sách Trình Ký";
     else if (
       currentView === "director_completed" ||
       currentView === "other_director_completed" ||
@@ -435,6 +433,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
     else if (
       currentView === "assign_tasks" ||
       currentView === "other_assign_tasks" ||
+      currentView === "archive_assign_tasks" ||
       currentView === "archive_assign_tasks"
     )
       title = "Hồ sơ chưa giao";
@@ -464,44 +463,48 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
             {/* SUB-HEADER TABS FOR MEASUREMENT RECORDS */}
             {isMeasurementView && (
           <div className="flex border-b border-gray-200 bg-gray-50 px-4 overflow-x-auto">
-            {isViewAllowedForUser(currentUser, employees, "all_records", rolePermissions, departmentPermissions) && (
-              <button
-                id="tab-records-all"
-                onClick={() => props.setCurrentView("all_records")}
-                className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "all_records" ? "border-blue-600 text-blue-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
-              >
-                <FileText size={16} /> Tất cả hồ sơ
-              </button>
-            )}
+            {!isDirector && (
+              <>
+                {isViewAllowedForUser(currentUser, employees, "all_records", rolePermissions, departmentPermissions) && (
+                  <button
+                    id="tab-records-all"
+                    onClick={() => props.setCurrentView("all_records")}
+                    className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "all_records" ? "border-blue-600 text-blue-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
+                  >
+                    <FileText size={16} /> Tất cả hồ sơ
+                  </button>
+                )}
 
-            {isViewAllowedForUser(currentUser, employees, "assign_tasks", rolePermissions, departmentPermissions) && (
-              <button
-                id="tab-records-assign-tasks"
-                onClick={() => props.setCurrentView("assign_tasks")}
-                className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "assign_tasks" ? "border-blue-600 text-blue-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
-              >
-                <UserPlusIcon size={16} /> Chưa giao
-              </button>
-            )}
+                {isViewAllowedForUser(currentUser, employees, "assign_tasks", rolePermissions, departmentPermissions) && (
+                  <button
+                    id="tab-records-assign-tasks"
+                    onClick={() => props.setCurrentView("assign_tasks")}
+                    className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "assign_tasks" ? "border-blue-600 text-blue-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
+                  >
+                    <UserPlusIcon size={16} /> Chưa giao
+                  </button>
+                )}
 
-            {isViewAllowedForUser(currentUser, employees, "completed_list", rolePermissions, departmentPermissions) && (
-              <button
-                id="tab-records-completed-list"
-                onClick={() => props.setCurrentView("completed_list")}
-                className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "completed_list" || currentView === "archive_completed_list" ? "border-blue-600 text-blue-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
-              >
-                <CheckSquare size={16} /> Đang thực hiện
-              </button>
-            )}
+                {isViewAllowedForUser(currentUser, employees, "completed_list", rolePermissions, departmentPermissions) && (
+                  <button
+                    id="tab-records-completed-list"
+                    onClick={() => props.setCurrentView("completed_list")}
+                    className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "completed_list" || currentView === "archive_completed_list" ? "border-blue-600 text-blue-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
+                  >
+                    <CheckSquare size={16} /> Đang thực hiện
+                  </button>
+                )}
 
-            {isViewAllowedForUser(currentUser, employees, "pending_check_list", rolePermissions, departmentPermissions) && (
-              <button
-                id="tab-records-pending-check-list"
-                onClick={() => props.setCurrentView("pending_check_list")}
-                className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "pending_check_list" ? "border-orange-600 text-orange-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
-              >
-                <ClipboardList size={16} /> Kiểm tra
-              </button>
+                {isViewAllowedForUser(currentUser, employees, "pending_check_list", rolePermissions, departmentPermissions) && (
+                  <button
+                    id="tab-records-pending-check-list"
+                    onClick={() => props.setCurrentView("pending_check_list")}
+                    className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "pending_check_list" ? "border-orange-600 text-orange-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
+                  >
+                    <ClipboardList size={16} /> Kiểm tra
+                  </button>
+                )}
+              </>
             )}
 
             {isViewAllowedForUser(currentUser, employees, "check_list", rolePermissions, departmentPermissions) && (
@@ -510,11 +513,21 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                 onClick={() => props.setCurrentView("check_list")}
                 className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "check_list" ? "border-purple-600 text-purple-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
               >
-                <ClipboardList size={16} /> Trình ký
+                <ClipboardList size={16} /> {isDirector ? "Chờ ký" : "Trình ký"}
               </button>
             )}
 
-            {isViewAllowedForUser(currentUser, employees, "handover_list", rolePermissions, departmentPermissions) && (
+            {isDirector && isViewAllowedForUser(currentUser, employees, "director_completed", rolePermissions, departmentPermissions) && (
+              <button
+                id="tab-records-director-completed"
+                onClick={() => props.setCurrentView("director_completed")}
+                className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "director_completed" ? "border-green-600 text-green-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
+              >
+                <CheckSquare size={16} /> Hoàn thành
+              </button>
+            )}
+
+            {!isDirector && isViewAllowedForUser(currentUser, employees, "handover_list", rolePermissions, departmentPermissions) && (
                 <button
                   id="tab-records-handover-list"
                   onClick={() => props.setCurrentView("handover_list")}
@@ -529,44 +542,48 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
         {/* SUB-HEADER TABS FOR ARCHIVE RECORDS */}
         {isArchiveMeasurementView && (
           <div className="flex border-b border-gray-200 bg-gray-50 px-4 overflow-x-auto">
-            {isViewAllowedForUser(currentUser, employees, "archive_records", rolePermissions, departmentPermissions) && (
-              <button
-                id="tab-archive-records"
-                onClick={() => props.setCurrentView("archive_records")}
-                className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "archive_records" ? "border-blue-600 text-blue-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
-              >
-                <FileText size={16} /> Tất cả hồ sơ
-              </button>
-            )}
+            {!isDirector && (
+              <>
+                {isViewAllowedForUser(currentUser, employees, "archive_records", rolePermissions, departmentPermissions) && (
+                  <button
+                    id="tab-archive-records"
+                    onClick={() => props.setCurrentView("archive_records")}
+                    className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "archive_records" ? "border-blue-600 text-blue-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
+                  >
+                    <FileText size={16} /> Tất cả hồ sơ
+                  </button>
+                )}
 
-            {isViewAllowedForUser(currentUser, employees, "archive_assign_tasks", rolePermissions, departmentPermissions) && (
-              <button
-                id="tab-archive-assign-tasks"
-                onClick={() => props.setCurrentView("archive_assign_tasks")}
-                className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "archive_assign_tasks" ? "border-blue-600 text-blue-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
-              >
-                <UserPlusIcon size={16} /> Chưa giao
-              </button>
-            )}
+                {isViewAllowedForUser(currentUser, employees, "archive_assign_tasks", rolePermissions, departmentPermissions) && (
+                  <button
+                    id="tab-archive-assign-tasks"
+                    onClick={() => props.setCurrentView("archive_assign_tasks")}
+                    className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "archive_assign_tasks" ? "border-blue-600 text-blue-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
+                  >
+                    <UserPlusIcon size={16} /> Chưa giao
+                  </button>
+                )}
 
-            {isViewAllowedForUser(currentUser, employees, "archive_completed_list", rolePermissions, departmentPermissions) && (
-              <button
-                id="tab-archive-completed-list"
-                onClick={() => props.setCurrentView("archive_completed_list")}
-                className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "archive_completed_list" ? "border-blue-600 text-blue-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
-              >
-                <CheckSquare size={16} /> Đang thực hiện
-              </button>
-            )}
+                {isViewAllowedForUser(currentUser, employees, "archive_completed_list", rolePermissions, departmentPermissions) && (
+                  <button
+                    id="tab-archive-completed-list"
+                    onClick={() => props.setCurrentView("archive_completed_list")}
+                    className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "archive_completed_list" ? "border-blue-600 text-blue-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
+                  >
+                    <CheckSquare size={16} /> Đang thực hiện
+                  </button>
+                )}
 
-            {isViewAllowedForUser(currentUser, employees, "archive_pending_check_list", rolePermissions, departmentPermissions) && (
-              <button
-                id="tab-archive-pending-check-list"
-                onClick={() => props.setCurrentView("archive_pending_check_list")}
-                className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "archive_pending_check_list" ? "border-orange-600 text-orange-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
-              >
-                <ClipboardList size={16} /> Kiểm tra
-              </button>
+                {/* {isViewAllowedForUser(currentUser, employees, "archive_pending_check_list", rolePermissions, departmentPermissions) && (
+                  <button
+                    id="tab-archive-pending-check-list"
+                    onClick={() => props.setCurrentView("archive_pending_check_list")}
+                    className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "archive_pending_check_list" ? "border-orange-600 text-orange-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
+                  >
+                    <ClipboardList size={16} /> Kiểm tra
+                  </button>
+                )} */}
+              </>
             )}
 
             {isViewAllowedForUser(currentUser, employees, "archive_check_list", rolePermissions, departmentPermissions) && (
@@ -575,11 +592,23 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                 onClick={() => props.setCurrentView("archive_check_list")}
                 className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "archive_check_list" ? "border-purple-600 text-purple-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
               >
-                <ClipboardList size={16} /> Trình ký
+                <ClipboardList size={16} /> {isDirector ? "Chờ ký" : "Trình ký"}
               </button>
             )}
 
-            {isViewAllowedForUser(currentUser, employees, "archive_handover_list", rolePermissions, departmentPermissions) && (
+            {isDirector && isViewAllowedForUser(currentUser, employees, "archive_director_completed", rolePermissions, departmentPermissions) && (
+              <button
+                id="tab-archive-director-completed"
+                onClick={() =>
+                  props.setCurrentView("archive_director_completed")
+                }
+                className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "archive_director_completed" ? "border-green-600 text-green-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
+              >
+                <CheckSquare size={16} /> Hoàn thành
+              </button>
+            )}
+
+            {!isDirector && isViewAllowedForUser(currentUser, employees, "archive_handover_list", rolePermissions, departmentPermissions) && (
                 <button
                   id="tab-archive-handover-list"
                   onClick={() => props.setCurrentView("archive_handover_list")}
@@ -594,24 +623,28 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
         {/* SUB-HEADER TABS FOR OTHER RECORDS */}
         {isOtherView && (
           <div className="flex border-b border-gray-200 bg-gray-50 px-4 overflow-x-auto">
-            {isViewAllowedForUser(currentUser, employees, "other_records", rolePermissions, departmentPermissions) && (
-              <button
-                id="tab-other-records"
-                onClick={() => props.setCurrentView("other_records")}
-                className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "other_records" ? "border-blue-600 text-blue-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
-              >
-                <FileText size={16} /> Tất cả hồ sơ
-              </button>
-            )}
+            {!isDirector && (
+              <>
+                {isViewAllowedForUser(currentUser, employees, "other_records", rolePermissions, departmentPermissions) && (
+                  <button
+                    id="tab-other-records"
+                    onClick={() => props.setCurrentView("other_records")}
+                    className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "other_records" ? "border-blue-600 text-blue-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
+                  >
+                    <FileText size={16} /> Tất cả hồ sơ
+                  </button>
+                )}
 
-            {isViewAllowedForUser(currentUser, employees, "other_assign_tasks", rolePermissions, departmentPermissions) && (
-              <button
-                id="tab-other-assign-tasks"
-                onClick={() => props.setCurrentView("other_assign_tasks")}
-                className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "other_assign_tasks" ? "border-blue-600 text-blue-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
-              >
-                <UserPlusIcon size={16} /> Chưa giao
-              </button>
+                {isViewAllowedForUser(currentUser, employees, "other_assign_tasks", rolePermissions, departmentPermissions) && (
+                  <button
+                    id="tab-other-assign-tasks"
+                    onClick={() => props.setCurrentView("other_assign_tasks")}
+                    className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "other_assign_tasks" ? "border-blue-600 text-blue-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
+                  >
+                    <UserPlusIcon size={16} /> Chưa giao
+                  </button>
+                )}
+              </>
             )}
 
             {isViewAllowedForUser(currentUser, employees, "other_check_list", rolePermissions, departmentPermissions) && (
@@ -620,11 +653,21 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                 onClick={() => props.setCurrentView("other_check_list")}
                 className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "other_check_list" ? "border-purple-600 text-purple-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
               >
-                <ClipboardList size={16} /> Trình ký
+                <ClipboardList size={16} /> {isDirector ? "Chờ ký" : "Trình ký"}
               </button>
             )}
 
-            {isViewAllowedForUser(currentUser, employees, "other_handover_list", rolePermissions, departmentPermissions) && (
+            {isDirector && isViewAllowedForUser(currentUser, employees, "other_director_completed", rolePermissions, departmentPermissions) && (
+              <button
+                id="tab-other-director-completed"
+                onClick={() => props.setCurrentView("other_director_completed")}
+                className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "other_director_completed" ? "border-green-600 text-green-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
+              >
+                <CheckSquare size={16} /> Hoàn thành
+              </button>
+            )}
+
+            {!isDirector && isViewAllowedForUser(currentUser, employees, "other_handover_list", rolePermissions, departmentPermissions) && (
                 <button
                   id="tab-other-handover-list"
                   onClick={() => props.setCurrentView("other_handover_list")}
@@ -765,31 +808,11 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                       </div>
 
                       <div className="space-y-3.5 max-h-[75vh] overflow-y-auto pr-1">
-                        {/* 1. Xã / Phường */}
-                        <div>
-                          <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 mb-1">
-                            <MapPin size={14} className="text-gray-500" />
-                            <span>Địa danh (Xã/Phường):</span>
-                          </label>
-                          <select
-                            value={props.filterWard}
-                            onChange={(e) => props.setFilterWard(e.target.value)}
-                            className="w-full text-sm border border-gray-200 rounded-lg p-2 font-medium bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          >
-                            <option value="all">Tất cả Xã/Phường</option>
-                            {wards.map((w) => (
-                              <option key={w} value={w}>
-                                {w}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        {/* 2. Thời gian lọc theo trạng thái */}
+                        {/* 1. Thời gian */}
                         <div>
                           <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 mb-1">
                             <Calendar size={14} className="text-gray-500" />
-                            <span>Thời gian (Từ ngày - Đến ngày):</span>
+                            <span>Thời gian:</span>
                           </label>
                           <div className="grid grid-cols-2 gap-2">
                             <div>
@@ -813,12 +836,12 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                           </div>
                         </div>
 
-                        {/* 4. Loại hồ sơ */}
+                        {/* 2. Loại hồ sơ */}
                         {isMeasurementView && (
                           <div>
                             <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 mb-1">
                               <Filter size={14} className="text-gray-500" />
-                              <span>Loại hồ sơ Đo đạc:</span>
+                              <span>Loại hồ sơ:</span>
                             </label>
                             <select
                               value={props.filterRecordType}
@@ -828,9 +851,9 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                               <option value="all">Tất cả loại HS</option>
                               <option value="2.1 Trích lục">2.1 Trích lục</option>
                               <option value="2.2 Trích đo">2.2 Trích đo</option>
-                              <option value="2.3 DĐ & CC số thửa">2.3 DĐ & CC số thửa</option>
-                              <option value="2.4 Trích đo Cắm mốc">2.4 Trích đo Cắm mốc</option>
-                              <option value="2.5 Trích đo Tách - Hợp thửa">2.5 Trích đo Tách - Hợp thửa</option>
+                              <option value="2.3 Duyệt đơn">2.3 Duyệt đơn</option>
+                              <option value="2.4 Cắm mốc">2.4 Cắm mốc</option>
+                              <option value="2.5 Tách-Hợp thửa">2.5 Tách-Hợp thửa</option>
                             </select>
                           </div>
                         )}
@@ -839,7 +862,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                           <div>
                             <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 mb-1">
                               <Filter size={14} className="text-gray-500" />
-                              <span>Loại hồ sơ Lưu trữ:</span>
+                              <span>Loại hồ sơ:</span>
                             </label>
                             <select
                               value={props.filterRecordType}
@@ -847,14 +870,37 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                               className="w-full text-sm border border-gray-200 rounded-lg p-2 font-medium bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                             >
                               <option value="all">Tất cả loại HS</option>
-                              <option value="1.1 Sao lục hồ sơ">1.1 Sao lục hồ sơ</option>
+                              <option value="1.1 Sao lục">1.1 Sao lục</option>
                               <option value="1.2 Công văn">1.2 Công văn</option>
                             </select>
                           </div>
                         )}
 
-                        {/* 5. Trạng thái hồ sơ */}
-                        {(currentView === "all_records" || currentView === "other_records" || currentView === "archive_records") && (
+                        {!isMeasurementView && !isArchiveMeasurementView && (
+                          <div>
+                            <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 mb-1">
+                              <Filter size={14} className="text-gray-500" />
+                              <span>Loại hồ sơ:</span>
+                            </label>
+                            <select
+                              value={props.filterRecordType}
+                              onChange={(e) => props.setFilterRecordType(e.target.value)}
+                              className="w-full text-sm border border-gray-200 rounded-lg p-2 font-medium bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            >
+                              <option value="all">Tất cả loại HS</option>
+                              <option value="2.1 Trích lục">2.1 Trích lục</option>
+                              <option value="2.2 Trích đo">2.2 Trích đo</option>
+                              <option value="2.3 Duyệt đơn">2.3 Duyệt đơn</option>
+                              <option value="2.4 Cắm mốc">2.4 Cắm mốc</option>
+                              <option value="2.5 Tách-Hợp thửa">2.5 Tách-Hợp thửa</option>
+                              <option value="1.1 Sao lục">1.1 Sao lục</option>
+                              <option value="1.2 Công văn">1.2 Công văn</option>
+                            </select>
+                          </div>
+                        )}
+
+                        {/* 3. Trạng thái hồ sơ */}
+                        {!isStatusFilterHidden && (
                           <div>
                             <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 mb-1">
                               <SlidersHorizontal size={14} className="text-gray-500" />
@@ -875,7 +921,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                           </div>
                         )}
 
-                        {/* 6. Cán bộ xử lý */}
+                        {/* 4. Cán bộ xử lý */}
                         {canPerformAction && (
                           <div>
                             <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 mb-1">
@@ -889,29 +935,34 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                             >
                               <option value="all">Tất cả cán bộ</option>
                               <option value="unassigned">Chưa giao</option>
-                              {employees
-                                .filter((emp) => {
-                                  const d = removeVietnameseTones((emp.department || "").toLowerCase());
-                                  if (isArchiveMeasurementView) return d.includes("luu tru");
-                                  if (isMeasurementView)
-                                    return (
-                                      d.includes("do dac") ||
-                                      d.includes("ky thuat") ||
-                                      d.includes("to do") ||
-                                      d.includes("dia chinh") ||
-                                      d.includes("noi nghiep") ||
-                                      d.includes("ngoai nghiep")
-                                    );
-                                  return true;
-                                })
-                                .map((emp) => (
-                                  <option key={emp.id} value={emp.id}>
-                                    {emp.name}
-                                  </option>
-                                ))}
+                              {employees.map((emp) => (
+                                <option key={emp.id} value={emp.id}>
+                                  {emp.name} ({emp.position || 'Cán bộ'})
+                                </option>
+                              ))}
                             </select>
                           </div>
                         )}
+
+                        {/* 5. Xã / Phường */}
+                        <div>
+                          <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 mb-1">
+                            <MapPin size={14} className="text-gray-500" />
+                            <span>Xã/Phường:</span>
+                          </label>
+                          <select
+                            value={props.filterWard}
+                            onChange={(e) => props.setFilterWard(e.target.value)}
+                            className="w-full text-sm border border-gray-200 rounded-lg p-2 font-medium bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          >
+                            <option value="all">Tất cả Xã/Phường</option>
+                            {wards.map((w) => (
+                              <option key={w} value={w}>
+                                {w}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
 
                         {/* 7. Reset filters button */}
                         <div className="pt-2">
@@ -1000,17 +1051,16 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                       <button
                         onClick={() => {
                           setIsAddMenuOpen(false);
-                          if (props.setImportModalMode) props.setImportModalMode('create');
-                          props.setIsImportModalOpen(true);
+                          navigateToReceiveRecordSubTab('bulk');
                         }}
-                        className="w-full text-left px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-emerald-50 hover:text-emerald-600 flex items-center gap-2.5 transition-colors cursor-pointer"
+                        className="w-full text-left px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-emerald-50 hover:text-emerald-600 flex items-center gap-2.5 transition-colors"
                       >
                         <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
                           <FileSpreadsheet size={18} />
                         </div>
                         <div>
                           <div className="font-bold text-slate-800 text-sm">Tiếp nhận hàng loạt</div>
-                          <div className="text-[11px] text-slate-500">Tải file Excel để thêm nhiều hồ sơ mới</div>
+                          <div className="text-[11px] text-slate-500">Nhập danh sách từ Excel</div>
                         </div>
                       </button>
 
@@ -1020,14 +1070,14 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                           if (props.setImportModalMode) props.setImportModalMode('update');
                           props.setIsImportModalOpen(true);
                         }}
-                        className="w-full text-left px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-amber-50 hover:text-amber-600 flex items-center gap-2.5 transition-colors cursor-pointer"
+                        className="w-full text-left px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-amber-50 hover:text-amber-600 flex items-center gap-2.5 transition-colors"
                       >
                         <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
                           <RefreshCw size={18} />
                         </div>
                         <div>
-                          <div className="font-bold text-slate-800 text-sm">Cập nhật hàng loạt</div>
-                          <div className="text-[11px] text-slate-500">Cập nhật thông tin hồ sơ bằng file Excel</div>
+                          <div className="font-bold text-slate-800 text-sm">Cập nhật thông tin</div>
+                          <div className="text-[11px] text-slate-500">Đổi trạng thái, cán bộ, hạn trả...</div>
                         </div>
                       </button>
                     </div>
@@ -1451,8 +1501,6 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
           records={records}
           currentUser={currentUser}
           employees={employees}
-          rolePermissions={rolePermissions}
-          departmentPermissions={departmentPermissions}
           setCurrentView={props.setCurrentView}
         />
       );
@@ -1498,15 +1546,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
           }}
           onHandOverRecords={props.handleHandOverRecords}
           onBulkUpdate={props.onBulkUpdate}
-          onViewRecord={props.handleViewRecord}
-          onEditRecord={(r) => {
-            props.setEditingRecord(r);
-            props.setIsModalOpen(true);
-          }}
-          onReturnRecord={props.handleOpenReturnModal}
-          onExtendDeadline={(r) => {
-            props.handleOpenExtendModal?.([r]);
-          }}
+          onReturnResult={props.handleOpenReturnModal}
         />
       );
     case "receive_contract":
@@ -1570,9 +1610,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
         />
       );
     case "registration_records":
-      return <RegistrationRecords currentUser={currentUser} wards={wards} holidays={holidays} />;
-    case "vaoso_records":
-      return <VaoSoView currentUser={currentUser} wards={wards} />;
+      return <RegistrationRecords currentUser={currentUser} wards={wards} />;
     case "congvan_records":
       return <CongVanView currentUser={currentUser} />;
     case "barcode_generator":
@@ -1606,7 +1644,6 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
           currentUser={currentUser}
           users={users}
           employees={employees}
-          records={records}
           onAddUser={(u) => props.handleUpdateUser(u, false)}
           onUpdateUser={(u) => props.handleUpdateUser(u, true)}
           onDeleteUser={props.handleDeleteUser}
@@ -1616,7 +1653,6 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
           onDeleteAllData={props.handleDeleteAllData}
           onHolidaysChanged={props.onRefreshData}
           onOpenCloudInspector={props.onOpenCloudInspector}
-          onViewRecord={props.handleViewRecord}
         />
       );
     case "reports":
@@ -1630,24 +1666,6 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
           employees={employees}
           wards={wards}
           currentUser={props.currentUser}
-        />
-      );
-    case "lookup_records":
-      return (
-        <RecordLookupView
-          records={records}
-          employees={employees}
-          wards={wards}
-          currentUser={currentUser}
-          onViewRecord={props.handleViewRecord}
-          onEditRecord={(r) => {
-            props.setEditingRecord(r);
-            props.setIsModalOpen(true);
-          }}
-          onReturnRecord={props.handleOpenReturnModal}
-          onExtendDeadline={(r) => {
-            props.handleOpenExtendModal?.([r]);
-          }}
         />
       );
     default:

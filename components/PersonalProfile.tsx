@@ -1,11 +1,10 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { RecordFile, RecordStatus, User, Employee, Contract, UserRole } from "../types";
+import { RecordFile, RecordStatus, User, Employee, Contract } from "../types";
 import StatusBadge from "./StatusBadge";
 import {
   Briefcase,
   ArrowRight,
   CheckCircle,
-  CheckCircle2,
   Clock,
   Send,
   AlertTriangle,
@@ -20,25 +19,22 @@ import {
   Bell,
   CalendarClock,
   FileCheck,
-  Map as MapIcon,
+  Map,
   CheckSquare,
   ClipboardList,
   FileDown,
   Undo,
   FileX,
-  FileSignature,
-  CheckCheck,
 } from "lucide-react";
 import * as XLSX from "xlsx-js-style";
 import { getShortRecordType, isArchiveRecordType } from "../constants";
-import { confirmAction, cleanSyncNotes, extractBatchNumber } from "../utils/appHelpers";
+import { confirmAction, cleanSyncNotes } from "../utils/appHelpers";
 import { updateRecordApi, fetchContracts } from "../services/api";
 import {
   fetchArchiveRecords,
   ArchiveRecord,
   saveArchiveRecord,
 } from "../services/apiArchive";
-import { addActivityLog } from "../services/activityLogService";
 import SubmitModal from "./receive-record/SubmitModal";
 import SystemAnnexTemplate from "./receive-record/SystemAnnexTemplate";
 import {
@@ -90,26 +86,6 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
   onCreateLiquidation,
   onMapCorrection,
 }) => {
-  // Xác định quyền Ban Giám đốc / Ban Lãnh đạo
-  const isDirectorUser = useMemo(() => {
-    if (isDirector) return true;
-    if (user.role === UserRole.ADMIN || user.role === UserRole.SUBADMIN || (user.role as string) === 'DIRECTOR') return true;
-    if (!user.employeeId) return false;
-    const emp = employees.find((e) => e.id === user.employeeId);
-    if (!emp) return false;
-    const dept = (emp.department || '').trim().toLowerCase();
-    const pos = (emp.position || '').trim().toLowerCase();
-    return (
-      dept.includes("giám đốc") ||
-      dept.includes("lãnh đạo") ||
-      dept.includes("ban giám đốc") ||
-      dept.includes("ban lãnh đạo") ||
-      pos.includes("giám đốc") ||
-      pos.includes("phó giám đốc") ||
-      pos.includes("lãnh đạo")
-    );
-  }, [isDirector, user, employees]);
-
   // Thêm tab 'pending_sign'
   const [activeTab, setActiveTab] = useState<
     | "all"
@@ -118,19 +94,16 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
     | "pending_sign"
     | "finished"
     | "reminder"
-  >(isDirectorUser ? "pending_sign" : "pending");
+  >(isDirector ? "pending_sign" : "pending");
   const [currentPage, setCurrentPage] = useState(1);
   const [mobileVisibleCount, setMobileVisibleCount] = useState(20);
   const itemsPerPage = 10;
 
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedSignIds, setSelectedSignIds] = useState<Set<string>>(new Set());
-  const [isBatchSigning, setIsBatchSigning] = useState(false);
 
   useEffect(() => {
     setCurrentPage(1);
     setMobileVisibleCount(20);
-    setSelectedSignIds(new Set());
   }, [activeTab, searchTerm]);
   const [sortConfig, setSortConfig] = useState<{
     key: keyof RecordFile;
@@ -183,82 +156,86 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
     loadContracts();
   }, []);
 
-  const myRecords: RecordFile[] = useMemo(() => {
+  const myRecords = useMemo(() => {
     const mainRecords = records.filter((r) => {
       if (!user.employeeId) return false;
-      
-      // Nếu là người trực tiếp thụ lý (assignedTo) -> Luôn thấy hồ sơ của mình
-      if (r.assignedTo === user.employeeId) return true;
-
-      // 1. Đối với người được trình ký (Ban Giám đốc / Lãnh đạo / Người ký duyệt)
-      if (r.submittedTo === user.employeeId) {
-        // Chỉ hiển thị trong hồ sơ cá nhân khi hồ sơ ĐÃ ĐƯỢC TRÌNH KÝ hoặc ĐÃ KÝ/HOÀN THÀNH
-        // Nếu hồ sơ đã bị thu hồi/quay về các bước trước (RECEIVED, ASSIGNED, IN_PROGRESS, COMPLETED_WORK, PENDING_CHECK) -> Ẩn khỏi hồ sơ của người được trình ký
-        const reachedSignStage =
-          r.status === RecordStatus.PENDING_SIGN ||
-          r.status === RecordStatus.SIGNED ||
-          r.status === RecordStatus.HANDOVER ||
-          r.status === RecordStatus.RETURNED ||
-          r.status === RecordStatus.REJECTED ||
-          r.status === RecordStatus.WITHDRAWN;
-        return reachedSignStage;
+      if (isDirector) {
+        return (
+          r.submittedTo === user.employeeId || r.assignedTo === user.employeeId
+        );
       }
-
-      // 2. Đối với người được trình kiểm tra (Tổ trưởng / Người kiểm tra)
-      if (r.checkedBy === user.employeeId) {
-        // Chỉ hiển thị khi hồ sơ đã được nộp kiểm tra trở đi
-        // Nếu đã bị thu hồi/quay về RECEIVED, ASSIGNED, IN_PROGRESS -> Ẩn khỏi hồ sơ cá nhân của người kiểm tra
-        const reachedCheckStage =
-          r.status === RecordStatus.COMPLETED_WORK ||
-          r.status === RecordStatus.PENDING_CHECK ||
-          r.status === RecordStatus.CHECKED ||
-          r.status === RecordStatus.PENDING_SIGN ||
-          r.status === RecordStatus.SIGNED ||
-          r.status === RecordStatus.HANDOVER ||
-          r.status === RecordStatus.RETURNED ||
-          r.status === RecordStatus.REJECTED ||
-          r.status === RecordStatus.WITHDRAWN;
-        return reachedCheckStage;
+      // Nếu là người kiểm tra, họ có thể thấy hồ sơ được giao cho họ HOẶC hồ sơ trình cho họ kiểm tra
+      const isCheckerUser =
+        employees
+          .find((e) => e.id === user.employeeId)
+          ?.position?.toLowerCase()
+          .includes("tổ") &&
+        (employees
+          .find((e) => e.id === user.employeeId)
+          ?.department?.toLowerCase()
+          .includes("đo đạc") ||
+          employees
+            .find((e) => e.id === user.employeeId)
+            ?.department?.toLowerCase()
+            .includes("kỹ thuật"));
+      if (isCheckerUser) {
+        // Chỉ hiển thị hồ sơ giao xử lý (assignedTo) HOẶC hồ sơ đã tới khâu kiểm tra (status >= PENDING_CHECK) nếu họ là người kiểm tra (checkedBy)
+        if (r.assignedTo === user.employeeId) return true;
+        if (r.checkedBy === user.employeeId) {
+          const reachedCheckStage =
+            r.status !== RecordStatus.RECEIVED &&
+            r.status !== RecordStatus.ASSIGNED &&
+            r.status !== RecordStatus.IN_PROGRESS &&
+            r.status !== RecordStatus.COMPLETED_WORK;
+          return reachedCheckStage;
+        }
+        return false;
       }
-
-      return false;
+      return r.assignedTo === user.employeeId;
     });
 
     const mappedArchives = archiveRecords
       .filter((r) => {
         if (!user.employeeId) return false;
-
-        // Nếu là người trực tiếp thụ lý archive
-        if (r.data?.assigned_to === user.employeeId) return true;
-
-        // Map status của archive
-        let status: RecordStatus = RecordStatus.RECEIVED;
-        if (r.status === "assigned") status = RecordStatus.ASSIGNED;
-        else if (r.status === "executed") status = RecordStatus.COMPLETED_WORK;
-        else if (r.status === "pending_sign") status = RecordStatus.PENDING_SIGN;
-        else if (r.status === "signed") status = RecordStatus.SIGNED;
-        else if (r.status === "completed") status = RecordStatus.RETURNED;
-
-        // 1. Đối với người được trình ký archive
-        if (r.data?.submitted_to === user.employeeId) {
-          const reachedSignStage =
-            status === RecordStatus.PENDING_SIGN ||
-            status === RecordStatus.SIGNED ||
-            status === RecordStatus.RETURNED;
-          return reachedSignStage;
+        if (isDirector) {
+          return (
+            r.data?.submitted_to === user.employeeId ||
+            r.data?.assigned_to === user.employeeId
+          );
         }
+        const isCheckerUser =
+          employees
+            .find((e) => e.id === user.employeeId)
+            ?.position?.toLowerCase()
+            .includes("tổ") &&
+          (employees
+            .find((e) => e.id === user.employeeId)
+            ?.department?.toLowerCase()
+            .includes("đo đạc") ||
+            employees
+              .find((e) => e.id === user.employeeId)
+              ?.department?.toLowerCase()
+              .includes("kỹ thuật"));
+        if (isCheckerUser) {
+          if (r.data?.assigned_to === user.employeeId) return true;
+          if (r.data?.checked_by === user.employeeId) {
+            // Map status của archive để kiểm tra xem đã tới khâu kiểm tra chưa
+            let status: RecordStatus = RecordStatus.RECEIVED;
+            if (r.status === "assigned") status = RecordStatus.ASSIGNED;
+            else if (r.status === "executed") status = RecordStatus.COMPLETED_WORK;
+            else if (r.status === "pending_sign") status = RecordStatus.PENDING_SIGN;
+            else if (r.status === "signed") status = RecordStatus.SIGNED;
+            else if (r.status === "completed") status = RecordStatus.RETURNED;
 
-        // 2. Đối với người được trình kiểm tra archive
-        if (r.data?.checked_by === user.employeeId) {
-          const reachedCheckStage =
-            status === RecordStatus.COMPLETED_WORK ||
-            status === RecordStatus.PENDING_SIGN ||
-            status === RecordStatus.SIGNED ||
-            status === RecordStatus.RETURNED;
-          return reachedCheckStage;
+            const reachedCheckStage =
+              status === RecordStatus.PENDING_SIGN ||
+              status === RecordStatus.SIGNED ||
+              status === RecordStatus.RETURNED;
+            return reachedCheckStage;
+          }
+          return false;
         }
-
-        return false;
+        return r.data?.assigned_to === user.employeeId;
       })
       .map((r) => {
         // Map status
@@ -312,18 +289,8 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
         } as RecordFile;
       });
 
-    const combined = [...mainRecords, ...mappedArchives];
-    const uniqueMap = new Map<string, RecordFile>();
-    combined.forEach((item) => {
-      if (item && item.id) {
-        if (!uniqueMap.has(item.id)) {
-          uniqueMap.set(item.id, item);
-        }
-      }
-    });
-
-    return Array.from(uniqueMap.values());
-  }, [records, archiveRecords, user.employeeId, isDirectorUser, employees]);
+    return [...mainRecords, ...mappedArchives];
+  }, [records, archiveRecords, user.employeeId]);
 
   const isChecker = useMemo(() => {
     if (!user.employeeId) return false;
@@ -489,134 +456,41 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
   };
 
   const handleExportExcel = () => {
-    const headers = [
-      "STT",
-      "Mã hồ sơ",
-      "Thông tin khách hàng",
-      "Số điện thoại",
-      "CCCD",
-      "Loại hồ sơ",
-      "Ngày nhận",
-      "Hẹn trả",
-      "Trạng thái",
-      "Xã/Phường",
-      "Số tờ",
-      "Số thửa",
-      "Diện tích",
-      "Địa chỉ",
-      "Nội dung",
-      "Ngày giao việc",
-      "Ngày trình ký",
-      "Ngày duyệt",
-      "Ngày hoàn thành",
-      "Đợt xuất",
-      "Ngày trả kết quả",
-      "Ghi chú",
-      "Ghi chú cá nhân",
-      "Số trích đo",
-      "Số trích lục",
-    ];
+    const dataToExport = displayRecords.map((r, idx) => ({
+      STT: idx + 1,
+      "Mã hồ sơ": r.code,
+      "Chủ sử dụng": r.customerName,
+      "Số điện thoại": r.phoneNumber || "",
+      CCCD: r.cccd || "",
+      "Loại hồ sơ": r.recordType,
+      "Ngày nhận": r.receivedDate ? r.receivedDate.split("T")[0] : "",
+      "Hẹn trả": r.deadline ? r.deadline.split("T")[0] : "",
+      "Trạng thái": r.status,
+      "Xã/Phường": r.ward || "",
+      "Số tờ": r.mapSheet || "",
+      "Số thửa": r.landPlot || "",
+      "Diện tích": r.area || "",
+      "Địa chỉ": r.address || "",
+      "Nội dung": cleanSyncNotes(r.content) || "",
+      "Ngày giao việc": r.assignedDate ? r.assignedDate.split("T")[0] : "",
+      "Ngày trình ký": r.submissionDate ? r.submissionDate.split("T")[0] : "",
+      "Ngày duyệt": r.approvalDate ? r.approvalDate.split("T")[0] : "",
+      "Ngày hoàn thành": r.completedDate ? r.completedDate.split("T")[0] : "",
+      "Ngày trả kết quả": r.resultReturnedDate
+        ? r.resultReturnedDate.split("T")[0]
+        : "",
+      "Ghi chú": cleanSyncNotes(r.notes) || "",
+      "Ghi chú cá nhân": r.personalNotes || "",
+      "Số trích đo": r.measurementNumber || "",
+      "Số trích lục": r.excerptNumber || "",
+    }));
 
-    const dataRows = displayRecords.map((r, idx) => [
-      idx + 1,
-      r.code || "",
-      r.customerName || "",
-      r.phoneNumber || "",
-      r.cccd || "",
-      r.recordType || "",
-      r.receivedDate ? r.receivedDate.split("T")[0] : "",
-      r.deadline ? r.deadline.split("T")[0] : "",
-      r.status || "",
-      r.ward || "",
-      r.mapSheet || "",
-      r.landPlot || "",
-      r.area || "",
-      r.address || "",
-      cleanSyncNotes(r.content) || "",
-      r.assignedDate ? r.assignedDate.split("T")[0] : "",
-      r.submissionDate ? r.submissionDate.split("T")[0] : "",
-      r.approvalDate ? r.approvalDate.split("T")[0] : "",
-      r.completedDate ? r.completedDate.split("T")[0] : "",
-      r.exportBatch ? extractBatchNumber(r.exportBatch) : "",
-      r.resultReturnedDate ? r.resultReturnedDate.split("T")[0] : "",
-      cleanSyncNotes(r.notes) || "",
-      r.personalNotes || "",
-      r.measurementNumber || "",
-      r.excerptNumber || "",
-    ]);
-
-    const ws = XLSX.utils.aoa_to_sheet([
-      ["CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM"],
-      ["Độc lập - Tự do - Hạnh phúc"],
-      [""],
-      [`DANH SÁCH HỒ SƠ CÁ NHÂN - ${user.name.toUpperCase()}`],
-      [`Ngày xuất: ${new Date().toLocaleDateString("vi-VN")} | Tổng số: ${displayRecords.length}`],
-      [""],
-      headers,
-      ...dataRows,
-    ]);
-
-    const totalCols = headers.length - 1;
-    ws["!merges"] = [
-      { s: { r: 0, c: 0 }, e: { r: 0, c: totalCols } },
-      { s: { r: 1, c: 0 }, e: { r: 1, c: totalCols } },
-      { s: { r: 3, c: 0 }, e: { r: 3, c: totalCols } },
-      { s: { r: 4, c: 0 }, e: { r: 4, c: totalCols } },
-    ];
-
-    if (ws["A1"]) ws["A1"].s = { font: { name: "Times New Roman", sz: 14, bold: true }, alignment: { horizontal: "center" } };
-    if (ws["A2"]) ws["A2"].s = { font: { name: "Times New Roman", sz: 12, bold: true, underline: true }, alignment: { horizontal: "center" } };
-    if (ws["A4"]) ws["A4"].s = { font: { name: "Times New Roman", sz: 16, bold: true, color: { rgb: "0000FF" } }, alignment: { horizontal: "center" } };
-    if (ws["A5"]) ws["A5"].s = { font: { name: "Times New Roman", sz: 12, italic: true }, alignment: { horizontal: "center" } };
-
-    const borderStyle = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
-    const headerStyle = {
-      font: { name: "Times New Roman", sz: 11, bold: true },
-      fill: { fgColor: { rgb: "E0E0E0" } },
-      border: borderStyle,
-      alignment: { horizontal: "center", vertical: "center", wrapText: true },
-    };
-    const cellStyle = {
-      font: { name: "Times New Roman", sz: 11 },
-      border: borderStyle,
-      alignment: { vertical: "center", wrapText: true },
-    };
-    const centerStyle = { ...cellStyle, alignment: { horizontal: "center", vertical: "center" } };
-
-    const headerRowIdx = 6;
-    const dataStartIdx = 7;
-
-    for (let c = 0; c <= totalCols; c++) {
-      const headerRef = XLSX.utils.encode_cell({ r: headerRowIdx, c });
-      if (!ws[headerRef]) ws[headerRef] = { v: "", t: "s" };
-      ws[headerRef].s = headerStyle;
-
-      for (let r = dataStartIdx; r < dataStartIdx + dataRows.length; r++) {
-        const cellRef = XLSX.utils.encode_cell({ r, c });
-        if (!ws[cellRef]) ws[cellRef] = { v: "", t: "s" };
-
-        // Center STT(0), Code(1), Phone(3), CCCD(4), Dates(6,7,15,16,17,18,20), Plot/Sheet(10,11), Batch(19), Numbers(23,24)
-        if ([0, 1, 3, 4, 6, 7, 8, 10, 11, 15, 16, 17, 18, 19, 20, 23, 24].includes(c)) {
-          ws[cellRef].s = centerStyle;
-        } else {
-          ws[cellRef].s = cellStyle;
-        }
-      }
-    }
-
-    ws["!cols"] = [
-      { wch: 5 }, { wch: 15 }, { wch: 25 }, { wch: 14 }, { wch: 14 },
-      { wch: 16 }, { wch: 12 }, { wch: 12 }, { wch: 15 }, { wch: 16 },
-      { wch: 7 }, { wch: 7 }, { wch: 10 }, { wch: 25 }, { wch: 25 },
-      { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 10 },
-      { wch: 12 }, { wch: 20 }, { wch: 20 }, { wch: 12 }, { wch: 12 },
-    ];
-
+    const ws = XLSX.utils.json_to_sheet(dataToExport);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "HoSoCaNhan");
     XLSX.writeFile(
       wb,
-      `HoSoCaNhan_${user.name.replace(/\s+/g, "_")}_${new Date().toISOString().split("T")[0]}.xlsx`,
+      `HoSoCaNhan_${user.name}_${new Date().toISOString().split("T")[0]}.xlsx`,
     );
   };
 
@@ -884,197 +758,6 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
     }
   };
 
-  const handleApproveSign = async (record: RecordFile) => {
-    if (!(await confirmAction(`Xác nhận Ký duyệt hồ sơ [${record.code}]?`))) return;
-
-    try {
-      const nowIso = new Date().toISOString();
-      const isArchive = record.recordType === "Sao lục" || record.recordType === "Công văn";
-
-      if (isArchive) {
-        const historyEntry = {
-          action: "Ký duyệt",
-          status: "signed",
-          timestamp: nowIso,
-          user: user.name || user.username,
-        };
-
-        const currentArchive = archiveRecords.find((r) => r.id === record.id);
-        if (currentArchive) {
-          const oldHistory = Array.isArray(currentArchive.data?.history)
-            ? currentArchive.data.history
-            : [];
-          const newHistory = [...oldHistory, historyEntry];
-
-          await saveArchiveRecord({
-            id: record.id,
-            status: "signed",
-            data: {
-              ...currentArchive.data,
-              history: newHistory,
-              signed_date: nowIso,
-            },
-          });
-        }
-      } else {
-        const oldLogs = Array.isArray(record.statusLogs) ? record.statusLogs : [];
-        const newLog = {
-          id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          recordId: record.id,
-          previousStatus: record.status,
-          newStatus: RecordStatus.SIGNED,
-          changedBy: user.name || user.username,
-          changedAt: nowIso,
-          note: "Ban giám đốc ký duyệt hồ sơ cá nhân",
-        };
-
-        const updatedRecord: RecordFile = {
-          ...record,
-          status: RecordStatus.SIGNED,
-          approvalDate: nowIso,
-          statusLogs: [...oldLogs, newLog],
-        };
-
-        if (onUpdateRecord) {
-          await onUpdateRecord(updatedRecord);
-        } else {
-          await updateRecordApi(updatedRecord);
-          onUpdateStatus(record, RecordStatus.SIGNED);
-        }
-      }
-
-      addActivityLog({
-        performerName: user.name || user.username,
-        performerRole: user.role || 'DIRECTOR',
-        actionType: 'APPROVE',
-        actionLabel: 'Ký duyệt',
-        targetType: 'Hồ sơ',
-        referenceCode: record.code,
-        details: `Lãnh đạo ${user.name || user.username} đã ký duyệt hồ sơ ${record.code} (${record.customerName || ''})`,
-      });
-
-      // Refresh archive data if archive
-      if (isArchive) {
-        const saoluc = await fetchArchiveRecords("saoluc");
-        const congvan = await fetchArchiveRecords("congvan");
-        setArchiveRecords([...saoluc, ...congvan]);
-      }
-
-      setSelectedSignIds((prev) => {
-        const next = new Set(prev);
-        next.delete(record.id);
-        return next;
-      });
-    } catch (err) {
-      console.error("Lỗi khi ký duyệt hồ sơ:", err);
-      alert("Đã xảy ra lỗi khi ký duyệt hồ sơ.");
-    }
-  };
-
-  const handleBatchApproveSign = async () => {
-    if (selectedSignIds.size === 0) return;
-    const targetRecords = reviewRecords.filter((r) => selectedSignIds.has(r.id));
-    if (targetRecords.length === 0) return;
-
-    if (!(await confirmAction(`Xác nhận Ký duyệt đồng loạt ${targetRecords.length} hồ sơ đã chọn?`))) return;
-
-    setIsBatchSigning(true);
-    try {
-      const nowIso = new Date().toISOString();
-      for (const record of targetRecords) {
-        const isArchive = record.recordType === "Sao lục" || record.recordType === "Công văn";
-        if (isArchive) {
-          const historyEntry = {
-            action: "Ký duyệt",
-            status: "signed",
-            timestamp: nowIso,
-            user: user.name || user.username,
-          };
-          const currentArchive = archiveRecords.find((r) => r.id === record.id);
-          if (currentArchive) {
-            const oldHistory = Array.isArray(currentArchive.data?.history)
-              ? currentArchive.data.history
-              : [];
-            await saveArchiveRecord({
-              id: record.id,
-              status: "signed",
-              data: {
-                ...currentArchive.data,
-                history: [...oldHistory, historyEntry],
-                signed_date: nowIso,
-              },
-            });
-          }
-        } else {
-          const oldLogs = Array.isArray(record.statusLogs) ? record.statusLogs : [];
-          const newLog = {
-            id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            recordId: record.id,
-            previousStatus: record.status,
-            newStatus: RecordStatus.SIGNED,
-            changedBy: user.name || user.username,
-            changedAt: nowIso,
-            note: "Ban giám đốc ký duyệt đồng loạt hồ sơ cá nhân",
-          };
-          const updatedRecord: RecordFile = {
-            ...record,
-            status: RecordStatus.SIGNED,
-            approvalDate: nowIso,
-            statusLogs: [...oldLogs, newLog],
-          };
-          if (onUpdateRecord) {
-            await onUpdateRecord(updatedRecord);
-          } else {
-            await updateRecordApi(updatedRecord);
-            onUpdateStatus(record, RecordStatus.SIGNED);
-          }
-        }
-
-        addActivityLog({
-          performerName: user.name || user.username,
-          performerRole: user.role || 'DIRECTOR',
-          actionType: 'APPROVE',
-          actionLabel: 'Ký duyệt',
-          targetType: 'Hồ sơ',
-          referenceCode: record.code,
-          details: `Lãnh đạo ${user.name || user.username} ký duyệt đồng loạt hồ sơ ${record.code} (${record.customerName || ''})`,
-        });
-      }
-
-      // Refresh archive data
-      const saoluc = await fetchArchiveRecords("saoluc");
-      const congvan = await fetchArchiveRecords("congvan");
-      setArchiveRecords([...saoluc, ...congvan]);
-
-      setSelectedSignIds(new Set());
-    } catch (err) {
-      console.error("Lỗi ký duyệt đồng loạt:", err);
-      alert("Đã xảy ra lỗi trong quá trình ký duyệt đồng loạt.");
-    } finally {
-      setIsBatchSigning(false);
-    }
-  };
-
-  const toggleSelectSign = (id: string) => {
-    setSelectedSignIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
-  };
-
-  const toggleSelectAllSign = () => {
-    if (selectedSignIds.size === paginatedDisplayRecords.length && paginatedDisplayRecords.length > 0) {
-      setSelectedSignIds(new Set());
-    } else {
-      setSelectedSignIds(new Set(paginatedDisplayRecords.map((r) => r.id)));
-    }
-  };
-
   const getAnnexContractCode = (recordCode: string, contractsList: Contract[]): string => {
     const recCode = (recordCode || "").trim();
     if (!recCode) return "";
@@ -1285,7 +968,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
       case "pending_check":
         return "Chờ kiểm tra";
       case "pending_sign":
-        return "Trình ký";
+        return "Chờ ký";
       case "finished":
         return "Hoàn thành";
       case "reminder":
@@ -1367,13 +1050,13 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
           <div 
             onClick={() => { setActiveTab("pending_sign"); setCurrentPage(1); setSearchTerm(""); }}
             className={`cursor-pointer active:scale-95 transition-all text-center p-1.5 md:px-4 md:py-2 bg-purple-50 rounded-lg border ${activeTab === "pending_sign" ? "ring-2 ring-purple-500 border-purple-400 font-extrabold shadow-sm" : "border-purple-100 hover:border-purple-300"} min-w-0 md:min-w-[100px] flex flex-col justify-center`}
-            title="Xem danh sách trình ký"
+            title="Xem danh sách chờ ký"
           >
             <div className="text-base md:text-2xl font-bold text-purple-700">
               {reviewRecords.length}
             </div>
             <div className="text-[9px] md:text-xs text-purple-600 uppercase font-bold leading-tight mt-0.5">
-              Trình ký
+              Chờ ký
             </div>
           </div>
           <div 
@@ -1431,18 +1114,6 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                 <span>Nhắc việc ({reminderRecords.length})</span>
               </button>
             )}
-
-            {activeTab === "pending_sign" && isDirectorUser && selectedSignIds.size > 0 && (
-              <button
-                onClick={handleBatchApproveSign}
-                disabled={isBatchSigning}
-                className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95 disabled:opacity-50"
-                title="Ký duyệt tất cả hồ sơ đã chọn"
-              >
-                <CheckCheck size={16} />
-                <span>Ký duyệt ({selectedSignIds.size})</span>
-              </button>
-            )}
           </div>
 
           <div className="hidden md:flex items-center justify-end gap-2 w-full md:w-auto">
@@ -1463,27 +1134,12 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                 <table className="w-full text-left table-fixed min-w-[1160px]">
                   <thead className="bg-white border-b border-gray-200 text-xs text-gray-500 uppercase sticky top-0 shadow-sm z-10">
                     <tr>
-                      <th className="p-3 w-12 text-center">
-                        {activeTab === "pending_sign" && isDirectorUser ? (
-                          <input
-                            type="checkbox"
-                            className="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
-                            checked={
-                              paginatedDisplayRecords.length > 0 &&
-                              paginatedDisplayRecords.every((r) => selectedSignIds.has(r.id))
-                            }
-                            onChange={toggleSelectAllSign}
-                            title="Chọn tất cả trang này"
-                          />
-                        ) : (
-                          "#"
-                        )}
-                      </th>
+                      <th className="p-3 w-10 text-center">#</th>
                       <th className="p-3 w-[120px]">
                         {renderSortHeader("Mã HS", "code")}
                       </th>
                       <th className="p-3 w-[180px]">
-                        {renderSortHeader("Thông tin khách hàng", "customerName")}
+                        {renderSortHeader("Chủ sử dụng", "customerName")}
                       </th>
                       <th className="p-3 w-[115px]">
                         {renderSortHeader("Loại hồ sơ", "recordType")}
@@ -1511,33 +1167,21 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
 
                       <th className="p-3 text-center w-[120px]">Trạng thái</th>
                       <th className="p-3 text-center w-[100px]">Chỉnh lý</th>
-                      <th className="p-3 text-center w-[200px]">Thao tác chính</th>
+                      <th className="p-3 text-center w-[180px]">Thao tác chính</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 text-sm">
                     {paginatedDisplayRecords.map((r, index) => {
                       const deadlineStatus = getDeadlineStatus(r);
-                      const isSelected = selectedSignIds.has(r.id);
                       const rowClass =
-                        isSelected
-                          ? "bg-emerald-50/40 hover:bg-emerald-50/70"
-                          : activeTab === "reminder"
+                        activeTab === "reminder"
                           ? "hover:bg-pink-50/50 bg-pink-50/10"
                           : "hover:bg-blue-50/50";
 
                       return (
                         <tr key={r.id} className={`${rowClass} transition-colors`}>
                           <td className="p-3 text-center text-gray-400 text-xs align-middle">
-                            {activeTab === "pending_sign" && isDirectorUser ? (
-                              <input
-                                type="checkbox"
-                                className="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
-                                checked={isSelected}
-                                onChange={() => toggleSelectSign(r.id)}
-                              />
-                            ) : (
-                              (currentPage - 1) * itemsPerPage + index + 1
-                            )}
+                            {(currentPage - 1) * itemsPerPage + index + 1}
                           </td>
                           <td className="p-3 font-medium text-blue-600 align-middle">
                             <div className="truncate" title={r.code || ""}>
@@ -1618,7 +1262,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                                     : "Yêu cầu chỉnh lý bản đồ"
                                 }
                               >
-                                <MapIcon
+                                <Map
                                   size={14}
                                   className={
                                     r.needsMapCorrection ? "fill-orange-100" : ""
@@ -1630,33 +1274,13 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                           </td>
 
                           <td className="p-3 align-middle">
-                            <div className="flex justify-center gap-2 flex-wrap items-center">
+                            <div className="flex justify-center gap-2 flex-wrap">
                               <button
                                 onClick={() => onViewRecord(r)}
                                 className="px-2 py-1.5 border border-gray-200 rounded-md text-gray-600 hover:bg-white hover:border-blue-300 hover:text-blue-600 text-xs font-medium transition-all shadow-sm"
                               >
                                 Chi tiết
                               </button>
-
-                              {/* Thao tác Ký duyệt / Trả lại cho Ban Giám Đốc */}
-                              {(activeTab === "pending_sign" || r.status === RecordStatus.PENDING_SIGN) && isDirectorUser && (
-                                <>
-                                  <button
-                                    onClick={() => handleApproveSign(r)}
-                                    title="Ký duyệt hồ sơ"
-                                    className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all active:scale-95"
-                                  >
-                                    <CheckCircle2 size={14} /> Ký duyệt
-                                  </button>
-                                  <button
-                                    onClick={() => handleOpenReturnModal(r)}
-                                    title="Ghi nhận trả hồ sơ yêu cầu chỉnh sửa/bổ sung"
-                                    className="px-2 py-1.5 bg-red-50 text-red-600 border border-red-200 rounded-md hover:bg-red-100 text-xs font-bold flex items-center gap-1 shadow-sm transition-all"
-                                  >
-                                    <FileX size={14} /> Trả lại
-                                  </button>
-                                </>
-                              )}
 
                               {/* Nút Trả hồ sơ (Ghi chú nội bộ) cho cá nhân */}
                               {activeTab === "pending" && (
@@ -1716,27 +1340,16 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                   const deadlineStatus = getDeadlineStatus(r);
                   const isArchiveType = isArchiveRecordType(r.recordType);
                   const checkerEmp = r.checkedBy ? employees.find((e) => e.id === r.checkedBy) : null;
-                  const isSelected = selectedSignIds.has(r.id);
 
                   return (
-                    <div key={r.id} className={`p-4 bg-white rounded-xl border ${isSelected ? "border-emerald-300 ring-1 ring-emerald-400 bg-emerald-50/20" : "border-gray-100"} shadow-sm space-y-3 hover:border-blue-200 transition-all`}>
+                    <div key={r.id} className="p-4 bg-white rounded-xl border border-gray-100 shadow-sm space-y-3 hover:border-blue-200 transition-all">
                       {/* Top row with code and status */}
                       <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-2">
-                          {activeTab === "pending_sign" && isDirectorUser && (
-                            <input
-                              type="checkbox"
-                              className="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
-                              checked={isSelected}
-                              onChange={() => toggleSelectSign(r.id)}
-                            />
-                          )}
-                          <span className="font-bold text-blue-600 text-sm font-mono">{r.code}</span>
-                        </div>
+                        <span className="font-bold text-blue-600 text-sm font-mono">{r.code}</span>
                         <div className="flex items-center gap-1.5">
                           {r.needsMapCorrection && (
                             <span className="p-1 bg-orange-100 text-orange-600 rounded" title="Cần chỉnh lý bản đồ">
-                              <MapIcon size={12} className="fill-orange-100" />
+                              <Map size={12} className="fill-orange-100" />
                             </span>
                           )}
                           <StatusBadge status={r.status} />
@@ -1801,7 +1414,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                             }`}
                             title={r.needsMapCorrection ? "Hủy yêu cầu chỉnh lý bản đồ" : "Yêu cầu chỉnh lý bản đồ"}
                           >
-                            <MapIcon size={14} className={r.needsMapCorrection ? "fill-orange-100" : ""} />
+                            <Map size={14} className={r.needsMapCorrection ? "fill-orange-100" : ""} />
                           </button>
                         )}
 
@@ -1812,25 +1425,6 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                           >
                             Chi tiết
                           </button>
-
-                          {/* Ký duyệt cho Ban Giám Đốc trên Mobile */}
-                          {(activeTab === "pending_sign" || r.status === RecordStatus.PENDING_SIGN) && isDirectorUser && (
-                            <>
-                              <button
-                                onClick={() => handleOpenReturnModal(r)}
-                                className="p-1.5 bg-red-50 text-red-600 border border-red-100 rounded-lg text-xs"
-                                title="Trả hồ sơ"
-                              >
-                                <FileX size={14} />
-                              </button>
-                              <button
-                                onClick={() => handleApproveSign(r)}
-                                className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-sm active:scale-95"
-                              >
-                                <CheckCircle2 size={13} /> Ký duyệt
-                              </button>
-                            </>
-                          )}
 
                           {activeTab === "pending" && (
                             <button

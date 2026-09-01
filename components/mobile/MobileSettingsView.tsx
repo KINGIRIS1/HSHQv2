@@ -123,6 +123,7 @@ const MobileSettingsView: React.FC<MobileSettingsViewProps> = (props) => {
                 onDeleteAllData={props.onDeleteAllData}
                 onHolidaysChanged={props.onHolidaysChanged}
                 employees={props.employees}
+                users={props.users}
               />
             </div>
           </div>
