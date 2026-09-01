@@ -36,7 +36,7 @@ function App() {
   const isMobile = useIsMobile(768);
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
     try {
-      const saved = localStorage.getItem('current_user_session');
+      const saved = sessionStorage.getItem('current_user_session');
       return saved ? JSON.parse(saved) : null;
     } catch {
       return null;
@@ -45,11 +45,12 @@ function App() {
 
   useEffect(() => {
     if (currentUser) {
-      localStorage.setItem('current_user_session', JSON.stringify(currentUser));
+      sessionStorage.setItem('current_user_session', JSON.stringify(currentUser));
     } else {
-      localStorage.removeItem('current_user_session');
+      sessionStorage.removeItem('current_user_session');
     }
   }, [currentUser]);
+
   const [backupNotification, setBackupNotification] = useState<{ show: boolean, filePath?: string, backupData?: any } | null>(null);
   const [isCloudDatabaseInspectorOpen, setIsCloudDatabaseInspectorOpen] = useState(false);
 
@@ -353,6 +354,37 @@ function App() {
       }
       setCurrentUser(null);
   }, [currentUser]);
+
+  // Idle timeout (60 minutes) - Tự động đăng xuất khi cán bộ không hoạt động sau 60 phút
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const timeoutDuration = 60 * 60 * 1000; // 60 minutes
+    let idleTimer: any;
+
+    const resetTimer = () => {
+      if (idleTimer) clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => {
+        handleLogout();
+      }, timeoutDuration);
+    };
+
+    // Initialize timer
+    resetTimer();
+
+    // Lắng nghe các hành vi tương tác trên màn hình
+    const events = ['mousemove', 'mousedown', 'keypress', 'scroll', 'touchstart'];
+    events.forEach(event => {
+      window.addEventListener(event, resetTimer);
+    });
+
+    return () => {
+      if (idleTimer) clearTimeout(idleTimer);
+      events.forEach(event => {
+        window.removeEventListener(event, resetTimer);
+      });
+    };
+  }, [currentUser, handleLogout]);
 
   const handleGlobalGenerateReport = async (fromDateStr: string, toDateStr: string, title?: string, data?: RecordFile[]) => {
       if (!currentUser) return;
@@ -1022,11 +1054,8 @@ function App() {
 
   const handleConfirmRejectReturnStep = useCallback(async (optionType: ReturnOptionType, reason: string, returnDateStr: string) => {
       if (rejectReturnTargetRecords.length === 0) return;
-      let targetDateISO = new Date().toISOString();
-      if (returnDateStr) {
-          const d = new Date(returnDateStr);
-          if (!isNaN(d.getTime())) targetDateISO = d.toISOString();
-      }
+      // Luôn lấy ngày giờ thực tế hiện tại làm ngày thực hiện thao tác đồng ý
+      const targetDateISO = new Date().toISOString();
       
       const formatDateVN = (dStr: string) => {
           try {
@@ -1050,10 +1079,13 @@ function App() {
 
           if (optionType === 'pause_supplement') {
               newStatus = RecordStatus.PENDING_SUPPLEMENT;
-              internalLogNote = `[TRẢ DỪNG QUY TRÌNH (CHỜ BỔ SUNG) - ${formattedReturnDate}] Lý do: ${reason} (Người trả: ${userLabel})`;
+              internalLogNote = `[TRẢ CHỜ BỔ SUNG - ${formattedReturnDate}] Lý do: ${reason} (Người trả: ${userLabel})`;
           } else if (optionType === 'cancel_reject') {
               newStatus = RecordStatus.REJECTED;
-              internalLogNote = `[TRẢ HỦY HỒ SƠ (TẠM DỪNG / TỪ CHỐI 1 CỬA) - ${formattedReturnDate}] Lý do: ${reason} (Người trả: ${userLabel})`;
+              internalLogNote = `[TRẢ HỦY HỒ SƠ - ${formattedReturnDate}] Lý do: ${reason} (Người trả: ${userLabel})`;
+          } else if (optionType === 'withdraw_citizen') {
+              newStatus = RecordStatus.WITHDRAWN;
+              internalLogNote = `[TRẢ CSD RÚT HS - ${formattedReturnDate}] Lý do: ${reason} (Người trả: ${userLabel})`;
           } else {
               newStatus = RecordStatus.IN_PROGRESS;
               const prevStatusLabel = STATUS_LABELS[r.status] || r.status;
@@ -1076,7 +1108,7 @@ function App() {
           return {
               ...r,
               status: newStatus,
-              ...(optionType === 'cancel_reject' ? { completedDate: targetDateISO } : {}),
+              ...((optionType === 'cancel_reject' || optionType === 'withdraw_citizen') ? { completedDate: targetDateISO } : {}),
               ...(optionType === 'return_handler' ? { pendingCheckDate: null, submissionDate: null, checkedDate: null, approvalDate: null } : {}),
               privateNotes: updatedPrivateNotes,
               statusLogs: [...(r.statusLogs || []), newLog]

@@ -3,7 +3,7 @@ import AutoResizeTextarea from './AutoResizeTextarea';
 import { X, Undo2, AlertCircle, Calendar, MessageSquare, PauseCircle, Ban, RefreshCw, CheckSquare } from 'lucide-react';
 import { RecordFile, User, Employee } from '../types';
 
-export type ReturnOptionType = 'pause_supplement' | 'cancel_reject' | 'return_handler';
+export type ReturnOptionType = 'pause_supplement' | 'cancel_reject' | 'return_handler' | 'withdraw_citizen';
 
 interface RejectReturnStepModalProps {
   isOpen: boolean;
@@ -67,7 +67,7 @@ export const RejectReturnStepModal: React.FC<RejectReturnStepModalProps> = ({
         <div className="bg-rose-600 px-5 py-3.5 text-white flex justify-between items-center shadow-sm">
           <div className="flex items-center gap-2.5 font-bold text-lg">
             <Undo2 size={22} className="shrink-0" />
-            <span>Thao Tác Trả Hồ Sơ</span>
+            <span>Trả hồ sơ</span>
           </div>
           <button 
             type="button"
@@ -134,7 +134,7 @@ export const RejectReturnStepModal: React.FC<RejectReturnStepModalProps> = ({
                 />
                 <PauseCircle size={18} className="text-amber-600 shrink-0" />
                 <span className="text-xs sm:text-sm">
-                  <strong>1. Trả dừng quy trình (Chờ người dân bổ sung)</strong>
+                  <strong>1. Trả chờ bổ sung</strong>
                 </span>
               </label>
 
@@ -156,7 +156,7 @@ export const RejectReturnStepModal: React.FC<RejectReturnStepModalProps> = ({
                 />
                 <Ban size={18} className="text-rose-600 shrink-0" />
                 <span className="text-xs sm:text-sm">
-                  <strong>2. Trả hủy hồ sơ (Tạm dừng / Từ chối hoàn trả 1 cửa)</strong>
+                  <strong>2. Trả hủy hồ sơ</strong>
                 </span>
               </label>
 
@@ -178,7 +178,29 @@ export const RejectReturnStepModal: React.FC<RejectReturnStepModalProps> = ({
                 />
                 <RefreshCw size={18} className="text-blue-600 shrink-0" />
                 <span className="text-xs sm:text-sm">
-                  <strong>3. Trả về cán bộ thụ lý (Yêu cầu sửa chữa / hoàn thiện)</strong>
+                  <strong>3. Trả về cán bộ thụ lý</strong>
+                </span>
+              </label>
+
+              {/* Option 4 */}
+              <label 
+                className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
+                  returnOption === 'withdraw_citizen' 
+                    ? 'border-2 border-teal-500 bg-teal-50/60 text-teal-950 font-bold shadow-xs' 
+                    : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-medium'
+                }`}
+              >
+                <input 
+                  type="radio" 
+                  name="returnOption" 
+                  value="withdraw_citizen"
+                  checked={returnOption === 'withdraw_citizen'}
+                  onChange={() => setReturnOption('withdraw_citizen')}
+                  className="w-4 h-4 text-teal-600 focus:ring-teal-500"
+                />
+                <CheckSquare size={18} className="text-teal-600 shrink-0" />
+                <span className="text-xs sm:text-sm">
+                  <strong>4. Trả CSD rút hs</strong>
                 </span>
               </label>
             </div>
@@ -200,20 +222,6 @@ export const RejectReturnStepModal: React.FC<RejectReturnStepModalProps> = ({
             />
           </div>
 
-          {/* Section 4: Execution Date */}
-          <div>
-            <label className="block text-xs font-bold text-slate-800 mb-1.5 flex items-center gap-1.5">
-              <Calendar size={15} className="text-indigo-600" />
-              <span>Ngày thực hiện</span>
-            </label>
-            <input
-              type="date"
-              className="w-full border border-slate-300 rounded-xl px-3.5 py-2 text-sm focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none font-semibold text-slate-700 bg-slate-50"
-              value={returnDate}
-              onChange={(e) => setReturnDate(e.target.value)}
-            />
-          </div>
-
           {/* Section 6: Footer buttons */}
           <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
             <button
@@ -230,7 +238,7 @@ export const RejectReturnStepModal: React.FC<RejectReturnStepModalProps> = ({
               className="flex items-center gap-2 px-6 py-2.5 bg-rose-500 hover:bg-rose-600 disabled:opacity-40 text-white rounded-xl font-bold text-sm shadow-md transition-all active:scale-95"
             >
               <Undo2 size={16} />
-              {isSubmitting ? 'Đang xử lý...' : 'Đồng Ý & Thực Hiện'}
+              {isSubmitting ? 'Đang xử lý...' : 'Đồng ý'}
             </button>
           </div>
         </form>

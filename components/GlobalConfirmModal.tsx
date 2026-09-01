@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { setGlobalConfirmCallback } from '../utils/appHelpers';
-import { AlertCircle, X } from 'lucide-react';
+import { Trash2, AlertTriangle, CheckCircle2, PenTool, HelpCircle } from 'lucide-react';
 
 const GlobalConfirmModal = () => {
     const [isOpen, setIsOpen] = useState(false);
@@ -28,33 +28,64 @@ const GlobalConfirmModal = () => {
         }
     };
 
+    const isDelete = /xóa|hủy|loại bỏ/i.test(title + ' ' + message);
+    const isSign = /ký|duyệt|trình/i.test(title + ' ' + message);
+
+    let Icon = HelpCircle;
+    if (isDelete) {
+        Icon = Trash2;
+    } else if (isSign) {
+        Icon = PenTool;
+    }
+
     return (
-        <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-sm overflow-hidden animate-fade-in-up">
-                <div className="bg-gray-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center">
-                    <div className="flex items-center gap-2 text-gray-700 font-bold">
-                        <AlertCircle size={18} className="text-orange-500" />
-                        {title}
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[9999] flex items-center justify-center p-4 animate-fade-in">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-100 animate-scale-up">
+                {/* Body Content */}
+                <div className="p-6 sm:p-8 flex flex-col items-center text-center">
+                    {/* Visual Status Indicator */}
+                    <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-5 ring-8 transition-all duration-300 ${
+                        isDelete 
+                            ? 'bg-red-50 text-red-600 ring-red-50/80' 
+                            : isSign 
+                                ? 'bg-emerald-50 text-emerald-600 ring-emerald-50/80' 
+                                : 'bg-blue-50 text-blue-600 ring-blue-50/80'
+                    }`}>
+                        <Icon size={28} />
                     </div>
-                    <button onClick={() => handleClose(false)} className="text-gray-400 hover:text-gray-600">
-                        <X size={18} />
-                    </button>
+                    
+                    {/* Modal Title */}
+                    <h3 className="text-xl font-bold text-slate-900 mb-2">
+                        {title || 'Xác nhận hành động'}
+                    </h3>
+                    
+                    {/* Modal Message */}
+                    <p className="text-sm text-slate-500 whitespace-pre-line leading-relaxed max-w-md">
+                        {message}
+                    </p>
                 </div>
-                <div className="p-4 text-gray-600 text-sm whitespace-pre-line">
-                    {message}
-                </div>
-                <div className="bg-gray-50 px-4 py-3 border-t border-gray-200 flex justify-end gap-2">
+                
+                {/* Modal Footer Actions */}
+                <div className="bg-slate-50 px-6 py-4 flex flex-col-reverse sm:flex-row gap-3 border-t border-slate-100">
                     <button 
-                        onClick={() => handleClose(false)} 
-                        className="px-4 py-2 border border-gray-300 bg-white text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-medium"
+                        type="button"
+                        onClick={() => handleClose(false)}
+                        className="flex-1 py-3 bg-white border border-slate-200 hover:bg-slate-100 active:scale-[0.98] transition-all text-slate-700 font-bold text-sm rounded-xl cursor-pointer"
                     >
-                        Hủy
+                        Quay lại
                     </button>
                     <button 
-                        onClick={() => handleClose(true)} 
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-bold shadow-sm"
+                        type="button"
+                        onClick={() => handleClose(true)}
+                        className={`flex-1 py-3 text-white font-bold text-sm rounded-xl shadow-md active:scale-[0.98] transition-all cursor-pointer ${
+                            isDelete 
+                                ? 'bg-red-600 hover:bg-red-700 shadow-red-500/10' 
+                                : isSign 
+                                    ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-500/10' 
+                                    : 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/10'
+                        }`}
                     >
-                        Đồng ý
+                        {isDelete ? 'Xác nhận xóa' : isSign ? 'Đồng ý ký duyệt' : 'Xác nhận'}
                     </button>
                 </div>
             </div>

@@ -108,36 +108,39 @@ export const exportReportToExcel = async (
     // Table Header (Cập nhật cột theo yêu cầu)
     const tableHeader = [
         "STT", 
-        "Mã Hồ Sơ", 
-        "Chủ Sử Dụng", 
-        "Địa Chỉ (Xã)", 
+        "Mã hồ sơ", 
+        "Chủ sử dụng", 
+        "Địa chỉ", 
         "Tờ",
         "Thửa",
-        "Loại Hồ Sơ", 
-        "Loại HĐ/TL", // Yêu cầu 2: Loại hồ sơ thanh lý (Trích lục, đo đạc...)
-        "NV Xử Lý",
-        "Số Biên Lai", 
-        "Giá trị HĐ", // Yêu cầu 3: Đổi từ Thành Tiền -> Giá trị HĐ
-        "Giá trị TL", // Yêu cầu 1: Thêm cột Giá trị thanh lý
-        "Ngày Nhận", 
-        "Hẹn Trả", 
-        "Ngày hoàn thành",
+        "loại hồ sơ", 
+        "ngày nhận", 
+        "ngày trả", 
+        "Ngày giao NV",
+        "NV xử lý",
+        "Ngày Trình Kiểm tra",
+        "Người kiểm tra",
+        "Ngày Trình ký",
+        "Người Ký duyệt",
+        "Hoàn Thành",
+        "Đợt",
         "Ngày trả kết quả",
-        "Trạng Thái", 
-        "Ghi Chú"
+        "trạng thái",
+        "Số BL/HĐ",
+        "Số Tiền"
     ];
     
     const dataRows = filtered.map((r, i) => {
         const contractInfo = getContractInfo(r.code);
         
-        // Tổng hợp ghi chú cho Excel
-        const notesParts: string[] = [];
-        const cleanedNotes = cleanSyncNotes(r.notes);
-        if (cleanedNotes) notesParts.push(cleanedNotes);
-        const cleanedContent = cleanSyncNotes(r.content);
-        if (cleanedContent && cleanedContent !== cleanedNotes) notesParts.push(cleanedContent);
-        
-        const fullNotesText = notesParts.join('; ') || '';
+        let rawPrice = '';
+        if (r.returnedPrice !== undefined && r.returnedPrice !== null) {
+            rawPrice = r.returnedPrice.toLocaleString('vi-VN');
+        } else if (r.price !== undefined && r.price !== null) {
+            rawPrice = r.price.toLocaleString('vi-VN');
+        } else {
+            rawPrice = contractInfo.amount;
+        }
 
         return [
             i + 1,
@@ -147,17 +150,20 @@ export const exportReportToExcel = async (
             r.mapSheet || '',
             r.landPlot || '',
             getShortRecordType(r.recordType || undefined),
-            contractInfo.type, // Loại HĐ/TL
-            getEmployeeName(r.assignedTo || undefined),
-            r.receiptNumber || '',
-            contractInfo.amount,      // Giá trị HĐ
-            contractInfo.liquidation, // Giá trị TL
             formatDate(r.receivedDate),
             formatDate(r.deadline),
-            formatDate(r.completedDate),      
+            formatDate(r.assignedDate),
+            getEmployeeName(r.assignedTo || undefined),
+            formatDate(r.pendingCheckDate),
+            getEmployeeName(r.checkedBy || undefined),
+            formatDate(r.submissionDate),
+            getEmployeeName(r.submittedTo || undefined),
+            formatDate(r.completedDate),
+            r.exportBatch || '',
             formatDate(r.resultReturnedDate),
-            STATUS_LABELS[r.status],
-            ""
+            STATUS_LABELS[r.status] || r.status,
+            r.receiptNumber || '',
+            rawPrice
         ];
     });
 
@@ -213,26 +219,29 @@ export const exportReportToExcel = async (
         { s: { r: 6, c: 0 }, e: { r: 6, c: totalCols } }
     ];
     
-    // Column Widths (Adjusted for new columns)
+    // Column Widths (Adjusted for requested columns)
     ws['!cols'] = [
         { wch: 5 },  // STT
-        { wch: 15 }, // Mã HS
-        { wch: 25 }, // Chủ SD
-        { wch: 18 }, // Địa Chỉ
+        { wch: 15 }, // Mã hồ sơ
+        { wch: 25 }, // Chủ sử dụng
+        { wch: 18 }, // Địa chỉ
         { wch: 7 },  // Tờ
         { wch: 7 },  // Thửa
-        { wch: 15 }, // Loại HS
-        { wch: 15 }, // Loại HĐ/TL (New)
-        { wch: 20 }, // NV Xử Lý
-        { wch: 12 }, // Số BL
-        { wch: 15 }, // Giá trị HĐ
-        { wch: 15 }, // Giá trị TL (New)
-        { wch: 12 }, // Ngày Nhận
-        { wch: 12 }, // Hẹn Trả
-        { wch: 14 }, // Ngày hoàn thành
-        { wch: 14 }, // Ngày trả kết quả
-        { wch: 15 }, // Trạng thái
-        { wch: 20 }  // Ghi chú
+        { wch: 15 }, // loại hồ sơ
+        { wch: 12 }, // ngày nhận
+        { wch: 12 }, // ngày trả
+        { wch: 12 }, // Ngày giao NV
+        { wch: 20 }, // NV xử lý
+        { wch: 12 }, // Ngày Trình Kiểm tra
+        { wch: 20 }, // Người kiểm tra
+        { wch: 12 }, // Ngày Trình ký
+        { wch: 20 }, // Người Ký duyệt
+        { wch: 12 }, // Hoàn Thành
+        { wch: 8 },  // Đợt
+        { wch: 12 }, // Ngày trả kết quả
+        { wch: 15 }, // trạng thái
+        { wch: 12 }, // Số BL/HĐ
+        { wch: 15 }  // Số Tiền
     ];
 
     // Apply Styles
@@ -255,11 +264,14 @@ export const exportReportToExcel = async (
             const cellRef = XLSX.utils.encode_cell({ r, c });
             if (!ws[cellRef]) ws[cellRef] = { v: "", t: "s" };
             
-            // Căn giữa: STT, Tờ, Thửa, NV, BL, Ngày, Trạng thái. Căn phải: Tiền.
-            // Index: 0(STT), 4(Tờ), 5(Thửa), 8(NV), 9(BL), 10(HĐ), 11(TL), 12(NgayNhan), 13(Hen), 14(Xong), 15(TraKQ), 16(Status)
-            if ([0, 4, 5, 8, 9, 12, 13, 14, 15, 16].includes(c)) ws[cellRef].s = centerStyle;
-            else if (c === 10 || c === 11) ws[cellRef].s = rightStyle;
-            else ws[cellRef].s = cellStyle;
+            // Căn giữa các cột thông tin, ngày tháng và trạng thái. Số tiền căn phải.
+            if ([0, 4, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19].includes(c)) {
+                ws[cellRef].s = centerStyle;
+            } else if (c === 20) {
+                ws[cellRef].s = rightStyle;
+            } else {
+                ws[cellRef].s = cellStyle;
+            }
         }
     }
 
