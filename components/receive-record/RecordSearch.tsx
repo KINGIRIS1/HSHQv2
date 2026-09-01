@@ -457,7 +457,7 @@ export const RecordSearch: React.FC<RecordSearchProps> = ({
     };
 
     // Excel Export Action
-    const handleExportExcel = () => {
+    const handleExportExcel = async () => {
         const recordsToExport = selectedIds.size > 0 
             ? records.filter(r => selectedIds.has(r.id))
             : sortedRecords;
@@ -471,7 +471,7 @@ export const RecordSearch: React.FC<RecordSearchProps> = ({
             ? `DANH SÁCH ${recordsToExport.length} HỒ SƠ ĐƯỢC CHỌN`
             : `DANH SÁCH TRA CỨU HỒ SƠ (${sortedRecords.length} BẢN GHI)`;
 
-        exportCustomRecordsToExcel(recordsToExport, employees, titleText);
+        await exportCustomRecordsToExcel(recordsToExport, employees, titleText);
     };
 
     // Confirm Extend Deadline callback

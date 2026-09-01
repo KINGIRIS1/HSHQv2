@@ -874,6 +874,8 @@ function App() {
       }
       setSelectedRecordIds(new Set()); 
       setToast({ type: 'success', message: `Đã chốt danh sách ${batchNumber} thành công.` });
+      setExportModalType("handover");
+      setIsExportModalOpen(true);
   };
 
   const executeReturnBatchHandover = async (batchNumber: number, batchDate: string, deptName: string) => {

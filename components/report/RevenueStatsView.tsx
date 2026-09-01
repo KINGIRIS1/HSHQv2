@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { RecordFile, RecordStatus, Employee } from '../../types';
 import { getShortRecordType } from '../../constants';
 import { removeVietnameseTones, isProcedure2_3 } from '../../utils/appHelpers';
@@ -237,6 +237,13 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
         const start = (currentPage - 1) * pageSize;
         return filteredRecords.slice(start, start + pageSize);
     }, [filteredRecords, currentPage, pageSize]);
+
+    // Notify parent component when revenue filtered records change
+    useEffect(() => {
+        if (onFilteredRecordsChange) {
+            onFilteredRecordsChange(filteredRecords);
+        }
+    }, [filteredRecords, onFilteredRecordsChange]);
 
     // Reset page when filters change
     const handleCardFilterChange = (type: 'all' | 'bien_lai' | 'hoa_don') => {

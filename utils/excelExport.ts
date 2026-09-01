@@ -18,8 +18,8 @@ export const exportReportToExcel = async (
     const to = new Date(toDateStr);
     to.setHours(23, 59, 59, 999);
 
-    // Filter records
-    const filtered = records.filter(r => {
+    // Filter records: If customTitle is provided or ward is PRE_FILTERED, use pre-filtered records directly
+    const filtered = (customTitle || ward === 'PRE_FILTERED') ? records : records.filter(r => {
         if (!r.receivedDate) return false;
         const rDate = new Date(r.receivedDate);
         const matchDate = rDate >= from && rDate <= to;
@@ -716,7 +716,7 @@ export const exportOverdueStatsToExcel = (records: any[], employees: Employee[],
     XLSX.writeFile(wb, fileName);
 };
 
-export const exportCustomRecordsToExcel = (
+export const exportCustomRecordsToExcel = async (
     records: RecordFile[],
     employees: Employee[],
     titleText: string = "DANH SÁCH HỒ SƠ"
@@ -725,6 +725,32 @@ export const exportCustomRecordsToExcel = (
         alert("Không có hồ sơ nào để xuất.");
         return;
     }
+
+    // Lấy dữ liệu hợp đồng để map giá tiền và số hợp đồng
+    let contracts: any[] = [];
+    try {
+        contracts = await fetchContracts();
+    } catch (e) {
+        console.warn("Không tải được dữ liệu hợp đồng cho xuất excel.");
+    }
+
+    const getContractInfo = (recordCode: string) => {
+        if (!recordCode) return { amount: '', liquidation: '', type: '' };
+        const match = contracts.find(c => c.code && c.code.toLowerCase().trim() === recordCode.toLowerCase().trim());
+        if (!match) return { amount: '', liquidation: '', type: '' };
+
+        return {
+            amount: match.totalAmount ? match.totalAmount.toLocaleString('vi-VN') : '',
+            liquidation: match.liquidationAmount ? match.liquidationAmount.toLocaleString('vi-VN') : '',
+            type: match.contractType || ''
+        };
+    };
+
+    const getEmployeeName = (empId?: string) => {
+        if (!empId) return '';
+        const emp = employees.find(e => e.id === empId);
+        return emp ? emp.name : '';
+    };
 
     const formatDate = (d: string | undefined | null) => {
         if (!d) return '';
@@ -735,38 +761,64 @@ export const exportCustomRecordsToExcel = (
 
     const tableHeader = [
         "STT", 
-        "Mã Hồ Sơ", 
-        "Chủ Sử Dụng", 
-        "Địa Chỉ (Xã)", 
+        "Mã hồ sơ", 
+        "Chủ sử dụng", 
+        "Địa chỉ", 
         "Tờ",
         "Thửa",
-        "Loại Hồ Sơ", 
-        "NV Xử Lý",
-        "Ngày Nhận", 
-        "Hẹn Trả", 
-        "Ngày Hoàn Thành",
-        "Ngày Trả Kết Quả",
-        "Trạng Thái", 
-        "Ghi Chú"
+        "loại hồ sơ", 
+        "ngày nhận", 
+        "ngày trả", 
+        "Ngày giao NV",
+        "NV xử lý",
+        "Ngày Trình Kiểm tra",
+        "Người kiểm tra",
+        "Ngày Trình ký",
+        "Người Ký duyệt",
+        "Hoàn Thành",
+        "Đợt",
+        "Ngày trả kết quả",
+        "trạng thái",
+        "Số BL/HĐ",
+        "Số Tiền"
     ];
 
     const dataRows = records.map((r, i) => {
-        const emp = employees.find(e => e.id === r.assignedTo);
+        const contractInfo = getContractInfo(r.code);
+        
+        let rawPrice = '';
+        if ((r as any).calcReturned !== undefined && (r as any).calcReturned !== null) {
+            rawPrice = (r as any).calcReturned.toLocaleString('vi-VN');
+        } else if (r.returnedPrice !== undefined && r.returnedPrice !== null) {
+            rawPrice = r.returnedPrice.toLocaleString('vi-VN');
+        } else if (r.price !== undefined && r.price !== null) {
+            rawPrice = r.price.toLocaleString('vi-VN');
+        } else {
+            rawPrice = contractInfo.amount;
+        }
+
         return [
             i + 1,
             r.code,
             r.customerName,
-            getNormalizedWard(r.ward || undefined),
+            getNormalizedWard(r.ward || (r as any).assignedWard || undefined),
             r.mapSheet || '',
             r.landPlot || '',
             getShortRecordType(r.recordType || undefined),
-            emp ? emp.name : '',
             formatDate(r.receivedDate),
             formatDate(r.deadline),
-            formatDate(r.completedDate),      
-            formatDate(r.resultReturnedDate),
+            formatDate(r.assignedDate),
+            getEmployeeName(r.assignedTo || undefined),
+            formatDate(r.pendingCheckDate),
+            getEmployeeName(r.checkedBy || undefined),
+            formatDate(r.submissionDate),
+            getEmployeeName(r.submittedTo || undefined),
+            formatDate(r.completedDate),
+            r.exportBatch || (r as any).handoverBatch || '',
+            formatDate(r.resultReturnedDate || r.exportDate),
             STATUS_LABELS[r.status] || r.status,
-            cleanSyncNotes(r.notes) || ''
+            r.receiptNumber || (r as any).contractNumber || '',
+            rawPrice
         ];
     });
 
@@ -789,6 +841,7 @@ export const exportCustomRecordsToExcel = (
         alignment: { vertical: "center", wrapText: true } 
     };
     const centerStyle = { ...cellStyle, alignment: { horizontal: "center", vertical: "center" } };
+    const rightStyle = { ...cellStyle, alignment: { horizontal: "right", vertical: "center" } };
 
     const todayStr = new Date().toLocaleDateString('vi-VN');
 
@@ -821,13 +874,20 @@ export const exportCustomRecordsToExcel = (
         { wch: 7 },  // Tờ
         { wch: 7 },  // Thửa
         { wch: 15 }, // Loại HS
-        { wch: 20 }, // NV Xử Lý
         { wch: 12 }, // Ngày nhận
-        { wch: 12 }, // Ngày hẹn
-        { wch: 15 }, // Ngày hoàn thành
-        { wch: 15 }, // Ngày trả kết quả
+        { wch: 12 }, // Ngày trả
+        { wch: 12 }, // Ngày giao NV
+        { wch: 18 }, // NV xử lý
+        { wch: 12 }, // Ngày Trình Kiểm tra
+        { wch: 18 }, // Người kiểm tra
+        { wch: 12 }, // Ngày Trình ký
+        { wch: 18 }, // Người Ký duyệt
+        { wch: 12 }, // Hoàn Thành
+        { wch: 10 }, // Đợt
+        { wch: 12 }, // Ngày trả kết quả
         { wch: 15 }, // Trạng thái
-        { wch: 25 }  // Ghi chú
+        { wch: 15 }, // Số BL/HĐ
+        { wch: 15 }  // Số Tiền
     ];
 
     if(ws['A1']) ws['A1'].s = titleStyle;
@@ -847,27 +907,28 @@ export const exportCustomRecordsToExcel = (
             const cellRef = XLSX.utils.encode_cell({ r, c });
             if (!ws[cellRef]) ws[cellRef] = { v: "", t: "s" };
             
-            if ([0, 3, 4, 5, 8, 9, 10, 11, 12].includes(c)) ws[cellRef].s = centerStyle;
+            if ([0, 3, 4, 5, 7, 8, 9, 11, 13, 15, 16, 17, 18].includes(c)) ws[cellRef].s = centerStyle;
+            else if (c === 20) ws[cellRef].s = rightStyle;
             else ws[cellRef].s = cellStyle;
         }
     }
 
     const footerStart = dataStartIdx + dataRows.length + 2;
     XLSX.utils.sheet_add_aoa(ws, [
-        ["NGƯỜI LẬP BIỂU", "", "", "", "", "", "", "THỦ TRƯỞNG ĐƠN VỊ", "", "", "", ""],
-        ["(Ký, họ tên)", "", "", "", "", "", "", "(Ký, họ tên, đóng dấu)", "", "", "", ""]
+        ["NGƯỜI LẬP BIỂU", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "THỦ TRƯỞNG ĐƠN VỊ", "", "", "", ""],
+        ["(Ký, họ tên)", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "(Ký, họ tên, đóng dấu)", "", "", "", ""]
     ], { origin: { r: footerStart, c: 0 } });
 
     ws['!merges'].push(
-        { s: { r: footerStart, c: 0 }, e: { r: footerStart, c: 2 } },
-        { s: { r: footerStart + 1, c: 0 }, e: { r: footerStart + 1, c: 2 } },
-        { s: { r: footerStart, c: 7 }, e: { r: footerStart, c: 11 } },
-        { s: { r: footerStart + 1, c: 7 }, e: { r: footerStart + 1, c: 11 } }
+        { s: { r: footerStart, c: 0 }, e: { r: footerStart, c: 3 } },
+        { s: { r: footerStart + 1, c: 0 }, e: { r: footerStart + 1, c: 3 } },
+        { s: { r: footerStart, c: 15 }, e: { r: footerStart, c: 20 } },
+        { s: { r: footerStart + 1, c: 15 }, e: { r: footerStart + 1, c: 20 } }
     );
 
     const footerTitleStyle = { font: { name: "Times New Roman", sz: 12, bold: true }, alignment: { horizontal: "center" } };
     const leftTitle = XLSX.utils.encode_cell({r: footerStart, c: 0});
-    const rightTitle = XLSX.utils.encode_cell({r: footerStart, c: 7});
+    const rightTitle = XLSX.utils.encode_cell({r: footerStart, c: 15});
     if(ws[leftTitle]) ws[leftTitle].s = footerTitleStyle;
     if(ws[rightTitle]) ws[rightTitle].s = footerTitleStyle;
 
