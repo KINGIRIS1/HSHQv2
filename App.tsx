@@ -38,18 +38,78 @@ function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
     try {
       const saved = sessionStorage.getItem('current_user_session');
-      return saved ? JSON.parse(saved) : null;
+      if (!saved) return null;
+
+      const lastActivity = sessionStorage.getItem('last_activity_timestamp');
+      const SIXTY_MINUTES_MS = 60 * 60 * 1000;
+      if (lastActivity) {
+        const elapsed = Date.now() - parseInt(lastActivity, 10);
+        if (elapsed >= SIXTY_MINUTES_MS) {
+          sessionStorage.removeItem('current_user_session');
+          sessionStorage.removeItem('last_activity_timestamp');
+          return null;
+        }
+      }
+      return JSON.parse(saved);
     } catch {
       return null;
     }
   });
 
+
+
   useEffect(() => {
     if (currentUser) {
       sessionStorage.setItem('current_user_session', JSON.stringify(currentUser));
+      if (!sessionStorage.getItem('last_activity_timestamp')) {
+        sessionStorage.setItem('last_activity_timestamp', Date.now().toString());
+      }
     } else {
       sessionStorage.removeItem('current_user_session');
+      sessionStorage.removeItem('last_activity_timestamp');
     }
+  }, [currentUser]);
+
+  // Session expiry & 60-minute inactivity auto-logout listener
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const SIXTY_MINUTES_MS = 60 * 60 * 1000;
+    let lastSavedTime = Date.now();
+
+    const updateActivity = () => {
+      const now = Date.now();
+      if (now - lastSavedTime > 10000) {
+        lastSavedTime = now;
+        sessionStorage.setItem('last_activity_timestamp', now.toString());
+      }
+    };
+
+    const events = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
+    events.forEach(evt => window.addEventListener(evt, updateActivity, { passive: true }));
+
+    const checkInterval = setInterval(() => {
+      const lastActivityStr = sessionStorage.getItem('last_activity_timestamp');
+      if (lastActivityStr) {
+        const lastActivity = parseInt(lastActivityStr, 10);
+        const elapsed = Date.now() - lastActivity;
+        if (elapsed >= SIXTY_MINUTES_MS) {
+          console.warn("Phiên làm việc đã hết hạn do 60 phút không hoạt động.");
+          setCurrentUser(null);
+          sessionStorage.removeItem('current_user_session');
+          sessionStorage.removeItem('last_activity_timestamp');
+          setToast({
+            type: 'error',
+            message: 'Phiên làm việc đã hết hạn (60 phút không hoạt động). Vui lòng đăng nhập lại.'
+          });
+        }
+      }
+    }, 15000);
+
+    return () => {
+      events.forEach(evt => window.removeEventListener(evt, updateActivity));
+      clearInterval(checkInterval);
+    };
   }, [currentUser]);
 
   const [backupNotification, setBackupNotification] = useState<{ show: boolean, filePath?: string, backupData?: any } | null>(null);
@@ -356,6 +416,8 @@ function App() {
           logSystemEvent(currentUser.username, 'LOGOUT', `Đăng xuất khỏi hệ thống (${currentUser.name})`).catch(e => console.error(e));
       }
       setCurrentUser(null);
+      sessionStorage.removeItem('current_user_session');
+      sessionStorage.removeItem('last_activity_timestamp');
   }, [currentUser]);
 
   // Idle timeout (60 minutes) - Tự động đăng xuất khi cán bộ không hoạt động sau 60 phút
@@ -366,8 +428,10 @@ function App() {
     let idleTimer: any;
 
     const resetTimer = () => {
+      sessionStorage.setItem('last_activity_timestamp', Date.now().toString());
       if (idleTimer) clearTimeout(idleTimer);
       idleTimer = setTimeout(() => {
+        setToast({ type: 'error', message: 'Phiên làm việc đã hết hạn (60 phút không hoạt động). Vui lòng đăng nhập lại.' });
         handleLogout();
       }, timeoutDuration);
     };
@@ -378,7 +442,7 @@ function App() {
     // Lắng nghe các hành vi tương tác trên màn hình
     const events = ['mousemove', 'mousedown', 'keypress', 'scroll', 'touchstart'];
     events.forEach(event => {
-      window.addEventListener(event, resetTimer);
+      window.addEventListener(event, resetTimer, { passive: true });
     });
 
     return () => {
@@ -1156,6 +1220,7 @@ function App() {
       />
       <Login 
         onLogin={(user) => {
+          sessionStorage.setItem('last_activity_timestamp', Date.now().toString());
           setCurrentUser(user);
           setCurrentView('dashboard');
           logSystemEvent(user.username, 'LOGIN', `Đăng nhập vào hệ thống (${user.name})`).catch(e => console.error(e));
