@@ -951,13 +951,6 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                                 >
                                     <Settings size={16}/>
                                 </button>
-                                <button onClick={handleDownloadTemplate} className="flex items-center gap-2 bg-emerald-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-emerald-700 shadow-sm" title="Tải mẫu Excel">
-                                    <FileSpreadsheet size={16}/> Tải mẫu
-                                </button>
-                                <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".xlsx, .xls" className="hidden" />
-                                <button onClick={handleImportClick} className="flex items-center gap-2 bg-blue-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-blue-700 shadow-sm">
-                                    <Upload size={16}/> Import Excel
-                                </button>
                                 <button onClick={handleAddNew} className="flex items-center gap-2 bg-teal-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-teal-700 shadow-sm">
                                     <Plus size={16}/> Thêm mới
                                 </button>

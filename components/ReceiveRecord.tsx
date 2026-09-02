@@ -10,7 +10,6 @@ import { isViewAllowedForUser } from '../config/roleConfig';
 
 // Components
 import RecordForm from './receive-record/RecordForm';
-import BulkImport from './receive-record/BulkImport';
 import DailyList from './receive-record/DailyList';
 import { RecordSearch } from './receive-record/RecordSearch';
 import TemplateConfigModal from './TemplateConfigModal';
@@ -68,35 +67,29 @@ const formatDateKey = (date: Date): string => {
 };
 
 const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, employees, currentUser, records = [], holidays, onCreateContract, onHandOverRecords, onBulkUpdate, initialTab = 'create', rolePermissions, departmentPermissions, onReturnResult }) => {
-  const [viewMode, setViewMode] = useState<'create' | 'list' | 'bulk' | 'update' | 'vphc' | 'search' | 'extend'>(initialTab as any);
+  const [viewMode, setViewMode] = useState<'create' | 'list' | 'update' | 'vphc' | 'search' | 'extend'>(initialTab === 'bulk' as any ? 'create' : initialTab as any);
 
   const canCreate = !currentUser || isViewAllowedForUser(currentUser, employees || [], 'receive_sub_create', rolePermissions, departmentPermissions);
-  const canBulk = !currentUser || isViewAllowedForUser(currentUser, employees || [], 'receive_sub_bulk', rolePermissions, departmentPermissions);
   const canList = !currentUser || isViewAllowedForUser(currentUser, employees || [], 'receive_sub_list', rolePermissions, departmentPermissions);
   const canVphc = false;
 
   useEffect(() => {
-    if (initialTab && initialTab !== 'vphc') {
-      setViewMode(initialTab);
-    } else if (initialTab === 'vphc') {
+    if (initialTab && initialTab !== 'vphc' && (initialTab as string) !== 'bulk') {
+      setViewMode(initialTab as any);
+    } else {
       setViewMode('create');
     }
   }, [initialTab]);
 
   useEffect(() => {
-    if (viewMode === 'vphc') {
+    if (viewMode === 'vphc' || (viewMode as string) === 'bulk') {
       setViewMode('create');
     } else if (viewMode === 'create' && !canCreate) {
-      if (canBulk) setViewMode('bulk');
-      else if (canList) setViewMode('list');
-    } else if (viewMode === 'bulk' && !canBulk) {
-      if (canCreate) setViewMode('create');
-      else if (canList) setViewMode('list');
+      if (canList) setViewMode('list');
     } else if (viewMode === 'list' && !canList) {
       if (canCreate) setViewMode('create');
-      else if (canBulk) setViewMode('bulk');
     }
-  }, [canCreate, canBulk, canList, viewMode]);
+  }, [canCreate, canList, viewMode]);
   // Removed local holidays state and useEffect
   
   // State chỉnh sửa
@@ -354,11 +347,6 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
                   <PlusCircle size={16} /> Nhập mới
               </button>
             )}
-            {canBulk && (
-              <button onClick={() => setViewMode('bulk')} className={`flex items-center gap-2 px-3.5 py-1.5 rounded-md text-sm font-semibold transition-all whitespace-nowrap cursor-pointer ${viewMode === 'bulk' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}>
-                  <FileSpreadsheet size={16} /> Tiếp nhận hàng loạt
-              </button>
-            )}
             {canList && (
               <button onClick={() => setViewMode('list')} className={`flex items-center gap-2 px-3.5 py-1.5 rounded-md text-sm font-semibold transition-all whitespace-nowrap cursor-pointer ${viewMode === 'list' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}>
                   <LayoutList size={16} /> Danh sách hôm nay
@@ -401,16 +389,6 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
                 onCancelEdit={() => setEditingRecord(null)}
                 currentUser={currentUser}
                 employees={employees}
-            />
-        )}
-
-        {viewMode === 'bulk' && (
-            <BulkImport 
-                onSave={onSave}
-                calculateDeadline={calculateDeadline}
-                calculateNextCode={(w, d, exist) => calculateNextCode(w, d, exist)}
-                onPreview={handlePreviewDocx}
-                currentUser={currentUser}
             />
         )}
 

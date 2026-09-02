@@ -776,10 +776,6 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Tân Qua
                                     <Users size={18}/> Giao việc ({selectedIds.size})
                                 </button>
                             )}
-                            <label className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 font-bold shadow-md transition-all cursor-pointer">
-                                <FileSpreadsheet size={18}/> Import Excel
-                                <input type="file" className="hidden" accept=".xlsx, .xls" onChange={handleImportExcel} />
-                            </label>
                             <button onClick={handleAddNew} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 font-bold shadow-md transition-all">
                                 <Plus size={18}/> Thêm mới
                             </button>

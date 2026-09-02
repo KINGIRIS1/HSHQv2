@@ -635,10 +635,6 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
                                     <Users size={18}/> Giao việc ({selectedIds.size})
                                 </button>
                             )}
-                            <label className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 font-bold shadow-md transition-all cursor-pointer">
-                                <FileSpreadsheet size={18}/> Import Excel
-                                <input type="file" className="hidden" accept=".xlsx, .xls" onChange={handleImportExcel} />
-                            </label>
                             <button onClick={() => { setIsFormOpen(true); setEditingId(null); setFormData({type: 'congvan', status: 'draft', so_hieu: '', trich_yeu: '', ngay_thang: new Date().toISOString(), noi_nhan_gui: ''}); }} className="flex items-center gap-2 bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 font-bold shadow-md transition-all">
                                 <Plus size={18}/> Tạo mới
                             </button>

@@ -1,11 +1,10 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import * as XLSX from 'xlsx-js-style';
 import { RecordFile, RecordStatus, Employee, Holiday } from '../types';
 import { RECORD_TYPES, STATUS_LABELS, STATUS_COLORS, getShortRecordType } from '../constants';
 import { fetchHolidays } from '../services/api';
-import { X, Upload, FileSpreadsheet, Save, Loader2, AlertCircle, Check, RefreshCw, PlusCircle, AlertTriangle } from 'lucide-react';
-import { calculateDeadlineHelper, formatDateKey, migrateUnbatchedRecords } from '../utils/appHelpers';
+import { X, Upload, FileSpreadsheet, Save, Loader2, Check, RefreshCw, PlusCircle } from 'lucide-react';
+import { calculateDeadlineHelper, migrateUnbatchedRecords } from '../utils/appHelpers';
 
 interface ImportModalProps {
   isOpen: boolean;
@@ -23,6 +22,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
   const [loading, setLoading] = useState(false);
   const [mode, setMode] = useState<'create' | 'update'>(initialMode || 'create');
   const [viewFilter, setViewFilter] = useState<'all' | 'valid' | 'errors'>('all');
+  const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [progress, setProgress] = useState<{ processed: number, total: number } | null>(null);
@@ -38,14 +38,13 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
         if (initialMode) {
             setMode(initialMode);
         }
-        if(fileInputRef.current) fileInputRef.current.value = '';
+        if (fileInputRef.current) fileInputRef.current.value = '';
     }
   }, [isOpen, initialMode]);
 
   const parseExcelDate = (input: any): string | undefined => {
       if (input === undefined || input === null || input === '') return undefined;
       
-      // If it is already a Date object
       if (input instanceof Date) {
           if (!isNaN(input.getTime())) {
               const y = input.getUTCFullYear();
@@ -56,10 +55,8 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
           return undefined;
       }
 
-      // Check for Excel serial number
       const num = Number(input);
       if (!isNaN(num) && num > 20000 && typeof input !== 'string') {
-          // Calculate UTC milliseconds directly from Excel epoch without local timezone offset shift
           const utcMs = Math.round((num - 25569) * 86400 * 1000);
           const date = new Date(utcMs);
           if (!isNaN(date.getTime())) {
@@ -74,7 +71,6 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
           const cleanStr = input.trim();
           if (cleanStr === '') return undefined;
           
-          // Try parse via regex for DD/MM/YYYY
           const dmyRegex = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/;
           const match = cleanStr.match(dmyRegex);
           if (match) {
@@ -84,7 +80,6 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
               return `${year}-${month}-${day}`;
           }
 
-          // Try match YYYY-MM-DD
           const ymdRegex = /^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/;
           const matchYmd = cleanStr.match(ymdRegex);
           if (matchYmd) {
@@ -94,7 +89,6 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
               return `${year}-${month}-${day}`;
           }
 
-          // Native Date fallback using UTC
           const date = new Date(cleanStr);
           if (!isNaN(date.getTime())) {
               const y = date.getUTCFullYear();
@@ -110,8 +104,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
       return calculateDeadlineHelper(type, receivedDateStr, holidays);
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const processFile = (file: File) => {
     if (!file) return;
     setFileName(file.name);
     setLoading(true);
@@ -125,17 +118,21 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
         const ws = wb.Sheets[wsname];
         const data = XLSX.utils.sheet_to_json(ws, { header: 1 });
 
+        // 1. Quét tìm dòng tiêu đề chính xác (Fuzzy Header Detection)
         let headerRowIndex = 0;
         for (let i = 0; i < Math.min(data.length, 20); i++) {
             const row = data[i] as any[];
-            if (row && row.some(cell => String(cell).toLowerCase().includes('mã') || String(cell).toLowerCase().includes('chủ sử dụng'))) {
+            if (row && row.some(cell => {
+              const s = String(cell).toLowerCase();
+              return s.includes('mã') || s.includes('chủ sử dụng') || s.includes('họ tên') || s.includes('thửa') || s.includes('loại hồ sơ') || s.includes('stt');
+            })) {
                 headerRowIndex = i;
                 break;
             }
         }
 
-        const headers = (data[headerRowIndex] as string[]).map(h => String(h).toUpperCase().trim());
-        const mappedRecords: any[] = []; // Dùng any để linh hoạt cho Update object
+        const headers = (data[headerRowIndex] as string[]).map(h => String(h || '').toUpperCase().trim());
+        const mappedRecords: any[] = [];
 
         const typeMapping: Record<string, string> = {
             'TL': '2.1 Trích lục', 'TRÍCH LỤC': '2.1 Trích lục', '2.1': '2.1 Trích lục',
@@ -151,14 +148,11 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
             const row = data[i] as any[];
             if (!row || row.length === 0) continue;
 
-            // Hàm helper: Trả về undefined nếu cột không tồn tại, trả về giá trị nếu có
             const getVal = (possibleHeaders: string[]) => {
-                // Ưu tiên khớp chính xác (exact match)
                 let idx = headers.findIndex(h => {
                     const hUpper = h.trim().toUpperCase();
                     return possibleHeaders.some(ph => hUpper === ph.toUpperCase());
                 });
-                // Nếu không có khớp chính xác, tìm khớp chứa chuỗi (contains)
                 if (idx === -1) {
                     idx = headers.findIndex(h => {
                         const hUpper = h.trim().toUpperCase();
@@ -171,27 +165,25 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
             const codeRaw = getVal(['MÃ HỒ SƠ', 'MÃ HS', 'CODE', 'code']);
             const code = codeRaw ? String(codeRaw).trim() : undefined;
             
-            if (mode === 'update' && !code) continue; // Update bắt buộc phải có mã
+            if (mode === 'update' && !code) continue;
             
-            // Xây dựng object record. Với Update, chỉ điền field nào có trong Excel.
             const record: any = {};
             
-            // 1. CÁC TRƯỜNG CƠ BẢN
             if (code) record.code = code;
             else if (mode === 'create') record.code = `AUTO-${Math.floor(Math.random()*10000)}`;
 
-            const nameRaw = getVal(['CHỦ SỬ DỤNG', 'TÊN', 'HỌ TÊN', 'CUSTOMER', 'customername', 'customer_name', 'customerName']);
-            if (nameRaw !== undefined) record.customerName = String(nameRaw);
+            const nameRaw = getVal(['CHỦ SỬ DỤNG', 'TÊN', 'HỌ TÊN', 'CUSTOMER', 'customername', 'customer_name', 'customerName', 'BÊN CHUYỂN NHƯỢNG']);
+            if (nameRaw !== undefined) record.customerName = String(nameRaw).trim();
             else if (mode === 'create') record.customerName = 'Chưa cập nhật';
 
             const phoneRaw = getVal(['SĐT', 'ĐIỆN THOẠI', 'phonenumber', 'phone_number', 'phoneNumber']);
-            if (phoneRaw !== undefined) record.phoneNumber = String(phoneRaw);
+            if (phoneRaw !== undefined) record.phoneNumber = String(phoneRaw).trim();
 
             const addressRaw = getVal(['ĐỊA CHỈ', 'ADDRESS', 'customeraddress', 'customer_address', 'customerAddress', 'address']);
-            if (addressRaw !== undefined) record.customerAddress = String(addressRaw);
+            if (addressRaw !== undefined) record.customerAddress = String(addressRaw).trim();
 
             const cccdRaw = getVal(['CCCD', 'CMND', 'cccd']);
-            if (cccdRaw !== undefined) record.cccd = String(cccdRaw);
+            if (cccdRaw !== undefined) record.cccd = String(cccdRaw).trim();
 
             const authByRaw = getVal(['NGƯỜI ỦY QUYỀN', 'ỦY QUYỀN', 'authorizedby', 'authorized_by', 'authorizedBy']);
             const authTypeRaw = getVal(['LOẠI ỦY QUYỀN', 'GIẤY ỦY QUYỀN', 'authdoctype', 'auth_doc_type', 'authDocType']);
@@ -199,14 +191,14 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
                 record.authDocType = `${authByRaw || ''}|${authTypeRaw || ''}`;
             }
 
-            const wardRaw = getVal(['XÃ', 'PHƯỜNG', 'WARD', 'ward']);
-            if (wardRaw !== undefined) record.ward = String(wardRaw);
+            const wardRaw = getVal(['XÃ', 'PHƯỜNG', 'WARD', 'ward', 'ĐỊA BÀN', 'XÃ / PHƯỜNG']);
+            if (wardRaw !== undefined) record.ward = String(wardRaw).trim();
 
-            const mapSheetRaw = getVal(['TỜ', 'BẢN ĐỒ SỐ', 'mapsheet', 'map_sheet', 'mapSheet']);
-            if (mapSheetRaw !== undefined) record.mapSheet = String(mapSheetRaw);
+            const mapSheetRaw = getVal(['TỜ', 'BẢN ĐỒ SỐ', 'TỜ BẢN ĐỒ', 'mapsheet', 'map_sheet', 'mapSheet']);
+            if (mapSheetRaw !== undefined) record.mapSheet = String(mapSheetRaw).trim();
 
-            const landPlotRaw = getVal(['THỬA', 'THỬA ĐẤT SỐ', 'landplot', 'land_plot', 'landPlot']);
-            if (landPlotRaw !== undefined) record.landPlot = String(landPlotRaw);
+            const landPlotRaw = getVal(['THỬA', 'THỬA ĐẤT SỐ', 'THỬA ĐẤT', 'landplot', 'land_plot', 'landPlot']);
+            if (landPlotRaw !== undefined) record.landPlot = String(landPlotRaw).trim();
 
             const errors: string[] = [];
 
@@ -233,21 +225,20 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
             }
 
             const issueNumRaw = getVal(['SỐ PHÁT HÀNH', 'issuenumber', 'issue_number', 'issueNumber']);
-            if (issueNumRaw !== undefined) record.issueNumber = String(issueNumRaw);
+            if (issueNumRaw !== undefined) record.issueNumber = String(issueNumRaw).trim();
 
             const entryNumRaw = getVal(['SỐ VÀO SỔ', 'entrynumber', 'entry_number', 'entryNumber']);
-            if (entryNumRaw !== undefined) record.entryNumber = String(entryNumRaw);
+            if (entryNumRaw !== undefined) record.entryNumber = String(entryNumRaw).trim();
 
             const issueDateRaw = getVal(['NGÀY CẤP', 'issuedate', 'issue_date', 'issueDate']);
             if (issueDateRaw !== undefined) record.issueDate = parseExcelDate(issueDateRaw);
 
             const contentRaw = getVal(['NỘI DUNG', 'GHI CHÚ', 'content', 'notes']);
-            if (contentRaw !== undefined) record.content = String(contentRaw);
+            if (contentRaw !== undefined) record.content = String(contentRaw).trim();
 
             const otherDocsRaw = getVal(['GIẤY TỜ KÈM THEO', 'GIẤY TỜ', 'otherdocs', 'other_docs', 'otherDocs']);
-            if (otherDocsRaw !== undefined) record.otherDocs = String(otherDocsRaw);
+            if (otherDocsRaw !== undefined) record.otherDocs = String(otherDocsRaw).trim();
 
-            // 2. NGÀY THÁNG CỦA TỪNG TRẠNG THÁI & THÔNG TIN CHUNG
             const receivedRaw = getVal(['NGÀY NHẬN', 'NGÀY NỘP', 'receiveddate', 'received_date', 'receivedDate']);
             if (receivedRaw !== undefined) record.receivedDate = parseExcelDate(receivedRaw);
             else if (mode === 'create') record.receivedDate = new Date().toISOString();
@@ -276,8 +267,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
             const resultReturnedDateRaw = getVal(['NGÀY TRẢ DÂN', 'resultreturneddate', 'result_returned_date', 'resultReturnedDate']);
             if (resultReturnedDateRaw !== undefined) record.resultReturnedDate = parseExcelDate(resultReturnedDateRaw);
 
-            // 3. LOẠI HỒ SƠ
-            const typeRaw = getVal(['LOẠI HỒ SƠ', 'LOAI HO SO', 'recordtype', 'record_type']);
+            const typeRaw = getVal(['LOẠI HỒ SƠ', 'LOAI HO SO', 'LOẠI', 'THỦ TỤC', 'recordtype', 'record_type']);
             if (typeRaw !== undefined) {
                 const str = String(typeRaw).trim();
                 record.recordType = typeMapping[str.toUpperCase()] || getShortRecordType(str);
@@ -294,7 +284,6 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
                 if (!record.price) record.price = 310000;
             }
 
-            // 4. THÔNG TIN XUẤT (QUAN TRỌNG CHO VIỆC TỰ ĐỘNG HANDOVER)
             const exportBatchRaw = getVal(['ĐỢT', 'BATCH', 'exportbatch', 'export_batch', 'exportBatch']);
             if (exportBatchRaw !== undefined) {
                 const numStr = String(exportBatchRaw).replace(/[^0-9]/g, '');
@@ -306,8 +295,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
                 record.exportDate = parseExcelDate(exportDateRaw);
             }
 
-            // Parse NGƯỜI XỬ LÝ & NGÀY GIAO trước để hỗ trợ suy diễn trạng thái Đã Giao Việc
-            const assigneeRaw = getVal(['NGƯỜI XỬ LÝ', 'NHÂN VIÊN', 'assignedto', 'assigned_to', 'assignedTo']);
+            const assigneeRaw = getVal(['NGƯỜI XỬ LÝ', 'NHÂN VIÊN', 'assignedto', 'assigned_to', 'assignedTo', 'NV XỬ LÝ']);
             if (assigneeRaw !== undefined && String(assigneeRaw).trim() !== '') {
                 const emp = employees.find(e => e.name.toLowerCase().includes(String(assigneeRaw).toLowerCase().trim()));
                 if (emp) {
@@ -321,12 +309,8 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
                 record.assignedDate = parseExcelDate(assignedDateRaw);
             }
 
-            // 5. TRẠNG THÁI & NGƯỜI XỬ LÝ
-            // Logic ưu tiên: Nếu có cột Trạng Thái được điền trực tiếp từ Excel -> Ưu tiên dùng cột Trạng Thái trước.
-            // Nếu không có, mới dùng logic suy diễn dựa trên các cột mốc ngày đã điền.
             let explicitStatus: RecordStatus | undefined = undefined;
 
-            // Kiểm tra cột trạng thái từ Excel trước
             const statusRaw = getVal(['TRẠNG THÁI', 'STATUS', 'status']);
             if (statusRaw !== undefined && String(statusRaw).trim() !== '') {
                 let sStr = String(statusRaw).toUpperCase().trim();
@@ -359,11 +343,9 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
                 }
             }
 
-            // Gán trạng thái theo độ ưu tiên
             if (explicitStatus !== undefined) {
                 record.status = explicitStatus;
                 
-                // Điền tự động các trường ngày tương ứng với trạng thái đã chọn nếu trường ngày đó chưa có giá trị
                 const nowStr = new Date().toISOString();
                 if (explicitStatus === RecordStatus.HANDOVER) {
                     if (!record.completedDate) record.completedDate = nowStr;
@@ -383,7 +365,6 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
                     if (!record.assignedDate) record.assignedDate = nowStr;
                 }
             } else {
-                // Nếu KHÔNG có cột TRẠNG THÁI cụ thể, dùng LOGIC SUY DIỄN DỰA TRÊN NGÀY THÁNG VÀ PHÂN CÔNG (chỉ áp dụng cho tạo mới, tránh ghi đè status khi update)
                 if (mode === 'create') {
                     if (record.exportBatch || record.exportDate || record.completedDate) {
                         record.status = RecordStatus.HANDOVER;
@@ -410,7 +391,6 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
                 }
             }
 
-            // ID giả lập cho preview
             record.id = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substr(2, 9);
             
             if (mode === 'create') {
@@ -435,6 +415,18 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
       }
     };
     reader.readAsArrayBuffer(file);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) processFile(file);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) processFile(file);
   };
 
   const handleSave = async () => {
@@ -493,128 +485,139 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100] p-4 backdrop-blur-sm">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-5xl h-[85vh] flex flex-col animate-fade-in-up">
-        {/* HEADER */}
-        <div className="flex justify-between items-center p-5 border-b shrink-0">
-          <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-            {mode === 'create' ? (
-              <>
-                <FileSpreadsheet className="text-green-600" />
-                Tiếp nhận hàng loạt từ Excel
-              </>
-            ) : (
-              <>
-                <RefreshCw className="text-amber-600" />
-                Cập nhật thông tin từ Excel
-              </>
-            )}
-          </h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-red-600">
-            <X size={24} />
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-[100] p-4 animate-fade-in">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl h-[88vh] flex flex-col overflow-hidden border border-slate-100">
+        
+        {/* HEADER BAR (Blue Header Matching Image 1 & Image 2) */}
+        <div className="bg-blue-700 px-6 py-4 flex justify-between items-center shrink-0 shadow-sm">
+          <div className="flex items-center gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center text-white border border-white/20 shadow-inner shrink-0">
+              <FileSpreadsheet size={22} className="text-white" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-white tracking-wide">
+                {mode === 'create' 
+                  ? 'Tiếp nhận hàng loạt từ Excel (Đo đạc / Lưu trữ)' 
+                  : 'Cập nhật hàng loạt từ file Excel (Đo đạc / Lưu trữ)'
+                }
+              </h2>
+              <p className="text-xs text-blue-100/90 font-medium mt-0.5">
+                {mode === 'create'
+                  ? 'Thêm mới hàng loạt hồ sơ Đo đạc & Lưu trữ từ file Excel'
+                  : 'Cập nhật tự động trạng thái quy trình, cán bộ thụ lý, hạn trả... dựa theo Mã hồ sơ'
+                }
+              </p>
+            </div>
+          </div>
+          <button 
+            onClick={onClose} 
+            className="text-white/80 hover:text-white p-1.5 hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
+            title="Đóng modal"
+          >
+            <X size={20} />
           </button>
         </div>
 
-        {/* MODE INFO & FILE CONTROLS */}
-        <div className="p-4 border-b bg-slate-50 shrink-0 space-y-3">
-            {/* Show mode switcher only when initialMode is not explicitly provided */}
-            {!initialMode && (
-              <div className="flex justify-center">
-                  <div className="bg-white border border-gray-300 rounded-lg p-1 flex shadow-sm">
-                      <button 
-                          onClick={() => { setMode('create'); setPreviewData([]); setFileName(''); }}
-                          className={`flex items-center gap-2 px-6 py-1.5 rounded-md font-medium text-sm transition-all ${mode === 'create' ? 'bg-blue-600 text-white shadow' : 'text-gray-600 hover:bg-gray-100'}`}
-                      >
-                          <PlusCircle size={16} /> Nhập hồ sơ mới
-                      </button>
-                      <button 
-                          onClick={() => { setMode('update'); setPreviewData([]); setFileName(''); }}
-                          className={`flex items-center gap-2 px-6 py-1.5 rounded-md font-medium text-sm transition-all ${mode === 'update' ? 'bg-orange-500 text-white shadow' : 'text-gray-600 hover:bg-gray-100'}`}
-                      >
-                          <RefreshCw size={16} /> Cập nhật thông tin
-                      </button>
-                  </div>
-              </div>
-            )}
+        {/* SUBHEADER CONTROL BAR (Top control row) */}
+        <div className="px-6 py-3.5 bg-slate-50/80 border-b border-slate-200/80 flex flex-wrap items-center justify-between gap-3 shrink-0">
+          
+          {/* Left Side: Segmented control tabs */}
+          <div className="bg-slate-200/70 p-1 rounded-xl flex items-center gap-1 border border-slate-200/60 shadow-inner">
+            <button 
+              onClick={() => { setMode('update'); setPreviewData([]); setFileName(''); setViewFilter('all'); }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-xs transition-all cursor-pointer ${
+                mode === 'update' 
+                  ? 'bg-white text-blue-700 shadow-xs border border-slate-200/60' 
+                  : 'text-slate-600 hover:text-slate-900 font-semibold'
+              }`}
+            >
+              <RefreshCw size={15} /> Cập nhật dữ liệu
+            </button>
 
-            {/* BAR ROW: FILTERS ON LEFT | ACTION BUTTONS ON RIGHT */}
-            <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-xl border border-slate-200 shadow-xs">
-                {/* Left Side: Filter Pills or Status */}
-                <div className="flex flex-wrap items-center gap-2">
-                    {previewData.length > 0 && !loading ? (
-                        <>
-                            <button 
-                                onClick={() => setViewFilter('all')}
-                                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${viewFilter === 'all' ? 'bg-slate-800 text-white shadow-xs' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
-                            >
-                                Tất cả ({previewData.length})
-                            </button>
-                            <button 
-                                onClick={() => setViewFilter('valid')}
-                                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${viewFilter === 'valid' ? 'bg-emerald-600 text-white shadow-xs' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'}`}
-                            >
-                                Hợp lệ ({previewData.filter(r => !r._errors?.length).length})
-                            </button>
-                            <button 
-                                onClick={() => setViewFilter('errors')}
-                                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${viewFilter === 'errors' ? 'bg-red-600 text-white shadow-xs' : 'bg-red-50 text-red-700 hover:bg-red-100 border border-red-200'}`}
-                            >
-                                Không hợp lệ ({previewData.filter(r => r._errors?.length).length})
-                            </button>
-                        </>
-                    ) : (
-                        <div className="flex items-center gap-2 text-xs font-semibold text-slate-600">
-                            <FileSpreadsheet size={16} className="text-blue-600" />
-                            {fileName ? (
-                                <span>File đã chọn: <strong className="text-blue-700">{fileName}</strong></span>
-                            ) : (
-                                <span>{mode === 'create' ? 'Tải file mẫu hoặc chọn file Excel để nhập hồ sơ mới' : 'Tải file mẫu hoặc chọn file Excel để cập nhật thông tin hồ sơ'}</span>
-                            )}
-                        </div>
-                    )}
-                </div>
+            <button 
+              onClick={() => { setMode('create'); setPreviewData([]); setFileName(''); setViewFilter('all'); }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-xs transition-all cursor-pointer ${
+                mode === 'create' 
+                  ? 'bg-white text-blue-700 shadow-xs border border-slate-200/60' 
+                  : 'text-slate-600 hover:text-slate-900 font-semibold'
+              }`}
+            >
+              <PlusCircle size={15} /> Nhập mới hàng loạt
+            </button>
 
-                {/* Right Side: Action Buttons: Tải mẫu -> Chọn File -> [!] */}
-                <div className="flex items-center gap-2 ml-auto">
-                    <button 
-                        onClick={handleDownloadTemplate} 
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-1.5 rounded-lg font-bold text-xs flex items-center gap-1.5 shadow-xs transition-all cursor-pointer"
-                        title="Tải file Excel mẫu"
-                    >
-                        <FileSpreadsheet size={15} /> Tải mẫu
-                    </button>
+            <button 
+              onClick={handleDownloadTemplate} 
+              className="flex items-center gap-2 px-4 py-2 rounded-lg font-semibold text-xs text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 shadow-2xs transition-all cursor-pointer"
+              title="Tải file mẫu Excel"
+            >
+              <FileSpreadsheet size={15} className="text-slate-600" /> Tải file mẫu Excel
+            </button>
+          </div>
 
-                    <input type="file" ref={fileInputRef} accept=".xlsx, .xls" onChange={handleFileChange} className="hidden" />
-                    
-                    <button 
-                        onClick={() => fileInputRef.current?.click()} 
-                        className={`text-white px-3.5 py-1.5 rounded-lg font-bold text-xs flex items-center gap-1.5 shadow-xs transition-all cursor-pointer ${mode === 'create' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-orange-600 hover:bg-orange-700'}`}
-                        title="Chọn file Excel từ máy tính"
-                    >
-                        <Upload size={15} /> Chọn File
-                    </button>
+          {/* Right Side: Upload button & Red Exclamation Notice Button */}
+          <div className="flex items-center gap-2 ml-auto">
+            <input type="file" ref={fileInputRef} accept=".xlsx, .xls" onChange={handleFileChange} className="hidden" />
+            
+            <button 
+              onClick={() => fileInputRef.current?.click()} 
+              className="bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl px-4.5 py-2.5 text-xs flex items-center gap-2 shadow-md hover:shadow-lg transition-all active:scale-95 cursor-pointer"
+              title="Tải lên file Excel"
+            >
+              <Upload size={15} /> Tải lên file Excel
+            </button>
 
-                    <button 
-                        onClick={() => setShowNoticeModal(true)} 
-                        className="w-6 h-6 rounded-full bg-red-500 hover:bg-red-600 text-white font-extrabold text-xs flex items-center justify-center shadow-sm border border-red-400 transition-all active:scale-90 cursor-pointer ml-0.5 shrink-0"
-                        title="Xem nhắc nhở & hướng dẫn Cập nhật thông minh"
-                    >
-                        !
-                    </button>
-                </div>
-            </div>
+            <button 
+              onClick={() => setShowNoticeModal(true)} 
+              className="w-8 h-8 rounded-full bg-red-500 hover:bg-red-600 text-white font-extrabold text-sm flex items-center justify-center shadow-md border border-red-400/80 cursor-pointer transition-all active:scale-90 ml-1 shrink-0"
+              title="Xem hướng dẫn cập nhật thông minh"
+            >
+              !
+            </button>
+          </div>
         </div>
 
-        {/* PREVIEW TABLE */}
-        <div className="flex-1 overflow-auto p-0">
-            {loading ? (
-                <div className="h-full flex flex-col items-center justify-center text-gray-500">
-                    <Loader2 className="w-10 h-10 animate-spin mb-2 text-blue-500" />
-                    <p>Đang xử lý dữ liệu...</p>
+        {/* MAIN BODY AREA */}
+        <div className="flex-1 overflow-auto p-6 flex flex-col">
+          {loading ? (
+            <div className="h-full flex flex-col items-center justify-center text-slate-500 my-auto">
+              <Loader2 className="w-10 h-10 animate-spin mb-3 text-blue-600" />
+              <p className="text-sm font-semibold text-slate-700">Đang đọc và đối soát dữ liệu file Excel...</p>
+            </div>
+          ) : previewData.length > 0 ? (
+            <div className="space-y-4 flex-1 flex flex-col">
+              {/* Filter Row */}
+              <div className="flex items-center justify-between bg-slate-50 p-3 rounded-xl border border-slate-200/80">
+                <div className="flex items-center gap-2">
+                  <button 
+                      onClick={() => setViewFilter('all')}
+                      className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${viewFilter === 'all' ? 'bg-slate-800 text-white shadow-xs' : 'bg-slate-200/70 text-slate-700 hover:bg-slate-300/70'}`}
+                  >
+                      Tất cả ({previewData.length})
+                  </button>
+                  <button 
+                      onClick={() => setViewFilter('valid')}
+                      className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${viewFilter === 'valid' ? 'bg-emerald-600 text-white shadow-xs' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'}`}
+                  >
+                      Hợp lệ ({previewData.filter(r => !r._errors?.length).length})
+                  </button>
+                  <button 
+                      onClick={() => setViewFilter('errors')}
+                      className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${viewFilter === 'errors' ? 'bg-red-600 text-white shadow-xs' : 'bg-red-50 text-red-700 hover:bg-red-100 border border-red-200'}`}
+                  >
+                      Không hợp lệ ({previewData.filter(r => r._errors?.length).length})
+                  </button>
                 </div>
-            ) : previewData.length > 0 ? (
+                {fileName && (
+                  <span className="text-xs text-slate-500 font-medium">
+                    File: <strong className="text-blue-600">{fileName}</strong>
+                  </span>
+                )}
+              </div>
+
+              {/* Data Table */}
+              <div className="flex-1 overflow-auto rounded-xl border border-slate-200">
                 <table className="w-full text-left border-collapse">
-                    <thead className="bg-gray-100 sticky top-0 shadow-sm z-10 text-xs uppercase font-bold text-gray-600">
+                    <thead className="bg-slate-100 sticky top-0 shadow-xs z-10 text-xs uppercase font-bold text-slate-600">
                         <tr>
                             <th className="p-3 border-b">#</th>
                             <th className="p-3 border-b">Mã HS</th>
@@ -625,38 +628,37 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
                             <th className="p-3 border-b">Kiểm duyệt lỗi</th>
                         </tr>
                     </thead>
-                    <tbody className="text-sm text-gray-700 divide-y divide-gray-100">
+                    <tbody className="text-sm text-slate-700 divide-y divide-slate-100">
                         {previewData.filter(r => {
                             if (viewFilter === 'valid') return !r._errors?.length;
                             if (viewFilter === 'errors') return r._errors && r._errors.length > 0;
                             return true;
-                        }).map((record, idx) => {
+                        }).map((record) => {
                             const hasError = record._errors && record._errors.length > 0;
-                            // Find original index for display
                             const originalIdx = previewData.indexOf(record) + 1;
                             return (
-                                <tr key={originalIdx} className={`hover:bg-blue-50 ${hasError ? 'bg-red-50' : ''}`}>
-                                    <td className="p-3">{originalIdx}</td>
+                                <tr key={originalIdx} className={`hover:bg-blue-50/50 ${hasError ? 'bg-red-50/50' : ''}`}>
+                                    <td className="p-3 text-xs font-semibold text-slate-400">{originalIdx}</td>
                                     <td className="p-3 font-medium text-blue-600">{record.code}</td>
-                                    <td className="p-3 font-medium text-gray-500">{record.customerName || <span className="text-gray-300 italic">(Giữ nguyên)</span>}</td>
+                                    <td className="p-3 font-medium text-slate-700">{record.customerName || <span className="text-slate-300 italic">(Giữ nguyên)</span>}</td>
                                     <td className="p-3">
                                         {record.status ? (
-                                            <span className={`text-xs px-2.5 py-1 rounded-full font-bold inline-block shadow-2xs ${STATUS_COLORS[record.status as RecordStatus] || 'bg-gray-100 text-gray-700'}`}>
+                                            <span className={`text-xs px-2.5 py-1 rounded-full font-bold inline-block shadow-2xs ${STATUS_COLORS[record.status as RecordStatus] || 'bg-slate-100 text-slate-700'}`}>
                                                 {STATUS_LABELS[record.status as RecordStatus] || record.status}
                                             </span>
                                         ) : (
-                                            <span className="text-gray-300 italic">(Giữ nguyên)</span>
+                                            <span className="text-slate-300 italic">(Giữ nguyên)</span>
                                         )}
                                     </td>
-                                    <td className="p-3 font-mono text-green-700">{record.exportDate ? record.exportDate.split('T')[0] : '-'}</td>
-                                    <td className="p-3 font-bold">{record.exportBatch || '-'}</td>
+                                    <td className="p-3 font-mono text-xs text-emerald-700">{record.exportDate ? record.exportDate.split('T')[0] : '-'}</td>
+                                    <td className="p-3 font-bold text-xs">{record.exportBatch || '-'}</td>
                                     <td className="p-3">
                                         {hasError ? (
                                             <ul className="text-red-600 list-disc pl-4 text-xs font-medium">
                                                 {record._errors!.map((err, i) => <li key={i}>{err}</li>)}
                                             </ul>
                                         ) : (
-                                            <span className="text-green-600 text-xs flex items-center gap-1 font-medium"><Check size={14} /> Hợp lệ</span>
+                                            <span className="text-emerald-600 text-xs flex items-center gap-1 font-medium"><Check size={14} /> Hợp lệ</span>
                                         )}
                                     </td>
                                 </tr>
@@ -664,49 +666,84 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
                         })}
                     </tbody>
                 </table>
-            ) : (
-                <div className="h-full flex flex-col items-center justify-center text-gray-400">
-                    <FileSpreadsheet size={48} className="mb-2 opacity-50" />
-                    <p>Chưa có dữ liệu. Vui lòng chọn file Excel.</p>
+              </div>
+            </div>
+          ) : (
+            /* EMPTY STATE / DRAG AND DROP ZONE (Exact Match Image 1 & Image 2) */
+            <div 
+              onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+              onDragLeave={() => setIsDragging(false)}
+              onDrop={handleDrop}
+              className={`w-full max-w-4xl border-2 border-dashed ${isDragging ? 'border-blue-500 bg-blue-50/50' : 'border-slate-200/90 bg-slate-50/40'} rounded-3xl p-12 flex flex-col items-center justify-center text-center my-auto transition-all mx-auto`}
+            >
+              <div className="w-16 h-16 rounded-2xl bg-slate-100/80 flex items-center justify-center text-slate-300 mb-4 shadow-inner">
+                <FileSpreadsheet size={40} className="text-slate-300 stroke-[1.2]" />
+              </div>
+              
+              <h3 className="text-base font-bold text-slate-800 mb-1.5">
+                Chưa có dữ liệu xem trước
+              </h3>
+              
+              <p className="text-xs text-slate-500 mb-6 max-w-md">
+                {mode === 'create'
+                  ? 'Vui lòng tải lên file Excel (.xlsx hoặc .xls) chứa danh sách hồ sơ cần tiếp nhận.'
+                  : 'Vui lòng tải lên file Excel (.xlsx hoặc .xls) chứa danh sách hồ sơ cần cập nhật.'
+                }
+              </p>
+
+              <button 
+                onClick={() => fileInputRef.current?.click()}
+                className="bg-white hover:bg-slate-50 text-blue-600 border border-blue-200/90 hover:border-blue-400 font-bold px-6 py-2.5 rounded-xl text-xs shadow-2xs transition-all cursor-pointer flex items-center gap-2"
+              >
+                Chọn file từ máy tính
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* FOOTER BAR (Matching Image 1 & Image 2) */}
+        <div className="px-6 py-4 bg-white border-t border-slate-200 flex justify-between items-center rounded-b-2xl shrink-0">
+          <button 
+            onClick={onClose} 
+            className="text-slate-600 hover:text-slate-900 font-bold text-xs transition-colors cursor-pointer px-2 py-1"
+            disabled={loading}
+          >
+            Đóng / Hủy
+          </button>
+
+          <div className="flex items-center gap-3">
+            {progress && (
+                <div className="w-48 bg-slate-200 rounded-full h-2 mr-2 overflow-hidden">
+                    <div className="bg-blue-600 h-2 rounded-full transition-all duration-300" style={{ width: `${Math.max(5, (progress.processed / progress.total) * 100)}%` }}></div>
                 </div>
             )}
+            
+            <button 
+                onClick={handleSave} 
+                disabled={previewData.length === 0 || previewData.some(r => r._errors?.length) || loading} 
+                className="bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl px-6 py-2.5 text-xs flex items-center gap-2 shadow-md hover:shadow-lg transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none cursor-pointer"
+            >
+                {loading ? (
+                    <>
+                        <Loader2 size={16} className="animate-spin" />
+                        {progress ? `Đang lưu... ${Math.round((progress.processed / progress.total) * 100)}%` : 'Đang xử lý...'}
+                    </>
+                ) : (
+                    <>
+                        <Check size={16} /> 
+                        {mode === 'create' 
+                          ? `Tiếp nhận ${previewData.length} hồ sơ` 
+                          : `Cập nhật ${previewData.length} hồ sơ`
+                        }
+                    </>
+                )}
+            </button>
+          </div>
         </div>
 
-        {/* FOOTER */}
-        <div className="p-5 border-t bg-white flex justify-between items-center shrink-0 rounded-b-lg">
-            {previewData.length > 0 ? (
-                <div className="flex gap-4 text-sm font-medium">
-                    <span className="text-green-600">✅ Hợp lệ: {previewData.filter(r => !r._errors?.length).length}</span>
-                    {previewData.some(r => r._errors?.length) && <span className="text-red-500">❌ Lỗi: {previewData.filter(r => r._errors?.length).length} (Vui lòng sửa Excel và tải lại)</span>}
-                </div>
-            ) : <div />}
-            <div className="flex gap-3 items-center">
-                {progress && (
-                    <div className="w-48 bg-gray-200 rounded-full h-2.5 mr-4 overflow-hidden">
-                        <div className="bg-blue-600 h-2.5 rounded-full transition-all duration-300" style={{ width: `${Math.max(5, (progress.processed / progress.total) * 100)}%` }}></div>
-                    </div>
-                )}
-                <button onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 font-medium disabled:opacity-50" disabled={loading}>Hủy bỏ</button>
-                <button 
-                    onClick={handleSave} 
-                    disabled={previewData.length === 0 || previewData.some(r => r._errors?.length) || loading} 
-                    className={`flex items-center gap-2 px-6 py-2 text-white rounded-md disabled:opacity-50 font-medium shadow-sm transition-all ${mode === 'create' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-orange-600 hover:bg-orange-700'}`}>
-                    {loading ? (
-                        <>
-                            <Loader2 size={18} className="animate-spin" />
-                            {progress ? `Đang lưu... ${Math.round((progress.processed / progress.total) * 100)}%` : 'Đang xử lý...'}
-                        </>
-                    ) : (
-                        <>
-                            <Save size={18} /> {mode === 'create' ? 'Lưu vào hệ thống' : 'Tiến hành cập nhật'}
-                        </>
-                    )}
-                </button>
-            </div>
-        </div>
       </div>
 
-      {/* MODAL HƯỚNG DẪN / NHẮC NHỞ CẬP NHẬT THÔNG MINH */}
+      {/* MODAL HƯỚNG DẪN CHẾ ĐỘ CẬP NHẬT THÔNG MINH */}
       {showNoticeModal && (
         <div className="fixed inset-0 z-[150] bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-lg w-full p-6 animate-scale-up">
@@ -748,6 +785,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
           </div>
         </div>
       )}
+
     </div>
   );
 };

@@ -1051,22 +1051,6 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                       <button
                         onClick={() => {
                           setIsAddMenuOpen(false);
-                          navigateToReceiveRecordSubTab('bulk');
-                        }}
-                        className="w-full text-left px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-emerald-50 hover:text-emerald-600 flex items-center gap-2.5 transition-colors"
-                      >
-                        <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                          <FileSpreadsheet size={18} />
-                        </div>
-                        <div>
-                          <div className="font-bold text-slate-800 text-sm">Tiếp nhận hàng loạt</div>
-                          <div className="text-[11px] text-slate-500">Nhập danh sách từ Excel</div>
-                        </div>
-                      </button>
-
-                      <button
-                        onClick={() => {
-                          setIsAddMenuOpen(false);
                           if (props.setImportModalMode) props.setImportModalMode('update');
                           props.setIsImportModalOpen(true);
                         }}
@@ -1077,7 +1061,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                         </div>
                         <div>
                           <div className="font-bold text-slate-800 text-sm">Cập nhật thông tin</div>
-                          <div className="text-[11px] text-slate-500">Đổi trạng thái, cán bộ, hạn trả...</div>
+                          <div className="text-[11px] text-slate-500">Nhập mới hoặc Cập nhật từ file Excel</div>
                         </div>
                       </button>
                     </div>
