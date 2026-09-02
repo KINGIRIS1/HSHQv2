@@ -490,11 +490,11 @@ export const mapUserToDb = (u: User) => ({
 });
 
 export const mapUserFromDb = (u: any): User => ({
-    username: u.username,
-    password: u.password,
-    name: u.name,
-    role: u.role,
-    employeeId: u.employeeId || u.employeeid
+    username: (u.username || u.user_name || u.userName || '').trim(),
+    password: u.password !== undefined ? String(u.password).trim() : (u.pass !== undefined ? String(u.pass).trim() : ''),
+    name: u.name || u.display_name || u.displayName || u.username || '',
+    role: (u.role || 'USER').toUpperCase() as any,
+    employeeId: u.employeeId || u.employeeid || u.employee_id || ''
 });
 
 export const mapPriceFromDb = (item: any): PriceItem => ({

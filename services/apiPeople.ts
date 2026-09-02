@@ -10,12 +10,17 @@ export const fetchEmployees = async (): Promise<Employee[]> => {
     try {
         const { data, error } = await supabase.from('employees').select('*');
         if (error) throw error;
-        const mapped = data.map(mapEmployeeFromDb);
-        saveToCache(CACHE_KEYS.EMPLOYEES, mapped);
-        return mapped;
+        if (Array.isArray(data) && data.length > 0) {
+            const mapped = data.map(mapEmployeeFromDb);
+            saveToCache(CACHE_KEYS.EMPLOYEES, mapped);
+            return mapped;
+        }
+        const cached = getFromCache<Employee[]>(CACHE_KEYS.EMPLOYEES, MOCK_EMPLOYEES);
+        return cached && cached.length > 0 ? cached : MOCK_EMPLOYEES;
     } catch (error) {
         logError("fetchEmployees", error, true);
-        return getFromCache(CACHE_KEYS.EMPLOYEES, MOCK_EMPLOYEES);
+        const cached = getFromCache<Employee[]>(CACHE_KEYS.EMPLOYEES, MOCK_EMPLOYEES);
+        return cached && cached.length > 0 ? cached : MOCK_EMPLOYEES;
     }
 };
 
@@ -56,12 +61,17 @@ export const fetchUsers = async (): Promise<User[]> => {
     try {
         const { data, error } = await supabase.from('users').select('*');
         if (error) throw error;
-        const mapped = data.map(mapUserFromDb);
-        saveToCache(CACHE_KEYS.USERS, mapped);
-        return mapped;
+        if (Array.isArray(data) && data.length > 0) {
+            const mapped = data.map(mapUserFromDb);
+            saveToCache(CACHE_KEYS.USERS, mapped);
+            return mapped;
+        }
+        const cached = getFromCache<User[]>(CACHE_KEYS.USERS, MOCK_USERS);
+        return cached && cached.length > 0 ? cached : MOCK_USERS;
     } catch (error) {
         logError("fetchUsers", error, true);
-        return getFromCache(CACHE_KEYS.USERS, MOCK_USERS);
+        const cached = getFromCache<User[]>(CACHE_KEYS.USERS, MOCK_USERS);
+        return cached && cached.length > 0 ? cached : MOCK_USERS;
     }
 };
 

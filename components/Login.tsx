@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { User } from '../types';
 import { LogIn, Eye, EyeOff, Check } from 'lucide-react';
-import { APP_VERSION } from '../constants';
+import { APP_VERSION, MOCK_USERS } from '../constants';
 
 interface LoginProps {
   onLogin: (user: User) => void;
@@ -29,28 +29,54 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
     setError('');
     setIsLoading(true);
 
-    const submittedUsername = username.trim();
+    const submittedUsername = username.trim().toLowerCase();
     const submittedPassword = password.trim();
 
     setTimeout(() => {
-      const user = users.find(u => {
+      // 1. Kiểm tra trong danh sách users prop truyền vào từ App
+      let matchedUser = users && users.length > 0 ? users.find(u => {
         const dbUsername = (u.username || '').trim().toLowerCase();
         const dbPassword = (u.password || '').trim();
-        return dbUsername === submittedUsername.toLowerCase() && dbPassword === submittedPassword;
-      });
+        return dbUsername === submittedUsername && dbPassword === submittedPassword;
+      }) : null;
 
-      if (user) {
+      // 2. Dự phòng: Kiểm tra trong bộ nhớ đệm cache (phòng khi prop users chưa kịp nạp)
+      if (!matchedUser && typeof window !== 'undefined') {
+        try {
+          const cached = JSON.parse(localStorage.getItem('app_users_cache_v1') || '[]');
+          if (Array.isArray(cached) && cached.length > 0) {
+            matchedUser = cached.find((u: any) => {
+              const dbUsername = (u.username || u.user_name || '').trim().toLowerCase();
+              const dbPassword = (u.password !== undefined ? String(u.password) : (u.pass !== undefined ? String(u.pass) : '')).trim();
+              return dbUsername === submittedUsername && dbPassword === submittedPassword;
+            });
+          }
+        } catch (e) {
+          console.warn("Lỗi đọc user cache:", e);
+        }
+      }
+
+      // 3. Dự phòng cấp cao nhất: Kiểm tra trong danh sách tài khoản mặc định MOCK_USERS
+      if (!matchedUser) {
+        matchedUser = MOCK_USERS.find(u => {
+          const dbUsername = (u.username || '').trim().toLowerCase();
+          const dbPassword = (u.password || '').trim();
+          return dbUsername === submittedUsername && dbPassword === submittedPassword;
+        });
+      }
+
+      if (matchedUser) {
         if (rememberMe) {
-          localStorage.setItem('saved_username', submittedUsername);
+          localStorage.setItem('saved_username', username.trim());
         } else {
           localStorage.removeItem('saved_username');
         }
-        onLogin(user);
+        onLogin(matchedUser);
       } else {
         setError('Tên đăng nhập hoặc mật khẩu không chính xác.');
         setIsLoading(false);
       }
-    }, 400);
+    }, 250);
   };
 
   return (

@@ -6,6 +6,7 @@ export type ConnectionState = {
     lastChecked: number;
     failureReason?: string;
     reconnectCountdown: number; // 5..0
+    consecutiveFailures: number;
 };
 
 type ConnectionListener = (state: ConnectionState) => void;
@@ -16,6 +17,8 @@ class ConnectionManager {
     private lastChecked: number = Date.now();
     private failureReason: string | undefined = undefined;
     private reconnectCountdown: number = 5;
+    private consecutiveFailures: number = 0;
+    private readonly MAX_CONSECUTIVE_FAILURES_BEFORE_OFFLINE = 3; // Chỉ chuyển Offline khi thất bại 3 lần liên tiếp
     private listeners: Set<ConnectionListener> = new Set();
     private heartbeatTimer: any = null;
     private countdownTimer: any = null;
@@ -26,13 +29,13 @@ class ConnectionManager {
             window.addEventListener('online', this.handleBrowserOnline);
             window.addEventListener('offline', this.handleBrowserOffline);
             
-            // Khởi động nhịp tim định kỳ (30s khi bình thường)
-            this.startHeartbeat(30000);
+            // Khởi động nhịp tim định kỳ (45s khi bình thường để giảm tải)
+            this.startHeartbeat(45000);
 
-            // Kiểm tra kết nối ban đầu
+            // Kiểm tra kết nối ban đầu sau khi app nạp xong
             setTimeout(() => {
                 this.ping();
-            }, 1000);
+            }, 2500);
         }
     }
 
@@ -50,7 +53,8 @@ class ConnectionManager {
             isChecking: this.isChecking,
             lastChecked: this.lastChecked,
             failureReason: this.failureReason,
-            reconnectCountdown: this.reconnectCountdown
+            reconnectCountdown: this.reconnectCountdown,
+            consecutiveFailures: this.consecutiveFailures
         };
     }
 
@@ -66,12 +70,14 @@ class ConnectionManager {
     }
 
     private handleBrowserOnline = () => {
-        console.log("🌐 Trình duyệt phát hiện có mạng lại, đang kiểm tra kết nối tới máy chủ...");
+        console.log("🌐 Trình duyệt phát hiện có mạng, tiến hành kiểm tra kết nối...");
+        this.consecutiveFailures = 0;
         this.ping();
     };
 
     private handleBrowserOffline = () => {
-        console.warn("❌ Trình duyệt phát hiện mất mạng (Offline event).");
+        console.warn("❌ Trình duyệt phát hiện mất mạng ngoại tuyến.");
+        this.consecutiveFailures = this.MAX_CONSECUTIVE_FAILURES_BEFORE_OFFLINE;
         this.isOnline = false;
         this.failureReason = "Không có kết nối Internet (Thiết bị đang ngoại tuyến)";
         this.startReconnectLoop();
@@ -79,28 +85,24 @@ class ConnectionManager {
     };
 
     public reportNetworkError(context: string, error?: any) {
-        // Chỉ kích hoạt nếu lỗi thực sự là do Network / Fetch / Offline / Timeout
-        const errorMsg = error?.message || (typeof error === 'string' ? error : '');
-        const isNetworkErr = 
-            !navigator.onLine ||
-            errorMsg.includes('Failed to fetch') ||
-            errorMsg.includes('NetworkError') ||
-            errorMsg.includes('Network request failed') ||
-            errorMsg.includes('Load failed') ||
-            errorMsg.includes('ERR_INTERNET_DISCONNECTED') ||
-            errorMsg.includes('ERR_CONNECTION_REFUSED') ||
-            errorMsg.includes('Timeout') ||
-            error?.status === 0;
+        // Tránh gián đoạn: Nếu trình duyệt vẫn online thì không ép Offline ngay, chỉ ghi nhận để ping ngầm
+        if (typeof navigator !== 'undefined' && !navigator.onLine) {
+            this.handleBrowserOffline();
+            return;
+        }
 
-        if (isNetworkErr) {
-            console.warn(`[ConnectionManager] Phát hiện lỗi kết nối từ API (${context}):`, errorMsg);
-            if (this.isOnline) {
+        const errorMsg = error?.message || (typeof error === 'string' ? error : '');
+        const isCriticalDisconnect = 
+            errorMsg.includes('ERR_INTERNET_DISCONNECTED') ||
+            errorMsg.includes('net::ERR_NAME_NOT_RESOLVED');
+
+        if (isCriticalDisconnect) {
+            this.consecutiveFailures++;
+            if (this.consecutiveFailures >= this.MAX_CONSECUTIVE_FAILURES_BEFORE_OFFLINE && this.isOnline) {
                 this.isOnline = false;
-                this.failureReason = `Không thể gửi dữ liệu tới máy chủ (${context})`;
+                this.failureReason = `Mất kết nối máy chủ (${context})`;
                 this.startReconnectLoop();
                 this.notify();
-                // Kích hoạt ping để thử lại ngay
-                this.ping();
             }
         }
     }
@@ -120,23 +122,27 @@ class ConnectionManager {
                     throw new Error("Trình duyệt đang ở chế độ Offline");
                 }
 
-                // Thực hiện ping nhẹ tới Supabase với timeout 5 giây
+                // Thực hiện ping nhẹ tới Supabase với timeout 12 giây
                 const timeoutPromise = new Promise<never>((_, reject) => 
-                    setTimeout(() => reject(new Error("Timeout kết nối máy chủ (5s)")), 5000)
+                    setTimeout(() => reject(new Error("Timeout phản hồi kết nối máy chủ")), 12000)
                 );
 
                 const pingPromise = (async () => {
                     if (isConfigured && supabase) {
-                        // Thử truy vấn nhẹ 1 bản ghi bất kỳ từ system_settings hoặc head count
                         const { error } = await supabase.from('system_settings').select('key').limit(1);
-                        if (error && error.code !== 'PGRST116' && error.code !== '42P01' && (error.message?.includes('fetch') || error.message?.includes('network'))) {
+                        // Chỉ coi là lỗi mất mạng nếu thực sự lỗi mạng kết nối, không tính lỗi bảng chưa tồn tại hoặc phân quyền
+                        if (error && error.code !== 'PGRST116' && error.code !== '42P01' && error.code !== '42501' && (error.message?.includes('fetch') || error.message?.includes('network') || error.message?.includes('Failed to fetch'))) {
                             throw error;
                         }
                         return true;
                     } else {
                         // Thử fetch nhẹ favicon hoặc origin
-                        const r = await fetch(window.location.origin + '/icon.png?t=' + Date.now(), { method: 'HEAD', cache: 'no-store' });
-                        return r.ok;
+                        try {
+                            const r = await fetch(window.location.origin + '/icon.png?t=' + Date.now(), { method: 'HEAD', cache: 'no-store' });
+                            return r.ok || r.status < 500;
+                        } catch {
+                            return true; // Fallback an toàn
+                        }
                     }
                 })();
 
@@ -144,29 +150,37 @@ class ConnectionManager {
                 success = true;
             } catch (err: any) {
                 success = false;
-                this.failureReason = err?.message || "Không thể phản hồi từ máy chủ Supabase";
-                console.warn("[ConnectionManager] Ping thất bại:", err?.message || err);
+                console.warn("[ConnectionManager] Ping lần này không thành công:", err?.message || err);
             } finally {
                 this.isChecking = false;
                 this.lastChecked = Date.now();
                 this.checkInProgress = null;
 
                 const prevOnline = this.isOnline;
-                this.isOnline = success;
 
                 if (success) {
+                    this.consecutiveFailures = 0;
+                    this.isOnline = true;
                     this.failureReason = undefined;
                     this.stopReconnectLoop();
-                    this.startHeartbeat(30000);
+                    this.startHeartbeat(45000);
                     if (!prevOnline) {
-                        console.log("✅ Kết nối Internet & Máy chủ đã được khôi phục thành công!");
-                        // Bắn event để các thành phần khác có thể bắt
+                        console.log("✅ Kết nối Internet & Máy chủ đã ổn định!");
                         if (typeof window !== 'undefined') {
                             window.dispatchEvent(new CustomEvent('app_connection_restored'));
                         }
                     }
                 } else {
-                    this.startReconnectLoop();
+                    this.consecutiveFailures += 1;
+                    // Chỉ chuyển sang offline khi thất bại liên tiếp đủ ngưỡng
+                    if (this.consecutiveFailures >= this.MAX_CONSECUTIVE_FAILURES_BEFORE_OFFLINE) {
+                        this.isOnline = false;
+                        this.failureReason = "Không thể kết nối đến máy chủ sau 3 lần thử. Vui lòng kiểm tra đường truyền.";
+                        this.startReconnectLoop();
+                    } else {
+                        // Nếu chỉ rớt 1-2 lần, giữ nguyên isOnline để không gián đoạn người dùng và thử lại sau 3s
+                        setTimeout(() => this.ping(), 3000);
+                    }
                 }
 
                 this.notify();
@@ -220,3 +234,4 @@ class ConnectionManager {
 }
 
 export const connectionManager = new ConnectionManager();
+
