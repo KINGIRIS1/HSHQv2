@@ -830,16 +830,16 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                             <div>
                                 <h3 className="font-black text-slate-800 flex items-center gap-2 tracking-tight text-base">
                                     <FileSpreadsheet size={20} className="text-emerald-600" />
-                                    Sao lưu định kỳ hồ sơ ra Excel
+                                    Sao lưu hồ sơ dự phòng ra Excel
                                 </h3>
                                 <p className="text-xs text-slate-500 font-medium mt-1">
-                                    Hệ thống tự động sao lưu toàn bộ hồ sơ vào lần đầu đăng nhập của Quản trị viên và định kỳ 5 ngày/lần. Tệp sao lưu được tải trực tiếp về thư mục <strong>Downloads (Tải về)</strong> của máy tính.
+                                    Hệ thống hỗ trợ nhắc nhở sao lưu vào lần đầu đăng nhập của Quản trị viên. Bạn cũng có thể chủ động bấm nút bên dưới bất kỳ lúc nào để xuất và tải toàn bộ hồ sơ về thư mục <strong>Downloads (Tải về)</strong>.
                                 </p>
                             </div>
                             <div className="flex flex-wrap items-center gap-2">
                                 <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-full border border-emerald-200">
                                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                                    Định kỳ: 5 ngày / lần
+                                    Chủ động & Khởi tạo lần đầu
                                 </span>
                                 <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-100 text-slate-700 text-xs font-mono font-bold rounded-full border border-slate-200">
                                     Tên tệp: {EXCEL_BACKUP_FILENAME}

@@ -22,21 +22,20 @@ export const CACHE_KEYS = {
 
 // --- HELPERS ---
 export const saveToCache = (key: string, data: any) => {
-    // 1. Nếu là danh sách hồ sơ lớn (hơn 100 mục), ưu tiên lưu toàn bộ vào IndexedDB
-    if (key === CACHE_KEYS.RECORDS && Array.isArray(data)) {
-        setIndexedDBItem(key, data).catch(() => {});
-        // Trong LocalStorage chỉ lưu 50 hồ sơ gần nhất để làm mẫu nạp nhanh tức thì (dưới 50KB)
-        try {
-            const preview = data.slice(0, 50);
-            localStorage.setItem(key, JSON.stringify(preview));
-        } catch {
-            // Nếu LocalStorage đã đầy, xóa bỏ key cũ để tránh lỗi
-            try { localStorage.removeItem(key); } catch {}
+    // 1. Nếu là danh sách hồ sơ: Lưu 100% toàn bộ vào IndexedDB, KHÔNG lưu vào LocalStorage để tránh giới hạn 5MB và lỗi cắt 50 hồ sơ
+    if (key === CACHE_KEYS.RECORDS) {
+        if (Array.isArray(data)) {
+            setIndexedDBItem(key, data).catch(() => {});
         }
+        // Xóa sạch key cũ trong LocalStorage để giải phóng bộ nhớ
+        try {
+            localStorage.removeItem(key);
+            localStorage.removeItem('app_records_cache_v1');
+        } catch {}
         return;
     }
 
-    // 2. Với các dữ liệu khác, lưu an toàn vào LocalStorage
+    // 2. Với các cấu hình / danh mục nhỏ khác (nhân viên, tài khoản, ngày nghỉ...), lưu an toàn vào LocalStorage
     try {
         localStorage.setItem(key, JSON.stringify(data));
     } catch (e: any) {
@@ -44,14 +43,8 @@ export const saveToCache = (key: string, data: any) => {
             // Dọn dẹp các cache rác nếu có
             try {
                 localStorage.removeItem('app_records_cache_v1');
+                localStorage.removeItem(CACHE_KEYS.RECORDS);
             } catch {}
-
-            if (Array.isArray(data) && data.length > 50) {
-                try {
-                    const truncated = data.slice(0, 50);
-                    localStorage.setItem(key, JSON.stringify(truncated));
-                } catch {}
-            }
         }
     }
 };

@@ -33,6 +33,7 @@ import { checkAndTriggerWeeklyBackup, downloadBackupAsFile } from './services/ba
 import { checkAndTriggerPeriodicExcelBackup, performExcelBackup } from './services/excelBackupService';
 import CloudDatabaseInspector from './components/CloudDatabaseInspector';
 import ConnectionGuardOverlay from './components/ConnectionGuardOverlay';
+import FirstLoginBackupModal from './components/FirstLoginBackupModal';
 
 function App() {
   const isMobile = useIsMobile(768);
@@ -317,36 +318,45 @@ function App() {
   const isTeamLeader = currentUser?.role === UserRole.TEAM_LEADER;
   const canPerformAction = isAdmin || isSubadmin || isTeamLeader || currentUser?.role === UserRole.ONEDOOR;
 
-  // Tự động sao lưu Excel vào lần đầu đăng nhập bằng tài khoản Admin & kiểm tra chu kỳ 5 ngày/lần
-  const hasTriggeredAdminLoginBackupRef = useRef(false);
+  // Bảng nhắc nhở sao lưu dữ liệu duy nhất 1 lần vào lần đầu đăng nhập của Quản trị viên (sau khi load xong toàn bộ hồ sơ)
+  const [isFirstLoginBackupModalOpen, setIsFirstLoginBackupModalOpen] = useState(false);
+  const hasCheckedFirstLoginBackupRef = useRef(false);
+
   useEffect(() => {
-    if (isAdmin && records.length > 0 && !hasTriggeredAdminLoginBackupRef.current) {
-      hasTriggeredAdminLoginBackupRef.current = true;
-
-      const triggerAdminBackup = async () => {
-        try {
-          const firstLoginKey = 'admin_first_login_excel_backup_done';
-          const isFirstLoginDone = localStorage.getItem(firstLoginKey);
-          if (!isFirstLoginDone) {
-            console.log('🚀 Thực hiện sao lưu Excel tự động vào lần đăng nhập đầu tiên của tài khoản Admin...');
-            const result = await performExcelBackup(records, employees);
-            if (result.success) {
-              localStorage.setItem(firstLoginKey, 'true');
-            }
-          } else {
-            // Định kỳ 5 ngày/lần
-            await checkAndTriggerPeriodicExcelBackup(records, employees);
-          }
-        } catch (err) {
-          console.error('Lỗi khi kích hoạt sao lưu tự động cho Admin:', err);
-        }
-      };
-
-      // Đợi 2 giây sau khi tải dữ liệu xong để app ổn định
-      const timer = setTimeout(triggerAdminBackup, 2000);
-      return () => clearTimeout(timer);
+    if (isAdmin && records.length > 0 && !hasCheckedFirstLoginBackupRef.current) {
+      hasCheckedFirstLoginBackupRef.current = true;
+      const FIRST_BACKUP_KEY = 'admin_first_login_backup_prompt_dismissed';
+      const isDismissed = localStorage.getItem(FIRST_BACKUP_KEY);
+      if (!isDismissed) {
+        // Đợi 1.5 giây sau khi nạp xong toàn bộ dữ liệu hồ sơ để giao diện hoàn toàn ổn định
+        const timer = setTimeout(() => {
+          setIsFirstLoginBackupModalOpen(true);
+        }, 1500);
+        return () => clearTimeout(timer);
+      }
     }
-  }, [isAdmin, records.length, employees]);
+  }, [isAdmin, records.length]);
+
+  const handleCloseFirstLoginBackupModal = useCallback(() => {
+    setIsFirstLoginBackupModalOpen(false);
+    localStorage.setItem('admin_first_login_backup_prompt_dismissed', 'true');
+  }, []);
+
+  const handleConfirmFirstLoginBackup = useCallback(async () => {
+    try {
+      const result = await performExcelBackup(records, employees);
+      localStorage.setItem('admin_first_login_backup_prompt_dismissed', 'true');
+      if (result.success) {
+        setToast({ type: 'success', message: 'Đã tạo và tải tệp sao lưu Excel về máy thành công!' });
+      } else if (result.error) {
+        setToast({ type: 'error', message: result.error });
+      }
+    } catch (err: any) {
+      console.error('Lỗi khi sao lưu dữ liệu:', err);
+      localStorage.setItem('admin_first_login_backup_prompt_dismissed', 'true');
+      setToast({ type: 'error', message: 'Lỗi khi sao lưu: ' + (err.message || 'Không xác định') });
+    }
+  }, [records, employees]);
 
   // --- UPDATE HANDLERS ---
   
@@ -1421,6 +1431,12 @@ function App() {
         )}
         <GlobalConfirmModal />
         <GlobalAlertModal />
+        <FirstLoginBackupModal 
+          isOpen={isFirstLoginBackupModalOpen} 
+          recordCount={records.length} 
+          onConfirmBackup={handleConfirmFirstLoginBackup} 
+          onClose={handleCloseFirstLoginBackupModal} 
+        />
       </MobileLayout>
     </>
     );
@@ -1724,6 +1740,12 @@ function App() {
         )}
         <GlobalConfirmModal />
         <GlobalAlertModal />
+        <FirstLoginBackupModal 
+          isOpen={isFirstLoginBackupModalOpen} 
+          recordCount={records.length} 
+          onConfirmBackup={handleConfirmFirstLoginBackup} 
+          onClose={handleCloseFirstLoginBackupModal} 
+        />
         <CloudDatabaseInspector isOpen={isCloudDatabaseInspectorOpen} onClose={() => setIsCloudDatabaseInspectorOpen(false)} />
         <ConnectionGuardOverlay 
           onRestored={() => {

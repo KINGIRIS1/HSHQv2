@@ -2,6 +2,7 @@ import { supabase, isConfigured } from './supabaseClient';
 import { RecordFile, RecordStatus } from '../types';
 import { MOCK_RECORDS, API_BASE_URL, isArchiveRecordType, getShortRecordType } from '../constants';
 import { logError, getFromCache, saveToCache, CACHE_KEYS, sanitizeData, sanitizePayloadFor22P02, normalizeCode, mapRecordFromDb } from './apiCore';
+import { getIndexedDBItem } from './storageService';
 
 const RECORD_DB_COLUMNS = [
     'id', 'code', 'customerName', 'phoneNumber', 'cccd', 'customerAddress', 'ward', 'landPlot', 'mapSheet', 
@@ -357,8 +358,8 @@ export const fetchRecords = async (onProgress?: TierProgressCallback): Promise<R
 
   } catch (error) {
     logError("fetchRecords", error, true);
-    const cached = getFromCache<RecordFile[]>(CACHE_KEYS.RECORDS, []);
-    return cached.length > 0 ? cached : MOCK_RECORDS;
+    const idb = await getIndexedDBItem<RecordFile[]>(CACHE_KEYS.RECORDS);
+    return Array.isArray(idb) && idb.length > 0 ? idb : MOCK_RECORDS;
   }
 };
 
@@ -454,9 +455,9 @@ export const getNextGlobalRecordCode = async (dateStr: string): Promise<string> 
 };
 
 // --- CACHE SYNCHRONIZATION HELPERS ---
-const syncCacheOnCreate = (newRecord: RecordFile) => {
+const syncCacheOnCreate = async (newRecord: RecordFile) => {
     try {
-        const cached: RecordFile[] = getFromCache(CACHE_KEYS.RECORDS, []);
+        const cached = (await getIndexedDBItem<RecordFile[]>(CACHE_KEYS.RECORDS)) || [];
         if (!cached.some(r => r.id === newRecord.id)) {
             cached.unshift(newRecord);
             saveToCache(CACHE_KEYS.RECORDS, cached);
@@ -466,9 +467,9 @@ const syncCacheOnCreate = (newRecord: RecordFile) => {
     }
 };
 
-const syncCacheOnUpdate = (updatedRecord: RecordFile) => {
+const syncCacheOnUpdate = async (updatedRecord: RecordFile) => {
     try {
-        const cached: RecordFile[] = getFromCache(CACHE_KEYS.RECORDS, []);
+        const cached = (await getIndexedDBItem<RecordFile[]>(CACHE_KEYS.RECORDS)) || [];
         const index = cached.findIndex(r => r.id === updatedRecord.id);
         if (index !== -1) {
             cached[index] = { ...cached[index], ...updatedRecord };
@@ -481,9 +482,9 @@ const syncCacheOnUpdate = (updatedRecord: RecordFile) => {
     }
 };
 
-const syncCacheOnDelete = (id: string) => {
+const syncCacheOnDelete = async (id: string) => {
     try {
-        const cached: RecordFile[] = getFromCache(CACHE_KEYS.RECORDS, []);
+        const cached = (await getIndexedDBItem<RecordFile[]>(CACHE_KEYS.RECORDS)) || [];
         const filtered = cached.filter(r => r.id !== id);
         saveToCache(CACHE_KEYS.RECORDS, filtered);
     } catch (e) {
@@ -491,9 +492,9 @@ const syncCacheOnDelete = (id: string) => {
     }
 };
 
-const syncCacheOnBatchUpdate = (batchUpdates: Partial<RecordFile>[]) => {
+const syncCacheOnBatchUpdate = async (batchUpdates: Partial<RecordFile>[]) => {
     try {
-        const cached: RecordFile[] = getFromCache(CACHE_KEYS.RECORDS, []);
+        const cached = (await getIndexedDBItem<RecordFile[]>(CACHE_KEYS.RECORDS)) || [];
         if (cached && cached.length > 0) {
             batchUpdates.forEach(up => {
                 const index = cached.findIndex(r => r.id === up.id);

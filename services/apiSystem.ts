@@ -78,30 +78,48 @@ export const saveUpdateInfo = async (version: string, url: string): Promise<bool
 };
 
 export const getSystemSetting = async (key: string): Promise<string | null> => {
-    if (!isConfigured) return null;
+    const localVal = typeof window !== 'undefined' ? localStorage.getItem(`sys_setting_${key}`) : null;
+    if (!isConfigured) return localVal;
     try {
         const { data, error } = await supabase
             .from('system_settings')
             .select('value')
             .eq('key', key)
-            .single();
-        if (error) throw error;
-        return data?.value || null;
+            .maybeSingle();
+        if (error) {
+            return localVal;
+        }
+        if (data?.value !== undefined && data?.value !== null) {
+            try {
+                if (typeof window !== 'undefined') {
+                    localStorage.setItem(`sys_setting_${key}`, data.value);
+                }
+            } catch {}
+            return data.value;
+        }
+        return localVal;
     } catch (error) {
-        return null;
+        return localVal;
     }
 };
 
 export const saveSystemSetting = async (key: string, value: string): Promise<boolean> => {
-    if (!isConfigured) return false;
+    try {
+        if (typeof window !== 'undefined') {
+            localStorage.setItem(`sys_setting_${key}`, value);
+        }
+    } catch {}
+
+    if (!isConfigured) return true;
+
     try {
         const { error } = await supabase
             .from('system_settings')
-            .upsert({ key, value });
+            .upsert({ key, value }, { onConflict: 'key' });
         if (error) throw error;
         return true;
     } catch (error) {
-        logError("saveSystemSetting", error);
+        logError("saveSystemSetting", error, true);
         return false;
     }
 };
