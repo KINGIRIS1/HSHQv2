@@ -268,10 +268,9 @@ export const RecordSearch: React.FC<RecordSearchProps> = ({
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    // Reset pagination and selection on filter/search update
+    // Reset pagination on filter/search update (preserves selectedIds across searches)
     useEffect(() => {
         setCurrentPage(1);
-        setSelectedIds(new Set());
     }, [searchKeyword, filterWard, filterStatus, filterRecordType, filterEmployee, filterFromDate, filterToDate]);
 
     // Format Dates nicely
@@ -693,7 +692,11 @@ export const RecordSearch: React.FC<RecordSearchProps> = ({
                         </div>
 
                         <span className="text-slate-500 text-xs font-semibold">
-                            Đã chọn <strong className="text-blue-600 font-bold">{selectedIds.size}</strong> / {sortedRecords.length} hồ sơ
+                            {selectedIds.size > 0 ? (
+                                <>Đã chọn <strong className="text-emerald-700 font-bold">{selectedIds.size}</strong> hồ sơ</>
+                            ) : (
+                                <>Tổng số <strong className="text-slate-700 font-bold">{sortedRecords.length}</strong> hồ sơ</>
+                            )}
                         </span>
                     </div>
 
@@ -703,11 +706,14 @@ export const RecordSearch: React.FC<RecordSearchProps> = ({
                         {/* Excel Export */}
                         <button
                             onClick={handleExportExcel}
-                            className="flex items-center gap-2 px-3.5 py-1.5 border border-emerald-200 text-emerald-700 bg-emerald-50/50 rounded-lg hover:bg-emerald-50 text-sm font-bold shadow-sm transition-all active:scale-95 cursor-pointer"
-                            title="Xuất file Excel"
+                            className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-[#00965e] hover:bg-[#008250] text-white rounded-lg font-bold shadow-xs transition-all active:scale-95 cursor-pointer select-none"
+                            title={selectedIds.size > 0 ? `Xuất Excel ${selectedIds.size} hồ sơ đã chọn` : `Xuất Excel toàn bộ ${sortedRecords.length} hồ sơ`}
                         >
-                            <FileSpreadsheet size={16} className="text-emerald-600" />
-                            <span>Xuất Excel</span>
+                            <FileSpreadsheet size={18} className="text-white shrink-0" />
+                            <span className="font-bold text-[14px] leading-tight">Xuất Excel</span>
+                            <span className="bg-[#005a36] text-white text-xs font-black px-2.5 py-0.5 rounded-full shadow-inner tracking-wider">
+                                {(selectedIds.size > 0 ? selectedIds.size : sortedRecords.length).toLocaleString('vi-VN')}
+                            </span>
                         </button>
 
                         {/* Column visibility and ordering selector matched perfectly to "Tất cả hồ sơ" */}
