@@ -3,11 +3,7 @@ import {
   getPreviewHDKTCode, 
   consumeNextHDKTCode, 
   getHDKTHistory, 
-  updateHDKTSequence, 
-  getPreviewContractCode, 
-  consumeNextContractCode, 
-  getContractHistory, 
-  updateContractSequence 
+  updateHDKTSequence
 } from '../services/api';
 import { X, Hash, Calendar, Copy, User, Check, ListFilter, RefreshCw, Pencil } from 'lucide-react';
 import { User as UserType } from '../types';
@@ -22,7 +18,6 @@ interface GetContractNumberModalProps {
 const GetContractNumberModal: React.FC<GetContractNumberModalProps> = ({ isOpen, onClose, currentUser, onSelectCode }) => {
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState<number>(currentYear);
-  const [numberType, setNumberType] = useState<'HĐKT' | 'HĐ'>('HĐKT');
   const [previewNumber, setPreviewNumber] = useState<string>('');
   const [note, setNote] = useState<string>('');
   const [history, setHistory] = useState<any[]>([]);
@@ -41,21 +36,14 @@ const GetContractNumberModal: React.FC<GetContractNumberModalProps> = ({ isOpen,
       setAllocatedNumber(null);
       setIsEditingSeq(false);
     }
-  }, [isOpen, selectedYear, numberType]);
+  }, [isOpen, selectedYear]);
 
   const loadData = async () => {
     try {
-      if (numberType === 'HĐKT') {
-        const preview = await getPreviewHDKTCode(selectedYear);
-        setPreviewNumber(preview);
-        const hist = await getHDKTHistory(selectedYear);
-        setHistory(hist);
-      } else {
-        const preview = await getPreviewContractCode(selectedYear);
-        setPreviewNumber(preview);
-        const hist = await getContractHistory(selectedYear);
-        setHistory(hist);
-      }
+      const preview = await getPreviewHDKTCode(selectedYear);
+      setPreviewNumber(preview);
+      const hist = await getHDKTHistory(selectedYear);
+      setHistory(hist);
     } catch (e) {
       console.error(e);
     }
@@ -68,12 +56,7 @@ const GetContractNumberModal: React.FC<GetContractNumberModalProps> = ({ isOpen,
     setAllocatedNumber(null);
     try {
       const userName = currentUser.name || currentUser.username || "Nhân viên";
-      let code = '';
-      if (numberType === 'HĐKT') {
-        code = await consumeNextHDKTCode(selectedYear, userName, note);
-      } else {
-        code = await consumeNextContractCode(userName, note, selectedYear);
-      }
+      const code = await consumeNextHDKTCode(selectedYear, userName, note);
       setAllocatedNumber(code);
       setNote('');
       await loadData(); // Reload preview and history
@@ -85,15 +68,8 @@ const GetContractNumberModal: React.FC<GetContractNumberModalProps> = ({ isOpen,
   };
 
   const getSequenceNumber = (code: string): string => {
-    if (numberType === 'HĐKT') {
-      const match = code.match(/^(\d+)\/HĐKT/);
-      return match ? parseInt(match[1], 10).toString() : '1';
-    } else {
-      const parts = code.split('-');
-      const lastPart = parts[parts.length - 1];
-      const match = lastPart ? lastPart.match(/^(\d+)/) : null;
-      return match ? parseInt(match[1], 10).toString() : '1';
-    }
+    const match = code.match(/^(\d+)\/HĐKT/);
+    return match ? parseInt(match[1], 10).toString() : '1';
   };
 
   const handleSaveSeq = async () => {
@@ -102,17 +78,13 @@ const GetContractNumberModal: React.FC<GetContractNumberModalProps> = ({ isOpen,
       alert("Số thứ tự phải là số nguyên dương lớn hơn hoặc bằng 1!");
       return;
     }
-    if (numberType === 'HĐKT' && selectedYear === 2026 && seqNum < 610) {
+    if (selectedYear === 2026 && seqNum < 610) {
       alert("Năm 2026 đã có hợp đồng lớn nhất là 0609/HĐKT/2026. Số thứ tự mới phải từ 610 trở lên để tránh trùng mã!");
       return;
     }
     setLoading(true);
     try {
-      if (numberType === 'HĐKT') {
-        await updateHDKTSequence(selectedYear, seqNum);
-      } else {
-        await updateContractSequence(selectedYear, seqNum);
-      }
+      await updateHDKTSequence(selectedYear, seqNum);
       setIsEditingSeq(false);
       await loadData();
     } catch (e) {
@@ -141,9 +113,7 @@ const GetContractNumberModal: React.FC<GetContractNumberModalProps> = ({ isOpen,
             <div>
               <h3 className="text-lg font-bold text-slate-800">Cấp Số Hợp Đồng Tự Động</h3>
               <p className="text-xs text-slate-500">
-                {numberType === 'HĐKT' 
-                  ? 'Hợp đồng đo đạc / cắm mốc (Bắt đầu lại theo năm mới)' 
-                  : 'Hợp đồng trích lục / tách thửa / khác'}
+                Hợp đồng kinh tế đo đạc / cắm mốc (Chuẩn HĐKT theo năm)
               </p>
             </div>
           </div>
@@ -158,22 +128,6 @@ const GetContractNumberModal: React.FC<GetContractNumberModalProps> = ({ isOpen,
         {/* BODY */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           
-          {/* NUMBER TYPE SELECTOR (TABS) */}
-          <div className="flex bg-slate-100 p-1 rounded-xl">
-            <button
-              onClick={() => { setNumberType('HĐKT'); setAllocatedNumber(null); }}
-              className={`flex-1 text-center py-2.5 rounded-lg text-sm font-bold transition-all ${numberType === 'HĐKT' ? 'bg-white text-purple-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
-            >
-              Mã HĐKT (Đo đạc / Cắm mốc)
-            </button>
-            <button
-              onClick={() => { setNumberType('HĐ'); setAllocatedNumber(null); }}
-              className={`flex-1 text-center py-2.5 rounded-lg text-sm font-bold transition-all ${numberType === 'HĐ' ? 'bg-white text-purple-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
-            >
-              Mã HĐ (Tách thửa / Trích lục)
-            </button>
-          </div>
-
           {/* YEAR SELECTOR */}
           <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100">
             <div className="flex items-center gap-2">
