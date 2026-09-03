@@ -7,8 +7,9 @@ import { fetchRecords, fetchEmployees, fetchUsers, fetchUpdateInfo, fetchHoliday
 } from '../services/api';
 import { supabase } from '../services/supabaseClient';
 import { mapRecordFromDb, getFromCache, CACHE_KEYS } from '../services/apiCore';
+import { getIndexedDBItem } from '../services/storageService';
 import { DEFAULT_WARDS as STATIC_WARDS, APP_VERSION, MOCK_EMPLOYEES, MOCK_USERS } from '../constants';
-import { migrateUnbatchedRecords } from '../utils/appHelpers';
+import { migrateUnbatchedRecords, deduplicateRecords } from '../utils/appHelpers';
 import { connectionManager } from '../services/connectionService';
 
 export const useAppData = (currentUser: User | null) => {
@@ -17,7 +18,7 @@ export const useAppData = (currentUser: User | null) => {
         if (typeof window !== 'undefined') {
             const cached = getFromCache<RecordFile[]>(CACHE_KEYS.RECORDS, []);
             if (Array.isArray(cached) && cached.length > 0) {
-                const { migratedRecords } = migrateUnbatchedRecords(cached);
+                const { migratedRecords } = migrateUnbatchedRecords(deduplicateRecords(cached));
                 return migratedRecords;
             }
         }
@@ -66,7 +67,26 @@ export const useAppData = (currentUser: User | null) => {
             };
 
             const [recData, empData, userData, updateInfo, holidayData, permsData, deptPermsData] = await Promise.all([
-                safeFetch(fetchRecords(), getFromCache(CACHE_KEYS.RECORDS, [])),
+                safeFetch(
+                    fetchRecords((tier, partialList, isComplete) => {
+                        // Cập nhật giao diện ngay khi từng Giai đoạn ưu tiên tải xong
+                        if (Array.isArray(partialList) && partialList.length > 0) {
+                            setRecords(prev => {
+                                if (!prev || prev.length === 0) {
+                                    const { migratedRecords } = migrateUnbatchedRecords(deduplicateRecords(partialList));
+                                    return migratedRecords;
+                                }
+                                const map = new Map<string, RecordFile>();
+                                prev.forEach(r => { if (r.id) map.set(r.id, r); });
+                                partialList.forEach(r => { if (r.id) map.set(r.id, r); });
+                                const merged = Array.from(map.values());
+                                const { migratedRecords } = migrateUnbatchedRecords(deduplicateRecords(merged));
+                                return migratedRecords;
+                            });
+                        }
+                    }),
+                    getFromCache(CACHE_KEYS.RECORDS, [])
+                ),
                 safeFetch(fetchEmployees(), getFromCache(CACHE_KEYS.EMPLOYEES, MOCK_EMPLOYEES)),
                 safeFetch(fetchUsers(), getFromCache(CACHE_KEYS.USERS, MOCK_USERS)),
                 safeFetch(fetchUpdateInfo(), { version: null, url: null }, 6000),
@@ -80,7 +100,7 @@ export const useAppData = (currentUser: User | null) => {
                 : (typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('app_records_cache_v1') || '[]') : []);
 
             if (validRecs.length > 0) {
-                const { migratedRecords } = migrateUnbatchedRecords(validRecs);
+                const { migratedRecords } = migrateUnbatchedRecords(deduplicateRecords(validRecs));
                 setRecords(migratedRecords);
             }
 
@@ -139,6 +159,21 @@ export const useAppData = (currentUser: User | null) => {
         }
     }, []);
 
+    // Khởi tạo ngầm từ IndexedDB khi mở app để đảm bảo đầy đủ bản ghi offline
+    useEffect(() => {
+        getIndexedDBItem<RecordFile[]>(CACHE_KEYS.RECORDS).then(idbRecords => {
+            if (Array.isArray(idbRecords) && idbRecords.length > 0) {
+                setRecords(prev => {
+                    if (prev.length < idbRecords.length) {
+                        const { migratedRecords } = migrateUnbatchedRecords(deduplicateRecords(idbRecords));
+                        return migratedRecords;
+                    }
+                    return prev;
+                });
+            }
+        }).catch(() => {});
+    }, []);
+
     // Lắng nghe sự kiện khôi phục kết nối từ connectionManager để reload data ngầm
     useEffect(() => {
         const unsubscribe = connectionManager.subscribe((state) => {
@@ -163,7 +198,7 @@ export const useAppData = (currentUser: User | null) => {
         const intervalId = setInterval(() => {
             fetchRecords().then(recData => {
                 if (recData && Array.isArray(recData)) {
-                    const { migratedRecords } = migrateUnbatchedRecords(recData);
+                    const { migratedRecords } = migrateUnbatchedRecords(deduplicateRecords(recData));
                     setRecords(prev => {
                         // Prevent unnecessary re-renders if data has not changed
                         if (prev.length === migratedRecords.length) {
@@ -309,7 +344,7 @@ export const useAppData = (currentUser: User | null) => {
         } else {
             const newRecord = await createRecordApi({ ...recordData, id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substr(2, 9) });
             if (newRecord) {
-                setRecords(prev => [newRecord, ...prev]);
+                setRecords(prev => [newRecord, ...prev.filter(r => r.id !== newRecord.id)]);
                 return newRecord;
             }
         }

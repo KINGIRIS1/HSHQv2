@@ -1067,6 +1067,29 @@ export function syncRecordStatusTransition(
     return updates;
 }
 
+/**
+ * Khử trùng lặp hồ sơ toàn cục dựa trên ID duy nhất
+ * Đảm bảo mỗi hồ sơ chỉ xuất hiện 1 lần duy nhất trong toàn bộ hệ thống
+ */
+export function deduplicateRecords<T extends { id?: string }>(records: T[]): T[] {
+    if (!Array.isArray(records) || records.length === 0) return [];
+    const uniqueMap = new Map<string, T>();
+    for (const r of records) {
+        if (!r || !r.id) continue;
+        if (!uniqueMap.has(r.id)) {
+            uniqueMap.set(r.id, r);
+        } else {
+            const existing = uniqueMap.get(r.id)!;
+            uniqueMap.set(r.id, {
+                ...r,
+                ...existing
+            });
+        }
+    }
+    return Array.from(uniqueMap.values());
+}
+
+
 
 
 

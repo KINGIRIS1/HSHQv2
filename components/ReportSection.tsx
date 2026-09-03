@@ -171,7 +171,35 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                     
                     const cungCapRecordsFromMain = records.filter(r => isArchiveRecordType(r.recordType));
 
-                    setArchiveRecords([...mapped, ...cungCapRecordsFromMain]);
+                    // Khử trùng lặp 100%: Dùng Map theo ID để mỗi hồ sơ chỉ xuất hiện duy nhất 1 lần trong báo cáo
+                    const archiveMap = new Map<string, RecordFile>();
+
+                    // 1. Nạp từ mapped (fetch trực tiếp từ luutru_records theo phân loại)
+                    mapped.forEach(r => {
+                        if (r && r.id) {
+                            archiveMap.set(r.id, r);
+                        }
+                    });
+
+                    // 2. Nạp thêm hồ sơ lưu trữ từ danh sách records chung (nếu chưa có thì thêm, có rồi thì giữ dữ liệu chi tiết nhất)
+                    cungCapRecordsFromMain.forEach(r => {
+                        if (!r || !r.id) return;
+                        if (!archiveMap.has(r.id)) {
+                            archiveMap.set(r.id, r);
+                        } else {
+                            const existing = archiveMap.get(r.id)!;
+                            archiveMap.set(r.id, {
+                                ...r,
+                                ...existing,
+                                customerName: existing.customerName || r.customerName,
+                                notes: existing.notes || r.notes,
+                                content: existing.content || r.content,
+                                recordType: existing.recordType || r.recordType,
+                            });
+                        }
+                    });
+
+                    setArchiveRecords(Array.from(archiveMap.values()));
                 } catch (e) {
                     console.error("Error loading archive records for report", e);
                 } finally {

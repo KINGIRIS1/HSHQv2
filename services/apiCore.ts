@@ -3,6 +3,7 @@ import { supabase, isConfigured } from './supabaseClient';
 import { Contract, PriceItem, Employee, User, RecordStatus } from '../types';
 import { API_BASE_URL } from '../constants'; 
 import { connectionManager } from './connectionService'; 
+import { setIndexedDBItem, getIndexedDBItem } from './storageService';
 
 // --- CACHE KEYS ---
 export const CACHE_KEYS = {
@@ -21,22 +22,36 @@ export const CACHE_KEYS = {
 
 // --- HELPERS ---
 export const saveToCache = (key: string, data: any) => {
+    // 1. Nếu là danh sách hồ sơ lớn (hơn 100 mục), ưu tiên lưu toàn bộ vào IndexedDB
+    if (key === CACHE_KEYS.RECORDS && Array.isArray(data)) {
+        setIndexedDBItem(key, data).catch(() => {});
+        // Trong LocalStorage chỉ lưu 50 hồ sơ gần nhất để làm mẫu nạp nhanh tức thì (dưới 50KB)
+        try {
+            const preview = data.slice(0, 50);
+            localStorage.setItem(key, JSON.stringify(preview));
+        } catch {
+            // Nếu LocalStorage đã đầy, xóa bỏ key cũ để tránh lỗi
+            try { localStorage.removeItem(key); } catch {}
+        }
+        return;
+    }
+
+    // 2. Với các dữ liệu khác, lưu an toàn vào LocalStorage
     try {
         localStorage.setItem(key, JSON.stringify(data));
     } catch (e: any) {
-        if (e.name === 'QuotaExceededError' || e?.message?.includes('quota')) {
-            console.warn(`LocalStorage full when saving ${key}. Attempting to truncate...`);
-            if (Array.isArray(data) && data.length > 500) {
+        if (e?.name === 'QuotaExceededError' || e?.message?.includes('quota')) {
+            // Dọn dẹp các cache rác nếu có
+            try {
+                localStorage.removeItem('app_records_cache_v1');
+            } catch {}
+
+            if (Array.isArray(data) && data.length > 50) {
                 try {
-                    const truncated = data.slice(0, 500);
+                    const truncated = data.slice(0, 50);
                     localStorage.setItem(key, JSON.stringify(truncated));
-                    console.info(`Successfully saved truncated ${key} (500 items) to free space.`);
-                } catch (err) {
-                    console.warn(`Failed to save even truncated ${key}`, err);
-                }
+                } catch {}
             }
-        } else {
-            console.warn('LocalStorage full or error:', e);
         }
     }
 };
@@ -45,11 +60,10 @@ export const getFromCache = <T>(key: string, fallback: T): T => {
     try {
         const cached = localStorage.getItem(key);
         if (cached) {
-            console.log(`[Offline Mode] Loaded data from cache: ${key}`);
             return JSON.parse(cached);
         }
     } catch (e) {
-        console.warn('Error reading cache:', e);
+        // Bỏ qua lỗi đọc cache
     }
     return fallback;
 };

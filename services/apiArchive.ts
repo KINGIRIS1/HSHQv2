@@ -344,7 +344,13 @@ export const fetchArchiveRecords = async (type: 'saoluc' | 'vaoso' | 'congvan'):
                 hasMore = false;
             }
         }
-        return allData;
+
+        // Khử trùng lặp 100% bằng Map theo id tránh trùng các bản ghi ở ranh giới phân trang
+        const uniqueMap = new Map<string, ArchiveRecord>();
+        allData.forEach(r => {
+            if (r && r.id) uniqueMap.set(r.id, r);
+        });
+        return Array.from(uniqueMap.values());
     } catch (error: any) {
         logError(`fetchArchiveRecords-${type}`, error, true);
         const cached = getFromCache<ArchiveRecord[]>(CACHE_KEY_ARCHIVE, []);

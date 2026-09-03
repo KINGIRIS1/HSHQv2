@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Database, AlertTriangle, Cloud, Loader2, CheckCircle, Save, Globe, Calendar, Plus, Trash2, ShieldAlert, Key, FolderArchive, Upload, Download, RefreshCw, FolderOpen, LayoutDashboard, SlidersHorizontal, Eye, EyeOff, ArrowLeft, ArrowRight, ChevronUp, ChevronDown, Search, RotateCcw, History } from 'lucide-react';
+import { Database, AlertTriangle, Cloud, Loader2, CheckCircle, Save, Globe, Calendar, Plus, Trash2, ShieldAlert, Key, FolderArchive, Upload, Download, RefreshCw, FolderOpen, LayoutDashboard, SlidersHorizontal, Eye, EyeOff, ArrowLeft, ArrowRight, ChevronUp, ChevronDown, Search, RotateCcw } from 'lucide-react';
 import { Holiday, UserRole, RolePermissions, DepartmentPermissions, DEFAULT_ROLE_PERMISSIONS, AVAILABLE_PERMISSIONS, Employee, RecordStatus, User } from '../types';
 import { fetchHolidays, saveHolidays, testDatabaseConnection, saveUpdateInfo, fetchUpdateInfo, getSystemSetting, saveSystemSetting, fetchSystemEvents } from '../services/api';
 import { fetchRecords } from '../services/apiRecords';
@@ -127,112 +127,11 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
   users,
   onOpenCloudInspector
 }) => {
-  const [activeTab, setActiveTab] = useState<'general' | 'holidays' | 'permissions' | 'data' | 'logs'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'holidays' | 'permissions' | 'data'>('general');
   const [isDeletingData, setIsDeletingData] = useState(false);
   const [dbTestStatus, setDbTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [dbTestMsg, setDbTestMsg] = useState('');
 
-  // System Log States
-  const [systemLogs, setSystemLogs] = useState<any[]>([]);
-  const [isLoadingLogs, setIsLoadingLogs] = useState(false);
-  const [logSearchQuery, setLogSearchQuery] = useState('');
-  const [selectedLogUser, setSelectedLogUser] = useState('');
-  const [selectedLogStatus, setSelectedLogStatus] = useState('');
-
-  const loadSystemLogs = async () => {
-    setIsLoadingLogs(true);
-    try {
-      const [records, authEvents] = await Promise.all([
-        fetchRecords(),
-        fetchSystemEvents()
-      ]);
-      const allLogs: any[] = [];
-      records.forEach(r => {
-        if (Array.isArray(r.statusLogs)) {
-          r.statusLogs.forEach(log => {
-            allLogs.push({
-              ...log,
-              recordCode: r.code,
-              customerName: r.customerName,
-              recordType: r.recordType,
-              ward: r.ward,
-              recordObj: r
-            });
-          });
-        }
-      });
-
-      if (Array.isArray(authEvents)) {
-        authEvents.forEach(evt => {
-          allLogs.push({
-            ...evt,
-            recordCode: '—',
-            customerName: '—',
-            recordType: 'SYSTEM',
-            ward: '—'
-          });
-        });
-      }
-
-      allLogs.sort((a, b) => new Date(b.changedAt).getTime() - new Date(a.changedAt).getTime());
-      setSystemLogs(allLogs);
-    } catch (err) {
-      console.error("Error loading system logs:", err);
-    } finally {
-      setIsLoadingLogs(false);
-    }
-  };
-
-  const uniqueUsersFromLogs = React.useMemo(() => {
-    const users = new Set<string>();
-    systemLogs.forEach(l => {
-      if (l.changedBy) users.add(l.changedBy);
-    });
-    return Array.from(users);
-  }, [systemLogs]);
-
-  const resolveName = React.useCallback((changedBy: string) => {
-    if (!changedBy) return 'Hệ thống';
-    if (changedBy === 'system' || changedBy === 'Hệ thống') return 'Hệ thống';
-    const emp = employees.find(e => e.id === changedBy || e.name === changedBy);
-    if (emp) return emp.name;
-    const usr = users.find(u => u.username === changedBy || u.id === changedBy || u.name === changedBy);
-    if (usr) {
-      if (usr.name) return usr.name;
-      if (usr.employeeId) {
-        const emp2 = employees.find(e => e.id === usr.employeeId);
-        if (emp2) return emp2.name;
-      }
-    }
-    return changedBy;
-  }, [employees, users]);
-
-  const filteredSystemLogs = React.useMemo(() => {
-    return systemLogs.filter(log => {
-      const matchSearch = !logSearchQuery ? true : (
-        (log.recordCode && log.recordCode.toLowerCase().includes(logSearchQuery.toLowerCase())) ||
-        (log.customerName && log.customerName.toLowerCase().includes(logSearchQuery.toLowerCase())) ||
-        (log.note && log.note.toLowerCase().includes(logSearchQuery.toLowerCase())) ||
-        (log.changedBy && log.changedBy.toLowerCase().includes(logSearchQuery.toLowerCase()))
-      );
-      const matchUser = !selectedLogUser ? true : log.changedBy === selectedLogUser;
-      const matchStatus = !selectedLogStatus ? true : log.newStatus === selectedLogStatus;
-      return matchSearch && matchUser && matchStatus;
-    });
-  }, [systemLogs, logSearchQuery, selectedLogUser, selectedLogStatus]);
-
-  const [logPage, setLogPage] = useState(1);
-  const logsPerPage = 15;
-  const totalLogPages = Math.ceil(filteredSystemLogs.length / logsPerPage) || 1;
-  
-  const paginatedSystemLogs = React.useMemo(() => {
-    return filteredSystemLogs.slice((logPage - 1) * logsPerPage, logPage * logsPerPage);
-  }, [filteredSystemLogs, logPage]);
-
-  React.useEffect(() => {
-    setLogPage(1);
-  }, [logSearchQuery, selectedLogUser, selectedLogStatus]);
-  
   // Update State (Manual Config)
   const [manualVersion, setManualVersion] = useState('');
   const [manualUrl, setManualUrl] = useState('');
@@ -363,12 +262,6 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
       loadContractSettings();
       loadBackupSettings();
   }, []);
-
-  useEffect(() => {
-      if (activeTab === 'logs') {
-          loadSystemLogs();
-      }
-  }, [activeTab]);
 
   const loadBackupSettings = async () => {
       const savedDir = await getSystemSetting('backup_directory');
@@ -827,17 +720,10 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
             >
                 <AlertTriangle size={16} /> Dữ liệu
             </button>
-            <button 
-                onClick={() => setActiveTab('logs')}
-                className={`px-4 py-3 text-xs md:text-sm font-black uppercase tracking-widest flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'logs' ? 'border-teal-600 text-teal-700 bg-white' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
-                id="tab-system-logs"
-            >
-                <History size={16} /> Log Lịch sử
-            </button>
         </div>
 
         <div className={`flex-1 bg-slate-50/30 min-h-0 ${
-            (activeTab === 'permissions' || activeTab === 'logs') ? 'p-2 md:p-3 overflow-hidden flex flex-col' : 'p-4 md:p-6 overflow-y-auto'
+            activeTab === 'permissions' ? 'p-2 md:p-3 overflow-hidden flex flex-col' : 'p-4 md:p-6 overflow-y-auto'
         }`}>
             {activeTab === 'general' && (
                 <div className="space-y-6 max-w-4xl mx-auto">
@@ -1316,231 +1202,6 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                                 </button>
                             </div>
                         </div>
-                    </div>
-                </div>
-            )}
-
-            {activeTab === 'logs' && (
-                <div className="space-y-6 max-w-6xl mx-auto flex flex-col h-full min-h-0">
-                    {/* FILTER CARD */}
-                    <div className="bg-white border border-slate-200/60 rounded-2xl p-4 md:p-5 shadow-sm flex flex-col gap-4 shrink-0">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-3 border-slate-100">
-                            <div>
-                                <h3 className="font-black text-slate-800 flex items-center gap-2 tracking-tight text-base">
-                                    <History className="text-teal-600" size={18} /> Nhật ký hoạt động & Thao tác phần mềm
-                                </h3>
-                                <p className="text-xs text-slate-500 font-medium mt-0.5">
-                                    Ghi nhận toàn bộ các tác vụ chuyển trạng thái, cập nhật hồ sơ từ các tài khoản đăng nhập
-                                </p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <span className="text-xs bg-slate-100 text-slate-600 font-black px-2.5 py-1 rounded-full uppercase tracking-wider">
-                                    Tổng: {filteredSystemLogs.length} logs
-                                </span>
-                                <button
-                                    onClick={loadSystemLogs}
-                                    disabled={isLoadingLogs}
-                                    className="p-2 text-slate-500 hover:text-teal-600 hover:bg-slate-50 rounded-lg border border-slate-200/80 transition-all disabled:opacity-50 cursor-pointer shadow-xs"
-                                    title="Tải lại logs"
-                                >
-                                    <RefreshCw size={14} className={isLoadingLogs ? 'animate-spin' : ''} />
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* FILTERS INPUT */}
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                            <div className="relative">
-                                <Search className="absolute left-3 top-2.5 text-slate-400" size={16} />
-                                <input
-                                    type="text"
-                                    placeholder="Tìm mã hồ sơ, chủ HS, ghi chú..."
-                                    value={logSearchQuery}
-                                    onChange={(e) => setLogSearchQuery(e.target.value)}
-                                    className="w-full pl-9 pr-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-hidden focus:border-teal-500 focus:ring-1 focus:ring-teal-500 bg-white text-slate-800 font-medium"
-                                />
-                            </div>
-
-                            <div>
-                                <select
-                                    value={selectedLogUser}
-                                    onChange={(e) => setSelectedLogUser(e.target.value)}
-                                    className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-hidden focus:border-teal-500 bg-white text-slate-800 font-medium"
-                                >
-                                    <option value="">-- Tất cả tài khoản --</option>
-                                    {uniqueUsersFromLogs.map(user => (
-                                        <option key={user} value={user}>{resolveName(user)}</option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            <div>
-                                <select
-                                    value={selectedLogStatus}
-                                    onChange={(e) => setSelectedLogStatus(e.target.value)}
-                                    className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-hidden focus:border-teal-500 bg-white text-slate-800 font-medium"
-                                >
-                                    <option value="">-- Tất cả trạng thái mới --</option>
-                                    <option value="LOGIN">Đăng nhập</option>
-                                    <option value="LOGOUT">Đăng xuất</option>
-                                    {Object.entries(STATUS_LABELS).map(([statusKey, statusLabel]) => (
-                                        <option key={statusKey} value={statusKey}>{statusLabel}</option>
-                                    ))}
-                                </select>
-                            </div>
-                        </div>
-
-                        {(logSearchQuery || selectedLogUser || selectedLogStatus) && (
-                            <div className="flex justify-end shrink-0">
-                                <button
-                                    onClick={() => {
-                                        setLogSearchQuery('');
-                                        setSelectedLogUser('');
-                                        setSelectedLogStatus('');
-                                    }}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-red-600 hover:text-red-700 font-bold hover:bg-red-50 border border-red-200 rounded-lg transition-colors cursor-pointer"
-                                >
-                                    <RotateCcw size={12} /> Xóa bộ lọc
-                                </button>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* TABLE CONTAINER */}
-                    <div className="bg-white border border-slate-200/60 rounded-2xl shadow-sm flex-1 min-h-0 flex flex-col overflow-hidden">
-                        {isLoadingLogs ? (
-                            <div className="flex flex-col items-center justify-center py-24 text-slate-500 flex-1">
-                                <Loader2 className="animate-spin text-teal-600 mb-3" size={32} />
-                                <span className="text-sm font-bold">Đang tải nhật ký thao tác...</span>
-                                <span className="text-xs text-slate-400 mt-1">Truy vấn dữ liệu từ máy chủ an toàn</span>
-                            </div>
-                        ) : filteredSystemLogs.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center py-20 text-slate-400 flex-1">
-                                <History size={48} className="stroke-1 text-slate-300 mb-3" />
-                                <span className="text-sm font-bold">Không tìm thấy bản ghi nhật ký phù hợp</span>
-                                <span className="text-xs text-slate-400 mt-1">Vui lòng thay đổi từ khóa tìm kiếm hoặc bộ lọc</span>
-                            </div>
-                        ) : (
-                            <div className="overflow-y-auto flex-1">
-                                <table className="w-full text-xs text-left border-collapse table-fixed">
-                                    <thead className="bg-slate-50 border-b border-slate-100 sticky top-0 z-10">
-                                        <tr>
-                                            <th className="p-3 font-bold uppercase tracking-wider text-[10px] text-slate-500 w-[160px]">Thời gian</th>
-                                            <th className="p-3 font-bold uppercase tracking-wider text-[10px] text-slate-500 w-[140px]">Tài khoản</th>
-                                            <th className="p-3 font-bold uppercase tracking-wider text-[10px] text-slate-500 w-[200px]">Hồ sơ liên quan</th>
-                                            <th className="p-3 font-bold uppercase tracking-wider text-[10px] text-slate-500 w-[240px]">Chuyển trạng thái</th>
-                                            <th className="p-3 font-bold uppercase tracking-wider text-[10px] text-slate-500">Ghi chú / Thao tác</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100">
-                                        {paginatedSystemLogs.map((log, idx) => (
-                                            <tr key={log.id || idx} className="hover:bg-slate-50/40 transition-colors">
-                                                <td className="p-3 whitespace-nowrap text-slate-500 font-mono">
-                                                    {log.changedAt ? new Date(log.changedAt).toLocaleString('vi-VN') : '—'}
-                                                </td>
-                                                <td className="p-3 font-bold text-slate-800">
-                                                    {resolveName(log.changedBy)}
-                                                </td>
-                                                <td className="p-3">
-                                                    {log.isAuthEvent ? (
-                                                        <span className="text-slate-400 font-medium italic">—</span>
-                                                    ) : (
-                                                        <div className="space-y-0.5">
-                                                            <span className="font-mono font-black text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded text-[10px]">
-                                                                {log.recordCode || 'N/A'}
-                                                            </span>
-                                                            <div className="font-bold text-slate-600 truncate text-[11px]" title={log.customerName}>
-                                                                {log.customerName || 'N/A'}
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                </td>
-                                                <td className="p-3">
-                                                    {log.isAuthEvent ? (
-                                                        <div className="flex items-center">
-                                                            {log.newStatus === 'LOGIN' ? (
-                                                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                                                    ĐĂNG NHẬP
-                                                                </span>
-                                                            ) : (
-                                                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                                                                    ĐĂNG XUẤT
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                    ) : (
-                                                        <div className="flex items-center gap-1 flex-wrap">
-                                                            {log.previousStatus ? (
-                                                                <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-600 border border-slate-200">
-                                                                    {STATUS_LABELS[log.previousStatus as RecordStatus] || log.previousStatus}
-                                                                </span>
-                                                            ) : (
-                                                                <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-teal-50 text-teal-700 border border-teal-100">
-                                                                    Mới tạo
-                                                                </span>
-                                                            )}
-                                                            <ArrowRight size={10} className="text-slate-400 shrink-0" />
-                                                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                                                                {STATUS_LABELS[log.newStatus as RecordStatus] || log.newStatus}
-                                                            </span>
-                                                        </div>
-                                                    )}
-                                                </td>
-                                                <td className="p-3 text-slate-600 font-medium italic break-words">
-                                                    {log.note || '—'}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
-
-                        {/* PAGINATION FOOTER */}
-                        {!isLoadingLogs && totalLogPages > 1 && (
-                            <div className="flex items-center justify-between px-4 py-3 bg-slate-50 border-t border-slate-100 select-none shrink-0">
-                                <span className="text-xs text-slate-500 font-medium">
-                                    Trang <strong className="font-bold text-slate-700">{logPage}</strong> / {totalLogPages} (Tổng {filteredSystemLogs.length} logs)
-                                </span>
-                                <div className="flex items-center gap-1">
-                                    <button
-                                        disabled={logPage === 1}
-                                        onClick={() => setLogPage(prev => Math.max(1, prev - 1))}
-                                        className="p-1 text-slate-500 hover:text-teal-600 hover:bg-white rounded-md border border-slate-200 disabled:opacity-40 transition-colors cursor-pointer"
-                                    >
-                                        <ArrowLeft size={14} />
-                                    </button>
-                                    {Array.from({ length: totalLogPages }, (_, i) => i + 1).map(p => {
-                                        if (totalLogPages > 8 && Math.abs(logPage - p) > 2 && p !== 1 && p !== totalLogPages) {
-                                            if (p === 2 || p === totalLogPages - 1) {
-                                                return <span key={p} className="text-slate-400 px-1 text-[10px] select-none">...</span>;
-                                            }
-                                            return null;
-                                        }
-                                        return (
-                                            <button
-                                                key={p}
-                                                onClick={() => setLogPage(p)}
-                                                className={`w-6 h-6 flex items-center justify-center text-[10px] font-bold rounded transition-colors border ${
-                                                    logPage === p
-                                                        ? 'bg-teal-600 border-teal-600 text-white shadow-xs'
-                                                        : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-800'
-                                                }`}
-                                            >
-                                                {p}
-                                            </button>
-                                        );
-                                    })}
-                                    <button
-                                        disabled={logPage === totalLogPages}
-                                        onClick={() => setLogPage(prev => Math.min(totalLogPages, prev + 1))}
-                                        className="p-1 text-slate-500 hover:text-teal-600 hover:bg-white rounded-md border border-slate-200 disabled:opacity-40 transition-colors cursor-pointer"
-                                    >
-                                        <ArrowRight size={14} />
-                                    </button>
-                                </div>
-                            </div>
-                        )}
                     </div>
                 </div>
             )}

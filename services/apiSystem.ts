@@ -799,8 +799,8 @@ export const logSystemEvent = async (userCode: string, actionType: 'LOGIN' | 'LO
 
         existingLogs = [newLog, ...existingLogs];
 
-        if (existingLogs.length > 1000) {
-            existingLogs = existingLogs.slice(0, 1000);
+        if (existingLogs.length > 50) {
+            existingLogs = existingLogs.slice(0, 50);
         }
 
         saveToCache(key, existingLogs);

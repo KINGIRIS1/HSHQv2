@@ -53,21 +53,121 @@ const OPTIONAL_NEW_COLUMNS = [
     'statusLogs', 'archiveHandoverDate', 'archiveHandoverBatch'
 ];
 
-const fetchTableRecordsParallel = async (table: 'dangky_records' | 'land_records' | 'luutru_records'): Promise<any[]> => {
-    const step = 1000;
-    try {
-        const { data: firstData, count, error } = await supabase
-            .from(table)
-            .select('*', { count: 'exact' })
-            .order('receivedDate', { ascending: false })
-            .order('id', { ascending: true })
-            .range(0, step - 1);
+// --- CẤU HÌNH PHÂN NHÓM TẢI 3 GIAI ĐOẠN ƯU TIÊN ---
+// Giai đoạn 1 (Ưu tiên 1): Tiếp nhận mới, đang thực hiện, đã giao 1 cửa
+export const TIER_1_STATUSES = [
+    'RECEIVED', 'received',
+    'ASSIGNED', 'assigned',
+    'IN_PROGRESS', 'in_progress',
+    'COMPLETED_WORK', 'completed_work',
+    'PENDING_SUPPLEMENT', 'pending_supplement',
+    'HANDOVER', 'handover'
+];
 
-        if (error) {
-            if (error.code === 'PGRST205' || error.code === '42P01' || error.message?.includes('does not exist')) {
+// Giai đoạn 2 (Ưu tiên 2): Tiếp tục tới kiểm tra, trình ký, chờ bàn giao
+export const TIER_2_STATUSES = [
+    'PENDING_CHECK', 'pending_check',
+    'CHECKED', 'checked',
+    'PENDING_SIGN', 'pending_sign',
+    'SIGNED', 'signed',
+    'GIAO_HS', 'giao_hs',
+    'REJECTED', 'rejected',
+    'WITHDRAWN', 'withdrawn'
+];
+
+// Giai đoạn 3 (Ưu tiên 3): Đã trả kết quả (và các trạng thái hoàn tất còn lại nếu có)
+export const TIER_3_STATUSES = [
+    'RETURNED', 'returned'
+];
+
+const applyTierFilter = (query: any, tier: 1 | 2 | 3) => {
+    if (tier === 1) {
+        return query.in('status', TIER_1_STATUSES);
+    } else if (tier === 2) {
+        return query.in('status', TIER_2_STATUSES);
+    } else {
+        // Tier 3: RETURNED và các bản ghi còn lại (hoặc status null / rỗng)
+        const excluded = [...TIER_1_STATUSES, ...TIER_2_STATUSES];
+        return query.or(`status.not.in.(${excluded.join(',')}),status.is.null`);
+    }
+};
+
+const fetchPageWithRetry = async (
+    table: 'dangky_records' | 'land_records' | 'luutru_records',
+    tier: 1 | 2 | 3,
+    from: number,
+    to: number,
+    retries = 3,
+    delayMs = 300
+): Promise<any[]> => {
+    for (let attempt = 1; attempt <= retries; attempt++) {
+        try {
+            let q = supabase.from(table).select('*');
+            q = applyTierFilter(q, tier);
+            const { data, error: pageErr } = await q
+                .order('receivedDate', { ascending: false })
+                .order('id', { ascending: true })
+                .range(from, to);
+
+            if (pageErr) {
+                if (attempt === retries) {
+                    console.warn(`Lỗi fetch trang ${from}-${to} của ${table} (Tier ${tier}, lần ${attempt}/${retries}):`, pageErr);
+                    return [];
+                }
+                await new Promise(res => setTimeout(res, delayMs * attempt));
+                continue;
+            }
+            return (data || []).map(item => ({ ...item, sourceTable: table }));
+        } catch (err: any) {
+            if (attempt === retries) {
+                console.warn(`Lỗi ngoại lệ fetch trang ${from}-${to} của ${table} (Tier ${tier}):`, err);
                 return [];
             }
-            throw error;
+            await new Promise(res => setTimeout(res, delayMs * attempt));
+        }
+    }
+    return [];
+};
+
+const fetchTableRecordsByTier = async (
+    table: 'dangky_records' | 'land_records' | 'luutru_records',
+    tier: 1 | 2 | 3
+): Promise<any[]> => {
+    const step = 1000;
+    try {
+        let firstData: any[] | null = null;
+        let count: number | null = null;
+
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            try {
+                let q = supabase.from(table).select('*', { count: 'exact' });
+                q = applyTierFilter(q, tier);
+                const res = await q
+                    .order('receivedDate', { ascending: false })
+                    .order('id', { ascending: true })
+                    .range(0, step - 1);
+
+                if (res.error) {
+                    if (res.error.code === 'PGRST205' || res.error.code === '42P01' || res.error.message?.includes('does not exist')) {
+                        return [];
+                    }
+                    if (attempt < 3) {
+                        await new Promise(r => setTimeout(r, 250 * attempt));
+                        continue;
+                    }
+                    throw res.error;
+                }
+
+                firstData = res.data;
+                count = res.count;
+                break;
+            } catch (err) {
+                if (attempt < 3) {
+                    await new Promise(r => setTimeout(r, 250 * attempt));
+                } else {
+                    throw err;
+                }
+            }
         }
 
         if (!firstData || firstData.length === 0) return [];
@@ -76,65 +176,77 @@ const fetchTableRecordsParallel = async (table: 'dangky_records' | 'land_records
             return mappedFirst;
         }
 
-        const promises = [];
+        // Tạo danh sách các khoảng phân trang cần tải song song
+        const ranges: { from: number; to: number }[] = [];
         for (let from = step; from < count; from += step) {
             const to = Math.min(from + step - 1, count - 1);
-            promises.push((async () => {
-                try {
-                    const { data, error: pageErr } = await supabase
-                        .from(table)
-                        .select('*')
-                        .order('receivedDate', { ascending: false })
-                        .order('id', { ascending: true })
-                        .range(from, to);
-
-                    if (pageErr) {
-                        console.warn(`Lỗi fetch trang ${from}-${to} của ${table}:`, pageErr);
-                        return [];
-                    }
-                    return (data || []).map(item => ({ ...item, sourceTable: table }));
-                } catch (err: any) {
-                    console.warn(`Lỗi ngoại lệ fetch trang ${from}-${to} của ${table}:`, err);
-                    return [];
-                }
-            })());
+            ranges.push({ from, to });
         }
 
-        const remainingPages = await Promise.all(promises);
+        // Tải theo nhóm song song (concurrency = 4) để tốc độ tối ưu nhất
+        const concurrency = 4;
+        const remainingPages: any[][] = [];
+        for (let i = 0; i < ranges.length; i += concurrency) {
+            const chunk = ranges.slice(i, i + concurrency);
+            const chunkResults = await Promise.all(
+                chunk.map(r => fetchPageWithRetry(table, tier, r.from, r.to))
+            );
+            remainingPages.push(...chunkResults);
+        }
+
         return [mappedFirst, ...remainingPages].flat();
     } catch (err: any) {
-        console.warn(`Lỗi fetch ${table}:`, err);
+        console.warn(`Lỗi fetch ${table} tier ${tier}:`, err);
         return [];
     }
 };
 
-export const fetchRecords = async (): Promise<RecordFile[]> => {
+const fetchTierData = async (tier: 1 | 2 | 3): Promise<RecordFile[]> => {
+    const [dangky, land, luutru] = await Promise.all([
+        fetchTableRecordsByTier('dangky_records', tier),
+        fetchTableRecordsByTier('land_records', tier),
+        fetchTableRecordsByTier('luutru_records', tier)
+    ]);
+    const rawList = [...dangky, ...land, ...luutru];
+    return rawList.map(item => mapRecordFromDb(item));
+};
+
+export type TierProgressCallback = (tier: 1 | 2 | 3, recordsSoFar: RecordFile[], isComplete: boolean) => void;
+
+export const fetchRecords = async (onProgress?: TierProgressCallback): Promise<RecordFile[]> => {
   if (!isConfigured) {
       console.warn("Supabase chưa được cấu hình.");
       return [];
   }
 
   try {
-    const [dangkyList, landList, luutruList] = await Promise.all([
-        fetchTableRecordsParallel('dangky_records'),
-        fetchTableRecordsParallel('land_records'),
-        fetchTableRecordsParallel('luutru_records')
-    ]);
+    const uniqueMap = new Map<string, RecordFile>();
 
-    const allRecords = [...dangkyList, ...landList, ...luutruList];
-    const uniqueMap = new Map();
-    allRecords.forEach((item: any) => {
-        if (item.id) {
-            uniqueMap.set(item.id, mapRecordFromDb(item));
-        }
-    });
-    const uniqueRecords = Array.from(uniqueMap.values());
-    
-    console.log(`[Fetch] Total fetched across all cloud tables: ${uniqueRecords.length}`);
-    if (uniqueRecords.length > 0) {
-        saveToCache(CACHE_KEYS.RECORDS, uniqueRecords);
+    // 🚀 GIAI ĐOẠN 1 (Ưu tiên 1): Tiếp nhận mới, đang thực hiện, đã giao 1 cửa
+    const tier1 = await fetchTierData(1);
+    tier1.forEach(r => { if (r.id) uniqueMap.set(r.id, r); });
+    const listTier1 = Array.from(uniqueMap.values());
+    console.log(`[Tier 1 Ready] Đã nạp xong ${listTier1.length} hồ sơ ưu tiên 1 (tiếp nhận mới, đang thực hiện, đã giao 1 cửa)`);
+    onProgress?.(1, listTier1, false);
+
+    // 🚀 GIAI ĐOẠN 2 (Ưu tiên 2): Tiếp tục tới kiểm tra, trình ký, chờ bàn giao
+    const tier2 = await fetchTierData(2);
+    tier2.forEach(r => { if (r.id) uniqueMap.set(r.id, r); });
+    const listTier2 = Array.from(uniqueMap.values());
+    console.log(`[Tier 2 Ready] Đã nạp xong tổng cộng ${listTier2.length} hồ sơ (+ kiểm tra, trình ký, chờ bàn giao)`);
+    onProgress?.(2, listTier2, false);
+
+    // 🚀 GIAI ĐOẠN 3 (Ưu tiên 3): Đã trả kết quả (tải ngầm sau cùng trong nền)
+    const tier3 = await fetchTierData(3);
+    tier3.forEach(r => { if (r.id) uniqueMap.set(r.id, r); });
+    const finalRecords = Array.from(uniqueMap.values());
+    console.log(`[Tier 3 Complete] Đã nạp đầy đủ toàn bộ ${finalRecords.length} hồ sơ hệ thống`);
+
+    if (finalRecords.length > 0) {
+        saveToCache(CACHE_KEYS.RECORDS, finalRecords);
     }
-    return uniqueRecords as RecordFile[];
+    onProgress?.(3, finalRecords, true);
+    return finalRecords;
 
   } catch (error) {
     logError("fetchRecords", error, true);
