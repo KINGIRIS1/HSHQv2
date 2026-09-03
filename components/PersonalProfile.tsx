@@ -19,7 +19,7 @@ import {
   Bell,
   CalendarClock,
   FileCheck,
-  Map,
+  Map as MapIcon,
   CheckSquare,
   ClipboardList,
   FileDown,
@@ -156,7 +156,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
     loadContracts();
   }, []);
 
-  const myRecords = useMemo(() => {
+  const myRecords = useMemo((): RecordFile[] => {
     const mainRecords = records.filter((r) => {
       if (!user.employeeId) return false;
       if (isDirector) {
@@ -289,7 +289,34 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
         } as RecordFile;
       });
 
-    return [...mainRecords, ...mappedArchives];
+    // Khử trùng lặp 100%: Dùng Map theo id để đảm bảo mỗi hồ sơ chỉ xuất hiện 1 lần duy nhất
+    const recordsMap = new Map<string, RecordFile>();
+
+    // 1. Nạp hồ sơ từ mainRecords (đã bao gồm land_records, dangky_records và luutru_records nạp từ hệ thống)
+    mainRecords.forEach((r) => {
+      if (r && r.id) {
+        recordsMap.set(r.id, r);
+      }
+    });
+
+    // 2. Hợp nhất từ mappedArchives: Nếu id đã tồn tại thì bổ sung thông tin thiếu, KHÔNG tạo bản ghi trùng
+    mappedArchives.forEach((ar) => {
+      if (!ar || !ar.id) return;
+      if (!recordsMap.has(ar.id)) {
+        recordsMap.set(ar.id, ar);
+      } else {
+        const existing = recordsMap.get(ar.id)!;
+        recordsMap.set(ar.id, {
+          ...ar,
+          ...existing,
+          customerName: existing.customerName || ar.customerName,
+          content: existing.content || ar.content,
+          recordType: existing.recordType || ar.recordType,
+        });
+      }
+    });
+
+    return Array.from(recordsMap.values());
   }, [records, archiveRecords, user.employeeId]);
 
   const isChecker = useMemo(() => {
@@ -1265,7 +1292,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                                     : "Yêu cầu chỉnh lý bản đồ"
                                 }
                               >
-                                <Map
+                                <MapIcon
                                   size={14}
                                   className={
                                     r.needsMapCorrection ? "fill-orange-100" : ""
@@ -1352,7 +1379,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                         <div className="flex items-center gap-1.5">
                           {r.needsMapCorrection && (
                             <span className="p-1 bg-orange-100 text-orange-600 rounded" title="Cần chỉnh lý bản đồ">
-                              <Map size={12} className="fill-orange-100" />
+                              <MapIcon size={12} className="fill-orange-100" />
                             </span>
                           )}
                           <StatusBadge status={r.status} />
@@ -1417,7 +1444,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                             }`}
                             title={r.needsMapCorrection ? "Hủy yêu cầu chỉnh lý bản đồ" : "Yêu cầu chỉnh lý bản đồ"}
                           >
-                            <Map size={14} className={r.needsMapCorrection ? "fill-orange-100" : ""} />
+                            <MapIcon size={14} className={r.needsMapCorrection ? "fill-orange-100" : ""} />
                           </button>
                         )}
 
