@@ -365,29 +365,28 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
                     if (!record.assignedDate) record.assignedDate = nowStr;
                 }
             } else {
-                if (mode === 'create') {
-                    if (record.exportBatch || record.exportDate || record.completedDate) {
-                        record.status = RecordStatus.HANDOVER;
-                        if (!record.completedDate && record.exportDate) {
-                            record.completedDate = record.exportDate;
-                        }
-                    } else if (record.resultReturnedDate) {
-                        record.status = RecordStatus.RETURNED;
-                    } else if (record.approvalDate) {
-                        record.status = RecordStatus.SIGNED;
-                    } else if (record.submissionDate) {
-                        record.status = RecordStatus.PENDING_SIGN;
-                    } else if (record.checkedDate) {
-                        record.status = RecordStatus.CHECKED;
-                    } else if (record.pendingCheckDate) {
-                        record.status = RecordStatus.PENDING_CHECK;
-                    } else if (record.completedWorkDate) {
-                        record.status = RecordStatus.COMPLETED_WORK;
-                    } else if (record.assignedTo || record.assignedDate) {
-                        record.status = RecordStatus.ASSIGNED;
-                    } else {
-                        record.status = RecordStatus.RECEIVED;
+                // Tự động suy luận trạng thái dựa trên các mốc tiến trình (áp dụng cho cả tạo mới và cập nhật khi file không có cột trạng thái)
+                if (record.resultReturnedDate) {
+                    record.status = RecordStatus.RETURNED;
+                } else if (record.exportBatch || record.exportDate || record.completedDate) {
+                    record.status = RecordStatus.HANDOVER;
+                    if (!record.completedDate && record.exportDate) {
+                        record.completedDate = record.exportDate;
                     }
+                } else if (record.approvalDate) {
+                    record.status = RecordStatus.SIGNED;
+                } else if (record.submissionDate || record.submittedTo) {
+                    record.status = RecordStatus.PENDING_SIGN;
+                } else if (record.checkedDate) {
+                    record.status = RecordStatus.CHECKED;
+                } else if (record.pendingCheckDate || record.checkedBy) {
+                    record.status = RecordStatus.PENDING_CHECK;
+                } else if (record.completedWorkDate) {
+                    record.status = RecordStatus.COMPLETED_WORK;
+                } else if (record.assignedTo || record.assignedDate) {
+                    record.status = RecordStatus.ASSIGNED;
+                } else if (mode === 'create') {
+                    record.status = RecordStatus.RECEIVED;
                 }
             }
 

@@ -117,6 +117,12 @@ export const mapLuutruDbToArchiveRecord = (row: any): ArchiveRecord => {
 
     const extraData = {
         ...(typeof row.data === 'object' && row.data !== null ? row.data : {}),
+        code: row.code,
+        so_hieu: row.code,
+        customerName: row.customerName,
+        noi_nhan_gui: row.customerName,
+        content: row.content,
+        trich_yeu: row.content,
         xa_phuong: row.ward,
         ward: row.ward,
         to_ban_do: row.mapSheet,
@@ -352,9 +358,21 @@ export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise
         if (record.id) {
             const idx = MOCK_ARCHIVE.findIndex(r => r.id === record.id);
             if (idx !== -1) {
-                MOCK_ARCHIVE[idx] = { ...MOCK_ARCHIVE[idx], ...record } as ArchiveRecord;
+                const existing = MOCK_ARCHIVE[idx];
+                const merged = {
+                    ...existing,
+                    ...record,
+                    data: {
+                        ...(existing.data || {}),
+                        ...(record.data || {})
+                    },
+                    so_hieu: record.so_hieu || existing.so_hieu,
+                    noi_nhan_gui: record.noi_nhan_gui || existing.noi_nhan_gui,
+                    trich_yeu: record.trich_yeu || existing.trich_yeu
+                } as ArchiveRecord;
+                MOCK_ARCHIVE[idx] = merged;
                 saveToCache(CACHE_KEY_ARCHIVE, MOCK_ARCHIVE);
-                return MOCK_ARCHIVE[idx];
+                return merged;
             }
         } else {
             const newRec = { 
@@ -369,7 +387,30 @@ export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise
         return null;
     }
     try {
-        const payload = mapArchiveRecordToLuutruDb(record);
+        let fullRecord = record;
+        if (record.id) {
+            const { data: existingRows } = await supabase
+                .from('luutru_records')
+                .select('*')
+                .eq('id', record.id)
+                .single();
+            if (existingRows) {
+                const currentArch = mapLuutruDbToArchiveRecord(existingRows);
+                fullRecord = {
+                    ...currentArch,
+                    ...record,
+                    so_hieu: record.so_hieu || currentArch.so_hieu || existingRows.code || '',
+                    noi_nhan_gui: record.noi_nhan_gui || currentArch.noi_nhan_gui || existingRows.customerName || '',
+                    trich_yeu: record.trich_yeu || currentArch.trich_yeu || existingRows.content || '',
+                    data: {
+                        ...(currentArch.data || {}),
+                        ...(record.data || {})
+                    }
+                };
+            }
+        }
+
+        const payload = mapArchiveRecordToLuutruDb(fullRecord);
 
         if (record.id) {
             let { data, error } = await supabase.from('luutru_records').update(payload).eq('id', record.id).select();

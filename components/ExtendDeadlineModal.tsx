@@ -34,16 +34,14 @@ export const ExtendDeadlineModal: React.FC<ExtendDeadlineModalProps> = ({
 
   const formatDateVN = (dStr?: string | null) => {
     if (!dStr) return '--';
-    try {
-      const d = new Date(dStr);
-      if (isNaN(d.getTime())) return dStr;
-      const day = String(d.getDate()).padStart(2, '0');
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const year = d.getFullYear();
-      return `${day}/${month}/${year}`;
-    } catch {
-      return dStr;
+    const cleanStr = String(dStr).trim();
+    const dateOnly = cleanStr.includes('T') ? cleanStr.split('T')[0] : cleanStr.split(' ')[0];
+    const parts = dateOnly.split('-');
+    if (parts.length === 3 && parts[0].length === 4) {
+      return `${parts[2].padStart(2, '0')}/${parts[1].padStart(2, '0')}/${parts[0]}`;
     }
+    if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(cleanStr)) return cleanStr;
+    return cleanStr;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -55,7 +53,8 @@ export const ExtendDeadlineModal: React.FC<ExtendDeadlineModalProps> = ({
     setErrorMsg('');
     setIsSubmitting(true);
     try {
-      const todayStr = new Date().toISOString().split('T')[0];
+      const now = new Date();
+      const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
       await onConfirm(newDeadline, 'Gia hạn thời gian nhận kết quả', todayStr);
       onClose();
     } catch (err) {

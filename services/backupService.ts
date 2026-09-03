@@ -21,6 +21,7 @@ import {
     fetchMapSheetConversions 
 } from './apiUtilities';
 import { supabase, isConfigured } from './supabaseClient';
+import * as XLSX from 'xlsx-js-style';
 
 export interface FullBackupData {
     backup_time: string;
@@ -445,4 +446,102 @@ export const checkAndTriggerWeeklyBackup = async (
             error: error.message
         };
     }
+};
+
+/**
+ * Xuất dữ liệu sao lưu tổng thể ra file Excel nhiều sheet một cách bất đồng bộ không gây lag UI
+ */
+export const exportFullBackupToExcelAsync = async (
+    backupData: FullBackupData,
+    onProgress?: (percent: number, status: string) => void
+): Promise<void> => {
+    onProgress?.(10, 'Đang chuẩn bị bảng tính Excel...');
+    await new Promise(r => setTimeout(r, 40));
+
+    const wb = XLSX.utils.book_new();
+    const payload = backupData.data || (backupData as any);
+
+    // 1. Sheet Records
+    const records = payload.records || [];
+    if (records.length > 0) {
+        onProgress?.(30, `Đang xử lý ${records.length} hồ sơ đo đạc...`);
+        const rows: any[] = [];
+        const chunkSize = 100;
+        for (let i = 0; i < records.length; i++) {
+            const r = records[i];
+            rows.push({
+                'Mã hồ sơ': r.code || r.id,
+                'Chủ sử dụng': r.customerName || '',
+                'Loại hồ sơ': r.recordType || '',
+                'Xã/Phường': r.ward || '',
+                'Tờ BĐ': r.mapSheet || '',
+                'Thửa đất': r.landPlot || '',
+                'Trạng thái': r.status || '',
+                'Người thực hiện': r.assignedTo || '',
+                'Ngày nhận': r.receivedDate || '',
+                'Hạn xử lý': r.deadline || '',
+                'Ngày hoàn thành': r.completedDate || ''
+            });
+            if (i % chunkSize === 0) {
+                await new Promise(res => setTimeout(res, 0));
+            }
+        }
+        const wsRecords = XLSX.utils.json_to_sheet(rows);
+        XLSX.utils.book_append_sheet(wb, wsRecords, "HoSoDoDac");
+    }
+
+    // 2. Sheet Archive Records (Sao lục & Công văn & Vào sổ)
+    const archiveRecords = [
+        ...(payload.archive_saoluc || []),
+        ...(payload.archive_congvan || []),
+        ...(payload.archive_vaoso || [])
+    ];
+    if (archiveRecords.length > 0) {
+        onProgress?.(60, `Đang xử lý ${archiveRecords.length} hồ sơ lưu trữ...`);
+        const archiveRows: any[] = [];
+        const chunkSize = 100;
+        for (let i = 0; i < archiveRecords.length; i++) {
+            const ar = archiveRecords[i];
+            archiveRows.push({
+                'Mã': ar.id,
+                'Loại': ar.type,
+                'Số hiệu': ar.so_hieu,
+                'Trích yếu': ar.trich_yeu,
+                'Nơi nhận/gửi': ar.noi_nhan_gui,
+                'Trạng thái': ar.status,
+                'Ngày tháng': ar.ngay_thang,
+                'Người tạo': ar.created_by
+            });
+            if (i % chunkSize === 0) {
+                await new Promise(res => setTimeout(res, 0));
+            }
+        }
+        const wsArchive = XLSX.utils.json_to_sheet(archiveRows);
+        XLSX.utils.book_append_sheet(wb, wsArchive, "HoSoLuuTru");
+    }
+
+    // 3. Sheet Contracts & Employees
+    onProgress?.(85, 'Đang tổng hợp thông tin hợp đồng và nhân sự...');
+    await new Promise(r => setTimeout(r, 30));
+
+    const contracts = payload.contracts || [];
+    if (contracts.length > 0) {
+        const wsContracts = XLSX.utils.json_to_sheet(contracts);
+        XLSX.utils.book_append_sheet(wb, wsContracts, "HopDong");
+    }
+
+    const employees = payload.employees || [];
+    if (employees.length > 0) {
+        const wsEmployees = XLSX.utils.json_to_sheet(employees);
+        XLSX.utils.book_append_sheet(wb, wsEmployees, "NhanSu");
+    }
+
+    onProgress?.(95, 'Đang ghi file Excel...');
+    await new Promise(r => setTimeout(r, 40));
+
+    const dateStr = new Date().toISOString().split('T')[0];
+    XLSX.writeFile(wb, `Backup_DuLieu_${dateStr}.xlsx`);
+
+    onProgress?.(100, 'Xuất file thành công!');
+    await new Promise(r => setTimeout(r, 200));
 };

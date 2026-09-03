@@ -197,9 +197,11 @@ export const calculateDeadlineHelper = (type: string, receivedDateStr: string, h
     
     // Áp dụng quy ước thời gian: nếu nhận sau 15h dời ngày trả qua sáng hôm sau (tức là cộng thêm 1 ngày làm việc)
     let isAfter15h = false;
+    const parsedStart = parseSafeDate(receivedDateStr);
+    const startDate = parsedStart ? new Date(parsedStart.getTime()) : new Date();
+
     if (receivedDateStr && (receivedDateStr.includes('T') || receivedDateStr.includes(' '))) {
-        const parsedDate = new Date(receivedDateStr);
-        if (!isNaN(parsedDate.getTime()) && parsedDate.getHours() >= 15) {
+        if (parsedStart && parsedStart.getHours() >= 15) {
             isAfter15h = true;
         }
     } else {
@@ -213,9 +215,8 @@ export const calculateDeadlineHelper = (type: string, receivedDateStr: string, h
         daysToAdd += 1;
     }
 
-    const startDate = new Date(receivedDateStr);
     let count = 0;
-    let currentDate = new Date(startDate);
+    let currentDate = new Date(startDate.getTime());
     
     // Tạo Set chứa chuỗi ngày nghỉ (YYYY-MM-DD) để tra cứu nhanh và chính xác
     const holidaySet = new Set<string>();
@@ -289,20 +290,30 @@ export function parseSafeDate(dateStr: any): Date | null {
     const s = String(dateStr).trim();
     if (!s) return null;
 
-    // Check if it's already ISO format or YYYY-MM-DD
-    if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
-        const d = new Date(s);
+    // Check if it's YYYY-MM-DD or ISO format with optional time
+    const ymdMatch = s.match(/^(\d{4})-(\d{2})-(\d{2})(?:$|[T\s](\d{2}):(\d{2})(?::(\d{2}))?)/);
+    if (ymdMatch) {
+        const year = parseInt(ymdMatch[1], 10);
+        const month = parseInt(ymdMatch[2], 10) - 1;
+        const day = parseInt(ymdMatch[3], 10);
+        const hour = ymdMatch[4] ? parseInt(ymdMatch[4], 10) : 0;
+        const minute = ymdMatch[5] ? parseInt(ymdMatch[5], 10) : 0;
+        const second = ymdMatch[6] ? parseInt(ymdMatch[6], 10) : 0;
+        const d = new Date(year, month, day, hour, minute, second);
         return isNaN(d.getTime()) ? null : d;
     }
 
-    // Check if it's DD/MM/YYYY or DD-MM-YYYY or similar
-    const dmyRegex = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/;
+    // Check if it's DD/MM/YYYY or DD-MM-YYYY or similar with optional time
+    const dmyRegex = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})(?:$|[T\s](\d{2}):(\d{2})(?::(\d{2}))?)/;
     const match = s.match(dmyRegex);
     if (match) {
         const day = parseInt(match[1], 10);
         const month = parseInt(match[2], 10) - 1; // 0-indexed
         const year = parseInt(match[3], 10);
-        const d = new Date(year, month, day);
+        const hour = match[4] ? parseInt(match[4], 10) : 0;
+        const minute = match[5] ? parseInt(match[5], 10) : 0;
+        const second = match[6] ? parseInt(match[6], 10) : 0;
+        const d = new Date(year, month, day, hour, minute, second);
         return isNaN(d.getTime()) ? null : d;
     }
 

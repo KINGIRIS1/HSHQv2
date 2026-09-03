@@ -145,20 +145,29 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Tân Qua
             );
         }
         return list;
-    }, [records, subTab, searchTerm, fromDate, toDate, filterWard, filterEmployee]);
+    }, [records, subTab, searchTerm, fromDate, toDate, filterWard, filterEmployee, filterRecordType, filterStatus]);
 
     // Reset selection and page when tab/filters change
     useEffect(() => {
         setSelectedIds(new Set());
         setCurrentPage(1);
-    }, [subTab, searchTerm, fromDate, toDate, filterWard, filterEmployee]);
+    }, [subTab, searchTerm, fromDate, toDate, filterWard, filterEmployee, filterRecordType, filterStatus]);
+
+    // Tự động làm sạch selectedIds khi chuyển trang để tránh tác động lên bản ghi bị ẩn
+    useEffect(() => {
+        setSelectedIds(new Set());
+    }, [currentPage]);
 
     const handleAssign = () => {
-        if (selectedIds.size === 0) return;
+        const validSelectedArr = Array.from(selectedIds).filter(id => filteredRecords.some(r => r.id === id));
+        if (validSelectedArr.length === 0) return;
         setShowAssignModal(true);
     };
 
     const handleConfirmAssign = async (employeeId: string) => {
+        const validSelectedArr = Array.from(selectedIds).filter(id => filteredRecords.some(r => r.id === id));
+        if (validSelectedArr.length === 0) return;
+
         const historyEntry = {
             action: 'Giao việc',
             status: 'assigned',
@@ -176,10 +185,9 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Tân Qua
             }
         };
         
-        const selectedArr = Array.from(selectedIds);
         // Optimistic UI update for instant feedback
         setRecords(prev => prev.map(r => {
-            if (selectedArr.includes(r.id)) {
+            if (validSelectedArr.includes(r.id)) {
                 const oldHistory = Array.isArray(r.data?.history) ? r.data.history : [];
                 return {
                     ...r,
@@ -197,7 +205,7 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Tân Qua
         setShowAssignModal(false);
         setSelectedIds(new Set());
 
-        await updateArchiveRecordsBatch(selectedArr, updates);
+        await updateArchiveRecordsBatch(validSelectedArr, updates);
         loadData();
     };
 
@@ -317,14 +325,15 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Tân Qua
     };
 
     const handleBatchStatusChange = async (newStatus: ArchiveRecord['status']) => {
-        if (selectedIds.size === 0) return;
+        const validSelectedArr = Array.from(selectedIds).filter(id => filteredRecords.some(r => r.id === id));
+        if (validSelectedArr.length === 0) return;
 
         let confirmMsg = '';
         let actionName = '';
         switch (newStatus) {
-            case 'executed': confirmMsg = `Xác nhận đã thực hiện xong ${selectedIds.size} hồ sơ?`; actionName = 'Đã thực hiện'; break;
-            case 'pending_sign': confirmMsg = `Trình ký ${selectedIds.size} hồ sơ?`; actionName = 'Trình ký'; break;
-            case 'signed': confirmMsg = `Xác nhận đã ký duyệt ${selectedIds.size} hồ sơ?`; actionName = 'Ký duyệt'; break;
+            case 'executed': confirmMsg = `Xác nhận đã thực hiện xong ${validSelectedArr.length} hồ sơ?`; actionName = 'Đã thực hiện'; break;
+            case 'pending_sign': confirmMsg = `Trình ký ${validSelectedArr.length} hồ sơ?`; actionName = 'Trình ký'; break;
+            case 'signed': confirmMsg = `Xác nhận đã ký duyệt ${validSelectedArr.length} hồ sơ?`; actionName = 'Ký duyệt'; break;
             default: return;
         }
 
@@ -343,7 +352,7 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Tân Qua
                 }
             };
             
-            await updateArchiveRecordsBatch(Array.from(selectedIds), updates);
+            await updateArchiveRecordsBatch(validSelectedArr, updates);
             setSelectedIds(new Set());
             loadData();
         }
@@ -375,6 +384,9 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Tân Qua
             setPendingCompletionRecord(null);
             loadData();
         } else if (selectedIds.size > 0 && subTab === 'signed') {
+            const validSelectedArr = Array.from(selectedIds).filter(id => filteredRecords.some(r => r.id === id));
+            if (validSelectedArr.length === 0) return;
+
             const historyEntry = {
                 action: 'Đã giao 1 cửa',
                 status: 'completed',
@@ -392,7 +404,7 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Tân Qua
                 }
             };
             
-            await updateArchiveRecordsBatch(Array.from(selectedIds), updates);
+            await updateArchiveRecordsBatch(validSelectedArr, updates);
             setSelectedIds(new Set());
             loadData();
         }

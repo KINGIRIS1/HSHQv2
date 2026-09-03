@@ -125,17 +125,38 @@ export const useRecordFilter = (
 
         // View-based filtering
         if (currentView === 'check_list' || currentView === 'other_check_list' || currentView === 'archive_check_list') {
+            const isPendingSign = (r: RecordFile) => {
+                if (r.status === RecordStatus.PENDING_SIGN) return true;
+                if ((r.submissionDate || r.submittedTo) && !(r.approvalDate || r.exportBatch || r.completedDate || r.resultReturnedDate)) {
+                    return true;
+                }
+                return false;
+            };
             if (isDirector) {
                 // Giám đốc chỉ thấy hồ sơ trình cho mình
-                result = result.filter(r => r.status === RecordStatus.PENDING_SIGN && r.submittedTo === currentUser?.employeeId);
+                result = result.filter(r => isPendingSign(r) && r.submittedTo === currentUser?.employeeId);
             } else {
-                result = result.filter(r => r.status === RecordStatus.PENDING_SIGN);
+                result = result.filter(r => isPendingSign(r));
             }
         } else if (currentView === 'pending_check_list' || currentView === 'archive_pending_check_list') {
             // Tab Kiểm tra: Hiển thị hồ sơ Chờ kiểm tra và Đã kiểm tra
-            result = result.filter(r => r.status === RecordStatus.PENDING_CHECK || r.status === RecordStatus.CHECKED);
+            result = result.filter(r => {
+                if (r.status === RecordStatus.PENDING_CHECK || r.status === RecordStatus.CHECKED) return true;
+                if ((r.pendingCheckDate || r.checkedBy || r.checkedDate) && !(r.submissionDate || r.submittedTo || r.approvalDate || r.exportBatch || r.completedDate || r.resultReturnedDate)) {
+                    return true;
+                }
+                return false;
+            });
         } else if (currentView === 'completed_list' || currentView === 'archive_completed_list') {
-            result = result.filter(r => r.status === RecordStatus.ASSIGNED || r.status === RecordStatus.IN_PROGRESS || r.status === RecordStatus.COMPLETED_WORK);
+            result = result.filter(r => {
+                const isExecuting = r.status === RecordStatus.ASSIGNED || r.status === RecordStatus.IN_PROGRESS || r.status === RecordStatus.COMPLETED_WORK;
+                if (!isExecuting) return false;
+                // Hồ sơ đã có mốc kết thúc hoặc đã chuyển bước không được hiển thị tại tab Đang thực hiện
+                if (r.completedDate || r.exportBatch || r.exportDate || r.resultReturnedDate || r.approvalDate) return false;
+                if (r.submissionDate || r.submittedTo) return false;
+                if (r.pendingCheckDate || r.checkedDate || r.checkedBy) return false;
+                return true;
+            });
         } else if (currentView === 'director_completed' || currentView === 'other_director_completed' || currentView === 'archive_director_completed') {
             result = result.filter(r => r.submittedTo === currentUser?.employeeId && r.status !== RecordStatus.PENDING_SIGN && r.status !== RecordStatus.RECEIVED && r.status !== RecordStatus.ASSIGNED && r.status !== RecordStatus.IN_PROGRESS && r.status !== RecordStatus.COMPLETED_WORK);
         } else if (currentView === 'handover_list' || currentView === 'other_handover_list' || currentView === 'archive_handover_list') {

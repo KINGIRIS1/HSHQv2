@@ -12,13 +12,22 @@ interface FlexibleDateInputProps {
     showCalendarIcon?: boolean;
 }
 
-// Convert YYYY-MM-DD to DD/MM/YYYY
+// Check days in month to prevent invalid dates like 31/04 or 29/02 in non-leap year
+const getDaysInMonth = (month: number, year: number): number => {
+    return new Date(year, month, 0).getDate();
+};
+
+// Convert YYYY-MM-DD or ISO string to DD/MM/YYYY without timezone shift
 const isoToDisplay = (isoStr?: string): string => {
     if (!isoStr) return '';
-    const dateOnly = isoStr.includes('T') ? isoStr.split('T')[0] : isoStr;
+    const dateOnly = isoStr.includes('T') ? isoStr.split('T')[0] : (isoStr.includes(' ') ? isoStr.split(' ')[0] : isoStr);
     const parts = dateOnly.split('-');
     if (parts.length === 3 && parts[0].length === 4) {
         return `${parts[2].padStart(2, '0')}/${parts[1].padStart(2, '0')}/${parts[0]}`;
+    }
+    // If it's already DD/MM/YYYY, return as is
+    if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(isoStr)) {
+        return isoStr;
     }
     return isoStr;
 };
@@ -40,11 +49,14 @@ const displayToIso = (displayStr: string): string | null => {
             year = year < 50 ? 2000 + year : 1900 + year;
         }
 
-        if (day >= 1 && day <= 31 && month >= 1 && month <= 12 && year >= 1900 && year <= 2100) {
-            const yStr = String(year).padStart(4, '0');
-            const mStr = String(month).padStart(2, '0');
-            const dStr = String(day).padStart(2, '0');
-            return `${yStr}-${mStr}-${dStr}`;
+        if (month >= 1 && month <= 12 && year >= 1900 && year <= 2100) {
+            const maxDays = getDaysInMonth(month, year);
+            if (day >= 1 && day <= maxDays) {
+                const yStr = String(year).padStart(4, '0');
+                const mStr = String(month).padStart(2, '0');
+                const dStr = String(day).padStart(2, '0');
+                return `${yStr}-${mStr}-${dStr}`;
+            }
         }
     }
     return null;

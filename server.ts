@@ -282,8 +282,8 @@ const startServer = async () => {
         const distPath = path.join(process.cwd(), 'dist');
         server.use(express.static(distPath));
         
-        // SPA fallback for HTML and client routes in production
-        server.get('*', (req: Request, res: Response, next: NextFunction) => {
+        // SPA fallback for HTML and client routes in production (Express v5 wildcard syntax)
+        server.get('*all', (req: Request, res: Response, next: NextFunction) => {
             const isApi = ['/api', '/custom', '/system', '/updates', '/records', '/excerpt_history', '/excerpt_counters', '/employees', '/users'].some(p => req.path.startsWith(p));
             if (isApi) {
                 return next();
@@ -293,8 +293,6 @@ const startServer = async () => {
     }
 
     // Use router AFTER custom routes and Vite middleware (for API fallback)
-    // Ideally, API should be under /api prefix, but current frontend expects root.
-    // json-server router handles requests matching db.json keys.
     server.use(router);
 
     const PORT = 3000;
@@ -303,4 +301,6 @@ const startServer = async () => {
     });
 };
 
-startServer();
+startServer().catch((err) => {
+    console.error('Lỗi khởi động máy chủ:', err);
+});

@@ -115,6 +115,11 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
         setCurrentPage(1);
     }, [subTab, searchTerm, fromDate, toDate, filterEmployee]);
 
+    // Reset selection when page changes to avoid actions on hidden records
+    useEffect(() => {
+        setSelectedIds(new Set());
+    }, [currentPage]);
+
     const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
@@ -278,11 +283,15 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
     };
 
     const handleAssign = () => {
-        if (selectedIds.size === 0) return;
+        const validSelectedArr = Array.from(selectedIds).filter(id => filteredRecords.some(r => r.id === id));
+        if (validSelectedArr.length === 0) return;
         setShowAssignModal(true);
     };
 
     const handleConfirmAssign = async (employeeId: string) => {
+        const validSelectedArr = Array.from(selectedIds).filter(id => filteredRecords.some(r => r.id === id));
+        if (validSelectedArr.length === 0) return;
+
         const historyEntry = {
             action: 'Giao việc',
             status: 'assigned',
@@ -300,10 +309,9 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
             }
         };
         
-        const selectedArr = Array.from(selectedIds);
         // Optimistic UI update for instant feedback
         setRecords(prev => prev.map(r => {
-            if (selectedArr.includes(r.id)) {
+            if (validSelectedArr.includes(r.id)) {
                 const oldHistory = Array.isArray(r.data?.history) ? r.data.history : [];
                 return {
                     ...r,
@@ -321,7 +329,7 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
         setShowAssignModal(false);
         setSelectedIds(new Set());
 
-        await updateArchiveRecordsBatch(selectedArr, updates);
+        await updateArchiveRecordsBatch(validSelectedArr, updates);
         loadData();
     };
 
@@ -406,14 +414,15 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
     };
 
     const handleBatchStatusChange = async (newStatus: ArchiveRecord['status']) => {
-        if (selectedIds.size === 0) return;
+        const validSelectedArr = Array.from(selectedIds).filter(id => filteredRecords.some(r => r.id === id));
+        if (validSelectedArr.length === 0) return;
 
         let confirmMsg = '';
         let actionName = '';
         switch (newStatus) {
-            case 'executed': confirmMsg = `Xác nhận đã thực hiện xong ${selectedIds.size} công văn?`; actionName = 'Đã thực hiện'; break;
-            case 'pending_sign': confirmMsg = `Trình ký ${selectedIds.size} công văn?`; actionName = 'Trình ký'; break;
-            case 'signed': confirmMsg = `Xác nhận đã ký duyệt ${selectedIds.size} công văn?`; actionName = 'Ký duyệt'; break;
+            case 'executed': confirmMsg = `Xác nhận đã thực hiện xong ${validSelectedArr.length} công văn?`; actionName = 'Đã thực hiện'; break;
+            case 'pending_sign': confirmMsg = `Trình ký ${validSelectedArr.length} công văn?`; actionName = 'Trình ký'; break;
+            case 'signed': confirmMsg = `Xác nhận đã ký duyệt ${validSelectedArr.length} công văn?`; actionName = 'Ký duyệt'; break;
             default: return;
         }
 
@@ -432,7 +441,7 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
                 }
             };
             
-            await updateArchiveRecordsBatch(Array.from(selectedIds), updates);
+            await updateArchiveRecordsBatch(validSelectedArr, updates);
             setSelectedIds(new Set());
             loadData();
         }
@@ -464,6 +473,9 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
             setPendingCompletionRecord(null);
             loadData();
         } else if (selectedIds.size > 0 && subTab === 'signed') {
+            const validSelectedArr = Array.from(selectedIds).filter(id => filteredRecords.some(r => r.id === id));
+            if (validSelectedArr.length === 0) return;
+
             const historyEntry = {
                 action: 'Đã giao 1 cửa',
                 status: 'completed',
@@ -481,7 +493,7 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
                 }
             };
             
-            await updateArchiveRecordsBatch(Array.from(selectedIds), updates);
+            await updateArchiveRecordsBatch(validSelectedArr, updates);
             setSelectedIds(new Set());
             loadData();
         }

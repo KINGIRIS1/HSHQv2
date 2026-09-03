@@ -333,9 +333,12 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
   const pendingRecords = useMemo(() => {
     let list = myRecords.filter(
       (r) =>
-        r.status === RecordStatus.ASSIGNED ||
+        (r.status === RecordStatus.ASSIGNED ||
         r.status === RecordStatus.IN_PROGRESS ||
-        r.status === RecordStatus.COMPLETED_WORK,
+        r.status === RecordStatus.COMPLETED_WORK) &&
+        !r.completedDate && !r.exportBatch && !r.exportDate && !r.resultReturnedDate && !r.approvalDate &&
+        !r.submissionDate && !r.submittedTo &&
+        !r.pendingCheckDate && !r.checkedDate && !r.checkedBy,
     );
     return filterAndSort(list, searchTerm, sortConfig);
   }, [myRecords, searchTerm, sortConfig]);

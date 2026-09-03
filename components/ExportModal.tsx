@@ -19,10 +19,14 @@ interface ExportModalProps {
 const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, type, onPreview, currentView }) => {
   const [selectedBatchKey, setSelectedBatchKey] = useState<string>('');
   const [recordCategory, setRecordCategory] = useState<'all' | 'measurement' | 'archive'>('all');
+  const [isExporting, setIsExporting] = useState<boolean>(false);
+  const [exportProgress, setExportProgress] = useState<number>(0);
 
   // Initialize category based on currentView
   useEffect(() => {
     if (isOpen) {
+      setIsExporting(false);
+      setExportProgress(0);
       if (currentView?.startsWith('archive_')) {
         setRecordCategory('archive');
       } else if (currentView === 'handover_list' || currentView === 'all_records' || currentView === 'completed_list' || currentView === 'check_list') {
@@ -422,11 +426,30 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, typ
     return { wb, fileName };
   };
 
-  const handleDownload = () => {
-      const result = generateWorkbook();
-      if (result) {
-          XLSX.writeFile(result.wb, result.fileName + '.xlsx');
-          onClose(); // Đóng sau khi tải
+  const handleDownload = async () => {
+      try {
+          setIsExporting(true);
+          setExportProgress(20);
+          await new Promise(r => setTimeout(r, 40));
+
+          setExportProgress(50);
+          await new Promise(r => setTimeout(r, 40));
+          const result = generateWorkbook();
+
+          if (result) {
+              setExportProgress(85);
+              await new Promise(r => setTimeout(r, 40));
+              XLSX.writeFile(result.wb, result.fileName + '.xlsx');
+              setExportProgress(100);
+              await new Promise(r => setTimeout(r, 200));
+              setIsExporting(false);
+              onClose(); // Đóng sau khi tải
+          } else {
+              setIsExporting(false);
+          }
+      } catch (err) {
+          console.error("Lỗi khi xuất file Excel:", err);
+          setIsExporting(false);
       }
   };
 
@@ -490,10 +513,26 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, typ
                 <p>Hệ thống sẽ tự động tổng hợp toàn bộ hồ sơ trong đợt và tạo file Excel chuẩn A4 Ngang (Landscape) để in ấn.</p>
             </div>
 
+            {isExporting && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-3 space-y-2">
+                    <div className="flex justify-between items-center text-xs text-green-800 font-medium">
+                        <span>Đang khởi tạo và xuất file Excel...</span>
+                        <span>{exportProgress}%</span>
+                    </div>
+                    <div className="w-full bg-green-200 h-2 rounded-full overflow-hidden">
+                        <div 
+                            className="bg-green-600 h-full transition-all duration-200 rounded-full"
+                            style={{ width: `${exportProgress}%` }}
+                        />
+                    </div>
+                </div>
+            )}
+
             <div className="pt-4 flex justify-between gap-3 border-t">
                 <button 
                     onClick={onClose} 
-                    className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 font-medium text-sm"
+                    disabled={isExporting}
+                    className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 font-medium text-sm disabled:opacity-50"
                 >
                     Hủy bỏ
                 </button>
@@ -501,7 +540,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, typ
                 <div className="flex gap-2">
                     <button 
                         onClick={handlePreview}
-                        disabled={batchOptions.length === 0}
+                        disabled={isExporting || batchOptions.length === 0}
                         className="flex items-center gap-2 px-4 py-2 bg-blue-100 text-blue-700 border border-blue-200 rounded-md hover:bg-blue-200 disabled:opacity-50 font-medium text-sm transition-colors cursor-pointer"
                     >
                         <Eye size={18} />
@@ -509,11 +548,11 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, typ
                     </button>
                     <button 
                         onClick={handleDownload}
-                        disabled={batchOptions.length === 0}
+                        disabled={isExporting || batchOptions.length === 0}
                         className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 font-medium text-sm shadow-sm transition-colors cursor-pointer"
                     >
                         <FileDown size={18} />
-                        Tải Excel
+                        {isExporting ? 'Đang tải...' : 'Tải Excel'}
                     </button>
                 </div>
             </div>

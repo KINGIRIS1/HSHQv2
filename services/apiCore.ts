@@ -1,6 +1,6 @@
 
 import { supabase, isConfigured } from './supabaseClient';
-import { Contract, PriceItem, Employee, User } from '../types';
+import { Contract, PriceItem, Employee, User, RecordStatus } from '../types';
 import { API_BASE_URL } from '../constants'; 
 import { connectionManager } from './connectionService'; 
 
@@ -380,6 +380,22 @@ export const mapRecordFromDb = (item: any): any => {
     r.statusLogs = Array.isArray(rawLogs) ? rawLogs : [];
     r.archiveHandoverDate = keepOnlyDate(val(r.archiveHandoverDate, r.archivehandoverdate, r.archive_handover_date));
     r.archiveHandoverBatch = val(r.archiveHandoverBatch, r.archivehandoverbatch, r.archive_handover_batch);
+
+    // Tự động chuẩn hóa nếu trạng thái bị lệch so với tiến trình thực tế
+    const currentStatus = (r.status || '').trim();
+    if (!currentStatus || ['ASSIGNED', 'IN_PROGRESS', 'COMPLETED_WORK', 'GIAO_HS'].includes(currentStatus)) {
+        if (r.resultReturnedDate) {
+            r.status = RecordStatus.RETURNED;
+        } else if (r.completedDate || r.exportBatch || r.exportDate || r.approvalDate) {
+            r.status = RecordStatus.HANDOVER;
+        } else if (r.submissionDate || r.submittedTo) {
+            r.status = RecordStatus.PENDING_SIGN;
+        } else if (r.checkedDate) {
+            r.status = RecordStatus.CHECKED;
+        } else if (r.pendingCheckDate || r.checkedBy) {
+            r.status = RecordStatus.PENDING_CHECK;
+        }
+    }
 
     return r;
 };

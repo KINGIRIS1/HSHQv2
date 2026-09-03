@@ -115,11 +115,16 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
         loadData();
     }, []);
 
-    // Tự động bỏ tích và xóa chuỗi tìm kiếm khi người dùng chuyển đổi giữa các tab con
+    // Tự động bỏ tích và reset trang khi thay đổi tab hoặc bộ lọc
     useEffect(() => {
         setSelectedIds(new Set());
-        setSearchTerm('');
-    }, [activeTab]);
+        setCurrentPage(1);
+    }, [activeTab, searchTerm, fromDate, toDate, filterRecordType, filterWard, filterEmployee, filterStatus]);
+
+    // Tự động bỏ tích khi chuyển trang để tránh thao tác nhầm trên bản ghi ẩn
+    useEffect(() => {
+        setSelectedIds(new Set());
+    }, [currentPage]);
 
     const loadData = async () => {
         setLoading(true);
@@ -600,14 +605,15 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
 
     // Chuyển sang tab "Chờ chuyển Scan"
     const handleMoveToPending = async () => {
-        if (selectedIds.size === 0) return;
-        if (!await confirmAction(`Bạn có chắc muốn chuyển ${selectedIds.size} hồ sơ sang danh sách Chờ Scan?`)) return;
+        const validSelectedArr = Array.from(selectedIds).filter(id => filteredRecords.some(r => r.id === id));
+        if (validSelectedArr.length === 0) return;
+        if (!await confirmAction(`Bạn có chắc muốn chuyển ${validSelectedArr.length} hồ sơ sang danh sách Chờ Scan?`)) return;
 
         setLoading(true);
         const updates = {
             data: { is_pending_scan: true }
         };
-        await updateArchiveRecordsBatch(Array.from(selectedIds), updates);
+        await updateArchiveRecordsBatch(validSelectedArr, updates);
         setLoading(false);
         setSelectedIds(new Set());
         loadData();
@@ -625,12 +631,15 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
 
     // Mở modal tạo đợt (từ tab Pending)
     const handleOpenBatchModal = () => {
-        if (selectedIds.size === 0) return;
+        const validSelectedArr = Array.from(selectedIds).filter(id => filteredRecords.some(r => r.id === id));
+        if (validSelectedArr.length === 0) return;
         setShowBatchModal(true);
     };
 
     // Xác nhận tạo đợt scan
     const handleConfirmBatch = async (batch: number, date: string) => {
+        const validSelectedArr = Array.from(selectedIds).filter(id => filteredRecords.some(r => r.id === id));
+        if (validSelectedArr.length === 0) return;
         setLoading(true);
         const updates = {
             data: { 
@@ -640,7 +649,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                 is_pending_scan: false // Đã scan xong thì bỏ cờ pending (hoặc giữ tùy logic, ở đây bỏ để biến mất khỏi tab pending)
             }
         };
-        await updateArchiveRecordsBatch(Array.from(selectedIds), updates);
+        await updateArchiveRecordsBatch(validSelectedArr, updates);
         setLoading(false);
         setSelectedIds(new Set());
         loadData();
