@@ -27,17 +27,11 @@ import {
     Clock,
     Printer,
     Trash2,
-    FileCheck,
-    CheckCircle2
+    FileCheck
 } from 'lucide-react';
 import { DetailModal } from '../DetailModal';
 import { ExtendDeadlineModal } from '../ExtendDeadlineModal';
 import { isRecordOverdue, isRecordApproaching, toTitleCase } from '../../utils/appHelpers';
-import { 
-    checkAndTriggerPeriodicExcelBackup, 
-    getLastExcelBackupTime,
-    EXCEL_BACKUP_FILENAME
-} from '../../services/excelBackupService';
 
 interface RecordSearchProps {
     records: RecordFile[];
@@ -263,43 +257,7 @@ export const RecordSearch: React.FC<RecordSearchProps> = ({
     const [selectedDetailRecord, setSelectedDetailRecord] = useState<RecordFile | null>(null);
     const [selectedExtendRecord, setSelectedExtendRecord] = useState<RecordFile | null>(null);
 
-    // Periodic Excel Auto-Backup (5 days)
-    const [lastAutoBackupTime, setLastAutoBackupTime] = useState<number | null>(null);
-    const [autoBackupToast, setAutoBackupToast] = useState<string | null>(null);
 
-    useEffect(() => {
-        let isMounted = true;
-        const runPeriodicBackupCheck = async () => {
-            const lastTime = await getLastExcelBackupTime();
-            if (isMounted) setLastAutoBackupTime(lastTime);
-
-            if (records && records.length > 0) {
-                const res = await checkAndTriggerPeriodicExcelBackup(records, employees);
-                if (res.triggered && res.result?.success && isMounted) {
-                    const now = Date.now();
-                    setLastAutoBackupTime(now);
-                    setAutoBackupToast(`Đã tự động sao lưu định kỳ (5 ngày) và ghi đè vào file ${res.result.fileName || EXCEL_BACKUP_FILENAME}`);
-                    setTimeout(() => {
-                        if (isMounted) setAutoBackupToast(null);
-                    }, 6000);
-                }
-            }
-        };
-
-        runPeriodicBackupCheck();
-
-        const handleBackupSuccess = (e: any) => {
-            if (e.detail?.time && isMounted) {
-                setLastAutoBackupTime(e.detail.time);
-            }
-        };
-        window.addEventListener('excel_backup_success', handleBackupSuccess);
-
-        return () => {
-            isMounted = false;
-            window.removeEventListener('excel_backup_success', handleBackupSuccess);
-        };
-    }, [records.length]);
 
     // Close popovers when clicking outside
     useEffect(() => {
@@ -579,20 +537,7 @@ export const RecordSearch: React.FC<RecordSearchProps> = ({
                     </div>
                 </div>
 
-                {autoBackupToast && (
-                    <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-bold text-emerald-800 flex items-center justify-between gap-2 animate-fade-in shadow-xs">
-                        <div className="flex items-center gap-2">
-                            <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
-                            <span>{autoBackupToast}</span>
-                        </div>
-                        <button 
-                            onClick={() => setAutoBackupToast(null)} 
-                            className="text-emerald-500 hover:text-emerald-700 p-1 cursor-pointer"
-                        >
-                            <X size={14} />
-                        </button>
-                    </div>
-                )}
+
 
                 {/* Filter and Actions Row matched perfectly to "Tất cả hồ sơ" in "Đo đạc" */}
                 <div className="flex flex-wrap items-center justify-between gap-3 bg-gray-50 p-2 rounded-lg relative">
@@ -761,16 +706,7 @@ export const RecordSearch: React.FC<RecordSearchProps> = ({
 
                     {/* Column Configuration & Export buttons */}
                     <div className="flex items-center gap-2">
-                        {/* Periodic Auto-Backup Status Indicator */}
-                        {lastAutoBackupTime && (
-                            <div 
-                                className="hidden lg:inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-lg text-xs font-semibold select-none"
-                                title={`Sao lưu định kỳ 5 ngày: Tự động xuất toàn bộ hồ sơ và ghi đè file ${EXCEL_BACKUP_FILENAME}. Lần gần nhất: ${new Date(lastAutoBackupTime).toLocaleString('vi-VN')}`}
-                            >
-                                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
-                                <span className="text-[11px] text-emerald-700">Sao lưu 5 ngày: <strong>{new Date(lastAutoBackupTime).toLocaleDateString('vi-VN')}</strong></span>
-                            </div>
-                        )}
+
                         
                         {/* Excel Export */}
                         <button

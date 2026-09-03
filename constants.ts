@@ -197,6 +197,16 @@ export const isArchiveRecordType = (type: string | null | undefined): boolean =>
   return short.startsWith('1.') || short === '1.1 Sao lục' || short === '1.2 Công văn' || t.includes('sao lục') || t.includes('công văn') || t.includes('cung cấp dữ liệu') || t.includes('cung cấp tài liệu');
 };
 
+export const isArchiveRecord = (r: Partial<RecordFile> | null | undefined): boolean => {
+  if (!r) return false;
+  if (r.sourceTable === 'luutru_records' || r.sourceTable === 'archive_records') return true;
+  if (isArchiveRecordType(r.recordType)) return true;
+  if (isArchiveRecordType(r.content)) return true;
+  const rawLower = String(r.recordType || '').toLowerCase().trim();
+  if (rawLower.startsWith('1.') || rawLower.includes('sao lục') || rawLower.includes('công văn') || rawLower.includes('cung cấp dữ liệu') || rawLower.includes('cung cấp tài liệu')) return true;
+  return false;
+};
+
 export const MOCK_EMPLOYEES: Employee[] = [
   { 
     id: 'emp1', 

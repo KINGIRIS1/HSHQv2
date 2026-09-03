@@ -2,7 +2,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { RecordFile, User, UserRole, RecordStatus, Employee } from '../types';
 import { removeVietnameseTones, isRecordOverdue, isRecordApproaching } from '../utils/appHelpers';
-import { getShortRecordType, isArchiveRecordType } from '../constants';
+import { getShortRecordType, isArchiveRecordType, isArchiveRecord } from '../constants';
 
 export const useRecordFilter = (
     records: RecordFile[],
@@ -149,12 +149,19 @@ export const useRecordFilter = (
             });
         } else if (currentView === 'completed_list' || currentView === 'archive_completed_list') {
             result = result.filter(r => {
-                const isExecuting = r.status === RecordStatus.ASSIGNED || r.status === RecordStatus.IN_PROGRESS || r.status === RecordStatus.COMPLETED_WORK;
-                if (!isExecuting) return false;
+                // Hồ sơ đang thực hiện là hồ sơ ĐÃ ĐƯỢC GIAO (có assignedTo hoặc status thuộc nhóm đang thực hiện)
+                const isAssigned = Boolean(r.assignedTo && r.assignedTo.trim() !== '');
+                const isExecutingStatus = r.status === RecordStatus.ASSIGNED || r.status === RecordStatus.IN_PROGRESS || r.status === RecordStatus.COMPLETED_WORK;
+                
+                // Nếu chưa được giao và đang ở trạng thái Tiếp nhận mới thì thuộc Chưa giao, không ở Đang thực hiện
+                if (!isAssigned && (!r.status || r.status === RecordStatus.RECEIVED)) return false;
+                if (!isAssigned && !isExecutingStatus) return false;
+
                 // Hồ sơ đã có mốc kết thúc hoặc đã chuyển bước không được hiển thị tại tab Đang thực hiện
                 if (r.completedDate || r.exportBatch || r.exportDate || r.resultReturnedDate || r.approvalDate) return false;
                 if (r.submissionDate || r.submittedTo) return false;
                 if (r.pendingCheckDate || r.checkedDate || r.checkedBy) return false;
+                if (r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED || r.status === RecordStatus.RETURNED || r.status === RecordStatus.HANDOVER || r.status === RecordStatus.SIGNED || r.status === RecordStatus.PENDING_SIGN || r.status === RecordStatus.PENDING_CHECK || r.status === RecordStatus.CHECKED) return false;
                 return true;
             });
         } else if (currentView === 'director_completed' || currentView === 'other_director_completed' || currentView === 'archive_director_completed') {
@@ -195,7 +202,16 @@ export const useRecordFilter = (
                 }
             }
         } else if (currentView === 'assign_tasks' || currentView === 'other_assign_tasks' || currentView === 'archive_assign_tasks') {
-            result = result.filter(r => r.status === RecordStatus.RECEIVED);
+            result = result.filter(r => {
+                // Đã bàn giao 1 cửa, đã trả kết quả, đã rút, đã trả thì không ở Chưa giao
+                if (r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED || r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED || r.status === RecordStatus.SIGNED) return false;
+                // Đã chuyển bước ký / kiểm tra / xuất đợt
+                if (r.submissionDate || r.submittedTo || r.approvalDate || r.exportBatch || r.exportDate || r.resultReturnedDate || r.pendingCheckDate || r.checkedDate || r.checkedBy) return false;
+                // Nếu đã giao cho cán bộ thì chuyển sang Đang thực hiện
+                if (r.assignedTo && r.assignedTo.trim() !== '') return false;
+                // Còn lại là hồ sơ chưa giao / tiếp nhận mới
+                return true;
+            });
         } else if (currentView === 'pending_supplement_list') {
             result = result.filter(r => r.status === RecordStatus.PENDING_SUPPLEMENT);
         }
@@ -211,12 +227,12 @@ export const useRecordFilter = (
         });
 
         if (isArchiveMeasurementView) {
-            result = result.filter(r => isArchiveRecordType(r.recordType));
+            result = result.filter(r => isArchiveRecord(r));
             if (filterRecordType !== 'all') {
-                result = result.filter(r => getShortRecordType(r.recordType) === filterRecordType);
+                result = result.filter(r => getShortRecordType(r.recordType) === filterRecordType || r.recordType === filterRecordType);
             }
         } else if (isMeasurementView) {
-            result = result.filter(r => !isArchiveRecordType(r.recordType));
+            result = result.filter(r => !isArchiveRecord(r));
             if (filterRecordType !== 'all') {
                 result = result.filter(r => getShortRecordType(r.recordType) === filterRecordType || r.recordType === filterRecordType);
             }
@@ -325,8 +341,8 @@ export const useRecordFilter = (
                 if (['CMD', 'Tòa án', 'Thi hành án'].includes(shortType)) return;
 
                 // Filter by recordType based on view group
-                if (isArchiveMeasurementView && !isArchiveRecordType(r.recordType)) return;
-                if (isMeasurementView && isArchiveRecordType(r.recordType)) return;
+                if (isArchiveMeasurementView && !isArchiveRecord(r)) return;
+                if (isMeasurementView && isArchiveRecord(r)) return;
 
                 if (isRecordOverdue(r)) overdue++;
                 else if (isRecordApproaching(r)) approaching++;

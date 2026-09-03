@@ -481,7 +481,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                   <button
                     id="tab-records-completed-list"
                     onClick={() => props.setCurrentView("completed_list")}
-                    className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "completed_list" || currentView === "archive_completed_list" ? "border-blue-600 text-blue-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
+                    className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "completed_list" ? "border-blue-600 text-blue-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
                   >
                     <CheckSquare size={16} /> Đang thực hiện
                   </button>

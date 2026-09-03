@@ -1,5 +1,5 @@
 import { supabase, isConfigured } from './supabaseClient';
-import { RecordFile } from '../types';
+import { RecordFile, RecordStatus } from '../types';
 import { MOCK_RECORDS, API_BASE_URL, isArchiveRecordType, getShortRecordType } from '../constants';
 import { logError, getFromCache, saveToCache, CACHE_KEYS, sanitizeData, sanitizePayloadFor22P02, normalizeCode, mapRecordFromDb } from './apiCore';
 
@@ -519,7 +519,11 @@ export const createRecordApi = async (record: RecordFile): Promise<RecordFile | 
             finalCode = await getNextGlobalRecordCode(record.receivedDate || new Date().toISOString());
         }
         
-        recordToSave = { ...record, code: finalCode };
+        recordToSave = { 
+            ...record, 
+            code: finalCode,
+            status: record.status || RecordStatus.RECEIVED
+        };
         if (!recordToSave.id) {
             recordToSave.id = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substr(2, 9);
         }

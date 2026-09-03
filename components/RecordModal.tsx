@@ -77,7 +77,7 @@ interface RecordModalProps {
 const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, initialData, employees, currentUser, wards, currentView, holidays }) => {
   const defaultState: Partial<RecordFile> = {
     code: '', customerName: '', phoneNumber: '', cccd: '', customerAddress: '', content: '', otherDocs: '',
-    receivedDate: new Date().toISOString(), deadline: '', assignedTo: '',
+    receivedDate: new Date().toISOString(), deadline: '', assignedTo: '', status: RecordStatus.RECEIVED,
     group: GROUPS[0], ward: '', landPlot: '', mapSheet: '', area: 0, address: '',
     recordType: '', measurementNumber: '', excerptNumber: '',
     issueNumber: '', entryNumber: '', issueDate: '',
@@ -226,20 +226,13 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
             };
             determinePrice();
         } else {
-            const defaultRecType = allowedRecordTypes[0] || EXTENDED_RECORD_TYPES[0];
-            const recDate = new Date().toISOString();
-            const initDeadline = calculateDeadlineHelper(defaultRecType, recDate.split('T')[0], holidays || []);
-            let initPrice: number | undefined = undefined;
-            if (defaultRecType.includes('1.1') || defaultRecType.includes('1.2') || defaultRecType.includes('sao lục') || defaultRecType.includes('công văn')) {
-              initPrice = 310000;
-            }
-
             setFormData({
               ...defaultState,
-              recordType: defaultRecType,
-              receivedDate: recDate,
-              deadline: initDeadline,
-              price: initPrice,
+              recordType: '',
+              receivedDate: new Date().toISOString(),
+              deadline: '',
+              price: undefined,
+              status: RecordStatus.RECEIVED,
               code: `HS-${new Date().getFullYear()}-${Math.floor(Math.random() * 1000)}`
             });
             setAttachedDocs([]);
@@ -287,6 +280,10 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!formData.recordType || !formData.recordType.trim()) {
+      alert("Vui lòng chọn loại hồ sơ / thủ tục trước khi lưu!");
+      return;
+    }
     const finalData = { ...formData };
     
     // Logic tự động set ngày khi trạng thái thay đổi hoặc xóa ngày khi quay lui
@@ -477,9 +474,16 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
         const rDate = field === 'receivedDate' ? value : prev.receivedDate;
         if (rType && rDate) {
           updated.deadline = calculateDeadlineHelper(rType, String(rDate).split('T')[0], holidays || []);
+        } else if (!rType) {
+          updated.deadline = '';
+          updated.price = undefined;
+          updated.returnedPrice = undefined;
         }
         if (field === 'recordType') {
-          if (isProcedure2_3(value)) {
+          if (!value) {
+            updated.price = undefined;
+            updated.returnedPrice = undefined;
+          } else if (isProcedure2_3(value)) {
             updated.price = 0;
             updated.returnedPrice = 0;
           } else {
@@ -527,11 +531,21 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                             <input type="text" required className="w-full border border-gray-300 rounded-md px-3 py-2 bg-gray-50 font-bold text-blue-700" value={val(formData.code)} onChange={(e) => handleChange('code', e.target.value)} />
                         </div>
                         <div className="md:col-span-3">
-                            <label className="block text-xs font-bold text-gray-700 mb-1">Loại hồ sơ</label>
-                            <select className="w-full border border-gray-300 rounded-md px-3 py-2 bg-white" value={formData.recordType ? getShortRecordType(formData.recordType) : ''} onChange={(e) => handleChange('recordType', e.target.value)}>
-                                <option value="">-- Chọn loại hồ sơ --</option>
+                            <label className="block text-xs font-bold text-gray-700 mb-1">
+                                Loại hồ sơ <span className="text-red-500">*</span>
+                            </label>
+                            <select 
+                                required
+                                className={`w-full border rounded-md px-3 py-2 bg-white ${!formData.recordType ? 'border-amber-400 bg-amber-50/40 text-amber-900 font-semibold ring-1 ring-amber-300' : 'border-gray-300'}`} 
+                                value={formData.recordType ? getShortRecordType(formData.recordType) : ''} 
+                                onChange={(e) => handleChange('recordType', e.target.value)}
+                            >
+                                <option value="">-- Chọn loại hồ sơ / thủ tục --</option>
                                 {allowedRecordTypes.map(t => <option key={t} value={t}>{t}</option>)}
                             </select>
+                            {!formData.recordType && (
+                                <p className="text-[11px] text-amber-600 mt-1 font-medium">* Bắt buộc chọn loại hồ sơ để kích hoạt chức năng lưu</p>
+                            )}
                         </div>
                         {hasAdminRights && (
                             <>
@@ -882,7 +896,18 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
         {/* FOOTER */}
         <div className="p-4 md:p-5 border-t bg-gray-50 flex justify-end gap-3 shrink-0 rounded-b-none md:rounded-b-xl sticky bottom-0 z-10">
             <button type="button" onClick={onClose} className="px-5 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-200 font-medium transition-colors text-sm">Hủy bỏ</button>
-            <button type="submit" form="record-form" className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-md font-bold transition-transform active:scale-95 text-sm"><Save size={18} /> {initialData ? 'Cập nhật' : 'Lưu hồ sơ'}</button>
+            <button 
+                type="submit" 
+                form="record-form" 
+                disabled={!formData.recordType || !formData.recordType.trim()}
+                className={`flex items-center gap-2 px-6 py-2.5 rounded-lg shadow-md font-bold transition-all text-sm ${
+                    !formData.recordType || !formData.recordType.trim() 
+                        ? 'bg-gray-400 text-gray-200 cursor-not-allowed opacity-70' 
+                        : 'bg-blue-600 text-white hover:bg-blue-700 active:scale-95'
+                }`}
+            >
+                <Save size={18} /> {initialData ? 'Cập nhật' : 'Lưu hồ sơ'}
+            </button>
         </div>
       </div>
     </div>

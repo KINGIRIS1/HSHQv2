@@ -145,38 +145,48 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
         if (field === 'recordType' || field === 'receivedDate') {
             const rType = field === 'recordType' ? (field === 'recordType' ? finalValue : prev.recordType) : prev.recordType;
             const rDate = field === 'receivedDate' ? (field === 'receivedDate' ? finalValue : prev.receivedDate) : prev.receivedDate;
-            if (rType && rDate) newData.deadline = calculateDeadline(rType, rDate);
+            if (rType && rDate) {
+                newData.deadline = calculateDeadline(rType, rDate);
+            } else if (!rType) {
+                newData.deadline = '';
+            }
         }
         
         if (field === 'recordType') {
-            const vLower = String(value || '').toLowerCase();
-            if (
-                value === '1.1 Sao lục' || 
-                value === '1.1 CC DL ĐĐ' || 
-                value === 'Cung cấp tài liệu đất đai' || 
-                value === '1.1 Cung cấp dữ liệu đất đai' ||
-                value === '1.1 Sao lục hồ sơ' ||
-                vLower.includes('sao lục') ||
-                vLower.includes('1.2') || 
-                vLower.includes('công văn') || 
-                vLower.includes('cong van')
-            ) {
-                newData.price = 310000;
-            } else {
+            if (!value) {
                 newData.price = null;
-            }
-
-            // Auto-populate default documents for "1.1 Sao lục hồ sơ" and "Hồ sơ đo đạc" (starts with 2.)
-            if (value === '1.1 Sao lục hồ sơ' || value === '1.1 Sao lục' || value === '1.1 Cung cấp dữ liệu đất đai' || value === '1.1 CC DL ĐĐ' || value.startsWith('2.')) {
-                const defaultDocs: AttachedDocItem[] = [
-                    { id: '1', name: 'Phiếu yêu cầu lập hợp đồng đo đạc dịch vụ, Cắm mốc, trích lục, Cung cấp thông tin', type: 'Bản chính' },
-                    { id: '2', name: 'Giấy chứng nhận đã cấp', type: 'Bản sao' }
-                ];
-                setAttachedDocs(defaultDocs);
-                newData.otherDocs = JSON.stringify(defaultDocs);
-            } else {
                 setAttachedDocs([]);
                 newData.otherDocs = '';
+            } else {
+                const vLower = String(value || '').toLowerCase();
+                if (
+                    value === '1.1 Sao lục' || 
+                    value === '1.1 CC DL ĐĐ' || 
+                    value === 'Cung cấp tài liệu đất đai' || 
+                    value === '1.1 Cung cấp dữ liệu đất đai' ||
+                    value === '1.1 Sao lục hồ sơ' ||
+                    vLower.includes('sao lục') ||
+                    vLower.includes('1.2') || 
+                    vLower.includes('công văn') || 
+                    vLower.includes('cong van')
+                ) {
+                    newData.price = 310000;
+                } else {
+                    newData.price = null;
+                }
+
+                // Auto-populate default documents for "1.1 Sao lục hồ sơ" and "Hồ sơ đo đạc" (starts with 2.)
+                if (value === '1.1 Sao lục hồ sơ' || value === '1.1 Sao lục' || value === '1.1 Cung cấp dữ liệu đất đai' || value === '1.1 CC DL ĐĐ' || value.startsWith('2.')) {
+                    const defaultDocs: AttachedDocItem[] = [
+                        { id: '1', name: 'Phiếu yêu cầu lập hợp đồng đo đạc dịch vụ, Cắm mốc, trích lục, Cung cấp thông tin', type: 'Bản chính' },
+                        { id: '2', name: 'Giấy chứng nhận đã cấp', type: 'Bản sao' }
+                    ];
+                    setAttachedDocs(defaultDocs);
+                    newData.otherDocs = JSON.stringify(defaultDocs);
+                } else {
+                    setAttachedDocs([]);
+                    newData.otherDocs = '';
+                }
             }
         }
         return newData;
@@ -220,10 +230,14 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setNotification(null);
+    if (!formData.recordType || !formData.recordType.trim()) { 
+        setNotification({ type: 'error', message: "Vui lòng chọn loại hồ sơ / thủ tục trước khi lưu." });
+        return; 
+    }
     const isCongVan = formData.recordType ? getShortRecordType(formData.recordType) === '1.2 Công văn' : false;
     const isDeadlineRequired = !isCongVan;
-    if (!formData.code || !formData.customerName || (isDeadlineRequired && !formData.deadline) || !formData.recordType) { 
-        setNotification({ type: 'error', message: "Vui lòng điền các trường bắt buộc (*) và chọn Loại hồ sơ." });
+    if (!formData.code || !formData.customerName || (isDeadlineRequired && !formData.deadline)) { 
+        setNotification({ type: 'error', message: "Vui lòng điền các trường bắt buộc (*) trước khi lưu." });
         return; 
     }
     setLoading(true);
@@ -299,10 +313,18 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
                         <span className="p-1 bg-blue-100 text-blue-600 rounded-md"><FileCheck size={14} /></span>
                         Loại hồ sơ <span className="text-red-500">*</span>
                     </label>
-                    <select className={`${inputClass} font-semibold`} value={formData.recordType ? getShortRecordType(formData.recordType) : ''} onChange={(e) => handleChange('recordType', e.target.value)}>
-                        <option value="">-- Chọn loại hồ sơ --</option>
+                    <select 
+                        required 
+                        className={`${inputClass} font-semibold ${!formData.recordType ? 'border-amber-400 bg-amber-50/40 text-amber-900 ring-1 ring-amber-300' : ''}`} 
+                        value={formData.recordType ? getShortRecordType(formData.recordType) : ''} 
+                        onChange={(e) => handleChange('recordType', e.target.value)}
+                    >
+                        <option value="">-- Chọn loại hồ sơ / thủ tục --</option>
                         {EXTENDED_RECORD_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                     </select>
+                    {!formData.recordType && (
+                        <p className="text-[11px] text-amber-600 mt-1 font-medium">* Bắt buộc chọn loại hồ sơ để kích hoạt lưu</p>
+                    )}
                 </div>
 
                 <div>
@@ -571,7 +593,15 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
             <button type="button" onClick={() => handleReset(false)} className="px-4 2xl:px-8 py-2 2xl:py-3 bg-white text-slate-600 rounded-lg hover:bg-slate-100 transition-colors shadow-xs text-xs sm:text-sm 2xl:text-base font-bold border border-slate-200 flex items-center justify-center gap-1.5 cursor-pointer">
                 {initialData ? <><XCircle size={16} className="text-red-500" /> Hủy</> : <><RotateCcw size={16} /> Làm mới</>}
             </button>
-            <button type="submit" disabled={loading} className="px-6 2xl:px-10 py-2 2xl:py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-md text-xs sm:text-sm 2xl:text-base font-bold transition-all active:scale-95 disabled:opacity-70 flex items-center justify-center gap-1.5 cursor-pointer">
+            <button 
+                type="submit" 
+                disabled={loading || !formData.recordType || !formData.recordType.trim()} 
+                className={`px-6 2xl:px-10 py-2 2xl:py-3 rounded-lg shadow-md text-xs sm:text-sm 2xl:text-base font-bold transition-all flex items-center justify-center gap-1.5 ${
+                    !formData.recordType || !formData.recordType.trim() 
+                        ? 'bg-slate-400 text-slate-200 cursor-not-allowed opacity-70' 
+                        : 'bg-blue-600 text-white hover:bg-blue-700 active:scale-95 cursor-pointer'
+                }`}
+            >
                 <Save size={16} /> {loading ? 'Đang xử lý...' : (initialData ? 'CẬP NHẬT' : 'LƯU VÀ IN')}
             </button>
         </div>

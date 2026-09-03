@@ -397,7 +397,9 @@ export const mapRecordFromDb = (item: any): any => {
 
     // Tự động chuẩn hóa nếu trạng thái bị lệch so với tiến trình thực tế
     const currentStatus = (r.status || '').trim();
-    if (!currentStatus || ['ASSIGNED', 'IN_PROGRESS', 'COMPLETED_WORK', 'GIAO_HS'].includes(currentStatus)) {
+    if (!currentStatus) {
+        r.status = RecordStatus.RECEIVED;
+    } else if (['ASSIGNED', 'IN_PROGRESS', 'COMPLETED_WORK', 'GIAO_HS'].includes(currentStatus)) {
         if (r.resultReturnedDate) {
             r.status = RecordStatus.RETURNED;
         } else if (r.completedDate || r.exportBatch || r.exportDate || r.approvalDate) {
