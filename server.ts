@@ -170,6 +170,43 @@ server.post('/api/backup', (req: Request, res: Response) => {
     }
 });
 
+server.post('/api/backup/excel-overwrite', (req: Request, res: Response) => {
+    try {
+        const { base64Data, customDirectory, fileName = "Sao_Luu_Toan_Bo_Ho_So.xlsx" } = req.body;
+        if (!base64Data) {
+            return res.status(400).json({ error: "Thiếu dữ liệu base64." });
+        }
+        
+        let targetDir = customDirectory ? customDirectory.trim() : '';
+        if (!targetDir) {
+            targetDir = path.join(__dirname, 'server/backups');
+        }
+        
+        if (!fs.existsSync(targetDir)) {
+            fs.mkdirSync(targetDir, { recursive: true });
+        }
+        
+        const filePath = path.join(targetDir, fileName);
+        const buffer = Buffer.from(base64Data, 'base64');
+        fs.writeFileSync(filePath, buffer);
+        console.log(`[EXCEL BACKUP] Da ghi de file sao luu Excel thanh cong: ${filePath}`);
+        
+        res.json({ 
+            success: true, 
+            message: "Sao lưu và ghi đè file Excel thành công!", 
+            filePath: filePath,
+            fileName: fileName,
+            time: new Date().toISOString()
+        });
+    } catch (error: any) {
+        console.error("Loi khi ghi de file sao luu Excel:", error);
+        res.status(500).json({ 
+            error: "Lỗi ghi file Excel trên hệ thống", 
+            details: error.message 
+        });
+    }
+});
+
 server.post('/api/backup/restore', (req: Request, res: Response) => {
     try {
         const { backupData } = req.body;

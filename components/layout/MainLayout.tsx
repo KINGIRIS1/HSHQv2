@@ -5,6 +5,7 @@ import { Menu, ShieldCheck, UserCircle, LogOut, UserCog, ChevronDown, Settings, 
 import { User, UserRole, RolePermissions, DepartmentPermissions, Employee } from '../../types';
 import { isViewAllowedForUser } from '../../config/roleConfig';
 import UpdateRequiredModal from '../UpdateRequiredModal';
+import AdminBackupWarningBanner from '../AdminBackupWarningBanner';
 
 interface MainLayoutProps {
     children: React.ReactNode;
@@ -219,6 +220,16 @@ const MainLayout: React.FC<MainLayoutProps> = ({
 
                 {/* CONTENT */}
                 <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-[#f0f2f5]">
+                    <AdminBackupWarningBanner
+                        currentUser={currentUser}
+                        onOpenSettings={() => {
+                            setCurrentView('system_dashboard');
+                            setTimeout(() => {
+                                window.dispatchEvent(new CustomEvent('open_system_settings'));
+                                window.dispatchEvent(new CustomEvent('open_system_settings_tab', { detail: { tab: 'general' } }));
+                            }, 50);
+                        }}
+                    />
                     <main className="flex-1 p-4 overflow-hidden relative">
                         {children}
                     </main>

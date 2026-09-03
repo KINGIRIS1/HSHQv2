@@ -1,12 +1,20 @@
 
 import React, { useState, useEffect } from 'react';
-import { Database, AlertTriangle, Cloud, Loader2, CheckCircle, Save, Globe, Calendar, Plus, Trash2, ShieldAlert, Key, FolderArchive, Upload, Download, RefreshCw, FolderOpen, LayoutDashboard, SlidersHorizontal, Eye, EyeOff, ArrowLeft, ArrowRight, ChevronUp, ChevronDown, Search, RotateCcw } from 'lucide-react';
-import { Holiday, UserRole, RolePermissions, DepartmentPermissions, DEFAULT_ROLE_PERMISSIONS, AVAILABLE_PERMISSIONS, Employee, RecordStatus, User } from '../types';
+import { Database, AlertTriangle, Cloud, Loader2, CheckCircle, Save, Globe, Calendar, Plus, Trash2, ShieldAlert, Key, FolderArchive, Upload, Download, RefreshCw, FolderOpen, LayoutDashboard, SlidersHorizontal, Eye, EyeOff, ArrowLeft, ArrowRight, ChevronUp, ChevronDown, Search, RotateCcw, FileSpreadsheet, Clock, CheckCircle2 } from 'lucide-react';
+import { Holiday, UserRole, RolePermissions, DepartmentPermissions, DEFAULT_ROLE_PERMISSIONS, AVAILABLE_PERMISSIONS, Employee, RecordStatus, User, RecordFile } from '../types';
 import { fetchHolidays, saveHolidays, testDatabaseConnection, saveUpdateInfo, fetchUpdateInfo, getSystemSetting, saveSystemSetting, fetchSystemEvents } from '../services/api';
 import { fetchRecords } from '../services/apiRecords';
 import { APP_VERSION, DEFAULT_HOLIDAYS, STATUS_LABELS } from '../constants';
 import { confirmAction, calculateDeadlineHelper, matchDepartmentKey } from '../utils/appHelpers';
 import { createFullBackupData, downloadBackupAsFile, saveBackupToServer, restoreFullBackupToSupabase } from '../services/backupService';
+import { 
+  getExcelBackupDirectory, 
+  saveExcelBackupDirectory, 
+  getLastExcelBackupTime, 
+  performExcelBackup, 
+  EXCEL_BACKUP_FILENAME, 
+  EXCEL_BACKUP_PERIOD_DAYS 
+} from '../services/excelBackupService';
 import { isConfigured } from '../services/supabaseClient';
 
 const PERMISSION_DEPARTMENTS = [
@@ -117,6 +125,7 @@ interface SystemSettingsViewProps {
   onHolidaysChanged?: () => void;
   employees: Employee[];
   users: User[];
+  records?: RecordFile[];
   onOpenCloudInspector?: () => void;
 }
 
@@ -125,6 +134,7 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
   onHolidaysChanged,
   employees,
   users,
+  records,
   onOpenCloudInspector
 }) => {
   const [activeTab, setActiveTab] = useState<'general' | 'holidays' | 'permissions' | 'data'>('general');
@@ -136,6 +146,13 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
   const [manualVersion, setManualVersion] = useState('');
   const [manualUrl, setManualUrl] = useState('');
   const [isSavingUpdate, setIsSavingUpdate] = useState(false);
+
+  // Excel Periodic Auto-Backup (5 days)
+  const [excelBackupDir, setExcelBackupDir] = useState('');
+  const [isSavingExcelBackupDir, setIsSavingExcelBackupDir] = useState(false);
+  const [isExecutingExcelBackup, setIsExecutingExcelBackup] = useState(false);
+  const [lastExcelBackupTimestamp, setLastExcelBackupTimestamp] = useState<number | null>(null);
+  const [excelBackupFeedback, setExcelBackupFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // Holiday States
   const [holidays, setHolidays] = useState<Holiday[]>([]);
@@ -261,7 +278,116 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
       loadPermissions();
       loadContractSettings();
       loadBackupSettings();
+      loadExcelBackupSettings();
+
+      const handleOpenTab = (e: any) => {
+          if (e.detail?.tab) {
+              setActiveTab(e.detail.tab);
+          }
+      };
+
+      const handleExcelDirUpdated = (e: any) => {
+          if (e.detail?.directory !== undefined) {
+              setExcelBackupDir(e.detail.directory);
+          }
+      };
+
+      const handleExcelSuccess = (e: any) => {
+          if (e.detail?.time) {
+              setLastExcelBackupTimestamp(e.detail.time);
+          }
+      };
+
+      window.addEventListener('open_system_settings_tab', handleOpenTab);
+      window.addEventListener('excel_backup_dir_updated', handleExcelDirUpdated);
+      window.addEventListener('excel_backup_success', handleExcelSuccess);
+
+      return () => {
+          window.removeEventListener('open_system_settings_tab', handleOpenTab);
+          window.removeEventListener('excel_backup_dir_updated', handleExcelDirUpdated);
+          window.removeEventListener('excel_backup_success', handleExcelSuccess);
+      };
   }, []);
+
+  const loadExcelBackupSettings = async () => {
+      const dir = await getExcelBackupDirectory();
+      setExcelBackupDir(dir || '');
+      const lastTime = await getLastExcelBackupTime();
+      setLastExcelBackupTimestamp(lastTime);
+  };
+
+  const handlePickExcelDirectory = async () => {
+      try {
+          if ('showDirectoryPicker' in window) {
+              const dirHandle = await (window as any).showDirectoryPicker({ mode: 'readwrite' });
+              if (dirHandle && dirHandle.name) {
+                  setExcelBackupDir(dirHandle.name);
+              }
+          } else {
+              const input = prompt("Nhập đường dẫn thư mục lưu trữ file Excel (Ví dụ: D:/SaoLuu_HoSo hoặc /server/backups):", excelBackupDir);
+              if (input !== null) {
+                  setExcelBackupDir(input.trim());
+              }
+          }
+      } catch (e: any) {
+          if (e.name !== 'AbortError') {
+              const input = prompt("Nhập đường dẫn thư mục lưu trữ file Excel (Ví dụ: D:/SaoLuu_HoSo hoặc /server/backups):", excelBackupDir);
+              if (input !== null) {
+                  setExcelBackupDir(input.trim());
+              }
+          }
+      }
+  };
+
+  const handleSaveExcelBackupDirectory = async () => {
+      setIsSavingExcelBackupDir(true);
+      setExcelBackupFeedback(null);
+      try {
+          await saveExcelBackupDirectory(excelBackupDir);
+          setExcelBackupFeedback({ type: 'success', message: 'Đã lưu cấu hình đường dẫn thư mục sao lưu Excel thành công!' });
+          setTimeout(() => setExcelBackupFeedback(null), 5000);
+      } catch (e: any) {
+          setExcelBackupFeedback({ type: 'error', message: e.message || 'Lỗi khi lưu cấu hình thư mục.' });
+      } finally {
+          setIsSavingExcelBackupDir(false);
+      }
+  };
+
+  const handleTriggerExcelBackupNow = async () => {
+      setIsExecutingExcelBackup(true);
+      setExcelBackupFeedback(null);
+      try {
+          let currentRecords = records;
+          if (!currentRecords || currentRecords.length === 0) {
+              currentRecords = await fetchRecords();
+          }
+          if (!currentRecords || currentRecords.length === 0) {
+              setExcelBackupFeedback({ type: 'error', message: 'Không có dữ liệu hồ sơ để sao lưu.' });
+              return;
+          }
+          const result = await performExcelBackup(currentRecords, employees, excelBackupDir);
+          if (result.success) {
+              const now = Date.now();
+              setLastExcelBackupTimestamp(now);
+              setExcelBackupFeedback({
+                  type: 'success',
+                  message: `Đã sao lưu và ghi đè thành công file ${result.fileName || EXCEL_BACKUP_FILENAME} (${currentRecords.length} hồ sơ)! File được lưu tại: ${result.filePath || excelBackupDir || 'server/backups'}`
+              });
+          } else {
+              setExcelBackupFeedback({
+                  type: 'error',
+                  message: result.error || 'Lỗi khi ghi đè file sao lưu Excel.'
+              });
+          }
+      } catch (err: any) {
+          setExcelBackupFeedback({
+              type: 'error',
+              message: err.message || 'Lỗi không xác định khi thực hiện sao lưu.'
+          });
+      } finally {
+          setIsExecutingExcelBackup(false);
+      }
+  };
 
   const loadBackupSettings = async () => {
       const savedDir = await getSystemSetting('backup_directory');
@@ -747,7 +873,118 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                         </div>
                     </div>
 
+                    {/* Excel Periodic Auto-Backup Config (5 days) */}
+                    <div className="bg-white border border-emerald-100 rounded-2xl p-5 shadow-sm space-y-4">
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-gray-100">
+                            <div>
+                                <h3 className="font-black text-slate-800 flex items-center gap-2 tracking-tight text-base">
+                                    <FileSpreadsheet size={20} className="text-emerald-600" />
+                                    Sao lưu định kỳ hồ sơ ra Excel (5 ngày/lần)
+                                </h3>
+                                <p className="text-xs text-slate-500 font-medium mt-1">
+                                    Hệ thống tự động xuất toàn bộ hồ sơ trong tab Tra cứu hồ sơ ra tệp Excel và ghi đè vào file cũ sau mỗi 5 ngày.
+                                </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-full border border-emerald-200">
+                                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                                    Định kỳ: 5 ngày / lần
+                                </span>
+                            </div>
+                        </div>
 
+                        {/* Directory path config */}
+                        <div>
+                            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                                Đường dẫn thư mục lưu trữ file sao lưu
+                            </label>
+                            <div className="flex flex-col sm:flex-row gap-2">
+                                <div className="relative flex-1">
+                                    <FolderOpen size={16} className="absolute left-3.5 top-3 text-slate-400" />
+                                    <input
+                                        type="text"
+                                        className="w-full border border-gray-200 rounded-xl px-4 py-2.5 pl-10 text-sm font-medium text-slate-700 focus:ring-2 focus:ring-emerald-500 outline-none transition-all placeholder:text-slate-400"
+                                        placeholder="Ví dụ: D:/SaoLuu_HoSo hoặc /server/backups hoặc để trống mặc định"
+                                        value={excelBackupDir}
+                                        onChange={(e) => setExcelBackupDir(e.target.value)}
+                                    />
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={handlePickExcelDirectory}
+                                    className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap"
+                                    title="Chọn thư mục"
+                                >
+                                    <FolderOpen size={15} />
+                                    Chọn thư mục
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleSaveExcelBackupDirectory}
+                                    disabled={isSavingExcelBackupDir}
+                                    className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap active:scale-95 disabled:opacity-60"
+                                >
+                                    {isSavingExcelBackupDir ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
+                                    Lưu đường dẫn
+                                </button>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500 mt-1.5">
+                                <span>* Tên tệp cố định:</span>
+                                <code className="font-mono text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded font-bold border border-emerald-200">{EXCEL_BACKUP_FILENAME}</code>
+                                <span>— Hệ thống tự động ghi đè lên file cũ đã xuất trước đó, tránh tạo thêm file rác.</span>
+                            </div>
+                        </div>
+
+                        {/* Status & Manual Action */}
+                        <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                            <div className="space-y-1">
+                                <div className="flex items-center gap-2 text-xs font-semibold text-slate-600">
+                                    <Clock size={14} className="text-slate-400" />
+                                    <span>Lần sao lưu gần nhất:</span>
+                                    <strong className="text-slate-800 font-bold">
+                                        {lastExcelBackupTimestamp ? new Date(lastExcelBackupTimestamp).toLocaleString('vi-VN') : 'Chưa có lịch sử sao lưu'}
+                                    </strong>
+                                </div>
+                                {lastExcelBackupTimestamp && (
+                                    <div className="text-[11px] text-slate-500">
+                                        Dự kiến sao lưu tiếp theo: <strong>{new Date(lastExcelBackupTimestamp + EXCEL_BACKUP_PERIOD_DAYS * 24 * 60 * 60 * 1000).toLocaleDateString('vi-VN')}</strong>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="flex items-center gap-2 w-full sm:w-auto">
+                                <button
+                                    type="button"
+                                    onClick={handleTriggerExcelBackupNow}
+                                    disabled={isExecutingExcelBackup}
+                                    className="w-full sm:w-auto px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95 cursor-pointer disabled:opacity-60"
+                                >
+                                    {isExecutingExcelBackup ? (
+                                        <>
+                                            <Loader2 size={14} className="animate-spin" />
+                                            <span>Đang xuất & ghi đè...</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <RefreshCw size={14} />
+                                            <span>Sao lưu & ghi đè ngay</span>
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+
+                        {excelBackupFeedback && (
+                            <div className={`p-3 rounded-xl text-xs font-bold flex items-center gap-2 ${
+                                excelBackupFeedback.type === 'success' 
+                                    ? 'bg-emerald-50 border border-emerald-200 text-emerald-800' 
+                                    : 'bg-red-50 border border-red-200 text-red-800'
+                            }`}>
+                                {excelBackupFeedback.type === 'success' ? <CheckCircle2 size={16} className="text-emerald-600 shrink-0" /> : <AlertTriangle size={16} className="text-red-600 shrink-0" />}
+                                <span>{excelBackupFeedback.message}</span>
+                            </div>
+                        )}
+                    </div>
 
                     {/* Manual Update Config */}
                     <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">

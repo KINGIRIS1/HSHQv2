@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { User, Employee, UserRole } from '../types';
+import React, { useState, useEffect } from 'react';
+import { User, Employee, UserRole, RecordFile } from '../types';
 import UserManagement from './UserManagement';
 import EmployeeManagement from './EmployeeManagement';
 import SystemSettingsView from './SystemSettingsView';
@@ -9,6 +9,7 @@ interface SystemViewProps {
     currentUser: User;
     users: User[];
     employees: Employee[];
+    records?: RecordFile[];
     onAddUser: (user: Omit<User, 'id'>) => void;
     onUpdateUser: (user: User) => void;
     onDeleteUser: (username: string) => void;
@@ -24,6 +25,7 @@ const SystemView: React.FC<SystemViewProps> = ({
     currentUser,
     users,
     employees,
+    records,
     onAddUser,
     onUpdateUser,
     onDeleteUser,
@@ -36,6 +38,14 @@ const SystemView: React.FC<SystemViewProps> = ({
 }) => {
     const isAdmin = currentUser.role === UserRole.ADMIN;
     const [activeTab, setActiveTab] = useState<'users' | 'employees' | 'settings'>('employees');
+
+    useEffect(() => {
+        const handleOpenSettings = () => {
+            setActiveTab('settings');
+        };
+        window.addEventListener('open_system_settings', handleOpenSettings);
+        return () => window.removeEventListener('open_system_settings', handleOpenSettings);
+    }, []);
 
     return (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col flex-1 h-full animate-fade-in-up">
@@ -91,6 +101,7 @@ const SystemView: React.FC<SystemViewProps> = ({
                         onHolidaysChanged={onHolidaysChanged} 
                         employees={employees}
                         users={users}
+                        records={records}
                         onOpenCloudInspector={onOpenCloudInspector}
                     />
                 )}

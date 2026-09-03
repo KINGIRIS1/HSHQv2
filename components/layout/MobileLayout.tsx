@@ -25,6 +25,7 @@ import {
   UserCheck,
   CheckCircle2
 } from 'lucide-react';
+import AdminBackupWarningBanner from '../AdminBackupWarningBanner';
 
 interface MobileLayoutProps {
   currentUser: User;
@@ -148,6 +149,18 @@ const MobileLayout: React.FC<MobileLayoutProps> = ({
           </div>
         </div>
       </header>
+
+      {/* Admin Backup Warning Banner - Only for ADMIN if path not set */}
+      <AdminBackupWarningBanner
+        currentUser={currentUser}
+        onOpenSettings={() => {
+          setCurrentView('system_dashboard');
+          setTimeout(() => {
+            window.dispatchEvent(new CustomEvent('open_system_settings'));
+            window.dispatchEvent(new CustomEvent('open_system_settings_tab', { detail: { tab: 'general' } }));
+          }, 50);
+        }}
+      />
 
       {/* Main Content Area */}
       <main className="flex-1 overflow-y-auto pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))]">

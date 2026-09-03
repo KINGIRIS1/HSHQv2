@@ -716,14 +716,13 @@ export const exportOverdueStatsToExcel = (records: any[], employees: Employee[],
     XLSX.writeFile(wb, fileName);
 };
 
-export const exportCustomRecordsToExcel = async (
+export const createRecordsWorkbook = async (
     records: RecordFile[],
     employees: Employee[],
     titleText: string = "DANH SÁCH HỒ SƠ"
 ) => {
     if (records.length === 0) {
-        alert("Không có hồ sơ nào để xuất.");
-        return;
+        throw new Error("Không có hồ sơ nào để xuất.");
     }
 
     // Lấy dữ liệu hợp đồng để map giá tiền và số hợp đồng
@@ -933,6 +932,34 @@ export const exportCustomRecordsToExcel = async (
     if(ws[rightTitle]) ws[rightTitle].s = footerTitleStyle;
 
     XLSX.utils.book_append_sheet(wb, ws, "DanhSach");
-    const fileName = `Danh_Sach_Ho_So_${new Date().getTime()}.xlsx`;
-    XLSX.writeFile(wb, fileName);
+    return wb;
+};
+
+export const generateRecordsWorkbookBase64 = async (
+    records: RecordFile[],
+    employees: Employee[],
+    titleText: string = "DANH SÁCH TOÀN BỘ HỒ SƠ"
+): Promise<{ wb: any; base64: string }> => {
+    const wb = await createRecordsWorkbook(records, employees, titleText);
+    const base64 = XLSX.write(wb, { bookType: 'xlsx', type: 'base64' });
+    return { wb, base64 };
+};
+
+export const exportCustomRecordsToExcel = async (
+    records: RecordFile[],
+    employees: Employee[],
+    titleText: string = "DANH SÁCH HỒ SƠ"
+) => {
+    if (records.length === 0) {
+        alert("Không có hồ sơ nào để xuất.");
+        return;
+    }
+
+    try {
+        const wb = await createRecordsWorkbook(records, employees, titleText);
+        const fileName = `Danh_Sach_Ho_So_${new Date().getTime()}.xlsx`;
+        XLSX.writeFile(wb, fileName);
+    } catch (err: any) {
+        alert(err.message || "Lỗi khi xuất file Excel.");
+    }
 };

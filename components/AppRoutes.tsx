@@ -1559,6 +1559,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
           currentUser={currentUser}
           users={users}
           employees={employees}
+          records={records}
           onAddUser={(u) => props.handleUpdateUser(u, false)}
           onUpdateUser={(u) => props.handleUpdateUser(u, true)}
           onDeleteUser={props.handleDeleteUser}
