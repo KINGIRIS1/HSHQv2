@@ -391,13 +391,6 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
       "handover_list",
       "director_completed",
     ].includes(currentView);
-    const isOtherView = [
-      "other_records",
-      "other_assign_tasks",
-      "other_check_list",
-      "other_handover_list",
-      "other_director_completed",
-    ].includes(currentView);
     const isArchiveMeasurementView = [
       "archive_records",
       "archive_assign_tasks",
@@ -408,7 +401,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
       "archive_director_completed",
     ].includes(currentView);
 
-    const isSpecializedTab = !["all_records", "other_records", "archive_records"].includes(currentView);
+    const isSpecializedTab = !["all_records", "archive_records"].includes(currentView);
 
     let title = "Danh sách Hồ sơ";
     if (
@@ -450,7 +443,6 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
     )
       title = "Hồ sơ chờ kiểm tra";
     else if (currentView === "all_records") title = "Hồ sơ đo đạc";
-    else if (currentView === "other_records") title = "Hồ sơ khác";
     else if (currentView === "archive_records")
       title = "Lưu trữ (Cung cấp TLĐĐ)";
     else if (currentView === "archive_completed_list") title = "Đang thực hiện";
@@ -613,65 +605,6 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                   id="tab-archive-handover-list"
                   onClick={() => props.setCurrentView("archive_handover_list")}
                   className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "archive_handover_list" ? "border-green-600 text-green-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
-                >
-                  <Send size={16} /> Giao 1 cửa
-                </button>
-              )}
-          </div>
-        )}
-
-        {/* SUB-HEADER TABS FOR OTHER RECORDS */}
-        {isOtherView && (
-          <div className="flex border-b border-gray-200 bg-gray-50 px-4 overflow-x-auto">
-            {!isDirector && (
-              <>
-                {isViewAllowedForUser(currentUser, employees, "other_records", rolePermissions, departmentPermissions) && (
-                  <button
-                    id="tab-other-records"
-                    onClick={() => props.setCurrentView("other_records")}
-                    className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "other_records" ? "border-blue-600 text-blue-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
-                  >
-                    <FileText size={16} /> Tất cả hồ sơ
-                  </button>
-                )}
-
-                {isViewAllowedForUser(currentUser, employees, "other_assign_tasks", rolePermissions, departmentPermissions) && (
-                  <button
-                    id="tab-other-assign-tasks"
-                    onClick={() => props.setCurrentView("other_assign_tasks")}
-                    className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "other_assign_tasks" ? "border-blue-600 text-blue-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
-                  >
-                    <UserPlusIcon size={16} /> Chưa giao
-                  </button>
-                )}
-              </>
-            )}
-
-            {isViewAllowedForUser(currentUser, employees, "other_check_list", rolePermissions, departmentPermissions) && (
-              <button
-                id="tab-other-check-list"
-                onClick={() => props.setCurrentView("other_check_list")}
-                className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "other_check_list" ? "border-purple-600 text-purple-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
-              >
-                <ClipboardList size={16} /> {isDirector ? "Chờ ký" : "Trình ký"}
-              </button>
-            )}
-
-            {isDirector && isViewAllowedForUser(currentUser, employees, "other_director_completed", rolePermissions, departmentPermissions) && (
-              <button
-                id="tab-other-director-completed"
-                onClick={() => props.setCurrentView("other_director_completed")}
-                className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "other_director_completed" ? "border-green-600 text-green-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
-              >
-                <CheckSquare size={16} /> Hoàn thành
-              </button>
-            )}
-
-            {!isDirector && isViewAllowedForUser(currentUser, employees, "other_handover_list", rolePermissions, departmentPermissions) && (
-                <button
-                  id="tab-other-handover-list"
-                  onClick={() => props.setCurrentView("other_handover_list")}
-                  className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "other_handover_list" ? "border-green-600 text-green-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
                 >
                   <Send size={16} /> Giao 1 cửa
                 </button>
@@ -989,7 +922,6 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
               )}
 
             {(currentView === "all_records" ||
-              currentView === "other_records" ||
               currentView === "archive_records") && (
                 <div className="flex gap-2">
                   <button
@@ -1233,7 +1165,6 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
 
               {/* Nút Cài đặt cột tiêu đề bảng */}
               {(currentView === "all_records" ||
-                currentView === "other_records" ||
                 currentView === "archive_records") && (
                 <div className="relative">
                   <button

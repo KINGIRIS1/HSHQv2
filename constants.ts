@@ -90,10 +90,7 @@ export const RECORD_TYPES = [
 
 // Danh sách loại hồ sơ MỞ RỘNG (Dùng cho form Thêm mới trong "Tất cả hồ sơ" - Admin/Nội bộ)
 export const EXTENDED_RECORD_TYPES = [
-  ...RECORD_TYPES,
-  'CMD',
-  'Thi hành án',
-  'Tòa án'
+  ...RECORD_TYPES
 ];
 
 // Hàm chuẩn hóa hiển thị tên Xã/Phường (Xóa Xã/Phường/TT)

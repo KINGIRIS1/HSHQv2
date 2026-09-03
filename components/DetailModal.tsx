@@ -862,6 +862,10 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                                 ))
                             );
 
+                            if (isExemptRecord) {
+                                return null;
+                            }
+
                             return (
                                 <div className="border-t border-gray-100 pt-4 mt-2">
                                     <label className="text-[11px] font-bold text-slate-700 uppercase block mb-2.5 flex items-center gap-1.5">
@@ -869,54 +873,31 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                                         <span>Thông tin Trả kết quả & Thu phí / Lệ phí</span>
                                     </label>
                                     
-                                    {isExemptRecord ? (
-                                        <div className="bg-amber-50/90 p-3.5 rounded-xl border border-amber-200/90 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-                                            <div className="flex items-center gap-2.5 min-w-0">
-                                                <span className="inline-flex items-center justify-center px-2 py-1 rounded-lg bg-amber-200/80 text-amber-900 font-bold text-[10px] uppercase tracking-wide border border-amber-300/80 shrink-0">
-                                                    {record.status === RecordStatus.WITHDRAWN ? 'CSD RÚT HỒ SƠ' : record.status === RecordStatus.REJECTED ? 'HỒ SƠ TRẢ HỦY' : 'THỦ TỤC 2.3'}
-                                                </span>
-                                                <span className="text-xs font-bold text-amber-950 truncate">
-                                                    {isProcedure2_3(record.recordType) && record.status !== RecordStatus.WITHDRAWN && record.status !== RecordStatus.REJECTED
-                                                        ? 'Thủ tục 2.3 (Duyệt Đơn & Cung cấp số thửa) - Miễn thu phí'
-                                                        : 'Hồ sơ trả hủy / CSD rút HS (Không thu phí)'}
-                                                </span>
-                                            </div>
-                                            <div className="flex items-center gap-2 shrink-0">
-                                                <span className="text-xs font-bold text-emerald-800 bg-white px-2.5 py-1 rounded-lg border border-amber-200 shadow-xs">
-                                                    0 đ
-                                                </span>
-                                                <span className="text-[11px] font-medium text-amber-700 italic">
-                                                    (Miễn thu & Không biên lai)
-                                                </span>
-                                            </div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        {/* Thẻ Số tiền */}
+                                        <div className="bg-emerald-50/80 p-3 rounded-xl border border-emerald-200/80 flex flex-col justify-center min-w-0">
+                                            <label className="text-[10px] text-emerald-700 uppercase font-bold block whitespace-nowrap truncate">
+                                                Số tiền thu
+                                            </label>
+                                            <p className="text-sm font-black text-emerald-800 whitespace-nowrap truncate mt-0.5">
+                                                {record.returnedPrice !== undefined && record.returnedPrice !== null
+                                                    ? record.returnedPrice.toLocaleString('vi-VN') + ' đ'
+                                                    : (record.recordType === 'Cung cấp tài liệu đất đai' 
+                                                        ? '310.000 đ' 
+                                                        : (contractPrice !== null && contractPrice !== undefined ? contractPrice.toLocaleString('vi-VN') + ' đ' : '---'))}
+                                            </p>
                                         </div>
-                                    ) : (
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                            {/* Thẻ Số tiền */}
-                                            <div className="bg-emerald-50/80 p-3 rounded-xl border border-emerald-200/80 flex flex-col justify-center min-w-0">
-                                                <label className="text-[10px] text-emerald-700 uppercase font-bold block whitespace-nowrap truncate">
-                                                    Số tiền thu
-                                                </label>
-                                                <p className="text-sm font-black text-emerald-800 whitespace-nowrap truncate mt-0.5">
-                                                    {record.returnedPrice !== undefined && record.returnedPrice !== null
-                                                        ? record.returnedPrice.toLocaleString('vi-VN') + ' đ'
-                                                        : (record.recordType === 'Cung cấp tài liệu đất đai' 
-                                                            ? '310.000 đ' 
-                                                            : (contractPrice !== null && contractPrice !== undefined ? contractPrice.toLocaleString('vi-VN') + ' đ' : '---'))}
-                                                </p>
-                                            </div>
 
-                                            {/* Thẻ Số BL/HĐ */}
-                                            <div className="bg-blue-50/80 p-3 rounded-xl border border-blue-200/80 flex flex-col justify-center min-w-0">
-                                                <label className="text-[10px] text-blue-700 uppercase font-bold block whitespace-nowrap truncate">
-                                                    {record.receiptType === 'Biên Lai' ? 'SỐ BIÊN LAI' : record.receiptType === 'Hóa Đơn' ? 'SỐ HÓA ĐƠN' : 'SỐ BIÊN LAI / HÓA ĐƠN'}
-                                                </label>
-                                                <p className="text-xs font-black text-blue-900 font-mono whitespace-nowrap truncate mt-0.5">
-                                                    {record.receiptNumber || '---'}
-                                                </p>
-                                            </div>
+                                        {/* Thẻ Số BL/HĐ */}
+                                        <div className="bg-blue-50/80 p-3 rounded-xl border border-blue-200/80 flex flex-col justify-center min-w-0">
+                                            <label className="text-[10px] text-blue-700 uppercase font-bold block whitespace-nowrap truncate">
+                                                {record.receiptType === 'Biên Lai' ? 'SỐ BIÊN LAI' : record.receiptType === 'Hóa Đơn' ? 'SỐ HÓA ĐƠN' : 'SỐ BIÊN LAI / HÓA ĐƠN'}
+                                            </label>
+                                            <p className="text-xs font-black text-blue-900 font-mono whitespace-nowrap truncate mt-0.5">
+                                                {record.receiptNumber || '---'}
+                                            </p>
                                         </div>
-                                    )}
+                                    </div>
                                 </div>
                             );
                         })()}

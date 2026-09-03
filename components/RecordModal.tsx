@@ -95,7 +95,19 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
   const isOneDoor = currentUser.role === UserRole.ONEDOOR;
   const canEditResult = (hasAdminRights || isOneDoor) && isEdit;
 
-  const isOtherView = currentView?.startsWith('other_') || currentView === 'other_records';
+  const isExemptReceipt = Boolean(
+    isProcedure2_3(formData.recordType) ||
+    formData.status === RecordStatus.WITHDRAWN ||
+    formData.status === RecordStatus.REJECTED ||
+    (initialData?.statusLogs && initialData.statusLogs.some(l => 
+        l.newStatus === RecordStatus.REJECTED || 
+        l.newStatus === RecordStatus.WITHDRAWN || 
+        l.note?.includes('Trả hủy') || 
+        l.note?.includes('rút hồ sơ') || 
+        l.note?.includes('Miễn thu phí') ||
+        l.note?.includes('Thủ tục 2.3')
+    ))
+  );
   
   const isArchiveView = [
     "archive_records",
@@ -396,6 +408,11 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
         if (!finalData.completedDate) {
             finalData.completedDate = finalData.exportDate ? finalData.exportDate : new Date().toISOString();
         }
+    }
+
+    if (isExemptReceipt) {
+        finalData.receiptNumber = '';
+        finalData.returnedPrice = 0;
     }
 
     // Áp dụng đồng bộ trạng thái trung tâm
@@ -832,22 +849,29 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                         {canEditResult && (
                             <div className="bg-emerald-50 p-4 rounded-lg border border-emerald-200">
                                 <h4 className="text-sm font-bold text-emerald-800 flex items-center gap-2 mb-3"><FileCheck size={16} /> TRẢ KẾT QUẢ CHO DÂN</h4>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    <div>
+                                {isExemptReceipt ? (
+                                    <div className="w-full">
                                         <label className="block text-xs font-bold text-emerald-700 mb-1">Ngày trả kết quả</label>
                                         <input type="date" className="w-full border border-emerald-300 rounded-md px-3 py-2 bg-white font-bold text-emerald-800" value={dateVal(formData.resultReturnedDate)} onChange={(e) => handleChange('resultReturnedDate', e.target.value)} />
                                     </div>
-                                    <div>
-                                        <label className="block text-xs font-bold text-emerald-700 mb-1">
-                                            {formData.receiptType === 'Biên Lai' ? 'Số Biên lai' : formData.receiptType === 'Hóa Đơn' ? 'Số Hóa đơn' : 'Số Biên lai / Hóa đơn'}
-                                        </label>
-                                        <input type="text" className="w-full border border-emerald-300 rounded-md px-3 py-2 font-mono bg-white" value={val(formData.receiptNumber)} onChange={(e) => handleChange('receiptNumber', e.target.value)} placeholder="Nhập số biên lai/hóa đơn..." />
+                                ) : (
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div>
+                                            <label className="block text-xs font-bold text-emerald-700 mb-1">Ngày trả kết quả</label>
+                                            <input type="date" className="w-full border border-emerald-300 rounded-md px-3 py-2 bg-white font-bold text-emerald-800" value={dateVal(formData.resultReturnedDate)} onChange={(e) => handleChange('resultReturnedDate', e.target.value)} />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-emerald-700 mb-1">
+                                                {formData.receiptType === 'Biên Lai' ? 'Số Biên lai' : formData.receiptType === 'Hóa Đơn' ? 'Số Hóa đơn' : 'Số Biên lai / Hóa đơn'}
+                                            </label>
+                                            <input type="text" className="w-full border border-emerald-300 rounded-md px-3 py-2 font-mono bg-white" value={val(formData.receiptNumber)} onChange={(e) => handleChange('receiptNumber', e.target.value)} placeholder="Nhập số biên lai/hóa đơn..." />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-emerald-700 mb-1">Số tiền (VNĐ)</label>
+                                            <input type="number" className="w-full border border-emerald-300 rounded-md px-3 py-2 font-bold text-emerald-900 bg-white" value={formData.returnedPrice !== undefined && formData.returnedPrice !== null ? formData.returnedPrice : ''} onChange={(e) => handleChange('returnedPrice', parseFloat(e.target.value) || 0)} placeholder="Nhập số tiền..." />
+                                        </div>
                                     </div>
-                                    <div>
-                                        <label className="block text-xs font-bold text-emerald-700 mb-1">Số tiền (VNĐ)</label>
-                                        <input type="number" className="w-full border border-emerald-300 rounded-md px-3 py-2 font-bold text-emerald-900 bg-white" value={formData.returnedPrice !== undefined && formData.returnedPrice !== null ? formData.returnedPrice : ''} onChange={(e) => handleChange('returnedPrice', parseFloat(e.target.value) || 0)} placeholder="Nhập số tiền..." />
-                                    </div>
-                                </div>
+                                )}
                             </div>
                         )}
                     </div>

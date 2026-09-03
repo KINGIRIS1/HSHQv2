@@ -538,25 +538,19 @@ function App() {
           ...processAssignmentTimelineCheck(r, employeeId, nowStr, employees, currentUser)
       }));
 
-      // Optimistic UI update immediately
-      setRecords(prev => prev.map(r => {
-          const updated = updatedTargets.find(u => u.id === r.id);
-          return updated ? updated : r;
-      }));
+      // Cập nhật giao diện tức thì 0 giây với O(1) Map
+      const updateMap = new Map<string, RecordFile>();
+      updatedTargets.forEach(u => updateMap.set(u.id, u));
+      setRecords(prev => prev.map(r => updateMap.get(r.id) || r));
+
       setIsAssignModalOpen(false); 
       setSelectedRecordIds(new Set()); 
       setToast({ type: 'success', message: `Đã giao ${assignTargetRecords.length} hồ sơ thành công!` });
 
-      // Background batch update for high performance
-      try {
-          const res = await updateRecordsBatchById(updatedTargets);
-          if (!res.success) {
-              await Promise.all(updatedTargets.map(r => updateRecordApi(r)));
-          }
-      } catch (e) {
-          console.error("Batch assign error:", e);
-          await Promise.all(updatedTargets.map(r => updateRecordApi(r)));
-      }
+      // Đẩy ngầm lên Supabase, không block UI
+      updateRecordsBatchById(updatedTargets).catch(err => {
+          console.error("Batch assign background error:", err);
+      });
   };
 
   const getUpdatesForStatusChange = (newStatus: RecordStatus, customDateStr?: string, existingRecord?: Partial<RecordFile>) => {
@@ -732,23 +726,19 @@ function App() {
           return { ...r, ...recordUpdates };
       });
 
-      setRecords(prev => prev.map(r => {
-          const updated = updatedTargets.find(u => u.id === r.id);
-          return updated ? updated : r;
-      }));
+      // Cập nhật giao diện tức thì 0 giây với O(1) Map
+      const updateMap = new Map<string, RecordFile>();
+      updatedTargets.forEach(u => updateMap.set(u.id, u));
+      setRecords(prev => prev.map(r => updateMap.get(r.id) || r));
+
       setToast({ type: 'success', message: `Đã cập nhật ${updatedTargets.length} hồ sơ thành công!` });
       setIsBulkUpdateModalOpen(false);
       setSelectedRecordIds(new Set()); 
 
-      try {
-          const res = await updateRecordsBatchById(updatedTargets);
-          if (!res.success) {
-              await Promise.all(updatedTargets.map(r => updateRecordApi(r)));
-          }
-      } catch (e) {
-          console.error("Batch update error:", e);
-          await Promise.all(updatedTargets.map(r => updateRecordApi(r)));
-      } 
+      // Đẩy ngầm lên Supabase, không block UI
+      updateRecordsBatchById(updatedTargets).catch(err => {
+          console.error("Batch update background error:", err);
+      });
   };
 
   const handleQuickUpdate = useCallback(async (id: string, field: keyof RecordFile, value: string) => {
@@ -856,18 +846,26 @@ function App() {
 
   const handleBatchUpdateRecords = useCallback(async (updates: Partial<RecordFile>[]) => {
       try {
-          const res = await updateRecordsBatchById(updates);
-          if (res.success) {
-              await loadData();
-              setToast({ type: 'success', message: `Đã cập nhật sửa lỗi cho ${res.count} hồ sơ thành công!` });
-          } else {
-              setToast({ type: 'error', message: 'Cập nhật sửa lỗi hàng loạt thất bại.' });
-          }
+          // Cập nhật giao diện tức thì
+          const updateMap = new Map<string, Partial<RecordFile>>();
+          updates.forEach(u => {
+              if (u.id) updateMap.set(u.id, u);
+          });
+          setRecords(prev => prev.map(r => {
+              const u = updateMap.get(r.id);
+              return u ? { ...r, ...u } : r;
+          }));
+          setToast({ type: 'success', message: `Đã cập nhật sửa lỗi cho ${updates.length} hồ sơ thành công!` });
+
+          // Đẩy ngầm lên Supabase
+          updateRecordsBatchById(updates).catch(err => {
+              console.error("Lỗi khi sửa lỗi hàng loạt:", err);
+          });
       } catch (err) {
           console.error("Lỗi khi sửa lỗi hàng loạt:", err);
           setToast({ type: 'error', message: 'Có lỗi xảy ra khi sửa lỗi hàng loạt.' });
       }
-  }, [loadData]);
+  }, []);
 
   const advanceStatus = useCallback(async (record: RecordFile) => {
       if (record.status === RecordStatus.RECEIVED) { 
@@ -908,8 +906,11 @@ function App() {
               userName: currentUser?.name || currentUser?.username || 'Hệ thống',
               userId: currentUser?.id
           });
-          setRecords(prev => prev.map(r => r.id === record.id ? { ...r, ...updates } : r));
-          await updateRecordApi({ ...record, ...updates });
+          const updatedRecord = { ...record, ...updates };
+          setRecords(prev => prev.map(r => r.id === record.id ? updatedRecord : r));
+          updateRecordApi(updatedRecord).catch(err => {
+              console.error("advanceStatus background error:", err);
+          });
       }
   }, [currentUser]);
 
@@ -991,23 +992,20 @@ function App() {
           completedDate: null,
           statusLogs: createStatusLog(r, RecordStatus.SIGNED, 'Ký duyệt đợt')
       }));
-      setRecords(prev => prev.map(r => {
-          const updated = updatedTargets.find(p => p.id === r.id);
-          return updated ? updated : r;
-      }));
+
+      // Cập nhật giao diện tức thì 0 giây với O(1) Map
+      const updateMap = new Map<string, RecordFile>();
+      updatedTargets.forEach(u => updateMap.set(u.id, u));
+      setRecords(prev => prev.map(r => updateMap.get(r.id) || r));
+
       setSelectedRecordIds(new Set());
       setToast({ type: 'success', message: `Đã chuyển ${bulkSignPendingRecords.length} hồ sơ sang "Đã ký".` });
       setIsBulkSignModalOpen(false);
 
-      try {
-          const res = await updateRecordsBatchById(updatedTargets);
-          if (!res.success) {
-              await Promise.all(updatedTargets.map(r => updateRecordApi(r)));
-          }
-      } catch (e) {
-          console.error("Batch sign error:", e);
-          await Promise.all(updatedTargets.map(r => updateRecordApi(r)));
-      }
+      // Đẩy ngầm lên Supabase, không block UI
+      updateRecordsBatchById(updatedTargets).catch(err => {
+          console.error("Batch sign background error:", err);
+      });
   };
 
   const handleExportReturnedList = () => {
@@ -1038,22 +1036,18 @@ function App() {
              return { ...r, ...updates };
           });
           
-          setRecords(prev => prev.map(r => {
-              const updated = updatesToApply.find(u => u.id === r.id);
-              return updated ? updated : r;
-          }));
+          // Cập nhật giao diện tức thì 0 giây với O(1) Map
+          const updateMap = new Map<string, RecordFile>();
+          updatesToApply.forEach(u => updateMap.set(u.id, u));
+          setRecords(prev => prev.map(r => updateMap.get(r.id) || r));
+
           setSelectedRecordIds(new Set());
           setToast({ type: 'success', message: `Đã đánh dấu ${targets.length} hồ sơ thành "Hồ sơ trả".` });
 
-          try {
-              const res = await updateRecordsBatchById(updatesToApply);
-              if (!res.success) {
-                  await Promise.all(updatesToApply.map(r => updateRecordApi(r)));
-              }
-          } catch (e) {
-              console.error("Batch reject error:", e);
-              await Promise.all(updatesToApply.map(r => updateRecordApi(r)));
-          }
+          // Đẩy ngầm lên Supabase, không block UI
+          updateRecordsBatchById(updatesToApply).catch(err => {
+              console.error("Batch reject background error:", err);
+          });
       }
   };
 
@@ -1588,26 +1582,30 @@ function App() {
             users={users}
             employees={employees}
             onConfirm={async (directorId) => {
-                try {
-                    const nowIso = new Date().toISOString();
-                    const updates = submitTargetRecords.map(r => ({
-                        ...r,
-                        status: RecordStatus.PENDING_SIGN,
-                        completedWorkDate: r.completedWorkDate || nowIso,
-                        checkedDate: r.checkedDate || nowIso,
-                        submissionDate: nowIso,
-                        submittedTo: directorId
-                    }));
-                    await updateRecordsBatchById(updates);
-                    setToast({ type: 'success', message: `Đã trình ký ${updates.length} hồ sơ thành công!` });
-                    setIsSubmitModalOpen(false);
-                    setSubmitTargetRecords([]);
-                    setSelectedRecordIds(new Set());
-                    loadData();
-                } catch (error) {
+                const nowIso = new Date().toISOString();
+                const updates = submitTargetRecords.map(r => ({
+                    ...r,
+                    status: RecordStatus.PENDING_SIGN,
+                    completedWorkDate: r.completedWorkDate || nowIso,
+                    checkedDate: r.checkedDate || nowIso,
+                    submissionDate: nowIso,
+                    submittedTo: directorId
+                }));
+
+                // Cập nhật giao diện tức thì 0 giây với O(1) Map
+                const updateMap = new Map<string, RecordFile>();
+                updates.forEach(u => updateMap.set(u.id, u));
+                setRecords(prev => prev.map(r => updateMap.get(r.id) || r));
+
+                setToast({ type: 'success', message: `Đã trình ký ${updates.length} hồ sơ thành công!` });
+                setIsSubmitModalOpen(false);
+                setSubmitTargetRecords([]);
+                setSelectedRecordIds(new Set());
+
+                // Đẩy ngầm lên Supabase, không block UI và không cần re-fetch toàn bộ loadData()
+                updateRecordsBatchById(updates).catch(error => {
                     console.error("Lỗi khi trình ký:", error);
-                    setToast({ type: 'error', message: 'Có lỗi xảy ra khi trình ký.' });
-                }
+                });
             }}
         />
 
@@ -1619,25 +1617,29 @@ function App() {
             employees={employees}
             isCheckMode={true}
             onConfirm={async (checkerId) => {
-                try {
-                    const nowIso = new Date().toISOString();
-                    const updates = submitTargetRecords.map(r => ({
-                        ...r,
-                        status: RecordStatus.PENDING_CHECK,
-                        completedWorkDate: r.completedWorkDate || nowIso,
-                        pendingCheckDate: nowIso,
-                        checkedBy: checkerId
-                    }));
-                    await updateRecordsBatchById(updates);
-                    setToast({ type: 'success', message: `Đã trình kiểm tra ${updates.length} hồ sơ thành công!` });
-                    setIsSubmitCheckModalOpen(false);
-                    setSubmitTargetRecords([]);
-                    setSelectedRecordIds(new Set());
-                    loadData();
-                } catch (error) {
+                const nowIso = new Date().toISOString();
+                const updates = submitTargetRecords.map(r => ({
+                    ...r,
+                    status: RecordStatus.PENDING_CHECK,
+                    completedWorkDate: r.completedWorkDate || nowIso,
+                    pendingCheckDate: nowIso,
+                    checkedBy: checkerId
+                }));
+
+                // Cập nhật giao diện tức thì 0 giây với O(1) Map
+                const updateMap = new Map<string, RecordFile>();
+                updates.forEach(u => updateMap.set(u.id, u));
+                setRecords(prev => prev.map(r => updateMap.get(r.id) || r));
+
+                setToast({ type: 'success', message: `Đã trình kiểm tra ${updates.length} hồ sơ thành công!` });
+                setIsSubmitCheckModalOpen(false);
+                setSubmitTargetRecords([]);
+                setSelectedRecordIds(new Set());
+
+                // Đẩy ngầm lên Supabase, không block UI và không cần re-fetch toàn bộ loadData()
+                updateRecordsBatchById(updates).catch(error => {
                     console.error("Lỗi khi trình kiểm tra:", error);
-                    setToast({ type: 'error', message: 'Có lỗi xảy ra khi trình kiểm tra.' });
-                }
+                });
             }}
         />
 

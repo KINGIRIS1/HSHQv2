@@ -4,7 +4,6 @@ import { Contract, PriceItem, SplitItem, RecordFile } from '../../types';
 import AutoResizeTextarea from '../AutoResizeTextarea';
 import { Save, Calculator, Search, Plus, Trash2, Printer, FileCheck, FileSignature, CheckCircle, AlertCircle, AlertTriangle, X, RotateCcw, MapPin, Ruler, Grid, Banknote, User, FileText, Calendar, Wand2, ChevronDown, ChevronUp, Copy, ExternalLink, RefreshCw } from 'lucide-react';
 import { confirmAction } from '../../utils/appHelpers';
-import { checkContractDateErrors, getTodayDateString } from '../../utils/contractDateUtils';
 
 interface ContractFormProps {
   initialData?: Contract;
@@ -50,11 +49,6 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
   });
 
   const [isManual, setIsManual] = useState<boolean>(false);
-
-  // Re-evaluate date validation whenever formData or mode changes
-  const dateCheck = useMemo(() => {
-    return checkContractDateErrors(formData, mode);
-  }, [formData, mode]);
 
   useEffect(() => {
       if (initialData) {
@@ -521,13 +515,18 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
       e.preventDefault();
       setNotification(null);
 
-      if (!formData.code || !formData.customerName) { 
-          setNotification({ type: 'error', message: "Vui lòng điền đầy đủ Mã hợp đồng và Tên khách hàng." }); 
+      const isExistingContract = initialData && contracts && contracts.some(c => c.id === initialData.id);
+      if (isExistingContract && !formData.code) {
+          setNotification({ type: 'error', message: "Vui lòng kiểm tra Mã hợp đồng." }); 
+          return; 
+      }
+      if (!formData.customerName) { 
+          setNotification({ type: 'error', message: "Vui lòng điền đầy đủ Tên khách hàng." }); 
           return; 
       }
 
-      // Kiểm tra trùng SỐ HỢP ĐỒNG (mã HĐ) với hợp đồng khác đã có
-      if (mode === 'contract' && formData.code && contracts) {
+      // Kiểm tra trùng SỐ HỢP ĐỒNG (mã HĐ) khi chỉnh sửa hợp đồng đã có mã
+      if (mode === 'contract' && isExistingContract && formData.code && contracts) {
           const duplicateCodeContract = contracts.find(c => 
               c.code && 
               c.code.trim().toLowerCase() === formData.code?.trim().toLowerCase() && 
@@ -844,31 +843,18 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                 <div className="p-3.5 space-y-3.5">
                     {/* Basic Info */}
-                    <div className={`grid ${mode === 'liquidation' ? 'grid-cols-1' : 'grid-cols-2'} gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200`}>
-                        {mode !== 'liquidation' && (
+                    <div className={`grid ${mode === 'liquidation' || (!initialData || (contracts && !contracts.some(c => c.id === initialData.id))) ? 'grid-cols-1' : 'grid-cols-2'} gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200`}>
+                        {mode !== 'liquidation' && initialData && contracts && contracts.some(c => c.id === initialData.id) && (
                             <div>
                                 <div className="flex justify-between items-center mb-1">
-                                    <label className={labelClass}>Mã Hợp Đồng</label>
-                                    <div className="flex items-center gap-1.5">
-                                        {(!initialData || (contracts && !contracts.some(c => c.id === initialData.id))) && (
-                                            <button 
-                                                type="button" 
-                                                onClick={() => setIsManual(!isManual)} 
-                                                className={`text-xs font-bold px-2 py-0.5 rounded-md transition-all ${isManual ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
-                                            >
-                                                {isManual ? '🔓 Tự nhập' : '🔒 Tự động'}
-                                            </button>
-                                        )}
-                                    </div>
+                                    <label className={labelClass}>Mã Hợp Đồng (HĐKT)</label>
                                 </div>
                                 <div>
                                     <input 
                                         type="text" 
-                                        readOnly={(initialData && contracts && contracts.some(c => c.id === initialData.id)) ? true : !isManual} 
-                                        className={`${inputClass} font-mono font-bold text-purple-700 ${isManual ? 'bg-amber-50/50 border-amber-300 focus:border-amber-500 focus:ring-amber-200' : 'bg-slate-50'}`} 
+                                        readOnly={true} 
+                                        className={`${inputClass} font-mono font-bold text-purple-700 bg-slate-100 cursor-not-allowed`} 
                                         value={formData.code ?? ''} 
-                                        onChange={e => isManual && handleChange('code', e.target.value)}
-                                        placeholder={isManual ? "Nhập mã hợp đồng..." : "Đang lấy số tự động..."}
                                     />
                                 </div>
                             </div>
@@ -876,9 +862,8 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
                         {mode !== 'liquidation' && (
                             <div>
                                 <label className={labelClass}>Ngày lập</label>
-                                <div className="flex gap-1.5 items-center">
+                                <div>
                                     <input type="date" className={inputClass} value={dateVal(formData.createdDate)} onChange={e => handleChange('createdDate', e.target.value)} />
-                                    <button type="button" onClick={() => handleChange('createdDate', todayStr)} className="px-2 py-1.5 bg-purple-100 hover:bg-purple-200 text-purple-800 rounded-lg text-xs font-bold whitespace-nowrap transition-colors" title="Đặt lại ngày hôm nay">Hôm nay</button>
                                 </div>
                             </div>
                         )}
@@ -886,25 +871,9 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
                         {mode === 'liquidation' && (
                             <div>
                                 <label className={labelClass}>Ngày thanh lý HĐ</label>
-                                <div className="flex gap-1.5 items-center">
+                                <div>
                                     <input type="date" className={inputClass} value={dateVal(formData.liquidationDate)} onChange={e => handleChange('liquidationDate', e.target.value)} />
-                                    <button type="button" onClick={() => handleChange('liquidationDate', todayStr)} className="px-2 py-1.5 bg-orange-100 hover:bg-orange-200 text-orange-800 rounded-lg text-xs font-bold whitespace-nowrap transition-colors" title="Đặt lại ngày hôm nay">Hôm nay</button>
                                 </div>
-                            </div>
-                        )}
-
-                        {/* CẢNH BÁO KIỂM TRA NGÀY BẤT THƯỜNG / SAI SO VỚI THỜI GIAN HIỆN TẠI */}
-                        {mode !== 'liquidation' && dateCheck.messages.length > 0 && (
-                            <div className={`col-span-full p-3 rounded-xl border text-xs space-y-1 animate-fade-in ${dateCheck.hasError ? 'bg-red-50 border-red-200 text-red-800' : 'bg-amber-50 border-amber-200 text-amber-800'}`}>
-                                <div className="flex items-center gap-1.5 font-bold text-sm">
-                                    <AlertTriangle size={16} className={dateCheck.hasError ? 'text-red-600' : 'text-amber-600'} />
-                                    <span>Cảnh báo ngày bất thường (So với thời gian hiện tại: {getTodayDateString()}):</span>
-                                </div>
-                                <ul className="list-disc list-inside pl-1 space-y-1 font-medium">
-                                    {dateCheck.messages.map((m, idx) => (
-                                        <li key={idx}>{m}</li>
-                                    ))}
-                                </ul>
                             </div>
                         )}
                     </div>

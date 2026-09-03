@@ -201,28 +201,22 @@ export const useRecordFilter = (
         }
 
         // Filter by recordType based on view group
-        const isOtherView = ['other_records', 'other_assign_tasks', 'other_check_list', 'other_handover_list', 'other_director_completed'].includes(currentView);
         const isArchiveMeasurementView = ['archive_records', 'archive_assign_tasks', 'archive_completed_list', 'archive_pending_check_list', 'archive_check_list', 'archive_handover_list', 'archive_director_completed'].includes(currentView);
         const isMeasurementView = ['all_records', 'assign_tasks', 'completed_list', 'pending_supplement_list', 'pending_check_list', 'check_list', 'handover_list', 'director_completed'].includes(currentView);
         
+        // Loại bỏ hoàn toàn các hồ sơ thuộc thủ tục CMD, Tòa án, Thi hành án
+        result = result.filter(r => {
+            const shortType = getShortRecordType(r.recordType);
+            return !['CMD', 'Tòa án', 'Thi hành án'].includes(shortType);
+        });
+
         if (isArchiveMeasurementView) {
             result = result.filter(r => isArchiveRecordType(r.recordType));
             if (filterRecordType !== 'all') {
                 result = result.filter(r => getShortRecordType(r.recordType) === filterRecordType);
             }
-        } else if (isOtherView) {
-            result = result.filter(r => {
-                const shortType = getShortRecordType(r.recordType);
-                return ['CMD', 'Tòa án', 'Thi hành án'].includes(shortType);
-            });
         } else if (isMeasurementView) {
-            result = result.filter(r => {
-                const shortType = getShortRecordType(r.recordType);
-                return (
-                    !isArchiveRecordType(r.recordType) &&
-                    !['CMD', 'Tòa án', 'Thi hành án'].includes(shortType)
-                );
-            });
+            result = result.filter(r => !isArchiveRecordType(r.recordType));
             if (filterRecordType !== 'all') {
                 result = result.filter(r => getShortRecordType(r.recordType) === filterRecordType || r.recordType === filterRecordType);
             }
@@ -320,7 +314,6 @@ export const useRecordFilter = (
         let overdue = 0;
         let approaching = 0;
         if (records.length > 0 && currentUser) {
-            const isOtherView = ['other_records', 'other_assign_tasks', 'other_check_list', 'other_handover_list', 'other_director_completed'].includes(currentView);
             const isArchiveMeasurementView = ['archive_records', 'archive_assign_tasks', 'archive_completed_list', 'archive_pending_check_list', 'archive_check_list', 'archive_handover_list', 'archive_director_completed'].includes(currentView);
             const isMeasurementView = ['all_records', 'assign_tasks', 'completed_list', 'pending_check_list', 'check_list', 'handover_list', 'director_completed'].includes(currentView);
 
@@ -328,13 +321,12 @@ export const useRecordFilter = (
                 if (r.status === RecordStatus.HANDOVER || r.status === RecordStatus.WITHDRAWN) return; 
                 if (!checkWarningPermission(r)) return; 
                 
+                const shortType = getShortRecordType(r.recordType);
+                if (['CMD', 'Tòa án', 'Thi hành án'].includes(shortType)) return;
+
                 // Filter by recordType based on view group
                 if (isArchiveMeasurementView && !isArchiveRecordType(r.recordType)) return;
-                if (isOtherView && !['CMD', 'Tòa án', 'Thi hành án'].includes(getShortRecordType(r.recordType))) return;
-                if (isMeasurementView && (
-                    isArchiveRecordType(r.recordType) ||
-                    ['CMD', 'Tòa án', 'Thi hành án'].includes(getShortRecordType(r.recordType))
-                )) return;
+                if (isMeasurementView && isArchiveRecordType(r.recordType)) return;
 
                 if (isRecordOverdue(r)) overdue++;
                 else if (isRecordApproaching(r)) approaching++;

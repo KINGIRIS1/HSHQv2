@@ -618,24 +618,7 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                   );
 
                   if (isExemptRecord) {
-                    return (
-                      <div className="p-3.5 bg-amber-50 rounded-xl border border-amber-200 space-y-2">
-                        <div className="flex items-center gap-2">
-                          <span className="px-2 py-0.5 bg-amber-200 text-amber-900 font-bold text-[10px] rounded uppercase tracking-wide border border-amber-300">
-                            {record.status === RecordStatus.WITHDRAWN ? 'CSD RÚT HỒ SƠ' : record.status === RecordStatus.REJECTED ? 'HỒ SƠ TRẢ HỦY' : 'THỦ TỤC 2.3'}
-                          </span>
-                          <span className="text-xs font-bold text-amber-950">
-                            {isProcedure2_3(record.recordType) && record.status !== RecordStatus.WITHDRAWN && record.status !== RecordStatus.REJECTED
-                              ? 'Thủ tục 2.3 (Duyệt Đơn & Cung cấp số thửa) - Miễn thu phí'
-                              : 'Hồ sơ trả hủy / CSD rút HS (Không thu phí)'}
-                          </span>
-                        </div>
-                        <div className="text-xs font-bold text-emerald-800 bg-white p-2 rounded-lg border border-amber-200 flex justify-between items-center shadow-xs">
-                          <span>Số tiền thu:</span>
-                          <span>0 đ (Miễn thu phí)</span>
-                        </div>
-                      </div>
-                    );
+                    return null;
                   }
 
                   return (

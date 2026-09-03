@@ -316,11 +316,9 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
       }
   }, [recordToCreateContract, priceList]);
 
-  const generateContractCode = async (contractType?: string, customYear?: number): Promise<string> => {
+  const generateContractCode = async (_contractType?: string, customYear?: number): Promise<string> => {
     const year = customYear || new Date().getFullYear();
-    let code = (contractType === 'Đo đạc' || contractType === 'Cắm mốc')
-      ? await getPreviewHDKTCode(year)
-      : await getPreviewContractCode(year);
+    let code = await getPreviewHDKTCode(year);
     
     // Kiểm tra tránh trùng với danh sách HĐ hiện có
     let attempts = 0;
@@ -380,11 +378,7 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
                   let checkCount = 0;
                   do {
                       checkCount++;
-                      if (contract.contractType === 'Đo đạc' || contract.contractType === 'Cắm mốc') {
-                          finalCode = await consumeNextHDKTCode(year, userName, note);
-                      } else {
-                          finalCode = await consumeNextContractCode(userName, note, year);
-                      }
+                      finalCode = await consumeNextHDKTCode(year, userName, note);
                   } while (
                       contracts.some(c => c.code && c.code.trim().toLowerCase() === finalCode.trim().toLowerCase() && c.id !== contract.id) &&
                       checkCount < 30
