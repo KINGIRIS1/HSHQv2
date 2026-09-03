@@ -52,7 +52,11 @@ if (!fs.existsSync(dbFile)) {
 }
 
 const router = jsonServer.router(dbFile);
-const middlewares = jsonServer.defaults({ logger: false });
+const middlewares = jsonServer.defaults({ logger: false, bodyParser: false });
+
+// Body parser với giới hạn dung lượng lớn (100MB) để hỗ trợ import Excel, sao lưu và xử lý dữ liệu lớn
+server.use(express.json({ limit: '100mb' }));
+server.use(express.urlencoded({ limit: '100mb', extended: true }));
 
 // --- TỐI ƯU HÓA TỐC ĐỘ CẬP NHẬT ---
 let releaseDir = path.join(process.cwd(), 'release');
@@ -113,7 +117,6 @@ if (!fs.existsSync(dbFile)) {
 
 // Use default middlewares (logger, static, cors and no-cache)
 server.use(middlewares);
-server.use(jsonServer.bodyParser);
 
 // Middleware hiển thị log (Chỉ log các request lỗi hoặc API quan trọng, loại bỏ log 304 không cần thiết)
 server.use((req: Request, res: Response, next: NextFunction) => {

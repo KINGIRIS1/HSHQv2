@@ -1,10 +1,22 @@
 import { RecordFile, Employee } from '../types';
 import { generateRecordsWorkbookBase64 } from '../utils/excelExport';
+import * as XLSX from 'xlsx-js-style';
 import { getSystemSetting, saveSystemSetting } from './apiSystem';
 
 export const EXCEL_BACKUP_PERIOD_DAYS = 5;
 export const EXCEL_BACKUP_PERIOD_MS = EXCEL_BACKUP_PERIOD_DAYS * 24 * 60 * 60 * 1000;
-export const EXCEL_BACKUP_FILENAME = 'Sao_Luu_Toan_Bo_Ho_So.xlsx';
+
+/**
+ * Tạo tên file sao lưu theo định dạng: Backup-DD-mm-yyyy.xlsx
+ */
+export const getExcelBackupFileName = (date: Date = new Date()): string => {
+    const dd = String(date.getDate()).padStart(2, '0');
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const yyyy = date.getFullYear();
+    return `Backup-${dd}-${mm}-${yyyy}.xlsx`;
+};
+
+export const EXCEL_BACKUP_FILENAME = getExcelBackupFileName();
 
 export interface ExcelBackupResult {
     success: boolean;
@@ -16,36 +28,17 @@ export interface ExcelBackupResult {
 }
 
 /**
- * Lấy đường dẫn thư mục sao lưu Excel từ hệ thống
+ * Lấy đường dẫn thư mục sao lưu Excel từ hệ thống (nếu có cấu hình)
  */
 export const getExcelBackupDirectory = async (): Promise<string> => {
-    try {
-        const cloudDir = await getSystemSetting('excel_backup_directory');
-        if (cloudDir && cloudDir.trim()) {
-            localStorage.setItem('excel_backup_directory', cloudDir.trim());
-            return cloudDir.trim();
-        }
-    } catch (e) {
-        console.warn("Không thể lấy đường dẫn sao lưu từ Cloud:", e);
-    }
-    return localStorage.getItem('excel_backup_directory') || '';
+    return '';
 };
 
 /**
  * Lưu đường dẫn thư mục sao lưu Excel vào hệ thống
  */
 export const saveExcelBackupDirectory = async (dir: string): Promise<boolean> => {
-    const trimmed = dir.trim();
-    localStorage.setItem('excel_backup_directory', trimmed);
-    try {
-        await saveSystemSetting('excel_backup_directory', trimmed);
-        window.dispatchEvent(new CustomEvent('excel_backup_dir_updated', { detail: { directory: trimmed } }));
-        return true;
-    } catch (e) {
-        console.warn("Lỗi khi lưu cấu hình thư mục sao lưu:", e);
-        window.dispatchEvent(new CustomEvent('excel_backup_dir_updated', { detail: { directory: trimmed } }));
-        return true;
-    }
+    return true;
 };
 
 /**
@@ -85,12 +78,12 @@ export const setLastExcelBackupTime = async (time: number): Promise<void> => {
 };
 
 /**
- * Gửi dữ liệu Excel lên máy chủ để ghi đè vào file cũ
+ * Gửi dữ liệu Excel lên máy chủ để lưu trữ dự phòng
  */
 export const saveExcelBackupToServer = async (
     base64Data: string,
-    customDirectory: string,
-    fileName: string = EXCEL_BACKUP_FILENAME
+    customDirectory: string = '',
+    fileName: string = getExcelBackupFileName()
 ): Promise<ExcelBackupResult> => {
     try {
         const response = await fetch('/api/backup/excel-overwrite', {
@@ -100,7 +93,7 @@ export const saveExcelBackupToServer = async (
             },
             body: JSON.stringify({
                 base64Data,
-                customDirectory: customDirectory.trim(),
+                customDirectory: customDirectory ? customDirectory.trim() : '',
                 fileName
             })
         });
@@ -114,7 +107,7 @@ export const saveExcelBackupToServer = async (
         return {
             success: true,
             filePath: data.filePath,
-            fileName: data.fileName,
+            fileName: data.fileName || fileName,
             message: data.message,
             time: data.time
         };
@@ -122,18 +115,19 @@ export const saveExcelBackupToServer = async (
         console.warn("Không thể lưu file Excel đè lên server:", err);
         return {
             success: false,
+            fileName: fileName,
             error: err.message || "Không thể kết nối đến server để ghi đè file."
         };
     }
 };
 
 /**
- * Thực hiện xuất toàn bộ hồ sơ ra Excel và ghi đè vào file cũ
+ * Thực hiện xuất toàn bộ hồ sơ ra Excel và tải trực tiếp về máy (Downloads)
  */
 export const performExcelBackup = async (
     records: RecordFile[],
     employees: Employee[],
-    explicitDir?: string
+    explicitFileName?: string
 ): Promise<ExcelBackupResult> => {
     if (!records || records.length === 0) {
         return {
@@ -142,37 +136,49 @@ export const performExcelBackup = async (
         };
     }
 
-    const dir = explicitDir !== undefined ? explicitDir : await getExcelBackupDirectory();
+    const fileName = explicitFileName || getExcelBackupFileName();
 
     try {
         // Tạo file Excel với định dạng chuẩn
-        const { base64 } = await generateRecordsWorkbookBase64(
+        const { wb, base64 } = await generateRecordsWorkbookBase64(
             records,
             employees,
             `BẢNG SAO LƯU ĐỊNH KỲ TOÀN BỘ HỒ SƠ (${records.length} HỒ SƠ)`
         );
 
-        // Ghi đè vào file trên máy chủ / thư mục cấu hình
-        const result = await saveExcelBackupToServer(base64, dir, EXCEL_BACKUP_FILENAME);
-        
-        if (result.success) {
-            const now = Date.now();
-            await setLastExcelBackupTime(now);
-            window.dispatchEvent(new CustomEvent('excel_backup_success', {
-                detail: {
-                    filePath: result.filePath,
-                    time: now,
-                    count: records.length
-                }
-            }));
+        // Tải ngay file về máy khách (Browser Download vào thư mục Downloads)
+        try {
+            XLSX.writeFile(wb, fileName);
+        } catch (downloadErr) {
+            console.warn("Không thể kích hoạt tải xuống trình duyệt:", downloadErr);
         }
 
-        return result;
+        // Lưu bản dự phòng lên máy chủ
+        const serverResult = await saveExcelBackupToServer(base64, '', fileName);
+        
+        const now = Date.now();
+        await setLastExcelBackupTime(now);
+        window.dispatchEvent(new CustomEvent('excel_backup_success', {
+            detail: {
+                fileName: fileName,
+                filePath: serverResult.filePath,
+                time: now,
+                count: records.length
+            }
+        }));
+
+        return {
+            success: true,
+            fileName: fileName,
+            filePath: serverResult.filePath,
+            message: `Đã sao lưu thành công ${records.length} hồ sơ vào file ${fileName}`
+        };
     } catch (err: any) {
         console.error("Lỗi trong quá trình tạo sao lưu Excel:", err);
         return {
             success: false,
-            error: err.message || "Lỗi không xác định khi xuất và ghi đè file Excel."
+            fileName: fileName,
+            error: err.message || "Lỗi không xác định khi xuất file Excel sao lưu."
         };
     }
 };
@@ -183,19 +189,14 @@ export const performExcelBackup = async (
 export const checkAndTriggerPeriodicExcelBackup = async (
     records: RecordFile[],
     employees: Employee[]
-): Promise<{ triggered: boolean; result?: ExcelBackupResult; needConfig?: boolean }> => {
-    const dir = await getExcelBackupDirectory();
-    if (!dir || !dir.trim()) {
-        return { triggered: false, needConfig: true };
-    }
-
+): Promise<{ triggered: boolean; result?: ExcelBackupResult }> => {
     const lastTime = await getLastExcelBackupTime();
     const now = Date.now();
 
     // Nếu chưa từng sao lưu hoặc đã đủ 5 ngày (432,000,000 ms)
     if (!lastTime || (now - lastTime) >= EXCEL_BACKUP_PERIOD_MS) {
-        console.log(`[EXCEL BACKUP] Đã đến hạn 5 ngày định kỳ (hoặc lần đầu). Bắt đầu sao lưu toàn bộ ${records.length} hồ sơ...`);
-        const result = await performExcelBackup(records, employees, dir);
+        console.log(`[EXCEL BACKUP] Đã đến hạn định kỳ (hoặc lần đầu). Bắt đầu sao lưu ${records.length} hồ sơ...`);
+        const result = await performExcelBackup(records, employees);
         return { triggered: true, result };
     }
 

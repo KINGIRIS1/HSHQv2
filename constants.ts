@@ -134,13 +134,23 @@ export const getShortRecordType = (type: string | null | undefined): string => {
   if (!type) return '---';
   const t = type.toLowerCase().trim();
   
+  // 1. Nhóm 1.x - Lưu trữ / Cung cấp dữ liệu
   if (t.startsWith('1.1') || t === 'cung cấp tài liệu đất đai' || t === 'cung cấp dữ liệu đất đai' || t === 'sao lục' || t === 'sao luc' || t === 'sao lục hồ sơ' || t === '1.1 cc dl đđ' || t === '1.1 sao lục') return '1.1 Sao lục';
   if (t.startsWith('1.2') || t === 'công văn') return '1.2 Công văn';
+  if (t.startsWith('1.')) return type;
+
+  // 2. Nhóm 2.x - Đo đạc bản đồ
   if (t.startsWith('2.1') || t === 'trích lục' || t === 'trích lục quy hoạch' || t === 'trích lục qh') return '2.1 Trích lục';
   if (t.startsWith('2.2') || t === '2.3 trích đo' || t === 'trích đo') return '2.2 Trích đo';
   if (t.startsWith('2.3') || t.startsWith('2.6') || t === 'cung cấp số thửa đất' || t === 'cung cấp số thửa' || t === 'cc số thửa' || t === 'cập nhập số thửa' || t === 'cập nhật số thửa' || t === 'cn số thửa' || t.includes('duyệt đơn') || t.includes('duyet don') || t.includes('số thửa') || t.includes('so thua') || t.includes('duyệt đơn & cung cấp số thửa') || t.includes('duyệt đơn-số thửa')) return '2.3 Duyệt đơn';
   if (t.startsWith('2.4') || t === 'cắm mốc' || t === 'trích đo cắm mốc') return '2.4 Cắm mốc';
   if (t.startsWith('2.5') || t === 'tách thửa' || t === 'tách-hợp thửa' || t === 'trích đo tách - hợp thửa') return '2.5 Tách-Hợp thửa';
+  if (t.startsWith('2.')) return type;
+
+  // 3. Nhóm 3.x - Đăng ký đất đai / Biến động / Cấp giấy
+  if (t.startsWith('3.1')) return '3.1 Đăng ký biến động';
+  if (t.startsWith('3.2')) return '3.2 Cấp GCN';
+  if (t.startsWith('3.')) return type;
 
   // Fallbacks for legacy other categories
   if (t.includes('cung cấp tài liệu đất đai') || t.includes('cung cấp dữ liệu') || t.includes('sao lục') || t.includes('sao luc') || t.includes('cc dl đđ')) return '1.1 Sao lục';
@@ -151,8 +161,9 @@ export const getShortRecordType = (type: string | null | undefined): string => {
   if (t.includes('trích đo') || t.includes('2.2')) return '2.2 Trích đo';
   if (t.includes('cắm mốc')) return '2.4 Cắm mốc';
   if (t.includes('trích lục')) return '2.1 Trích lục';
-  if (t.includes('tách thửa')) return '2.5 Tách-Hợp thửa';
-  if (t.includes('hợp thửa')) return '2.5 Tách-Hợp thửa';
+  if (t.includes('tách thửa') || t.includes('hợp thửa')) return '2.5 Tách-Hợp thửa';
+  if (t.includes('đăng ký biến động') || t.includes('biến động')) return '3.1 Đăng ký biến động';
+  if (t.includes('đăng ký đất đai') || t.includes('cấp giấy') || t.includes('cấp đổi')) return '3.2 Cấp GCN';
 
   // Legacy fallback
   if (t.includes('thi hành án')) return 'Thi hành án';
@@ -173,12 +184,17 @@ export const getFullRecordType = (type: string | null | undefined): string => {
   if (short === '2.3 Duyệt đơn') return '2.3 Cung cấp số thửa đất và duyệt đơn';
   if (short === '2.4 Cắm mốc') return '2.4 Trích đo Cắm mốc ranh giới thửa đất';
   if (short === '2.5 Tách-Hợp thửa') return '2.5 Trích đo Tách thửa - Hợp thửa đất';
+  if (short === '3.1 Đăng ký biến động') return '3.1 Đăng ký biến động quyền sử dụng đất';
+  if (short === '3.2 Cấp GCN') return '3.2 Đăng ký cấp đổi, cấp lại Giấy chứng nhận';
   return type;
 };
 
 export const isArchiveRecordType = (type: string | null | undefined): boolean => {
+  if (!type) return false;
+  const t = type.toLowerCase().trim();
+  if (t.startsWith('1.') || t.startsWith('1.1') || t.startsWith('1.2')) return true;
   const short = getShortRecordType(type);
-  return short === '1.1 Sao lục' || short === '1.2 Công văn';
+  return short.startsWith('1.') || short === '1.1 Sao lục' || short === '1.2 Công văn' || t.includes('sao lục') || t.includes('công văn') || t.includes('cung cấp dữ liệu') || t.includes('cung cấp tài liệu');
 };
 
 export const MOCK_EMPLOYEES: Employee[] = [

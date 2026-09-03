@@ -1,6 +1,6 @@
 import { supabase, isConfigured } from './supabaseClient';
 import { RecordFile } from '../types';
-import { MOCK_RECORDS, API_BASE_URL, isArchiveRecordType } from '../constants';
+import { MOCK_RECORDS, API_BASE_URL, isArchiveRecordType, getShortRecordType } from '../constants';
 import { logError, getFromCache, saveToCache, CACHE_KEYS, sanitizeData, sanitizePayloadFor22P02, normalizeCode, mapRecordFromDb } from './apiCore';
 
 const RECORD_DB_COLUMNS = [
@@ -19,28 +19,135 @@ const RECORD_DB_COLUMNS = [
     'statusLogs', 'archiveHandoverDate', 'archiveHandoverBatch'
 ];
 
+/**
+ * Định tuyến bảng dữ liệu chuẩn xác theo tiền tố mã thủ tục:
+ * - Nhóm 1.x (Sao lục, Công văn, Cung cấp dữ liệu đất đai) -> luutru_records
+ * - Nhóm 2.x (Trích lục, Trích đo, Duyệt đơn, Cắm mốc, Tách-Hợp thửa) -> land_records
+ * - Nhóm 3.x (Đăng ký đất đai, Cấp giấy, Đăng ký biến động) -> dangky_records
+ */
 export const getTargetTable = (record: Partial<RecordFile>): 'dangky_records' | 'land_records' | 'luutru_records' => {
+    const rawType = String(record.recordType || record.content || '').trim();
+    const shortType = getShortRecordType(rawType);
+    const typeLower = rawType.toLowerCase();
+
+    // 1. Nhóm 1.x -> luutru_records
+    if (
+        shortType.startsWith('1.') ||
+        rawType.startsWith('1.') ||
+        isArchiveRecordType(record.recordType) ||
+        isArchiveRecordType(record.content) ||
+        typeLower.includes('sao lục') ||
+        typeLower.includes('công văn') ||
+        typeLower.includes('cung cấp dữ liệu') ||
+        typeLower.includes('cung cấp tài liệu')
+    ) {
+        return 'luutru_records';
+    }
+
+    // 2. Nhóm 3.x -> dangky_records
+    if (
+        shortType.startsWith('3.') ||
+        rawType.startsWith('3.') ||
+        typeLower.includes('đăng ký') ||
+        typeLower.includes('biến động') ||
+        typeLower.includes('cấp giấy')
+    ) {
+        return 'dangky_records';
+    }
+
+    // 3. Nhóm 2.x -> land_records
+    if (
+        shortType.startsWith('2.') ||
+        rawType.startsWith('2.') ||
+        typeLower.includes('trích lục') ||
+        typeLower.includes('trích đo') ||
+        typeLower.includes('duyệt đơn') ||
+        typeLower.includes('cắm mốc') ||
+        typeLower.includes('tách') ||
+        typeLower.includes('hợp thửa')
+    ) {
+        return 'land_records';
+    }
+
+    // Nếu có sourceTable
     if (record.sourceTable === 'luutru_records' || record.sourceTable === 'archive_records') return 'luutru_records';
     if (record.sourceTable === 'dangky_records') return 'dangky_records';
     if (record.sourceTable === 'land_records') return 'land_records';
 
-    // Check if recordType or content is an archive type
-    if (isArchiveRecordType(record.recordType) || isArchiveRecordType(record.content)) {
-        return 'luutru_records';
-    }
-
+    // Tra cứu nhanh từ Cache nếu không có recordType
     if (record.id || record.code) {
         const cached: RecordFile[] = getFromCache(CACHE_KEYS.RECORDS, []);
         const found = cached.find(r => (record.id && r.id === record.id) || (record.code && r.code === record.code));
-        if (found) {
-            if (found.sourceTable === 'luutru_records' || found.sourceTable === 'archive_records') return 'luutru_records';
-            if (found.sourceTable === 'dangky_records' || found.sourceTable === 'land_records') return found.sourceTable;
-            if (isArchiveRecordType(found.recordType) || isArchiveRecordType(found.content)) {
-                return 'luutru_records';
-            }
+        if (found && (found.recordType || found.content)) {
+            return getTargetTable(found);
         }
     }
+
     return 'land_records';
+};
+
+/**
+ * Tự động xóa bản ghi trùng lặp ở các bảng sai (loại bỏ hoàn toàn lưu sai bảng / đa bảng)
+ */
+export const purgeRecordFromOtherTables = async (
+    id?: string,
+    code?: string,
+    keepTable?: 'dangky_records' | 'land_records' | 'luutru_records'
+) => {
+    if (!isConfigured || (!id && !code) || !keepTable) return;
+    const allTables: ('dangky_records' | 'land_records' | 'luutru_records')[] = ['dangky_records', 'land_records', 'luutru_records'];
+    const otherTables = allTables.filter(t => t !== keepTable);
+
+    for (const tbl of otherTables) {
+        try {
+            let query = supabase.from(tbl).delete();
+            if (id && code) {
+                query = query.or(`id.eq.${id},code.eq.${code}`);
+            } else if (id) {
+                query = query.eq('id', id);
+            } else if (code) {
+                query = query.eq('code', code);
+            }
+            await query;
+        } catch {
+            // Không ngắt luồng nếu bảng đó không có bản ghi
+        }
+    }
+};
+
+/**
+ * Xóa hàng loạt bản ghi trùng lặp ở các bảng khác
+ */
+export const purgeBatchFromOtherTables = async (
+    ids: string[],
+    codes: string[],
+    keepTable: 'dangky_records' | 'land_records' | 'luutru_records'
+) => {
+    if (!isConfigured || !keepTable) return;
+    const validIds = ids.filter(Boolean);
+    const validCodes = codes.filter(Boolean);
+    if (validIds.length === 0 && validCodes.length === 0) return;
+
+    const allTables: ('dangky_records' | 'land_records' | 'luutru_records')[] = ['dangky_records', 'land_records', 'luutru_records'];
+    const otherTables = allTables.filter(t => t !== keepTable);
+
+    for (const tbl of otherTables) {
+        try {
+            const CHUNK = 200;
+            if (validIds.length > 0) {
+                for (let i = 0; i < validIds.length; i += CHUNK) {
+                    await supabase.from(tbl).delete().in('id', validIds.slice(i, i + CHUNK));
+                }
+            }
+            if (validCodes.length > 0) {
+                for (let i = 0; i < validCodes.length; i += CHUNK) {
+                    await supabase.from(tbl).delete().in('code', validCodes.slice(i, i + CHUNK));
+                }
+            }
+        } catch {
+            // bỏ qua lỗi
+        }
+    }
 };
 
 const OPTIONAL_NEW_COLUMNS = [
@@ -446,7 +553,11 @@ export const createRecordApi = async (record: RecordFile): Promise<RecordFile | 
         
         if (error) throw error;
         const result = mapRecordFromDb({ ...recordToSave, ...(data?.[0] || {}), sourceTable: targetTable }) as RecordFile;
-        if (result) syncCacheOnCreate(result);
+        if (result) {
+            syncCacheOnCreate(result);
+            // Tự động quét và loại bỏ bản ghi khỏi các bảng khác để không lưu sai phân loại
+            purgeRecordFromOtherTables(result.id, result.code, targetTable);
+        }
         return result;
     } catch (error) {
         logError("createRecordApi", error, true);
@@ -481,13 +592,19 @@ export const updateRecordApi = async (record: RecordFile): Promise<RecordFile | 
             const { data: fallbackData, error: fallbackError } = await supabase.from(targetTable).update(fallbackPayload).eq('id', record.id).select();
             if (fallbackError) throw fallbackError;
             const result = mapRecordFromDb({ ...record, ...(fallbackData?.[0] || {}), sourceTable: targetTable }) as RecordFile;
-            if (result) syncCacheOnUpdate(result);
+            if (result) {
+                syncCacheOnUpdate(result);
+                purgeRecordFromOtherTables(result.id, result.code, targetTable);
+            }
             return result;
         }
         
         if (error) throw error;
         const result = mapRecordFromDb({ ...record, ...(data?.[0] || {}), sourceTable: targetTable }) as RecordFile;
-        if (result) syncCacheOnUpdate(result);
+        if (result) {
+            syncCacheOnUpdate(result);
+            purgeRecordFromOtherTables(result.id, result.code, targetTable);
+        }
         return result;
     } catch (error) {
         logError("updateRecordApi", error, true);
@@ -523,13 +640,19 @@ export const updateRecordFieldsApi = async (id: string, fields: Partial<RecordFi
             const { data: fallbackData, error: fallbackError } = await supabase.from(targetTable).update(fallbackPayload).eq('id', id).select();
             if (fallbackError) throw fallbackError;
             const result = mapRecordFromDb({ id, ...fields, ...(fallbackData?.[0] || {}), sourceTable: targetTable }) as RecordFile;
-            if (result) syncCacheOnUpdate(result);
+            if (result) {
+                syncCacheOnUpdate(result);
+                purgeRecordFromOtherTables(result.id, result.code, targetTable);
+            }
             return result;
         }
         
         if (error) throw error;
         const result = mapRecordFromDb({ id, ...fields, ...(data?.[0] || {}), sourceTable: targetTable }) as RecordFile;
-        if (result) syncCacheOnUpdate(result);
+        if (result) {
+            syncCacheOnUpdate(result);
+            purgeRecordFromOtherTables(result.id, result.code, targetTable);
+        }
         return result;
     } catch (error) {
         logError("updateRecordFieldsApi", error, true);
@@ -618,12 +741,15 @@ export const createRecordsBatchApi = async (records: RecordFile[], onProgress?: 
 
         if (landPayload.length > 0) {
             await insertIntoTableInChunks('land_records', landPayload);
+            purgeBatchFromOtherTables(landPayload.map(r => r.id), landPayload.map(r => r.code), 'land_records');
         }
         if (dangkyPayload.length > 0) {
             await insertIntoTableInChunks('dangky_records', dangkyPayload);
+            purgeBatchFromOtherTables(dangkyPayload.map(r => r.id), dangkyPayload.map(r => r.code), 'dangky_records');
         }
         if (luutruPayload.length > 0) {
             await insertIntoTableInChunks('luutru_records', luutruPayload);
+            purgeBatchFromOtherTables(luutruPayload.map(r => r.id), luutruPayload.map(r => r.code), 'luutru_records');
         }
 
         if (onProgress) {
@@ -907,6 +1033,16 @@ export const updateRecordsBatchById = async (updates: Partial<RecordFile>[], onP
             upsertIntoTable('dangky_records', dangkyRows),
             upsertIntoTable('luutru_records', luutruRows)
         ]);
+
+        if (landRows.length > 0) {
+            purgeBatchFromOtherTables(landRows.map(r => r.id), landRows.map(r => r.code), 'land_records');
+        }
+        if (dangkyRows.length > 0) {
+            purgeBatchFromOtherTables(dangkyRows.map(r => r.id), dangkyRows.map(r => r.code), 'dangky_records');
+        }
+        if (luutruRows.length > 0) {
+            purgeBatchFromOtherTables(luutruRows.map(r => r.id), luutruRows.map(r => r.code), 'luutru_records');
+        }
         
         syncCacheOnBatchUpdate(updates);
         if (onProgress) onProgress(updates.length, updates.length);
@@ -942,6 +1078,8 @@ export const bulkUpdateDangKyRecordsApi = async (records: RecordFile[]): Promise
                 await supabase.from('dangky_records').update(payload).or(`id.eq.${r.id},code.eq.${r.code}`);
                 await supabase.from('land_records').update(payload).or(`id.eq.${r.id},code.eq.${r.code}`);
                 await supabase.from('luutru_records').update(payload).or(`id.eq.${r.id},code.eq.${r.code}`);
+            } else {
+                purgeRecordFromOtherTables(r.id, r.code, targetTable);
             }
         }
         syncCacheOnBatchUpdate(records);

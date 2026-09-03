@@ -30,6 +30,7 @@ import BulkSignConfirmModal from './components/BulkSignConfirmModal';
 import GlobalConfirmModal from './components/GlobalConfirmModal';
 import GlobalAlertModal from './components/GlobalAlertModal';
 import { checkAndTriggerWeeklyBackup, downloadBackupAsFile } from './services/backupService';
+import { checkAndTriggerPeriodicExcelBackup, performExcelBackup } from './services/excelBackupService';
 import CloudDatabaseInspector from './components/CloudDatabaseInspector';
 import ConnectionGuardOverlay from './components/ConnectionGuardOverlay';
 
@@ -315,6 +316,37 @@ function App() {
   const isSubadmin = currentUser?.role === UserRole.SUBADMIN;
   const isTeamLeader = currentUser?.role === UserRole.TEAM_LEADER;
   const canPerformAction = isAdmin || isSubadmin || isTeamLeader || currentUser?.role === UserRole.ONEDOOR;
+
+  // Tự động sao lưu Excel vào lần đầu đăng nhập bằng tài khoản Admin & kiểm tra chu kỳ 5 ngày/lần
+  const hasTriggeredAdminLoginBackupRef = useRef(false);
+  useEffect(() => {
+    if (isAdmin && records.length > 0 && !hasTriggeredAdminLoginBackupRef.current) {
+      hasTriggeredAdminLoginBackupRef.current = true;
+
+      const triggerAdminBackup = async () => {
+        try {
+          const firstLoginKey = 'admin_first_login_excel_backup_done';
+          const isFirstLoginDone = localStorage.getItem(firstLoginKey);
+          if (!isFirstLoginDone) {
+            console.log('🚀 Thực hiện sao lưu Excel tự động vào lần đăng nhập đầu tiên của tài khoản Admin...');
+            const result = await performExcelBackup(records, employees);
+            if (result.success) {
+              localStorage.setItem(firstLoginKey, 'true');
+            }
+          } else {
+            // Định kỳ 5 ngày/lần
+            await checkAndTriggerPeriodicExcelBackup(records, employees);
+          }
+        } catch (err) {
+          console.error('Lỗi khi kích hoạt sao lưu tự động cho Admin:', err);
+        }
+      };
+
+      // Đợi 2 giây sau khi tải dữ liệu xong để app ổn định
+      const timer = setTimeout(triggerAdminBackup, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [isAdmin, records.length, employees]);
 
   // --- UPDATE HANDLERS ---
   

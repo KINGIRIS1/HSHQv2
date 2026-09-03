@@ -147,9 +147,7 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
   const [manualUrl, setManualUrl] = useState('');
   const [isSavingUpdate, setIsSavingUpdate] = useState(false);
 
-  // Excel Periodic Auto-Backup (5 days)
-  const [excelBackupDir, setExcelBackupDir] = useState('');
-  const [isSavingExcelBackupDir, setIsSavingExcelBackupDir] = useState(false);
+  // Excel Periodic Auto-Backup
   const [isExecutingExcelBackup, setIsExecutingExcelBackup] = useState(false);
   const [lastExcelBackupTimestamp, setLastExcelBackupTimestamp] = useState<number | null>(null);
   const [excelBackupFeedback, setExcelBackupFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -286,12 +284,6 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
           }
       };
 
-      const handleExcelDirUpdated = (e: any) => {
-          if (e.detail?.directory !== undefined) {
-              setExcelBackupDir(e.detail.directory);
-          }
-      };
-
       const handleExcelSuccess = (e: any) => {
           if (e.detail?.time) {
               setLastExcelBackupTimestamp(e.detail.time);
@@ -299,58 +291,17 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
       };
 
       window.addEventListener('open_system_settings_tab', handleOpenTab);
-      window.addEventListener('excel_backup_dir_updated', handleExcelDirUpdated);
       window.addEventListener('excel_backup_success', handleExcelSuccess);
 
       return () => {
           window.removeEventListener('open_system_settings_tab', handleOpenTab);
-          window.removeEventListener('excel_backup_dir_updated', handleExcelDirUpdated);
           window.removeEventListener('excel_backup_success', handleExcelSuccess);
       };
   }, []);
 
   const loadExcelBackupSettings = async () => {
-      const dir = await getExcelBackupDirectory();
-      setExcelBackupDir(dir || '');
       const lastTime = await getLastExcelBackupTime();
       setLastExcelBackupTimestamp(lastTime);
-  };
-
-  const handlePickExcelDirectory = async () => {
-      try {
-          if ('showDirectoryPicker' in window) {
-              const dirHandle = await (window as any).showDirectoryPicker({ mode: 'readwrite' });
-              if (dirHandle && dirHandle.name) {
-                  setExcelBackupDir(dirHandle.name);
-              }
-          } else {
-              const input = prompt("Nhập đường dẫn thư mục lưu trữ file Excel (Ví dụ: D:/SaoLuu_HoSo hoặc /server/backups):", excelBackupDir);
-              if (input !== null) {
-                  setExcelBackupDir(input.trim());
-              }
-          }
-      } catch (e: any) {
-          if (e.name !== 'AbortError') {
-              const input = prompt("Nhập đường dẫn thư mục lưu trữ file Excel (Ví dụ: D:/SaoLuu_HoSo hoặc /server/backups):", excelBackupDir);
-              if (input !== null) {
-                  setExcelBackupDir(input.trim());
-              }
-          }
-      }
-  };
-
-  const handleSaveExcelBackupDirectory = async () => {
-      setIsSavingExcelBackupDir(true);
-      setExcelBackupFeedback(null);
-      try {
-          await saveExcelBackupDirectory(excelBackupDir);
-          setExcelBackupFeedback({ type: 'success', message: 'Đã lưu cấu hình đường dẫn thư mục sao lưu Excel thành công!' });
-          setTimeout(() => setExcelBackupFeedback(null), 5000);
-      } catch (e: any) {
-          setExcelBackupFeedback({ type: 'error', message: e.message || 'Lỗi khi lưu cấu hình thư mục.' });
-      } finally {
-          setIsSavingExcelBackupDir(false);
-      }
   };
 
   const handleTriggerExcelBackupNow = async () => {
@@ -365,18 +316,18 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
               setExcelBackupFeedback({ type: 'error', message: 'Không có dữ liệu hồ sơ để sao lưu.' });
               return;
           }
-          const result = await performExcelBackup(currentRecords, employees, excelBackupDir);
+          const result = await performExcelBackup(currentRecords, employees);
           if (result.success) {
               const now = Date.now();
               setLastExcelBackupTimestamp(now);
               setExcelBackupFeedback({
                   type: 'success',
-                  message: `Đã sao lưu và ghi đè thành công file ${result.fileName || EXCEL_BACKUP_FILENAME} (${currentRecords.length} hồ sơ)! File được lưu tại: ${result.filePath || excelBackupDir || 'server/backups'}`
+                  message: `Đã sao lưu thành công file ${result.fileName || EXCEL_BACKUP_FILENAME} (${currentRecords.length} hồ sơ)! Tệp Excel đã được tải trực tiếp về thư mục Downloads.`
               });
           } else {
               setExcelBackupFeedback({
                   type: 'error',
-                  message: result.error || 'Lỗi khi ghi đè file sao lưu Excel.'
+                  message: result.error || 'Lỗi khi sao lưu file Excel.'
               });
           }
       } catch (err: any) {
@@ -873,65 +824,26 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                         </div>
                     </div>
 
-                    {/* Excel Periodic Auto-Backup Config (5 days) */}
+                    {/* Excel Periodic Auto-Backup Config */}
                     <div className="bg-white border border-emerald-100 rounded-2xl p-5 shadow-sm space-y-4">
                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-gray-100">
                             <div>
                                 <h3 className="font-black text-slate-800 flex items-center gap-2 tracking-tight text-base">
                                     <FileSpreadsheet size={20} className="text-emerald-600" />
-                                    Sao lưu định kỳ hồ sơ ra Excel (5 ngày/lần)
+                                    Sao lưu định kỳ hồ sơ ra Excel
                                 </h3>
                                 <p className="text-xs text-slate-500 font-medium mt-1">
-                                    Hệ thống tự động xuất toàn bộ hồ sơ trong tab Tra cứu hồ sơ ra tệp Excel và ghi đè vào file cũ sau mỗi 5 ngày.
+                                    Hệ thống tự động sao lưu toàn bộ hồ sơ vào lần đầu đăng nhập của Quản trị viên và định kỳ 5 ngày/lần. Tệp sao lưu được tải trực tiếp về thư mục <strong>Downloads (Tải về)</strong> của máy tính.
                                 </p>
                             </div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
                                 <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-full border border-emerald-200">
                                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                                     Định kỳ: 5 ngày / lần
                                 </span>
-                            </div>
-                        </div>
-
-                        {/* Directory path config */}
-                        <div>
-                            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                                Đường dẫn thư mục lưu trữ file sao lưu
-                            </label>
-                            <div className="flex flex-col sm:flex-row gap-2">
-                                <div className="relative flex-1">
-                                    <FolderOpen size={16} className="absolute left-3.5 top-3 text-slate-400" />
-                                    <input
-                                        type="text"
-                                        className="w-full border border-gray-200 rounded-xl px-4 py-2.5 pl-10 text-sm font-medium text-slate-700 focus:ring-2 focus:ring-emerald-500 outline-none transition-all placeholder:text-slate-400"
-                                        placeholder="Ví dụ: D:/SaoLuu_HoSo hoặc /server/backups hoặc để trống mặc định"
-                                        value={excelBackupDir}
-                                        onChange={(e) => setExcelBackupDir(e.target.value)}
-                                    />
-                                </div>
-                                <button
-                                    type="button"
-                                    onClick={handlePickExcelDirectory}
-                                    className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap"
-                                    title="Chọn thư mục"
-                                >
-                                    <FolderOpen size={15} />
-                                    Chọn thư mục
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={handleSaveExcelBackupDirectory}
-                                    disabled={isSavingExcelBackupDir}
-                                    className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap active:scale-95 disabled:opacity-60"
-                                >
-                                    {isSavingExcelBackupDir ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
-                                    Lưu đường dẫn
-                                </button>
-                            </div>
-                            <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500 mt-1.5">
-                                <span>* Tên tệp cố định:</span>
-                                <code className="font-mono text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded font-bold border border-emerald-200">{EXCEL_BACKUP_FILENAME}</code>
-                                <span>— Hệ thống tự động ghi đè lên file cũ đã xuất trước đó, tránh tạo thêm file rác.</span>
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-100 text-slate-700 text-xs font-mono font-bold rounded-full border border-slate-200">
+                                    Tên tệp: {EXCEL_BACKUP_FILENAME}
+                                </span>
                             </div>
                         </div>
 
@@ -952,22 +864,22 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                                 )}
                             </div>
 
-                            <div className="flex items-center gap-2 w-full sm:w-auto">
+                            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
                                 <button
                                     type="button"
                                     onClick={handleTriggerExcelBackupNow}
                                     disabled={isExecutingExcelBackup}
-                                    className="w-full sm:w-auto px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95 cursor-pointer disabled:opacity-60"
+                                    className="w-full sm:w-auto px-4 py-2.5 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95 cursor-pointer disabled:opacity-60"
                                 >
                                     {isExecutingExcelBackup ? (
                                         <>
                                             <Loader2 size={14} className="animate-spin" />
-                                            <span>Đang xuất & ghi đè...</span>
+                                            <span>Đang tạo & tải file...</span>
                                         </>
                                     ) : (
                                         <>
-                                            <RefreshCw size={14} />
-                                            <span>Sao lưu & ghi đè ngay</span>
+                                            <Download size={14} className="text-emerald-400" />
+                                            <span>Sao lưu & Tải file Excel về máy</span>
                                         </>
                                     )}
                                 </button>
