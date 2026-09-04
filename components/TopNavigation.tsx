@@ -3,6 +3,7 @@ import { LayoutDashboard, FileText, ClipboardList, Send, BarChart3, Settings, Lo
 import { User as UserType, UserRole, RolePermissions, DepartmentPermissions, Employee, DEFAULT_ROLE_PERMISSIONS } from '../types';
 import { matchDepartmentKey } from '../utils/appHelpers';
 import { isViewAllowedForUser } from '../config/roleConfig';
+import { checkUserPermission } from '../utils/permissionUtils';
 
 interface TopNavigationProps {
   currentView: string;
@@ -45,58 +46,13 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
   const isEmployee = currentUser.role === UserRole.EMPLOYEE;
 
   const hasPermission = (permissionId: string) => {
-    if (isAdmin || isSubadmin) return true;
-
-    const checkIds = [permissionId];
-    if (permissionId === 'BTN_ASSIGN_STAFF' || permissionId === 'ASSIGN_RECORDS') {
-      checkIds.push('BTN_ASSIGN_STAFF', 'ASSIGN_RECORDS', 'dodac_BTN_ASSIGN_STAFF', 'luutru_BTN_ASSIGN_STAFF');
-    } else if (permissionId === 'BTN_SUBMIT_CHECK' || permissionId === 'CHECK_RECORDS') {
-      checkIds.push('BTN_SUBMIT_CHECK', 'CHECK_RECORDS', 'dodac_BTN_SUBMIT_CHECK', 'luutru_BTN_SUBMIT_CHECK');
-    } else if (permissionId === 'BTN_SUBMIT_SIGN' || permissionId === 'SIGN_RECORDS') {
-      checkIds.push('BTN_SUBMIT_SIGN', 'SIGN_RECORDS', 'dodac_BTN_SUBMIT_SIGN', 'luutru_BTN_SUBMIT_SIGN');
-    } else if (permissionId === 'BTN_APPROVE_SIGN') {
-      checkIds.push('BTN_APPROVE_SIGN', 'dodac_BTN_APPROVE_SIGN', 'luutru_BTN_APPROVE_SIGN');
-    } else if (permissionId === 'BTN_REJECT_RECORD' || permissionId === 'REJECT_RECORDS') {
-      checkIds.push('BTN_REJECT_RECORD', 'REJECT_RECORDS', 'dodac_BTN_REJECT_RECORD', 'luutru_BTN_REJECT_RECORD');
-    } else if (permissionId === 'HANDOVER_RECORDS' || permissionId === 'EXPORT_RECORDS') {
-      checkIds.push('HANDOVER_RECORDS', 'EXPORT_RECORDS', 'dodac_HANDOVER_RECORDS', 'luutru_HANDOVER_RECORDS');
-    } else if (permissionId === 'BTN_RETURN_RESULT' || permissionId === 'RETURN_RECORDS') {
-      checkIds.push('BTN_RETURN_RESULT', 'RETURN_RECORDS', 'dodac_BTN_RETURN_RESULT', 'luutru_BTN_RETURN_RESULT');
-    } else if (permissionId === 'BTN_EXTEND_DEADLINE') {
-      checkIds.push('BTN_EXTEND_DEADLINE', 'dodac_BTN_EXTEND_DEADLINE', 'luutru_BTN_EXTEND_DEADLINE');
-    } else if (permissionId === 'EDIT_RECORDS') {
-      checkIds.push('EDIT_RECORDS', 'dodac_EDIT_RECORDS', 'luutru_EDIT_RECORDS');
-    } else if (permissionId === 'DELETE_RECORDS') {
-      checkIds.push('DELETE_RECORDS', 'dodac_DELETE_RECORDS', 'luutru_DELETE_RECORDS');
-    } else if (permissionId === 'VIEW_DETAILS') {
-      checkIds.push('VIEW_DETAILS', 'dodac_VIEW_DETAILS', 'luutru_VIEW_DETAILS');
-    } else if (permissionId === 'ADD_RECORDS') {
-      checkIds.push('ADD_RECORDS', 'dodac_ADD_RECORDS', 'luutru_ADD_RECORDS');
-    }
-
-    const checkListPerm = (perm: string) => {
-      if (currentUser.employeeId && employees) {
-          const emp = employees.find(e => e.id === currentUser.employeeId);
-          if (emp && emp.department) {
-              const compositeKey = `${emp.department}_${currentUser.role}`;
-              if (departmentPermissions && departmentPermissions[compositeKey]) {
-                  const deptRolePerms = departmentPermissions[compositeKey] || [];
-                  if (deptRolePerms.includes('*') || deptRolePerms.includes(perm)) return true;
-              }
-
-              const matchingKey = Object.keys(departmentPermissions || {}).find(k => matchDepartmentKey(k, emp.department));
-              if (matchingKey && departmentPermissions[matchingKey]) {
-                  const deptPerms = departmentPermissions[matchingKey] || [];
-                  if (deptPerms.includes('*') || deptPerms.includes(perm)) return true;
-              }
-          }
-      }
-
-      const rolePerms = (rolePermissions && rolePermissions[currentUser.role]) || DEFAULT_ROLE_PERMISSIONS[currentUser.role] || [];
-      return rolePerms.includes('*') || rolePerms.includes(perm);
-    };
-
-    return checkIds.some(id => checkListPerm(id));
+    return checkUserPermission(
+      permissionId,
+      currentUser,
+      employees,
+      rolePermissions,
+      departmentPermissions
+    );
   };
 
   // Cập nhật danh sách các view được phép

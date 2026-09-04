@@ -3,7 +3,7 @@ import { User, Employee, UserRole, RecordFile } from '../types';
 import UserManagement from './UserManagement';
 import EmployeeManagement from './EmployeeManagement';
 import SystemSettingsView from './SystemSettingsView';
-import { Shield, Users, Settings2 } from 'lucide-react';
+import { Shield, Users, Settings2, ShieldCheck } from 'lucide-react';
 
 interface SystemViewProps {
     currentUser: User;
@@ -37,14 +37,25 @@ const SystemView: React.FC<SystemViewProps> = ({
     onOpenCloudInspector
 }) => {
     const isAdmin = currentUser.role === UserRole.ADMIN;
-    const [activeTab, setActiveTab] = useState<'users' | 'employees' | 'settings'>('employees');
+    const [activeTab, setActiveTab] = useState<'users' | 'employees' | 'permissions' | 'settings'>('employees');
 
     useEffect(() => {
-        const handleOpenSettings = () => {
-            setActiveTab('settings');
+        const handleOpenSettings = (e: any) => {
+            if (e?.detail?.tab === 'permissions') {
+                setActiveTab('permissions');
+            } else {
+                setActiveTab('settings');
+            }
+        };
+        const handleOpenPermissions = () => {
+            setActiveTab('permissions');
         };
         window.addEventListener('open_system_settings', handleOpenSettings);
-        return () => window.removeEventListener('open_system_settings', handleOpenSettings);
+        window.addEventListener('open_system_permissions', handleOpenPermissions);
+        return () => {
+            window.removeEventListener('open_system_settings', handleOpenSettings);
+            window.removeEventListener('open_system_permissions', handleOpenPermissions);
+        };
     }, []);
 
     return (
@@ -65,6 +76,14 @@ const SystemView: React.FC<SystemViewProps> = ({
                 >
                     <Users size={16}/> DS Nhân sự
                 </button>
+                {isAdmin && (
+                    <button 
+                        onClick={() => setActiveTab('permissions')}
+                        className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'permissions' ? 'border-purple-600 text-purple-700 bg-white' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                    >
+                        <ShieldCheck size={16}/> Phân quyền
+                    </button>
+                )}
                 {isAdmin && (
                     <button 
                         onClick={() => setActiveTab('settings')}
@@ -93,6 +112,17 @@ const SystemView: React.FC<SystemViewProps> = ({
                         onDeleteEmployee={onDeleteEmployee} 
                         wards={wards} 
                         currentUser={currentUser} 
+                    />
+                )}
+                {activeTab === 'permissions' && isAdmin && (
+                    <SystemSettingsView 
+                        fixedTab="permissions"
+                        onDeleteAllData={onDeleteAllData} 
+                        onHolidaysChanged={onHolidaysChanged} 
+                        employees={employees}
+                        users={users}
+                        records={records}
+                        onOpenCloudInspector={onOpenCloudInspector}
                     />
                 )}
                 {activeTab === 'settings' && isAdmin && (

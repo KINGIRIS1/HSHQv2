@@ -32,7 +32,11 @@ export const RejectReturnStepModal: React.FC<RejectReturnStepModalProps> = ({
 
   if (!isOpen || records.length === 0) return null;
 
-  const hideReturnHandler = records.some(r => r.status === 'RECEIVED' || r.status === 'ASSIGNED' || r.status === 'IN_PROGRESS' || r.status === RecordStatus.RECEIVED || r.status === RecordStatus.ASSIGNED || r.status === RecordStatus.IN_PROGRESS);
+  const hideReturnHandler = records.some(r => {
+    const st = String(r.status || '');
+    return st === 'RECEIVED' || st === 'ASSIGNED' || st === 'IN_PROGRESS' ||
+      st === RecordStatus.RECEIVED || st === RecordStatus.ASSIGNED || st === RecordStatus.IN_PROGRESS;
+  });
 
   // Nếu hồ sơ đang ở trạng thái không thể trả về cán bộ thụ lý và option đang là return_handler thì chuyển về pause_supplement
   if (hideReturnHandler && returnOption === 'return_handler') {

@@ -592,7 +592,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                                         RecordStatus.HANDOVER,
                                         RecordStatus.RETURNED
                                     ];
-                                    const currentIdx = statusFlow.indexOf(formData.status);
+                                    const currentIdx = formData.status ? statusFlow.indexOf(formData.status) : -1;
                                     const hasAssigned = currentIdx >= statusFlow.indexOf(RecordStatus.ASSIGNED) || !!formData.assignedDate;
                                     const hasPendingCheck = !isArchive && (currentIdx >= statusFlow.indexOf(RecordStatus.PENDING_CHECK) || !!formData.pendingCheckDate);
                                     const hasSubmission = currentIdx >= statusFlow.indexOf(RecordStatus.PENDING_SIGN) || !!formData.submissionDate;

@@ -12,6 +12,7 @@ import {
 } from "../types";
 import { STATUS_LABELS, SELECTABLE_STATUSES, getNormalizedWard } from "../constants";
 import { COLUMN_DEFS, removeVietnameseTones, matchDepartmentKey, groupEmployeesByDepartment } from "../utils/appHelpers";
+import { checkUserPermission } from "../utils/permissionUtils";
 
 // Components
 import DashboardView from "./DashboardView";
@@ -266,60 +267,18 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
     props.setSelectedRecordIds?.(new Set());
   }, [props.handoverTab]);
 
-  const hasPermission = (permissionId: string) => {
-    if (currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.SUBADMIN) return true;
-
-    const checkIds = [permissionId];
-    if (permissionId === 'BTN_ASSIGN_STAFF' || permissionId === 'ASSIGN_RECORDS') {
-      checkIds.push('BTN_ASSIGN_STAFF', 'ASSIGN_RECORDS', 'dodac_BTN_ASSIGN_STAFF', 'luutru_BTN_ASSIGN_STAFF');
-    } else if (permissionId === 'BTN_SUBMIT_CHECK' || permissionId === 'CHECK_RECORDS') {
-      checkIds.push('BTN_SUBMIT_CHECK', 'CHECK_RECORDS', 'dodac_BTN_SUBMIT_CHECK', 'luutru_BTN_SUBMIT_CHECK');
-    } else if (permissionId === 'BTN_SUBMIT_SIGN' || permissionId === 'SIGN_RECORDS') {
-      checkIds.push('BTN_SUBMIT_SIGN', 'SIGN_RECORDS', 'dodac_BTN_SUBMIT_SIGN', 'luutru_BTN_SUBMIT_SIGN');
-    } else if (permissionId === 'BTN_APPROVE_SIGN') {
-      checkIds.push('BTN_APPROVE_SIGN', 'dodac_BTN_APPROVE_SIGN', 'luutru_BTN_APPROVE_SIGN');
-    } else if (permissionId === 'BTN_REJECT_RECORD' || permissionId === 'REJECT_RECORDS') {
-      checkIds.push('BTN_REJECT_RECORD', 'REJECT_RECORDS', 'dodac_BTN_REJECT_RECORD', 'luutru_BTN_REJECT_RECORD');
-    } else if (permissionId === 'HANDOVER_RECORDS' || permissionId === 'EXPORT_RECORDS') {
-      checkIds.push('HANDOVER_RECORDS', 'EXPORT_RECORDS', 'dodac_HANDOVER_RECORDS', 'luutru_HANDOVER_RECORDS');
-    } else if (permissionId === 'BTN_RETURN_RESULT' || permissionId === 'RETURN_RECORDS') {
-      checkIds.push('BTN_RETURN_RESULT', 'RETURN_RECORDS', 'dodac_BTN_RETURN_RESULT', 'luutru_BTN_RETURN_RESULT');
-    } else if (permissionId === 'BTN_EXTEND_DEADLINE') {
-      checkIds.push('BTN_EXTEND_DEADLINE', 'dodac_BTN_EXTEND_DEADLINE', 'luutru_BTN_EXTEND_DEADLINE');
-    } else if (permissionId === 'EDIT_RECORDS') {
-      checkIds.push('EDIT_RECORDS', 'dodac_EDIT_RECORDS', 'luutru_EDIT_RECORDS');
-    } else if (permissionId === 'DELETE_RECORDS') {
-      checkIds.push('DELETE_RECORDS', 'dodac_DELETE_RECORDS', 'luutru_DELETE_RECORDS');
-    } else if (permissionId === 'VIEW_DETAILS') {
-      checkIds.push('VIEW_DETAILS', 'dodac_VIEW_DETAILS', 'luutru_VIEW_DETAILS');
-    } else if (permissionId === 'ADD_RECORDS') {
-      checkIds.push('ADD_RECORDS', 'dodac_ADD_RECORDS', 'luutru_ADD_RECORDS');
-    }
-
-    const checkListPerm = (perm: string) => {
-      if (currentUser.employeeId && employees) {
-        const emp = employees.find(e => e.id === currentUser.employeeId);
-        if (emp && emp.department) {
-          const compositeKey = `${emp.department}_${currentUser.role}`;
-          if (departmentPermissions && departmentPermissions[compositeKey]) {
-            const deptRolePerms = departmentPermissions[compositeKey] || [];
-            if (deptRolePerms.includes('*') || deptRolePerms.includes(perm)) return true;
-          }
-
-          const matchingKey = Object.keys(departmentPermissions || {}).find(k => matchDepartmentKey(k, emp.department));
-          if (matchingKey && departmentPermissions[matchingKey]) {
-            const deptPerms = departmentPermissions[matchingKey] || [];
-            if (deptPerms.includes('*') || deptPerms.includes(perm)) return true;
-          }
-        }
-      }
-
-      const rolePerms = (rolePermissions && rolePermissions[currentUser.role]) || DEFAULT_ROLE_PERMISSIONS[currentUser.role] || [];
-      return rolePerms.includes("*") || rolePerms.includes(perm);
-    };
-
-    return checkIds.some(id => checkListPerm(id));
-  };
+  const hasPermission = React.useCallback(
+    (permissionId: string) => {
+      return checkUserPermission(
+        permissionId,
+        currentUser,
+        employees,
+        rolePermissions,
+        departmentPermissions
+      );
+    },
+    [currentUser, employees, rolePermissions, departmentPermissions]
+  );
 
   const isAdmin = currentUser.role === UserRole.ADMIN;
   const isSubadmin = currentUser.role === UserRole.SUBADMIN;
@@ -335,17 +294,22 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
       : false;
   }, [currentUser.employeeId, employees, isAdmin, isSubadmin]);
 
-  // canPerformAction is kept for backward compatibility, but we should use hasPermission where possible
+  // canPerformAction reflects whether the user has at least one active action permission
   const canPerformAction =
     isAdmin ||
     isSubadmin ||
-    currentUser.role === UserRole.TEAM_LEADER ||
-    currentUser.role === UserRole.ONEDOOR ||
-    currentUser.role === UserRole.EMPLOYEE ||
-    isDirector ||
+    hasPermission('VIEW_DETAILS') ||
+    hasPermission('dodac_VIEW_DETAILS') ||
+    hasPermission('luutru_VIEW_DETAILS') ||
     hasPermission('EDIT_RECORDS') ||
     hasPermission('dodac_EDIT_RECORDS') ||
     hasPermission('luutru_EDIT_RECORDS') ||
+    hasPermission('BTN_ADVANCE_STATUS') ||
+    hasPermission('dodac_BTN_ADVANCE_STATUS') ||
+    hasPermission('luutru_BTN_ADVANCE_STATUS') ||
+    hasPermission('BTN_RETURN_RESULT') ||
+    hasPermission('dodac_BTN_RETURN_RESULT') ||
+    hasPermission('luutru_BTN_RETURN_RESULT') ||
     hasPermission('BTN_ASSIGN_STAFF') ||
     hasPermission('dodac_BTN_ASSIGN_STAFF') ||
     hasPermission('luutru_BTN_ASSIGN_STAFF') ||
@@ -355,9 +319,15 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
     hasPermission('BTN_SUBMIT_CHECK') ||
     hasPermission('dodac_BTN_SUBMIT_CHECK') ||
     hasPermission('luutru_BTN_SUBMIT_CHECK') ||
+    hasPermission('BTN_APPROVE_SIGN') ||
+    hasPermission('dodac_BTN_APPROVE_SIGN') ||
+    hasPermission('luutru_BTN_APPROVE_SIGN') ||
     hasPermission('ADD_RECORDS') ||
     hasPermission('dodac_ADD_RECORDS') ||
-    hasPermission('luutru_ADD_RECORDS');
+    hasPermission('luutru_ADD_RECORDS') ||
+    hasPermission('DELETE_RECORDS') ||
+    hasPermission('dodac_DELETE_RECORDS') ||
+    hasPermission('luutru_DELETE_RECORDS');
 
   const [showColumnSelector, setShowColumnSelector] = React.useState(false);
   const [isAddMenuOpen, setIsAddMenuOpen] = React.useState(false);
@@ -999,7 +969,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
 
             {(() => {
               const isArchiveView = (currentView || '').startsWith('archive_');
-              const canAdd = (isArchiveView ? (hasPermission('luutru_ADD_RECORDS') || hasPermission('ADD_RECORDS')) : (hasPermission('dodac_ADD_RECORDS') || hasPermission('ADD_RECORDS'))) || canPerformAction;
+              const canAdd = isArchiveView ? hasPermission('luutru_ADD_RECORDS') : hasPermission('dodac_ADD_RECORDS');
               return canAdd && !["handover_list", "archive_handover_list"].includes(currentView);
             })() && (
               <div className="flex items-center gap-2 flex-wrap">
@@ -1060,7 +1030,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                     {/* Bulk Assign (Giao việc) */}
                     {(currentView === "assign_tasks" ||
                       currentView === "archive_assign_tasks") &&
-                      (hasPermission('BTN_ASSIGN_STAFF') || hasPermission('ASSIGN_RECORDS')) && (
+                      (currentView.startsWith("archive_") ? hasPermission('luutru_BTN_ASSIGN_STAFF') : hasPermission('dodac_BTN_ASSIGN_STAFF')) && (
                         <button
                           onClick={() => {
                             const targets = records.filter((r) =>
@@ -1078,7 +1048,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                     {/* Bulk Approve / Sign (Ký Duyệt) */}
                     {(currentView === "check_list" ||
                       currentView === "archive_check_list") &&
-                      (hasPermission('BTN_APPROVE_SIGN') || hasPermission('BTN_SUBMIT_SIGN') || hasPermission('SIGN_RECORDS')) && (
+                      (currentView.startsWith("archive_") ? hasPermission('luutru_BTN_APPROVE_SIGN') : hasPermission('dodac_BTN_APPROVE_SIGN')) && (
                         <button
                           onClick={props.handleConfirmSignBatch}
                           className="flex items-center gap-1.5 bg-purple-600 text-white px-3.5 py-1.5 rounded-lg hover:bg-purple-700 text-sm font-bold shadow-sm transition-all animate-pulse cursor-pointer whitespace-nowrap"
@@ -1088,7 +1058,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                       )}
 
                     {/* Bulk Submit Check (Trình Kiểm Tra) */}
-                    {(hasPermission('BTN_SUBMIT_CHECK') || hasPermission('BTN_SUBMIT_SIGN')) &&
+                    {hasPermission('dodac_BTN_SUBMIT_CHECK') &&
                       (currentView === "completed_list") && (
                         <button
                           onClick={() => {
@@ -1105,7 +1075,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                       )}
 
                     {/* Bulk Submit Sign (Trình Ký) */}
-                    {hasPermission('BTN_SUBMIT_SIGN') &&
+                    {(currentView.startsWith("archive_") ? hasPermission('luutru_BTN_SUBMIT_SIGN') : hasPermission('dodac_BTN_SUBMIT_SIGN')) &&
                       (currentView === "archive_completed_list" ||
                        currentView === "pending_check_list" ||
                        currentView === "archive_pending_check_list") && (
@@ -1126,7 +1096,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                     {/* Bulk Handover (Bàn giao 1 cửa) */}
                     {(currentView === "director_completed" ||
                       currentView === "archive_director_completed") &&
-                      (hasPermission('HANDOVER_RECORDS') || hasPermission('EXPORT_RECORDS')) && (
+                      (currentView.startsWith("archive_") ? hasPermission('luutru_HANDOVER_RECORDS') : hasPermission('dodac_HANDOVER_RECORDS')) && (
                         <button
                           onClick={() => {
                             props.setExportModalType("handover");
@@ -1149,8 +1119,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                 <>
                   {/* Bulk Reject (Trả hồ sơ) - Bỏ ở các tab bàn giao/trả kết quả */}
                   {!["handover_list", "archive_handover_list"].includes(currentView) &&
-                    (hasPermission('BTN_REJECT_RECORD') || hasPermission('REJECT_RECORDS') ||
-                     hasPermission('dodac_BTN_REJECT_RECORD') || hasPermission('luutru_BTN_REJECT_RECORD')) && (
+                    (currentView.startsWith("archive_") ? hasPermission('luutru_BTN_REJECT_RECORD') : hasPermission('dodac_BTN_REJECT_RECORD')) && (
                     <button
                       onClick={() => {
                         const targets = records.filter((r) =>
@@ -1386,6 +1355,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                     onReturnResult={props.handleOpenReturnModal}
                     onMapCorrection={props.handleMapCorrectionRequest}
                     canSelect={canPerformAction || hasPermission('BTN_SUBMIT_SIGN')}
+                    hasPermission={hasPermission}
                   />
                 ))
               ) : (

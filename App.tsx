@@ -1363,6 +1363,8 @@ function App() {
             canPerformAction={canPerformAction}
             selectedRecordsForBulk={selectedRecordsForBulk}
             currentView={currentView}
+            rolePermissions={rolePermissions}
+            departmentPermissions={departmentPermissions}
         />
 
         {backupNotification?.show && (
@@ -1591,6 +1593,8 @@ function App() {
             canPerformAction={canPerformAction}
             selectedRecordsForBulk={selectedRecordsForBulk}
             currentView={currentView}
+            rolePermissions={rolePermissions}
+            departmentPermissions={departmentPermissions}
         />
 
         <BulkSignConfirmModal 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { RecordFile, Employee, User, RecordStatus } from '../types';
+import { RecordFile, Employee, User, RecordStatus, RolePermissions, DepartmentPermissions } from '../types';
 import RecordModal from './RecordModal';
 import ImportModal from './ImportModal';
 import AssignModal from './AssignModal';
@@ -17,6 +17,7 @@ import BatchErrorDiagnosticModal from './BatchErrorDiagnosticModal';
 import RejectReturnStepModal, { ReturnOptionType } from './RejectReturnStepModal';
 import ExtendDeadlineModal from './ExtendDeadlineModal';
 import * as XLSX from 'xlsx-js-style';
+import { checkUserPermission, hasRecordActionPermission } from '../utils/permissionUtils';
 
 interface AppModalsProps {
     // States
@@ -106,12 +107,22 @@ interface AppModalsProps {
     canPerformAction: boolean;
     selectedRecordsForBulk: RecordFile[];
     currentView: string;
+    rolePermissions?: RolePermissions;
+    departmentPermissions?: DepartmentPermissions;
 }
 
 const AppModals: React.FC<AppModalsProps> = (props) => {
     // Xác định danh sách hồ sơ cần chốt để truyền vào modal (cho tính năng cảnh báo)
     const targetRecordsForBatch = props.selectedRecordsForBulk.length > 0 ? props.selectedRecordsForBulk : props.filteredRecords;
     const isMobile = useIsMobile();
+
+    const canEditViewingRecord = props.viewingRecord
+        ? hasRecordActionPermission('edit', props.viewingRecord, props.currentUser, props.employees, props.rolePermissions, props.departmentPermissions)
+        : false;
+
+    const canDeleteViewingRecord = props.viewingRecord
+        ? hasRecordActionPermission('delete', props.viewingRecord, props.currentUser, props.employees, props.rolePermissions, props.departmentPermissions)
+        : false;
 
     return (
         <>
@@ -165,8 +176,8 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
                     employees={props.employees} 
                     users={props.users}
                     currentUser={props.currentUser} 
-                    onEdit={props.canPerformAction ? (r) => { props.setEditingRecord(r); props.setIsModalOpen(true); } : undefined}
-                    onDelete={props.canPerformAction ? props.confirmDelete : undefined}
+                    onEdit={canEditViewingRecord ? (r) => { props.setEditingRecord(r); props.setIsModalOpen(true); } : undefined}
+                    onDelete={canDeleteViewingRecord ? props.confirmDelete : undefined}
                     onCreateLiquidation={props.onCreateLiquidation}
                     onCreateContract={props.onCreateContract}
                     onRefreshData={props.onRefreshData}
@@ -179,8 +190,8 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
                     employees={props.employees} 
                     users={props.users}
                     currentUser={props.currentUser} 
-                    onEdit={props.canPerformAction ? (r) => { props.setEditingRecord(r); props.setIsModalOpen(true); } : undefined}
-                    onDelete={props.canPerformAction ? props.confirmDelete : undefined}
+                    onEdit={canEditViewingRecord ? (r) => { props.setEditingRecord(r); props.setIsModalOpen(true); } : undefined}
+                    onDelete={canDeleteViewingRecord ? props.confirmDelete : undefined}
                     onCreateLiquidation={props.onCreateLiquidation}
                     onCreateContract={props.onCreateContract}
                     onRefreshData={props.onRefreshData}

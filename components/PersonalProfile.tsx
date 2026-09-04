@@ -265,6 +265,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
             let status: RecordStatus = RecordStatus.RECEIVED;
             const rawSt = String(r.status || '').toLowerCase();
             if (rawSt === 'assigned') status = RecordStatus.ASSIGNED;
+            else if (rawSt === 'in_progress') status = RecordStatus.IN_PROGRESS;
             else if (rawSt === 'executed' || rawSt === 'completed_work') status = RecordStatus.COMPLETED_WORK;
             else if (rawSt === 'pending_supplement') status = RecordStatus.PENDING_SUPPLEMENT;
             else if (rawSt === 'pending_check') status = RecordStatus.PENDING_CHECK;

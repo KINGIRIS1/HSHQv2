@@ -24,6 +24,7 @@ interface RecordRowProps {
   onMapCorrection?: (record: RecordFile) => void; // New Handler
   columnOrder?: string[];
   canSelect?: boolean;
+  hasPermission?: (permissionId: string) => boolean;
 }
 
 const formatDate = (dateStr?: string | null) => {
@@ -49,7 +50,8 @@ const RecordRow: React.FC<RecordRowProps> = ({
   onReturnResult,
   onMapCorrection,
   columnOrder,
-  canSelect
+  canSelect,
+  hasPermission
 }) => {
   const [localMsr, setLocalMsr] = React.useState(record.measurementNumber || "");
   const [localExc, setLocalExc] = React.useState(record.excerptNumber || "");
@@ -325,27 +327,79 @@ const RecordRow: React.FC<RecordRowProps> = ({
           <div className="flex flex-col items-center justify-center gap-1 py-0.5">
             {/* Hàng trên: Xem & Chuyển bước */}
             <div className="flex items-center gap-1">
-              <button onClick={(e) => { e.stopPropagation(); onView(record); }} className="p-1 text-slate-600 hover:text-green-700 hover:bg-green-100/80 rounded transition-colors border border-slate-200/80 bg-white" title="Xem chi tiết"><Eye size={15} /></button>
+              {(() => {
+                const isArchiveRecord = isArchiveRecordType(record.recordType || '') || record.sourceTable === 'luutru_records';
+                const isAdminOrSub = currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.SUBADMIN;
+
+                const canView = isAdminOrSub || (hasPermission ? (
+                  isArchiveRecord ? hasPermission('luutru_VIEW_DETAILS') : hasPermission('dodac_VIEW_DETAILS')
+                ) : true);
+
+                if (!canView) return null;
+                return (
+                  <button onClick={(e) => { e.stopPropagation(); onView(record); }} className="p-1 text-slate-600 hover:text-green-700 hover:bg-green-100/80 rounded transition-colors border border-slate-200/80 bg-white" title="Xem chi tiết"><Eye size={15} /></button>
+                );
+              })()}
               
-              {onReturnResult && (displayStatus === RecordStatus.HANDOVER || displayStatus === RecordStatus.SIGNED) && !record.resultReturnedDate && (
+              {onReturnResult && (displayStatus === RecordStatus.HANDOVER || displayStatus === RecordStatus.SIGNED) && !record.resultReturnedDate && (() => {
+                const isArchiveRecord = isArchiveRecordType(record.recordType || '') || record.sourceTable === 'luutru_records';
+                const isAdminOrSub = currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.SUBADMIN;
+                const canReturn = isAdminOrSub || (hasPermission ? (
+                  isArchiveRecord ? hasPermission('luutru_BTN_RETURN_RESULT') : hasPermission('dodac_BTN_RETURN_RESULT')
+                ) : false);
+
+                if (!canReturn) return null;
+                return (
                   <button onClick={(e) => { e.stopPropagation(); onReturnResult(record); }} className="p-1 text-emerald-700 hover:bg-emerald-100 rounded transition-colors border border-emerald-200 bg-emerald-50" title="Trả kết quả">
                       <FileCheck size={15} />
                   </button>
-              )}
+                );
+              })()}
 
-              {displayStatus !== RecordStatus.HANDOVER && displayStatus !== RecordStatus.WITHDRAWN && displayStatus !== RecordStatus.REJECTED && !record.resultReturnedDate && currentUser?.role !== 'ONEDOOR' && (
-                <button onClick={() => onAdvanceStatus(record)} className="p-1 text-green-700 hover:bg-green-100 rounded transition-colors border border-green-200 bg-green-50" title="Chuyển bước"><ArrowRight size={15} /></button>
-              )}
+              {displayStatus !== RecordStatus.HANDOVER && displayStatus !== RecordStatus.WITHDRAWN && displayStatus !== RecordStatus.REJECTED && !record.resultReturnedDate && currentUser?.role !== 'ONEDOOR' && (() => {
+                const isArchiveRecord = isArchiveRecordType(record.recordType || '') || record.sourceTable === 'luutru_records';
+                const isAdminOrSub = currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.SUBADMIN;
+                
+                const canAdvance = isAdminOrSub || (hasPermission ? (
+                  isArchiveRecord ? hasPermission('luutru_BTN_ADVANCE_STATUS') : hasPermission('dodac_BTN_ADVANCE_STATUS')
+                ) : false);
+
+                if (!canAdvance) return null;
+                return (
+                  <button onClick={() => onAdvanceStatus(record)} className="p-1 text-green-700 hover:bg-green-100 rounded transition-colors border border-green-200 bg-green-50" title="Chuyển bước"><ArrowRight size={15} /></button>
+                );
+              })()}
             </div>
 
             {/* Hàng dưới: Sửa & Xóa */}
             <div className="flex items-center gap-1">
-              {currentUser?.role !== 'ONEDOOR' && currentUser?.role !== UserRole.ONEDOOR && (
-                <button onClick={() => onEdit(record)} className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors border border-blue-200 bg-blue-50/50" title="Sửa"><Pencil size={15} /></button>
-              )}
-              {(currentUser?.role === 'ADMIN' || currentUser?.role === 'SUBADMIN' || currentUser?.role === 'TEAM_LEADER' || currentUser?.role === UserRole.TEAM_LEADER) && (
+              {currentUser?.role !== 'ONEDOOR' && currentUser?.role !== UserRole.ONEDOOR && (() => {
+                const isArchiveRecord = isArchiveRecordType(record.recordType || '') || record.sourceTable === 'luutru_records';
+                const isAdminOrSub = currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.SUBADMIN;
+
+                const canEdit = isAdminOrSub || (hasPermission ? (
+                  isArchiveRecord ? hasPermission('luutru_EDIT_RECORDS') : hasPermission('dodac_EDIT_RECORDS')
+                ) : false);
+
+                if (!canEdit) return null;
+                return (
+                  <button onClick={() => onEdit(record)} className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors border border-blue-200 bg-blue-50/50" title="Sửa"><Pencil size={15} /></button>
+                );
+              })()}
+
+              {(currentUser?.role === 'ADMIN' || currentUser?.role === 'SUBADMIN' || currentUser?.role === 'TEAM_LEADER' || currentUser?.role === UserRole.TEAM_LEADER) && (() => {
+                const isArchiveRecord = isArchiveRecordType(record.recordType || '') || record.sourceTable === 'luutru_records';
+                const isAdminOrSub = currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.SUBADMIN;
+
+                const canDelete = isAdminOrSub || (hasPermission ? (
+                  isArchiveRecord ? hasPermission('luutru_DELETE_RECORDS') : hasPermission('dodac_DELETE_RECORDS')
+                ) : false);
+
+                if (!canDelete) return null;
+                return (
                   <button onClick={() => onDelete(record)} className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors border border-red-200 bg-red-50/50" title="Xóa"><Trash2 size={15} /></button>
-              )}
+                );
+              })()}
             </div>
           </div>
         </td>
@@ -360,6 +414,9 @@ export default React.memo(RecordRow, (prevProps, nextProps) => {
     prevProps.isSelected === nextProps.isSelected &&
     prevProps.visibleColumns === nextProps.visibleColumns &&
     prevProps.columnOrder === nextProps.columnOrder &&
-    prevProps.employees.length === nextProps.employees.length
+    prevProps.employees.length === nextProps.employees.length &&
+    prevProps.hasPermission === nextProps.hasPermission &&
+    prevProps.currentUser === nextProps.currentUser &&
+    prevProps.canPerformAction === nextProps.canPerformAction
   );
 });

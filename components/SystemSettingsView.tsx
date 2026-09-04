@@ -86,6 +86,7 @@ const PERMISSION_GROUPS = [
       { id: 'dodac_VIEW_DETAILS', label: 'Xem chi tiết hồ sơ (Đo đạc)' },
       { id: 'dodac_VIEW_EXCERPTS', label: 'Xem trích lục bản đồ' },
       { id: 'dodac_MANAGE_EXCERPTS', label: 'Cấp số trích lục bản đồ' },
+      { id: 'dodac_BTN_ADVANCE_STATUS', label: 'Chuyển bước hồ sơ (Đo đạc)' },
     ]
   },
   {
@@ -107,6 +108,7 @@ const PERMISSION_GROUPS = [
       { id: 'luutru_VIEW_DETAILS', label: 'Xem chi tiết hồ sơ (Lưu trữ)' },
       { id: 'VIEW_ARCHIVE', label: 'Tra cứu thông tin lưu trữ' },
       { id: 'MANAGE_ARCHIVE', label: 'Quản lý kho lưu trữ (Mượn/trả)' },
+      { id: 'luutru_BTN_ADVANCE_STATUS', label: 'Chuyển bước hồ sơ (Lưu trữ)' },
     ]
   },
   {
@@ -133,6 +135,7 @@ interface SystemSettingsViewProps {
   users: User[];
   records?: RecordFile[];
   onOpenCloudInspector?: () => void;
+  fixedTab?: 'general' | 'holidays' | 'permissions' | 'data';
 }
 
 const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ 
@@ -141,9 +144,16 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
   employees,
   users,
   records,
-  onOpenCloudInspector
+  onOpenCloudInspector,
+  fixedTab
 }) => {
-  const [activeTab, setActiveTab] = useState<'general' | 'holidays' | 'permissions' | 'data'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'holidays' | 'permissions' | 'data'>(fixedTab || 'general');
+
+  useEffect(() => {
+    if (fixedTab) {
+      setActiveTab(fixedTab);
+    }
+  }, [fixedTab]);
   const [isDeletingData, setIsDeletingData] = useState(false);
   const [dbTestStatus, setDbTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [dbTestMsg, setDbTestMsg] = useState('');
@@ -549,6 +559,20 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
       }
   };
 
+  const getRelatedKeysToRemove = (id: string): string[] => {
+      const toRemove = [id];
+      if (id.startsWith('dodac_') || id.startsWith('luutru_')) {
+          const raw = id.replace(/^(dodac_|luutru_)/, '');
+          toRemove.push(raw);
+          if (raw === 'BTN_ASSIGN_STAFF') toRemove.push('ASSIGN_RECORDS');
+          if (raw === 'BTN_SUBMIT_CHECK') toRemove.push('CHECK_RECORDS');
+          if (raw === 'BTN_SUBMIT_SIGN') toRemove.push('SIGN_RECORDS');
+          if (raw === 'BTN_REJECT_RECORD') toRemove.push('REJECT_RECORDS');
+          if (raw === 'BTN_RETURN_RESULT') toRemove.push('RETURN_RECORDS');
+      }
+      return toRemove;
+  };
+
   const getDefaultDeptPerms = (deptName: string, role: string): string[] => {
       const basePerms = rolePermissions[role] || DEFAULT_ROLE_PERMISSIONS[role as UserRole] || [];
       if (matchDepartmentKey('đo đạc', deptName)) {
@@ -557,13 +581,13 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
               'archive_completed_list', 'archive_pending_check_list', 'archive_check_list',
               'archive_handover_list', 'archive_director_completed', 'VIEW_ARCHIVE', 'MANAGE_ARCHIVE'
           ];
-          return basePerms.filter(p => !ARCHIVE_PERMS.includes(p));
+          return basePerms.filter(p => !ARCHIVE_PERMS.includes(p) && !p.startsWith('luutru_'));
       } else if (matchDepartmentKey('lưu trữ', deptName)) {
           const SURVEY_PERMS = [
               'all_records', 'all_sub_all', 'assign_tasks', 'completed_list',
               'pending_check_list', 'check_list', 'handover_list', 'director_completed', 'survey_list'
           ];
-          return basePerms.filter(p => !SURVEY_PERMS.includes(p));
+          return basePerms.filter(p => !SURVEY_PERMS.includes(p) && !p.startsWith('dodac_'));
       }
       return basePerms;
   };
@@ -593,8 +617,9 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
           setDepartmentPermissions(prev => {
               const current = prev[compositeKey] || getDefaultDeptPerms(selectedDepartmentScope, selectedRole as string);
               const isRemoving = current.includes(permissionId);
+              const keysToRemove = getRelatedKeysToRemove(permissionId);
               const updated = isRemoving
-                  ? current.filter(p => p !== permissionId)
+                  ? current.filter(p => !keysToRemove.includes(p))
                   : [...current, permissionId];
               return { ...prev, [compositeKey]: updated };
           });
@@ -604,8 +629,9 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
       setRolePermissions(prev => {
           const current = prev[selectedRole as string] || DEFAULT_ROLE_PERMISSIONS[selectedRole as UserRole] || [];
           const isRemoving = current.includes(permissionId);
+          const keysToRemove = getRelatedKeysToRemove(permissionId);
           const updated = isRemoving
-              ? current.filter(p => p !== permissionId)
+              ? current.filter(p => !keysToRemove.includes(p))
               : [...current, permissionId];
           return { ...prev, [selectedRole as string]: updated };
       });
@@ -617,10 +643,11 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
       if (selectedDepartmentScope !== 'all') {
           const compositeKey = `${selectedDepartmentScope}_${selectedRole}`;
           setDepartmentPermissions(prev => {
-              const current = prev[compositeKey] || rolePermissions[selectedRole as string] || DEFAULT_ROLE_PERMISSIONS[selectedRole as UserRole] || [];
+              const current = prev[compositeKey] || getDefaultDeptPerms(selectedDepartmentScope, selectedRole as string);
+              const allKeysToRemove = itemIds.flatMap(getRelatedKeysToRemove);
               const updated = selectAll
                   ? Array.from(new Set([...current, ...itemIds]))
-                  : current.filter(p => !itemIds.includes(p));
+                  : current.filter(p => !allKeysToRemove.includes(p));
               return { ...prev, [compositeKey]: updated };
           });
           return;
@@ -628,9 +655,10 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
 
       setRolePermissions(prev => {
           const current = prev[selectedRole as string] || DEFAULT_ROLE_PERMISSIONS[selectedRole as UserRole] || [];
+          const allKeysToRemove = itemIds.flatMap(getRelatedKeysToRemove);
           const updated = selectAll
               ? Array.from(new Set([...current, ...itemIds]))
-              : current.filter(p => !itemIds.includes(p));
+              : current.filter(p => !allKeysToRemove.includes(p));
           return { ...prev, [selectedRole as string]: updated };
       });
   };
@@ -780,33 +808,29 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col flex-1 h-full min-h-0 animate-fade-in-up">
-        {/* Tabs */}
-        <div className="flex border-b border-gray-200 bg-gray-50 px-2 overflow-x-auto no-scrollbar shrink-0">
-            <button 
-                onClick={() => setActiveTab('general')}
-                className={`px-4 py-3 text-xs md:text-sm font-black uppercase tracking-widest flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'general' ? 'border-blue-600 text-blue-700 bg-white' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
-            >
-                <Database size={16} /> Chung
-            </button>
-            <button 
-                onClick={() => setActiveTab('holidays')}
-                className={`px-4 py-3 text-xs md:text-sm font-black uppercase tracking-widest flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'holidays' ? 'border-orange-600 text-orange-700 bg-white' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
-            >
-                <Calendar size={16} /> Ngày nghỉ lễ
-            </button>
-            <button 
-                onClick={() => setActiveTab('permissions')}
-                className={`px-4 py-3 text-xs md:text-sm font-black uppercase tracking-widest flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'permissions' ? 'border-purple-600 text-purple-700 bg-white' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
-            >
-                <Key size={16} /> Phân quyền
-            </button>
-            <button 
-                onClick={() => setActiveTab('data')}
-                className={`px-4 py-3 text-xs md:text-sm font-black uppercase tracking-widest flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'data' ? 'border-red-600 text-red-700 bg-white' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
-            >
-                <AlertTriangle size={16} /> Dữ liệu
-            </button>
-        </div>
+        {/* Tabs - Only show when not in fixedTab mode */}
+        {!fixedTab && (
+            <div className="flex border-b border-gray-200 bg-gray-50 px-2 overflow-x-auto no-scrollbar shrink-0">
+                <button 
+                    onClick={() => setActiveTab('general')}
+                    className={`px-4 py-3 text-xs md:text-sm font-black uppercase tracking-widest flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'general' ? 'border-blue-600 text-blue-700 bg-white' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
+                >
+                    <Database size={16} /> Chung
+                </button>
+                <button 
+                    onClick={() => setActiveTab('holidays')}
+                    className={`px-4 py-3 text-xs md:text-sm font-black uppercase tracking-widest flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'holidays' ? 'border-orange-600 text-orange-700 bg-white' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
+                >
+                    <Calendar size={16} /> Ngày nghỉ lễ
+                </button>
+                <button 
+                    onClick={() => setActiveTab('data')}
+                    className={`px-4 py-3 text-xs md:text-sm font-black uppercase tracking-widest flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${activeTab === 'data' ? 'border-red-600 text-red-700 bg-white' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
+                >
+                    <AlertTriangle size={16} /> Dữ liệu
+                </button>
+            </div>
+        )}
 
         <div className={`flex-1 bg-slate-50/30 min-h-0 ${
             activeTab === 'permissions' ? 'p-2 md:p-3 overflow-hidden flex flex-col' : 'p-4 md:p-6 overflow-y-auto'

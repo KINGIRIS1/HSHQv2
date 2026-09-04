@@ -590,14 +590,14 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                     </button>
                 )}
                 
-                {canPerformAction && onEdit && (
-                    <button onClick={() => { onClose(); onEdit(record); }} className="p-2 text-gray-400 hover:text-blue-600 transition-colors">
+                {onEdit && (
+                    <button onClick={() => { onClose(); onEdit(record); }} className="p-2 text-gray-400 hover:text-blue-600 transition-colors" title="Chỉnh sửa">
                         <Pencil size={20} />
                     </button>
                 )}
                 
-                {canPerformAction && onDelete && (currentUser?.role === 'ADMIN' || currentUser?.role === 'SUBADMIN' || currentUser?.role === 'TEAM_LEADER' || currentUser?.role === UserRole.TEAM_LEADER) && (
-                    <button onClick={() => { onClose(); onDelete(record); }} className="p-2 text-gray-400 hover:text-red-600 transition-colors">
+                {onDelete && (
+                    <button onClick={() => { onClose(); onDelete(record); }} className="p-2 text-gray-400 hover:text-red-600 transition-colors" title="Xóa">
                         <Trash2 size={20} />
                     </button>
                 )}

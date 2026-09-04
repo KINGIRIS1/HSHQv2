@@ -450,13 +450,13 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
               </div>
             </div>
             <div className="flex items-center gap-1 shrink-0">
-              {canPerformAction && onEdit && (
-                <button onClick={() => { onClose(); onEdit(record); }} className="p-2 text-slate-500 hover:text-blue-600 active:bg-slate-100 rounded-xl transition-colors cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center">
+              {onEdit && (
+                <button onClick={() => { onClose(); onEdit(record); }} className="p-2 text-slate-500 hover:text-blue-600 active:bg-slate-100 rounded-xl transition-colors cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center" title="Chỉnh sửa">
                   <Pencil size={20} />
                 </button>
               )}
-              {canPerformAction && onDelete && (currentUser?.role === 'ADMIN' || currentUser?.role === 'SUBADMIN' || currentUser?.role === 'TEAM_LEADER' || currentUser?.role === UserRole.TEAM_LEADER) && (
-                <button onClick={() => { onClose(); onDelete(record); }} className="p-2 text-slate-500 hover:text-red-600 active:bg-slate-100 rounded-xl transition-colors cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center">
+              {onDelete && (
+                <button onClick={() => { onClose(); onDelete(record); }} className="p-2 text-slate-500 hover:text-red-600 active:bg-slate-100 rounded-xl transition-colors cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center" title="Xóa">
                   <Trash2 size={20} />
                 </button>
               )}
