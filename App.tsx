@@ -118,7 +118,7 @@ function App() {
 
   // Tự động kiểm tra và thực hiện sao lưu hàng tuần cho admin đã tắt theo yêu cầu
 
-  const [currentView, setCurrentView] = useState('dashboard');
+  const [currentView, setCurrentView] = useState(() => currentUser?.role === UserRole.EMPLOYEE ? 'reports' : 'dashboard');
   const [receiveRecordResetKey, setReceiveRecordResetKey] = useState(0);
 
   const handleSetCurrentView = useCallback((viewId: string) => {
@@ -1240,7 +1240,7 @@ function App() {
         onLogin={(user) => {
           sessionStorage.setItem('last_activity_timestamp', Date.now().toString());
           setCurrentUser(user);
-          setCurrentView('dashboard');
+          setCurrentView(user.role === UserRole.EMPLOYEE ? 'reports' : 'dashboard');
           logSystemEvent(user.username, 'LOGIN', `Đăng nhập vào hệ thống (${user.name})`).catch(e => console.error(e));
         }} 
         users={users} 

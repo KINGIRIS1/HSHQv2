@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import AutoResizeTextarea from './AutoResizeTextarea';
 import { X, Undo2, AlertCircle, Calendar, MessageSquare, PauseCircle, Ban, RefreshCw, CheckSquare } from 'lucide-react';
-import { RecordFile, User, Employee } from '../types';
+import { RecordFile, User, Employee, RecordStatus } from '../types';
 
 export type ReturnOptionType = 'pause_supplement' | 'cancel_reject' | 'return_handler' | 'withdraw_citizen';
 

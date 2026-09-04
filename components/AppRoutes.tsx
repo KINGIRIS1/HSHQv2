@@ -269,6 +269,23 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
   const hasPermission = (permissionId: string) => {
     if (currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.SUBADMIN) return true;
 
+    if (currentUser.employeeId && employees) {
+      const emp = employees.find(e => e.id === currentUser.employeeId);
+      if (emp && emp.department) {
+        const compositeKey = `${emp.department}_${currentUser.role}`;
+        if (departmentPermissions && departmentPermissions[compositeKey]) {
+          const deptRolePerms = departmentPermissions[compositeKey] || [];
+          return deptRolePerms.includes('*') || deptRolePerms.includes(permissionId);
+        }
+
+        const matchingKey = Object.keys(departmentPermissions || {}).find(k => matchDepartmentKey(k, emp.department));
+        if (matchingKey && departmentPermissions[matchingKey]) {
+          const deptPerms = departmentPermissions[matchingKey] || [];
+          return deptPerms.includes('*') || deptPerms.includes(permissionId);
+        }
+      }
+    }
+
     const rolePerms = (rolePermissions && rolePermissions[currentUser.role]) || DEFAULT_ROLE_PERMISSIONS[currentUser.role] || [];
     return rolePerms.includes("*") || rolePerms.includes(permissionId);
   };
@@ -278,13 +295,14 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
 
   // Xác định xem user có thuộc Ban giám đốc không
   const isDirector = React.useMemo(() => {
+    if (isAdmin || isSubadmin) return false;
     if (!currentUser.employeeId) return false;
     const emp = employees.find((e) => e.id === currentUser.employeeId);
     return emp
       ? emp.department?.trim().toLowerCase() === "ban giám đốc" ||
           emp.department?.trim().toLowerCase() === "ban lãnh đạo"
       : false;
-  }, [currentUser.employeeId, employees]);
+  }, [currentUser.employeeId, employees, isAdmin, isSubadmin]);
 
   // canPerformAction is kept for backward compatibility, but we should use hasPermission where possible
   const canPerformAction =
@@ -1111,13 +1129,15 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                   )}
 
                   {/* Bulk Update (Xử lý All) */}
-                  <button
-                    onClick={() => props.setIsBulkUpdateModalOpen(true)}
-                    className="flex items-center gap-1.5 bg-orange-600 text-white px-3.5 py-1.5 rounded-lg hover:bg-orange-700 shadow-sm text-sm font-bold animate-pulse cursor-pointer whitespace-nowrap"
-                    title="Xử lý All"
-                  >
-                    <Layers size={16} /> Xử lý All ({props.selectedRecordIds.size})
-                  </button>
+                  {isAdmin && (
+                    <button
+                      onClick={() => props.setIsBulkUpdateModalOpen(true)}
+                      className="flex items-center gap-1.5 bg-orange-600 text-white px-3.5 py-1.5 rounded-lg hover:bg-orange-700 shadow-sm text-sm font-bold animate-pulse cursor-pointer whitespace-nowrap"
+                      title="Xử lý All"
+                    >
+                      <Layers size={16} /> Xử lý All ({props.selectedRecordIds.size})
+                    </button>
+                  )}
                 </>
               )}
               {/* Tab "Đã trả kết quả": Xuất Excel TKQ */}

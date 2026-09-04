@@ -220,9 +220,9 @@ const DashboardView: React.FC<DashboardViewProps> = ({ records, currentUser, emp
                 color: 'text-amber-600 bg-amber-50/50 border-amber-100 hover:border-amber-300 hover:bg-amber-50',
             });
             modules.push({
-                id: 'all_records',
-                label: 'Quản lý Hồ sơ 1 cửa',
-                description: 'Theo dõi tiến độ, trao trả kết quả, quản lý biên lai hóa đơn và bàn giao hồ sơ.',
+                id: 'registration_records',
+                label: 'Tra cứu hồ sơ',
+                description: 'Tra cứu thông tin hồ sơ, tiến độ giải quyết và kết quả trả cho công dân.',
                 icon: FileText,
                 color: 'text-rose-600 bg-rose-50/50 border-rose-100 hover:border-rose-300 hover:bg-rose-50',
             });

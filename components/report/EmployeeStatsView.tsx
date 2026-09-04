@@ -15,10 +15,11 @@ interface EmployeeStatsViewProps {
     selectedEmpId: string;
     setSelectedEmpId: (id: string) => void;
     defaultDeptFilter?: 'all' | 'archive' | 'onedoor' | 'measurement';
+    isEmployee?: boolean;
 }
 
 const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({ 
-    records, employees, fromDate, toDate, selectedEmpId, setSelectedEmpId, defaultDeptFilter = 'all' 
+    records, employees, fromDate, toDate, selectedEmpId, setSelectedEmpId, defaultDeptFilter = 'all', isEmployee = false
 }) => {
     const [aiEvaluation, setAiEvaluation] = useState<string>('');
     const [isGenerating, setIsGenerating] = useState(false);
@@ -515,11 +516,12 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
                     <div className="relative flex-1">
                         <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                         <select 
-                            className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-500 bg-white transition-shadow shadow-sm cursor-pointer hover:border-indigo-300"
+                            className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-500 bg-white transition-shadow shadow-sm cursor-pointer hover:border-indigo-300 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
                             value={selectedEmpId}
                             onChange={(e) => { setSelectedEmpId(e.target.value); setAiEvaluation(''); }}
+                            disabled={isEmployee}
                         >
-                            <option value="">-- Tổng hợp tất cả nhân viên --</option>
+                            {!isEmployee && <option value="">-- Tổng hợp tất cả nhân viên --</option>}
                             {filteredEmployeesByDept.map(emp => (
                                 <option key={emp.id} value={emp.id}>{emp.name} - {emp.department}</option>
                             ))}

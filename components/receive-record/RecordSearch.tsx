@@ -1037,7 +1037,7 @@ export const RecordSearch: React.FC<RecordSearchProps> = ({
                                                             >
                                                                 <FileCheck size={15} />
                                                             </button>
-                                                        ) : (currentUser?.role === 'ADMIN' || currentUser?.role === 'SUBADMIN') ? (
+                                                        ) : (currentUser?.role === 'ADMIN' || currentUser?.role === 'SUBADMIN' || currentUser?.role === 'TEAM_LEADER') ? (
                                                             <button
                                                                 onClick={async () => {
                                                                     if (confirm(`Bạn có chắc muốn xóa hồ sơ ${r.code}?`)) {

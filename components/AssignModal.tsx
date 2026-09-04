@@ -14,14 +14,6 @@ interface DeptConfig {
 
 const DEPARTMENTS_CONFIG: DeptConfig[] = [
     {
-        id: 'ALL',
-        label: 'Tất cả nhân viên',
-        subtitle: 'Toàn bộ nhân viên phân loại theo tổ',
-        matchKeys: [],
-        icon: <Layers size={16} />,
-        colorClass: 'text-indigo-600 bg-indigo-50 border-indigo-200'
-    },
-    {
         id: 'Tổ Đo đạc',
         label: 'Tổ Đo đạc',
         subtitle: 'Đo vẽ bản đồ, trích đo thửa đất...',

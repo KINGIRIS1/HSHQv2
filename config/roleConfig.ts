@@ -88,6 +88,20 @@ export function isViewAllowedForUser(
 ): boolean {
   if (!user) return false;
 
+  const isUserDodac = (u: any, emps: any[]) => {
+    if (!u.employeeId || !emps) return false;
+    const emp = emps.find(e => e.id === u.employeeId);
+    if (!emp || !emp.department) return false;
+    return matchDepartmentKey('đo đạc', emp.department) && !matchDepartmentKey('lưu trữ', emp.department);
+  };
+
+  const isUserLuutru = (u: any, emps: any[]) => {
+    if (!u.employeeId || !emps) return false;
+    const emp = emps.find(e => e.id === u.employeeId);
+    if (!emp || !emp.department) return false;
+    return matchDepartmentKey('lưu trữ', emp.department) && !matchDepartmentKey('đo đạc', emp.department);
+  };
+
   // Admin và Subadmin luôn có toàn quyền truy cập tất cả các view/tab, không bị giới hạn bởi Tổ chuyên môn
   if (user.role === UserRole.ADMIN || user.role === UserRole.SUBADMIN) return true;
 
@@ -150,18 +164,18 @@ export function isViewAllowedForUser(
           'archive_completed_list', 'archive_pending_check_list', 'archive_check_list',
           'archive_handover_list', 'archive_director_completed', 'VIEW_ARCHIVE', 'MANAGE_ARCHIVE'
         ];
-        activePerms = activePerms.filter(p => !ARCHIVE_PERMS.includes(p));
+        activePerms = activePerms.filter(p => !ARCHIVE_PERMS.includes(p) && !p.startsWith('luutru_'));
       } else if (isLuutru && !isDodac) {
         const SURVEY_PERMS = [
           'all_records', 'all_sub_all', 'assign_tasks', 'completed_list',
           'pending_supplement_list', 'pending_check_list', 'check_list', 'handover_list', 'director_completed', 'survey_list'
         ];
-        activePerms = activePerms.filter(p => !SURVEY_PERMS.includes(p));
+        activePerms = activePerms.filter(p => !SURVEY_PERMS.includes(p) && !p.startsWith('dodac_'));
       }
     }
   }
 
-  // Luôn đảm bảo vai trò ONEDOOR kế thừa toàn bộ danh sách quyền mặc định của Một cửa
+  // Luôn đảm bảo vai trò ONEDOOR kế thừa toàn bộ danh sách quyền mặc định của Một cửa, và tuyệt đối không có module Đo đạc hoặc Lưu trữ
   if (user.role === UserRole.ONEDOOR) {
     const defaultOneDoor = DEFAULT_ROLE_PERMISSIONS[UserRole.ONEDOOR] || [];
     if (activePerms) {
@@ -169,6 +183,16 @@ export function isViewAllowedForUser(
     } else {
       activePerms = defaultOneDoor;
     }
+    const SURVEY_PERMS = [
+      'all_records', 'all_sub_all', 'assign_tasks', 'completed_list',
+      'pending_supplement_list', 'pending_check_list', 'check_list', 'handover_list', 'director_completed', 'survey_list'
+    ];
+    const ARCHIVE_PERMS = [
+      'archive_records', 'archive_sub_all', 'archive_assign_tasks',
+      'archive_completed_list', 'archive_pending_check_list', 'archive_check_list',
+      'archive_handover_list', 'archive_director_completed', 'VIEW_ARCHIVE', 'MANAGE_ARCHIVE'
+    ];
+    activePerms = activePerms.filter(p => !SURVEY_PERMS.includes(p) && !ARCHIVE_PERMS.includes(p) && !p.startsWith('dodac_') && !p.startsWith('luutru_'));
   }
 
   if (activePerms !== null) {
@@ -202,7 +226,13 @@ export function isViewAllowedForUser(
       case 'receive_group':
         return hasAnyPerm(ONEDOOR_CHILD_PERMS) || hasAnyPerm(CONTRACT_CHILD_PERMS);
       case 'records_group':
-        return hasAnyPerm(DODAC_CHILD_PERMS) || hasAnyPerm(LUUTRU_CHILD_PERMS) || activePerms.includes('registration_records');
+        if (user.role === UserRole.ONEDOOR) {
+          return activePerms.includes('registration_records');
+        }
+        const allowDodac = !isUserLuutru(user, employees || []) && (activePerms.includes('all_records') || activePerms.includes('all_sub_all') || activePerms.includes('assign_tasks') || activePerms.includes('completed_list'));
+        const allowLuutru = !isUserDodac(user, employees || []) && (activePerms.includes('archive_records') || activePerms.includes('archive_sub_all') || activePerms.includes('archive_assign_tasks') || activePerms.includes('archive_completed_list'));
+        const allowReg = activePerms.includes('registration_records');
+        return allowDodac || allowLuutru || allowReg;
       case 'tools_group':
         return activePerms.includes('reports') || activePerms.includes('VIEW_REPORTS') || activePerms.includes('excerpt_management') || activePerms.includes('MANAGE_EXCERPTS') || activePerms.includes('VIEW_EXCERPTS') || activePerms.includes('dodac_VIEW_EXCERPTS') || activePerms.includes('dodac_MANAGE_EXCERPTS') || activePerms.includes('utilities') || activePerms.includes('work_schedule');
       case 'management_group':
@@ -212,9 +242,13 @@ export function isViewAllowedForUser(
       case 'receive_record':
         return hasAnyPerm(ONEDOOR_CHILD_PERMS);
       case 'all_records':
-        return hasAnyPerm(DODAC_CHILD_PERMS);
+        if (user.role === UserRole.ONEDOOR) return false;
+        if (isUserLuutru(user, employees || [])) return false;
+        return activePerms.includes('all_records') || activePerms.includes('all_sub_all') || activePerms.includes('assign_tasks') || activePerms.includes('completed_list');
       case 'archive_records':
-        return hasAnyPerm(LUUTRU_CHILD_PERMS);
+        if (user.role === UserRole.ONEDOOR) return false;
+        if (isUserDodac(user, employees || [])) return false;
+        return activePerms.includes('archive_records') || activePerms.includes('archive_sub_all') || activePerms.includes('archive_assign_tasks') || activePerms.includes('archive_completed_list');
       case 'receive_contract':
         return hasAnyPerm(CONTRACT_CHILD_PERMS);
 

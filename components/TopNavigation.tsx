@@ -46,12 +46,6 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
 
   const hasPermission = (permissionId: string) => {
     if (isAdmin || isSubadmin) return true;
-    
-    // Đối với vai trò Một cửa, luôn cho phép các quyền mặc định của Một cửa
-    if (currentUser.role === UserRole.ONEDOOR) {
-        const defaultOneDoor = DEFAULT_ROLE_PERMISSIONS[UserRole.ONEDOOR] || [];
-        if (defaultOneDoor.includes(permissionId)) return true;
-    }
 
     if (currentUser.employeeId && employees) {
         const emp = employees.find(e => e.id === currentUser.employeeId);
@@ -75,7 +69,7 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
   };
 
   // Cập nhật danh sách các view được phép
-  const oneDoorAllowedViews = ['dashboard', 'receive_record', 'receive_contract', 'all_records', 'registration_records', 'personal_profile', 'account_settings', 'utilities', 'handover_list', 'work_schedule', 'archive_records', 'receive_group', 'records_group', 'reports', 'tools_group'];
+  const oneDoorAllowedViews = ['dashboard', 'receive_record', 'receive_contract', 'registration_records', 'personal_profile', 'account_settings', 'utilities', 'handover_list', 'work_schedule', 'receive_group', 'reports', 'tools_group'];
   const teamLeaderAllowedViews = ['dashboard', 'personal_profile', 'all_records', 'registration_records', 'excerpt_management', 'reports', 'account_settings', 'utilities', 'work_schedule', 'archive_records', 'records_group', 'tools_group'];
 
   // Define menu structure

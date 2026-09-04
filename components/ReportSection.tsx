@@ -55,7 +55,12 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
     const [selectedWard, setSelectedWard] = useState<string>('all');
     
     // State chọn nhân viên (Lifting state up)
-    const [selectedEmpId, setSelectedEmpId] = useState<string>('');
+    const [selectedEmpId, setSelectedEmpId] = useState<string>(() => {
+        if (currentUser?.role === 'EMPLOYEE' && currentUser?.employeeId) {
+            return currentUser.employeeId;
+        }
+        return '';
+    });
 
     // Report Type State
     const [reportType, setReportType] = useState<'today' | 'week' | 'month' | 'custom'>('custom');
@@ -64,6 +69,17 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
     const [cardFilter, setCardFilter] = useState<'all' | 'completed' | 'processing' | 'overdue_pending' | 'overdue_completed' | null>(null);
 
     const [activeTab, setActiveTab] = useState<'list' | 'ward_stats' | 'revenue' | 'ai' | 'employee' | 'daily_stats' | 'overdue'>('list');
+    
+    const isRevenueHidden = currentUser?.role === 'EMPLOYEE' || currentUser?.role === 'TEAM_LEADER';
+
+    useEffect(() => {
+        if (isRevenueHidden && activeTab === 'revenue') {
+            setActiveTab('list');
+        }
+        if (currentUser?.role === 'EMPLOYEE' && currentUser?.employeeId) {
+            setSelectedEmpId(currentUser.employeeId);
+        }
+    }, [currentUser, activeTab, isRevenueHidden]);
     const previewRef = useRef<HTMLDivElement>(null);
 
     const [isKeyModalOpen, setIsKeyModalOpen] = useState(false);
@@ -211,15 +227,27 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
     }, [mainTab, records]);
 
     const activeRecords = useMemo(() => {
-        return mainTab === 'measurement' 
+        let base = mainTab === 'measurement' 
             ? records.filter(r => {
                 const shortType = getShortRecordType(r.recordType);
                 return !isArchiveRecordType(r.recordType) && !['CMD', 'Tòa án', 'Thi hành án'].includes(shortType);
             }) 
             : archiveRecords;
-    }, [records, mainTab, archiveRecords]);
+
+        // Nếu là tài khoản EMPLOYEE, chỉ hiển thị những hồ sơ mình được giao việc
+        if (currentUser?.role === 'EMPLOYEE' && userEmployee) {
+            const empId = userEmployee.id;
+            const empName = userEmployee.name;
+            base = base.filter(r => r.assignedTo === empId || r.assignedTo === empName);
+        }
+
+        return base;
+    }, [records, mainTab, archiveRecords, currentUser, userEmployee]);
 
     const activeEmployees = useMemo(() => {
+        if (currentUser?.role === 'EMPLOYEE' && userEmployee) {
+            return [userEmployee];
+        }
         if (mainTab === 'measurement') {
             return employees.filter(e => {
                 const dept = e.department?.toLowerCase() || '';
@@ -231,7 +259,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                 return dept.includes('lưu trữ') && !dept.includes('một cửa') && !dept.includes('hành chính');
             });
         }
-    }, [employees, mainTab]);
+    }, [employees, mainTab, currentUser, userEmployee]);
 
     useEffect(() => {
         if (isKeyModalOpen) {
@@ -548,14 +576,16 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                     <PieChart size={18}/> 
                     <span className="hidden sm:inline">Thống kê theo Xã</span>
                 </button>
-                <button 
-                    onClick={() => setActiveTab('revenue')}
-                    className={`px-3 md:px-5 py-2.5 md:py-3 text-xs md:text-sm font-bold border-b-2 transition-all flex items-center justify-center gap-1.5 shrink-0 ${activeTab === 'revenue' ? 'border-emerald-600 text-emerald-600 bg-emerald-50/60 md:bg-transparent rounded-t-lg md:rounded-none' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-                    title="Báo cáo Doanh thu"
-                >
-                    <DollarSign size={18}/> 
-                    <span className="hidden sm:inline">Báo cáo Doanh thu</span>
-                </button>
+                {!isRevenueHidden && (
+                    <button 
+                        onClick={() => setActiveTab('revenue')}
+                        className={`px-3 md:px-5 py-2.5 md:py-3 text-xs md:text-sm font-bold border-b-2 transition-all flex items-center justify-center gap-1.5 shrink-0 ${activeTab === 'revenue' ? 'border-emerald-600 text-emerald-600 bg-emerald-50/60 md:bg-transparent rounded-t-lg md:rounded-none' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                        title="Báo cáo Doanh thu"
+                    >
+                        <DollarSign size={18}/> 
+                        <span className="hidden sm:inline">Báo cáo Doanh thu</span>
+                    </button>
+                )}
                 <button 
                     onClick={() => setActiveTab('employee')}
                     className={`px-3 md:px-5 py-2.5 md:py-3 text-xs md:text-sm font-bold border-b-2 transition-all flex items-center justify-center gap-1.5 shrink-0 ${activeTab === 'employee' ? 'border-orange-600 text-orange-600 bg-orange-50/60 md:bg-transparent rounded-t-lg md:rounded-none' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
@@ -957,6 +987,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                         selectedEmpId={selectedEmpId}
                         setSelectedEmpId={setSelectedEmpId}
                         defaultDeptFilter={mainTab === 'archive' ? 'archive' : mainTab === 'measurement' ? 'measurement' : 'all'}
+                        isEmployee={currentUser?.role === 'EMPLOYEE'}
                     />
                 )}
 
@@ -1026,7 +1057,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                     />
                 )}
 
-                {activeTab === 'revenue' && (
+                {!isRevenueHidden && activeTab === 'revenue' && (
                     <RevenueStatsView 
                         records={activeRecords}
                         employees={activeEmployees}

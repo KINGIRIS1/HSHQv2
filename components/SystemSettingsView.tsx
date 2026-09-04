@@ -487,13 +487,14 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
           try {
               const parsed = JSON.parse(savedPerms);
               Object.keys(DEFAULT_ROLE_PERMISSIONS).forEach(roleKey => {
-                  const defPerms = DEFAULT_ROLE_PERMISSIONS[roleKey as UserRole] || [];
-                  const existingPerms = (parsed[roleKey] || []).filter((p: string) => p !== 'CHECK_RECORDS' && p !== 'BTN_CLOSE_BATCH');
-                  parsed[roleKey] = Array.from(new Set([...existingPerms, ...defPerms]));
+                  if (!parsed[roleKey]) {
+                      parsed[roleKey] = DEFAULT_ROLE_PERMISSIONS[roleKey as UserRole] || [];
+                  }
               });
               setRolePermissions(parsed);
           } catch (e) {
               console.error("Failed to parse role_permissions", e);
+              setRolePermissions(DEFAULT_ROLE_PERMISSIONS);
           }
       } else {
           setRolePermissions(DEFAULT_ROLE_PERMISSIONS);
@@ -502,11 +503,6 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
       if (savedDeptPerms) {
           try {
               const parsedDept = JSON.parse(savedDeptPerms);
-              Object.keys(parsedDept).forEach(key => {
-                  if (Array.isArray(parsedDept[key])) {
-                      parsedDept[key] = parsedDept[key].filter((p: string) => p !== 'CHECK_RECORDS' && p !== 'BTN_CLOSE_BATCH');
-                  }
-              });
               setDepartmentPermissions(parsedDept);
           } catch (e) {
               console.error("Failed to parse department_permissions", e);

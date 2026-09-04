@@ -47,28 +47,20 @@ export const DEFAULT_ROLE_PERMISSIONS: RolePermissions = {
   [UserRole.ONEDOOR]: [
     'receive_record', 'receive_sub_create', 'receive_sub_bulk', 'receive_sub_list', 'receive_sub_vphc', 'ADD_RECORDS',
     'receive_contract', 'VIEW_CONTRACTS', 'ADD_CONTRACTS', 'EDIT_CONTRACTS', 'EXPORT_CONTRACTS',
-    'all_records', 'all_sub_all', 'handover_list', 'VIEW_RECORDS', 'HANDOVER_RECORDS', 'RETURN_RECORDS', 'EXPORT_RECORDS',
-    'archive_records', 'archive_sub_all', 'VIEW_ARCHIVE',
     'registration_records',
     'excerpt_management', 'VIEW_EXCERPTS',
     'reports', 'VIEW_REPORTS',
     'work_schedule', 'VIEW_SCHEDULE',
     'utilities', 'VIEW_CHAT', 'VIEW_PERSONAL_PROFILE',
-    'BTN_ASSIGN_STAFF', 'BTN_SUBMIT_SIGN', 'BTN_APPROVE_SIGN', 'BTN_SUBMIT_CHECK', 'BTN_REJECT_RECORD', 'HANDOVER_RECORDS', 'BTN_RETURN_RESULT', 'BTN_EXTEND_DEADLINE', 'EDIT_RECORDS', 'DELETE_RECORDS', 'VIEW_DETAILS',
-    'dodac_BTN_ASSIGN_STAFF', 'dodac_BTN_SUBMIT_CHECK', 'dodac_BTN_SUBMIT_SIGN', 'dodac_BTN_APPROVE_SIGN', 'dodac_BTN_REJECT_RECORD', 'dodac_HANDOVER_RECORDS', 'dodac_BTN_RETURN_RESULT', 'dodac_VIEW_EXCERPTS', 'dodac_MANAGE_EXCERPTS', 'dodac_BTN_EXTEND_DEADLINE', 'dodac_EDIT_RECORDS', 'dodac_DELETE_RECORDS', 'dodac_VIEW_DETAILS',
-    'luutru_BTN_ASSIGN_STAFF', 'luutru_BTN_SUBMIT_CHECK', 'luutru_BTN_SUBMIT_SIGN', 'luutru_BTN_APPROVE_SIGN', 'luutru_BTN_REJECT_RECORD', 'luutru_HANDOVER_RECORDS', 'luutru_BTN_RETURN_RESULT', 'luutru_VIEW_ARCHIVE', 'luutru_MANAGE_ARCHIVE', 'luutru_BTN_EXTEND_DEADLINE', 'luutru_EDIT_RECORDS', 'luutru_DELETE_RECORDS', 'luutru_VIEW_DETAILS'
+    'BTN_ASSIGN_STAFF', 'BTN_SUBMIT_SIGN', 'BTN_APPROVE_SIGN', 'BTN_SUBMIT_CHECK', 'BTN_REJECT_RECORD', 'HANDOVER_RECORDS', 'BTN_RETURN_RESULT', 'BTN_EXTEND_DEADLINE', 'EDIT_RECORDS', 'DELETE_RECORDS', 'VIEW_DETAILS'
   ],
   [UserRole.EMPLOYEE]: [
-    'receive_contract', 'VIEW_CONTRACTS', 'LIQUIDATE_CONTRACTS',
-    'all_records', 'all_sub_all', 'completed_list',
-    'archive_records', 'archive_sub_all', 'archive_completed_list',
-    'registration_records',
-    'excerpt_management', 'VIEW_EXCERPTS',
+    'reports', 'VIEW_REPORTS',
     'work_schedule', 'VIEW_SCHEDULE',
     'utilities',
-    'BTN_ASSIGN_STAFF', 'BTN_SUBMIT_SIGN', 'BTN_APPROVE_SIGN', 'BTN_SUBMIT_CHECK', 'BTN_REJECT_RECORD', 'HANDOVER_RECORDS', 'BTN_RETURN_RESULT', 'BTN_EXTEND_DEADLINE', 'EDIT_RECORDS', 'DELETE_RECORDS', 'VIEW_DETAILS',
-    'dodac_BTN_ASSIGN_STAFF', 'dodac_BTN_SUBMIT_CHECK', 'dodac_BTN_SUBMIT_SIGN', 'dodac_BTN_APPROVE_SIGN', 'dodac_BTN_REJECT_RECORD', 'dodac_HANDOVER_RECORDS', 'dodac_BTN_RETURN_RESULT', 'dodac_VIEW_EXCERPTS', 'dodac_MANAGE_EXCERPTS', 'dodac_BTN_EXTEND_DEADLINE', 'dodac_EDIT_RECORDS', 'dodac_DELETE_RECORDS', 'dodac_VIEW_DETAILS',
-    'luutru_BTN_ASSIGN_STAFF', 'luutru_BTN_SUBMIT_CHECK', 'luutru_BTN_SUBMIT_SIGN', 'luutru_BTN_APPROVE_SIGN', 'luutru_BTN_REJECT_RECORD', 'luutru_HANDOVER_RECORDS', 'luutru_BTN_RETURN_RESULT', 'luutru_VIEW_ARCHIVE', 'luutru_MANAGE_ARCHIVE', 'luutru_BTN_EXTEND_DEADLINE', 'luutru_EDIT_RECORDS', 'luutru_DELETE_RECORDS', 'luutru_VIEW_DETAILS'
+    'dashboard', 'VIEW_DASHBOARD',
+    'personal_profile', 'VIEW_PERSONAL_PROFILE',
+    'account_settings'
   ]
 };
 
