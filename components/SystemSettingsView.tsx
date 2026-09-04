@@ -199,8 +199,15 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
       let standardName = trimmed;
       if (matchDepartmentKey('đo đạc', trimmed)) standardName = 'Tổ Đo đạc';
       else if (matchDepartmentKey('lưu trữ', trimmed)) standardName = 'Tổ Lưu trữ';
+      else if (matchDepartmentKey('hành chính', trimmed)) standardName = 'Tổ Hành chính';
 
-      if (!resultList.includes(standardName)) {
+      const isDuplicate = resultList.some(existing => {
+        if (existing.toLowerCase() === standardName.toLowerCase()) return true;
+        if (matchDepartmentKey(existing, standardName) || matchDepartmentKey(standardName, existing)) return true;
+        return false;
+      });
+
+      if (!isDuplicate) {
         resultList.push(standardName);
       }
     };
