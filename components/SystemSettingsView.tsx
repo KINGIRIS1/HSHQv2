@@ -72,6 +72,7 @@ const PERMISSION_GROUPS = [
     title: '3. Quyền Thao tác - Tổ Đo đạc',
     desc: 'Các nút bấm và hành động xử lý chuyên môn tại Tổ Đo đạc',
     items: [
+      { id: 'dodac_ADD_RECORDS', label: 'Thêm mới hồ sơ (Đo đạc)' },
       { id: 'dodac_BTN_ASSIGN_STAFF', label: 'Giao việc (Đo đạc)' },
       { id: 'dodac_BTN_SUBMIT_CHECK', label: 'Trình kiểm tra (Đo đạc)' },
       { id: 'dodac_BTN_SUBMIT_SIGN', label: 'Trình ký (Đo đạc)' },
@@ -92,6 +93,7 @@ const PERMISSION_GROUPS = [
     title: '4. Quyền Thao tác - Tổ Lưu trữ',
     desc: 'Các nút bấm và hành động xử lý chuyên môn tại Tổ Lưu trữ',
     items: [
+      { id: 'luutru_ADD_RECORDS', label: 'Thêm mới hồ sơ (Lưu trữ)' },
       { id: 'luutru_BTN_ASSIGN_STAFF', label: 'Giao việc (Lưu trữ)' },
       { id: 'luutru_BTN_SUBMIT_CHECK', label: 'Trình kiểm tra (Lưu trữ)' },
       { id: 'luutru_BTN_SUBMIT_SIGN', label: 'Trình ký (Lưu trữ)' },

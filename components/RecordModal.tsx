@@ -543,27 +543,47 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                         </div>
                         {hasAdminRights && (
                             <>
-                                <div><label className="block text-xs font-bold text-gray-700 mb-1">Trạng thái</label><select className="w-full border border-gray-300 rounded-md px-3 py-2 bg-yellow-50 font-medium" value={val(formData.status)} onChange={(e) => handleChange('status', e.target.value)}>{SELECTABLE_STATUSES.map(item => <option key={item.key} value={item.key}>{item.label}</option>)}</select></div>
+                                <div><label className="block text-xs font-bold text-gray-700 mb-1">Trạng thái</label><select className="w-full border border-gray-300 rounded-md px-3 py-2 bg-yellow-50 font-medium" value={val(formData.status)} onChange={(e) => handleChange('status', e.target.value)}>{SELECTABLE_STATUSES.filter(item => !isArchive || (item.key !== RecordStatus.PENDING_CHECK && item.key !== RecordStatus.CHECKED)).map(item => <option key={item.key} value={item.key}>{item.label}</option>)}</select></div>
                                 <div><label className="block text-xs font-bold text-gray-700 mb-1">Ngày nhận</label><input type="date" required className="w-full border border-gray-300 rounded-md px-3 py-2" value={dateVal(formData.receivedDate)} onChange={(e) => handleChange('receivedDate', e.target.value)} /></div>
                                 {!isCongVan && (
                                     <div><label className="block text-xs font-bold text-gray-700 mb-1">Hẹn trả <span className="text-red-500">*</span></label><input type="date" required className="w-full border border-gray-300 rounded-md px-3 py-2 font-semibold text-red-600 bg-red-50" value={dateVal(formData.deadline)} onChange={(e) => handleChange('deadline', e.target.value)} /></div>
                                 )}
-                                <div><label className="block text-xs font-bold text-gray-700 mb-1">Ngày giao NV</label><input type="date" className="w-full border border-gray-300 rounded-md px-3 py-2" value={dateVal(formData.assignedDate)} onChange={(e) => handleChange('assignedDate', e.target.value)} /></div>
-                                
-                                {(formData.status === RecordStatus.HANDOVER || formData.status === RecordStatus.WITHDRAWN || formData.status === RecordStatus.RETURNED || formData.status === RecordStatus.REJECTED || formData.exportBatch) && (
-                                    <div><label className="block text-xs font-bold text-green-700 mb-1">{formData.status === RecordStatus.WITHDRAWN ? 'Ngày rút hồ sơ' : formData.status === RecordStatus.REJECTED ? 'Ngày trả hồ sơ' : 'Ngày hoàn thành'}</label><input type="date" className="w-full border border-green-300 rounded-md px-3 py-2 bg-green-50 font-semibold text-green-800" value={dateVal(formData.completedDate)} onChange={(e) => handleChange('completedDate', e.target.value)} /></div>
-                                )}
-                                
-                                {/* Thêm trường hiển thị Ngày Trình Kiểm Tra, Ngày Trình Ký và Ngày Ký Duyệt nếu trạng thái tương ứng */}
-                                {!isArchive && (formData.status === RecordStatus.PENDING_CHECK || formData.status === RecordStatus.CHECKED) && (
-                                    <div><label className="block text-xs font-bold text-blue-700 mb-1">Ngày trình kiểm tra</label><input type="date" className="w-full border border-blue-300 rounded-md px-3 py-2 bg-blue-50 text-blue-800" value={dateVal(formData.pendingCheckDate)} onChange={(e) => handleChange('pendingCheckDate', e.target.value)} /></div>
-                                )}
-                                {(formData.status === RecordStatus.PENDING_SIGN) && (
-                                    <div><label className="block text-xs font-bold text-purple-700 mb-1">Ngày trình ký</label><input type="date" className="w-full border border-purple-300 rounded-md px-3 py-2 bg-purple-50 text-purple-800" value={dateVal(formData.submissionDate)} onChange={(e) => handleChange('submissionDate', e.target.value)} /></div>
-                                )}
-                                {(formData.status === RecordStatus.SIGNED) && (
-                                    <div><label className="block text-xs font-bold text-indigo-700 mb-1">Ngày ký duyệt</label><input type="date" className="w-full border border-indigo-300 rounded-md px-3 py-2 bg-indigo-50 text-indigo-800" value={dateVal(formData.approvalDate)} onChange={(e) => handleChange('approvalDate', e.target.value)} /></div>
-                                )}
+                                {(() => {
+                                    const statusFlow = [
+                                        RecordStatus.RECEIVED,
+                                        RecordStatus.ASSIGNED,
+                                        RecordStatus.IN_PROGRESS,
+                                        RecordStatus.COMPLETED_WORK,
+                                        RecordStatus.PENDING_CHECK,
+                                        RecordStatus.CHECKED,
+                                        RecordStatus.PENDING_SIGN,
+                                        RecordStatus.SIGNED,
+                                        RecordStatus.HANDOVER,
+                                        RecordStatus.RETURNED
+                                    ];
+                                    const currentIdx = statusFlow.indexOf(formData.status);
+                                    const hasAssigned = currentIdx >= statusFlow.indexOf(RecordStatus.ASSIGNED) || !!formData.assignedDate;
+                                    const hasPendingCheck = !isArchive && (currentIdx >= statusFlow.indexOf(RecordStatus.PENDING_CHECK) || !!formData.pendingCheckDate);
+                                    const hasSubmission = currentIdx >= statusFlow.indexOf(RecordStatus.PENDING_SIGN) || !!formData.submissionDate;
+                                    const hasHandover = currentIdx >= statusFlow.indexOf(RecordStatus.SIGNED) || formData.status === RecordStatus.HANDOVER || formData.status === RecordStatus.RETURNED || !!formData.completedDate;
+
+                                    return (
+                                        <>
+                                            {hasAssigned && (
+                                                <div><label className="block text-xs font-bold text-gray-700 mb-1">Ngày giao NV</label><input type="date" className="w-full border border-gray-300 rounded-md px-3 py-2" value={dateVal(formData.assignedDate)} onChange={(e) => handleChange('assignedDate', e.target.value)} /></div>
+                                            )}
+                                            {hasPendingCheck && (
+                                                <div><label className="block text-xs font-bold text-blue-700 mb-1">Ngày trình kiểm tra</label><input type="date" className="w-full border border-blue-300 rounded-md px-3 py-2 bg-blue-50/50 text-blue-800" value={dateVal(formData.pendingCheckDate)} onChange={(e) => handleChange('pendingCheckDate', e.target.value)} /></div>
+                                            )}
+                                            {hasSubmission && (
+                                                <div><label className="block text-xs font-bold text-purple-700 mb-1">Ngày trình ký</label><input type="date" className="w-full border border-purple-300 rounded-md px-3 py-2 bg-purple-50/50 text-purple-800" value={dateVal(formData.submissionDate)} onChange={(e) => handleChange('submissionDate', e.target.value)} /></div>
+                                            )}
+                                            {hasHandover && (
+                                                <div><label className="block text-xs font-bold text-green-700 mb-1">Ngày hoàn thành (Giao 1 cửa)</label><input type="date" className="w-full border border-green-300 rounded-md px-3 py-2 bg-green-50/50 font-semibold text-green-800" value={dateVal(formData.completedDate)} onChange={(e) => handleChange('completedDate', e.target.value)} /></div>
+                                            )}
+                                        </>
+                                    );
+                                })()}
                             </>
                         )}
                     </div>

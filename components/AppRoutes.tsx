@@ -960,7 +960,11 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                 </div>
               )}
 
-            {canPerformAction && !["handover_list", "archive_handover_list"].includes(currentView) && (
+            {(() => {
+              const isArchiveView = (currentView || '').startsWith('archive_');
+              const canAdd = (isArchiveView ? (hasPermission('luutru_ADD_RECORDS') || hasPermission('ADD_RECORDS')) : (hasPermission('dodac_ADD_RECORDS') || hasPermission('ADD_RECORDS'))) || canPerformAction;
+              return canAdd && !["handover_list", "archive_handover_list"].includes(currentView);
+            })() && (
               <div className="flex items-center gap-2 flex-wrap">
                 <div className="h-6 w-px bg-gray-300 mx-1"></div>
                 <div className="relative inline-block text-left" ref={addMenuRef}>
