@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { RecordFile, RecordStatus, User, Employee, Contract } from "../types";
+import { RecordFile, RecordStatus, User, Employee, Contract, UserRole } from "../types";
 import StatusBadge from "./StatusBadge";
 import {
   Briefcase,
@@ -137,6 +137,24 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
   });
   const [returnReason, setReturnReason] = useState("");
 
+  const currentEmployee = useMemo(() => {
+    return employees.find((e) => e.id === user.employeeId);
+  }, [employees, user.employeeId]);
+
+  const isDirectorUser = useMemo(() => {
+    const pos = currentEmployee?.position?.toLowerCase() || '';
+    const dept = currentEmployee?.department?.toLowerCase() || '';
+    return (
+      isDirector ||
+      user.role === UserRole.ADMIN ||
+      user.role === UserRole.SUBADMIN ||
+      pos.includes("giám đốc") ||
+      pos.includes("phó giám đốc") ||
+      dept.includes("ban giám đốc") ||
+      dept.includes("ban lãnh đạo")
+    );
+  }, [isDirector, user.role, currentEmployee]);
+
   useEffect(() => {
     const loadArchive = async () => {
       const saoluc = await fetchArchiveRecords("saoluc");
@@ -159,9 +177,16 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
     const mainRecords = records.filter((r) => {
       if (!user.employeeId) return false;
       if (isDirector) {
-        return (
-          r.submittedTo === user.employeeId || r.assignedTo === user.employeeId
-        );
+        if (r.assignedTo === user.employeeId) return true;
+        if (r.submittedTo === user.employeeId) {
+          const reachedSignStage =
+            r.status === RecordStatus.PENDING_SIGN ||
+            r.status === RecordStatus.SIGNED ||
+            r.status === RecordStatus.HANDOVER ||
+            r.status === RecordStatus.RETURNED;
+          return reachedSignStage;
+        }
+        return false;
       }
       // Nếu là người kiểm tra, họ có thể thấy hồ sơ được giao cho họ HOẶC hồ sơ trình cho họ kiểm tra
       const isCheckerUser =
@@ -197,10 +222,28 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
       .filter((r) => {
         if (!user.employeeId) return false;
         if (isDirector) {
-          return (
-            r.data?.submitted_to === user.employeeId ||
-            r.data?.assigned_to === user.employeeId
-          );
+          if (r.data?.assigned_to === user.employeeId) return true;
+          if (r.data?.submitted_to === user.employeeId || r.data?.submittedTo === user.employeeId) {
+            let status: RecordStatus = RecordStatus.RECEIVED;
+            const rawSt = String(r.status || '').toLowerCase();
+            if (rawSt === 'assigned') status = RecordStatus.ASSIGNED;
+            else if (rawSt === 'executed' || rawSt === 'completed_work') status = RecordStatus.COMPLETED_WORK;
+            else if (rawSt === 'pending_supplement') status = RecordStatus.PENDING_SUPPLEMENT;
+            else if (rawSt === 'pending_check') status = RecordStatus.PENDING_CHECK;
+            else if (rawSt === 'checked') status = RecordStatus.CHECKED;
+            else if (rawSt === 'pending_sign') status = RecordStatus.PENDING_SIGN;
+            else if (rawSt === 'signed') status = RecordStatus.SIGNED;
+            else if (rawSt === 'handover') status = RecordStatus.HANDOVER;
+            else if (rawSt === 'completed') status = RecordStatus.RETURNED;
+
+            const reachedSignStage =
+              status === RecordStatus.PENDING_SIGN ||
+              status === RecordStatus.SIGNED ||
+              status === RecordStatus.HANDOVER ||
+              status === RecordStatus.RETURNED;
+            return reachedSignStage;
+          }
+          return false;
         }
         const isCheckerUser =
           employees
@@ -220,16 +263,22 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
           if (r.data?.checked_by === user.employeeId) {
             // Map status của archive để kiểm tra xem đã tới khâu kiểm tra chưa
             let status: RecordStatus = RecordStatus.RECEIVED;
-            if (r.status === "assigned") status = RecordStatus.ASSIGNED;
-            else if (r.status === "executed") status = RecordStatus.COMPLETED_WORK;
-            else if (r.status === "pending_sign") status = RecordStatus.PENDING_SIGN;
-            else if (r.status === "signed") status = RecordStatus.SIGNED;
-            else if (r.status === "completed") status = RecordStatus.RETURNED;
+            const rawSt = String(r.status || '').toLowerCase();
+            if (rawSt === 'assigned') status = RecordStatus.ASSIGNED;
+            else if (rawSt === 'executed' || rawSt === 'completed_work') status = RecordStatus.COMPLETED_WORK;
+            else if (rawSt === 'pending_supplement') status = RecordStatus.PENDING_SUPPLEMENT;
+            else if (rawSt === 'pending_check') status = RecordStatus.PENDING_CHECK;
+            else if (rawSt === 'checked') status = RecordStatus.CHECKED;
+            else if (rawSt === 'pending_sign') status = RecordStatus.PENDING_SIGN;
+            else if (rawSt === 'signed') status = RecordStatus.SIGNED;
+            else if (rawSt === 'handover') status = RecordStatus.HANDOVER;
+            else if (rawSt === 'completed') status = RecordStatus.RETURNED;
 
             const reachedCheckStage =
-              status === RecordStatus.PENDING_SIGN ||
-              status === RecordStatus.SIGNED ||
-              status === RecordStatus.RETURNED;
+              status !== RecordStatus.RECEIVED &&
+              status !== RecordStatus.ASSIGNED &&
+              status !== RecordStatus.IN_PROGRESS &&
+              status !== RecordStatus.COMPLETED_WORK;
             return reachedCheckStage;
           }
           return false;
@@ -721,6 +770,63 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
     setIsSubmitCheckModalOpen(true);
   };
 
+  const handleSignRecord = async (record: RecordFile) => {
+    if (
+      await confirmAction(
+        `Xác nhận ký duyệt hồ sơ ${record.code}?\nHồ sơ sẽ chuyển sang trạng thái "Chờ bàn giao" (Đã ký).`
+      )
+    ) {
+      const nowIso = new Date().toISOString();
+      if (
+        record.recordType === "Sao lục" ||
+        record.recordType === "Công văn" ||
+        isArchiveRecordType(record.recordType)
+      ) {
+        const historyEntry = {
+          action: "Ký duyệt",
+          status: "signed",
+          timestamp: nowIso,
+          user: user.name,
+        };
+        const currentArchive = archiveRecords.find((r) => r.id === record.id);
+        if (currentArchive) {
+          const oldHistory = Array.isArray(currentArchive.data?.history)
+            ? currentArchive.data.history
+            : [];
+          const newHistory = [...oldHistory, historyEntry];
+          await saveArchiveRecord({
+            ...currentArchive,
+            id: record.id,
+            status: "signed",
+            so_hieu: currentArchive.so_hieu || record.code || '',
+            noi_nhan_gui: currentArchive.noi_nhan_gui || record.customerName || '',
+            trich_yeu: currentArchive.trich_yeu || record.content || '',
+            data: {
+              ...currentArchive.data,
+              history: newHistory,
+              approvalDate: nowIso,
+            },
+          });
+          const saoluc = await fetchArchiveRecords("saoluc");
+          const congvan = await fetchArchiveRecords("congvan");
+          setArchiveRecords([...saoluc, ...congvan]);
+        }
+      } else {
+        const updatedRecord: RecordFile = {
+          ...record,
+          status: RecordStatus.SIGNED,
+          approvalDate: nowIso,
+        };
+        if (onUpdateRecord) {
+          await onUpdateRecord(updatedRecord);
+        } else {
+          await updateRecordApi(updatedRecord);
+          onUpdateStatus(record, RecordStatus.SIGNED);
+        }
+      }
+    }
+  };
+
   const handleConfirmSubmit = async (directorId: string) => {
     try {
       for (const record of submitTargetRecords) {
@@ -1001,9 +1107,9 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
       case "pending":
         return "Đang thực hiện";
       case "pending_check":
-        return "Chờ kiểm tra";
+        return "Kiểm tra";
       case "pending_sign":
-        return "Chờ ký";
+        return "Trình ký";
       case "finished":
         return "Hoàn thành";
       case "reminder":
@@ -1043,66 +1149,51 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
             Danh sách hồ sơ bạn đang phụ trách.
           </p>
         </div>
-        <div className={`grid ${isChecker || isMeasurementTeam ? "grid-cols-5" : "grid-cols-4"} sm:flex gap-1.5 md:gap-4 w-full md:w-auto justify-center`}>
+        <div className={`grid ${isChecker || isMeasurementTeam ? "grid-cols-5" : "grid-cols-4"} sm:flex gap-1.5 md:gap-3 w-full md:w-auto justify-center`}>
           <div 
             onClick={() => { setActiveTab("all"); setCurrentPage(1); setSearchTerm(""); }}
-            className={`cursor-pointer active:scale-95 transition-all text-center p-1.5 md:px-4 md:py-2 bg-slate-100 rounded-lg border ${activeTab === "all" ? "ring-2 ring-slate-600 border-slate-500 font-extrabold shadow-sm" : "border-slate-200 hover:border-slate-400"} min-w-0 md:min-w-[90px] flex flex-col justify-center`}
+            className={`cursor-pointer active:scale-95 transition-all text-center px-3 py-2.5 bg-slate-50 rounded-lg border ${activeTab === "all" ? "ring-2 ring-slate-600 border-slate-500 font-extrabold shadow-sm bg-slate-100" : "border-slate-200 hover:border-slate-400"} min-w-0 md:min-w-[100px] flex flex-col justify-center`}
             title="Xem tất cả hồ sơ"
           >
-            <div className="text-base md:text-2xl font-bold text-slate-800">
-              {myRecords.length}
-            </div>
-            <div className="text-[9px] md:text-xs text-slate-700 uppercase font-bold leading-tight mt-0.5">
+            <div className="text-xs md:text-sm text-slate-700 uppercase font-bold tracking-wide leading-tight">
               Tất cả
             </div>
           </div>
           <div 
             onClick={() => { setActiveTab("pending"); setCurrentPage(1); setSearchTerm(""); }}
-            className={`cursor-pointer active:scale-95 transition-all text-center p-1.5 md:px-4 md:py-2 bg-blue-50 rounded-lg border ${activeTab === "pending" ? "ring-2 ring-blue-500 border-blue-400 font-extrabold shadow-sm" : "border-blue-100 hover:border-blue-300"} min-w-0 md:min-w-[90px] flex flex-col justify-center`}
+            className={`cursor-pointer active:scale-95 transition-all text-center px-3 py-2.5 bg-blue-50/60 rounded-lg border ${activeTab === "pending" ? "ring-2 ring-blue-500 border-blue-400 font-extrabold shadow-sm bg-blue-50" : "border-blue-100 hover:border-blue-300"} min-w-0 md:min-w-[110px] flex flex-col justify-center`}
             title="Xem danh sách đang thực hiện"
           >
-            <div className="text-base md:text-2xl font-bold text-blue-700">
-              {pendingRecords.length}
-            </div>
-            <div className="text-[9px] md:text-xs text-blue-600 uppercase font-bold leading-tight mt-0.5">
+            <div className="text-xs md:text-sm text-blue-700 uppercase font-bold tracking-wide leading-tight">
               Đang thực hiện
             </div>
           </div>
           {(isChecker || isMeasurementTeam) && (
             <div 
               onClick={() => { setActiveTab("pending_check"); setCurrentPage(1); setSearchTerm(""); }}
-              className={`cursor-pointer active:scale-95 transition-all text-center p-1.5 md:px-4 md:py-2 bg-orange-50 rounded-lg border ${activeTab === "pending_check" ? "ring-2 ring-orange-500 border-orange-400 font-extrabold shadow-sm" : "border-orange-100 hover:border-orange-300"} min-w-0 md:min-w-[100px] flex flex-col justify-center`}
-              title="Xem danh sách chờ kiểm tra"
+              className={`cursor-pointer active:scale-95 transition-all text-center px-3 py-2.5 bg-orange-50/60 rounded-lg border ${activeTab === "pending_check" ? "ring-2 ring-orange-500 border-orange-400 font-extrabold shadow-sm bg-orange-50" : "border-orange-100 hover:border-orange-300"} min-w-0 md:min-w-[110px] flex flex-col justify-center`}
+              title="Xem danh sách kiểm tra"
             >
-              <div className="text-base md:text-2xl font-bold text-orange-700">
-                {pendingCheckRecords.length}
-              </div>
-              <div className="text-[9px] md:text-xs text-orange-600 uppercase font-bold leading-tight mt-0.5">
-                Chờ kiểm tra
+              <div className="text-xs md:text-sm text-orange-700 uppercase font-bold tracking-wide leading-tight">
+                Kiểm tra
               </div>
             </div>
           )}
           <div 
             onClick={() => { setActiveTab("pending_sign"); setCurrentPage(1); setSearchTerm(""); }}
-            className={`cursor-pointer active:scale-95 transition-all text-center p-1.5 md:px-4 md:py-2 bg-purple-50 rounded-lg border ${activeTab === "pending_sign" ? "ring-2 ring-purple-500 border-purple-400 font-extrabold shadow-sm" : "border-purple-100 hover:border-purple-300"} min-w-0 md:min-w-[100px] flex flex-col justify-center`}
-            title="Xem danh sách chờ ký"
+            className={`cursor-pointer active:scale-95 transition-all text-center px-3 py-2.5 bg-purple-50/60 rounded-lg border ${activeTab === "pending_sign" ? "ring-2 ring-purple-500 border-purple-400 font-extrabold shadow-sm bg-purple-50" : "border-purple-100 hover:border-purple-300"} min-w-0 md:min-w-[110px] flex flex-col justify-center`}
+            title="Xem danh sách trình ký"
           >
-            <div className="text-base md:text-2xl font-bold text-purple-700">
-              {reviewRecords.length}
-            </div>
-            <div className="text-[9px] md:text-xs text-purple-600 uppercase font-bold leading-tight mt-0.5">
-              Chờ ký
+            <div className="text-xs md:text-sm text-purple-700 uppercase font-bold tracking-wide leading-tight">
+              Trình ký
             </div>
           </div>
           <div 
             onClick={() => { setActiveTab("finished"); setCurrentPage(1); setSearchTerm(""); }}
-            className={`cursor-pointer active:scale-95 transition-all text-center p-1.5 md:px-4 md:py-2 bg-green-50 rounded-lg border ${activeTab === "finished" ? "ring-2 ring-green-500 border-green-400 font-extrabold shadow-sm" : "border-green-100 hover:border-green-300"} min-w-0 md:min-w-[100px] flex flex-col justify-center`}
+            className={`cursor-pointer active:scale-95 transition-all text-center px-3 py-2.5 bg-green-50/60 rounded-lg border ${activeTab === "finished" ? "ring-2 ring-green-500 border-green-400 font-extrabold shadow-sm bg-green-50" : "border-green-100 hover:border-green-300"} min-w-0 md:min-w-[110px] flex flex-col justify-center`}
             title="Xem danh sách hoàn thành"
           >
-            <div className="text-base md:text-2xl font-bold text-green-700">
-              {finishedRecords.length}
-            </div>
-            <div className="text-[9px] md:text-xs text-green-600 uppercase font-bold leading-tight mt-0.5">
+            <div className="text-xs md:text-sm text-green-700 uppercase font-bold tracking-wide leading-tight">
               Hoàn thành
             </div>
           </div>
@@ -1360,6 +1451,16 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                                     <Send size={14} /> Trình ký
                                   </button>
                                 )}
+
+                              {isDirectorUser && r.status === RecordStatus.PENDING_SIGN && (
+                                <button
+                                  onClick={() => handleSignRecord(r)}
+                                  title="Ký duyệt hồ sơ"
+                                  className="px-3 py-1.5 bg-purple-600 text-white rounded-md hover:bg-purple-700 text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all"
+                                >
+                                  <FileCheck size={14} /> Ký duyệt
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -1499,6 +1600,16 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                                 <Send size={12} /> Trình ký
                               </button>
                             )}
+
+                          {isDirectorUser && r.status === RecordStatus.PENDING_SIGN && (
+                            <button
+                              onClick={() => handleSignRecord(r)}
+                              className="px-2.5 py-1.5 bg-purple-600 text-white rounded-lg text-xs font-bold flex items-center gap-1"
+                              title="Ký duyệt hồ sơ"
+                            >
+                              <FileCheck size={12} /> Ký duyệt
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>

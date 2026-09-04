@@ -322,9 +322,6 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
                         <option value="">-- Chọn loại hồ sơ / thủ tục --</option>
                         {EXTENDED_RECORD_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                     </select>
-                    {!formData.recordType && (
-                        <p className="text-[11px] text-amber-600 mt-1 font-medium">* Bắt buộc chọn loại hồ sơ để kích hoạt lưu</p>
-                    )}
                 </div>
 
                 <div>
