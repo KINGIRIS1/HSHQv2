@@ -535,15 +535,15 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
 
   const handleExportExcel = () => {
     const dataToExport = displayRecords.map((r, idx) => ({
-      STT: idx + 1,
-      "Mã hồ sơ": r.code,
-      "Chủ sử dụng": r.customerName,
+      "STT": idx + 1,
+      "Mã hồ sơ": r.code || "",
+      "Chủ sử dụng": r.customerName || "",
       "Số điện thoại": r.phoneNumber || "",
       CCCD: r.cccd || "",
-      "Loại hồ sơ": r.recordType,
+      "Loại hồ sơ": r.recordType || "",
       "Ngày nhận": r.receivedDate ? r.receivedDate.split("T")[0] : "",
       "Hẹn trả": r.deadline ? r.deadline.split("T")[0] : "",
-      "Trạng thái": r.status,
+      "Trạng thái": r.status || "",
       "Xã/Phường": r.ward || "",
       "Số tờ": r.mapSheet || "",
       "Số thửa": r.landPlot || "",
@@ -554,16 +554,79 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
       "Ngày trình ký": r.submissionDate ? r.submissionDate.split("T")[0] : "",
       "Ngày duyệt": r.approvalDate ? r.approvalDate.split("T")[0] : "",
       "Ngày hoàn thành": r.completedDate ? r.completedDate.split("T")[0] : "",
-      "Ngày trả kết quả": r.resultReturnedDate
-        ? r.resultReturnedDate.split("T")[0]
-        : "",
+      "Ngày trả kết quả": r.resultReturnedDate ? r.resultReturnedDate.split("T")[0] : "",
       "Ghi chú": cleanSyncNotes(r.notes) || "",
       "Ghi chú cá nhân": r.personalNotes || "",
       "Số trích đo": r.measurementNumber || "",
       "Số trích lục": r.excerptNumber || "",
     }));
 
+    if (dataToExport.length === 0) return;
+
     const ws = XLSX.utils.json_to_sheet(dataToExport);
+
+    // Set column widths
+    ws['!cols'] = [
+      { wch: 6 },  // STT
+      { wch: 16 }, // Mã hồ sơ
+      { wch: 25 }, // Chủ sử dụng
+      { wch: 14 }, // Số điện thoại
+      { wch: 16 }, // CCCD
+      { wch: 20 }, // Loại hồ sơ
+      { wch: 12 }, // Ngày nhận
+      { wch: 12 }, // Hẹn trả
+      { wch: 15 }, // Trạng thái
+      { wch: 18 }, // Xã/Phường
+      { wch: 8 },  // Số tờ
+      { wch: 8 },  // Số thửa
+      { wch: 10 }, // Diện tích
+      { wch: 30 }, // Địa chỉ
+      { wch: 35 }, // Nội dung
+      { wch: 14 }, // Ngày giao việc
+      { wch: 14 }, // Ngày trình ký
+      { wch: 14 }, // Ngày duyệt
+      { wch: 14 }, // Ngày hoàn thành
+      { wch: 15 }, // Ngày trả kết quả
+      { wch: 25 }, // Ghi chú
+      { wch: 20 }, // Ghi chú cá nhân
+      { wch: 12 }, // Số trích đo
+      { wch: 12 }, // Số trích lục
+    ];
+
+    // Set row heights for line spacing / padding
+    const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+    const rowHeights = [{ hpt: 28 }]; // Header row height
+    for (let r = 1; r <= range.e.r; r++) {
+      rowHeights.push({ hpt: 22 }); // Data row height
+    }
+    ws['!rows'] = rowHeights;
+
+    const borderStyle = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
+    const styles = {
+      tableHeader: { font: { name: "Times New Roman", sz: 11, bold: true }, alignment: { horizontal: "center", vertical: "center", wrapText: true }, border: borderStyle, fill: { fgColor: { rgb: "E0E0E0" } } },
+      tableData: { font: { name: "Times New Roman", sz: 11 }, border: borderStyle, alignment: { vertical: "center", wrapText: true } },
+      tableDataCenter: { font: { name: "Times New Roman", sz: 11 }, border: borderStyle, alignment: { horizontal: "center", vertical: "center", wrapText: true } }
+    };
+
+    const headers = Object.keys(dataToExport[0] || {});
+    const centerCols = ["STT", "Mã hồ sơ", "Ngày nhận", "Hẹn trả", "Trạng thái", "Số tờ", "Số thửa", "Ngày giao việc", "Ngày trình ký", "Ngày duyệt", "Ngày hoàn thành", "Ngày trả kết quả"];
+
+    for (let c = 0; c < headers.length; c++) {
+      const headerCell = XLSX.utils.encode_cell({ r: 0, c: c });
+      if (ws[headerCell]) ws[headerCell].s = styles.tableHeader;
+
+      for (let r = 1; r <= dataToExport.length; r++) {
+        const cellRef = XLSX.utils.encode_cell({ r, c });
+        if (!ws[cellRef]) ws[cellRef] = { v: "", t: "s" };
+        const colName = headers[c];
+        if (centerCols.includes(colName)) {
+          ws[cellRef].s = styles.tableDataCenter;
+        } else {
+          ws[cellRef].s = styles.tableData;
+        }
+      }
+    }
+
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "HoSoCaNhan");
     XLSX.writeFile(

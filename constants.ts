@@ -177,7 +177,7 @@ export const getShortRecordType = (type: string | null | undefined): string => {
 export const getFullRecordType = (type: string | null | undefined): string => {
   if (!type) return '';
   const short = getShortRecordType(type);
-  if (short === '1.1 Sao lục') return '1.1 Cung cấp dữ liệu đất đai (Sao lục hồ sơ)';
+  if (short === '1.1 Sao lục') return '1.1 Sao lục hồ sơ';
   if (short === '1.2 Công văn') return '1.2 Công văn';
   if (short === '2.1 Trích lục') return '2.1 Trích lục bản đồ địa chính';
   if (short === '2.2 Trích đo') return '2.2 Đo đạc chỉnh lý bản đồ địa chính';
