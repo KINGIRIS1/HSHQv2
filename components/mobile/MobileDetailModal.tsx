@@ -787,7 +787,7 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                   subText={record.assignedTo ? (() => {
                       const emp = employees.find(e => e.id === record.assignedTo);
                       if (!emp) return undefined;
-                      return `${emp.name} (${emp.department})`;
+                      return `${emp.name} (${emp.position || 'Chuyên viên'});`
                   })() : undefined}
                 />
 

@@ -695,13 +695,11 @@ export const RecordSearch: React.FC<RecordSearchProps> = ({
                             )}
                         </div>
 
-                        <span className="text-slate-500 text-xs font-semibold">
-                            {selectedIds.size > 0 ? (
-                                <>Đã chọn <strong className="text-emerald-700 font-bold">{selectedIds.size}</strong> hồ sơ</>
-                            ) : (
-                                <>Tổng số <strong className="text-slate-700 font-bold">{sortedRecords.length}</strong> hồ sơ</>
-                            )}
-                        </span>
+                        {selectedIds.size > 0 && (
+                            <span className="text-slate-500 text-xs font-semibold">
+                                Đã chọn <strong className="text-emerald-700 font-bold">{selectedIds.size}</strong> hồ sơ
+                            </span>
+                        )}
                     </div>
 
                     {/* Column Configuration & Export buttons */}
@@ -911,7 +909,7 @@ export const RecordSearch: React.FC<RecordSearchProps> = ({
                                                 case 'deadlineOld': {
                                                     const { oldDeadline } = getExtensionDates(r);
                                                     return (
-                                                        <td key="deadlineOld" className="p-3 align-middle text-center font-bold text-gray-500 font-mono">
+                                                        <td key="deadlineOld" className="p-3 align-middle text-center font-bold text-gray-400 font-mono line-through">
                                                             {oldDeadline}
                                                         </td>
                                                     );
@@ -920,10 +918,7 @@ export const RecordSearch: React.FC<RecordSearchProps> = ({
                                                     const { newDeadline } = getExtensionDates(r);
                                                     return (
                                                         <td key="deadlineNew" className="p-3 align-middle text-center font-bold text-blue-700 font-mono">
-                                                            <div className="flex flex-col items-center gap-1 justify-center">
-                                                                <span>{newDeadline}</span>
-                                                                <span className="inline-block px-1.5 py-0.5 bg-amber-100 text-amber-700 text-[9px] rounded font-extrabold uppercase tracking-wider">Đã gia hạn</span>
-                                                            </div>
+                                                            <span>{newDeadline}</span>
                                                         </td>
                                                     );
                                                 }

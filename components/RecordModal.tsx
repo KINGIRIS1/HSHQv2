@@ -72,9 +72,36 @@ interface RecordModalProps {
   wards: string[];
   currentView?: string;
   holidays?: any[];
+  records?: RecordFile[];
 }
 
-const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, initialData, employees, currentUser, wards, currentView, holidays }) => {
+const generateHQCode = (dateStr: string, recordsList: RecordFile[] = []) => {
+    const d = new Date(dateStr || new Date());
+    const year = d.getFullYear().toString();
+    const yy = year.slice(-2);
+    const mm = ('0' + (d.getMonth() + 1)).slice(-2);
+    const dd = ('0' + d.getDate()).slice(-2);
+    const datePrefix = `${yy}${mm}${dd}`;
+
+    let maxSeq = 0;
+    recordsList.forEach((r) => {
+        if (!r.code) return;
+        const parts = r.code.split('-');
+        if (parts.length >= 2) {
+            const rDate = parts.length === 3 ? parts[1] : parts[0];
+            const rSeq = parts.length === 3 ? parts[2] : parts[1];
+            if (rDate && rDate.substring(0, 2) === yy) {
+                const seqNum = parseInt(rSeq, 10);
+                if (!isNaN(seqNum) && seqNum > maxSeq) maxSeq = seqNum;
+            }
+        }
+    });
+
+    const nextSeq = (maxSeq + 1).toString().padStart(3, '0');
+    return `HQ-${datePrefix}-${nextSeq}`;
+};
+
+const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, initialData, employees, currentUser, wards, currentView, holidays, records }) => {
   const defaultState: Partial<RecordFile> = {
     code: '', customerName: '', phoneNumber: '', cccd: '', customerAddress: '', content: '', otherDocs: '',
     receivedDate: new Date().toISOString(), deadline: '', assignedTo: '', status: RecordStatus.RECEIVED,
@@ -227,7 +254,8 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
               deadline: '',
               price: undefined,
               status: RecordStatus.RECEIVED,
-              code: `HS-${new Date().getFullYear()}-${Math.floor(Math.random() * 1000)}`
+              code: generateHQCode(new Date().toISOString(), records),
+              receivedBy: currentUser?.employeeId || ''
             });
             setAttachedDocs([]);
             setAuthCccd('');
@@ -279,6 +307,9 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
       return;
     }
     const finalData = { ...formData };
+    if (!finalData.receivedBy && currentUser?.employeeId) {
+        finalData.receivedBy = currentUser.employeeId;
+    }
     
     // Logic tự động set ngày khi trạng thái thay đổi hoặc xóa ngày khi quay lui
     // Chỉ áp dụng logic này nếu trạng thái khác với ban đầu (hoặc là tạo mới)
@@ -813,33 +844,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                             </div>
                         </div>
 
-                        <div className={`grid gap-4 bg-gray-50 p-3.5 rounded-lg border border-gray-200 ${(!isCongVan && (showMsr || showExc)) ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
-                            {!isCongVan && (
-                                <>
-                                    {showMsr && (
-                                        <div><label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Số Trích đo</label><input type="text" className="w-full border border-gray-300 rounded-md px-2.5 py-1.5 text-sm bg-white" value={val(formData.measurementNumber)} onChange={(e) => handleChange('measurementNumber', e.target.value)} placeholder="Nhập số trích đo..." /></div>
-                                    )}
-                                    {showExc && (
-                                        <div><label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Số Trích lục</label><input type="text" className="w-full border border-gray-300 rounded-md px-2.5 py-1.5 text-sm bg-white" value={val(formData.excerptNumber)} onChange={(e) => handleChange('excerptNumber', e.target.value)} placeholder="Nhập số trích lục..." /></div>
-                                    )}
-                                </>
-                            )}
-                            <div className="w-full">
-                                <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Giao nhân viên xử lý</label>
-                                <select className="w-full border border-gray-300 rounded-md px-2.5 py-1.5 text-sm bg-white font-medium" value={val(formData.assignedTo)} onChange={(e) => handleChange('assignedTo', e.target.value)}>
-                                    <option value="">-- Chưa giao --</option>
-                                    {Object.entries(groupedEmployees).map(([dept, emps]) => (
-                                        <optgroup key={dept} label={dept}>
-                                            {emps.map(emp => (
-                                                <option key={emp.id} value={emp.id}>
-                                                    {emp.name} ({emp.position || 'Cán bộ'})
-                                                </option>
-                                            ))}
-                                        </optgroup>
-                                    ))}
-                                </select>
-                            </div>
-                        </div>
+                        {/* Ẩn mục Số trích đo, Số trích lục và Giao nhân viên xử lý theo yêu cầu */}
 
                          {hasAdminRights && isEdit && (
                             <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">

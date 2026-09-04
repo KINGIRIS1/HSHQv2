@@ -125,6 +125,7 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
                 wards={props.wards}
                 currentView={props.currentView}
                 holidays={props.holidays}
+                records={props.records}
             />
             
             <ImportModal 
