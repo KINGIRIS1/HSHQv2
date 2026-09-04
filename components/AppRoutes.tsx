@@ -341,7 +341,23 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
     isSubadmin ||
     currentUser.role === UserRole.TEAM_LEADER ||
     currentUser.role === UserRole.ONEDOOR ||
-    isDirector;
+    currentUser.role === UserRole.EMPLOYEE ||
+    isDirector ||
+    hasPermission('EDIT_RECORDS') ||
+    hasPermission('dodac_EDIT_RECORDS') ||
+    hasPermission('luutru_EDIT_RECORDS') ||
+    hasPermission('BTN_ASSIGN_STAFF') ||
+    hasPermission('dodac_BTN_ASSIGN_STAFF') ||
+    hasPermission('luutru_BTN_ASSIGN_STAFF') ||
+    hasPermission('BTN_SUBMIT_SIGN') ||
+    hasPermission('dodac_BTN_SUBMIT_SIGN') ||
+    hasPermission('luutru_BTN_SUBMIT_SIGN') ||
+    hasPermission('BTN_SUBMIT_CHECK') ||
+    hasPermission('dodac_BTN_SUBMIT_CHECK') ||
+    hasPermission('luutru_BTN_SUBMIT_CHECK') ||
+    hasPermission('ADD_RECORDS') ||
+    hasPermission('dodac_ADD_RECORDS') ||
+    hasPermission('luutru_ADD_RECORDS');
 
   const [showColumnSelector, setShowColumnSelector] = React.useState(false);
   const [isAddMenuOpen, setIsAddMenuOpen] = React.useState(false);
@@ -727,17 +743,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                   </button>
                 )}
 
-                {/* Chốt HS lưu (khi ở tab returned - Đã trả kết quả và có chọn hồ sơ) */}
-                {props.handoverTab === "returned" && props.selectedRecordIds.size > 0 && (
-                  <button
-                    id="btn-close-return-handover-batch"
-                    onClick={() => props.setIsReturnHandoverModalOpen?.(true)}
-                    className="flex items-center gap-1.5 bg-emerald-600 text-white px-3.5 py-1.5 rounded-lg hover:bg-emerald-700 text-sm font-bold shadow-sm transition-all cursor-pointer animate-pulse whitespace-nowrap"
-                    title="Chốt danh sách hồ sơ lưu tại Đã trả kết quả"
-                  >
-                    <Send size={16} /> Chốt HS lưu ({props.selectedRecordIds.size})
-                  </button>
-                )}
+                {/* Đã loại bỏ nút Chốt HS lưu theo yêu cầu */}
               </div>
             )}
 

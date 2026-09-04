@@ -171,7 +171,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
   const isSubadmin = currentUser?.role === UserRole.SUBADMIN;
   const isOneDoor = currentUser?.role === UserRole.ONEDOOR;
 
-  const canPerformAction = isAdmin || isSubadmin || isOneDoor; // Điều kiện để Sửa, Xóa
+  const canPerformAction = isAdmin || isSubadmin || isOneDoor || currentUser?.role === UserRole.TEAM_LEADER || currentUser?.role === UserRole.EMPLOYEE; // Điều kiện để Sửa, Xóa
   
   // Điều kiện để In biên nhận: Chỉ Admin hoặc Một cửa mới được thấy nút này
   const canPrintReceipt = isAdmin || isOneDoor;
