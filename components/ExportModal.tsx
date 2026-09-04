@@ -223,7 +223,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, typ
             r.handoverWard || r.ward || '',
             r.landPlot || '',
             r.mapSheet || '',
-            r.recordType || ''
+            getShortRecordType(r.recordType || '')
         ];
 
         if (!isHandover) {

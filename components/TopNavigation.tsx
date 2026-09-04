@@ -45,7 +45,7 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
   const isEmployee = currentUser.role === UserRole.EMPLOYEE;
 
   const hasPermission = (permissionId: string) => {
-    if (isAdmin) return true;
+    if (isAdmin || isSubadmin) return true;
     
     // Đối với vai trò Một cửa, luôn cho phép các quyền mặc định của Một cửa
     if (currentUser.role === UserRole.ONEDOOR) {

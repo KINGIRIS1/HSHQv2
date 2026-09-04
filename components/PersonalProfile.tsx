@@ -136,7 +136,6 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
     type: "return_record",
   });
   const [returnReason, setReturnReason] = useState("");
-  const [returnDateTime, setReturnDateTime] = useState("");
 
   useEffect(() => {
     const loadArchive = async () => {
@@ -559,8 +558,12 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
           const newHistory = [...oldHistory, historyEntry];
 
           await saveArchiveRecord({
+            ...currentArchive,
             id: record.id,
             status: (archiveStatus || "assigned") as any,
+            so_hieu: currentArchive.so_hieu || record.code || '',
+            noi_nhan_gui: currentArchive.noi_nhan_gui || record.customerName || '',
+            trich_yeu: currentArchive.trich_yeu || record.content || '',
             data: {
               ...currentArchive.data,
               history: newHistory,
@@ -609,9 +612,6 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
   };
 
   const handleOpenReturnModal = (record: RecordFile) => {
-    // Khởi tạo ngày hiện tại (YYYY-MM-DD)
-    const today = new Date().toISOString().split('T')[0];
-    setReturnDateTime(today);
     setReturnReason("");
     setReturnModalConfig({
       isOpen: true,
@@ -628,17 +628,12 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
       return;
     }
 
-    // Format ngày hiển thị trong ghi chú
-    let displayTime = "---";
-    if (returnDateTime) {
-      const d = new Date(returnDateTime);
-      if (!isNaN(d.getTime())) {
-        const day = String(d.getDate()).padStart(2, "0");
-        const month = String(d.getMonth() + 1).padStart(2, "0");
-        const year = d.getFullYear();
-        displayTime = `${day}/${month}/${year}`;
-      }
-    }
+    // Lấy ngày tháng mặc định thời điểm lưu
+    const now = new Date();
+    const day = String(now.getDate()).padStart(2, "0");
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const year = now.getFullYear();
+    const displayTime = `${day}/${month}/${year}`;
 
     // 1. Trả hồ sơ (chỉ ghi chú nội dung, giữ nguyên trạng thái cũ vì hồ sơ phải hoàn thiện quy trình như trình kiểm tra trình ký rồi mới chuyển 1 cửa)
     const logEntry = `[Trả hồ sơ - ${displayTime}] Lý do: ${returnReason.trim()}`;
@@ -685,8 +680,12 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
           const newHistory = [...oldHistory, historyEntry];
 
           await saveArchiveRecord({
+            ...currentArchive,
             id: record.id,
             status: "executed",
+            so_hieu: currentArchive.so_hieu || record.code || '',
+            noi_nhan_gui: currentArchive.noi_nhan_gui || record.customerName || '',
+            trich_yeu: currentArchive.trich_yeu || record.content || '',
             data: { ...currentArchive.data, history: newHistory },
           });
 
@@ -745,12 +744,18 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
             const newHistory = [...oldHistory, historyEntry];
 
             await saveArchiveRecord({
+              ...currentArchive,
               id: record.id,
               status: "pending_sign",
+              so_hieu: currentArchive.so_hieu || record.code || '',
+              noi_nhan_gui: currentArchive.noi_nhan_gui || record.customerName || '',
+              trich_yeu: currentArchive.trich_yeu || record.content || '',
               data: {
                 ...currentArchive.data,
                 history: newHistory,
                 submitted_to: directorId,
+                submittedTo: directorId,
+                submissionDate: new Date().toISOString(),
               },
             });
           }
@@ -1459,10 +1464,10 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                           {activeTab === "pending" && (
                             <button
                               onClick={() => handleOpenReturnModal(r)}
-                              className="p-1.5 bg-red-50 text-red-600 border border-red-100 rounded-lg text-xs"
+                              className="px-2.5 py-1.5 border border-red-200 bg-red-50 text-red-600 rounded-lg text-xs font-bold flex items-center gap-1 hover:bg-red-100 transition-all"
                               title="Trả hồ sơ"
                             >
-                              <FileX size={14} />
+                              <FileX size={14} /> Trả hồ sơ
                             </button>
                           )}
 
@@ -1602,12 +1607,17 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                   const newHistory = [...oldHistory, historyEntry];
 
                   await saveArchiveRecord({
+                    ...currentArchive,
                     id: record.id,
                     status: "pending_check",
+                    so_hieu: currentArchive.so_hieu || record.code || '',
+                    noi_nhan_gui: currentArchive.noi_nhan_gui || record.customerName || '',
+                    trich_yeu: currentArchive.trich_yeu || record.content || '',
                     data: {
                       ...currentArchive.data,
                       history: newHistory,
                       checked_by: checkerId,
+                      checkedBy: checkerId,
                     },
                   });
                 }
@@ -1672,18 +1682,6 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
 
             {/* Content */}
             <div className="p-5 space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-                  Ngày thực hiện
-                </label>
-                <input
-                  type="date"
-                  className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-100 transition-all font-medium"
-                  value={returnDateTime}
-                  onChange={(e) => setReturnDateTime(e.target.value)}
-                />
-              </div>
-
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
                   Lý do trả hồ sơ

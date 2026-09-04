@@ -16,7 +16,7 @@ export const STATUS_LABELS: Record<RecordStatus, string> = {
   [RecordStatus.COMPLETED_WORK]: 'Đang thực hiện',
   [RecordStatus.PENDING_SUPPLEMENT]: 'Chờ bổ sung',
   [RecordStatus.PENDING_CHECK]: 'Chờ kiểm tra',
-  [RecordStatus.CHECKED]: 'Đã kiểm tra',
+  [RecordStatus.CHECKED]: 'Chờ kiểm tra',
   [RecordStatus.PENDING_SIGN]: 'Chờ ký duyệt',
   [RecordStatus.SIGNED]: 'Chờ bàn giao',
   [RecordStatus.HANDOVER]: 'Đã giao 1 cửa',
@@ -180,7 +180,7 @@ export const getFullRecordType = (type: string | null | undefined): string => {
   if (short === '1.1 Sao lục') return '1.1 Cung cấp dữ liệu đất đai (Sao lục hồ sơ)';
   if (short === '1.2 Công văn') return '1.2 Công văn';
   if (short === '2.1 Trích lục') return '2.1 Trích lục bản đồ địa chính';
-  if (short === '2.2 Trích đo') return '2.2 Đo đạc chỉnh lý bản đồ địa chính (Trích đo)';
+  if (short === '2.2 Trích đo') return '2.2 Đo đạc chỉnh lý bản đồ địa chính';
   if (short === '2.3 Duyệt đơn') return '2.3 Cung cấp số thửa đất và duyệt đơn';
   if (short === '2.4 Cắm mốc') return '2.4 Trích đo Cắm mốc ranh giới thửa đất';
   if (short === '2.5 Tách-Hợp thửa') return '2.5 Trích đo Tách thửa - Hợp thửa đất';

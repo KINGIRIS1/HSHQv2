@@ -124,7 +124,7 @@ export const useRecordFilter = (
         }
 
         // View-based filtering
-        if (currentView === 'check_list' || currentView === 'other_check_list' || currentView === 'archive_check_list') {
+        if (currentView === 'check_list' || currentView === 'archive_check_list') {
             const isPendingSign = (r: RecordFile) => {
                 if (r.status === RecordStatus.PENDING_SIGN) return true;
                 if ((r.submissionDate || r.submittedTo) && !(r.approvalDate || r.exportBatch || r.completedDate || r.resultReturnedDate)) {
@@ -164,9 +164,9 @@ export const useRecordFilter = (
                 if (r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED || r.status === RecordStatus.RETURNED || r.status === RecordStatus.HANDOVER || r.status === RecordStatus.SIGNED || r.status === RecordStatus.PENDING_SIGN || r.status === RecordStatus.PENDING_CHECK || r.status === RecordStatus.CHECKED) return false;
                 return true;
             });
-        } else if (currentView === 'director_completed' || currentView === 'other_director_completed' || currentView === 'archive_director_completed') {
+        } else if (currentView === 'director_completed' || currentView === 'archive_director_completed') {
             result = result.filter(r => r.submittedTo === currentUser?.employeeId && r.status !== RecordStatus.PENDING_SIGN && r.status !== RecordStatus.RECEIVED && r.status !== RecordStatus.ASSIGNED && r.status !== RecordStatus.IN_PROGRESS && r.status !== RecordStatus.COMPLETED_WORK);
-        } else if (currentView === 'handover_list' || currentView === 'other_handover_list' || currentView === 'archive_handover_list') {
+        } else if (currentView === 'handover_list' || currentView === 'archive_handover_list') {
             if (handoverTab === 'today') {
                 // Tab chờ giao: Bao gồm Đã ký HOẶC (Đã rút VÀ chưa có đợt xuất) HOẶC Hồ sơ trả (REJECTED)
                 result = result.filter(r => 
@@ -201,7 +201,7 @@ export const useRecordFilter = (
                     });
                 }
             }
-        } else if (currentView === 'assign_tasks' || currentView === 'other_assign_tasks' || currentView === 'archive_assign_tasks') {
+        } else if (currentView === 'assign_tasks' || currentView === 'archive_assign_tasks') {
             result = result.filter(r => {
                 // Đã bàn giao 1 cửa, đã trả kết quả, đã rút, đã trả thì không ở Chưa giao
                 if (r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED || r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED || r.status === RecordStatus.SIGNED) return false;
@@ -254,16 +254,16 @@ export const useRecordFilter = (
         if (filterWard !== 'all') {
             const wardSearch = removeVietnameseTones(filterWard);
             result = result.filter(r => {
-                const targetWard = (currentView === 'handover_list' || currentView === 'other_handover_list' || currentView === 'archive_handover_list') ? (r.handoverWard || r.ward) : r.ward;
+                const targetWard = (currentView === 'handover_list' || currentView === 'archive_handover_list') ? (r.handoverWard || r.ward) : r.ward;
                 return removeVietnameseTones(targetWard || '').includes(wardSearch);
             });
         }
         const isStatusFilterHidden = [
-            'assign_tasks', 'other_assign_tasks', 'archive_assign_tasks',
+            'assign_tasks', 'archive_assign_tasks',
             'completed_list', 'archive_completed_list',
-            'pending_check_list', 'archive_pending_check_list', 'check_list', 'other_check_list', 'archive_check_list',
-            'director_completed', 'other_director_completed', 'archive_director_completed',
-            'handover_list', 'other_handover_list', 'archive_handover_list'
+            'pending_check_list', 'archive_pending_check_list', 'check_list', 'archive_check_list',
+            'director_completed', 'archive_director_completed',
+            'handover_list', 'archive_handover_list'
         ].includes(currentView || '');
 
         if (!isStatusFilterHidden && filterStatus !== 'all') {

@@ -35,6 +35,7 @@ interface MobileLayoutProps {
   children: React.ReactNode;
   unreadMessages: number;
   activeRemindersCount: number;
+  onOpenRecordModal?: () => void;
 }
 
 const MobileLayout: React.FC<MobileLayoutProps> = ({
@@ -44,7 +45,8 @@ const MobileLayout: React.FC<MobileLayoutProps> = ({
   onLogout,
   children,
   unreadMessages,
-  activeRemindersCount
+  activeRemindersCount,
+  onOpenRecordModal
 }) => {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [showHelpModal, setShowHelpModal] = useState(false);
@@ -194,11 +196,13 @@ const MobileLayout: React.FC<MobileLayoutProps> = ({
         </div>
       </nav>
       
-      {/* Floating Action Button for quick record creation (if admin/subadmin) */}
-      {(currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.SUBADMIN) && currentView === 'all_records' && (
+      {/* Floating Action Button cho phép nhập mới nhanh ở tab tìm kiếm & danh sách hồ sơ */}
+      {(currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.SUBADMIN || currentUser.role === UserRole.ONEDOOR || currentUser.role === UserRole.TEAM_LEADER) &&
+        ['all_records', 'received_list', 'assigned_list', 'in_progress_list', 'completed_list', 'pending_sign_list', 'signed_list', 'handover_list', 'returned_list'].includes(currentView) && (
         <button 
-          className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom,0px))] right-4 min-w-[56px] min-h-[56px] w-14 h-14 bg-blue-600 text-white rounded-full shadow-lg shadow-blue-500/30 flex items-center justify-center hover:bg-blue-700 active:scale-95 transition-all z-40 cursor-pointer"
-          onClick={() => {/* Trigger add record modal */}}
+          className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom,0px))] right-4 min-w-[56px] min-h-[56px] w-14 h-14 bg-blue-600 text-white rounded-full shadow-lg shadow-blue-500/40 flex items-center justify-center hover:bg-blue-700 active:scale-95 transition-all z-40 cursor-pointer"
+          onClick={() => onOpenRecordModal?.()}
+          title="Nhập mới hồ sơ"
         >
           <Plus size={28} />
         </button>

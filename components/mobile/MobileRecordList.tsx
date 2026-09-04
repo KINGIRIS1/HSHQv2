@@ -1,13 +1,14 @@
-import React, { useState } from 'react';
-import { RecordFile, RecordStatus, Employee } from '../../types';
-import { STATUS_LABELS, SELECTABLE_STATUSES, RECORD_TYPES, getShortRecordType } from '../../constants';
+import React, { useState, useMemo } from 'react';
+import { RecordFile, RecordStatus, Employee, User, UserRole } from '../../types';
+import { STATUS_LABELS, SELECTABLE_STATUSES, RECORD_TYPES, getShortRecordType, DEFAULT_WARDS, getNormalizedWard } from '../../constants';
+import { removeVietnameseTones, groupEmployeesByDepartment } from '../../utils/appHelpers';
 import StatusBadge from '../StatusBadge';
 import { 
   Search, 
   Filter, 
   ChevronRight, 
   MapPin, 
-  User, 
+  User as UserIcon, 
   Phone, 
   Calendar,
   Clock,
@@ -21,6 +22,8 @@ import {
 interface MobileRecordListProps {
   records: RecordFile[];
   employees: Employee[];
+  currentUser?: User;
+  wards?: string[];
   onViewRecord: (r: RecordFile) => void;
   onEditRecord: (r: RecordFile) => void;
   onDeleteRecord: (r: RecordFile) => void;
@@ -30,6 +33,8 @@ interface MobileRecordListProps {
 const MobileRecordList: React.FC<MobileRecordListProps> = ({ 
   records, 
   employees, 
+  currentUser,
+  wards,
   onViewRecord, 
   onEditRecord, 
   onDeleteRecord,
@@ -45,6 +50,62 @@ const MobileRecordList: React.FC<MobileRecordListProps> = ({
   const [showAdvancedFilter, setShowAdvancedFilter] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
+
+  // Lọc danh sách hồ sơ cơ sở theo Phân quyền chức danh (Mobile Permission Filter)
+  const allowedRecords = useMemo(() => {
+    if (!currentUser) return records;
+
+    const role = currentUser.role;
+    // ADMIN và SUBADMIN được thấy toàn bộ hồ sơ
+    if (role === UserRole.ADMIN || role === UserRole.SUBADMIN) {
+      return records;
+    }
+
+    const currentEmp = employees.find(e => e.id === currentUser.employeeId || e.name === currentUser.name);
+    const empId = currentUser.employeeId || currentEmp?.id;
+    const empDepartment = currentEmp?.department?.toLowerCase().trim();
+
+    // TEAM_LEADER: Xem hồ sơ thuộc tổ/bộ phận của mình hoặc do mình phụ trách/giao việc
+    if (role === UserRole.TEAM_LEADER) {
+      const deptEmpIds = employees
+        .filter(e => e.department?.toLowerCase().trim() === empDepartment)
+        .map(e => e.id);
+
+      return records.filter(r => {
+        if (!r) return false;
+        if (empId && (r.assignedTo === empId || r.submittedTo === empId || r.checkedBy === empId)) return true;
+        if (r.assignedTo && deptEmpIds.includes(r.assignedTo)) return true;
+        if (r.receivedBy === currentUser.username || r.receivedBy === currentUser.name) return true;
+        return false;
+      });
+    }
+
+    // Chuyên viên / Nhân viên / Cán bộ / Một cửa: Chỉ thấy hồ sơ được giao, được trình, kiểm tra hoặc do mình tiếp nhận
+    return records.filter(r => {
+      if (!r) return false;
+      if (empId && (r.assignedTo === empId || r.submittedTo === empId || r.checkedBy === empId)) return true;
+      if (currentEmp && (r.assignedTo === currentEmp.name || r.checkedBy === currentEmp.name)) return true;
+      if (r.receivedBy === currentUser.username || r.receivedBy === currentUser.name) return true;
+      if (role === UserRole.ONEDOOR && (r.status === RecordStatus.RECEIVED || r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED)) return true;
+      return false;
+    });
+  }, [records, currentUser, employees]);
+
+  // Danh sách xã/phường chuẩn hóa thống nhất toàn hệ thống
+  const unifiedWards = useMemo(() => {
+    const baseWards = (wards && wards.length > 0) ? wards : DEFAULT_WARDS;
+    const combined = [...baseWards];
+    allowedRecords.forEach(r => {
+      if (r.ward) {
+        const norm = getNormalizedWard(r.ward);
+        if (norm && !combined.some(w => getNormalizedWard(w) === norm)) {
+          combined.push(norm);
+        }
+      }
+    });
+    const uniqueNormalized = Array.from(new Set(combined.map(w => getNormalizedWard(w)).filter(Boolean)));
+    return uniqueNormalized.length > 0 ? uniqueNormalized : DEFAULT_WARDS;
+  }, [wards, allowedRecords]);
 
   // Reset page when filtering
   React.useEffect(() => {
@@ -65,7 +126,7 @@ const MobileRecordList: React.FC<MobileRecordListProps> = ({
     }
   };
 
-  const filtered = records.filter(r => {
+  const filtered = allowedRecords.filter(r => {
     // 1. Tìm kiếm
     const matchesSearch = 
       r.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -106,8 +167,14 @@ const MobileRecordList: React.FC<MobileRecordListProps> = ({
       if (filterEmployee !== 'unassigned' && r.assignedTo !== filterEmployee) return false;
     }
 
-    // 6. Xã / Phường
-    if (filterWard !== 'all' && r.ward !== filterWard) return false;
+    // 6. Xã / Phường (Chuẩn hóa so sánh không phân biệt hoa thường, tiền tố và dấu tiếng Việt)
+    if (filterWard !== 'all') {
+      const targetWardSearch = removeVietnameseTones(getNormalizedWard(filterWard) || filterWard).toLowerCase();
+      const rWardNorm = removeVietnameseTones(getNormalizedWard(r.ward) || r.ward || '').toLowerCase();
+      const rHandoverWardNorm = removeVietnameseTones(getNormalizedWard(r.handoverWard) || r.handoverWard || '').toLowerCase();
+      const matchesWard = rWardNorm.includes(targetWardSearch) || rHandoverWardNorm.includes(targetWardSearch);
+      if (!matchesWard) return false;
+    }
 
     return true;
   });
@@ -137,33 +204,31 @@ const MobileRecordList: React.FC<MobileRecordListProps> = ({
     <div className="flex flex-col h-full">
       {/* Search & Filter Bar */}
       <div className="bg-white px-3 sm:px-6 py-3 border-b border-slate-100 sticky top-0 z-10 shadow-sm">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row gap-2.5 items-center justify-between">
-          <div className="relative flex-1 w-full">
+        <div className="max-w-7xl mx-auto flex items-center gap-2">
+          <div className="relative flex-1 min-w-0">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
             <input 
               type="text" 
               placeholder="Tìm tên khách hàng, mã hồ sơ, SĐT..." 
-              className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+              className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all truncate"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
-            <button
-              onClick={() => setShowAdvancedFilter(!showAdvancedFilter)}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-colors ${
-                showAdvancedFilter || fromDate || toDate || filterRecordType !== 'all' || filterStatus !== 'all' || filterEmployee !== 'all' || filterWard !== 'all'
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-              }`}
-            >
-              <Filter size={14} />
-              <span>Bộ lọc</span>
-            </button>
+          <button
+            onClick={() => setShowAdvancedFilter(!showAdvancedFilter)}
+            className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-2 rounded-xl text-xs font-bold shrink-0 transition-colors ${
+              showAdvancedFilter || fromDate || toDate || filterRecordType !== 'all' || filterStatus !== 'all' || filterEmployee !== 'all' || filterWard !== 'all'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+            }`}
+          >
+            <Filter size={14} />
+            <span className="hidden xs:inline sm:inline">Bộ lọc</span>
+          </button>
 
-            <div className="text-xs font-bold text-slate-500 whitespace-nowrap px-2 bg-slate-100 py-2 rounded-xl border border-slate-200 ml-auto">
-              {filtered.length} hồ sơ
-            </div>
+          <div className="text-xs font-bold text-slate-600 whitespace-nowrap px-2.5 py-2 bg-slate-100 rounded-xl border border-slate-200 shrink-0">
+            {filtered.length} HS
           </div>
         </div>
 
@@ -226,10 +291,10 @@ const MobileRecordList: React.FC<MobileRecordListProps> = ({
               </select>
             </div>
 
-            {/* 4. Cán bộ xử lý */}
+            {/* 4. Cán bộ xử lý (Đã phân tổ chuyên môn) */}
             <div>
               <label className="text-[11px] font-bold text-slate-600 mb-1 flex items-center gap-1">
-                <User size={12} /> Cán bộ xử lý:
+                <UserIcon size={12} /> Cán bộ xử lý:
               </label>
               <select
                 value={filterEmployee}
@@ -238,8 +303,12 @@ const MobileRecordList: React.FC<MobileRecordListProps> = ({
               >
                 <option value="all">Tất cả cán bộ</option>
                 <option value="unassigned">Chưa giao</option>
-                {employees.map((emp) => (
-                  <option key={emp.id} value={emp.id}>{emp.name}</option>
+                {Object.entries(groupEmployeesByDepartment(employees)).map(([dept, emps]) => (
+                  <optgroup key={dept} label={dept}>
+                    {emps.map((emp) => (
+                      <option key={emp.id} value={emp.id}>{emp.name}</option>
+                    ))}
+                  </optgroup>
                 ))}
               </select>
             </div>
@@ -255,7 +324,7 @@ const MobileRecordList: React.FC<MobileRecordListProps> = ({
                 className="w-full text-xs p-1.5 border border-slate-200 rounded-lg bg-white font-medium"
               >
                 <option value="all">Tất cả Xã/Phường</option>
-                {Array.from(new Set(records.map(r => r.ward).filter((w): w is string => !!w))).map(w => (
+                {unifiedWards.map(w => (
                   <option key={w} value={w}>{w}</option>
                 ))}
               </select>

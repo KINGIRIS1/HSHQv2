@@ -32,6 +32,13 @@ export const RejectReturnStepModal: React.FC<RejectReturnStepModalProps> = ({
 
   if (!isOpen || records.length === 0) return null;
 
+  const hideReturnHandler = records.some(r => r.status === 'RECEIVED' || r.status === 'ASSIGNED' || r.status === 'IN_PROGRESS' || r.status === RecordStatus.RECEIVED || r.status === RecordStatus.ASSIGNED || r.status === RecordStatus.IN_PROGRESS);
+
+  // Nếu hồ sơ đang ở trạng thái không thể trả về cán bộ thụ lý và option đang là return_handler thì chuyển về pause_supplement
+  if (hideReturnHandler && returnOption === 'return_handler') {
+    setReturnOption('pause_supplement');
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!reason.trim()) {
@@ -161,26 +168,28 @@ export const RejectReturnStepModal: React.FC<RejectReturnStepModalProps> = ({
               </label>
 
               {/* Option 3 */}
-              <label 
-                className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
-                  returnOption === 'return_handler' 
-                    ? 'border-2 border-blue-500 bg-blue-50/60 text-blue-950 font-bold shadow-xs' 
-                    : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-medium'
-                }`}
-              >
-                <input 
-                  type="radio" 
-                  name="returnOption" 
-                  value="return_handler"
-                  checked={returnOption === 'return_handler'}
-                  onChange={() => setReturnOption('return_handler')}
-                  className="w-4 h-4 text-blue-600 focus:ring-blue-500"
-                />
-                <RefreshCw size={18} className="text-blue-600 shrink-0" />
-                <span className="text-xs sm:text-sm">
-                  <strong>3. Trả về cán bộ thụ lý</strong>
-                </span>
-              </label>
+              {!hideReturnHandler && (
+                <label 
+                  className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
+                    returnOption === 'return_handler' 
+                      ? 'border-2 border-blue-500 bg-blue-50/60 text-blue-950 font-bold shadow-xs' 
+                      : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-medium'
+                  }`}
+                >
+                  <input 
+                    type="radio" 
+                    name="returnOption" 
+                    value="return_handler"
+                    checked={returnOption === 'return_handler'}
+                    onChange={() => setReturnOption('return_handler')}
+                    className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+                  />
+                  <RefreshCw size={18} className="text-blue-600 shrink-0" />
+                  <span className="text-xs sm:text-sm">
+                    <strong>3. Trả về cán bộ thụ lý</strong>
+                  </span>
+                </label>
+              )}
 
               {/* Option 4 */}
               <label 

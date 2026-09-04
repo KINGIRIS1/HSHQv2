@@ -33,7 +33,6 @@ import { checkAndTriggerWeeklyBackup, downloadBackupAsFile } from './services/ba
 import { checkAndTriggerPeriodicExcelBackup, performExcelBackup } from './services/excelBackupService';
 import CloudDatabaseInspector from './components/CloudDatabaseInspector';
 import ConnectionGuardOverlay from './components/ConnectionGuardOverlay';
-import FirstLoginBackupModal from './components/FirstLoginBackupModal';
 
 function App() {
   const isMobile = useIsMobile(768);
@@ -318,45 +317,28 @@ function App() {
   const isTeamLeader = currentUser?.role === UserRole.TEAM_LEADER;
   const canPerformAction = isAdmin || isSubadmin || isTeamLeader || currentUser?.role === UserRole.ONEDOOR;
 
-  // Bảng nhắc nhở sao lưu dữ liệu duy nhất 1 lần vào lần đầu đăng nhập của Quản trị viên (sau khi load xong toàn bộ hồ sơ)
-  const [isFirstLoginBackupModalOpen, setIsFirstLoginBackupModalOpen] = useState(false);
-  const hasCheckedFirstLoginBackupRef = useRef(false);
+  // Tự động kiểm tra và thực hiện sao lưu định kỳ 5 ngày ra file Excel (Tải về máy) hoàn toàn tự động, không hiện thông báo modal
+  const hasCheckedPeriodicBackupRef = useRef(false);
 
   useEffect(() => {
-    if (isAdmin && records.length > 0 && !hasCheckedFirstLoginBackupRef.current) {
-      hasCheckedFirstLoginBackupRef.current = true;
-      const FIRST_BACKUP_KEY = 'admin_first_login_backup_prompt_dismissed';
-      const isDismissed = localStorage.getItem(FIRST_BACKUP_KEY);
-      if (!isDismissed) {
-        // Đợi 1.5 giây sau khi nạp xong toàn bộ dữ liệu hồ sơ để giao diện hoàn toàn ổn định
-        const timer = setTimeout(() => {
-          setIsFirstLoginBackupModalOpen(true);
-        }, 1500);
-        return () => clearTimeout(timer);
-      }
+    if (isAdmin && records.length > 0 && employees.length > 0 && !hasCheckedPeriodicBackupRef.current) {
+      hasCheckedPeriodicBackupRef.current = true;
+      const timer = setTimeout(async () => {
+        try {
+          const res = await checkAndTriggerPeriodicExcelBackup(records, employees);
+          if (res.triggered && res.result?.success) {
+            setToast({
+              type: 'success',
+              message: `Đã tự động sao lưu dữ liệu định kỳ 5 ngày (${records.length} hồ sơ) và tải về máy thành công!`
+            });
+          }
+        } catch (err) {
+          console.error('Lỗi khi tự động sao lưu định kỳ:', err);
+        }
+      }, 2000);
+      return () => clearTimeout(timer);
     }
-  }, [isAdmin, records.length]);
-
-  const handleCloseFirstLoginBackupModal = useCallback(() => {
-    setIsFirstLoginBackupModalOpen(false);
-    localStorage.setItem('admin_first_login_backup_prompt_dismissed', 'true');
-  }, []);
-
-  const handleConfirmFirstLoginBackup = useCallback(async () => {
-    try {
-      const result = await performExcelBackup(records, employees);
-      localStorage.setItem('admin_first_login_backup_prompt_dismissed', 'true');
-      if (result.success) {
-        setToast({ type: 'success', message: 'Đã tạo và tải tệp sao lưu Excel về máy thành công!' });
-      } else if (result.error) {
-        setToast({ type: 'error', message: result.error });
-      }
-    } catch (err: any) {
-      console.error('Lỗi khi sao lưu dữ liệu:', err);
-      localStorage.setItem('admin_first_login_backup_prompt_dismissed', 'true');
-      setToast({ type: 'error', message: 'Lỗi khi sao lưu: ' + (err.message || 'Không xác định') });
-    }
-  }, [records, employees]);
+  }, [isAdmin, records, employees]);
 
   // --- UPDATE HANDLERS ---
   
@@ -1285,13 +1267,14 @@ function App() {
           onUpdateLater={handleUpdateLater}
         />
         <MobileLayout
-        currentUser={currentUser}
-        currentView={currentView}
-        setCurrentView={handleSetCurrentView}
-        onLogout={handleLogout}
-        unreadMessages={unreadMessages}
-        activeRemindersCount={activeRemindersCount}
-      >
+          currentUser={currentUser}
+          currentView={currentView}
+          setCurrentView={handleSetCurrentView}
+          onLogout={handleLogout}
+          unreadMessages={unreadMessages}
+          activeRemindersCount={activeRemindersCount}
+          onOpenRecordModal={() => { setEditingRecord(null); setIsModalOpen(true); }}
+        >
         <MobileRoutes
           currentView={currentView}
           setCurrentView={handleSetCurrentView}
@@ -1431,12 +1414,6 @@ function App() {
         )}
         <GlobalConfirmModal />
         <GlobalAlertModal />
-        <FirstLoginBackupModal 
-          isOpen={isFirstLoginBackupModalOpen} 
-          recordCount={records.length} 
-          onConfirmBackup={handleConfirmFirstLoginBackup} 
-          onClose={handleCloseFirstLoginBackupModal} 
-        />
       </MobileLayout>
     </>
     );
@@ -1740,12 +1717,6 @@ function App() {
         )}
         <GlobalConfirmModal />
         <GlobalAlertModal />
-        <FirstLoginBackupModal 
-          isOpen={isFirstLoginBackupModalOpen} 
-          recordCount={records.length} 
-          onConfirmBackup={handleConfirmFirstLoginBackup} 
-          onClose={handleCloseFirstLoginBackupModal} 
-        />
         <CloudDatabaseInspector isOpen={isCloudDatabaseInspectorOpen} onClose={() => setIsCloudDatabaseInspectorOpen(false)} />
         <ConnectionGuardOverlay 
           onRestored={() => {

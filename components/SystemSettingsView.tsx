@@ -40,9 +40,8 @@ const PERMISSION_GROUPS = [
   {
     id: 'group_onedoor',
     title: '1. Phân hệ Tổ Tiếp nhận & Một cửa',
-    desc: 'Quyền xem Tab Tiếp nhận & các chức năng giao dịch một cửa',
+    desc: 'Các chức năng giao dịch và xử lý tại Bộ phận Tiếp nhận & Một cửa',
     items: [
-      { id: 'receive_record', label: 'Xem & Truy cập Tab Tiếp nhận hồ sơ' },
       { id: 'ADD_RECORDS', label: 'Thêm / Nhập mới hồ sơ' },
       { id: 'EXPORT_RECORDS', label: 'Xuất danh sách hồ sơ (Excel)' },
     ]
@@ -50,9 +49,8 @@ const PERMISSION_GROUPS = [
   {
     id: 'group_dodac',
     title: '2. Tổ Đo đạc',
-    desc: 'Quyền xem Tab Đo đạc & các chức năng xử lý hồ sơ kỹ thuật',
+    desc: 'Các chức năng xử lý và vận hành hồ sơ kỹ thuật đo đạc',
     items: [
-      { id: 'all_records', label: 'Xem & Truy cập Tab Đo đạc (Hồ sơ kỹ thuật)' },
       { id: 'dodac_BTN_ASSIGN_STAFF', label: 'Giao việc' },
       { id: 'dodac_BTN_SUBMIT_CHECK', label: 'Trình kiểm tra' },
       { id: 'dodac_BTN_SUBMIT_SIGN', label: 'Trình ký' },
@@ -71,9 +69,8 @@ const PERMISSION_GROUPS = [
   {
     id: 'group_luutru',
     title: '3. Tổ Lưu trữ',
-    desc: 'Quyền xem Tab Lưu trữ & các chức năng quản lý kho tài liệu',
+    desc: 'Các chức năng xử lý hồ sơ và quản lý kho tài liệu lưu trữ',
     items: [
-      { id: 'archive_records', label: 'Xem & Truy cập Tab Lưu trữ (Hồ sơ & Công văn)' },
       { id: 'luutru_BTN_ASSIGN_STAFF', label: 'Giao việc' },
       { id: 'luutru_BTN_SUBMIT_CHECK', label: 'Trình kiểm tra' },
       { id: 'luutru_BTN_SUBMIT_SIGN', label: 'Trình ký' },
@@ -92,10 +89,8 @@ const PERMISSION_GROUPS = [
   {
     id: 'group_hopdong',
     title: '4. Phân hệ Tổ Hợp đồng dịch vụ',
-    desc: 'Quyền xem Tab Hợp đồng & các chức năng quản lý hợp đồng',
+    desc: 'Các chức năng quản lý hợp đồng dịch vụ và quyết toán',
     items: [
-      { id: 'receive_contract', label: 'Xem & Truy cập Tab Hợp đồng dịch vụ' },
-      { id: 'VIEW_CONTRACTS', label: 'Xem danh sách hợp đồng' },
       { id: 'ADD_CONTRACTS', label: 'Thêm mới hợp đồng' },
       { id: 'EDIT_CONTRACTS', label: 'Sửa thông tin hợp đồng' },
       { id: 'LIQUIDATE_CONTRACTS', label: 'Thanh lý / Lập quyết toán hợp đồng' },
@@ -833,13 +828,13 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                                     Sao lưu hồ sơ dự phòng ra Excel
                                 </h3>
                                 <p className="text-xs text-slate-500 font-medium mt-1">
-                                    Hệ thống hỗ trợ nhắc nhở sao lưu vào lần đầu đăng nhập của Quản trị viên. Bạn cũng có thể chủ động bấm nút bên dưới bất kỳ lúc nào để xuất và tải toàn bộ hồ sơ về thư mục <strong>Downloads (Tải về)</strong>.
+                                    Hệ thống tự động sao lưu dữ liệu ra file Excel theo chu kỳ 5 ngày và tải về máy. Bạn cũng có thể chủ động bấm nút bên dưới bất kỳ lúc nào để xuất và tải ngay toàn bộ hồ sơ về thư mục <strong>Downloads (Tải về)</strong>.
                                 </p>
                             </div>
                             <div className="flex flex-wrap items-center gap-2">
                                 <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-full border border-emerald-200">
                                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                                    Chủ động & Khởi tạo lần đầu
+                                    Tự động theo chu kỳ 5 ngày
                                 </span>
                                 <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-100 text-slate-700 text-xs font-mono font-bold rounded-full border border-slate-200">
                                     Tên tệp: {EXCEL_BACKUP_FILENAME}
@@ -1060,7 +1055,7 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                                     if (selectedDepartmentScope === 'all' || !allDepartmentOptions.includes(selectedDepartmentScope)) {
                                         setSelectedDepartmentScope(allDepartmentOptions[0] || 'Tổ Lưu trữ');
                                     }
-                                    if (selectedRole === UserRole.ADMIN || selectedRole === UserRole.ONEDOOR) {
+                                    if (selectedRole === UserRole.ADMIN || selectedRole === UserRole.SUBADMIN || selectedRole === UserRole.ONEDOOR) {
                                         setSelectedRole(UserRole.TEAM_LEADER);
                                     }
                                 }}
@@ -1218,7 +1213,19 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
 
                     {/* Categorized Permissions Grid */}
                     <div className="flex-1 overflow-y-auto min-h-0 p-4 md:p-6 bg-slate-50/60 custom-scrollbar space-y-6">
-                        {PERMISSION_GROUPS.map((group) => {
+                        {PERMISSION_GROUPS.filter((group) => {
+                            // Khi đang cấu hình phân quyền theo phòng ban cụ thể:
+                            if (permissionTab === 'department' && selectedDepartmentScope !== 'all') {
+                                const isDodacScope = matchDepartmentKey('đo đạc', selectedDepartmentScope);
+                                const isLuutruScope = matchDepartmentKey('lưu trữ', selectedDepartmentScope);
+                                
+                                // Nếu là Tổ Đo đạc: Ẩn nhóm Tổ Lưu trữ
+                                if (isDodacScope && group.id === 'group_luutru') return false;
+                                // Nếu là Tổ Lưu trữ: Ẩn nhóm Tổ Đo đạc
+                                if (isLuutruScope && group.id === 'group_dodac') return false;
+                            }
+                            return true;
+                        }).map((group) => {
                             const filteredItems = group.items.filter(item => {
                                 if (!permSearchQuery.trim()) return true;
                                 const q = permSearchQuery.toLowerCase();

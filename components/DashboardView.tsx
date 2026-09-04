@@ -275,26 +275,6 @@ const DashboardView: React.FC<DashboardViewProps> = ({ records, currentUser, emp
                             </p>
                         </div>
                         
-                        <div className="bg-white/15 backdrop-blur-md border border-white/20 rounded-lg p-3 w-full md:w-auto shrink-0 md:min-w-[240px]">
-                            <h3 className="text-[10px] font-bold text-sky-200 uppercase tracking-wider mb-2 flex items-center justify-center gap-1 text-center">
-                                👤 Thông tin thêm
-                            </h3>
-                            <div className="space-y-1.5 text-[11px]">
-                                <p className="flex justify-between items-center text-blue-100 border-b border-white/10 pb-1"><span className="text-blue-200/80 font-medium shrink-0">Họ và tên:</span> <span className="font-bold text-white text-center flex-1 ml-2">{linkedEmployee?.name || currentUser.name}</span></p>
-                                <p className="flex justify-between items-center text-blue-100 border-b border-white/10 pb-1"><span className="text-blue-200/80 font-medium shrink-0">Chức danh:</span> <span className="font-bold text-white text-center flex-1 ml-2">{linkedEmployee?.position || (currentUser.role === 'ONEDOOR' ? 'Viên chức' : 'Chuyên viên')}</span></p>
-                                <p className="flex justify-between items-center text-blue-100 border-b border-white/10 pb-1"><span className="text-blue-200/80 font-medium shrink-0">Bộ phận:</span> <span className="font-bold text-white text-center flex-1 ml-2">{linkedEmployee?.department || (currentUser.role === 'ONEDOOR' ? 'Bộ phận Một cửa' : 'Văn phòng')}</span></p>
-                                {linkedEmployee?.managedWards && linkedEmployee.managedWards.length > 0 && (
-                                    <div className="pt-1">
-                                        <span className="text-blue-200/80 text-[10px] block text-center mb-1">Địa bàn quản lý:</span>
-                                        <div className="flex flex-wrap gap-1 justify-center">
-                                            {linkedEmployee.managedWards.map((w: string) => (
-                                                <span key={w} className="bg-white/20 text-white text-[9px] px-1.5 py-0.5 rounded border border-white/25">{w}</span>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
                     </div>
                 </div>
 

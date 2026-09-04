@@ -626,7 +626,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                             >
                                 <option value="all">Toàn bộ địa bàn</option>
                                 {wards.map(w => (
-                                    <option key={w} value={w}>{w}</option>
+                                    <option key={w} value={w}>{getNormalizedWard(w)}</option>
                                 ))}
                             </select>
                         </div>

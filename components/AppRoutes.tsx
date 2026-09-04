@@ -10,8 +10,8 @@ import {
   DepartmentPermissions,
   DEFAULT_ROLE_PERMISSIONS,
 } from "../types";
-import { STATUS_LABELS, SELECTABLE_STATUSES } from "../constants";
-import { COLUMN_DEFS, removeVietnameseTones, matchDepartmentKey } from "../utils/appHelpers";
+import { STATUS_LABELS, SELECTABLE_STATUSES, getNormalizedWard } from "../constants";
+import { COLUMN_DEFS, removeVietnameseTones, matchDepartmentKey, groupEmployeesByDepartment } from "../utils/appHelpers";
 
 // Components
 import DashboardView from "./DashboardView";
@@ -267,7 +267,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
   }, [props.handoverTab]);
 
   const hasPermission = (permissionId: string) => {
-    if (currentUser.role === UserRole.ADMIN) return true;
+    if (currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.SUBADMIN) return true;
 
     const rolePerms = (rolePermissions && rolePermissions[currentUser.role]) || DEFAULT_ROLE_PERMISSIONS[currentUser.role] || [];
     return rolePerms.includes("*") || rolePerms.includes(permissionId);
@@ -313,11 +313,11 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
   }, []);
 
   const isStatusFilterHidden = [
-    'assign_tasks', 'other_assign_tasks', 'archive_assign_tasks',
+    'assign_tasks', 'archive_assign_tasks',
     'completed_list', 'archive_completed_list',
-    'pending_check_list', 'archive_pending_check_list', 'check_list', 'other_check_list', 'archive_check_list',
-    'director_completed', 'other_director_completed', 'archive_director_completed',
-    'handover_list', 'other_handover_list', 'archive_handover_list'
+    'pending_check_list', 'archive_pending_check_list', 'check_list', 'archive_check_list',
+    'director_completed', 'archive_director_completed',
+    'handover_list', 'archive_handover_list'
   ].includes(props.currentView || '');
 
   const activeFilterCount = React.useMemo(() => {
@@ -406,14 +406,11 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
     let title = "Danh sách Hồ sơ";
     if (
       currentView === "check_list" ||
-      currentView === "other_check_list" ||
-      currentView === "archive_check_list" ||
       currentView === "archive_check_list"
     )
       title = isDirector ? "Danh sách Chờ ký" : "Danh sách Trình Ký";
     else if (
       currentView === "director_completed" ||
-      currentView === "other_director_completed" ||
       currentView === "archive_director_completed"
     )
       title = "Danh sách Hoàn thành";
@@ -421,12 +418,8 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
       title = "Danh sách Giao 1 cửa (Hồ sơ đo đạc)";
     else if (currentView === "archive_handover_list")
       title = "Danh sách Giao 1 cửa (Hồ sơ lưu trữ)";
-    else if (currentView === "other_handover_list")
-      title = "Danh sách Giao 1 cửa (Hồ sơ khác)";
     else if (
       currentView === "assign_tasks" ||
-      currentView === "other_assign_tasks" ||
-      currentView === "archive_assign_tasks" ||
       currentView === "archive_assign_tasks"
     )
       title = "Hồ sơ chưa giao";
@@ -639,7 +632,6 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
 
           <div className="flex flex-wrap items-center gap-3 bg-gray-50 p-2 rounded-lg relative">
             {(currentView === "handover_list" ||
-              currentView === "other_handover_list" ||
               currentView === "archive_handover_list") && (
               <div className="flex items-center gap-2 flex-wrap">
                 <div className="flex bg-white rounded-md border border-gray-200 p-1 shadow-sm">
@@ -701,7 +693,6 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
             )}
 
             {currentView !== "handover_list" &&
-              currentView !== "other_handover_list" &&
               currentView !== "archive_handover_list" && (
                 <div className="relative inline-block" ref={filterPopoverRef}>
                   <button
@@ -868,10 +859,14 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                             >
                               <option value="all">Tất cả cán bộ</option>
                               <option value="unassigned">Chưa giao</option>
-                              {employees.map((emp) => (
-                                <option key={emp.id} value={emp.id}>
-                                  {emp.name} ({emp.position || 'Cán bộ'})
-                                </option>
+                              {Object.entries(groupEmployeesByDepartment(employees)).map(([dept, emps]) => (
+                                <optgroup key={dept} label={dept}>
+                                  {emps.map((emp) => (
+                                    <option key={emp.id} value={emp.id}>
+                                      {emp.name} ({emp.position || 'Cán bộ'})
+                                    </option>
+                                  ))}
+                                </optgroup>
                               ))}
                             </select>
                           </div>
@@ -891,7 +886,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                             <option value="all">Tất cả Xã/Phường</option>
                             {wards.map((w) => (
                               <option key={w} value={w}>
-                                {w}
+                                {getNormalizedWard(w)}
                               </option>
                             ))}
                           </select>
@@ -947,7 +942,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                 </div>
               )}
 
-            {canPerformAction && !["handover_list", "other_handover_list", "archive_handover_list"].includes(currentView) && (
+            {canPerformAction && !["handover_list", "archive_handover_list"].includes(currentView) && (
               <div className="flex items-center gap-2 flex-wrap">
                 <div className="h-6 w-px bg-gray-300 mx-1"></div>
                 <div className="relative inline-block text-left" ref={addMenuRef}>
@@ -1005,7 +1000,6 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                   <>
                     {/* Bulk Assign (Giao việc) */}
                     {(currentView === "assign_tasks" ||
-                      currentView === "other_assign_tasks" ||
                       currentView === "archive_assign_tasks") &&
                       (hasPermission('BTN_ASSIGN_STAFF') || hasPermission('ASSIGN_RECORDS')) && (
                         <button
@@ -1024,7 +1018,6 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
 
                     {/* Bulk Approve / Sign (Ký Duyệt) */}
                     {(currentView === "check_list" ||
-                      currentView === "other_check_list" ||
                       currentView === "archive_check_list") &&
                       (hasPermission('BTN_APPROVE_SIGN') || hasPermission('BTN_SUBMIT_SIGN') || hasPermission('SIGN_RECORDS')) && (
                         <button
@@ -1073,7 +1066,6 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
 
                     {/* Bulk Handover (Bàn giao 1 cửa) */}
                     {(currentView === "director_completed" ||
-                      currentView === "other_director_completed" ||
                       currentView === "archive_director_completed") &&
                       (hasPermission('HANDOVER_RECORDS') || hasPermission('EXPORT_RECORDS')) && (
                         <button
@@ -1097,7 +1089,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
               {props.selectedRecordIds.size > 0 && (
                 <>
                   {/* Bulk Reject (Trả hồ sơ) - Bỏ ở các tab bàn giao/trả kết quả */}
-                  {!["handover_list", "other_handover_list", "archive_handover_list"].includes(currentView) &&
+                  {!["handover_list", "archive_handover_list"].includes(currentView) &&
                     (hasPermission('BTN_REJECT_RECORD') || hasPermission('REJECT_RECORDS') ||
                      hasPermission('dodac_BTN_REJECT_RECORD') || hasPermission('luutru_BTN_REJECT_RECORD')) && (
                     <button
@@ -1130,7 +1122,6 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
               )}
               {/* Tab "Đã trả kết quả": Xuất Excel TKQ */}
               {(currentView === "handover_list" ||
-                currentView === "other_handover_list" ||
                 currentView === "archive_handover_list") &&
                 props.handoverTab === "returned" && (
                   <button
@@ -1144,10 +1135,8 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
 
               {/* Các tab "Chờ bàn giao" & "Chờ trả kết quả": Nút Xuất DS */}
               {(currentView === "director_completed" ||
-                currentView === "other_director_completed" ||
                 currentView === "archive_director_completed" ||
                 ((currentView === "handover_list" ||
-                  currentView === "other_handover_list" ||
                   currentView === "archive_handover_list") &&
                  props.handoverTab !== "returned")) && (
                 <button

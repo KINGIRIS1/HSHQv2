@@ -5,6 +5,35 @@ import { getNormalizedWard, getShortRecordType, STATUS_LABELS } from '../constan
 import { isRecordOverdue, removeVietnameseTones, cleanSyncNotes } from './appHelpers';
 import { fetchContracts } from '../services/api';
 
+/**
+ * Tự động tính toán độ rộng cột trong Excel vừa vặn với nội dung chữ Tiếng Việt
+ */
+export const autoFitColumns = (ws: XLSX.WorkSheet, minWidth = 8, maxWidth = 60) => {
+    if (!ws['!ref']) return;
+    const range = XLSX.utils.decode_range(ws['!ref']);
+    const colWidths: { wch: number }[] = [];
+
+    for (let C = range.s.c; C <= range.e.c; ++C) {
+        let maxLen = minWidth;
+        for (let R = range.s.r; R <= range.e.r; ++R) {
+            // Tránh tính toán trên các dòng tiêu đề/banner gộp ô ở đầu trang
+            if (R < 6 && (C === 0 || range.e.c > 5)) continue;
+            const cellRef = XLSX.utils.encode_cell({ c: C, r: R });
+            const cell = ws[cellRef];
+            if (cell && cell.v !== undefined && cell.v !== null) {
+                const valStr = String(cell.v);
+                const lines = valStr.split('\n');
+                for (const line of lines) {
+                    const len = Math.ceil(line.length * 1.2) + 3;
+                    if (len > maxLen) maxLen = len;
+                }
+            }
+        }
+        colWidths.push({ wch: Math.min(Math.max(maxLen, minWidth), maxWidth) });
+    }
+    ws['!cols'] = colWidths;
+};
+
 export const exportReportToExcel = async (
     records: RecordFile[], 
     fromDateStr: string, 
@@ -299,6 +328,7 @@ export const exportReportToExcel = async (
     if(ws[leftTitle]) ws[leftTitle].s = footerStyle;
     if(ws[rightTitle]) ws[rightTitle].s = footerStyle;
 
+    autoFitColumns(ws, 8, 55);
     XLSX.utils.book_append_sheet(wb, ws, "Bao Cao");
     const safeWardName = ward === 'all' ? 'Tong_Hop' : ward.replace(/\s/g, '_');
     const fileName = `Bao_Cao_${safeWardName}_${fromDateStr}_${toDateStr}.xlsx`;
@@ -431,6 +461,7 @@ export const exportDailyStatsToExcel = (records: RecordFile[], employees: Employ
         { wch: 20 }  // Trạng thái
     ];
 
+    autoFitColumns(ws, 8, 55);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "ThongKe");
     
@@ -582,6 +613,7 @@ export const exportReturnedListToExcel = (records: RecordFile[], fromDateStr?: s
     if(ws[leftTitle]) ws[leftTitle].s = footerTitleStyle;
     if(ws[rightTitle]) ws[rightTitle].s = footerTitleStyle;
 
+    autoFitColumns(ws, 8, 55);
     XLSX.utils.book_append_sheet(wb, ws, "DS_Tra_KQ");
     
     let safeName = 'Tat_Ca';
@@ -711,6 +743,7 @@ export const exportOverdueStatsToExcel = (records: any[], employees: Employee[],
         { wch: 15 }  // Trạng thái
     ];
 
+    autoFitColumns(ws, 8, 55);
     XLSX.utils.book_append_sheet(wb, ws, "HoSoTreHan");
     const fileName = `Danh_Sach_Tre_Han_${filterType}_${new Date().getTime()}.xlsx`;
     XLSX.writeFile(wb, fileName);
@@ -931,6 +964,7 @@ export const createRecordsWorkbook = async (
     if(ws[leftTitle]) ws[leftTitle].s = footerTitleStyle;
     if(ws[rightTitle]) ws[rightTitle].s = footerTitleStyle;
 
+    autoFitColumns(ws, 8, 55);
     XLSX.utils.book_append_sheet(wb, ws, "DanhSach");
     return wb;
 };

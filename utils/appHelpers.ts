@@ -281,8 +281,78 @@ export function matchDepartmentKey(key: string, empDept: string): boolean {
         return empDeptLower.includes('hành chính') || empDeptLower.includes('một cửa');
     }
     
+    // 5. Ban Giám đốc
+    if (kLower.includes('giám đốc') || kLower.includes('lãnh đạo')) {
+        return empDeptLower.includes('giám đốc') || empDeptLower.includes('lãnh đạo');
+    }
+    
     return false;
 }
+
+// Chuẩn hóa và phân nhóm nhân viên theo tổ chuyên môn
+export function groupEmployeesByDepartment(employees: Employee[] = []): Record<string, Employee[]> {
+    if (!employees || employees.length === 0) return {};
+
+    const standardOrder = ['Tổ Đo đạc', 'Tổ Cấp giấy', 'Tổ Lưu trữ', 'Tổ Hành chính', 'Ban Giám đốc'];
+    const groups: Record<string, Employee[]> = {};
+
+    employees.forEach(emp => {
+        let dept = emp.department?.trim() || 'Chưa phân tổ';
+        const dLower = dept.toLowerCase();
+        
+        if (dLower.includes('đo đạc') || dLower.includes('đo dạc')) {
+            dept = 'Tổ Đo đạc';
+        } else if (dLower.includes('cấp giấy') || dLower.includes('đăng ký')) {
+            dept = 'Tổ Cấp giấy';
+        } else if (dLower.includes('lưu trữ') || dLower.includes('thông tin')) {
+            dept = 'Tổ Lưu trữ';
+        } else if (dLower.includes('hành chính') || dLower.includes('một cửa')) {
+            dept = 'Tổ Hành chính';
+        } else if (dLower.includes('giám đốc') || dLower.includes('lãnh đạo')) {
+            dept = 'Ban Giám đốc';
+        }
+
+        if (!groups[dept]) groups[dept] = [];
+        groups[dept].push(emp);
+    });
+
+    const orderedGroups: Record<string, Employee[]> = {};
+    standardOrder.forEach(dept => {
+        if (groups[dept] && groups[dept].length > 0) {
+            orderedGroups[dept] = groups[dept];
+        }
+    });
+
+    Object.keys(groups).forEach(dept => {
+        if (!orderedGroups[dept] && groups[dept].length > 0) {
+            orderedGroups[dept] = groups[dept];
+        }
+    });
+
+    return orderedGroups;
+}
+
+// Kiểu màu sắc và huy hiệu theo từng tổ
+export function getDepartmentBadgeStyle(department?: string): { bg: string; text: string; border: string; badgeBg: string; label: string } {
+    const dept = (department || '').toLowerCase();
+    if (dept.includes('đo đạc') || dept.includes('đo dạc')) {
+        return { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200', badgeBg: 'bg-blue-100 text-blue-800 border-blue-300', label: 'Tổ Đo đạc' };
+    }
+    if (dept.includes('cấp giấy') || dept.includes('đăng ký')) {
+        return { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', badgeBg: 'bg-emerald-100 text-emerald-800 border-emerald-300', label: 'Tổ Cấp giấy' };
+    }
+    if (dept.includes('lưu trữ') || dept.includes('thông tin')) {
+        return { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200', badgeBg: 'bg-purple-100 text-purple-800 border-purple-300', label: 'Tổ Lưu trữ' };
+    }
+    if (dept.includes('hành chính') || dept.includes('một cửa')) {
+        return { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200', badgeBg: 'bg-amber-100 text-amber-800 border-amber-300', label: 'Tổ Hành chính' };
+    }
+    if (dept.includes('giám đốc') || dept.includes('lãnh đạo')) {
+        return { bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200', badgeBg: 'bg-rose-100 text-rose-800 border-rose-300', label: 'Ban Giám đốc' };
+    }
+    return { bg: 'bg-slate-50', text: 'text-slate-700', border: 'border-slate-200', badgeBg: 'bg-slate-100 text-slate-800 border-slate-300', label: department || 'Nhân sự' };
+}
+
 
 export function parseSafeDate(dateStr: any): Date | null {
     if (!dateStr) return null;

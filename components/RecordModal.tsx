@@ -4,7 +4,7 @@ import { RecordFile, RecordStatus, Employee, User, UserRole } from '../types';
 import AutoResizeTextarea from './AutoResizeTextarea';
 import { GROUPS, EXTENDED_RECORD_TYPES, STATUS_LABELS, SELECTABLE_STATUSES, getShortRecordType, getWardLabel, getNormalizedWard, isArchiveRecordType } from '../constants';
 import { X, Save, Lock, User as UserIcon, MapPin, FileText, Calendar, FileCheck, ChevronDown, ChevronUp } from 'lucide-react';
-import { calculateDeadlineHelper, getDepartmentForRecord, isProcedure2_3, syncRecordStatusTransition, getPureBatchNumber } from '../utils/appHelpers';
+import { calculateDeadlineHelper, getDepartmentForRecord, isProcedure2_3, syncRecordStatusTransition, getPureBatchNumber, groupEmployeesByDepartment } from '../utils/appHelpers';
 import { fetchContracts } from '../services/api';
 
 interface AttachedDocItem {
@@ -91,7 +91,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   
   const isEdit = !!initialData && !!initialData.id;
-  const hasAdminRights = currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.SUBADMIN;
+  const hasAdminRights = currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.SUBADMIN || currentUser.role === UserRole.TEAM_LEADER;
   const isOneDoor = currentUser.role === UserRole.ONEDOOR;
   const canEditResult = (hasAdminRights || isOneDoor) && isEdit;
 
@@ -134,13 +134,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
 
   const groupedEmployees = useMemo(() => {
     if (!employees || employees.length === 0) return {};
-    const groups: Record<string, Employee[]> = {};
-    employees.forEach(emp => {
-      const dept = emp.department?.trim() || 'Tổ khác';
-      if (!groups[dept]) groups[dept] = [];
-      groups[dept].push(emp);
-    });
-    return groups;
+    return groupEmployeesByDepartment(employees);
   }, [employees]);
 
   useEffect(() => {
@@ -572,7 +566,6 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                                 )}
                             </>
                         )}
-                        {!hasAdminRights && <div className="col-span-full p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700 italic text-center">* Ngày tháng và trạng thái chỉ Admin/Subadmin được chỉnh sửa.</div>}
                     </div>
                 </div>
 

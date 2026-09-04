@@ -1,13 +1,15 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Employee, RecordFile, User as AppUser } from '../types';
-import { X, Check, MapPin, User, Users, Search, Briefcase } from 'lucide-react';
-import { removeVietnameseTones } from '../utils/appHelpers';
+import { X, Check, MapPin, User, Users, Search, Briefcase, Compass, FileText, Archive, Building2, Shield, Layers } from 'lucide-react';
+import { removeVietnameseTones, groupEmployeesByDepartment, getDepartmentBadgeStyle } from '../utils/appHelpers';
 
 interface DeptConfig {
     id: string;
     label: string;
     subtitle: string;
     matchKeys: string[];
+    icon: React.ReactNode;
+    colorClass: string;
 }
 
 const DEPARTMENTS_CONFIG: DeptConfig[] = [
@@ -15,37 +17,49 @@ const DEPARTMENTS_CONFIG: DeptConfig[] = [
         id: 'ALL',
         label: 'Tất cả nhân viên',
         subtitle: 'Toàn bộ nhân viên phân loại theo tổ',
-        matchKeys: []
-    },
-    {
-        id: 'Tổ Cấp giấy',
-        label: 'Tổ Cấp giấy',
-        subtitle: 'Đăng ký, biến động, cấp ...',
-        matchKeys: ['tổ cấp giấy', 'tổ đăng ký cấp giấy', 'đăng ký cấp giấy', 'tổ đăng ký', 'cấp giấy']
-    },
-    {
-        id: 'Tổ Lưu trữ',
-        label: 'Tổ Lưu trữ',
-        subtitle: 'Khai thác hồ sơ & dữ liệu l...',
-        matchKeys: ['tổ thông tin lưu trữ', 'tổ lưu trữ', 'thông tin lưu trữ', 'lưu trữ']
+        matchKeys: [],
+        icon: <Layers size={16} />,
+        colorClass: 'text-indigo-600 bg-indigo-50 border-indigo-200'
     },
     {
         id: 'Tổ Đo đạc',
         label: 'Tổ Đo đạc',
-        subtitle: 'Đo vẽ bản đồ, trích đo th...',
-        matchKeys: ['tổ đo đạc', 'đo đạc']
+        subtitle: 'Đo vẽ bản đồ, trích đo thửa đất...',
+        matchKeys: ['tổ đo đạc', 'đo đạc'],
+        icon: <Compass size={16} />,
+        colorClass: 'text-blue-600 bg-blue-50 border-blue-200'
+    },
+    {
+        id: 'Tổ Cấp giấy',
+        label: 'Tổ Cấp giấy',
+        subtitle: 'Đăng ký, biến động, cấp GCN...',
+        matchKeys: ['tổ cấp giấy', 'tổ đăng ký cấp giấy', 'đăng ký cấp giấy', 'tổ đăng ký', 'cấp giấy'],
+        icon: <FileText size={16} />,
+        colorClass: 'text-emerald-600 bg-emerald-50 border-emerald-200'
+    },
+    {
+        id: 'Tổ Lưu trữ',
+        label: 'Tổ Lưu trữ',
+        subtitle: 'Khai thác hồ sơ & dữ liệu lưu trữ...',
+        matchKeys: ['tổ thông tin lưu trữ', 'tổ lưu trữ', 'thông tin lưu trữ', 'lưu trữ'],
+        icon: <Archive size={16} />,
+        colorClass: 'text-purple-600 bg-purple-50 border-purple-200'
     },
     {
         id: 'Tổ Hành chính',
         label: 'Tổ Hành chính',
-        subtitle: 'Một cửa, tổng hợp, hành ...',
-        matchKeys: ['tổ hành chính', 'một cửa', 'quản trị hệ thống', 'hành chính']
+        subtitle: 'Một cửa, tổng hợp, hành chính...',
+        matchKeys: ['tổ hành chính', 'một cửa', 'quản trị hệ thống', 'hành chính'],
+        icon: <Building2 size={16} />,
+        colorClass: 'text-amber-600 bg-amber-50 border-amber-200'
     },
     {
         id: 'Ban Giám đốc',
         label: 'Ban Giám đốc',
-        subtitle: 'Ban Giám đốc & Phối hợp ...',
-        matchKeys: ['ban giám đốc', 'giám đốc']
+        subtitle: 'Ban Giám đốc & Lãnh đạo duyệt...',
+        matchKeys: ['ban giám đốc', 'giám đốc', 'lãnh đạo'],
+        icon: <Shield size={16} />,
+        colorClass: 'text-rose-600 bg-rose-50 border-rose-200'
     }
 ];
 
@@ -70,75 +84,94 @@ interface EmployeeItemProps {
 }
 
 // Component hiển thị một dòng nhân viên trong danh sách tổ chuyên môn
-const EmployeeItem: React.FC<EmployeeItemProps> = ({ emp, isLastAssigned, isTargetWardMatch, isSelected, onSelect }) => (
-    <div 
-        onClick={() => onSelect(emp.id)}
-        className={`relative flex flex-col justify-between p-3 rounded-xl border cursor-pointer transition-all duration-200 group h-full ${
-            isTargetWardMatch 
-                ? (isSelected 
-                    ? 'bg-emerald-100/90 border-emerald-600 shadow-md ring-2 ring-emerald-300' 
-                    : 'bg-emerald-50 border-emerald-300 hover:border-emerald-500 hover:bg-emerald-100/70 shadow-sm')
-                : (isSelected 
-                    ? 'bg-indigo-50/80 border-indigo-500 shadow-md ring-2 ring-indigo-200' 
-                    : 'bg-white border-gray-200 hover:border-indigo-400 hover:shadow-lg')
-        }`}
-    >
-        {/* Phần trên: Ảnh/Chữ viết tắt tên & Thông tin nhân viên */}
-        <div className="flex items-start gap-2.5">
-            <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-black shrink-0 transition-colors ${
-                isSelected 
-                    ? 'bg-indigo-600 text-white' 
-                    : isTargetWardMatch 
-                        ? 'bg-emerald-600 text-white' 
-                        : 'bg-gray-100 text-gray-700 group-hover:bg-indigo-100 group-hover:text-indigo-700'
-            }`}>
-                {emp.name.charAt(0).toUpperCase()}
-            </div>
-            
-            <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between gap-1 mb-0.5">
-                    <span className={`font-black text-sm truncate ${isSelected ? 'text-indigo-900' : isTargetWardMatch ? 'text-emerald-950 font-extrabold' : 'text-gray-800'}`}>
-                        {emp.name}
-                    </span>
-                    {/* Dấu tích chọn nổi bật màu tím indigo khi nhân viên được chọn */}
-                    {isSelected && (
-                        <div className="bg-indigo-600 text-white p-1 rounded-full shadow-xs shrink-0 flex items-center justify-center">
-                            <Check size={14} strokeWidth={3} />
-                        </div>
-                    )}
+const EmployeeItem: React.FC<EmployeeItemProps> = ({ emp, isLastAssigned, isTargetWardMatch, isSelected, onSelect }) => {
+    const deptStyle = getDepartmentBadgeStyle(emp.department);
+
+    return (
+        <div 
+            onClick={() => onSelect(emp.id)}
+            className={`relative flex flex-col justify-between p-3.5 rounded-xl border cursor-pointer transition-all duration-200 group h-full ${
+                isTargetWardMatch 
+                    ? (isSelected 
+                        ? 'bg-emerald-100/90 border-emerald-600 shadow-md ring-2 ring-emerald-300' 
+                        : 'bg-emerald-50/70 border-emerald-300 hover:border-emerald-500 hover:bg-emerald-100/70 shadow-sm')
+                    : (isSelected 
+                        ? 'bg-indigo-50/90 border-indigo-500 shadow-md ring-2 ring-indigo-200' 
+                        : 'bg-white border-slate-200 hover:border-indigo-400 hover:shadow-md')
+            }`}
+        >
+            {/* Phần trên: Avatar & Thông tin nhân viên */}
+            <div className="flex items-start gap-3">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-black shrink-0 shadow-xs transition-colors ${
+                    isSelected 
+                        ? 'bg-indigo-600 text-white' 
+                        : isTargetWardMatch 
+                            ? 'bg-emerald-600 text-white' 
+                            : 'bg-slate-100 text-slate-700 group-hover:bg-indigo-100 group-hover:text-indigo-700'
+                }`}>
+                    {emp.name.charAt(0).toUpperCase()}
                 </div>
                 
-                {/* Chức vụ và Tổ thể hiện ví dụ: Chuyên viên - Tổ Đo đạc */}
-                <div className="text-xs font-semibold text-gray-600 flex items-center gap-1">
-                    <Briefcase size={12} className="text-gray-400 shrink-0" />
-                    <span className="truncate">{emp.position || 'Nhân viên'} - <span className="text-indigo-700 font-bold">{emp.department || 'Tổ chuyên môn'}</span></span>
-                </div>
-            </div>
-        </div>
-
-        {/* Dòng địa bàn phụ trách: Căn chỉnh vừa hết khung thẻ (full card width, không bị cản/thụt lùi bởi avatar chữ cái tên) */}
-        {emp.managedWards && emp.managedWards.length > 0 && (
-            <div className="mt-2 pt-2 border-t border-gray-200/60 w-full">
-                <span className="text-[10px] text-gray-500 font-bold block mb-1 uppercase tracking-tight">ĐỊA BÀN PHỤ TRÁCH:</span>
-                <div className="grid grid-cols-4 gap-1 w-full">
-                    {emp.managedWards.map((w, idx) => {
-                        // Tự động bỏ các tiền tố "Xã", "Phường", "Thị trấn", "TT." khi hiển thị để 4 địa bàn luôn hiển thị vừa vặn trọn vẹn 1 dòng không bị mất chữ
-                        const displayName = w.replace(/^(Xã|Phường|Thị trấn|TT\.)\s+/i, '');
-                        return (
-                            <span 
-                                key={idx} 
-                                className="text-[10px] bg-white/90 text-slate-700 px-1 py-0.5 rounded border border-slate-200/80 text-center font-medium block shadow-2xs whitespace-nowrap overflow-hidden text-ellipsis" 
-                                title={w}
-                            >
-                                {displayName}
+                <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-1 mb-1">
+                        <span className={`font-black text-sm truncate ${isSelected ? 'text-indigo-900' : isTargetWardMatch ? 'text-emerald-950 font-extrabold' : 'text-slate-800'}`}>
+                            {emp.name}
+                        </span>
+                        {/* Dấu tích chọn nổi bật khi nhân viên được chọn */}
+                        {isSelected && (
+                            <div className="bg-indigo-600 text-white p-1 rounded-full shadow-xs shrink-0 flex items-center justify-center">
+                                <Check size={13} strokeWidth={3} />
+                            </div>
+                        )}
+                        {isLastAssigned && !isSelected && (
+                            <span className="text-[9px] font-bold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded border border-amber-200 shrink-0">
+                                Giao gần nhất
                             </span>
-                        );
-                    })}
+                        )}
+                    </div>
+                    
+                    {/* Chức vụ & Huy hiệu phân tổ chuyên môn nổi bật */}
+                    <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                        <span className="text-slate-600 font-medium truncate">
+                            {emp.position || 'Nhân viên'}
+                        </span>
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border shrink-0 ${deptStyle.badgeBg}`}>
+                            {deptStyle.label}
+                        </span>
+                    </div>
                 </div>
             </div>
-        )}
-    </div>
-);
+
+            {/* Dòng địa bàn phụ trách */}
+            {emp.managedWards && emp.managedWards.length > 0 && (
+                <div className="mt-2.5 pt-2 border-t border-slate-200/60 w-full">
+                    <div className="flex items-center justify-between mb-1">
+                        <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">ĐỊA BÀN PHỤ TRÁCH:</span>
+                        {isTargetWardMatch && (
+                            <span className="text-[9px] text-emerald-700 font-bold bg-emerald-100/80 px-1 rounded">
+                                Khớp hồ sơ
+                            </span>
+                        )}
+                    </div>
+                    <div className="grid grid-cols-4 gap-1 w-full">
+                        {emp.managedWards.map((w, idx) => {
+                            const displayName = w.replace(/^(Xã|Phường|Thị trấn|TT\.)\s+/i, '');
+                            return (
+                                <span 
+                                    key={idx} 
+                                    className="text-[10px] bg-white/90 text-slate-700 px-1 py-0.5 rounded border border-slate-200/80 text-center font-medium block shadow-2xs whitespace-nowrap overflow-hidden text-ellipsis" 
+                                    title={w}
+                                >
+                                    {displayName}
+                                </span>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
 
 const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, employees, selectedRecords, filterDepartment, currentView, currentUser, allRecords }) => {
   const [selectedDept, setSelectedDept] = useState<string>('');
@@ -372,13 +405,14 @@ const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, e
                                       const currentEmp = employees.find(e => e.id === currentUser?.employeeId);
                                       const isUserDept = config && currentEmp?.department && 
                                           config.matchKeys.some(key => currentEmp.department?.toLowerCase().includes(key));
+                                      const icon = config?.icon || <Briefcase size={16} />;
 
                                       return (
                                           <div className="flex items-center gap-3 w-full min-w-0">
                                               <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
-                                                  isSelected ? 'bg-indigo-700/80' : 'bg-slate-100 group-hover:bg-indigo-50'
+                                                  isSelected ? 'bg-indigo-700 text-white' : 'bg-slate-100 text-slate-600 group-hover:bg-indigo-50 group-hover:text-indigo-600'
                                               }`}>
-                                                  <Briefcase size={16} className={isSelected ? 'text-white' : 'text-slate-500'} />
+                                                  {icon}
                                               </div>
                                               <div className="flex-1 min-w-0 flex flex-col">
                                                   <div className="flex items-center gap-1">
@@ -428,7 +462,7 @@ const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, e
                      <div>
                         <h4 className="text-sm font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
                            <Users size={16} className="text-slate-500" />
-                           {selectedDept} ({filteredEmployees.length} thành viên)
+                           {selectedDept === 'ALL' ? 'Toàn bộ nhân sự theo tổ' : selectedDept} ({filteredEmployees.length} thành viên)
                         </h4>
                         <p className="text-[10px] text-slate-400 font-bold uppercase mt-0.5">Chọn nhân viên bên dưới để phân công giải quyết hồ sơ</p>
                      </div>
@@ -436,18 +470,50 @@ const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, e
 
                  <div className="p-6 overflow-y-auto flex-1 custom-scrollbar bg-slate-50/50">
                      {filteredEmployees.length > 0 ? (
-                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {filteredEmployees.map(emp => (
-                                <EmployeeItem 
-                                    key={emp.id} 
-                                    emp={emp}
-                                    isLastAssigned={lastAssignedIdForCurrentDept === emp.id}
-                                    isTargetWardMatch={isWardMatch(emp)}
-                                    isSelected={selectedEmpId === emp.id}
-                                    onSelect={setSelectedEmpId}
-                                />
-                            ))}
-                         </div>
+                         selectedDept === 'ALL' ? (
+                             <div className="space-y-6">
+                                 {Object.entries(groupEmployeesByDepartment(filteredEmployees)).map(([deptName, deptEmps]) => {
+                                     const badge = getDepartmentBadgeStyle(deptName);
+                                     return (
+                                         <div key={deptName} className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
+                                             <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-100">
+                                                 <div className="flex items-center gap-2">
+                                                     <span className={`text-xs font-black px-2.5 py-1 rounded-lg border ${badge.badgeBg}`}>
+                                                         {deptName}
+                                                     </span>
+                                                     <span className="text-xs font-bold text-slate-500">({deptEmps.length} nhân sự)</span>
+                                                 </div>
+                                             </div>
+                                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                                                 {deptEmps.map(emp => (
+                                                     <EmployeeItem 
+                                                         key={emp.id} 
+                                                         emp={emp}
+                                                         isLastAssigned={lastAssignedIdForCurrentDept === emp.id}
+                                                         isTargetWardMatch={isWardMatch(emp)}
+                                                         isSelected={selectedEmpId === emp.id}
+                                                         onSelect={setSelectedEmpId}
+                                                     />
+                                                 ))}
+                                             </div>
+                                         </div>
+                                     );
+                                 })}
+                             </div>
+                         ) : (
+                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {filteredEmployees.map(emp => (
+                                    <EmployeeItem 
+                                        key={emp.id} 
+                                        emp={emp}
+                                        isLastAssigned={lastAssignedIdForCurrentDept === emp.id}
+                                        isTargetWardMatch={isWardMatch(emp)}
+                                        isSelected={selectedEmpId === emp.id}
+                                        onSelect={setSelectedEmpId}
+                                    />
+                                ))}
+                             </div>
+                         )
                      ) : (
                          <div className="h-full flex flex-col items-center justify-center text-slate-400 border-2 border-dashed border-slate-200 rounded-2xl m-2 bg-white p-8">
                             <Users size={40} className="mb-3 opacity-30 text-indigo-600" />
