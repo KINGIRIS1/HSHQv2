@@ -178,7 +178,13 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
 
   const formatDate = (dateStr?: string | null) => {
     if (!dateStr) return '---';
+    const clean = dateStr.split('T')[0];
+    const parts = clean.split('-');
+    if (parts.length === 3) {
+      return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
     const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return dateStr;
     const d = String(date.getDate()).padStart(2, '0');
     const m = String(date.getMonth() + 1).padStart(2, '0');
     const y = date.getFullYear();
@@ -489,32 +495,32 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
   const recordTypeLower = (record?.recordType || '').toLowerCase();
   const isCongVan = record?.recordType ? getShortRecordType(record.recordType) === '1.2 Công văn' : false;
 
-  // LOGIC CHECK TIẾN ĐỘ & THỜI GIAN (Đồng bộ tuyệt đối theo trạng thái hiện tại)
-  const isWorkDone = [
-      RecordStatus.COMPLETED_WORK, RecordStatus.PENDING_CHECK, RecordStatus.CHECKED, RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER, RecordStatus.RETURNED
-  ].includes(record.status) && (!!record.completedWorkDate || !!record.assignedDate);
+  // LOGIC CHECK TIẾN ĐỘ & THỜI GIAN (Đồng bộ tuyệt đối theo trạng thái hiện tại hoặc khi có mốc ngày)
+  const isWorkDone = !!record.assignedDate || !!record.completedWorkDate || [
+      RecordStatus.ASSIGNED, RecordStatus.IN_PROGRESS, RecordStatus.COMPLETED_WORK, RecordStatus.PENDING_CHECK, RecordStatus.CHECKED, RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER, RecordStatus.RETURNED
+  ].includes(record.status);
   
-  const isPendingCheckActive = [
+  const isPendingCheckActive = !!record.pendingCheckDate || !!record.checkedDate || [
       RecordStatus.PENDING_CHECK, RecordStatus.CHECKED, RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER, RecordStatus.RETURNED
-  ].includes(record.status) && (!!record.pendingCheckDate || !!record.checkedDate);
+  ].includes(record.status);
 
-  const isCheckedActive = [
+  const isCheckedActive = !!record.checkedDate || [
       RecordStatus.CHECKED, RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER, RecordStatus.RETURNED
-  ].includes(record.status) && !!record.checkedDate;
+  ].includes(record.status);
 
-  const isPendingSignActive = [
+  const isPendingSignActive = !!record.submissionDate || !!record.approvalDate || [
       RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER, RecordStatus.RETURNED
-  ].includes(record.status) && (!!record.submissionDate || !!record.approvalDate);
+  ].includes(record.status);
 
-  const isSignedActive = [
+  const isSignedActive = !!record.approvalDate || [
       RecordStatus.SIGNED, RecordStatus.HANDOVER, RecordStatus.RETURNED
-  ].includes(record.status) && !!record.approvalDate;
+  ].includes(record.status);
 
-  const isHandoverActive = [
+  const isHandoverActive = !!record.completedDate || !!record.exportDate || !!record.exportBatch || [
       RecordStatus.HANDOVER, RecordStatus.RETURNED, RecordStatus.WITHDRAWN, RecordStatus.REJECTED
-  ].includes(record.status) && (!!record.completedDate || !!record.exportDate || !!record.exportBatch);
+  ].includes(record.status);
 
-  const isReturnedActive = record.status === RecordStatus.RETURNED && !!record.resultReturnedDate;
+  const isReturnedActive = !!record.resultReturnedDate || record.status === RecordStatus.RETURNED;
 
 
   return (
@@ -976,8 +982,8 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                                 icon={UserIcon}
                                 colorClass={{text: 'text-blue-700', border: 'border-blue-600', bg: 'bg-blue-600'}}
                                 subText={record.assignedTo ? (() => {
-                                    const emp = employees.find(e => e.id === record.assignedTo);
-                                    if (!emp) return undefined;
+                                    const emp = employees.find(e => e.id === record.assignedTo || e.name === record.assignedTo);
+                                    if (!emp) return record.assignedTo;
                                     return `${emp.name} (${emp.position || 'Chuyên viên'})`;
                                 })() : undefined}
                             />
@@ -991,8 +997,8 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                                     icon={Send}
                                     colorClass={{text: 'text-orange-700', border: 'border-orange-600', bg: 'bg-orange-600'}}
                                     subText={record.checkedBy ? (() => {
-                                        const checker = employees.find(e => e.id === record.checkedBy);
-                                        if (!checker) return undefined;
+                                        const checker = employees.find(e => e.id === record.checkedBy || e.name === record.checkedBy);
+                                        if (!checker) return record.checkedBy;
                                         return `${checker.name} (${checker?.position || 'Người kiểm tra'})`;
                                     })() : undefined}
                                 />
@@ -1005,8 +1011,11 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                                 icon={Send}
                                 colorClass={{text: 'text-purple-700', border: 'border-purple-600', bg: 'bg-purple-600'}}
                                 subText={record.submittedTo ? (() => {
-                                    const director = users.find(u => u.employeeId === record.submittedTo);
-                                    if (!director) return undefined;
+                                    const director = users.find(u => u.employeeId === record.submittedTo || u.name === record.submittedTo || u.id === record.submittedTo);
+                                    if (!director) {
+                                        const emp = employees.find(e => e.id === record.submittedTo || e.name === record.submittedTo);
+                                        return emp ? `${emp.name} (${emp.position || 'Lãnh đạo'})` : record.submittedTo;
+                                    }
                                     const emp = employees.find(e => e.id === director.employeeId);
                                     return `${director.name} (${emp?.position || (director.role === UserRole.ADMIN ? 'Giám đốc' : 'Phó giám đốc')})`;
                                 })() : undefined}
