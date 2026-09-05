@@ -943,7 +943,7 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Tân Qua
                                             <input type="checkbox" checked={selectedIds.has(r.id)} onChange={() => handleSelectRow(r.id)} />
                                         </td>
                                         <td className="p-3 text-center text-gray-500">{(currentPage - 1) * itemsPerPage + idx + 1}</td>
-                                        <td className="p-3 font-bold text-blue-600 cursor-pointer hover:underline" onClick={() => setDetailRecord(r)}>{r.so_hieu}</td>
+                                        <td className="p-3 font-mono font-bold text-blue-600 cursor-pointer hover:underline" onClick={() => setDetailRecord(r)}>{r.so_hieu}</td>
                                         <td className="p-3 font-medium text-gray-800">{toTitleCase(r.noi_nhan_gui)}</td>
                                         <td className="p-3 text-gray-600">{r.data?.xa_phuong}</td>
                                         <td className="p-3 text-center font-mono text-xs">{r.data?.to_ban_do || '-'} / {r.data?.thua_dat || '-'}</td>

@@ -481,11 +481,16 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
         updated = { ...updated, ...synced };
       }
 
-      if (field === 'assignedTo' && value) {
-        const emp = employees.find(e => e.id === value);
-        const firstWard = emp?.managedWards?.[0];
-        if (firstWard) {
-          updated.ward = firstWard;
+      if (field === 'assignedTo') {
+        if (value) {
+          const emp = employees.find(e => e.id === value || e.name === value);
+          const firstWard = emp?.managedWards?.[0];
+          if (firstWard && !prev.ward) {
+            updated.ward = firstWard;
+          }
+          if (!updated.assignedDate) {
+            updated.assignedDate = new Date().toISOString().split('T')[0];
+          }
         }
       }
       if (updated.ward) {
@@ -524,6 +529,12 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
   };
   const val = (v: any) => v === undefined || v === null ? '' : v;
   const dateVal = (v: any) => { if (!v) return ''; const str = String(v); return str.includes('T') ? str.split('T')[0] : str; };
+  const formatDate = (dateStr?: string | null) => {
+    if (!dateStr) return '--';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+  };
 
   const isArchive = isArchiveRecordType(formData.recordType || '') || (getDepartmentForRecord(formData as RecordFile).toLowerCase().includes('lưu trữ'));
   const isCongVan = formData.recordType ? getShortRecordType(formData.recordType) === '1.2 Công văn' : false;
@@ -572,7 +583,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                                 <p className="text-[11px] text-amber-600 mt-1 font-medium">* Bắt buộc chọn loại hồ sơ để kích hoạt chức năng lưu</p>
                             )}
                         </div>
-                        {hasAdminRights && (
+                        {hasAdminRights ? (
                             <>
                                 <div><label className="block text-xs font-bold text-gray-700 mb-1">Trạng thái</label><select className="w-full border border-gray-300 rounded-md px-3 py-2 bg-yellow-50 font-medium" value={val(formData.status)} onChange={(e) => handleChange('status', e.target.value)}>{SELECTABLE_STATUSES.filter(item => !isArchive || (item.key !== RecordStatus.PENDING_CHECK && item.key !== RecordStatus.CHECKED)).map(item => <option key={item.key} value={item.key}>{item.label}</option>)}</select></div>
                                 <div><label className="block text-xs font-bold text-gray-700 mb-1">Ngày nhận</label><input type="date" required className="w-full border border-gray-300 rounded-md px-3 py-2" value={dateVal(formData.receivedDate)} onChange={(e) => handleChange('receivedDate', e.target.value)} /></div>
@@ -593,7 +604,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                                         RecordStatus.RETURNED
                                     ];
                                     const currentIdx = formData.status ? statusFlow.indexOf(formData.status) : -1;
-                                    const hasAssigned = currentIdx >= statusFlow.indexOf(RecordStatus.ASSIGNED) || !!formData.assignedDate;
+                                    const hasAssigned = isEdit || currentIdx >= statusFlow.indexOf(RecordStatus.ASSIGNED) || !!formData.assignedDate || !!formData.assignedTo;
                                     const hasPendingCheck = !isArchive && (currentIdx >= statusFlow.indexOf(RecordStatus.PENDING_CHECK) || !!formData.pendingCheckDate);
                                     const hasSubmission = currentIdx >= statusFlow.indexOf(RecordStatus.PENDING_SIGN) || !!formData.submissionDate;
                                     const hasHandover = currentIdx >= statusFlow.indexOf(RecordStatus.SIGNED) || formData.status === RecordStatus.HANDOVER || formData.status === RecordStatus.RETURNED || !!formData.completedDate;
@@ -615,6 +626,37 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                                         </>
                                     );
                                 })()}
+                            </>
+                        ) : (
+                            <>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 mb-1">Trạng thái</label>
+                                    <div className="w-full border border-gray-200 rounded-md px-3 py-2 bg-gray-50 text-sm font-semibold text-gray-700">
+                                        {SELECTABLE_STATUSES.find(s => s.key === formData.status)?.label || formData.status || 'Chưa xác định'}
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 mb-1">Ngày nhận</label>
+                                    <div className="w-full border border-gray-200 rounded-md px-3 py-2 bg-gray-50 text-sm font-semibold text-gray-700">
+                                        {formData.receivedDate ? formatDate(formData.receivedDate) : '--'}
+                                    </div>
+                                </div>
+                                {!isCongVan && (
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-500 mb-1">Hẹn trả</label>
+                                        <div className="w-full border border-gray-200 rounded-md px-3 py-2 bg-gray-50 text-sm font-semibold text-red-600">
+                                            {formData.deadline ? formatDate(formData.deadline) : '--'}
+                                        </div>
+                                    </div>
+                                )}
+                                {formData.assignedDate && (
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-500 mb-1">Ngày giao NV</label>
+                                        <div className="w-full border border-gray-200 rounded-md px-3 py-2 bg-gray-50 text-sm font-semibold text-gray-700">
+                                            {formatDate(formData.assignedDate)}
+                                        </div>
+                                    </div>
+                                )}
                             </>
                         )}
                     </div>
@@ -842,9 +884,48 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                                     </div>
                                 )}
                             </div>
-                        </div>
 
-                        {/* Ẩn mục Số trích đo, Số trích lục và Giao nhân viên xử lý theo yêu cầu */}
+                            {/* NGƯỜI GIAO XỬ LÝ (1 HÀNG ĐẶT DƯỚI THÔNG TIN NGƯỜI ĐƯỢC ỦY QUYỀN) */}
+                            <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
+                                <label className="block text-xs font-bold text-gray-700 uppercase mb-2 flex items-center justify-between">
+                                    <span className="flex items-center gap-2">
+                                        <UserIcon size={14} className="text-indigo-600" />
+                                        Người giao xử lý
+                                    </span>
+                                    {formData.assignedTo && (
+                                        <span className="text-[11px] text-indigo-600 font-semibold bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
+                                            Đã phân công
+                                        </span>
+                                    )}
+                                </label>
+                                {hasAdminRights ? (
+                                    <select
+                                        id="record-assignedTo-select"
+                                        className="w-full border border-gray-300 rounded-lg px-3 py-2.5 bg-white text-sm font-medium text-gray-800 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all shadow-xs"
+                                        value={formData.assignedTo ? (employees.find(e => e.id === formData.assignedTo || e.name === formData.assignedTo)?.id || formData.assignedTo) : ''}
+                                        onChange={(e) => handleChange('assignedTo', e.target.value)}
+                                    >
+                                        <option value="">-- Chưa giao / Chọn cán bộ xử lý --</option>
+                                        {Object.entries(groupedEmployees).map(([dept, emps]) => (
+                                            <optgroup key={dept} label={dept}>
+                                                {emps.map(emp => (
+                                                    <option key={emp.id} value={emp.id}>
+                                                        {emp.name} ({emp.position || 'Cán bộ'})
+                                                    </option>
+                                                ))}
+                                            </optgroup>
+                                        ))}
+                                    </select>
+                                ) : (
+                                    <div className="w-full border border-gray-200 rounded-lg px-3 py-2.5 bg-gray-50 text-sm font-semibold text-indigo-800">
+                                        {(() => {
+                                            const emp = employees.find(e => e.id === formData.assignedTo || e.name === formData.assignedTo);
+                                            return emp ? `${emp.name} (${emp.position || 'Cán bộ'})` : (formData.assignedTo || 'Chưa phân công');
+                                        })()}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
 
                          {hasAdminRights && isEdit && (
                             <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">

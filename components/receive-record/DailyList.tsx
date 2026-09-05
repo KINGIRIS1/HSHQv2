@@ -302,7 +302,7 @@ const DailyList: React.FC<DailyListProps> = ({ records, wards, currentUser, empl
                             filteredDailyRecords.map((r, index) => (
                                 <tr key={r.id} className="hover:bg-blue-50/50 group">
                                     <td className="p-3 text-center text-gray-400 align-middle">{index + 1}</td> 
-                                    <td className="p-3 font-medium text-blue-600 truncate align-middle" title={r.code}>{r.code}</td> 
+                                    <td className="p-3 font-mono font-bold text-blue-600 truncate align-middle" title={r.code}>{r.code}</td> 
                                     <td className="p-3 font-medium text-gray-800 truncate align-middle" title={r.customerName}>{r.customerName}</td> 
                                     <td className="p-3 text-gray-700 truncate align-middle font-medium" title={getNormalizedWard(r.ward)}>
                                         {getNormalizedWard(r.ward)}
@@ -310,7 +310,7 @@ const DailyList: React.FC<DailyListProps> = ({ records, wards, currentUser, empl
                                     <td className="p-3 text-center font-mono align-middle">{r.mapSheet || '-'}</td>
                                     <td className="p-3 text-center font-mono align-middle">{r.landPlot || '-'}</td>
                                     <td className="p-3 text-gray-600 truncate align-middle" title={r.recordType || ''}>{getShortRecordType(r.recordType)}</td> 
-                                    <td className="p-3 text-center text-blue-700 font-medium align-middle">{r.deadline ? new Date(r.deadline).toLocaleDateString('vi-VN') : '-'}</td> 
+                                    <td className="p-3 text-center text-blue-700 font-mono font-bold align-middle">{r.deadline ? new Date(r.deadline).toLocaleDateString('vi-VN') : '-'}</td> 
                                     <td className="p-3 text-gray-500 italic truncate align-middle" title={r.content || ''}>{r.content}</td>
                                     <td className="p-2 align-middle text-center sticky right-0 bg-white group-hover:bg-blue-50/50 shadow-l">
                                         <div className="flex items-center justify-center gap-1.5">

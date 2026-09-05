@@ -755,8 +755,8 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
                                         <input type="checkbox" checked={selectedIds.has(r.id)} onChange={() => handleSelectRow(r.id)} />
                                     </td>
                                     <td className="p-3 text-center text-gray-500">{(currentPage - 1) * itemsPerPage + idx + 1}</td>
-                                    <td className="p-3 font-bold text-orange-600 cursor-pointer hover:underline" onClick={() => setDetailRecord(r)}>{r.so_hieu}</td>
-                                    <td className="p-3 text-gray-600">{r.ngay_thang?.split('-').reverse().join('/')}</td>
+                                    <td className="p-3 font-mono font-bold text-orange-600 cursor-pointer hover:underline" onClick={() => setDetailRecord(r)}>{r.so_hieu}</td>
+                                    <td className="p-3 font-mono text-gray-600">{r.ngay_thang?.split('-').reverse().join('/')}</td>
                                     <td className="p-3 text-gray-800">{r.trich_yeu}</td>
                                     <td className="p-3 text-gray-600">{toTitleCase(r.noi_nhan_gui)}</td>
                                     {(subTab === 'all') && (

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { RecordFile, RecordStatus, User, Employee, Contract, UserRole } from "../types";
 import StatusBadge from "./StatusBadge";
 import {
@@ -25,6 +25,13 @@ import {
   FileDown,
   Undo,
   FileX,
+  Filter,
+  ChevronDown,
+  ChevronUp,
+  X,
+  Calendar,
+  SlidersHorizontal,
+  RefreshCw,
 } from "lucide-react";
 import * as XLSX from "xlsx-js-style";
 import { getShortRecordType, isArchiveRecordType } from "../constants";
@@ -100,11 +107,44 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
   const itemsPerPage = 10;
 
   const [searchTerm, setSearchTerm] = useState("");
+  const [filterFromDate, setFilterFromDate] = useState("");
+  const [filterToDate, setFilterToDate] = useState("");
+  const [filterRecordType, setFilterRecordType] = useState("all");
+  const [filterStatus, setFilterStatus] = useState("all");
+
+  const [isFilterPopoverOpen, setIsFilterPopoverOpen] = useState(false);
+  const filterPopoverRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        filterPopoverRef.current &&
+        !filterPopoverRef.current.contains(event.target as Node)
+      ) {
+        setIsFilterPopoverOpen(false);
+      }
+    };
+    if (isFilterPopoverOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isFilterPopoverOpen]);
+
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (filterFromDate) count++;
+    if (filterToDate) count++;
+    if (filterRecordType && filterRecordType !== "all") count++;
+    if (filterStatus && filterStatus !== "all") count++;
+    return count;
+  }, [filterFromDate, filterToDate, filterRecordType, filterStatus]);
 
   useEffect(() => {
     setCurrentPage(1);
     setMobileVisibleCount(20);
-  }, [activeTab, searchTerm]);
+  }, [activeTab, searchTerm, filterFromDate, filterToDate, filterRecordType, filterStatus]);
   const [sortConfig, setSortConfig] = useState<{
     key: keyof RecordFile;
     direction: "asc" | "desc";
@@ -368,6 +408,16 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
     return Array.from(recordsMap.values());
   }, [records, archiveRecords, user.employeeId]);
 
+  const availableRecordTypes = useMemo(() => {
+    const set = new Set<string>();
+    myRecords.forEach(r => {
+      if (r.recordType) {
+        set.add(getShortRecordType(r.recordType));
+      }
+    });
+    return Array.from(set).sort();
+  }, [myRecords]);
+
   const isChecker = useMemo(() => {
     if (!user.employeeId) return false;
     const emp = employees.find((e) => e.id === user.employeeId);
@@ -477,6 +527,34 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
 
   // Helper filter & sort chung
   function filterAndSort(list: RecordFile[], term: string, sort: any) {
+    // 1. Time range filter
+    if (filterFromDate) {
+      list = list.filter(r => {
+        const d = r.receivedDate ? r.receivedDate.split('T')[0] : '';
+        return d >= filterFromDate;
+      });
+    }
+    if (filterToDate) {
+      list = list.filter(r => {
+        const d = r.receivedDate ? r.receivedDate.split('T')[0] : '';
+        return d <= filterToDate;
+      });
+    }
+
+    // 2. Record type filter
+    if (filterRecordType && filterRecordType !== 'all') {
+      list = list.filter(r => {
+        const short = getShortRecordType(r.recordType);
+        return short === filterRecordType || r.recordType === filterRecordType;
+      });
+    }
+
+    // 3. Status filter
+    if (filterStatus && filterStatus !== 'all') {
+      list = list.filter(r => r.status === filterStatus);
+    }
+
+    // 4. Search term
     if (term) {
       const lowerSearch = removeVietnameseTones(term);
       const rawSearch = term.toLowerCase();
@@ -535,105 +613,175 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
   };
 
   const handleExportExcel = () => {
-    const dataToExport = displayRecords.map((r, idx) => ({
-      "STT": idx + 1,
-      "Mã hồ sơ": r.code || "",
-      "Chủ sử dụng": r.customerName || "",
-      "Số điện thoại": r.phoneNumber || "",
-      CCCD: r.cccd || "",
-      "Loại hồ sơ": r.recordType || "",
-      "Ngày nhận": r.receivedDate ? r.receivedDate.split("T")[0] : "",
-      "Hẹn trả": r.deadline ? r.deadline.split("T")[0] : "",
-      "Trạng thái": r.status || "",
-      "Xã/Phường": r.ward || "",
-      "Số tờ": r.mapSheet || "",
-      "Số thửa": r.landPlot || "",
-      "Diện tích": r.area || "",
-      "Địa chỉ": r.address || "",
-      "Nội dung": cleanSyncNotes(r.content) || "",
-      "Ngày giao việc": r.assignedDate ? r.assignedDate.split("T")[0] : "",
-      "Ngày trình ký": r.submissionDate ? r.submissionDate.split("T")[0] : "",
-      "Ngày duyệt": r.approvalDate ? r.approvalDate.split("T")[0] : "",
-      "Ngày hoàn thành": r.completedDate ? r.completedDate.split("T")[0] : "",
-      "Ngày trả kết quả": r.resultReturnedDate ? r.resultReturnedDate.split("T")[0] : "",
-      "Ghi chú": cleanSyncNotes(r.notes) || "",
-      "Ghi chú cá nhân": r.personalNotes || "",
-      "Số trích đo": r.measurementNumber || "",
-      "Số trích lục": r.excerptNumber || "",
-    }));
+    if (displayRecords.length === 0) {
+      alert("Không có hồ sơ nào theo kết quả lọc để xuất Excel.");
+      return;
+    }
 
-    if (dataToExport.length === 0) return;
+    const title = "DANH SÁCH HỒ SƠ CÁ NHÂN";
+    const subTitle = `TỔNG SỐ HỒ SƠ: ${displayRecords.length} ${filterFromDate || filterToDate ? `(Từ ${filterFromDate || 'đầu'} đến ${filterToDate || 'nay'})` : ''}`;
+    const displayDate = `Ngày ${new Date().getDate()} tháng ${new Date().getMonth() + 1} năm ${new Date().getFullYear()}`;
 
-    const ws = XLSX.utils.json_to_sheet(dataToExport);
+    const headers = [
+      "STT", "Mã Hồ Sơ", "Chủ Sử Dụng", "Số Điện Thoại", "CCCD", 
+      "Loại Hồ Sơ", "Ngày Nhận", "Hẹn Trả", "Trạng Thái", "Ngày Giao Việc", "Xã/Phường", 
+      "Số Tờ", "Số Thửa", "Diện Tích", "Địa Chỉ", "Nội Dung", "Ghi Chú"
+    ];
 
-    // Set column widths
+    const dataRows = displayRecords.map((r, idx) => [
+      idx + 1,
+      r.code || "",
+      r.customerName || "",
+      r.phoneNumber || "",
+      r.cccd || "",
+      r.recordType || "",
+      r.receivedDate ? r.receivedDate.split("T")[0].split("-").reverse().join("/") : "",
+      r.deadline ? r.deadline.split("T")[0].split("-").reverse().join("/") : "",
+      r.status || "",
+      r.assignedDate ? r.assignedDate.split("T")[0].split("-").reverse().join("/") : "",
+      r.ward || "",
+      r.mapSheet || "",
+      r.landPlot || "",
+      r.area || "",
+      r.address || "",
+      cleanSyncNotes(r.content) || "",
+      cleanSyncNotes(r.notes) || ""
+    ]);
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet([]);
+
+    const headerRows = [
+      ["CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM"],
+      ["Độc lập - Tự do - Hạnh phúc"],
+      [""],
+      [title],
+      [displayDate.toUpperCase()],
+      [subTitle],
+      [""]
+    ];
+
+    const tableHeaderRowIndex = headerRows.length;
+    headerRows.push(headers);
+
+    XLSX.utils.sheet_add_aoa(ws, headerRows, { origin: "A1" });
+
+    const dataOriginRow = headerRows.length + 1;
+    XLSX.utils.sheet_add_aoa(ws, dataRows, { origin: `A${dataOriginRow}` });
+
+    const totalCols = headers.length;
+    const lastDataRow = (dataOriginRow - 1) + dataRows.length;
+    const footerStartRow = lastDataRow + 2;
+
+    const midPoint = Math.floor(totalCols / 2);
+    const leftStart = 0;
+    const leftEnd = midPoint - 1;
+    const rightStart = midPoint + 1;
+    const rightEnd = totalCols - 1;
+
+    const footerRow1 = new Array(totalCols).fill("");
+    footerRow1[leftStart] = "NGƯỜI LẬP BÁO CÁO";
+    footerRow1[rightStart] = "PHỤ TRÁCH / LÃNH ĐẠO";
+
+    const footerRow2 = new Array(totalCols).fill("");
+    footerRow2[leftStart] = "(Ký và ghi rõ họ tên)";
+    footerRow2[rightStart] = "(Ký và ghi rõ họ tên)";
+
+    XLSX.utils.sheet_add_aoa(ws, [footerRow1, footerRow2], { origin: `A${footerStartRow + 1}` });
+
+    // Column widths
     ws['!cols'] = [
       { wch: 6 },  // STT
-      { wch: 16 }, // Mã hồ sơ
-      { wch: 25 }, // Chủ sử dụng
-      { wch: 14 }, // Số điện thoại
+      { wch: 16 }, // Mã HS
+      { wch: 25 }, // Chủ SD
+      { wch: 14 }, // SĐT
       { wch: 16 }, // CCCD
-      { wch: 20 }, // Loại hồ sơ
+      { wch: 20 }, // Loại HS
       { wch: 12 }, // Ngày nhận
       { wch: 12 }, // Hẹn trả
       { wch: 15 }, // Trạng thái
+      { wch: 14 }, // Ngày Giao Việc
       { wch: 18 }, // Xã/Phường
       { wch: 8 },  // Số tờ
       { wch: 8 },  // Số thửa
       { wch: 10 }, // Diện tích
-      { wch: 30 }, // Địa chỉ
-      { wch: 35 }, // Nội dung
-      { wch: 14 }, // Ngày giao việc
-      { wch: 14 }, // Ngày trình ký
-      { wch: 14 }, // Ngày duyệt
-      { wch: 14 }, // Ngày hoàn thành
-      { wch: 15 }, // Ngày trả kết quả
+      { wch: 25 }, // Địa chỉ
+      { wch: 30 }, // Nội dung
       { wch: 25 }, // Ghi chú
-      { wch: 20 }, // Ghi chú cá nhân
-      { wch: 12 }, // Số trích đo
-      { wch: 12 }, // Số trích lục
     ];
 
-    // Set row heights for line spacing / padding
-    const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
-    const rowHeights = [{ hpt: 28 }]; // Header row height
-    for (let r = 1; r <= range.e.r; r++) {
-      rowHeights.push({ hpt: 22 }); // Data row height
+    // Row heights
+    const wsrows = [];
+    for (let i = 0; i <= tableHeaderRowIndex; i++) {
+      wsrows.push({ hpx: 30 });
     }
-    ws['!rows'] = rowHeights;
+    for (let i = 0; i < dataRows.length; i++) {
+      wsrows.push({ hpx: 25 });
+    }
+    wsrows.push({ hpx: 25 }, { hpx: 25 }, { hpx: 30 }, { hpx: 30 });
+    ws['!rows'] = wsrows;
 
+    // Merges
+    const merges = [
+      { s: { r: 0, c: 0 }, e: { r: 0, c: totalCols - 1 } },
+      { s: { r: 1, c: 0 }, e: { r: 1, c: totalCols - 1 } },
+      { s: { r: 3, c: 0 }, e: { r: 3, c: totalCols - 1 } },
+      { s: { r: 4, c: 0 }, e: { r: 4, c: totalCols - 1 } },
+      { s: { r: 5, c: 0 }, e: { r: 5, c: totalCols - 1 } },
+      { s: { r: footerStartRow, c: leftStart }, e: { r: footerStartRow, c: leftEnd } },
+      { s: { r: footerStartRow + 1, c: leftStart }, e: { r: footerStartRow + 1, c: leftEnd } },
+      { s: { r: footerStartRow, c: rightStart }, e: { r: footerStartRow, c: rightEnd } },
+      { s: { r: footerStartRow + 1, c: rightStart }, e: { r: footerStartRow + 1, c: rightEnd } },
+    ];
+    ws['!merges'] = merges;
+
+    // Styles
     const borderStyle = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
     const styles = {
+      nationalTitle: { font: { name: "Times New Roman", sz: 12, bold: true }, alignment: { horizontal: "center", vertical: "center" } },
+      nationalSlogan: { font: { name: "Times New Roman", sz: 12, bold: true, underline: true }, alignment: { horizontal: "center", vertical: "center" } },
+      reportTitle: { font: { name: "Times New Roman", sz: 14, bold: true }, alignment: { horizontal: "center", vertical: "center" } },
+      reportSubTitle: { font: { name: "Times New Roman", sz: 12, italic: true }, alignment: { horizontal: "center", vertical: "center" } },
       tableHeader: { font: { name: "Times New Roman", sz: 11, bold: true }, alignment: { horizontal: "center", vertical: "center", wrapText: true }, border: borderStyle, fill: { fgColor: { rgb: "E0E0E0" } } },
       tableData: { font: { name: "Times New Roman", sz: 11 }, border: borderStyle, alignment: { vertical: "center", wrapText: true } },
-      tableDataCenter: { font: { name: "Times New Roman", sz: 11 }, border: borderStyle, alignment: { horizontal: "center", vertical: "center", wrapText: true } }
+      tableDataCenter: { font: { name: "Times New Roman", sz: 11 }, border: borderStyle, alignment: { horizontal: "center", vertical: "center", wrapText: true } },
+      sigTitle: { font: { name: "Times New Roman", sz: 12, bold: true }, alignment: { horizontal: "center", vertical: "center" } },
+      sigNote: { font: { name: "Times New Roman", sz: 11, italic: true }, alignment: { horizontal: "center", vertical: "center" } }
     };
 
-    const headers = Object.keys(dataToExport[0] || {});
-    const centerCols = ["STT", "Mã hồ sơ", "Ngày nhận", "Hẹn trả", "Trạng thái", "Số tờ", "Số thửa", "Ngày giao việc", "Ngày trình ký", "Ngày duyệt", "Ngày hoàn thành", "Ngày trả kết quả"];
+    if (ws['A1']) ws['A1'].s = styles.nationalTitle;
+    if (ws['A2']) ws['A2'].s = styles.nationalSlogan;
+    if (ws['A4']) ws['A4'].s = styles.reportTitle;
+    if (ws['A5']) ws['A5'].s = styles.reportSubTitle;
+    if (ws['A6']) ws['A6'].s = styles.reportSubTitle;
 
-    for (let c = 0; c < headers.length; c++) {
-      const headerCell = XLSX.utils.encode_cell({ r: 0, c: c });
-      if (ws[headerCell]) ws[headerCell].s = styles.tableHeader;
+    for (let c = 0; c < totalCols; c++) {
+      const headerCell = XLSX.utils.encode_cell({ r: tableHeaderRowIndex, c: c });
+      if (!ws[headerCell]) ws[headerCell] = { v: "", t: "s" };
+      ws[headerCell].s = styles.tableHeader;
 
-      for (let r = 1; r <= dataToExport.length; r++) {
-        const cellRef = XLSX.utils.encode_cell({ r, c });
+      for (let r = tableHeaderRowIndex + 1; r <= lastDataRow; r++) {
+        const cellRef = XLSX.utils.encode_cell({ r: r, c: c });
         if (!ws[cellRef]) ws[cellRef] = { v: "", t: "s" };
         const colName = headers[c];
-        if (centerCols.includes(colName)) {
-          ws[cellRef].s = styles.tableDataCenter;
-        } else {
-          ws[cellRef].s = styles.tableData;
-        }
+        const centerCols = ["STT", "Số Tờ", "Số Thửa", "Hẹn Trả", "Ngày Nhận", "Trạng Thái", "Ngày Giao Việc"];
+        if (centerCols.includes(colName)) ws[cellRef].s = styles.tableDataCenter;
+        else ws[cellRef].s = styles.tableData;
       }
     }
 
-    const wb = XLSX.utils.book_new();
+    const giaoRef = XLSX.utils.encode_cell({ r: footerStartRow, c: leftStart });
+    const giaoNoteRef = XLSX.utils.encode_cell({ r: footerStartRow + 1, c: leftStart });
+    const nhanRef = XLSX.utils.encode_cell({ r: footerStartRow, c: rightStart });
+    const nhanNoteRef = XLSX.utils.encode_cell({ r: footerStartRow + 1, c: rightStart });
+
+    if (ws[giaoRef]) ws[giaoRef].s = styles.sigTitle;
+    if (ws[giaoNoteRef]) ws[giaoNoteRef].s = styles.sigNote;
+    if (ws[nhanRef]) ws[nhanRef].s = styles.sigTitle;
+    if (ws[nhanNoteRef]) ws[nhanNoteRef].s = styles.sigNote;
+
     XLSX.utils.book_append_sheet(wb, ws, "HoSoCaNhan");
-    XLSX.writeFile(
-      wb,
-      `HoSoCaNhan_${user.name}_${new Date().toISOString().split("T")[0]}.xlsx`,
-    );
+    XLSX.writeFile(wb, `Danh_Sach_Ho_So_Ca_Nhan_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
   // --- ACTIONS ---
@@ -1306,12 +1454,149 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
             )}
           </div>
 
-          <div className="hidden md:flex items-center justify-end gap-2 w-full md:w-auto">
+          <div className="flex items-center justify-end gap-2 w-full md:w-auto">
+            {/* LỌC BUTTON (POPOVER LIKE ĐO ĐẠC) */}
+            <div className="relative inline-block" ref={filterPopoverRef}>
+              <button
+                onClick={() => setIsFilterPopoverOpen(!isFilterPopoverOpen)}
+                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-sm font-bold transition-all shadow-sm cursor-pointer ${
+                  activeFilterCount > 0
+                    ? "bg-blue-700 text-white ring-2 ring-blue-300"
+                    : "bg-blue-600 hover:bg-blue-700 text-white"
+                }`}
+                title="Mở bộ lọc tìm kiếm"
+              >
+                <Filter size={16} />
+                <span>Lọc</span>
+                {activeFilterCount > 0 && (
+                  <span className="bg-red-500 text-white text-[11px] px-1.5 py-0.2 rounded-full font-extrabold">
+                    {activeFilterCount}
+                  </span>
+                )}
+                {isFilterPopoverOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+              </button>
+
+              {/* POPOVER DROPDOWN CARD */}
+              {isFilterPopoverOpen && (
+                <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 p-4 z-50 animate-fade-in text-gray-800">
+                  {/* Popover Header */}
+                  <div className="flex items-center justify-between pb-3 border-b border-gray-100 mb-3">
+                    <div className="flex items-center gap-2 font-bold text-blue-700 text-base">
+                      <Filter size={18} />
+                      <span>Bộ lọc tìm kiếm</span>
+                    </div>
+                    <button
+                      onClick={() => setIsFilterPopoverOpen(false)}
+                      className="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100 transition-colors cursor-pointer"
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+
+                  <div className="space-y-3.5 max-h-[75vh] overflow-y-auto pr-1">
+                    {/* 1. Thời gian */}
+                    <div>
+                      <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 mb-1">
+                        <Calendar size={14} className="text-gray-500" />
+                        <span>Thời gian:</span>
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <span className="text-[11px] text-gray-500 font-medium block mb-0.5">Từ ngày</span>
+                          <input
+                            type="date"
+                            value={filterFromDate}
+                            onChange={(e) => setFilterFromDate(e.target.value)}
+                            className="w-full text-xs border border-gray-200 rounded-lg p-2 font-medium bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <span className="text-[11px] text-gray-500 font-medium block mb-0.5">Đến ngày</span>
+                          <input
+                            type="date"
+                            value={filterToDate}
+                            onChange={(e) => setFilterToDate(e.target.value)}
+                            className="w-full text-xs border border-gray-200 rounded-lg p-2 font-medium bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 2. Loại hồ sơ */}
+                    <div>
+                      <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 mb-1">
+                        <Filter size={14} className="text-gray-500" />
+                        <span>Loại hồ sơ:</span>
+                      </label>
+                      <select
+                        value={filterRecordType}
+                        onChange={(e) => setFilterRecordType(e.target.value)}
+                        className="w-full text-sm border border-gray-200 rounded-lg p-2 font-medium bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="all">Tất cả loại HS</option>
+                        {availableRecordTypes.map((t) => (
+                          <option key={t} value={t}>
+                            {t}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* 3. Trạng thái hồ sơ */}
+                    <div>
+                      <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 mb-1">
+                        <SlidersHorizontal size={14} className="text-gray-500" />
+                        <span>Trạng thái hồ sơ:</span>
+                      </label>
+                      <select
+                        value={filterStatus}
+                        onChange={(e) => setFilterStatus(e.target.value)}
+                        className="w-full text-sm border border-gray-200 rounded-lg p-2 font-medium bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="all">Mọi trạng thái</option>
+                        <option value={RecordStatus.RECEIVED}>Đã tiếp nhận</option>
+                        <option value={RecordStatus.ASSIGNED}>Đã giao việc</option>
+                        <option value={RecordStatus.IN_PROGRESS}>Đang thực hiện</option>
+                        <option value={RecordStatus.COMPLETED_WORK}>Đã xong việc</option>
+                        <option value={RecordStatus.PENDING_CHECK}>Chờ kiểm tra</option>
+                        <option value={RecordStatus.CHECKED}>Đã kiểm tra</option>
+                        <option value={RecordStatus.PENDING_SIGN}>Chờ ký</option>
+                        <option value={RecordStatus.SIGNED}>Đã ký</option>
+                        <option value={RecordStatus.HANDOVER}>Đã bàn giao</option>
+                        <option value={RecordStatus.RETURNED}>Đã trả kết quả</option>
+                      </select>
+                    </div>
+
+                    {/* Reset Button */}
+                    <div className="pt-2">
+                      <button
+                        onClick={() => {
+                          setFilterFromDate("");
+                          setFilterToDate("");
+                          setFilterRecordType("all");
+                          setFilterStatus("all");
+                        }}
+                        className="w-full py-2 border border-red-200 text-red-600 rounded-xl hover:bg-red-50 text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer"
+                      >
+                        <RefreshCw size={14} /> Xóa tất cả bộ lọc
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* XUẤT EXCEL BUTTON WITH EMBEDDED RECORD COUNT PILL */}
             <button
               onClick={handleExportExcel}
-              className="flex items-center gap-2 px-3.5 py-2 bg-green-600 text-white rounded-lg text-sm font-bold hover:bg-green-700 transition-colors whitespace-nowrap shadow-sm ml-auto md:ml-0"
+              className="flex items-center gap-2 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-bold transition-colors whitespace-nowrap shadow-sm cursor-pointer ml-auto md:ml-0"
+              title="Xuất danh sách hồ sơ ra file Excel"
             >
-              <FileDown size={16} /> Xuất Excel
+              <FileDown size={16} />
+              <span>Xuất Excel</span>
+              <span className="bg-emerald-800/80 text-white text-xs px-2.5 py-0.5 rounded-full font-extrabold tracking-wide">
+                {displayRecords.length}
+              </span>
             </button>
           </div>
         </div>
