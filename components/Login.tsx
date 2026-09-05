@@ -92,10 +92,10 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
         <div className="absolute inset-0 bg-black/15 pointer-events-none"></div>
       </div>
 
-      {/* Header: Trên mobile đưa logo lên trên cùng, chữ xuống dưới tạo không gian hiển thị rộng rãi; trên desktop xếp ngang góc trái */}
-      <header className="relative sm:absolute top-0 left-0 right-0 sm:right-auto sm:top-6 sm:left-6 md:top-8 md:left-10 z-20 flex flex-col sm:flex-row items-center sm:items-center gap-2 sm:gap-3 md:gap-4 pt-5 pb-2 px-4 sm:p-0 text-center sm:text-left">
+      {/* Header: Căn giữa logo lên trên và chữ xuống dưới trên cả mobile và PC */}
+      <header className="relative top-0 left-0 right-0 z-20 flex flex-col items-center text-center pt-4 pb-1 px-4 sm:pt-6 sm:pb-2">
         {/* Logo Đồng Nai - Bỏ nền trắng bao ngoài */}
-        <div className="w-12 h-12 sm:w-12 sm:h-12 md:w-14 md:h-14 flex items-center justify-center shrink-0 drop-shadow-[0_4px_8px_rgba(0,0,0,0.85)]">
+        <div className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 flex items-center justify-center shrink-0 drop-shadow-[0_4px_8px_rgba(0,0,0,0.85)] mb-1.5 sm:mb-2">
           <img 
             src="/Logo_Dong_Nai.ico" 
             alt="Logo Đồng Nai" 
@@ -107,7 +107,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
         </div>
 
         {/* Tiêu đề Chi nhánh */}
-        <div className="flex flex-col">
+        <div className="flex flex-col items-center">
           <h1 className="text-white text-xs sm:text-sm md:text-base lg:text-lg font-black uppercase tracking-wide leading-snug drop-shadow-[0_2px_4px_rgba(0,0,0,0.95)]">
             VĂN PHÒNG ĐĂNG KÝ THÀNH PHỐ ĐỒNG NAI
           </h1>

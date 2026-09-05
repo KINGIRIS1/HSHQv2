@@ -342,7 +342,7 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
             {canCreate && (
               <button 
                   onClick={() => { setViewMode('create'); setEditingRecord(null); }} 
-                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-md text-sm font-semibold transition-all whitespace-nowrap cursor-pointer ${viewMode === 'create' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
+                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-md text-sm transition-all whitespace-nowrap cursor-pointer ${viewMode === 'create' ? 'bg-white text-emerald-600 border border-emerald-200 shadow-sm font-bold' : 'text-gray-600 hover:bg-gray-100 font-semibold'}`}
               >
                   <PlusCircle size={16} /> Nhập mới
               </button>

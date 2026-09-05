@@ -214,8 +214,8 @@ const ScheduleList: React.FC<ScheduleListProps> = ({ schedules, onEdit, onDelete
                             />
                         </div>
 
-                        <button onClick={handleExport} className="flex items-center gap-1.5 bg-green-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-green-700 shadow-sm shrink-0">
-                            <FileSpreadsheet size={15} /> Xuất Excel
+                        <button onClick={handleExport} className="flex items-center gap-1.5 bg-white text-emerald-700 border border-emerald-300 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-emerald-50 shadow-xs shrink-0">
+                            <FileSpreadsheet size={15} className="text-emerald-600" /> Xuất Excel
                         </button>
                     </div>
                 </div>

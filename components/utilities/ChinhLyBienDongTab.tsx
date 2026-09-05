@@ -819,8 +819,8 @@ const ChinhLyBienDongTab: React.FC<ChinhLyBienDongTabProps> = ({ currentUser, no
                                     </button>
                                 )}
 
-                                <button onClick={handleExportExcel} className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-bold hover:bg-green-700 shadow-sm">
-                                    <FileSpreadsheet size={16} /> Xuất Excel
+                                <button onClick={handleExportExcel} className="flex items-center gap-2 px-4 py-2 bg-white text-emerald-700 border border-emerald-300 rounded-lg text-sm font-bold hover:bg-emerald-50 shadow-xs">
+                                    <FileSpreadsheet size={16} className="text-emerald-600" /> Xuất Excel
                                 </button>
                             </div>
                         </div>

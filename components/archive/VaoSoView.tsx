@@ -960,7 +960,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                                 >
                                     <Settings size={16}/>
                                 </button>
-                                <button onClick={handleAddNew} className="flex items-center gap-2 bg-teal-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-teal-700 shadow-sm">
+                                <button onClick={handleAddNew} className="flex items-center gap-2 bg-white text-emerald-600 border border-emerald-200 px-3 py-1.5 rounded-md font-bold text-sm hover:bg-emerald-50 shadow-sm">
                                     <Plus size={16}/> Thêm mới
                                 </button>
                                 {selectedIds.size > 0 && (
@@ -983,8 +983,8 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                             </button>
                         )}
 
-                        <button onClick={handleExportExcel} className="hidden md:flex items-center gap-2 bg-green-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-green-700 shadow-sm">
-                            <FileSpreadsheet size={16}/> Xuất Excel
+                        <button onClick={handleExportExcel} className="hidden md:flex items-center gap-2 bg-white text-emerald-700 border border-emerald-300 px-3 py-1.5 rounded-md font-bold text-sm hover:bg-emerald-50 shadow-xs">
+                            <FileSpreadsheet size={16} className="text-emerald-600"/> Xuất Excel
                         </button>
                         <button onClick={() => {
                             if (selectedIds.size > 0) {

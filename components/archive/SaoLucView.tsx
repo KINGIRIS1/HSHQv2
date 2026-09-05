@@ -788,7 +788,7 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Tân Qua
                                     <Users size={18}/> Giao việc ({selectedIds.size})
                                 </button>
                             )}
-                            <button onClick={handleAddNew} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 font-bold shadow-md transition-all">
+                            <button onClick={handleAddNew} className="flex items-center gap-2 bg-white text-emerald-600 border border-emerald-200 px-4 py-2 rounded-lg hover:bg-emerald-50 font-bold shadow-sm transition-all">
                                 <Plus size={18}/> Thêm mới
                             </button>
                         </>

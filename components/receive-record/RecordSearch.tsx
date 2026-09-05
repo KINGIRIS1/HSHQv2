@@ -570,15 +570,14 @@ export const RecordSearch: React.FC<RecordSearchProps> = ({
                         <div className="relative inline-block text-left" ref={filterPopoverRef}>
                             <button
                                 onClick={() => setIsFilterPopoverOpen(!isFilterPopoverOpen)}
-                                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-sm font-bold transition-all shadow-sm ${
+                                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-sm font-bold transition-all shadow-sm bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 cursor-pointer ${
                                     activeFilterCount > 0
-                                        ? "bg-blue-700 text-white ring-2 ring-blue-300"
-                                        : "bg-blue-600 hover:bg-blue-700 text-white"
+                                        ? "border-blue-300 text-blue-700 bg-blue-50/50"
+                                        : ""
                                 }`}
                                 title="Mở bộ lọc tìm kiếm"
                             >
                                 <Filter size={16} />
-                                <span>Lọc</span>
                                 {activeFilterCount > 0 && (
                                     <span className="bg-red-500 text-white text-[11px] px-1.5 py-0.2 rounded-full font-extrabold">
                                         {activeFilterCount}
@@ -732,12 +731,12 @@ export const RecordSearch: React.FC<RecordSearchProps> = ({
                         {/* Excel Export */}
                         <button
                             onClick={handleExportExcel}
-                            className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-[#00965e] hover:bg-[#008250] text-white rounded-lg font-bold shadow-xs transition-all active:scale-95 cursor-pointer select-none"
+                            className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-white text-emerald-700 border border-emerald-300 hover:bg-emerald-50 rounded-lg font-bold shadow-xs transition-all active:scale-95 cursor-pointer select-none"
                             title={selectedIds.size > 0 ? `Xuất Excel ${selectedIds.size} hồ sơ đã chọn` : `Xuất Excel toàn bộ ${sortedRecords.length} hồ sơ`}
                         >
-                            <FileSpreadsheet size={18} className="text-white shrink-0" />
+                            <FileSpreadsheet size={18} className="text-emerald-600 shrink-0" />
                             <span className="font-bold text-[14px] leading-tight">Xuất Excel</span>
-                            <span className="bg-[#005a36] text-white text-xs font-black px-2.5 py-0.5 rounded-full shadow-inner tracking-wider">
+                            <span className="bg-emerald-100 text-emerald-800 text-xs font-black px-2.5 py-0.5 rounded-full shadow-inner tracking-wider">
                                 {(selectedIds.size > 0 ? selectedIds.size : sortedRecords.length).toLocaleString('vi-VN')}
                             </span>
                         </button>

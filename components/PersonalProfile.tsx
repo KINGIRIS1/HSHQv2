@@ -1454,15 +1454,15 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                   setCurrentPage(1);
                   setSearchTerm("");
                 }}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap shadow-sm border ${
+                className={`flex items-center gap-1 px-2.5 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap shadow-sm border ${
                   activeTab === "reminder"
                     ? "bg-pink-600 text-white border-pink-700"
                     : "bg-white text-pink-700 border-pink-200 hover:bg-pink-50"
                 }`}
-                title="Xem nhắc việc"
+                title={`Nhắc việc (${reminderRecords.length})`}
               >
-                <Bell size={14} />
-                <span>Nhắc việc ({reminderRecords.length})</span>
+                <Bell size={16} />
+                <span>({reminderRecords.length})</span>
               </button>
             )}
           </div>
@@ -1472,15 +1472,14 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
             <div className="relative inline-block" ref={filterPopoverRef}>
               <button
                 onClick={() => setIsFilterPopoverOpen(!isFilterPopoverOpen)}
-                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-sm font-bold transition-all shadow-sm cursor-pointer ${
+                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-sm font-bold transition-all shadow-sm cursor-pointer bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 ${
                   activeFilterCount > 0
-                    ? "bg-blue-700 text-white ring-2 ring-blue-300"
-                    : "bg-blue-600 hover:bg-blue-700 text-white"
+                    ? "border-blue-300 text-blue-700 bg-blue-50/50"
+                    : ""
                 }`}
                 title="Mở bộ lọc tìm kiếm"
               >
                 <Filter size={16} />
-                <span>Lọc</span>
                 {activeFilterCount > 0 && (
                   <span className="bg-red-500 text-white text-[11px] px-1.5 py-0.2 rounded-full font-extrabold">
                     {activeFilterCount}
@@ -1602,12 +1601,12 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
             {/* XUẤT EXCEL BUTTON WITH EMBEDDED RECORD COUNT PILL */}
             <button
               onClick={handleExportExcel}
-              className="flex items-center gap-2 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-bold transition-colors whitespace-nowrap shadow-sm cursor-pointer ml-auto md:ml-0"
+              className="flex items-center gap-2 px-3.5 py-1.5 bg-white text-emerald-700 border border-emerald-300 hover:bg-emerald-50 rounded-lg text-sm font-bold transition-all whitespace-nowrap shadow-xs cursor-pointer ml-auto md:ml-0"
               title="Xuất danh sách hồ sơ ra file Excel"
             >
-              <FileDown size={16} />
+              <FileDown size={16} className="text-emerald-600" />
               <span>Xuất Excel</span>
-              <span className="bg-emerald-800/80 text-white text-xs px-2.5 py-0.5 rounded-full font-extrabold tracking-wide">
+              <span className="bg-emerald-100 text-emerald-800 text-xs px-2.5 py-0.5 rounded-full font-extrabold tracking-wide">
                 {displayRecords.length}
               </span>
             </button>

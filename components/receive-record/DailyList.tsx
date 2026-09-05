@@ -276,8 +276,8 @@ const DailyList: React.FC<DailyListProps> = ({ records, wards, currentUser, empl
                 <input type="text" placeholder="Tìm kiếm..." className="w-full pl-9 pr-4 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /> 
             </div>
             <div className="ml-auto hidden md:flex gap-2">
-                <button onClick={handlePreview} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 shadow-sm text-sm font-medium"> <Eye size={16} /> Xem Excel </button>
-                <button onClick={handleExport} className="flex items-center gap-2 bg-white text-green-600 border border-green-200 px-4 py-2 rounded-md hover:bg-green-50 shadow-sm text-sm font-medium"> <FileSpreadsheet size={16} /> Tải Excel </button>
+                <button onClick={handlePreview} className="flex items-center gap-2 bg-white text-blue-700 border border-blue-300 px-4 py-2 rounded-md hover:bg-blue-50 shadow-xs text-sm font-semibold"> <Eye size={16} className="text-blue-600" /> Xem Excel </button>
+                <button onClick={handleExport} className="flex items-center gap-2 bg-white text-emerald-700 border border-emerald-300 px-4 py-2 rounded-md hover:bg-emerald-50 shadow-xs text-sm font-semibold"> <FileSpreadsheet size={16} className="text-emerald-600" /> Tải Excel </button>
             </div>
         </div>
         <div className="flex-1 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col min-h-0">

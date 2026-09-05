@@ -205,7 +205,7 @@ const UserManagement: React.FC<UserManagementProps> = ({
                     </button>
                     <button
                         onClick={() => { setEditingUser(null); setIsModalOpen(true); }}
-                        className="flex-1 sm:flex-none flex items-center justify-center gap-1 bg-blue-600 text-white px-3 py-2 rounded-xl hover:bg-blue-700 font-medium text-sm shadow-sm transition-colors whitespace-nowrap ml-auto sm:ml-0"
+                        className="flex-1 sm:flex-none flex items-center justify-center gap-1 bg-white text-emerald-600 border border-emerald-200 px-3 py-2 rounded-xl hover:bg-emerald-50 font-semibold text-sm shadow-sm transition-colors whitespace-nowrap ml-auto sm:ml-0"
                     >
                         <Plus size={14} /> Thêm
                     </button>

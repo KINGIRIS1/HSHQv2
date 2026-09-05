@@ -369,9 +369,9 @@ const ExportHandoverModal: React.FC<ExportHandoverModalProps> = ({ isOpen, onClo
                         <button 
                             onClick={handleExport} 
                             disabled={isExporting || (availableBatches.length === 0 && selectedBatch !== 'all')}
-                            className="px-4 py-2 bg-green-600 text-white rounded-lg font-bold text-sm hover:bg-green-700 shadow-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="px-4 py-2 bg-white text-emerald-700 border border-emerald-300 rounded-lg font-bold text-sm hover:bg-emerald-50 shadow-xs flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer"
                         >
-                            <FileDown size={16}/> {isExporting ? 'Đang xuất...' : 'Xuất Excel'}
+                            <FileDown size={16} className="text-emerald-600"/> {isExporting ? 'Đang xuất...' : 'Xuất Excel'}
                         </button>
                     </div>
                 </div>

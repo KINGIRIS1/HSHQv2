@@ -76,8 +76,8 @@ const BienBanList: React.FC<BienBanListProps> = ({ data, onEdit, onDelete, onRef
                     <input type="date" className="text-sm border-none outline-none text-gray-700 cursor-pointer" value={filterDate} onChange={e => setFilterDate(e.target.value)} />
                     {filterDate && <button onClick={() => setFilterDate('')} className="text-xs text-red-500 font-bold hover:underline">Xóa</button>}
                 </div>
-                <button onClick={handleExportExcel} className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 shadow-sm transition-colors text-sm font-bold">
-                    <FileSpreadsheet size={18} /> Xuất Excel
+                <button onClick={handleExportExcel} className="flex items-center gap-2 px-4 py-2 bg-white text-emerald-700 border border-emerald-300 rounded-lg hover:bg-emerald-50 shadow-xs transition-colors text-sm font-bold">
+                    <FileSpreadsheet size={18} className="text-emerald-600" /> Xuất Excel
                 </button>
                 <button onClick={onRefresh} className="p-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 text-gray-600" title="Tải lại">
                     <RefreshCw size={18} />

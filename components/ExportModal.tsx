@@ -549,9 +549,9 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, typ
                     <button 
                         onClick={handleDownload}
                         disabled={isExporting || batchOptions.length === 0}
-                        className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 font-medium text-sm shadow-sm transition-colors cursor-pointer"
+                        className="flex items-center gap-2 px-4 py-2 bg-white text-emerald-700 border border-emerald-300 rounded-md hover:bg-emerald-50 disabled:opacity-50 font-bold text-sm shadow-xs transition-all cursor-pointer"
                     >
-                        <FileDown size={18} />
+                        <FileDown size={18} className="text-emerald-600" />
                         {isExporting ? 'Đang tải...' : 'Tải Excel'}
                     </button>
                 </div>

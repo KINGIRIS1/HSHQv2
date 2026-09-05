@@ -707,13 +707,13 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                         {/* UNIFIED EXCEL EXPORT BUTTON */}
                         <button 
                             onClick={handleExportExcelClick} 
-                            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-1.5 rounded-lg font-bold text-xs md:text-sm shadow-sm transition-all cursor-pointer whitespace-nowrap active:scale-95" 
+                            className="flex items-center gap-2 bg-white text-emerald-700 border border-emerald-300 hover:bg-emerald-50 px-3.5 py-1.5 rounded-lg font-bold text-xs md:text-sm shadow-xs transition-all cursor-pointer whitespace-nowrap active:scale-95" 
                             title="Xuất Báo Cáo Excel Cho Tab Đang Chọn"
                         >
-                            <FileSpreadsheet size={17} className="shrink-0" /> 
+                            <FileSpreadsheet size={17} className="text-emerald-600 shrink-0" /> 
                             <span>Xuất Excel</span>
                             {activeExportCount > 0 && (
-                                <span className="bg-emerald-800 text-emerald-100 text-[10px] md:text-xs px-2 py-0.5 rounded-full font-extrabold ml-0.5">
+                                <span className="bg-emerald-100 text-emerald-800 text-[10px] md:text-xs px-2 py-0.5 rounded-full font-extrabold ml-0.5">
                                     {activeExportCount}
                                 </span>
                             )}

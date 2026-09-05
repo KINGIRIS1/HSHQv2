@@ -92,17 +92,17 @@ const MainLayout: React.FC<MainLayoutProps> = ({
             />
 
             {/* HEADER */}
-            <header className="h-14 bg-[#1e3a8a] text-white flex items-center justify-between px-4 shadow-md z-50 shrink-0 border-b border-blue-800">
+            <header className="h-14 bg-[#1e3a8a] text-white flex items-center justify-between px-2 sm:px-4 shadow-md z-50 shrink-0 border-b border-blue-800">
                 {/* LEFT: BRAND */}
-                <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-full bg-white p-0.5 flex items-center justify-center shrink-0 shadow-sm ring-1 ring-white/30">
+                <div className="flex items-center gap-2 sm:gap-3 overflow-hidden">
+                    <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white p-0.5 flex items-center justify-center shrink-0 shadow-sm ring-1 ring-white/30">
                         <img src="./icon.png?v=4" alt="Logo Hớn Quản" className="w-full h-full object-contain rounded-full" />
                     </div>
-                    <div className="flex flex-col leading-tight">
-                        <h1 className="font-bold text-sm uppercase tracking-wide text-white whitespace-nowrap">
+                    <div className="flex flex-col leading-tight truncate">
+                        <h1 className="font-bold text-xs sm:text-sm uppercase tracking-wide text-white truncate">
                             Hệ thống tiếp nhận và quản lý hồ sơ
                         </h1>
-                        <span className="font-bold text-sm uppercase tracking-wide text-blue-200 whitespace-nowrap">
+                        <span className="font-bold text-xs sm:text-sm uppercase tracking-wide text-blue-200 truncate">
                             Chi nhánh Hớn Quản
                         </span>
                     </div>

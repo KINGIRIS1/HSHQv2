@@ -726,15 +726,15 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                 <div className="relative inline-block" ref={filterPopoverRef}>
                   <button
                     onClick={() => setIsFilterPopoverOpen(!isFilterPopoverOpen)}
-                    className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-sm font-bold transition-all shadow-sm ${
+                    className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-sm font-bold transition-all shadow-sm bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 cursor-pointer ${
                       activeFilterCount > 0
-                        ? "bg-blue-700 text-white ring-2 ring-blue-300"
-                        : "bg-blue-600 hover:bg-blue-700 text-white"
+                        ? "border-blue-300 text-blue-700 bg-blue-50/50"
+                        : ""
                     }`}
                     title="Mở bộ lọc tìm kiếm"
                   >
                     <Filter size={16} />
-                    <span>Lọc</span>
+
                     {activeFilterCount > 0 && (
                       <span className="bg-red-500 text-white text-[11px] px-1.5 py-0.2 rounded-full font-extrabold">
                         {activeFilterCount}
@@ -981,7 +981,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                 <div className="relative inline-block text-left" ref={addMenuRef}>
                   <button
                     onClick={() => setIsAddMenuOpen(!isAddMenuOpen)}
-                    className="flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-sm font-bold text-sm active:scale-95 transition-all cursor-pointer whitespace-nowrap"
+                    className="flex items-center gap-1.5 px-3.5 py-1.5 bg-white text-emerald-600 border border-emerald-200 rounded-lg hover:bg-emerald-50 shadow-sm font-bold text-sm active:scale-95 transition-all cursor-pointer whitespace-nowrap"
                     title="Thêm hồ sơ hoặc nhập từ Excel"
                   >
                     <Plus size={16} />
@@ -1160,10 +1160,10 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                 props.handoverTab === "returned" && (
                   <button
                     onClick={props.handleExportReturnedList}
-                    className="flex items-center gap-1.5 bg-emerald-700 text-white px-3.5 py-1.5 rounded-lg hover:bg-emerald-800 text-sm font-bold shadow-sm transition-all cursor-pointer whitespace-nowrap"
+                    className="flex items-center gap-1.5 bg-white text-emerald-700 border border-emerald-300 px-3.5 py-1.5 rounded-lg hover:bg-emerald-50 text-sm font-bold shadow-xs transition-all cursor-pointer whitespace-nowrap"
                     title="Xuất file Excel cho danh sách Đã trả kết quả (TKQ)"
                   >
-                    <FileSpreadsheet size={16} /> Xuất Excel TKQ
+                    <FileSpreadsheet size={16} className="text-emerald-600" /> Xuất Excel TKQ
                   </button>
                 )}
 

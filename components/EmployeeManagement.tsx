@@ -206,7 +206,7 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
                             <button onClick={() => fileInputRef.current?.click()} className="px-3 py-2 bg-green-600 text-white rounded-xl text-sm font-medium hover:bg-green-700 flex items-center gap-1 shadow-sm transition-colors whitespace-nowrap">
                                 <FileSpreadsheet size={14} /> Nhập Excel
                             </button>
-                            <button onClick={handleAddNewClick} className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 flex items-center gap-1 shadow-sm transition-colors whitespace-nowrap ml-auto sm:ml-0">
+                            <button onClick={handleAddNewClick} className="px-4 py-2 bg-white text-emerald-600 border border-emerald-200 rounded-xl text-sm font-semibold hover:bg-emerald-50 flex items-center gap-1 shadow-sm transition-colors whitespace-nowrap ml-auto sm:ml-0">
                                 <Plus size={14} /> Thêm NV
                             </button>
                         </div>

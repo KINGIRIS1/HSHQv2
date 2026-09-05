@@ -647,7 +647,7 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
                                     <Users size={18}/> Giao việc ({selectedIds.size})
                                 </button>
                             )}
-                            <button onClick={() => { setIsFormOpen(true); setEditingId(null); setFormData({type: 'congvan', status: 'draft', so_hieu: '', trich_yeu: '', ngay_thang: new Date().toISOString(), noi_nhan_gui: ''}); }} className="flex items-center gap-2 bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 font-bold shadow-md transition-all">
+                            <button onClick={() => { setIsFormOpen(true); setEditingId(null); setFormData({type: 'congvan', status: 'draft', so_hieu: '', trich_yeu: '', ngay_thang: new Date().toISOString(), noi_nhan_gui: ''}); }} className="flex items-center gap-2 bg-white text-emerald-600 border border-emerald-200 px-4 py-2 rounded-lg hover:bg-emerald-50 font-bold shadow-sm transition-all">
                                 <Plus size={18}/> Tạo mới
                             </button>
                         </>
