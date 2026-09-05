@@ -240,6 +240,8 @@ export function isViewAllowedForUser(
 
       // Main Tabs - Tự động bật quyền xem tab nếu người dùng có bất kỳ quyền con nào trong phân hệ
       case 'receive_record':
+      case 'receive_search':
+      case 'receive_record_search':
         return hasAnyPerm(ONEDOOR_CHILD_PERMS);
       case 'all_records':
         if (user.role === UserRole.ONEDOOR) return false;

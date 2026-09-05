@@ -333,7 +333,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
   const [isAddMenuOpen, setIsAddMenuOpen] = React.useState(false);
   const [isFilterPopoverOpen, setIsFilterPopoverOpen] = React.useState(false);
   const filterPopoverRef = React.useRef<HTMLDivElement>(null);
-  const [receiveRecordSubTab, setReceiveRecordSubTab] = React.useState<'create' | 'list' | 'bulk' | 'update' | 'vphc'>('create');
+  const [receiveRecordSubTab, setReceiveRecordSubTab] = React.useState<'create' | 'list' | 'bulk' | 'update' | 'vphc' | 'search' | 'extend'>('create');
   const addMenuRef = React.useRef<HTMLDivElement>(null);
   const ignoreSubTabResetRef = React.useRef(false);
 
@@ -365,7 +365,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
     return count;
   }, [props.filterFromDate, props.filterToDate, props.filterWard, props.filterRecordType, props.filterStatus, props.filterEmployee, isStatusFilterHidden]);
 
-  const navigateToReceiveRecordSubTab = (subTab: 'create' | 'list' | 'bulk' | 'update' | 'vphc') => {
+  const navigateToReceiveRecordSubTab = (subTab: 'create' | 'list' | 'bulk' | 'update' | 'vphc' | 'search' | 'extend') => {
     ignoreSubTabResetRef.current = true;
     setReceiveRecordSubTab(subTab);
     props.setCurrentView('receive_record');
@@ -377,7 +377,11 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
       ignoreSubTabResetRef.current = false;
       return;
     }
-    setReceiveRecordSubTab('create');
+    if (props.currentView === 'receive_search' || props.currentView === 'receive_record_search') {
+      setReceiveRecordSubTab('search');
+    } else {
+      setReceiveRecordSubTab('create');
+    }
   }, [props.receiveRecordResetKey, props.currentView]);
 
   React.useEffect(() => {
@@ -1462,10 +1466,12 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
         />
       );
     case "receive_record":
+    case "receive_search":
+    case "receive_record_search":
       return (
         <ReceiveRecord
-          key={`receive_record_${receiveRecordSubTab}_${props.receiveRecordResetKey || 0}`}
-          initialTab={receiveRecordSubTab}
+          key={`receive_record_${props.currentView === 'receive_search' || props.currentView === 'receive_record_search' ? 'search' : receiveRecordSubTab}_${props.receiveRecordResetKey || 0}`}
+          initialTab={props.currentView === 'receive_search' || props.currentView === 'receive_record_search' ? 'search' : receiveRecordSubTab}
           onSave={props.handleAddOrUpdateRecord}
           onDelete={props.handleDeleteRecord}
           wards={wards}

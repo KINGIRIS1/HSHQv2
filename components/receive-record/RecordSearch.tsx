@@ -31,7 +31,7 @@ import {
 } from 'lucide-react';
 import { DetailModal } from '../DetailModal';
 import { ExtendDeadlineModal } from '../ExtendDeadlineModal';
-import { isRecordOverdue, isRecordApproaching, toTitleCase } from '../../utils/appHelpers';
+import { isRecordOverdue, isRecordApproaching, toTitleCase, getBatchDisplayParts } from '../../utils/appHelpers';
 
 interface RecordSearchProps {
     records: RecordFile[];
@@ -358,24 +358,42 @@ export const RecordSearch: React.FC<RecordSearchProps> = ({
                 if (r.assignedTo !== filterEmployee) return false;
             }
 
-            // From date
-            if (filterFromDate) {
-                if (!r.receivedDate) return false;
-                const rDate = new Date(r.receivedDate);
-                rDate.setHours(0,0,0,0);
-                const limitDate = new Date(filterFromDate);
-                limitDate.setHours(0,0,0,0);
-                if (rDate < limitDate) return false;
-            }
+            // From date & To date - Lọc theo ngày của trạng thái
+            if (filterFromDate || filterToDate) {
+                const targetStatus = filterStatus !== 'all' ? filterStatus : r.status;
+                let targetDateStr: string | null | undefined = null;
 
-            // To date
-            if (filterToDate) {
-                if (!r.receivedDate) return false;
-                const rDate = new Date(r.receivedDate);
-                rDate.setHours(0,0,0,0);
-                const limitDate = new Date(filterToDate);
-                limitDate.setHours(23,59,59,999);
-                if (rDate > limitDate) return false;
+                if (targetStatus === RecordStatus.RECEIVED) {
+                    targetDateStr = r.receivedDate;
+                } else if (targetStatus === 'DANG_THUC_HIEN' || targetStatus === RecordStatus.ASSIGNED || targetStatus === RecordStatus.IN_PROGRESS) {
+                    targetDateStr = r.assignedDate || r.receivedDate;
+                } else if (targetStatus === RecordStatus.COMPLETED_WORK) {
+                    targetDateStr = r.completedWorkDate || r.assignedDate || r.receivedDate;
+                } else if (targetStatus === RecordStatus.PENDING_SUPPLEMENT) {
+                    targetDateStr = r.assignedDate || r.receivedDate;
+                } else if (targetStatus === RecordStatus.PENDING_CHECK) {
+                    targetDateStr = r.pendingCheckDate || r.completedWorkDate || r.assignedDate || r.receivedDate;
+                } else if (targetStatus === RecordStatus.CHECKED) {
+                    targetDateStr = r.checkedDate || r.pendingCheckDate || r.assignedDate || r.receivedDate;
+                } else if (targetStatus === RecordStatus.PENDING_SIGN) {
+                    targetDateStr = r.submissionDate || r.checkedDate || r.pendingCheckDate || r.receivedDate;
+                } else if (targetStatus === RecordStatus.SIGNED) {
+                    targetDateStr = r.approvalDate || r.submissionDate || r.receivedDate;
+                } else if (targetStatus === RecordStatus.HANDOVER) {
+                    targetDateStr = r.exportDate || r.completedDate || r.approvalDate || r.receivedDate;
+                } else if (targetStatus === RecordStatus.RETURNED) {
+                    targetDateStr = r.resultReturnedDate || r.completedDate || r.exportDate || r.receivedDate;
+                } else if (targetStatus === RecordStatus.WITHDRAWN || targetStatus === RecordStatus.REJECTED) {
+                    targetDateStr = r.completedDate || r.receivedDate;
+                } else {
+                    targetDateStr = r.receivedDate;
+                }
+
+                if (!targetDateStr) return false;
+                const dOnly = targetDateStr.includes('T') ? targetDateStr.split('T')[0] : targetDateStr;
+
+                if (filterFromDate && dOnly < filterFromDate) return false;
+                if (filterToDate && dOnly > filterToDate) return false;
             }
 
             return true;
@@ -393,6 +411,11 @@ export const RecordSearch: React.FC<RecordSearchProps> = ({
             if (sortConfig.key === 'customer') {
                 aVal = a.customerName || '';
                 bVal = b.customerName || '';
+            }
+
+            if (sortConfig.key === 'completed') {
+                aVal = a.exportBatch || a.completedDate || '';
+                bVal = b.exportBatch || b.completedDate || '';
             }
 
             if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
@@ -581,11 +604,11 @@ export const RecordSearch: React.FC<RecordSearchProps> = ({
                                     </div>
 
                                     <div className="space-y-3.5 max-h-[75vh] overflow-y-auto pr-1">
-                                        {/* 1. Received Date Filter */}
+                                        {/* 1. Date Filter by status */}
                                         <div>
                                             <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 mb-1">
                                                 <Calendar size={14} className="text-gray-500" />
-                                                <span>Thời gian:</span>
+                                                <span>Thời gian ({filterStatus !== 'all' ? `Ngày ${STATUS_LABELS[filterStatus as RecordStatus] || filterStatus}` : 'Theo ngày trạng thái'}):</span>
                                             </label>
                                             <div className="grid grid-cols-2 gap-2">
                                                 <div>
@@ -947,16 +970,39 @@ export const RecordSearch: React.FC<RecordSearchProps> = ({
                                                             )}
                                                         </td>
                                                     );
-                                                case 'completed':
+                                                case 'completed': {
+                                                    const batchParts = r.exportBatch ? getBatchDisplayParts(r.exportBatch, r.exportDate || r.completedDate) : null;
                                                     return (
-                                                        <td key="completed" className="p-3 align-middle text-center">
-                                                            {r.returnBatch ? (
+                                                        <td key="completed" className="p-3 align-middle text-center text-gray-600">
+                                                            {r.exportBatch && batchParts ? (
+                                                                <span className={`inline-flex flex-col items-center justify-center px-2 py-0.5 rounded border leading-tight ${r.status === RecordStatus.WITHDRAWN ? 'bg-slate-100 text-slate-700 border-slate-300' : r.status === RecordStatus.REJECTED ? 'bg-red-50 text-red-700 border-red-200' : 'bg-green-50 text-green-700 border-green-200'}`}>
+                                                                    <span className="text-[11px] font-extrabold whitespace-nowrap">{batchParts.batchName}</span>
+                                                                    {batchParts.dateName && (
+                                                                        <span className="text-[10px] font-medium opacity-90 whitespace-nowrap">{batchParts.dateName}</span>
+                                                                    )}
+                                                                </span>
+                                                            ) : r.returnBatch ? (
                                                                 <span className="px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded-full text-[10px] font-bold border border-indigo-100">
                                                                     Đợt {r.returnBatch}
                                                                 </span>
-                                                            ) : '--'}
+                                                            ) : r.status === RecordStatus.WITHDRAWN ? (
+                                                                <div className="flex flex-col items-center">
+                                                                    <span className="text-xs font-bold bg-slate-200 text-slate-600 px-2 py-0.5 rounded mb-1">Rút HS</span>
+                                                                    <span className="text-sm font-bold text-slate-600">{formatDate(r.completedDate)}</span>
+                                                                </div>
+                                                            ) : r.status === RecordStatus.REJECTED ? (
+                                                                <div className="flex flex-col items-center">
+                                                                    <span className="text-xs font-bold bg-red-100 text-red-700 border border-red-200 px-2 py-0.5 rounded mb-1">Trả hồ sơ</span>
+                                                                    <span className="text-sm font-bold text-red-700">{formatDate(r.completedDate)}</span>
+                                                                </div>
+                                                            ) : r.completedDate ? (
+                                                                <span className="text-sm font-bold text-green-700">{formatDate(r.completedDate)}</span>
+                                                            ) : (
+                                                                <span className="text-gray-300">--</span>
+                                                            )}
                                                         </td>
                                                     );
+                                                }
                                                 case 'tech':
                                                     return (
                                                         <td key="tech" className="p-3 align-middle text-center font-medium text-slate-500">

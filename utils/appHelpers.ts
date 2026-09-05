@@ -983,88 +983,97 @@ export function syncRecordStatusTransition(
         updates.resultReturnedDate = undefined;
         updates.receiverName = undefined;
     } else {
-        // DỌN DẸP NẾU QUAY LÙI BƯỚC (Chỉ xóa khi thực sự quay lùi trạng thái và không có customDates bảo toàn)
-        if (isRollback && !options?.customDates) {
+        // DỌN DẸP NẾU QUAY LÙI BƯỚC (Xóa sạch các mốc ngày và thông tin các bước sau)
+        if (isRollback) {
             if (newRank < 1) {
-                updates.assignedDate = undefined;
-                updates.completedWorkDate = undefined;
-                updates.pendingCheckDate = undefined;
-                updates.checkedDate = undefined;
-                updates.submissionDate = undefined;
-                updates.approvalDate = undefined;
-                updates.completedDate = undefined;
-                updates.exportDate = undefined;
-                updates.exportBatch = undefined;
+                updates.assignedDate = null as any;
+                updates.completedWorkDate = null as any;
+                updates.pendingCheckDate = null as any;
+                updates.checkedDate = null as any;
+                updates.checkedBy = null as any;
+                updates.submissionDate = null as any;
+                updates.submittedTo = null as any;
+                updates.approvalDate = null as any;
+                updates.completedDate = null as any;
+                updates.exportDate = null as any;
+                updates.exportBatch = null as any;
                 updates.is_handover = false;
-                updates.handover_date = undefined;
-                updates.resultReturnedDate = undefined;
-                updates.receiverName = undefined;
+                updates.handover_date = null as any;
+                updates.resultReturnedDate = null as any;
+                updates.receiverName = null as any;
             } else if (newRank < 2) {
-                updates.completedWorkDate = undefined;
-                updates.pendingCheckDate = undefined;
-                updates.checkedDate = undefined;
-                updates.submissionDate = undefined;
-                updates.approvalDate = undefined;
-                updates.completedDate = undefined;
-                updates.exportDate = undefined;
-                updates.exportBatch = undefined;
+                updates.completedWorkDate = null as any;
+                updates.pendingCheckDate = null as any;
+                updates.checkedDate = null as any;
+                updates.checkedBy = null as any;
+                updates.submissionDate = null as any;
+                updates.submittedTo = null as any;
+                updates.approvalDate = null as any;
+                updates.completedDate = null as any;
+                updates.exportDate = null as any;
+                updates.exportBatch = null as any;
                 updates.is_handover = false;
-                updates.handover_date = undefined;
-                updates.resultReturnedDate = undefined;
-                updates.receiverName = undefined;
+                updates.handover_date = null as any;
+                updates.resultReturnedDate = null as any;
+                updates.receiverName = null as any;
             } else if (newRank < 3) {
-                updates.pendingCheckDate = undefined;
-                updates.checkedDate = undefined;
-                updates.submissionDate = undefined;
-                updates.approvalDate = undefined;
-                updates.completedDate = undefined;
-                updates.exportDate = undefined;
-                updates.exportBatch = undefined;
+                updates.pendingCheckDate = null as any;
+                updates.checkedDate = null as any;
+                updates.checkedBy = null as any;
+                updates.submissionDate = null as any;
+                updates.submittedTo = null as any;
+                updates.approvalDate = null as any;
+                updates.completedDate = null as any;
+                updates.exportDate = null as any;
+                updates.exportBatch = null as any;
                 updates.is_handover = false;
-                updates.handover_date = undefined;
-                updates.resultReturnedDate = undefined;
-                updates.receiverName = undefined;
+                updates.handover_date = null as any;
+                updates.resultReturnedDate = null as any;
+                updates.receiverName = null as any;
             } else if (newRank < 4) {
-                updates.checkedDate = undefined;
-                updates.submissionDate = undefined;
-                updates.approvalDate = undefined;
-                updates.completedDate = undefined;
-                updates.exportDate = undefined;
-                updates.exportBatch = undefined;
+                updates.checkedDate = null as any;
+                updates.checkedBy = null as any;
+                updates.submissionDate = null as any;
+                updates.submittedTo = null as any;
+                updates.approvalDate = null as any;
+                updates.completedDate = null as any;
+                updates.exportDate = null as any;
+                updates.exportBatch = null as any;
                 updates.is_handover = false;
-                updates.handover_date = undefined;
-                updates.resultReturnedDate = undefined;
-                updates.receiverName = undefined;
+                updates.handover_date = null as any;
+                updates.resultReturnedDate = null as any;
+                updates.receiverName = null as any;
             } else if (newRank < 5) {
-                updates.submissionDate = undefined;
-                updates.approvalDate = undefined;
-                updates.completedDate = undefined;
-                updates.exportDate = undefined;
-                updates.exportBatch = undefined;
+                updates.submissionDate = null as any;
+                updates.submittedTo = null as any;
+                updates.approvalDate = null as any;
+                updates.completedDate = null as any;
+                updates.exportDate = null as any;
+                updates.exportBatch = null as any;
                 updates.is_handover = false;
-                updates.handover_date = undefined;
-                updates.resultReturnedDate = undefined;
-                updates.receiverName = undefined;
+                updates.handover_date = null as any;
+                updates.resultReturnedDate = null as any;
+                updates.receiverName = null as any;
             } else if (newRank < 6) {
-                updates.approvalDate = undefined;
-                updates.completedDate = undefined;
-                updates.exportDate = undefined;
-                updates.exportBatch = undefined;
+                updates.approvalDate = null as any;
+                updates.completedDate = null as any;
+                updates.exportDate = null as any;
+                updates.exportBatch = null as any;
                 updates.is_handover = false;
-                updates.handover_date = undefined;
-                updates.resultReturnedDate = undefined;
-                updates.receiverName = undefined;
+                updates.handover_date = null as any;
+                updates.resultReturnedDate = null as any;
+                updates.receiverName = null as any;
             } else if (newRank < 7) {
-                updates.completedDate = undefined;
-                updates.exportDate = undefined;
-                updates.exportBatch = undefined;
+                updates.completedDate = null as any;
+                updates.exportDate = null as any;
+                updates.exportBatch = null as any;
                 updates.is_handover = false;
-                updates.handover_date = undefined;
-                updates.resultReturnedDate = undefined;
-                updates.receiverName = undefined;
+                updates.handover_date = null as any;
+                updates.resultReturnedDate = null as any;
+                updates.receiverName = null as any;
             } else if (newRank < 8) {
-                updates.resultReturnedDate = undefined;
-                updates.receiverName = undefined;
+                updates.resultReturnedDate = null as any;
+                updates.receiverName = null as any;
             }
         }
 
@@ -1121,18 +1130,18 @@ export function syncRecordStatusTransition(
             if (options?.returnedPrice !== undefined) updates.returnedPrice = options.returnedPrice;
         }
 
-        // BẢO TOÀN TUYỆT ĐỐI TẤT CẢ CÁC MỐC NGÀY TRUYỀN VÀO TỪ CUSTOM DATES
+        // BẢO TOÀN CÁC MỐC NGÀY TRUYỀN VÀO TỪ CUSTOM DATES (Chỉ giữ lại mốc ngày phù hợp với bước hiện tại, không hồi sinh bước tương lai nếu đang rollback)
         if (options?.customDates) {
             if (options.customDates.receivedDate !== undefined && options.customDates.receivedDate !== null && options.customDates.receivedDate !== '') updates.receivedDate = options.customDates.receivedDate;
-            if (options.customDates.assignedDate !== undefined && options.customDates.assignedDate !== null && options.customDates.assignedDate !== '') updates.assignedDate = options.customDates.assignedDate;
-            if (options.customDates.completedWorkDate !== undefined && options.customDates.completedWorkDate !== null && options.customDates.completedWorkDate !== '') updates.completedWorkDate = options.customDates.completedWorkDate;
-            if (options.customDates.pendingCheckDate !== undefined && options.customDates.pendingCheckDate !== null && options.customDates.pendingCheckDate !== '') updates.pendingCheckDate = options.customDates.pendingCheckDate;
-            if (options.customDates.checkedDate !== undefined && options.customDates.checkedDate !== null && options.customDates.checkedDate !== '') updates.checkedDate = options.customDates.checkedDate;
-            if (options.customDates.submissionDate !== undefined && options.customDates.submissionDate !== null && options.customDates.submissionDate !== '') updates.submissionDate = options.customDates.submissionDate;
-            if (options.customDates.approvalDate !== undefined && options.customDates.approvalDate !== null && options.customDates.approvalDate !== '') updates.approvalDate = options.customDates.approvalDate;
-            if (options.customDates.completedDate !== undefined && options.customDates.completedDate !== null && options.customDates.completedDate !== '') updates.completedDate = options.customDates.completedDate;
-            if (options.customDates.exportDate !== undefined && options.customDates.exportDate !== null && options.customDates.exportDate !== '') updates.exportDate = options.customDates.exportDate;
-            if (options.customDates.resultReturnedDate !== undefined && options.customDates.resultReturnedDate !== null && options.customDates.resultReturnedDate !== '') updates.resultReturnedDate = options.customDates.resultReturnedDate;
+            if ((!isRollback || newRank >= 1) && options.customDates.assignedDate !== undefined && options.customDates.assignedDate !== null && options.customDates.assignedDate !== '') updates.assignedDate = options.customDates.assignedDate;
+            if ((!isRollback || newRank >= 2) && options.customDates.completedWorkDate !== undefined && options.customDates.completedWorkDate !== null && options.customDates.completedWorkDate !== '') updates.completedWorkDate = options.customDates.completedWorkDate;
+            if ((!isRollback || newRank >= 3) && options.customDates.pendingCheckDate !== undefined && options.customDates.pendingCheckDate !== null && options.customDates.pendingCheckDate !== '') updates.pendingCheckDate = options.customDates.pendingCheckDate;
+            if ((!isRollback || newRank >= 4) && options.customDates.checkedDate !== undefined && options.customDates.checkedDate !== null && options.customDates.checkedDate !== '') updates.checkedDate = options.customDates.checkedDate;
+            if ((!isRollback || newRank >= 5) && options.customDates.submissionDate !== undefined && options.customDates.submissionDate !== null && options.customDates.submissionDate !== '') updates.submissionDate = options.customDates.submissionDate;
+            if ((!isRollback || newRank >= 6) && options.customDates.approvalDate !== undefined && options.customDates.approvalDate !== null && options.customDates.approvalDate !== '') updates.approvalDate = options.customDates.approvalDate;
+            if ((!isRollback || newRank >= 7) && options.customDates.completedDate !== undefined && options.customDates.completedDate !== null && options.customDates.completedDate !== '') updates.completedDate = options.customDates.completedDate;
+            if ((!isRollback || newRank >= 7) && options.customDates.exportDate !== undefined && options.customDates.exportDate !== null && options.customDates.exportDate !== '') updates.exportDate = options.customDates.exportDate;
+            if ((!isRollback || newRank >= 8) && options.customDates.resultReturnedDate !== undefined && options.customDates.resultReturnedDate !== null && options.customDates.resultReturnedDate !== '') updates.resultReturnedDate = options.customDates.resultReturnedDate;
         }
     }
 

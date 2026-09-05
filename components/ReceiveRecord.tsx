@@ -28,7 +28,7 @@ interface ReceiveRecordProps {
   onCreateContract?: (record: Partial<RecordFile>) => void;
   onHandOverRecords?: (recordIds: string[]) => Promise<void>;
   onBulkUpdate?: (field: keyof RecordFile, value: any, customDate?: string, targetRecordIds?: string[]) => Promise<void>;
-  initialTab?: 'create' | 'list' | 'bulk' | 'update' | 'vphc';
+  initialTab?: 'create' | 'list' | 'bulk' | 'update' | 'vphc' | 'search' | 'extend';
   rolePermissions?: RolePermissions;
   departmentPermissions?: DepartmentPermissions;
   onReturnResult?: (record: RecordFile) => void;

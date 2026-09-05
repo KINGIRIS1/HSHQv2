@@ -314,32 +314,52 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
     // Logic tự động set ngày khi trạng thái thay đổi hoặc xóa ngày khi quay lui
     // Chỉ áp dụng logic này nếu trạng thái khác với ban đầu (hoặc là tạo mới)
     // Hoặc user admin ép kiểu
+    const flow = [
+        RecordStatus.RECEIVED, RecordStatus.ASSIGNED, RecordStatus.IN_PROGRESS, 
+        RecordStatus.COMPLETED_WORK, RecordStatus.PENDING_CHECK, RecordStatus.CHECKED, 
+        RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER, RecordStatus.RETURNED
+    ];
+
     if (hasAdminRights && finalData.status) {
         const now = new Date().toISOString();
         
         // BACKFILL LOGIC: Nếu thay đổi trạng thái, đảm bảo các ngày của tiến trình trước đó (hoặc trạng thái cũ) 
         // được chốt lại để không bị mất màu trên Timeline do thiếu Date.
         if (initialData?.status && finalData.status !== initialData?.status) {
-            const flow = [
-                RecordStatus.RECEIVED, RecordStatus.ASSIGNED, RecordStatus.IN_PROGRESS, 
-                RecordStatus.COMPLETED_WORK, RecordStatus.PENDING_CHECK, RecordStatus.CHECKED, 
-                RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER
-            ];
             const prevIdx = flow.indexOf(initialData.status);
             const newIdx = flow.indexOf(finalData.status);
 
             if (newIdx >= 0 && prevIdx >= 0 && newIdx < prevIdx) {
-                // Quay lùi bước -> Chỉ làm sạch nếu người dùng không tự tay nhập mốc ngày đó
-                if (newIdx < flow.indexOf(RecordStatus.ASSIGNED) && !formData.assignedDate) finalData.assignedDate = undefined;
-                if (newIdx < flow.indexOf(RecordStatus.COMPLETED_WORK) && !formData.completedWorkDate) finalData.completedWorkDate = undefined;
-                if (newIdx < flow.indexOf(RecordStatus.PENDING_CHECK) && !formData.pendingCheckDate) finalData.pendingCheckDate = undefined;
-                if (newIdx < flow.indexOf(RecordStatus.CHECKED) && !formData.checkedDate) finalData.checkedDate = undefined;
-                if (newIdx < flow.indexOf(RecordStatus.PENDING_SIGN) && !formData.submissionDate) finalData.submissionDate = undefined;
-                if (newIdx < flow.indexOf(RecordStatus.SIGNED) && !formData.approvalDate) finalData.approvalDate = undefined;
+                // Quay lùi bước -> Gán null để Supabase xóa sạch giá trị cũ trong Database
+                if (newIdx < flow.indexOf(RecordStatus.ASSIGNED)) {
+                    finalData.assignedDate = null as any;
+                    finalData.assignedTo = null as any;
+                }
+                if (newIdx < flow.indexOf(RecordStatus.COMPLETED_WORK)) finalData.completedWorkDate = null as any;
+                if (newIdx < flow.indexOf(RecordStatus.PENDING_CHECK)) {
+                    finalData.pendingCheckDate = null as any;
+                    finalData.checkedDate = null as any;
+                    finalData.checkedBy = null as any;
+                }
+                if (newIdx < flow.indexOf(RecordStatus.CHECKED)) {
+                    finalData.checkedDate = null as any;
+                    finalData.checkedBy = null as any;
+                }
+                if (newIdx < flow.indexOf(RecordStatus.PENDING_SIGN)) {
+                    finalData.submissionDate = null as any;
+                    finalData.submittedTo = null as any;
+                }
+                if (newIdx < flow.indexOf(RecordStatus.SIGNED)) {
+                    finalData.approvalDate = null as any;
+                }
                 if (newIdx < flow.indexOf(RecordStatus.HANDOVER)) {
-                    if (!formData.completedDate) finalData.completedDate = undefined;
-                    if (!formData.exportBatch) finalData.exportBatch = undefined;
-                    if (!formData.exportDate) finalData.exportDate = undefined;
+                    finalData.completedDate = null as any;
+                    finalData.exportBatch = null as any;
+                    finalData.exportDate = null as any;
+                    finalData.is_handover = false;
+                    finalData.handover_date = null as any;
+                    finalData.resultReturnedDate = null as any;
+                    finalData.receiverName = null as any;
                 }
             } else if (newIdx >= 0 && prevIdx >= 0 && newIdx > prevIdx) {
                 // Tiến tới bước mới -> Auto fill nếu thiếu
@@ -356,21 +376,29 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
     if (finalData.status === RecordStatus.WITHDRAWN && !finalData.completedDate) finalData.completedDate = new Date().toISOString();
     if (finalData.status === RecordStatus.REJECTED && !finalData.completedDate) finalData.completedDate = new Date().toISOString();
     
-    if (finalData.resultReturnedDate && finalData.status !== RecordStatus.RETURNED) {
-        finalData.status = RecordStatus.RETURNED;
-        if (!finalData.completedDate) finalData.completedDate = finalData.resultReturnedDate;
-    }
-    
     if (finalData.exportBatch !== undefined && finalData.exportBatch !== null) {
         finalData.exportBatch = getPureBatchNumber(finalData.exportBatch) || undefined;
     }
 
-    // LOGIC QUAN TRỌNG: Nếu có Đợt xuất hoặc Ngày xuất thì phải là HANDOVER (trừ khi Đã rút, Đã trả hoặc Bị từ chối)
-    if ((finalData.exportBatch || finalData.exportDate) && finalData.status !== RecordStatus.WITHDRAWN && finalData.status !== RecordStatus.RETURNED && finalData.status !== RecordStatus.REJECTED) {
-        finalData.status = RecordStatus.HANDOVER;
-        if (!finalData.completedDate) {
-            finalData.completedDate = finalData.exportDate ? finalData.exportDate : new Date().toISOString();
+    const curIdx = finalData.status ? flow.indexOf(finalData.status) : -1;
+    if (curIdx >= flow.indexOf(RecordStatus.HANDOVER)) {
+        if (finalData.resultReturnedDate && finalData.status !== RecordStatus.RETURNED) {
+            finalData.status = RecordStatus.RETURNED;
+            if (!finalData.completedDate) finalData.completedDate = finalData.resultReturnedDate;
         }
+        if ((finalData.exportBatch || finalData.exportDate) && finalData.status !== RecordStatus.WITHDRAWN && finalData.status !== RecordStatus.RETURNED && finalData.status !== RecordStatus.REJECTED) {
+            finalData.status = RecordStatus.HANDOVER;
+            if (!finalData.completedDate) {
+                finalData.completedDate = finalData.exportDate ? finalData.exportDate : new Date().toISOString();
+            }
+        }
+    } else if (finalData.status !== RecordStatus.WITHDRAWN && finalData.status !== RecordStatus.REJECTED) {
+        finalData.exportBatch = undefined;
+        finalData.exportDate = undefined;
+        finalData.completedDate = undefined;
+        finalData.resultReturnedDate = undefined;
+        finalData.is_handover = false;
+        finalData.handover_date = undefined;
     }
 
     if (isExemptReceipt) {
@@ -423,10 +451,49 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
     ] as const;
 
     for (const df of dateFields) {
-        if (finalData[df] !== undefined && finalData[df] !== null && finalData[df] !== '') {
+        if (finalData[df] !== undefined && finalData[df] !== '') {
             mergedData[df] = finalData[df];
-        } else if (syncedUpdates[df] !== undefined && syncedUpdates[df] !== null) {
+        } else if (syncedUpdates[df] !== undefined && syncedUpdates[df] !== '') {
             mergedData[df] = syncedUpdates[df];
+        } else {
+            mergedData[df] = null;
+        }
+    }
+
+    // Nếu quay lùi bước, dọn dẹp triệt để các trường người thực hiện & tiến độ
+    if (finalData.status) {
+        const flow = [
+            RecordStatus.RECEIVED, RecordStatus.ASSIGNED, RecordStatus.IN_PROGRESS, 
+            RecordStatus.COMPLETED_WORK, RecordStatus.PENDING_CHECK, RecordStatus.CHECKED, 
+            RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER, RecordStatus.RETURNED
+        ];
+        const newIdx = flow.indexOf(finalData.status);
+        if (newIdx >= 0) {
+            if (newIdx < flow.indexOf(RecordStatus.PENDING_CHECK)) {
+                mergedData.pendingCheckDate = null;
+                mergedData.checkedDate = null;
+                mergedData.checkedBy = null;
+            }
+            if (newIdx < flow.indexOf(RecordStatus.CHECKED)) {
+                mergedData.checkedDate = null;
+                mergedData.checkedBy = null;
+            }
+            if (newIdx < flow.indexOf(RecordStatus.PENDING_SIGN)) {
+                mergedData.submissionDate = null;
+                mergedData.submittedTo = null;
+            }
+            if (newIdx < flow.indexOf(RecordStatus.SIGNED)) {
+                mergedData.approvalDate = null;
+            }
+            if (newIdx < flow.indexOf(RecordStatus.HANDOVER)) {
+                mergedData.completedDate = null;
+                mergedData.exportBatch = null;
+                mergedData.exportDate = null;
+                mergedData.is_handover = false;
+                mergedData.handover_date = null;
+                mergedData.resultReturnedDate = null;
+                mergedData.receiverName = null;
+            }
         }
     }
 
@@ -442,23 +509,77 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
       
       if (field === 'status') {
         const newStatus = value as RecordStatus;
+        const statusFlow = [
+          RecordStatus.RECEIVED,
+          RecordStatus.ASSIGNED,
+          RecordStatus.IN_PROGRESS,
+          RecordStatus.COMPLETED_WORK,
+          RecordStatus.PENDING_CHECK,
+          RecordStatus.CHECKED,
+          RecordStatus.PENDING_SIGN,
+          RecordStatus.SIGNED,
+          RecordStatus.HANDOVER,
+          RecordStatus.RETURNED
+        ];
+        const oldIdx = prev.status ? statusFlow.indexOf(prev.status) : -1;
+        const newIdx = statusFlow.indexOf(newStatus);
+
+        let rollbackFields: Partial<RecordFile> = {};
+        if (newIdx >= 0) {
+          if (newIdx < statusFlow.indexOf(RecordStatus.RETURNED)) {
+            rollbackFields.resultReturnedDate = '';
+            rollbackFields.receiptNumber = '';
+            rollbackFields.returnedPrice = 0;
+          }
+          if (newIdx < statusFlow.indexOf(RecordStatus.HANDOVER)) {
+            rollbackFields.completedDate = '';
+            rollbackFields.exportBatch = '';
+            rollbackFields.exportDate = '';
+            rollbackFields.is_handover = false;
+            rollbackFields.handover_date = '';
+            rollbackFields.handoverWard = null;
+            rollbackFields.receiverName = '';
+          }
+          if (newIdx < statusFlow.indexOf(RecordStatus.SIGNED)) {
+            rollbackFields.approvalDate = '';
+          }
+          if (newIdx < statusFlow.indexOf(RecordStatus.PENDING_SIGN)) {
+            rollbackFields.submissionDate = '';
+            rollbackFields.submittedTo = '';
+          }
+          if (newIdx < statusFlow.indexOf(RecordStatus.CHECKED)) {
+            rollbackFields.checkedDate = '';
+            rollbackFields.checkedBy = '';
+          }
+          if (newIdx < statusFlow.indexOf(RecordStatus.PENDING_CHECK)) {
+            rollbackFields.pendingCheckDate = '';
+          }
+          if (newIdx < statusFlow.indexOf(RecordStatus.COMPLETED_WORK)) {
+            rollbackFields.completedWorkDate = '';
+          }
+          if (newIdx < statusFlow.indexOf(RecordStatus.ASSIGNED)) {
+            rollbackFields.assignedDate = '';
+            rollbackFields.assignedTo = '';
+          }
+        }
+
         const synced = syncRecordStatusTransition(prev, newStatus, {
           userName: currentUser.name || currentUser.username || 'Hệ thống',
           userId: currentUser.id,
           customDates: {
             receivedDate: prev.receivedDate,
-            assignedDate: prev.assignedDate,
-            completedWorkDate: prev.completedWorkDate,
-            pendingCheckDate: prev.pendingCheckDate,
-            checkedDate: prev.checkedDate,
-            submissionDate: prev.submissionDate,
-            approvalDate: prev.approvalDate,
-            completedDate: prev.completedDate,
-            exportDate: prev.exportDate,
-            resultReturnedDate: prev.resultReturnedDate
+            assignedDate: newIdx >= statusFlow.indexOf(RecordStatus.ASSIGNED) ? prev.assignedDate : undefined,
+            completedWorkDate: newIdx >= statusFlow.indexOf(RecordStatus.COMPLETED_WORK) ? prev.completedWorkDate : undefined,
+            pendingCheckDate: newIdx >= statusFlow.indexOf(RecordStatus.PENDING_CHECK) ? prev.pendingCheckDate : undefined,
+            checkedDate: newIdx >= statusFlow.indexOf(RecordStatus.CHECKED) ? prev.checkedDate : undefined,
+            submissionDate: newIdx >= statusFlow.indexOf(RecordStatus.PENDING_SIGN) ? prev.submissionDate : undefined,
+            approvalDate: newIdx >= statusFlow.indexOf(RecordStatus.SIGNED) ? prev.approvalDate : undefined,
+            completedDate: newIdx >= statusFlow.indexOf(RecordStatus.HANDOVER) ? prev.completedDate : undefined,
+            exportDate: newIdx >= statusFlow.indexOf(RecordStatus.HANDOVER) ? prev.exportDate : undefined,
+            resultReturnedDate: newIdx >= statusFlow.indexOf(RecordStatus.RETURNED) ? prev.resultReturnedDate : undefined
           }
         });
-        updated = { ...updated, ...synced };
+        updated = { ...updated, ...synced, ...rollbackFields };
       }
 
       if (field === 'assignedTo') {
@@ -584,10 +705,11 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                                         RecordStatus.RETURNED
                                     ];
                                     const currentIdx = formData.status ? statusFlow.indexOf(formData.status) : -1;
-                                    const hasAssigned = isEdit || currentIdx >= statusFlow.indexOf(RecordStatus.ASSIGNED) || !!formData.assignedDate || !!formData.assignedTo;
-                                    const hasPendingCheck = !isArchive && (currentIdx >= statusFlow.indexOf(RecordStatus.PENDING_CHECK) || !!formData.pendingCheckDate);
-                                    const hasSubmission = currentIdx >= statusFlow.indexOf(RecordStatus.PENDING_SIGN) || !!formData.submissionDate;
-                                    const hasHandover = currentIdx >= statusFlow.indexOf(RecordStatus.SIGNED) || formData.status === RecordStatus.HANDOVER || formData.status === RecordStatus.RETURNED || !!formData.completedDate;
+                                    const hasAssigned = currentIdx >= statusFlow.indexOf(RecordStatus.ASSIGNED) || formData.status === RecordStatus.PENDING_SUPPLEMENT;
+                                    const hasPendingCheck = !isArchive && currentIdx >= statusFlow.indexOf(RecordStatus.PENDING_CHECK);
+                                    const hasSubmission = currentIdx >= statusFlow.indexOf(RecordStatus.PENDING_SIGN);
+                                    const hasApproval = currentIdx >= statusFlow.indexOf(RecordStatus.SIGNED);
+                                    const hasHandover = currentIdx >= statusFlow.indexOf(RecordStatus.HANDOVER) || formData.status === RecordStatus.WITHDRAWN || formData.status === RecordStatus.REJECTED;
 
                                     return (
                                         <>
@@ -600,8 +722,16 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                                             {hasSubmission && (
                                                 <div><label className="block text-xs font-bold text-purple-700 mb-1">Ngày trình ký</label><input type="date" className="w-full border border-purple-300 rounded-md px-3 py-2 bg-purple-50/50 text-purple-800" value={dateVal(formData.submissionDate)} onChange={(e) => handleChange('submissionDate', e.target.value)} /></div>
                                             )}
+                                            {hasApproval && (
+                                                <div><label className="block text-xs font-bold text-indigo-700 mb-1">Ngày ký duyệt</label><input type="date" className="w-full border border-indigo-300 rounded-md px-3 py-2 bg-indigo-50/50 text-indigo-800" value={dateVal(formData.approvalDate)} onChange={(e) => handleChange('approvalDate', e.target.value)} /></div>
+                                            )}
                                             {hasHandover && (
-                                                <div><label className="block text-xs font-bold text-green-700 mb-1">Ngày hoàn thành (Giao 1 cửa)</label><input type="date" className="w-full border border-green-300 rounded-md px-3 py-2 bg-green-50/50 font-semibold text-green-800" value={dateVal(formData.completedDate)} onChange={(e) => handleChange('completedDate', e.target.value)} /></div>
+                                                <div>
+                                                    <label className="block text-xs font-bold text-green-700 mb-1">
+                                                        {formData.status === RecordStatus.WITHDRAWN ? 'Ngày rút hồ sơ' : formData.status === RecordStatus.REJECTED ? 'Ngày trả hồ sơ' : 'Ngày hoàn thành (Giao 1 cửa)'}
+                                                    </label>
+                                                    <input type="date" className="w-full border border-green-300 rounded-md px-3 py-2 bg-green-50/50 font-semibold text-green-800" value={dateVal(formData.completedDate)} onChange={(e) => handleChange('completedDate', e.target.value)} />
+                                                </div>
                                             )}
                                         </>
                                     );
@@ -634,6 +764,40 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                                         <label className="block text-xs font-bold text-gray-500 mb-1">Ngày giao NV</label>
                                         <div className="w-full border border-gray-200 rounded-md px-3 py-2 bg-gray-50 text-sm font-semibold text-gray-700">
                                             {formatDate(formData.assignedDate)}
+                                        </div>
+                                    </div>
+                                )}
+                                {formData.pendingCheckDate && (
+                                    <div>
+                                        <label className="block text-xs font-bold text-blue-700 mb-1">Ngày trình kiểm tra</label>
+                                        <div className="w-full border border-blue-100 rounded-md px-3 py-2 bg-blue-50/50 text-sm font-semibold text-blue-800">
+                                            {formatDate(formData.pendingCheckDate)}
+                                        </div>
+                                    </div>
+                                )}
+                                {formData.submissionDate && (
+                                    <div>
+                                        <label className="block text-xs font-bold text-purple-700 mb-1">Ngày trình ký</label>
+                                        <div className="w-full border border-purple-100 rounded-md px-3 py-2 bg-purple-50/50 text-sm font-semibold text-purple-800">
+                                            {formatDate(formData.submissionDate)}
+                                        </div>
+                                    </div>
+                                )}
+                                {formData.approvalDate && (
+                                    <div>
+                                        <label className="block text-xs font-bold text-indigo-700 mb-1">Ngày ký duyệt</label>
+                                        <div className="w-full border border-indigo-100 rounded-md px-3 py-2 bg-indigo-50/50 text-sm font-semibold text-indigo-800">
+                                            {formatDate(formData.approvalDate)}
+                                        </div>
+                                    </div>
+                                )}
+                                {formData.completedDate && (
+                                    <div>
+                                        <label className="block text-xs font-bold text-green-700 mb-1">
+                                            {formData.status === RecordStatus.WITHDRAWN ? 'Ngày rút hồ sơ' : formData.status === RecordStatus.REJECTED ? 'Ngày trả hồ sơ' : 'Ngày hoàn thành (Giao 1 cửa)'}
+                                        </label>
+                                        <div className="w-full border border-green-100 rounded-md px-3 py-2 bg-green-50/50 text-sm font-semibold text-green-800">
+                                            {formatDate(formData.completedDate)}
                                         </div>
                                     </div>
                                 )}
@@ -914,32 +1078,50 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                             </div>
                         )}
 
-                        {/* HIỂN THỊ ĐỢT XUẤT, NGÀY XUẤT VÀ PHI ĐỊA GIỚI */}
-                        {hasAdminRights && isEdit && (
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-indigo-50/80 p-3.5 rounded-lg border border-indigo-200/80">
-                                <div>
-                                    <label className="block text-[10px] font-bold text-indigo-800 uppercase mb-1">Đợt xuất (Batch)</label>
-                                    <input type="text" className="w-full border border-indigo-200 rounded-md px-2.5 py-1.5 text-sm bg-white font-medium" value={val(getPureBatchNumber(formData.exportBatch))} onChange={(e) => handleChange('exportBatch', getPureBatchNumber(e.target.value))} placeholder="VD: 1, 2, 3..." />
-                                </div>
-                                <div>
-                                    <label className="block text-[10px] font-bold text-indigo-800 uppercase mb-1">Ngày xuất</label>
-                                    <input type="date" className="w-full border border-indigo-200 rounded-md px-2.5 py-1.5 text-sm bg-white" value={val(formData.exportDate ? formData.exportDate.split('T')[0] : '')} onChange={(e) => { const v = e.target.value; if (!v) { handleChange('exportDate', null); return; } const d = new Date(v); if (!isNaN(d.getTime())) { handleChange('exportDate', d.toISOString()); } }} />
-                                </div>
-                                <div>
-                                    <label className="block text-[10px] font-bold text-purple-900 uppercase mb-1">Phi địa giới</label>
-                                    <select 
-                                        className="w-full border border-indigo-200 rounded-md px-2.5 py-1.5 text-sm bg-white font-semibold text-purple-900"
-                                        value={val(formData.handoverWard)} 
-                                        onChange={(e) => handleChange('handoverWard', e.target.value || null)}
-                                    >
-                                        <option value="">-- Không (Theo địa chỉ thửa đất) --</option>
-                                        {wards.map(w => <option key={w} value={w}>{getWardLabel(w)}</option>)}
-                                    </select>
-                                </div>
-                            </div>
-                        )}
+                        {/* HIỂN THỊ ĐỢT XUẤT, NGÀY XUẤT VÀ PHI ĐỊA GIỚI (Chỉ hiển thị khi đã ở bước Giao 1 cửa trở lên hoặc Rút/Trả hồ sơ) */}
+                        {hasAdminRights && isEdit && (() => {
+                            const statusFlow = [
+                                RecordStatus.RECEIVED,
+                                RecordStatus.ASSIGNED,
+                                RecordStatus.IN_PROGRESS,
+                                RecordStatus.COMPLETED_WORK,
+                                RecordStatus.PENDING_CHECK,
+                                RecordStatus.CHECKED,
+                                RecordStatus.PENDING_SIGN,
+                                RecordStatus.SIGNED,
+                                RecordStatus.HANDOVER,
+                                RecordStatus.RETURNED
+                            ];
+                            const curIdx = formData.status ? statusFlow.indexOf(formData.status) : -1;
+                            const showExportInfo = curIdx >= statusFlow.indexOf(RecordStatus.HANDOVER) || formData.status === RecordStatus.WITHDRAWN || formData.status === RecordStatus.REJECTED;
+                            if (!showExportInfo) return null;
 
-                        {canEditResult && (
+                            return (
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-indigo-50/80 p-3.5 rounded-lg border border-indigo-200/80">
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-indigo-800 uppercase mb-1">Đợt xuất (Batch)</label>
+                                        <input type="text" className="w-full border border-indigo-200 rounded-md px-2.5 py-1.5 text-sm bg-white font-medium" value={val(getPureBatchNumber(formData.exportBatch))} onChange={(e) => handleChange('exportBatch', getPureBatchNumber(e.target.value))} placeholder="VD: 1, 2, 3..." />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-indigo-800 uppercase mb-1">Ngày xuất</label>
+                                        <input type="date" className="w-full border border-indigo-200 rounded-md px-2.5 py-1.5 text-sm bg-white" value={val(formData.exportDate ? formData.exportDate.split('T')[0] : '')} onChange={(e) => { const v = e.target.value; if (!v) { handleChange('exportDate', null); return; } const d = new Date(v); if (!isNaN(d.getTime())) { handleChange('exportDate', d.toISOString()); } }} />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-purple-900 uppercase mb-1">Phi địa giới</label>
+                                        <select 
+                                            className="w-full border border-indigo-200 rounded-md px-2.5 py-1.5 text-sm bg-white font-semibold text-purple-900"
+                                            value={val(formData.handoverWard)} 
+                                            onChange={(e) => handleChange('handoverWard', e.target.value || null)}
+                                        >
+                                            <option value="">-- Không (Theo địa chỉ thửa đất) --</option>
+                                            {wards.map(w => <option key={w} value={w}>{getWardLabel(w)}</option>)}
+                                        </select>
+                                    </div>
+                                </div>
+                            );
+                        })()}
+
+                        {canEditResult && formData.status === RecordStatus.RETURNED && (
                             <div className="bg-emerald-50 p-4 rounded-lg border border-emerald-200">
                                 <h4 className="text-sm font-bold text-emerald-800 flex items-center gap-2 mb-3"><FileCheck size={16} /> TRẢ KẾT QUẢ CHO DÂN</h4>
                                 {isExemptReceipt ? (

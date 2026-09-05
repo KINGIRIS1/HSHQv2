@@ -56,7 +56,7 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
   };
 
   // Cập nhật danh sách các view được phép
-  const oneDoorAllowedViews = ['dashboard', 'receive_record', 'receive_contract', 'registration_records', 'personal_profile', 'account_settings', 'utilities', 'handover_list', 'work_schedule', 'receive_group', 'reports', 'tools_group'];
+  const oneDoorAllowedViews = ['dashboard', 'receive_record', 'receive_search', 'receive_record_search', 'receive_contract', 'registration_records', 'personal_profile', 'account_settings', 'utilities', 'handover_list', 'work_schedule', 'receive_group', 'reports', 'tools_group'];
   const teamLeaderAllowedViews = ['dashboard', 'personal_profile', 'all_records', 'registration_records', 'excerpt_management', 'reports', 'account_settings', 'utilities', 'work_schedule', 'archive_records', 'records_group', 'tools_group'];
 
   // Define menu structure
@@ -165,7 +165,7 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
             if (!item.visible) return null;
 
             // Check if any sub-item is active
-            const isGroupActive = item.subItems?.some(sub => currentView === sub.id) || currentView === item.id;
+            const isGroupActive = item.subItems?.some(sub => currentView === sub.id || (sub.id === 'receive_record' && (currentView === 'receive_search' || currentView === 'receive_record_search'))) || currentView === item.id;
             const isActive = currentView === item.id;
 
             // Render Tab Group (Section Header + Items)
@@ -189,7 +189,7 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
                        if (!isAllowed) return null;
                        if (!sub.visible) return null;
     
-                       const isSubActive = currentView === sub.id;
+                       const isSubActive = currentView === sub.id || (sub.id === 'receive_record' && (currentView === 'receive_search' || currentView === 'receive_record_search'));
                        return (
                         <button
                           id={`nav-item-${sub.id}`}

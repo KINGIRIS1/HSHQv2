@@ -54,10 +54,31 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
     // State chọn xã phường
     const [selectedWard, setSelectedWard] = useState<string>('all');
     
+    // --- NEW LOGIC FOR MAIN TABS (Đo đạc vs Lưu trữ) ---
+    // Tìm nhân sự ứng với tài khoản hiện tại linh hoạt theo employeeId, name hoặc username
+    const userEmployee = useMemo(() => {
+        if (!currentUser) return null;
+        if (currentUser.employeeId) {
+            const found = employees.find(e => e.id === currentUser.employeeId);
+            if (found) return found;
+        }
+        if (currentUser.name) {
+            const foundByName = employees.find(e => e.name?.trim().toLowerCase() === currentUser.name?.trim().toLowerCase());
+            if (foundByName) return foundByName;
+        }
+        if (currentUser.username) {
+            const foundByUsername = employees.find(e => e.id === currentUser.username || e.name?.trim().toLowerCase() === currentUser.username?.trim().toLowerCase());
+            if (foundByUsername) return foundByUsername;
+        }
+        return null;
+    }, [currentUser, employees]);
+
     // State chọn nhân viên (Lifting state up)
     const [selectedEmpId, setSelectedEmpId] = useState<string>(() => {
-        if (currentUser?.role === 'EMPLOYEE' && currentUser?.employeeId) {
-            return currentUser.employeeId;
+        if (currentUser?.role === 'EMPLOYEE') {
+            if (currentUser.employeeId) return currentUser.employeeId;
+            const foundByName = employees.find(e => e.name?.trim().toLowerCase() === (currentUser.name || '').trim().toLowerCase());
+            if (foundByName) return foundByName.id;
         }
         return '';
     });
@@ -71,34 +92,6 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
     const [activeTab, setActiveTab] = useState<'list' | 'ward_stats' | 'revenue' | 'ai' | 'employee' | 'daily_stats' | 'overdue'>('list');
     
     const isRevenueHidden = currentUser?.role === 'EMPLOYEE' || currentUser?.role === 'TEAM_LEADER';
-
-    useEffect(() => {
-        if (isRevenueHidden && activeTab === 'revenue') {
-            setActiveTab('list');
-        }
-        if (currentUser?.role === 'EMPLOYEE' && currentUser?.employeeId) {
-            setSelectedEmpId(currentUser.employeeId);
-        }
-    }, [currentUser, activeTab, isRevenueHidden]);
-    const previewRef = useRef<HTMLDivElement>(null);
-
-    const [isKeyModalOpen, setIsKeyModalOpen] = useState(false);
-    const [apiKey, setApiKey] = useState('');
-
-    // Pagination States
-    const [currentPage, setCurrentPage] = useState(1);
-    const [itemsPerPage, setItemsPerPage] = useState(20);
-
-    const [dailyStatsRecords, setDailyStatsRecords] = useState<RecordFile[]>([]);
-    const [revenueStatsRecords, setRevenueStatsRecords] = useState<RecordFile[]>([]);
-
-    // --- NEW LOGIC FOR MAIN TABS (Đo đạc vs Lưu trữ) ---
-    // Tìm nhân sự ứng với tài khoản hiện tại
-    const userEmployee = useMemo(() => {
-        if (!currentUser || !currentUser.employeeId) return null;
-        return employees.find(e => e.id === currentUser.employeeId);
-    }, [currentUser, employees]);
-
     const userDept = userEmployee?.department || '';
     const userRole = currentUser?.role;
 
@@ -126,16 +119,43 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
         }
     }, [isHanhChinhOrAdmin, userDept, mainTab]);
 
+    useEffect(() => {
+        if (isRevenueHidden && activeTab === 'revenue') {
+            setActiveTab('list');
+        }
+        if (currentUser?.role === 'EMPLOYEE') {
+            const targetEmpId = userEmployee?.id || currentUser?.employeeId || '';
+            if (targetEmpId && selectedEmpId !== targetEmpId) {
+                setSelectedEmpId(targetEmpId);
+            }
+        }
+    }, [currentUser, userEmployee, activeTab, isRevenueHidden]);
+
     // Reset date filters and search states to "Tất cả" when switching report tabs or main tabs
     useEffect(() => {
         setFromDate('1970-01-01');
         setToDate(new Date().toISOString().split('T')[0]);
         setReportType('custom');
         setSelectedWard('all');
-        setSelectedEmpId('');
+        if (currentUser?.role === 'EMPLOYEE') {
+            setSelectedEmpId(userEmployee?.id || currentUser?.employeeId || '');
+        } else {
+            setSelectedEmpId('');
+        }
         setCardFilter(null);
         setCurrentPage(1);
-    }, [activeTab, mainTab]);
+    }, [activeTab, mainTab, currentUser?.username, userEmployee?.id]);
+    const previewRef = useRef<HTMLDivElement>(null);
+
+    const [isKeyModalOpen, setIsKeyModalOpen] = useState(false);
+    const [apiKey, setApiKey] = useState('');
+
+    // Pagination States
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(20);
+
+    const [dailyStatsRecords, setDailyStatsRecords] = useState<RecordFile[]>([]);
+    const [revenueStatsRecords, setRevenueStatsRecords] = useState<RecordFile[]>([]);
 
     useEffect(() => {
         if (mainTab === 'archive') {

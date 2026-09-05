@@ -34,7 +34,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import * as XLSX from "xlsx-js-style";
-import { getShortRecordType, isArchiveRecordType } from "../constants";
+import { getShortRecordType, isArchiveRecordType, STATUS_LABELS } from "../constants";
 import { confirmAction, cleanSyncNotes } from "../utils/appHelpers";
 import { updateRecordApi, fetchContracts } from "../services/api";
 import {
@@ -459,12 +459,9 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
   const pendingRecords = useMemo(() => {
     let list = myRecords.filter(
       (r) =>
-        (r.status === RecordStatus.ASSIGNED ||
+        r.status === RecordStatus.ASSIGNED ||
         r.status === RecordStatus.IN_PROGRESS ||
-        r.status === RecordStatus.COMPLETED_WORK) &&
-        !r.completedDate && !r.exportBatch && !r.exportDate && !r.resultReturnedDate && !r.approvalDate &&
-        !r.submissionDate && !r.submittedTo &&
-        !r.pendingCheckDate && !r.checkedDate && !r.checkedBy,
+        r.status === RecordStatus.COMPLETED_WORK,
     );
     return filterAndSort(list, searchTerm, sortConfig);
   }, [myRecords, searchTerm, sortConfig]);
@@ -637,7 +634,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
       r.recordType || "",
       r.receivedDate ? r.receivedDate.split("T")[0].split("-").reverse().join("/") : "",
       r.deadline ? r.deadline.split("T")[0].split("-").reverse().join("/") : "",
-      r.status || "",
+      (r.status && STATUS_LABELS[r.status as RecordStatus]) ? STATUS_LABELS[r.status as RecordStatus] : (r.status || ""),
       r.assignedDate ? r.assignedDate.split("T")[0].split("-").reverse().join("/") : "",
       r.ward || "",
       r.mapSheet || "",
@@ -1040,74 +1037,90 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
   };
 
   const handleConfirmSubmit = async (directorId: string) => {
+    const targets = [...submitTargetRecords];
+    if (targets.length === 0) return;
+
+    // 1. Đóng modal ngay lập tức và làm mới danh sách đã chọn để trải nghiệm tức thì, không giật lag
+    setIsSubmitModalOpen(false);
+    setSubmitTargetRecords([]);
+
+    // 2. Cập nhật Optimistic UI ngay lập tức cho các hồ sơ
+    targets.forEach((record) => {
+      onUpdateStatus(record, RecordStatus.PENDING_SIGN);
+    });
+
     try {
-      for (const record of submitTargetRecords) {
-        if (
-          record.recordType === "Sao lục" ||
-          record.recordType === "Công văn"
-        ) {
-          // Handle Archive Record
-          const historyEntry = {
-            action: "Trình ký",
-            status: "pending_sign",
-            timestamp: new Date().toISOString(),
-            user: user.name,
-          };
+      const nowIso = new Date().toISOString();
+      let hasArchive = false;
 
-          const currentArchive = archiveRecords.find((r) => r.id === record.id);
-          if (currentArchive) {
-            const oldHistory = Array.isArray(currentArchive.data?.history)
-              ? currentArchive.data.history
-              : [];
-            const newHistory = [...oldHistory, historyEntry];
-
-            await saveArchiveRecord({
-              ...currentArchive,
-              id: record.id,
+      // 3. Xử lý đồng thời (parallel) toàn bộ hồ sơ trong nền
+      await Promise.all(
+        targets.map(async (record) => {
+          if (
+            record.recordType === "Sao lục" ||
+            record.recordType === "Công văn"
+          ) {
+            hasArchive = true;
+            const historyEntry = {
+              action: "Trình ký",
               status: "pending_sign",
-              so_hieu: currentArchive.so_hieu || record.code || '',
-              noi_nhan_gui: currentArchive.noi_nhan_gui || record.customerName || '',
-              trich_yeu: currentArchive.trich_yeu || record.content || '',
-              data: {
-                ...currentArchive.data,
-                history: newHistory,
-                submitted_to: directorId,
-                submittedTo: directorId,
-                submissionDate: new Date().toISOString(),
-              },
-            });
-          }
-        } else {
-          // Normal Record
-          const nowIso = new Date().toISOString();
-          const updatedRecord = {
-            ...record,
-            status: RecordStatus.PENDING_SIGN,
-            completedWorkDate: record.completedWorkDate || nowIso,
-            checkedDate: record.checkedDate || nowIso,
-            submittedTo: directorId,
-            submissionDate: nowIso,
-          };
+              timestamp: nowIso,
+              user: user.name,
+            };
 
-          if (onUpdateRecord) {
-            await onUpdateRecord(updatedRecord);
+            const currentArchive = archiveRecords.find((r) => r.id === record.id);
+            if (currentArchive) {
+              const oldHistory = Array.isArray(currentArchive.data?.history)
+                ? currentArchive.data.history
+                : [];
+              const newHistory = [...oldHistory, historyEntry];
+
+              return saveArchiveRecord({
+                ...currentArchive,
+                id: record.id,
+                status: "pending_sign",
+                so_hieu: currentArchive.so_hieu || record.code || '',
+                noi_nhan_gui: currentArchive.noi_nhan_gui || record.customerName || '',
+                trich_yeu: currentArchive.trich_yeu || record.content || '',
+                data: {
+                  ...currentArchive.data,
+                  history: newHistory,
+                  submitted_to: directorId,
+                  submittedTo: directorId,
+                  submissionDate: nowIso,
+                },
+              });
+            }
           } else {
-            await updateRecordApi(updatedRecord);
-            onUpdateStatus(record, RecordStatus.PENDING_SIGN); // Fallback local state update
+            // Normal Record
+            const updatedRecord: RecordFile = {
+              ...record,
+              status: RecordStatus.PENDING_SIGN,
+              completedWorkDate: record.completedWorkDate || nowIso,
+              checkedDate: record.checkedDate || nowIso,
+              submittedTo: directorId,
+              submissionDate: nowIso,
+            };
+
+            if (onUpdateRecord) {
+              return onUpdateRecord(updatedRecord);
+            } else {
+              return updateRecordApi(updatedRecord);
+            }
           }
-        }
+        })
+      );
+
+      // Làm mới dữ liệu lưu trữ nếu có hồ sơ lưu trữ
+      if (hasArchive) {
+        const [saoluc, congvan] = await Promise.all([
+          fetchArchiveRecords("saoluc"),
+          fetchArchiveRecords("congvan"),
+        ]);
+        setArchiveRecords([...saoluc, ...congvan]);
       }
-
-      // Refresh archive data
-      const saoluc = await fetchArchiveRecords("saoluc");
-      const congvan = await fetchArchiveRecords("congvan");
-      setArchiveRecords([...saoluc, ...congvan]);
-
-      setIsSubmitModalOpen(false);
-      setSubmitTargetRecords([]);
     } catch (error) {
       console.error("Error submitting records:", error);
-      alert("Có lỗi xảy ra khi trình ký.");
     }
   };
 
@@ -2044,63 +2057,85 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
         employees={employees}
         isCheckMode={true}
         onConfirm={async (checkerId) => {
+          const targets = [...submitTargetRecords];
+          if (targets.length === 0) return;
+
+          // 1. Đóng modal ngay lập tức và làm mới danh sách đã chọn để trải nghiệm tức thì, không giật lag
+          setIsSubmitCheckModalOpen(false);
+          setSubmitTargetRecords([]);
+
+          // 2. Cập nhật Optimistic UI ngay lập tức
+          targets.forEach((record) => {
+            onUpdateStatus(record, RecordStatus.PENDING_CHECK);
+          });
+
           try {
-            for (const record of submitTargetRecords) {
-              if (
-                isArchiveRecordType(record.recordType)
-              ) {
-                // Xử lý hồ sơ lưu trữ
-                const historyEntry = {
-                  action: "Trình kiểm tra",
-                  status: "pending_check",
-                  timestamp: new Date().toISOString(),
-                  user: user.name,
-                };
+            const nowIso = new Date().toISOString();
+            let hasArchive = false;
 
-                const currentArchive = archiveRecords.find(
-                  (r) => r.id === record.id,
-                );
-                if (currentArchive) {
-                  const oldHistory = Array.isArray(currentArchive.data?.history)
-                    ? currentArchive.data.history
-                    : [];
-                  const newHistory = [...oldHistory, historyEntry];
-
-                  await saveArchiveRecord({
-                    ...currentArchive,
-                    id: record.id,
+            // 3. Xử lý đồng thời (parallel) toàn bộ hồ sơ trong nền
+            await Promise.all(
+              targets.map(async (record) => {
+                if (isArchiveRecordType(record.recordType)) {
+                  hasArchive = true;
+                  const historyEntry = {
+                    action: "Trình kiểm tra",
                     status: "pending_check",
-                    so_hieu: currentArchive.so_hieu || record.code || '',
-                    noi_nhan_gui: currentArchive.noi_nhan_gui || record.customerName || '',
-                    trich_yeu: currentArchive.trich_yeu || record.content || '',
-                    data: {
-                      ...currentArchive.data,
-                      history: newHistory,
-                      checked_by: checkerId,
-                      checkedBy: checkerId,
-                    },
-                  });
+                    timestamp: nowIso,
+                    user: user.name,
+                  };
+
+                  const currentArchive = archiveRecords.find(
+                    (r) => r.id === record.id,
+                  );
+                  if (currentArchive) {
+                    const oldHistory = Array.isArray(currentArchive.data?.history)
+                      ? currentArchive.data.history
+                      : [];
+                    const newHistory = [...oldHistory, historyEntry];
+
+                    return saveArchiveRecord({
+                      ...currentArchive,
+                      id: record.id,
+                      status: "pending_check",
+                      so_hieu: currentArchive.so_hieu || record.code || '',
+                      noi_nhan_gui: currentArchive.noi_nhan_gui || record.customerName || '',
+                      trich_yeu: currentArchive.trich_yeu || record.content || '',
+                      data: {
+                        ...currentArchive.data,
+                        history: newHistory,
+                        checked_by: checkerId,
+                        checkedBy: checkerId,
+                      },
+                    });
+                  }
+                } else {
+                  // Hồ sơ Đo đạc thường
+                  const updatedRecord: RecordFile = {
+                    ...record,
+                    status: RecordStatus.PENDING_CHECK,
+                    completedWorkDate: record.completedWorkDate || nowIso,
+                    pendingCheckDate: nowIso,
+                    checkedBy: checkerId,
+                  };
+
+                  if (onUpdateRecord) {
+                    return onUpdateRecord(updatedRecord);
+                  } else {
+                    return updateRecordApi(updatedRecord);
+                  }
                 }
-              } else {
-                // Hồ sơ Đo đạc thường
-                const nowIso = new Date().toISOString();
-                await onUpdateRecord?.({
-                  ...record,
-                  status: RecordStatus.PENDING_CHECK,
-                  completedWorkDate: record.completedWorkDate || nowIso,
-                  pendingCheckDate: nowIso,
-                  checkedBy: checkerId,
-                });
-              }
+              })
+            );
+
+            // Làm mới dữ liệu lưu trữ nếu có hồ sơ lưu trữ
+            if (hasArchive) {
+              const [saoluc, congvan] = await Promise.all([
+                fetchArchiveRecords("saoluc"),
+                fetchArchiveRecords("congvan"),
+              ]);
+              setArchiveRecords([...saoluc, ...congvan]);
             }
-
-            // Làm mới dữ liệu lưu trữ
-            const saoluc = await fetchArchiveRecords("saoluc");
-            const congvan = await fetchArchiveRecords("congvan");
-            setArchiveRecords([...saoluc, ...congvan]);
-
-            setIsSubmitCheckModalOpen(false);
-            setSubmitTargetRecords([]);
           } catch (err) {
             console.error("Lỗi khi trình kiểm tra:", err);
           }

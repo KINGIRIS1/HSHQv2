@@ -282,6 +282,11 @@ export const useRecordFilter = (
                 const datesToCheck: string[] = [];
                 if (r.receivedDate) datesToCheck.push(r.receivedDate.split('T')[0]);
                 if (r.assignedDate) datesToCheck.push(r.assignedDate.split('T')[0]);
+                if (r.completedWorkDate) datesToCheck.push(r.completedWorkDate.split('T')[0]);
+                if (r.pendingCheckDate) datesToCheck.push(r.pendingCheckDate.split('T')[0]);
+                if (r.checkedDate) datesToCheck.push(r.checkedDate.split('T')[0]);
+                if (r.submissionDate) datesToCheck.push(r.submissionDate.split('T')[0]);
+                if (r.approvalDate) datesToCheck.push(r.approvalDate.split('T')[0]);
                 if (r.resultReturnedDate) datesToCheck.push(r.resultReturnedDate.split('T')[0]);
                 if (r.completedDate) datesToCheck.push(r.completedDate.split('T')[0]);
                 if (r.exportDate) datesToCheck.push(r.exportDate.split('T')[0]);

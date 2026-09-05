@@ -122,7 +122,7 @@ function App() {
   const [receiveRecordResetKey, setReceiveRecordResetKey] = useState(0);
 
   const handleSetCurrentView = useCallback((viewId: string) => {
-    if (viewId === 'receive_record') {
+    if (viewId === 'receive_record' || viewId === 'receive_search' || viewId === 'receive_record_search') {
       setReceiveRecordResetKey(prev => prev + 1);
     }
     setCurrentView(viewId);

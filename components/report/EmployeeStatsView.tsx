@@ -34,7 +34,7 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
 
     // Filter employees by department (separating One-Door from Archive)
     const filteredEmployeesByDept = useMemo(() => {
-        return employees.filter(emp => {
+        const list = employees.filter(emp => {
             const d = (emp.department || '').toLowerCase();
             if (deptFilter === 'archive') {
                 return d.includes('lưu trữ') && !d.includes('một cửa') && !d.includes('hành chính');
@@ -47,7 +47,16 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
             }
             return true;
         });
-    }, [employees, deptFilter]);
+
+        // Đảm bảo nhân viên đang được chọn (selectedEmpId) luôn luôn có mặt trong danh sách options
+        if (selectedEmpId) {
+            const selectedEmp = employees.find(e => e.id === selectedEmpId);
+            if (selectedEmp && !list.some(e => e.id === selectedEmp.id)) {
+                return [selectedEmp, ...list];
+            }
+        }
+        return list;
+    }, [employees, deptFilter, selectedEmpId]);
 
     // Filter records by date range first
     const recordsInTimeRange = useMemo(() => {
@@ -512,22 +521,32 @@ const EmployeeStatsView: React.FC<EmployeeStatsViewProps> = ({
                     </div>
                 </div>
                 
-                <div className="flex-1 w-full flex gap-2">
+                <div className="flex-1 w-full flex items-center gap-2">
                     <div className="relative flex-1">
                         <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                         <select 
                             className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-500 bg-white transition-shadow shadow-sm cursor-pointer hover:border-indigo-300 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
-                            value={selectedEmpId}
+                            value={selectedEmpId || ''}
                             onChange={(e) => { setSelectedEmpId(e.target.value); setAiEvaluation(''); }}
-                            disabled={isEmployee}
+                            disabled={isEmployee && !!selectedEmpId}
                         >
                             {!isEmployee && <option value="">-- Tổng hợp tất cả nhân viên --</option>}
+                            {isEmployee && !selectedEmpId && <option value="">-- Chưa liên kết nhân viên (Xem tất cả) --</option>}
                             {filteredEmployeesByDept.map(emp => (
-                                <option key={emp.id} value={emp.id}>{emp.name} - {emp.department}</option>
+                                <option key={emp.id} value={emp.id}>{emp.name} - {emp.department || 'Tổ chuyên môn'}</option>
                             ))}
                         </select>
                     </div>
-                    {/* Single shared Excel button is on top toolbar */}
+                    {selectedEmpId && !isEmployee && (
+                        <button
+                            onClick={() => { setSelectedEmpId(''); setAiEvaluation(''); }}
+                            className="px-3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition-colors shrink-0 flex items-center gap-1.5 shadow-sm border border-slate-200"
+                            title="Quay lại bảng thống kê tổng hợp toàn bộ nhân viên"
+                        >
+                            <ListFilter size={15} />
+                            <span>Xem tất cả</span>
+                        </button>
+                    )}
                 </div>
             </div>
 
