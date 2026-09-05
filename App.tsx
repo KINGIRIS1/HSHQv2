@@ -1201,7 +1201,15 @@ function App() {
               ...r,
               status: newStatus,
               ...((optionType === 'cancel_reject' || optionType === 'withdraw_citizen') ? { completedDate: targetDateISO } : {}),
-              ...(optionType === 'return_handler' ? { pendingCheckDate: null, submissionDate: null, checkedDate: null, approvalDate: null } : {}),
+              ...(optionType === 'return_handler' ? { 
+                  pendingCheckDate: null, 
+                  checkedDate: null, 
+                  checkedBy: null,
+                  submissionDate: null, 
+                  approvalDate: null, 
+                  submittedTo: null,
+                  completedWorkDate: null,
+              } : {}),
               privateNotes: updatedPrivateNotes,
               statusLogs: [...(r.statusLogs || []), newLog]
           };

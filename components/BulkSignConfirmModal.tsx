@@ -50,7 +50,7 @@ const BulkSignConfirmModal: React.FC<BulkSignConfirmModalProps> = ({ isOpen, onC
                         onClick={onConfirm}
                         className="px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-bold text-sm rounded-xl shadow-md shadow-purple-500/10 hover:shadow-lg active:scale-[0.98] transition-all cursor-pointer"
                     >
-                        Xác nhận ký duyệt
+                        Xác nhận
                     </button>
                 </div>
             </div>

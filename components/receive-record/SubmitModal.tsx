@@ -127,7 +127,7 @@ const SubmitModal: React.FC<SubmitModalProps> = ({ isOpen, onClose, records, onC
                             className={`flex items-center gap-2 px-5 py-2 rounded-xl font-bold text-white transition-all shadow-md ${selectedDirector ? (isCheckMode ? 'bg-orange-600 hover:bg-orange-700' : 'bg-indigo-600 hover:bg-indigo-700') : 'bg-gray-300 cursor-not-allowed'}`}
                         >
                             <CheckCircle size={18} />
-                            Xác nhận {isCheckMode ? 'trình kiểm tra' : 'trình ký'}
+                            Xác nhận
                         </button>
                     </div>
                 </div>
