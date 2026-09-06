@@ -524,24 +524,24 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
 
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-      <div className="bg-gray-50 rounded-xl shadow-2xl w-full max-w-7xl max-h-[95vh] overflow-hidden flex flex-col animate-fade-in-up">
+    <div className="fixed inset-0 bg-black/60 z-50 flex flex-col justify-start sm:justify-center sm:items-center sm:p-4 backdrop-blur-sm">
+      <div className="bg-gray-50 rounded-none sm:rounded-xl shadow-2xl w-full h-full sm:h-auto sm:max-h-[95vh] sm:max-w-7xl overflow-hidden flex flex-col animate-fade-in-up">
         
         {/* HEADER */}
-        <div className="bg-white px-6 py-4 border-b border-gray-200 flex justify-between items-center shrink-0">
-            <div className="flex items-center gap-4">
-                <span className="bg-blue-100 text-blue-700 font-bold px-3 py-1 rounded text-sm border border-blue-200">
+        <div className="bg-white px-3 sm:px-6 py-3 sm:py-4 border-b border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-4 shrink-0">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-4">
+                <span className="bg-blue-100 text-blue-700 font-bold px-2.5 py-1 rounded text-xs sm:text-sm border border-blue-200">
                     {record.code}
                 </span>
-                <h2 className="text-lg font-bold text-gray-800 uppercase">{getShortRecordType(record.recordType)}</h2>
+                <h2 className="text-base sm:text-lg font-bold text-gray-800 uppercase">{getShortRecordType(record.recordType)}</h2>
                 <StatusBadge status={displayStatus} />
             </div>
             
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
                 {onOpenRejectReturnModal && record && (record.status === RecordStatus.PENDING_CHECK || record.status === RecordStatus.CHECKED || record.status === RecordStatus.PENDING_SIGN || record.status === RecordStatus.SIGNED) && (
                     <button
                         onClick={() => { onClose(); onOpenRejectReturnModal(record); }}
-                        className="flex items-center gap-2 px-3 py-1.5 bg-rose-50 border border-rose-200 text-rose-700 rounded hover:bg-rose-100 transition-colors text-sm font-bold shadow-sm"
+                        className="flex items-center gap-1.5 px-2.5 py-1 bg-rose-50 border border-rose-200 text-rose-700 rounded hover:bg-rose-100 transition-colors text-xs sm:text-sm font-bold shadow-sm"
                         title="Trả hồ sơ (Yêu cầu sửa / bổ sung / hủy)"
                     >
                         <Undo2 size={16} /> Trả hồ sơ
@@ -551,7 +551,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                 {onOpenExtendModal && record && (
                     <button
                         onClick={() => { onClose(); onOpenExtendModal(record); }}
-                        className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 border border-amber-200 text-amber-800 rounded hover:bg-amber-100 transition-colors text-sm font-bold shadow-sm"
+                        className="flex items-center gap-1.5 px-2.5 py-1 bg-amber-50 border border-amber-200 text-amber-800 rounded hover:bg-amber-100 transition-colors text-xs sm:text-sm font-bold shadow-sm"
                         title="Gia hạn ngày hẹn trả"
                     >
                         <CalendarClock size={16} /> Gia hạn
@@ -561,7 +561,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                 {onCreateLiquidation && record && record.recordType && (getShortRecordType(record.recordType).startsWith('2.2') || getShortRecordType(record.recordType).startsWith('2.4')) && (
                     <button
                         onClick={() => { onClose(); onCreateLiquidation(record); }}
-                        className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-200 text-gray-600 rounded hover:bg-gray-50 transition-colors text-sm font-medium"
+                        className="flex items-center gap-1.5 px-2.5 py-1 bg-white border border-gray-200 text-gray-600 rounded hover:bg-gray-50 transition-colors text-xs sm:text-sm font-medium"
                         title="Thanh lý HĐ"
                     >
                         <FileCheck size={16} /> Thanh lý HĐ
@@ -578,7 +578,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                             }
                             setIsAnnexModalOpen(true);
                         }}
-                        className="flex items-center gap-2 px-3 py-1.5 bg-white border border-rose-200 text-rose-600 rounded hover:bg-rose-50 transition-colors text-sm font-medium"
+                        className="flex items-center gap-1.5 px-2.5 py-1 bg-white border border-rose-200 text-rose-600 rounded hover:bg-rose-50 transition-colors text-xs sm:text-sm font-medium"
                         title="In phụ lục hợp đồng"
                     >
                         <FileDown size={16} /> Phụ lục
@@ -589,7 +589,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                     <button 
                         onClick={handlePrintReceipt}
                         disabled={isProcessing}
-                        className="flex items-center gap-2 px-3 py-1.5 bg-white border border-blue-200 text-blue-600 rounded hover:bg-blue-50 transition-colors text-sm font-medium disabled:opacity-50"
+                        className="flex items-center gap-1.5 px-2.5 py-1 bg-white border border-blue-200 text-blue-600 rounded hover:bg-blue-50 transition-colors text-xs sm:text-sm font-medium disabled:opacity-50"
                     >
                         {isProcessing ? <Loader2 size={16} className="animate-spin" /> : <Printer size={16} />}
                         In biên nhận
@@ -597,31 +597,31 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                 )}
                 
                 {onEdit && (
-                    <button onClick={() => { onClose(); onEdit(record); }} className="p-2 text-gray-400 hover:text-blue-600 transition-colors" title="Chỉnh sửa">
-                        <Pencil size={20} />
+                    <button onClick={() => { onClose(); onEdit(record); }} className="p-1.5 text-gray-400 hover:text-blue-600 transition-colors" title="Chỉnh sửa">
+                        <Pencil size={18} />
                     </button>
                 )}
                 
                 {onDelete && (
-                    <button onClick={() => { onClose(); onDelete(record); }} className="p-2 text-gray-400 hover:text-red-600 transition-colors" title="Xóa">
-                        <Trash2 size={20} />
+                    <button onClick={() => { onClose(); onDelete(record); }} className="p-1.5 text-gray-400 hover:text-red-600 transition-colors" title="Xóa">
+                        <Trash2 size={18} />
                     </button>
                 )}
 
-                <div className="w-px h-6 bg-gray-300 mx-2"></div>
+                <div className="w-px h-6 bg-gray-300 mx-1 hidden sm:block"></div>
 
-                <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
-                    <X size={24} />
+                <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors p-1">
+                    <X size={22} />
                 </button>
             </div>
         </div>
 
         {/* BODY */}
-        <div className="flex-1 overflow-y-auto p-6">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="flex-1 overflow-y-auto p-3 sm:p-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
                 
                 {/* COLUMN 1: THÔNG TIN CHUNG */}
-                <div className="space-y-6">
+                <div className="space-y-6 order-2 lg:order-1">
                     {/* KHÁCH HÀNG */}
                     <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
                         <h3 className="text-xs font-bold text-blue-600 uppercase mb-4 flex items-center gap-2 border-l-4 border-blue-600 pl-2">
@@ -770,7 +770,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                 </div>
 
                 {/* COLUMN 2: CHI TIẾT & TÀI CHÍNH */}
-                <div className="space-y-6">
+                <div className="space-y-6 order-3 lg:order-2">
                     {/* NỘI DUNG */}
                     <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm h-full flex flex-col">
                         {/* HÀNG BÁO HỢP ĐỒNG (CHỈ ÁP DỤNG CHO 2.2 VÀ 2.4) & SỐ TRÍCH ĐO / TRÍCH LỤC */}
@@ -945,7 +945,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                 </div>
 
                 {/* COLUMN 3: TIẾN ĐỘ & NHẮC VIỆC */}
-                <div className="space-y-6">
+                <div className="space-y-6 order-1 lg:order-3">
                     {/* TIMELINE */}
                     <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
                         <div className="bg-indigo-600 px-5 py-3 flex items-center gap-2">

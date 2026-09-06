@@ -1490,7 +1490,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
 
               {/* POPOVER DROPDOWN CARD */}
               {isFilterPopoverOpen && (
-                <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 p-4 z-50 animate-fade-in text-gray-800">
+                <div className="absolute left-0 sm:left-auto sm:right-0 mt-2 w-[calc(100vw-2rem)] sm:w-96 max-w-sm bg-white rounded-2xl shadow-2xl border border-slate-200 p-4 z-50 animate-fade-in text-gray-800">
                   {/* Popover Header */}
                   <div className="flex items-center justify-between pb-3 border-b border-gray-100 mb-3">
                     <div className="flex items-center gap-2 font-bold text-blue-700 text-base">
