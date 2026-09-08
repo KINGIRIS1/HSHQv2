@@ -129,7 +129,12 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
             <RecordModal 
                 isOpen={props.isModalOpen}
                 onClose={() => { props.setIsModalOpen(false); props.setEditingRecord(null); }}
-                onSubmit={props.handleAddOrUpdate}
+                onSubmit={async (data) => {
+                    if (props.viewingRecord && data && props.viewingRecord.id === data.id) {
+                        props.setViewingRecord({ ...props.viewingRecord, ...data });
+                    }
+                    return props.handleAddOrUpdate(data);
+                }}
                 initialData={props.editingRecord}
                 employees={props.employees}
                 currentUser={props.currentUser}

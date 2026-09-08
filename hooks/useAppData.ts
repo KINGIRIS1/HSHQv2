@@ -428,6 +428,9 @@ export const useAppData = (currentUser: User | null) => {
     const handleAddOrUpdateRecord = async (recordData: any): Promise<RecordFile | null> => {
         const isEdit = recordData.id && records.find(r => r.id === recordData.id);
         if (isEdit) {
+            // Optimistic update: Cập nhật bộ nhớ UI ngay lập tức 0ms
+            setRecords(prev => prev.map(r => r.id === recordData.id ? { ...r, ...recordData } : r));
+
             const updated = await updateRecordApi(recordData);
             if (updated) {
                 setRecords(prev => prev.map(r => r.id === updated.id ? updated : r));
@@ -435,17 +438,22 @@ export const useAppData = (currentUser: User | null) => {
                 setPendingSyncCount(count);
                 return updated;
             }
+            return recordData as RecordFile;
         } else {
             const standardId = (recordData.id && String(recordData.id).includes('-')) ? recordData.id : generateStandardUUID();
-            const newRecord = await createRecordApi({ ...recordData, id: standardId });
+            const tempRecord = { ...recordData, id: standardId };
+            // Optimistic insert: Hiển thị ngay hồ sơ mới trên UI
+            setRecords(prev => [tempRecord, ...prev.filter(r => r.id !== standardId)]);
+
+            const newRecord = await createRecordApi(tempRecord);
             if (newRecord) {
                 setRecords(prev => [newRecord, ...prev.filter(r => r.id !== newRecord.id)]);
                 const count = await getPendingSyncCount();
                 setPendingSyncCount(count);
                 return newRecord;
             }
+            return tempRecord;
         }
-        return null;
     };
 
     const handleDeleteRecord = async (id: string) => {

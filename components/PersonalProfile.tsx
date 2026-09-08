@@ -1010,16 +1010,14 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
     setIsHandoverOfficeModalOpen(true);
   };
 
-  const handleConfirmHandoverOffice = async (drafterId: string, handoverDateStr: string) => {
+  const handleConfirmHandoverOffice = async (drafterId: string) => {
     const targets = [...handoverOfficeTargetRecords];
     if (targets.length === 0) return;
 
     setIsHandoverOfficeModalOpen(false);
     setHandoverOfficeTargetRecords([]);
 
-    const handoverIso = handoverDateStr
-      ? new Date(handoverDateStr + "T12:00:00").toISOString()
-      : new Date().toISOString();
+    const handoverIso = new Date().toISOString();
 
     // 1. Cập nhật Optimistic UI tức thì 0 giây
     targets.forEach((record) => {

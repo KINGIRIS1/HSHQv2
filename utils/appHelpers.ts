@@ -449,18 +449,21 @@ export function processAssignmentTimelineCheck(
     assignedTo: newEmployeeId,
     assignedDate: record.assignedDate || newAssignedDateStr,
   };
-  if (record.status === RecordStatus.RECEIVED) {
+  if (isOfficeOnlySurveyProcedure(record.recordType)) {
+    // Thủ tục 2.1, 2.3: Bắt buộc gán trạng thái OFFICE_WORK (Biên tập bản đồ) khi phân công
+    updates.status = RecordStatus.OFFICE_WORK;
+    updates.drafterId = newEmployeeId;
+    updates.assignedTo = newEmployeeId;
+    if (!record.officeAssignedDate) {
+      updates.officeAssignedDate = newAssignedDateStr;
+    }
+  } else if (!record.status || record.status === RecordStatus.RECEIVED || record.status === RecordStatus.ASSIGNED) {
     if (isFieldWorkProcedure(record.recordType)) {
       // Thủ tục 2.2, 2.4, 2.5: Tổ Đo đạc - Đo thực địa (Ngoại nghiệp)
       updates.status = RecordStatus.FIELD_WORK;
       updates.surveyorId = newEmployeeId;
       updates.surveyAssignedDate = newAssignedDateStr;
       updates.fieldAssignedDate = newAssignedDateStr;
-    } else if (isOfficeOnlySurveyProcedure(record.recordType)) {
-      // Thủ tục 2.1, 2.3: Tổ Đo đạc - Biên tập bản đồ (Nội nghiệp trực tiếp)
-      updates.status = RecordStatus.OFFICE_WORK;
-      updates.drafterId = newEmployeeId;
-      updates.officeAssignedDate = newAssignedDateStr;
     } else {
       // Thủ tục nhóm 1.x (Lưu trữ), nhóm 3.x (Đăng ký cấp giấy) và các thủ tục khác: Đang thực hiện
       updates.status = RecordStatus.IN_PROGRESS;
@@ -468,10 +471,6 @@ export function processAssignmentTimelineCheck(
   } else if (record.status === RecordStatus.FIELD_WORK || isFieldWorkProcedure(record.recordType)) {
     if (!record.surveyorId) {
       updates.surveyorId = newEmployeeId;
-    }
-  } else if (record.status === RecordStatus.OFFICE_WORK || isOfficeOnlySurveyProcedure(record.recordType)) {
-    if (!record.drafterId) {
-      updates.drafterId = newEmployeeId;
     }
   }
 
@@ -965,7 +964,7 @@ export function isOfficeOnlySurveyProcedure(recordType: string | null | undefine
     if (!recordType) return false;
     const lower = recordType.toLowerCase().trim();
     // Khớp mã thủ tục 2.1 hoặc 2.3
-    if (lower.startsWith('2.1') || lower.startsWith('2.3')) {
+    if (lower.startsWith('2.1') || lower.startsWith('2.3') || /\b2\.1\b/.test(lower) || /\b2\.3\b/.test(lower)) {
         return true;
     }
     // Khớp tên mô tả nếu không có mã số
@@ -1060,14 +1059,24 @@ export function syncRecordStatusTransition(
         updates.resultReturnedDate = undefined;
         updates.receiverName = undefined;
     } else {
-        // DỌN DẸP NẾU QUAY LÙI BƯỚC (Chỉ xóa mốc ngày tương lai, GIỮ NGUYÊN người thực hiện: checkedBy, submittedTo, receiverName, returnedBy)
+        // DỌN DẸP NẾU QUAY LÙI BƯỚC (Xóa ngày và người được giao/thực hiện của các bước đã chuyển lùi)
         if (isRollback) {
             if (newRank < 1) {
+                // Quay về Tiếp nhận mới -> Xóa sạch thông tin giao việc, người thụ lý, đo đạc, biên tập, kiểm tra, trình ký, bàn giao
                 updates.assignedDate = null as any;
+                updates.assignedTo = null as any;
+                updates.fieldAssignedDate = null as any;
+                updates.fieldCompletedDate = null as any;
+                updates.surveyorId = null as any;
+                updates.officeAssignedDate = null as any;
+                updates.officeCompletedDate = null as any;
+                updates.drafterId = null as any;
                 updates.completedWorkDate = null as any;
                 updates.pendingCheckDate = null as any;
                 updates.checkedDate = null as any;
+                updates.checkedBy = null as any;
                 updates.submissionDate = null as any;
+                updates.submittedTo = null as any;
                 updates.approvalDate = null as any;
                 updates.completedDate = null as any;
                 updates.exportDate = null as any;
@@ -1075,11 +1084,38 @@ export function syncRecordStatusTransition(
                 updates.is_handover = false;
                 updates.handover_date = null as any;
                 updates.resultReturnedDate = null as any;
+                updates.receiverName = null as any;
+                updates.receiptNumber = null as any;
+                updates.returnedPrice = null as any;
+            } else if (newRank < 1.5) {
+                // Quay về Đo đạc thực địa / Đang thực hiện -> Xóa thông tin biên tập, kiểm tra, trình ký, bàn giao
+                updates.officeAssignedDate = null as any;
+                updates.officeCompletedDate = null as any;
+                updates.drafterId = null as any;
+                updates.completedWorkDate = null as any;
+                updates.pendingCheckDate = null as any;
+                updates.checkedDate = null as any;
+                updates.checkedBy = null as any;
+                updates.submissionDate = null as any;
+                updates.submittedTo = null as any;
+                updates.approvalDate = null as any;
+                updates.completedDate = null as any;
+                updates.exportDate = null as any;
+                updates.exportBatch = null as any;
+                updates.is_handover = false;
+                updates.handover_date = null as any;
+                updates.resultReturnedDate = null as any;
+                updates.receiverName = null as any;
+                updates.receiptNumber = null as any;
+                updates.returnedPrice = null as any;
             } else if (newRank < 2) {
+                // Quay về Biên tập bản đồ -> Xóa thông tin hoàn thành nghiệp vụ, kiểm tra, trình ký, bàn giao
                 updates.completedWorkDate = null as any;
                 updates.pendingCheckDate = null as any;
                 updates.checkedDate = null as any;
+                updates.checkedBy = null as any;
                 updates.submissionDate = null as any;
+                updates.submittedTo = null as any;
                 updates.approvalDate = null as any;
                 updates.completedDate = null as any;
                 updates.exportDate = null as any;
@@ -1087,10 +1123,15 @@ export function syncRecordStatusTransition(
                 updates.is_handover = false;
                 updates.handover_date = null as any;
                 updates.resultReturnedDate = null as any;
+                updates.receiverName = null as any;
+                updates.receiptNumber = null as any;
+                updates.returnedPrice = null as any;
             } else if (newRank < 3) {
                 updates.pendingCheckDate = null as any;
                 updates.checkedDate = null as any;
+                updates.checkedBy = null as any;
                 updates.submissionDate = null as any;
+                updates.submittedTo = null as any;
                 updates.approvalDate = null as any;
                 updates.completedDate = null as any;
                 updates.exportDate = null as any;
@@ -1098,9 +1139,14 @@ export function syncRecordStatusTransition(
                 updates.is_handover = false;
                 updates.handover_date = null as any;
                 updates.resultReturnedDate = null as any;
+                updates.receiverName = null as any;
+                updates.receiptNumber = null as any;
+                updates.returnedPrice = null as any;
             } else if (newRank < 4) {
                 updates.checkedDate = null as any;
+                updates.checkedBy = null as any;
                 updates.submissionDate = null as any;
+                updates.submittedTo = null as any;
                 updates.approvalDate = null as any;
                 updates.completedDate = null as any;
                 updates.exportDate = null as any;
@@ -1108,8 +1154,12 @@ export function syncRecordStatusTransition(
                 updates.is_handover = false;
                 updates.handover_date = null as any;
                 updates.resultReturnedDate = null as any;
+                updates.receiverName = null as any;
+                updates.receiptNumber = null as any;
+                updates.returnedPrice = null as any;
             } else if (newRank < 5) {
                 updates.submissionDate = null as any;
+                updates.submittedTo = null as any;
                 updates.approvalDate = null as any;
                 updates.completedDate = null as any;
                 updates.exportDate = null as any;
@@ -1117,6 +1167,9 @@ export function syncRecordStatusTransition(
                 updates.is_handover = false;
                 updates.handover_date = null as any;
                 updates.resultReturnedDate = null as any;
+                updates.receiverName = null as any;
+                updates.receiptNumber = null as any;
+                updates.returnedPrice = null as any;
             } else if (newRank < 6) {
                 updates.approvalDate = null as any;
                 updates.completedDate = null as any;
@@ -1125,6 +1178,9 @@ export function syncRecordStatusTransition(
                 updates.is_handover = false;
                 updates.handover_date = null as any;
                 updates.resultReturnedDate = null as any;
+                updates.receiverName = null as any;
+                updates.receiptNumber = null as any;
+                updates.returnedPrice = null as any;
             } else if (newRank < 7) {
                 updates.completedDate = null as any;
                 updates.exportDate = null as any;
@@ -1132,8 +1188,14 @@ export function syncRecordStatusTransition(
                 updates.is_handover = false;
                 updates.handover_date = null as any;
                 updates.resultReturnedDate = null as any;
+                updates.receiverName = null as any;
+                updates.receiptNumber = null as any;
+                updates.returnedPrice = null as any;
             } else if (newRank < 8) {
                 updates.resultReturnedDate = null as any;
+                updates.receiverName = null as any;
+                updates.receiptNumber = null as any;
+                updates.returnedPrice = null as any;
             }
         }
 

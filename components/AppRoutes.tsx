@@ -212,6 +212,8 @@ interface AppRoutesProps {
   handleConfirmSignBatch: () => void;
   setAssignTargetRecords: (r: RecordFile[]) => void;
   setIsAssignModalOpen: (b: boolean) => void;
+  setHandoverOfficeTargetRecords?: (r: RecordFile[]) => void;
+  setIsHandoverOfficeModalOpen?: (b: boolean) => void;
   setSubmitTargetRecords: (r: RecordFile[]) => void;
   setIsSubmitModalOpen: (b: boolean) => void;
   setIsSubmitCheckModalOpen: (b: boolean) => void; // MỚI: Trình kiểm tra
@@ -523,7 +525,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                       onClick={() => props.setCurrentView("measurement_field")}
                       className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "measurement_field" ? "border-blue-600 text-blue-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
                     >
-                      <Compass size={16} /> Đo đạc
+                      <Compass size={16} /> Đo đạc thực địa
                     </button>
                     <button
                       id="tab-records-measurement-office"
@@ -1077,9 +1079,27 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                         </button>
                       )}
 
-                    {/* Bulk Submit Check (Trình Kiểm Tra) */}
+                    {/* Bulk Handover Office (Giao Biên Tập - Dành riêng cho Đo đạc thực địa) */}
+                    {currentView === "measurement_field" && (hasPermission('dodac_BTN_ASSIGN_STAFF') || hasPermission('dodac_BTN_ADVANCE_STATUS')) && (
+                      <button
+                        onClick={() => {
+                          const targets = records.filter((r) =>
+                            props.selectedRecordIds.has(r.id),
+                          );
+                          if (props.setHandoverOfficeTargetRecords && props.setIsHandoverOfficeModalOpen) {
+                            props.setHandoverOfficeTargetRecords(targets);
+                            props.setIsHandoverOfficeModalOpen(true);
+                          }
+                        }}
+                        className="flex items-center gap-1.5 bg-indigo-600 text-white px-3.5 py-1.5 rounded-lg hover:bg-indigo-700 text-sm font-bold shadow-sm transition-all animate-pulse cursor-pointer whitespace-nowrap"
+                      >
+                        <PenTool size={16} /> Giao Biên tập ({props.selectedRecordIds.size})
+                      </button>
+                    )}
+
+                    {/* Bulk Submit Check (Trình Kiểm Tra - Dành cho tab Biên tập hoặc Đã thực hiện) */}
                     {hasPermission('dodac_BTN_SUBMIT_CHECK') &&
-                      (currentView === "completed_list" || currentView === "measurement_field" || currentView === "measurement_office") && (
+                      (currentView === "completed_list" || currentView === "measurement_office") && (
                         <button
                           onClick={() => {
                             const targets = records.filter((r) =>

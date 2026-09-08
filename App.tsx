@@ -696,16 +696,16 @@ function App() {
           } else if (field === 'assignedTo') {
               recordUpdates.assignedTo = value;
               recordUpdates.assignedDate = customDateStr || r.assignedDate || targetDateStr;
-              if (r.status === RecordStatus.RECEIVED) {
+              if (isOfficeOnlySurveyProcedure(r.recordType)) {
+                  recordUpdates.status = RecordStatus.OFFICE_WORK;
+                  recordUpdates.drafterId = value;
+                  recordUpdates.officeAssignedDate = customDateStr || targetDateStr;
+              } else if (r.status === RecordStatus.RECEIVED || r.status === RecordStatus.ASSIGNED) {
                   if (isFieldWorkProcedure(r.recordType)) {
                       recordUpdates.status = RecordStatus.FIELD_WORK;
                       recordUpdates.surveyorId = value;
                       recordUpdates.surveyAssignedDate = customDateStr || targetDateStr;
                       recordUpdates.fieldAssignedDate = customDateStr || targetDateStr;
-                  } else if (isOfficeOnlySurveyProcedure(r.recordType)) {
-                      recordUpdates.status = RecordStatus.OFFICE_WORK;
-                      recordUpdates.drafterId = value;
-                      recordUpdates.officeAssignedDate = customDateStr || targetDateStr;
                   } else {
                       recordUpdates.status = RecordStatus.IN_PROGRESS;
                   }
@@ -890,11 +890,9 @@ function App() {
       }
   }, []);
 
-  const handleConfirmHandoverOffice = useCallback(async (drafterId: string, handoverDateStr: string) => {
+  const handleConfirmHandoverOffice = useCallback(async (drafterId: string) => {
     if (handoverOfficeTargetRecords.length === 0) return;
-    const handoverIso = handoverDateStr
-      ? new Date(handoverDateStr + "T12:00:00").toISOString()
-      : new Date().toISOString();
+    const handoverIso = new Date().toISOString();
 
     const targets = [...handoverOfficeTargetRecords];
     setIsHandoverOfficeModalOpen(false);
@@ -942,7 +940,7 @@ function App() {
           return;
       }
       const isArchive = isArchiveRecordType(record.recordType) || (getDepartmentForRecord(record).toLowerCase().includes('lưu trữ'));
-      if (record.status === RecordStatus.ASSIGNED || record.status === RecordStatus.IN_PROGRESS) {
+      if (record.status === RecordStatus.OFFICE_WORK || record.status === RecordStatus.ASSIGNED || record.status === RecordStatus.IN_PROGRESS) {
           if (isArchive) {
               // Module Lưu trữ bỏ qua bước Trình kiểm tra -> Đi thẳng sang Trình ký!
               setSubmitTargetRecords([record]);
@@ -1241,19 +1239,17 @@ function App() {
               note: `Trả hồ sơ (${optionType}). Lý do: ${reason}`
           };
 
+          const synced = syncRecordStatusTransition(r, newStatus, {
+              userName: userLabel,
+              userId: currentUser?.id,
+              targetDate: targetDateISO
+          });
+
           return {
               ...r,
+              ...synced,
               status: newStatus,
               ...((optionType === 'cancel_reject' || optionType === 'withdraw_citizen') ? { completedDate: targetDateISO } : {}),
-              ...(optionType === 'return_handler' ? { 
-                  pendingCheckDate: null, 
-                  checkedDate: null, 
-                  checkedBy: null,
-                  submissionDate: null, 
-                  approvalDate: null, 
-                  submittedTo: null,
-                  completedWorkDate: null,
-              } : {}),
               privateNotes: updatedPrivateNotes,
               statusLogs: [...(r.statusLogs || []), newLog]
           };
@@ -1569,6 +1565,8 @@ function App() {
             handleConfirmSignBatch={handleConfirmSignBatch}
             setAssignTargetRecords={setAssignTargetRecords}
             setIsAssignModalOpen={setIsAssignModalOpen}
+            setHandoverOfficeTargetRecords={setHandoverOfficeTargetRecords}
+            setIsHandoverOfficeModalOpen={setIsHandoverOfficeModalOpen}
             setSubmitTargetRecords={setSubmitTargetRecords}
             setIsSubmitModalOpen={setIsSubmitModalOpen}
             setIsSubmitCheckModalOpen={setIsSubmitCheckModalOpen}

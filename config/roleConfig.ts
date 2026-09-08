@@ -187,17 +187,15 @@ export function isViewAllowedForUser(
     const ONEDOOR_CHILD_PERMS = ['receive_record', 'receive_sub_create', 'receive_sub_bulk', 'receive_sub_list', 'receive_sub_vphc', 'ADD_RECORDS', 'EXPORT_RECORDS'];
     const DODAC_CHILD_PERMS = [
       'all_records', 'all_sub_all', 'assign_tasks', 'completed_list', 'measurement_field', 'measurement_office', 'pending_supplement_list', 'pending_check_list', 'check_list', 'handover_list', 'director_completed',
-      'dodac_BTN_ASSIGN_STAFF', 'dodac_BTN_SUBMIT_CHECK', 'dodac_BTN_SUBMIT_SIGN', 'dodac_BTN_APPROVE_SIGN', 
+      'dodac_ADD_RECORDS', 'dodac_BTN_ASSIGN_STAFF', 'dodac_BTN_SUBMIT_CHECK', 'dodac_BTN_SUBMIT_SIGN', 'dodac_BTN_APPROVE_SIGN', 
       'dodac_BTN_REJECT_RECORD', 'dodac_HANDOVER_RECORDS', 'dodac_BTN_RETURN_RESULT', 'dodac_VIEW_EXCERPTS', 
-      'dodac_MANAGE_EXCERPTS', 'dodac_BTN_EXTEND_DEADLINE', 'dodac_EDIT_RECORDS', 'dodac_DELETE_RECORDS', 'dodac_VIEW_DETAILS',
-      'BTN_ASSIGN_STAFF', 'BTN_SUBMIT_CHECK', 'BTN_SUBMIT_SIGN', 'BTN_APPROVE_SIGN', 'BTN_REJECT_RECORD', 'HANDOVER_RECORDS', 'BTN_RETURN_RESULT', 'EDIT_RECORDS', 'DELETE_RECORDS', 'VIEW_DETAILS'
+      'dodac_MANAGE_EXCERPTS', 'dodac_BTN_EXTEND_DEADLINE', 'dodac_EDIT_RECORDS', 'dodac_DELETE_RECORDS', 'dodac_VIEW_DETAILS', 'dodac_BTN_ADVANCE_STATUS'
     ];
     const LUUTRU_CHILD_PERMS = [
       'archive_records', 'archive_sub_all', 'archive_assign_tasks', 'archive_completed_list', 'archive_pending_check_list', 'archive_check_list', 'archive_handover_list', 'archive_director_completed',
-      'luutru_BTN_ASSIGN_STAFF', 'luutru_BTN_SUBMIT_CHECK', 'luutru_BTN_SUBMIT_SIGN', 'luutru_BTN_APPROVE_SIGN', 
+      'luutru_ADD_RECORDS', 'luutru_BTN_ASSIGN_STAFF', 'luutru_BTN_SUBMIT_CHECK', 'luutru_BTN_SUBMIT_SIGN', 'luutru_BTN_APPROVE_SIGN', 
       'luutru_BTN_REJECT_RECORD', 'luutru_HANDOVER_RECORDS', 'luutru_BTN_RETURN_RESULT', 'luutru_VIEW_ARCHIVE', 
-      'luutru_MANAGE_ARCHIVE', 'luutru_BTN_EXTEND_DEADLINE', 'luutru_EDIT_RECORDS', 'luutru_DELETE_RECORDS', 'luutru_VIEW_DETAILS',
-      'VIEW_ARCHIVE', 'MANAGE_ARCHIVE'
+      'luutru_MANAGE_ARCHIVE', 'luutru_BTN_EXTEND_DEADLINE', 'luutru_EDIT_RECORDS', 'luutru_DELETE_RECORDS', 'luutru_VIEW_DETAILS', 'luutru_BTN_ADVANCE_STATUS'
     ];
     const CONTRACT_CHILD_PERMS = [
       'receive_contract', 'VIEW_CONTRACTS', 'ADD_CONTRACTS', 'EDIT_CONTRACTS', 'LIQUIDATE_CONTRACTS', 'DELETE_CONTRACTS', 'EXPORT_CONTRACTS'
@@ -211,8 +209,8 @@ export function isViewAllowedForUser(
       case 'receive_group':
         return hasAnyPerm(ONEDOOR_CHILD_PERMS) || hasAnyPerm(CONTRACT_CHILD_PERMS);
       case 'records_group':
-        const allowDodac = !isUserLuutru(user, employees || []) && (activePerms.includes('all_records') || activePerms.includes('all_sub_all') || activePerms.includes('assign_tasks') || activePerms.includes('completed_list'));
-        const allowLuutru = !isUserDodac(user, employees || []) && (activePerms.includes('archive_records') || activePerms.includes('archive_sub_all') || activePerms.includes('archive_assign_tasks') || activePerms.includes('archive_completed_list'));
+        const allowDodac = !isUserLuutru(user, employees || []) && hasAnyPerm(DODAC_CHILD_PERMS);
+        const allowLuutru = !isUserDodac(user, employees || []) && hasAnyPerm(LUUTRU_CHILD_PERMS);
         const allowReg = activePerms.includes('registration_records');
         return allowDodac || allowLuutru || allowReg;
       case 'tools_group':
@@ -227,10 +225,10 @@ export function isViewAllowedForUser(
         return hasAnyPerm(ONEDOOR_CHILD_PERMS);
       case 'all_records':
         if (isUserLuutru(user, employees || [])) return false;
-        return activePerms.includes('all_records') || activePerms.includes('all_sub_all') || activePerms.includes('assign_tasks') || activePerms.includes('completed_list');
+        return hasAnyPerm(DODAC_CHILD_PERMS);
       case 'archive_records':
         if (isUserDodac(user, employees || [])) return false;
-        return activePerms.includes('archive_records') || activePerms.includes('archive_sub_all') || activePerms.includes('archive_assign_tasks') || activePerms.includes('archive_completed_list');
+        return hasAnyPerm(LUUTRU_CHILD_PERMS);
       case 'receive_contract':
         return hasAnyPerm(CONTRACT_CHILD_PERMS);
 

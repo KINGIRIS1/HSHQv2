@@ -55,10 +55,6 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
     );
   };
 
-  // Cập nhật danh sách các view được phép
-  const oneDoorAllowedViews = ['dashboard', 'receive_record', 'receive_search', 'receive_record_search', 'receive_contract', 'registration_records', 'personal_profile', 'account_settings', 'utilities', 'handover_list', 'work_schedule', 'receive_group', 'reports', 'tools_group'];
-  const teamLeaderAllowedViews = ['dashboard', 'personal_profile', 'all_records', 'registration_records', 'excerpt_management', 'reports', 'account_settings', 'utilities', 'work_schedule', 'archive_records', 'records_group', 'tools_group'];
-
   // Define menu structure
   const menuItems = [
     { id: 'dashboard', label: 'Tổng quan', icon: LayoutDashboard, visible: true, badge: reminderCount, badgeColor: 'bg-pink-500' },

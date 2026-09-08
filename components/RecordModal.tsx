@@ -512,7 +512,17 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
           if (newIdx < statusFlow.indexOf(RecordStatus.COMPLETED_WORK)) {
             rollbackFields.completedWorkDate = '';
           }
-          if (newIdx < statusFlow.indexOf(RecordStatus.ASSIGNED)) {
+          if (newIdx < statusFlow.indexOf(RecordStatus.OFFICE_WORK)) {
+            rollbackFields.officeAssignedDate = '';
+            rollbackFields.officeCompletedDate = '';
+            rollbackFields.drafterId = '';
+          }
+          if (newIdx < statusFlow.indexOf(RecordStatus.FIELD_WORK)) {
+            rollbackFields.fieldAssignedDate = '';
+            rollbackFields.fieldCompletedDate = '';
+            rollbackFields.surveyorId = '';
+          }
+          if (newIdx < statusFlow.indexOf(RecordStatus.ASSIGNED) || newStatus === RecordStatus.RECEIVED) {
             rollbackFields.assignedDate = '';
             rollbackFields.assignedTo = '';
           }
@@ -812,7 +822,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                                                     />
                                                 </div>
                                             )}
-                                            {isFieldWork && (currentIdx >= statusFlow.indexOf(RecordStatus.FIELD_WORK) || hasPendingCheck || !!formData.officeAssignedDate || !!formData.officeCompletedDate || !!formData.assignedDate || !!formData.fieldAssignedDate) && (
+                                            {isFieldWork && (currentIdx >= statusFlow.indexOf(RecordStatus.OFFICE_WORK) || hasPendingCheck || !!formData.officeAssignedDate || !!formData.officeCompletedDate) && (
                                                 <div>
                                                     <label className="block text-xs font-bold text-indigo-700 mb-1">Ngày Biên tập</label>
                                                     <input 

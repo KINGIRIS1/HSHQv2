@@ -1,7 +1,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { RecordFile, User, UserRole, RecordStatus, Employee } from '../types';
-import { removeVietnameseTones, isRecordOverdue, isRecordApproaching } from '../utils/appHelpers';
+import { removeVietnameseTones, isRecordOverdue, isRecordApproaching, isOfficeOnlySurveyProcedure } from '../utils/appHelpers';
 import { getShortRecordType, isArchiveRecordType, isArchiveRecord, isRecordType11 } from '../constants';
 
 export const useRecordFilter = (
@@ -149,6 +149,9 @@ export const useRecordFilter = (
             });
         } else if (currentView === 'measurement_field') {
             result = result.filter(r => {
+                // Thủ tục 2.1, 2.3 (Nội nghiệp trực tiếp / Trích lục / Duyệt đơn) KHÔNG thuộc Đo đạc thực địa
+                if (isOfficeOnlySurveyProcedure(r.recordType)) return false;
+
                 // Hồ sơ thuộc bước Đo đạc thực địa / Đo đạc bản đồ
                 const isAssigned = Boolean(r.assignedTo && r.assignedTo.trim() !== '');
                 const isExecutingStatus = r.status === RecordStatus.ASSIGNED || r.status === RecordStatus.IN_PROGRESS || r.status === RecordStatus.FIELD_WORK;
@@ -172,7 +175,14 @@ export const useRecordFilter = (
                 if (r.pendingCheckDate || r.checkedDate || r.checkedBy) return false;
                 if (r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED || r.status === RecordStatus.RETURNED || r.status === RecordStatus.HANDOVER || r.status === RecordStatus.SIGNED || r.status === RecordStatus.PENDING_SIGN || r.status === RecordStatus.PENDING_CHECK || r.status === RecordStatus.CHECKED) return false;
 
-                return r.status === RecordStatus.OFFICE_WORK;
+                const isAssigned = Boolean(r.assignedTo && r.assignedTo.trim() !== '');
+                const isOfficeProcedure = isOfficeOnlySurveyProcedure(r.recordType);
+
+                // Hồ sơ ở trạng thái OFFICE_WORK hoặc hồ sơ 2.1/2.3 đã được giao việc
+                if (r.status === RecordStatus.OFFICE_WORK) return true;
+                if (isOfficeProcedure && isAssigned) return true;
+
+                return false;
             });
         } else if (currentView === 'completed_list' || currentView === 'archive_completed_list') {
             result = result.filter(r => {
