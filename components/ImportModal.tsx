@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import * as XLSX from 'xlsx-js-style';
 import { RecordFile, RecordStatus, Employee, Holiday } from '../types';
 import { RECORD_TYPES, STATUS_LABELS, STATUS_COLORS, getShortRecordType } from '../constants';
@@ -290,7 +290,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
                 if (numStr) record.exportBatch = parseInt(numStr, 10);
             }
 
-            const exportDateRaw = getVal(['NGÀY XUẤT', 'EXPORT DATE', 'NGÀY TRẢ', 'exportdate', 'export_date', 'exportDate']);
+            const exportDateRaw = getVal(['NGÀY XUẤT', 'EXPORT DATE', 'exportdate', 'export_date', 'exportDate']);
             if (exportDateRaw !== undefined) {
                 record.exportDate = parseExcelDate(exportDateRaw);
             }
@@ -314,31 +314,33 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
             const statusRaw = getVal(['TRẠNG THÁI', 'STATUS', 'status']);
             if (statusRaw !== undefined && String(statusRaw).trim() !== '') {
                 let sStr = String(statusRaw).toUpperCase().trim();
-                if (sStr.includes('1 CỬA') || sStr.includes('1 CUA') || sStr.includes('MỘT CỬA') || sStr.includes('MOT CUA') || sStr.includes('HANDOVER') || sStr.includes('GIAO 1 CỬA') || sStr.includes('ĐÃ GIAO 1 CỬA') || sStr.includes('BÀN GIAO') || sStr.includes('ĐÃ XUẤT') || sStr.includes('XUẤT 1 CỬA')) {
+                if (sStr.includes('1 CỬA') || sStr.includes('1 CUA') || sStr.includes('MỘT CỬA') || sStr.includes('MOT CUA') || sStr.includes('HANDOVER') || sStr.includes('GIAO 1 CỬA') || sStr.includes('ĐÃ GIAO 1 CỬA') || sStr.includes('BÀN GIAO 1 CỬA') || sStr.includes('XUẤT 1 CỬA') || sStr.includes('ĐÃ XUẤT 1 CỬA')) {
                     explicitStatus = RecordStatus.HANDOVER;
+                } else if (sStr.includes('TRẢ DÂN') || sStr.includes('RETURNED') || sStr.includes('ĐÃ TRẢ DÂN') || sStr.includes('TRẢ KẾT QUẢ')) {
+                    explicitStatus = RecordStatus.RETURNED;
+                } else if (sStr.includes('KÝ DUYỆT') || sStr.includes('ĐÃ KÝ') || sStr.includes('SIGNED') || sStr.includes('LÃNH ĐẠO KÝ') || sStr.includes('ĐÃ KÝ DUYỆT')) {
+                    explicitStatus = RecordStatus.SIGNED;
+                } else if (sStr.includes('CHỜ KÝ') || sStr.includes('PENDING_SIGN') || sStr.includes('TRÌNH KÝ') || sStr.includes('CHỜ KÝ DUYỆT')) {
+                    explicitStatus = RecordStatus.PENDING_SIGN;
+                } else if (sStr.includes('ĐÃ KIỂM TRA') || sStr.includes('CHECKED') || sStr.includes('ĐÃ KT') || sStr.includes('KIỂM TRA XONG') || sStr.includes('ĐÃ DUYỆT')) {
+                    explicitStatus = RecordStatus.CHECKED;
+                } else if (sStr.includes('CHỜ KIỂM TRA') || sStr.includes('PENDING_CHECK') || sStr.includes('TRÌNH KIỂM TRA') || sStr.includes('CHỜ KT')) {
+                    explicitStatus = RecordStatus.PENDING_CHECK;
+                } else if (sStr.includes('ĐÃ THỰC HIỆN') || sStr.includes('THỰC HIỆN XONG') || sStr.includes('COMPLETED_WORK') || sStr.includes('ĐO ĐẠC XONG') || sStr.includes('HOÀN THÀNH ĐO')) {
+                    explicitStatus = RecordStatus.COMPLETED_WORK;
+                } else if (sStr.includes('NỘI NGHIỆP') || sStr.includes('BIÊN TẬP') || sStr.includes('OFFICE_WORK') || sStr.includes('XỬ LÝ NỘI NGHIỆP')) {
+                    explicitStatus = RecordStatus.OFFICE_WORK;
+                } else if (sStr.includes('NGOẠI NGHIỆP') || sStr.includes('FIELD_WORK') || sStr.includes('ĐI ĐO') || sStr.includes('ĐO NGOẠI NGHIỆP')) {
+                    explicitStatus = RecordStatus.FIELD_WORK;
                 } else if (sStr.includes('GIAO NHÂN VIÊN') || sStr.includes('PASSED_TO') || sStr.includes('ASSIGNED') || sStr.includes('GIAO VIỆC') || sStr.includes('ĐÃ GIAO VIỆC') || sStr.includes('PHÂN CÔNG') || (sStr.includes('ĐÃ GIAO') && !sStr.includes('1 CỬA'))) {
                     explicitStatus = RecordStatus.ASSIGNED;
                 } else if (sStr.includes('ĐANG') || sStr.includes('PROGRESS')) {
                     explicitStatus = RecordStatus.IN_PROGRESS;
-                } else if (sStr.includes('ĐÃ THỰC HIỆN') || sStr.includes('THỰC HIỆN XONG') || sStr.includes('COMPLETED_WORK') || sStr.includes('ĐO ĐẠC XONG')) {
-                    explicitStatus = RecordStatus.COMPLETED_WORK;
-                } else if (sStr.includes('CHỜ KIỂM TRA') || sStr.includes('PENDING_CHECK') || sStr.includes('TRÌNH KIỂM TRA')) {
-                    explicitStatus = RecordStatus.PENDING_CHECK;
-                } else if (sStr.includes('ĐÃ KIỂM TRA') || sStr.includes('CHECKED') || sStr.includes('ĐÃ KT')) {
-                    explicitStatus = RecordStatus.CHECKED;
-                } else if (sStr.includes('CHỜ KÝ') || sStr.includes('PENDING_SIGN') || sStr.includes('TRÌNH KÝ')) {
-                    explicitStatus = RecordStatus.PENDING_SIGN;
-                } else if (sStr.includes('ĐÃ KÝ') || sStr.includes('SIGNED') || sStr.includes('KÝ DUYỆT')) {
-                    explicitStatus = RecordStatus.SIGNED;
-                } else if (sStr.includes('XONG') || sStr.includes('HOÀN THÀNH')) {
-                    explicitStatus = RecordStatus.HANDOVER;
-                } else if (sStr.includes('TRẢ DÂN') || sStr.includes('RETURNED') || sStr.includes('ĐÃ TRẢ') || sStr.includes('TRẢ KẾT QUẢ')) {
-                    explicitStatus = RecordStatus.RETURNED;
                 } else if (sStr.includes('RÚT') || sStr.includes('WITHDRAWN')) {
                     explicitStatus = RecordStatus.WITHDRAWN;
                 } else if (sStr.includes('TỪ CHỐI') || sStr.includes('BỊ TRẢ') || sStr.includes('REJECTED')) {
                     explicitStatus = RecordStatus.REJECTED;
-                } else if (sStr.includes('TIẾP NHẬN') || sStr.includes('RECEIVED') || sStr.includes('MỚI NHẬN') || sStr.includes('CHƯA GIAO')) {
+                } else if (sStr.includes('TIẾP NHẬN') || sStr.includes('RECEIVED') || sStr.includes('MỚI NHẬN') || sStr.includes('CHƯA GIAO') || sStr.includes('ĐÃ NHẬN')) {
                     explicitStatus = RecordStatus.RECEIVED;
                 }
             }
@@ -365,14 +367,11 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
                     if (!record.assignedDate) record.assignedDate = nowStr;
                 }
             } else {
-                // Tự động suy luận trạng thái dựa trên các mốc tiến trình (áp dụng cho cả tạo mới và cập nhật khi file không có cột trạng thái)
+                // Tự động suy luận trạng thái dựa trên các mốc tiến trình (khi file không có cột Trạng thái)
                 if (record.resultReturnedDate) {
                     record.status = RecordStatus.RETURNED;
-                } else if (record.exportBatch || record.exportDate || record.completedDate) {
+                } else if (record.completedDate) {
                     record.status = RecordStatus.HANDOVER;
-                    if (!record.completedDate && record.exportDate) {
-                        record.completedDate = record.exportDate;
-                    }
                 } else if (record.approvalDate) {
                     record.status = RecordStatus.SIGNED;
                 } else if (record.submissionDate || record.submittedTo) {
@@ -460,13 +459,14 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
               'MÃ HỒ SƠ', 'CHỦ SỬ DỤNG', 'CCCD', 'SĐT', 'ĐỊA CHỈ', 'NGƯỜI ỦY QUYỀN', 
               'XÃ', 'THỬA', 'TỜ', 'DIỆN TÍCH', 'ĐẤT Ở', 'SỐ PHÁT HÀNH', 'SỐ VÀO SỔ', 'NGÀY CẤP', 
               'LOẠI HỒ SƠ', 'NỘI DUNG', 'GIẤY TỜ KÈM THEO', 'NGÀY NHẬN', 'HẸN TRẢ', 
-              'TRẠNG THÁI', 'NGÀY XUẤT', 'ĐỢT', 'NGƯỜI XỬ LÝ', 'NGÀY GIAO'
+              'TRẠNG THÁI', 'NGÀY THỰC HIỆN', 'NGÀY TRÌNH KIỂM TRA', 'NGÀY ĐÃ KIỂM TRA', 'NGÀY TRÌNH KÝ', 
+              'NGÀY KÝ DUYỆT', 'NGÀY HOÀN THÀNH', 'NGÀY TRẢ DÂN', 'NGÀY XUẤT', 'ĐỢT', 'NGƯỜI XỬ LÝ', 'NGÀY GIAO'
           ];
           sampleData = [
               ['HS001', 'Nguyễn Văn A', '070012345678', '0901234567', 'Tổ 1, KP 2', 'Lê Văn C', 
                'Tân Khải', '123', '45', '100.5', '50', 'CD 123456', 'CH 01234', '2024-01-01', 
                '2.1 Trích Lục', 'cấp đổi', 'Sổ đỏ | Bản chính', '2024-01-01', '2024-01-15', 
-               'Đã giao 1 cửa', '2024-01-20', '1', '', '']
+               'Đã kiểm tra', '', '', '2024-01-10', '', '', '', '', '2024-01-20', '1', '', '']
           ];
       } else {
           headers = [
@@ -490,6 +490,70 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
       XLSX.utils.book_append_sheet(wb, ws, 'Mau_Excel');
       XLSX.writeFile(wb, fileName);
   };
+
+  // Danh sách các cột động hiển thị dựa trên dữ liệu người dùng thực tế tải lên từ Excel
+  const activePreviewColumns = useMemo(() => {
+    if (!previewData.length) return [];
+    
+    const possibleCols: { key: keyof RecordFile; label: string; render: (r: PreviewRecord) => React.ReactNode }[] = [
+      { 
+        key: 'customerName', 
+        label: 'Chủ Sử Dụng', 
+        render: (r) => r.customerName || <span className="text-slate-300 italic">(Giữ nguyên)</span> 
+      },
+      { 
+        key: 'status', 
+        label: 'Trạng Thái (Dự kiến)', 
+        render: (r) => r.status ? (
+          <span className={`text-xs px-2.5 py-1 rounded-full font-bold inline-block shadow-2xs ${STATUS_COLORS[r.status as RecordStatus] || 'bg-slate-100 text-slate-700'}`}>
+            {STATUS_LABELS[r.status as RecordStatus] || r.status}
+          </span>
+        ) : <span className="text-slate-300 italic">(Giữ nguyên)</span> 
+      },
+      { 
+        key: 'assignedTo', 
+        label: 'Người Xử Lý', 
+        render: (r) => {
+          const emp = employees.find(e => e.id === r.assignedTo);
+          return emp ? <span className="font-semibold text-indigo-600">{emp.name}</span> : (r.assignedTo ? String(r.assignedTo) : <span className="text-slate-300 italic">(Giữ nguyên)</span>);
+        }
+      },
+      { key: 'assignedDate', label: 'Ngày Giao', render: (r) => r.assignedDate ? r.assignedDate.split('T')[0] : '-' },
+      { key: 'completedWorkDate', label: 'Ngày Thực Hiện', render: (r) => r.completedWorkDate ? r.completedWorkDate.split('T')[0] : '-' },
+      { key: 'pendingCheckDate', label: 'Ngày Trình KT', render: (r) => r.pendingCheckDate ? r.pendingCheckDate.split('T')[0] : '-' },
+      { key: 'checkedDate', label: 'Ngày Đã KT', render: (r) => r.checkedDate ? r.checkedDate.split('T')[0] : '-' },
+      { key: 'submissionDate', label: 'Ngày Trình Ký', render: (r) => r.submissionDate ? r.submissionDate.split('T')[0] : '-' },
+      { key: 'approvalDate', label: 'Ngày Ký Duyệt', render: (r) => r.approvalDate ? r.approvalDate.split('T')[0] : '-' },
+      { key: 'completedDate', label: 'Ngày Hoàn Thành', render: (r) => r.completedDate ? r.completedDate.split('T')[0] : '-' },
+      { key: 'resultReturnedDate', label: 'Ngày Trả Dân', render: (r) => r.resultReturnedDate ? r.resultReturnedDate.split('T')[0] : '-' },
+      { key: 'exportDate', label: 'Ngày Xuất', render: (r) => <span className="font-mono text-emerald-700">{r.exportDate ? r.exportDate.split('T')[0] : '-'}</span> },
+      { key: 'exportBatch', label: 'Đợt', render: (r) => <span className="font-bold">{r.exportBatch || '-'}</span> }
+    ];
+
+    if (mode === 'create') {
+      return [
+        possibleCols[0], // customerName
+        possibleCols[1], // status
+        possibleCols[11], // exportDate
+        possibleCols[12]  // exportBatch
+      ];
+    }
+
+    // Chế độ Cập nhật (Update): Chỉ lấy những cột mà ít nhất 1 dòng có dữ liệu
+    const active = possibleCols.filter(col => 
+      previewData.some(r => r[col.key] !== undefined && r[col.key] !== null && r[col.key] !== '')
+    );
+
+    if (active.length === 0) {
+      return [
+        possibleCols[0], // customerName
+        possibleCols[1], // status
+        possibleCols[11], // exportDate
+        possibleCols[12]  // exportBatch
+      ];
+    }
+    return active;
+  }, [previewData, employees, mode]);
 
   if (!isOpen) return null;
 
@@ -628,13 +692,12 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
                 <table className="w-full text-left border-collapse">
                     <thead className="bg-slate-100 sticky top-0 shadow-xs z-10 text-xs uppercase font-bold text-slate-600">
                         <tr>
-                            <th className="p-3 border-b">#</th>
-                            <th className="p-3 border-b">Mã HS</th>
-                            <th className="p-3 border-b">Chủ Sử Dụng</th>
-                            <th className="p-3 border-b">Trạng Thái (Dự kiến)</th>
-                            <th className="p-3 border-b">Ngày Xuất</th>
-                            <th className="p-3 border-b">Đợt</th>
-                            <th className="p-3 border-b">Kiểm duyệt lỗi</th>
+                            <th className="p-3 border-b whitespace-nowrap">#</th>
+                            <th className="p-3 border-b whitespace-nowrap">Mã HS</th>
+                            {activePreviewColumns.map(col => (
+                                <th key={col.key} className="p-3 border-b whitespace-nowrap">{col.label}</th>
+                            ))}
+                            <th className="p-3 border-b whitespace-nowrap">Kiểm duyệt lỗi</th>
                         </tr>
                     </thead>
                     <tbody className="text-sm text-slate-700 divide-y divide-slate-100">
@@ -648,19 +711,12 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
                             return (
                                 <tr key={originalIdx} className={`hover:bg-blue-50/50 ${hasError ? 'bg-red-50/50' : ''}`}>
                                     <td className="p-3 text-xs font-semibold text-slate-400">{originalIdx}</td>
-                                    <td className="p-3 font-medium text-blue-600">{record.code}</td>
-                                    <td className="p-3 font-medium text-slate-700">{record.customerName || <span className="text-slate-300 italic">(Giữ nguyên)</span>}</td>
-                                    <td className="p-3">
-                                        {record.status ? (
-                                            <span className={`text-xs px-2.5 py-1 rounded-full font-bold inline-block shadow-2xs ${STATUS_COLORS[record.status as RecordStatus] || 'bg-slate-100 text-slate-700'}`}>
-                                                {STATUS_LABELS[record.status as RecordStatus] || record.status}
-                                            </span>
-                                        ) : (
-                                            <span className="text-slate-300 italic">(Giữ nguyên)</span>
-                                        )}
-                                    </td>
-                                    <td className="p-3 font-mono text-xs text-emerald-700">{record.exportDate ? record.exportDate.split('T')[0] : '-'}</td>
-                                    <td className="p-3 font-bold text-xs">{record.exportBatch || '-'}</td>
+                                    <td className="p-3 font-medium text-blue-600 whitespace-nowrap">{record.code}</td>
+                                    {activePreviewColumns.map(col => (
+                                        <td key={col.key} className="p-3 whitespace-nowrap">
+                                            {col.render(record)}
+                                        </td>
+                                    ))}
                                     <td className="p-3">
                                         {hasError ? (
                                             <ul className="text-red-600 list-disc pl-4 text-xs font-medium">

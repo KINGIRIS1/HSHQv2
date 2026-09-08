@@ -153,10 +153,7 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Tân Qua
         setCurrentPage(1);
     }, [subTab, searchTerm, fromDate, toDate, filterWard, filterEmployee, filterRecordType, filterStatus]);
 
-    // Tự động làm sạch selectedIds khi chuyển trang để tránh tác động lên bản ghi bị ẩn
-    useEffect(() => {
-        setSelectedIds(new Set());
-    }, [currentPage]);
+
 
     const handleAssign = () => {
         const validSelectedArr = Array.from(selectedIds).filter(id => filteredRecords.some(r => r.id === id));
@@ -210,11 +207,16 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Tân Qua
     };
 
     const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.checked) {
-            setSelectedIds(new Set(filteredRecords.map(r => r.id)));
-        } else {
-            setSelectedIds(new Set());
-        }
+        const pageIds = paginatedRecords.map(r => r.id);
+        setSelectedIds(prev => {
+            const newSet = new Set(prev);
+            if (e.target.checked) {
+                pageIds.forEach(id => newSet.add(id));
+            } else {
+                pageIds.forEach(id => newSet.delete(id));
+            }
+            return newSet;
+        });
     };
 
     const handleSelectRow = (id: string) => {
@@ -947,7 +949,7 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Tân Qua
                             <thead className="bg-gray-100 text-xs font-bold text-gray-600 uppercase sticky top-0 shadow-sm z-10">
                                 <tr>
                                     <th className="p-3 w-10 text-center">
-                                        <input type="checkbox" onChange={handleSelectAll} checked={filteredRecords.length > 0 && selectedIds.size === filteredRecords.length} />
+                                        <input type="checkbox" onChange={handleSelectAll} checked={paginatedRecords.length > 0 && paginatedRecords.every(r => selectedIds.has(r.id))} />
                                     </th>
                                     <th className="p-3 w-10 text-center">#</th>
                                     <th className="p-3 w-32 text-center">Mã HS</th>

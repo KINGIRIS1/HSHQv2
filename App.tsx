@@ -532,8 +532,19 @@ function App() {
   };
 
   const toggleSelectAll = useCallback(() => {
-      if (selectedRecordIds.size === recordFilterProps.paginatedRecords.length && recordFilterProps.paginatedRecords.length > 0) setSelectedRecordIds(new Set());
-      else setSelectedRecordIds(new Set(recordFilterProps.paginatedRecords.map(r => r.id)));
+      const pageIds = recordFilterProps.paginatedRecords.map(r => r.id);
+      if (pageIds.length === 0) return;
+      const allSelectedOnPage = pageIds.every(id => selectedRecordIds.has(id));
+
+      setSelectedRecordIds(prev => {
+          const newSet = new Set(prev);
+          if (allSelectedOnPage) {
+              pageIds.forEach(id => newSet.delete(id));
+          } else {
+              pageIds.forEach(id => newSet.add(id));
+          }
+          return newSet;
+      });
   }, [selectedRecordIds, recordFilterProps.paginatedRecords]);
 
   const toggleSelectRecord = useCallback((id: string) => {

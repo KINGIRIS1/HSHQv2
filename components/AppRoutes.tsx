@@ -66,6 +66,7 @@ import {
   UserPlus,
   FileOutput,
   CheckSquare,
+  MinusSquare,
   Square,
   ArrowUpDown,
   ChevronLeft,
@@ -1300,11 +1301,11 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
               <tr>
                 <th className="p-3 w-10 text-center">
                   {(canPerformAction || hasPermission('BTN_SUBMIT_SIGN')) ? (
-                    <button onClick={props.toggleSelectAll}>
-                      {props.selectedRecordIds.size ===
-                        props.paginatedRecords.length &&
-                      props.paginatedRecords.length > 0 ? (
+                    <button onClick={props.toggleSelectAll} title="Chọn / Bỏ chọn tất cả trang này">
+                      {props.paginatedRecords.length > 0 && props.paginatedRecords.every(r => props.selectedRecordIds.has(r.id)) ? (
                         <CheckSquare size={16} className="text-blue-600" />
+                      ) : props.paginatedRecords.some(r => props.selectedRecordIds.has(r.id)) ? (
+                        <MinusSquare size={16} className="text-blue-500" />
                       ) : (
                         <Square size={16} className="text-gray-400" />
                       )}

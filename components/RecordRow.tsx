@@ -166,18 +166,19 @@ const RecordRow: React.FC<RecordRowProps> = ({
       case 'landPlot':
         return <td key="landPlot" className={`${cellClass} text-center font-mono text-sm font-bold text-slate-700`}>{record.landPlot || '-'}</td>;
       case 'assigned':
+        const assignedDateVal = record.fieldAssignedDate || record.officeAssignedDate || record.assignedDate;
         return (
           <td key="assigned" className={`${cellClass} text-center`}>
               {employee ? (
                   <div className="flex flex-col items-center gap-0.5">
-                      {record.assignedDate && (
-                          <span className="text-xs text-gray-500">{formatDate(record.assignedDate)}</span>
+                      {assignedDateVal && (
+                          <span className="text-xs text-gray-500">{formatDate(assignedDateVal)}</span>
                       )}
                       <span className="text-xs text-indigo-600 font-bold bg-indigo-50 px-1.5 py-0.5 rounded break-words max-w-full leading-tight" title={employee.name}>{employee.name}</span>
                   </div>
               ) : (
-                  record.assignedDate ? (
-                      <span className="text-sm text-gray-600">{formatDate(record.assignedDate)}</span>
+                  assignedDateVal ? (
+                      <span className="text-sm text-gray-600">{formatDate(assignedDateVal)}</span>
                   ) : '--'
               )}
           </td>

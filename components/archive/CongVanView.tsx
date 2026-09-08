@@ -115,10 +115,7 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
         setCurrentPage(1);
     }, [subTab, searchTerm, fromDate, toDate, filterEmployee]);
 
-    // Reset selection when page changes to avoid actions on hidden records
-    useEffect(() => {
-        setSelectedIds(new Set());
-    }, [currentPage]);
+
 
     const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -334,11 +331,16 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
     };
 
     const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.checked) {
-            setSelectedIds(new Set(filteredRecords.map(r => r.id)));
-        } else {
-            setSelectedIds(new Set());
-        }
+        const pageIds = paginatedRecords.map(r => r.id);
+        setSelectedIds(prev => {
+            const newSet = new Set(prev);
+            if (e.target.checked) {
+                pageIds.forEach(id => newSet.add(id));
+            } else {
+                pageIds.forEach(id => newSet.delete(id));
+            }
+            return newSet;
+        });
     };
 
     const handleSelectRow = (id: string) => {
@@ -762,7 +764,7 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
                         <thead className="bg-gray-100 text-xs font-bold text-gray-600 uppercase sticky top-0 shadow-sm z-10">
                             <tr>
                                 <th className="p-3 w-10 text-center">
-                                    <input type="checkbox" onChange={handleSelectAll} checked={filteredRecords.length > 0 && selectedIds.size === filteredRecords.length} />
+                                    <input type="checkbox" onChange={handleSelectAll} checked={paginatedRecords.length > 0 && paginatedRecords.every(r => selectedIds.has(r.id))} />
                                 </th>
                                 <th className="p-3 w-10 text-center">#</th>
                                 <th className="p-3 w-32 text-center">Số hiệu</th>

@@ -580,11 +580,9 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
 
       if (field === 'fieldAssignedDate' || field === 'fieldCompletedDate') {
         if (value) {
-          if (!updated.assignedDate) {
-            updated.assignedDate = value;
-          }
           if (field === 'fieldAssignedDate') {
             updated.fieldAssignedDate = value;
+            updated.assignedDate = value;
           } else {
             updated.fieldCompletedDate = value;
           }
@@ -596,11 +594,9 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
 
       if (field === 'officeAssignedDate' || field === 'officeCompletedDate') {
         if (value) {
-          if (!updated.assignedDate) {
-            updated.assignedDate = value;
-          }
           if (field === 'officeAssignedDate') {
             updated.officeAssignedDate = value;
+            updated.assignedDate = value;
           } else {
             updated.officeCompletedDate = value;
           }

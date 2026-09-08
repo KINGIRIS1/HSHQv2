@@ -121,10 +121,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
         setCurrentPage(1);
     }, [activeTab, searchTerm, fromDate, toDate, filterRecordType, filterWard, filterEmployee, filterStatus]);
 
-    // Tự động bỏ tích khi chuyển trang để tránh thao tác nhầm trên bản ghi ẩn
-    useEffect(() => {
-        setSelectedIds(new Set());
-    }, [currentPage]);
+
 
     const loadData = async () => {
         setLoading(true);
@@ -589,11 +586,16 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
     };
 
     const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.checked) {
-            setSelectedIds(new Set(filteredRecords.map(r => r.id)));
-        } else {
-            setSelectedIds(new Set());
-        }
+        const pageIds = paginatedRecords.map(r => r.id);
+        setSelectedIds(prev => {
+            const newSet = new Set(prev);
+            if (e.target.checked) {
+                pageIds.forEach(id => newSet.add(id));
+            } else {
+                pageIds.forEach(id => newSet.delete(id));
+            }
+            return newSet;
+        });
     };
 
     const handleSelectRow = (id: string) => {
@@ -1016,7 +1018,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                             <thead className="bg-gray-100 sticky top-0 z-10 shadow-sm">
                                 <tr>
                                     <th className="p-2 border-b border-r border-gray-200 w-10 text-center bg-gray-100 sticky left-0 z-20">
-                                        <input type="checkbox" onChange={handleSelectAll} checked={filteredRecords.length > 0 && selectedIds.size === filteredRecords.length} />
+                                        <input type="checkbox" onChange={handleSelectAll} checked={paginatedRecords.length > 0 && paginatedRecords.every(r => selectedIds.has(r.id))} />
                                     </th>
                                     <th className="p-2 border-b border-r border-gray-200 w-12 text-center bg-gray-100 sticky left-10 z-20">#</th>
                                     {COLUMNS.map(col => (

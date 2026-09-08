@@ -407,14 +407,18 @@ export const mapRecordFromDb = (item: any): any => {
 
     if (r.resultReturnedDate) {
         r.status = RecordStatus.RETURNED;
-    } else if (r.completedDate || r.exportBatch || r.exportDate || r.approvalDate) {
+    } else if (r.completedDate) {
         r.status = RecordStatus.HANDOVER;
-    } else if (r.submissionDate || r.submittedTo) {
+    } else if (r.approvalDate && (!currentStatus || currentStatus === RecordStatus.RECEIVED || currentStatus === RecordStatus.ASSIGNED || currentStatus === RecordStatus.FIELD_WORK || currentStatus === RecordStatus.OFFICE_WORK || currentStatus === RecordStatus.PENDING_CHECK || currentStatus === RecordStatus.CHECKED || currentStatus === RecordStatus.PENDING_SIGN)) {
+        r.status = RecordStatus.SIGNED;
+    } else if ((r.submissionDate || r.submittedTo) && (!currentStatus || currentStatus === RecordStatus.RECEIVED || currentStatus === RecordStatus.ASSIGNED || currentStatus === RecordStatus.FIELD_WORK || currentStatus === RecordStatus.OFFICE_WORK || currentStatus === RecordStatus.PENDING_CHECK || currentStatus === RecordStatus.CHECKED)) {
         r.status = RecordStatus.PENDING_SIGN;
-    } else if (r.checkedDate) {
+    } else if (r.checkedDate && (!currentStatus || currentStatus === RecordStatus.RECEIVED || currentStatus === RecordStatus.ASSIGNED || currentStatus === RecordStatus.FIELD_WORK || currentStatus === RecordStatus.OFFICE_WORK || currentStatus === RecordStatus.PENDING_CHECK)) {
         r.status = RecordStatus.CHECKED;
-    } else if (r.pendingCheckDate || r.checkedBy) {
+    } else if ((r.pendingCheckDate || r.checkedBy) && (!currentStatus || currentStatus === RecordStatus.RECEIVED || currentStatus === RecordStatus.ASSIGNED || currentStatus === RecordStatus.FIELD_WORK || currentStatus === RecordStatus.OFFICE_WORK)) {
         r.status = RecordStatus.PENDING_CHECK;
+    } else if (currentStatus && Object.values(RecordStatus).includes(currentStatus as RecordStatus)) {
+        r.status = currentStatus as RecordStatus;
     } else if (!isArchive) {
         // Module Đo đạc: Bỏ hoàn toàn trạng thái "Đang thực hiện" -> Chuyển sang Đo đạc thực địa hoặc Biên tập bản đồ
         if (isOfficeProcedure) {
