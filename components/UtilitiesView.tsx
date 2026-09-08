@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { FolderCog, Loader2, CheckCircle, AlertCircle, X, Calculator, FileText, Gavel, Info, Table2, Grid, FileSpreadsheet, BookOpen, Wrench } from 'lucide-react';
-import { User as UserType, RecordFile, NotifyFunction, NotifyType, Employee } from '../types';
+import { User as UserType, RecordFile, NotifyFunction, NotifyType, Employee, User } from '../types';
 import { isViewAllowedForUser } from '../config/roleConfig';
 import SoanBienBanTab from './utilities/SoanBienBanTab';
 import CungCapThongTinTab from './utilities/CungCapThongTinTab';
@@ -17,6 +17,7 @@ import { KiemTraDoDacTab } from './utilities/KiemTraDoDacTab';
 interface UtilitiesViewProps {
     currentUser: UserType;
     employees?: Employee[];
+    users?: User[];
     initialRecordForCorrection?: RecordFile | null; // New prop for auto-navigation
     records?: RecordFile[];
     onUpdateRecord?: (id: string, num: string, type: 'trichluc' | 'trichdo') => void;
@@ -25,6 +26,8 @@ interface UtilitiesViewProps {
     onDeleteWard?: (ward: string) => void;
     onResetWards?: () => void;
     onSaveRecord?: (record: any) => Promise<any>;
+    onBatchUpdateRecords?: (updates: Partial<RecordFile>[]) => Promise<void>;
+    onDeleteBatchRecords?: (ids: string[]) => Promise<boolean>;
     holidays?: any[];
     onRefreshData?: () => void | Promise<void>;
 }
@@ -32,14 +35,17 @@ interface UtilitiesViewProps {
 const UtilitiesView: React.FC<UtilitiesViewProps> = ({ 
     currentUser, 
     employees = [],
+    users = [],
     initialRecordForCorrection,
-    records,
+    records = [],
     onUpdateRecord,
     wards,
     onAddWard,
     onDeleteWard,
     onResetWards,
     onSaveRecord,
+    onBatchUpdateRecords,
+    onDeleteBatchRecords,
     onRefreshData,
 }) => {
   const [activeTab, setActiveTab] = useState<'bienban' | 'thongtin' | 'vphc' | 'saiso' | 'chinhly' | 'tachthua' | 'chuyendoi' | 'sotltd' | 'vaoloi' | 'kiemtra'>('bienban');

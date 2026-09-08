@@ -254,7 +254,7 @@ function App() {
       pendingSyncCount, handleSyncPendingRecords,
       isUpdateAvailable, latestVersion, updateUrl,
       setEmployees, setUsers, setRecords, setWards,
-      loadData, handleAddOrUpdateRecord, handleDeleteRecord, handleImportRecords,
+      loadData, handleAddOrUpdateRecord, handleDeleteRecord, handleBatchDeleteRecords, handleImportRecords,
       handleSaveEmployee, handleDeleteEmployee, handleDeleteAllData, handleUpdateUser, handleDeleteUser
   } = useAppData(currentUser);
 
@@ -1399,6 +1399,7 @@ function App() {
             onCreateLiquidation={(r) => { setRecordToLiquidate(r); setCurrentView('receive_contract'); }}
             onCreateContract={(r) => { setRecordToCreateContract(r as RecordFile); setCurrentView('receive_contract'); }}
             handleBulkUpdate={handleBulkUpdate}
+            handleBatchDeleteRecords={handleBatchDeleteRecords}
             confirmReturnResult={handleConfirmReturnResult}
 
             employees={employees}
@@ -1581,6 +1582,8 @@ function App() {
             handleOpenRejectReturnModal={handleOpenRejectReturnModal}
             handleOpenExtendModal={handleOpenExtendModal}
             handleSyncPendingRecords={handleSyncPendingRecords}
+            handleBatchUpdateRecords={handleBatchUpdateRecords}
+            handleBatchDeleteRecords={handleBatchDeleteRecords}
         />
 
         <AppModals 
@@ -1627,6 +1630,7 @@ function App() {
             onCreateContract={(r) => { setRecordToCreateContract(r as RecordFile); setCurrentView('receive_contract'); }}
             handleBulkUpdate={handleBulkUpdate}
             handleBatchUpdateRecords={handleBatchUpdateRecords}
+            handleBatchDeleteRecords={handleBatchDeleteRecords}
             confirmReturnResult={handleConfirmReturnResult}
             onConfirmRejectReturnStep={handleConfirmRejectReturnStep}
             onOpenRejectReturnModal={(r) => handleOpenRejectReturnModal([r])}

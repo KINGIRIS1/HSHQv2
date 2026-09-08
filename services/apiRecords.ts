@@ -362,14 +362,17 @@ export const getShortCode = (ward: string) => {
     return 'CT';
 };
 
-export const getNextGlobalRecordCode = async (dateStr: string, isArchive = false): Promise<string> => {
+export const getNextGlobalRecordCode = async (dateStr: string, isArchive = false, recordType = ''): Promise<string> => {
+    const rType = (recordType || '').toLowerCase();
+    const isLT = isArchive || rType.startsWith('1.') || rType.includes('1.1') || rType.includes('1.2') || rType.includes('sao lục') || rType.includes('công văn') || rType.includes('cung cấp') || rType.includes('lưu trữ');
+
     if (!isConfigured) {
         const d = new Date(dateStr);
         const yy = d.getFullYear().toString().slice(-2);
         const mm = ('0' + (d.getMonth() + 1)).slice(-2);
         const dd = ('0' + d.getDate()).slice(-2);
         const datePrefix = `${yy}${mm}${dd}`;
-        const prefix = isArchive ? 'LT-' : '';
+        const prefix = isLT ? 'LT-' : '';
         return `${prefix}${datePrefix}-${Math.floor(Math.random() * 1000).toString().padStart(4, '0')}`;
     }
 
@@ -380,8 +383,8 @@ export const getNextGlobalRecordCode = async (dateStr: string, isArchive = false
     const dd = ('0' + d.getDate()).slice(-2);
     const datePrefix = `${yy}${mm}${dd}`;
     
-    // Tách riêng bộ đếm cho Hồ sơ Lưu trữ (isArchive = true) và Hồ sơ Đo đạc
-    const key = isArchive ? `archive_record_counter_${year}` : `record_counter_${year}`;
+    // Tách riêng bộ đếm cho Hồ sơ Lưu trữ / 1.1, 1.2 (isLT = true) và Hồ sơ Đo đạc khác
+    const key = isLT ? `archive_record_counter_${year}` : `record_counter_${year}`;
     let nextSeq = 1;
     let success = false;
     let attempts = 0;
@@ -430,8 +433,8 @@ export const getNextGlobalRecordCode = async (dateStr: string, isArchive = false
     }
 
     const seqStr = nextSeq.toString().padStart(4, '0');
-    // Với hồ sơ lưu trữ có tiền tố LT-yyMMdd-XXXX
-    return isArchive ? `LT-${datePrefix}-${seqStr}` : `${datePrefix}-${seqStr}`;
+    // Với hồ sơ lưu trữ / 1.1, 1.2 có tiền tố LT-YYMMDD-XXXX
+    return isLT ? `LT-${datePrefix}-${seqStr}` : `${datePrefix}-${seqStr}`;
 };
 
 // --- CACHE SYNCHRONIZATION HELPERS ---
@@ -469,6 +472,17 @@ const syncCacheOnDelete = async (id: string) => {
         saveToCache(CACHE_KEYS.RECORDS, filtered);
     } catch (e) {
         console.error("Error syncing cache for deleted record", e);
+    }
+};
+
+const syncCacheOnBatchDelete = async (ids: string[]) => {
+    try {
+        const idSet = new Set(ids);
+        const cached = (await getIndexedDBItem<RecordFile[]>(CACHE_KEYS.RECORDS)) || [];
+        const filtered = cached.filter(r => !idSet.has(r.id));
+        saveToCache(CACHE_KEYS.RECORDS, filtered);
+    } catch (e) {
+        console.error("Error syncing cache for batch deleted records", e);
     }
 };
 
@@ -694,6 +708,29 @@ export const deleteRecordApi = async (id: string): Promise<boolean> => {
     } catch (error) {
         logError("deleteRecordApi", error, true);
         syncCacheOnDelete(id);
+        return true;
+    }
+};
+
+export const deleteRecordsBatchApi = async (ids: string[], onProgress?: (processed: number, total: number) => void): Promise<boolean> => {
+    if (!ids || ids.length === 0) return true;
+    
+    // Always sync local cache first
+    await syncCacheOnBatchDelete(ids);
+
+    if (!isConfigured) return true;
+    try {
+        const CHUNK_SIZE = 100;
+        for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
+            const chunk = ids.slice(i, i + CHUNK_SIZE);
+            await supabase.from('land_records').delete().in('id', chunk);
+            await supabase.from('dangky_records').delete().in('id', chunk);
+            await supabase.from('luutru_records').delete().in('id', chunk);
+            if (onProgress) onProgress(Math.min(i + CHUNK_SIZE, ids.length), ids.length);
+        }
+        return true;
+    } catch (error) {
+        logError("deleteRecordsBatchApi", error, true);
         return true;
     }
 };

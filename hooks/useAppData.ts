@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { RecordFile, Employee, User, UserRole, RecordStatus, Holiday, RolePermissions, DepartmentPermissions, DEFAULT_ROLE_PERMISSIONS } from '../types';
 import { fetchRecords, fetchEmployees, fetchUsers, fetchUpdateInfo, fetchHolidays,
-    createRecordApi, updateRecordApi, deleteRecordApi, createRecordsBatchApi,
+    createRecordApi, updateRecordApi, deleteRecordApi, deleteRecordsBatchApi, createRecordsBatchApi,
     saveEmployeeApi, deleteEmployeeApi, saveUserApi, deleteUserApi, deleteAllDataApi, getSystemSetting
 } from '../services/api';
 import { supabase } from '../services/supabaseClient';
@@ -464,6 +464,13 @@ export const useAppData = (currentUser: User | null) => {
         return success;
     };
 
+    const handleBatchDeleteRecords = async (ids: string[]) => {
+        if (!ids || ids.length === 0) return true;
+        setRecords(prev => prev.filter(r => !ids.includes(r.id)));
+        const success = await deleteRecordsBatchApi(ids);
+        return success;
+    };
+
     const handleImportRecords = async (newRecords: RecordFile[], onProgress?: (processed: number, total: number) => void) => {
         let success = true;
 
@@ -534,7 +541,7 @@ export const useAppData = (currentUser: User | null) => {
         isUpdateAvailable, latestVersion, updateUrl,
         setWards, setEmployees, setUsers, setRecords,
         loadData,
-        handleAddOrUpdateRecord, handleDeleteRecord, handleImportRecords, handleBatchUpdate,
+        handleAddOrUpdateRecord, handleDeleteRecord, handleBatchDeleteRecords, handleImportRecords, handleBatchUpdate,
         handleSaveEmployee, handleDeleteEmployee,
         handleUpdateUser, handleDeleteUser,
         handleDeleteAllData

@@ -65,7 +65,7 @@ export const fetchVphcRecords = async (): Promise<VphcRecord[]> => {
         if (error) throw error;
         return data as VphcRecord[];
     } catch (error) {
-        logError("fetchVphcRecords", error);
+        logError("fetchVphcRecords", error, true);
         return MOCK_VPHC;
     }
 };
@@ -99,7 +99,7 @@ export const saveVphcRecord = async (record: Partial<VphcRecord>): Promise<boole
         }
         return true;
     } catch (error) {
-        logError("saveVphcRecord", error);
+        logError("saveVphcRecord", error, true);
         return false;
     }
 };
@@ -115,7 +115,7 @@ export const deleteVphcRecord = async (id: string): Promise<boolean> => {
         if (error) throw error;
         return true;
     } catch (error) {
-        logError("deleteVphcRecord", error);
+        logError("deleteVphcRecord", error, true);
         return false;
     }
 };

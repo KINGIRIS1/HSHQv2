@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { RecordFile, Employee, User, RecordStatus } from '../../types';
+import { RecordFile, Employee, User, RecordStatus, UserRole } from '../../types';
 import { STATUS_LABELS, STATUS_COLORS, RECORD_TYPES } from '../../constants';
 import { getNormalizedWard, getShortRecordType } from '../../constants';
 import { exportCustomRecordsToExcel } from '../../utils/excelExport';
@@ -40,6 +40,7 @@ interface RecordSearchProps {
     employees: Employee[];
     onEdit: (record: RecordFile) => void;
     onDelete: (record: RecordFile) => void;
+    onDeleteBatch?: (ids: string[]) => Promise<boolean>;
     onPrint: (record: RecordFile) => void;
     onSave: (record: RecordFile) => Promise<RecordFile | null>;
     isExtendView?: boolean;
@@ -83,6 +84,7 @@ export const RecordSearch: React.FC<RecordSearchProps> = ({
     employees = [],
     onEdit,
     onDelete,
+    onDeleteBatch,
     onPrint,
     onSave,
     isExtendView = false,
@@ -94,6 +96,15 @@ export const RecordSearch: React.FC<RecordSearchProps> = ({
     // Filter popover state
     const [isFilterPopoverOpen, setIsFilterPopoverOpen] = useState(false);
     const filterPopoverRef = useRef<HTMLDivElement>(null);
+
+    // Check admin rights for batch deletion
+    const isAdmin = currentUser?.role === UserRole.ADMIN || currentUser?.role === 'ADMIN';
+
+    // Batch delete state & ref
+    const [isBatchDeleteOpen, setIsBatchDeleteOpen] = useState(false);
+    const batchDeletePopoverRef = useRef<HTMLDivElement>(null);
+    const [confirmDeleteType, setConfirmDeleteType] = useState<'selected' | 'all' | null>(null);
+    const [isDeletingBatch, setIsDeletingBatch] = useState(false);
 
     // Filter inputs (immediately applied upon change, matching "Tất cả hồ sơ")
     const [filterWard, setFilterWard] = useState('all');
@@ -264,6 +275,9 @@ export const RecordSearch: React.FC<RecordSearchProps> = ({
         const handleClickOutside = (event: MouseEvent) => {
             if (filterPopoverRef.current && !filterPopoverRef.current.contains(event.target as Node)) {
                 setIsFilterPopoverOpen(false);
+            }
+            if (batchDeletePopoverRef.current && !batchDeletePopoverRef.current.contains(event.target as Node)) {
+                setIsBatchDeleteOpen(false);
             }
         };
         document.addEventListener('mousedown', handleClickOutside);
@@ -516,6 +530,59 @@ export const RecordSearch: React.FC<RecordSearchProps> = ({
         }
     };
 
+    const handleExecuteBatchDelete = async () => {
+        if (!confirmDeleteType) return;
+
+        let recordsToDelete: RecordFile[] = [];
+        if (confirmDeleteType === 'selected') {
+            recordsToDelete = sortedRecords.filter(r => selectedIds.has(r.id));
+            if (recordsToDelete.length < selectedIds.size) {
+                const foundIds = new Set(recordsToDelete.map(r => r.id));
+                records.forEach(r => {
+                    if (selectedIds.has(r.id) && !foundIds.has(r.id)) {
+                        recordsToDelete.push(r);
+                    }
+                });
+            }
+        } else if (confirmDeleteType === 'all') {
+            recordsToDelete = [...sortedRecords];
+        }
+
+        if (recordsToDelete.length === 0) {
+            alert('Không tìm thấy hồ sơ nào để xóa!');
+            setConfirmDeleteType(null);
+            return;
+        }
+
+        setIsDeletingBatch(true);
+        try {
+            const idsToDelete = recordsToDelete.map(r => r.id);
+            if (onDeleteBatch) {
+                await onDeleteBatch(idsToDelete);
+            } else {
+                for (const r of recordsToDelete) {
+                    await onDelete(r);
+                }
+            }
+
+            // Remove deleted ids from selectedIds
+            const deletedSet = new Set(idsToDelete);
+            setSelectedIds(prev => {
+                const next = new Set(prev);
+                deletedSet.forEach(id => next.delete(id));
+                return next;
+            });
+
+            setConfirmDeleteType(null);
+            alert(`Đã xóa thành công ${recordsToDelete.length} hồ sơ!`);
+        } catch (error) {
+            console.error('Lỗi khi xóa hàng loạt:', error);
+            alert('Có lỗi xảy ra trong quá trình xóa hồ sơ!');
+        } finally {
+            setIsDeletingBatch(false);
+        }
+    };
+
     const handleHeaderClick = (key: string) => {
         let sortKey = key;
         if (key === 'customer') sortKey = 'customerName';
@@ -717,10 +784,120 @@ export const RecordSearch: React.FC<RecordSearchProps> = ({
                             )}
                         </div>
 
+                        {/* Nút Xóa hàng loạt chỉ xuất hiện với quyền Admin */}
+                        {isAdmin && (
+                            <div className="relative inline-block text-left" ref={batchDeletePopoverRef}>
+                                <button
+                                    onClick={() => setIsBatchDeleteOpen(!isBatchDeleteOpen)}
+                                    className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-sm font-bold transition-all shadow-sm bg-white border border-red-200 text-red-600 hover:bg-red-50 cursor-pointer ${
+                                        selectedIds.size > 0 ? "bg-red-50 border-red-300 text-red-700 ring-2 ring-red-100" : ""
+                                    }`}
+                                    title="Xóa hàng loạt hồ sơ"
+                                >
+                                    <Trash2 size={16} className="text-red-600" />
+                                    <span>Xóa hàng loạt</span>
+                                    {selectedIds.size > 0 && (
+                                        <span className="bg-red-600 text-white text-[11px] px-1.5 py-0.2 rounded-full font-extrabold">
+                                            {selectedIds.size}
+                                        </span>
+                                    )}
+                                    {isBatchDeleteOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                                </button>
+
+                                {/* Batch Delete Popover Dropdown */}
+                                {isBatchDeleteOpen && (
+                                    <div className="absolute left-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 p-4 z-50 animate-fade-in text-gray-800">
+                                        <div className="flex items-center justify-between pb-2.5 border-b border-gray-100 mb-3">
+                                            <div className="flex items-center gap-2 font-bold text-red-700 text-sm">
+                                                <Trash2 size={18} />
+                                                <span>Tùy chọn xóa hàng loạt</span>
+                                            </div>
+                                            <button
+                                                onClick={() => setIsBatchDeleteOpen(false)}
+                                                className="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100 transition-colors cursor-pointer"
+                                            >
+                                                <X size={16} />
+                                            </button>
+                                        </div>
+
+                                        <div className="space-y-2.5">
+                                            {/* Option 1: Xóa các hồ sơ đã tích chọn */}
+                                            <button
+                                                disabled={selectedIds.size === 0}
+                                                onClick={() => {
+                                                    setIsBatchDeleteOpen(false);
+                                                    setConfirmDeleteType('selected');
+                                                }}
+                                                className={`w-full text-left p-3 rounded-xl border transition-all flex items-start gap-3 ${
+                                                    selectedIds.size > 0
+                                                        ? "border-red-200 bg-red-50/60 hover:bg-red-100/80 hover:border-red-300 text-red-900 cursor-pointer shadow-xs"
+                                                        : "border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed opacity-60"
+                                                }`}
+                                            >
+                                                <CheckSquare size={18} className={`shrink-0 mt-0.5 ${selectedIds.size > 0 ? "text-red-600" : "text-gray-400"}`} />
+                                                <div>
+                                                    <div className="font-bold text-xs uppercase tracking-wide">
+                                                        1. Xóa các hồ sơ đã tích chọn ({selectedIds.size})
+                                                    </div>
+                                                    <div className="text-[11px] font-medium text-gray-500 mt-0.5">
+                                                        {selectedIds.size > 0
+                                                            ? `Xóa ${selectedIds.size} hồ sơ bạn đã đánh dấu tích chọn trong danh sách`
+                                                            : 'Tích chọn checkbox ở các dòng hồ sơ để thực hiện tùy chọn này'}
+                                                    </div>
+                                                </div>
+                                            </button>
+
+                                            {/* Option 2: Xóa toàn bộ kết quả tìm kiếm */}
+                                            <button
+                                                disabled={sortedRecords.length === 0}
+                                                onClick={() => {
+                                                    setIsBatchDeleteOpen(false);
+                                                    setConfirmDeleteType('all');
+                                                }}
+                                                className={`w-full text-left p-3 rounded-xl border transition-all flex items-start gap-3 ${
+                                                    sortedRecords.length > 0
+                                                        ? "border-amber-300 bg-amber-50/60 hover:bg-amber-100/80 hover:border-amber-400 text-amber-950 cursor-pointer shadow-xs"
+                                                        : "border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed opacity-60"
+                                                }`}
+                                            >
+                                                <AlertCircle size={18} className={`shrink-0 mt-0.5 ${sortedRecords.length > 0 ? "text-amber-600" : "text-gray-400"}`} />
+                                                <div>
+                                                    <div className="font-bold text-xs uppercase tracking-wide text-amber-800">
+                                                        2. Xóa TOÀN BỘ kết quả tìm kiếm ({sortedRecords.length})
+                                                    </div>
+                                                    <div className="text-[11px] font-medium text-gray-600 mt-0.5">
+                                                        {sortedRecords.length > 0
+                                                            ? `Xóa tất cả ${sortedRecords.length} hồ sơ đang hiển thị theo từ khóa & bộ lọc hiện tại`
+                                                            : 'Không có hồ sơ nào trong kết quả tìm kiếm'}
+                                                    </div>
+                                                </div>
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
                         {selectedIds.size > 0 && (
-                            <span className="text-slate-500 text-xs font-semibold">
-                                Đã chọn <strong className="text-emerald-700 font-bold">{selectedIds.size}</strong> hồ sơ
-                            </span>
+                            <div className="flex items-center gap-2 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-200">
+                                <span className="text-slate-600 text-xs font-semibold">
+                                    Đã chọn <strong className="text-blue-700 font-bold">{selectedIds.size}</strong> hồ sơ
+                                </span>
+                                <button
+                                    onClick={() => setSelectedIds(new Set(sortedRecords.map(r => r.id)))}
+                                    className="text-[11px] text-blue-600 hover:text-blue-800 font-bold hover:underline cursor-pointer"
+                                    title="Chọn toàn bộ hồ sơ trong kết quả tìm kiếm"
+                                >
+                                    Chọn tất cả ({sortedRecords.length})
+                                </button>
+                                <span className="text-gray-300">|</span>
+                                <button
+                                    onClick={() => setSelectedIds(new Set())}
+                                    className="text-[11px] text-gray-500 hover:text-gray-700 font-semibold hover:underline cursor-pointer"
+                                >
+                                    Bỏ chọn
+                                </button>
+                            </div>
                         )}
                     </div>
 
@@ -1176,6 +1353,99 @@ export const RecordSearch: React.FC<RecordSearchProps> = ({
                     employees={employees}
                     onConfirm={handleConfirmExtend}
                 />
+            )}
+
+            {/* Modal Xác nhận xóa hàng loạt */}
+            {confirmDeleteType && (
+                <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+                    <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 max-w-lg w-full p-6 space-y-4">
+                        <div className="flex items-center gap-3 text-red-600">
+                            <div className="p-3 bg-red-100 rounded-full shrink-0">
+                                <Trash2 size={24} />
+                            </div>
+                            <div>
+                                <h3 className="font-bold text-lg text-slate-800">
+                                    {confirmDeleteType === 'selected'
+                                        ? `Xác nhận xóa ${selectedIds.size} hồ sơ đã chọn`
+                                        : `⚠️ CẢNH BÁO: Xóa TOÀN BỘ ${sortedRecords.length} hồ sơ`}
+                                </h3>
+                                <p className="text-xs text-slate-500 mt-0.5">
+                                    {confirmDeleteType === 'selected'
+                                        ? 'Xóa các hồ sơ bạn đã tích chọn thủ công'
+                                        : 'Xóa toàn bộ hồ sơ trong kết quả tìm kiếm / bộ lọc hiện tại'}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-xs text-red-800 font-medium space-y-1">
+                            {confirmDeleteType === 'selected' ? (
+                                <p>
+                                    Bạn sắp xóa <strong className="font-bold underline">{selectedIds.size} hồ sơ</strong> đã được tích chọn trong danh sách.
+                                </p>
+                            ) : (
+                                <div>
+                                    <p className="font-bold text-red-900">
+                                        Cảnh báo xóa hàng loạt dữ liệu tìm kiếm!
+                                    </p>
+                                    <p className="mt-1">
+                                        Bạn sắp xóa <strong>TOÀN BỘ {sortedRecords.length} hồ sơ</strong> phù hợp với điều kiện tìm kiếm/lọc hiện tại.
+                                    </p>
+                                    {(searchKeyword || activeFilterCount > 0) && (
+                                        <div className="mt-2 bg-white/80 p-2 rounded border border-red-200 text-[11px] text-gray-700">
+                                            {searchKeyword && <div>- Từ khóa tìm kiếm: <strong>"{searchKeyword}"</strong></div>}
+                                            {filterWard !== 'all' && <div>- Xã/Phường: <strong>{getNormalizedWard(filterWard)}</strong></div>}
+                                            {filterStatus !== 'all' && <div>- Trạng thái: <strong>{STATUS_LABELS[filterStatus as RecordStatus] || filterStatus}</strong></div>}
+                                            {filterRecordType !== 'all' && <div>- Loại hồ sơ: <strong>{filterRecordType}</strong></div>}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                            <p className="text-[11px] text-red-600 font-bold pt-1">
+                                ⚠️ Thao tác này sẽ xóa vĩnh viễn dữ liệu và KHÔNG THỂ HOÀN TÁC!
+                            </p>
+                        </div>
+
+                        {/* Preview summary of records to be deleted */}
+                        <div className="max-h-36 overflow-y-auto border border-gray-200 rounded-xl p-2 bg-gray-50/50 space-y-1 text-xs">
+                            <div className="font-bold text-gray-500 text-[11px] uppercase tracking-wide px-1">
+                                Danh sách hồ sơ sẽ bị xóa ({confirmDeleteType === 'selected' ? selectedIds.size : sortedRecords.length}):
+                            </div>
+                            {(confirmDeleteType === 'selected' 
+                                ? sortedRecords.filter(r => selectedIds.has(r.id))
+                                : sortedRecords
+                            ).slice(0, 15).map((r) => (
+                                <div key={r.id} className="flex items-center justify-between py-1 px-2 bg-white rounded border border-gray-100 text-gray-700">
+                                    <span className="font-mono font-bold text-blue-600">{r.code}</span>
+                                    <span className="font-medium text-gray-800 truncate max-w-[200px]">{toTitleCase(r.customerName || '')}</span>
+                                    <span className="text-[10px] text-gray-400 font-mono">{r.mapSheet || '--'}/{r.landPlot || '--'}</span>
+                                </div>
+                            ))}
+                            {((confirmDeleteType === 'selected' ? selectedIds.size : sortedRecords.length) > 15) && (
+                                <div className="text-center py-1 text-[11px] text-gray-500 font-bold italic">
+                                    ... và còn {(confirmDeleteType === 'selected' ? selectedIds.size : sortedRecords.length) - 15} hồ sơ khác
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100">
+                            <button
+                                disabled={isDeletingBatch}
+                                onClick={() => setConfirmDeleteType(null)}
+                                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                            >
+                                Hủy bỏ
+                            </button>
+                            <button
+                                disabled={isDeletingBatch}
+                                onClick={handleExecuteBatchDelete}
+                                className="px-5 py-2 bg-red-600 hover:bg-red-700 active:scale-95 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                            >
+                                <Trash2 size={15} />
+                                <span>{isDeletingBatch ? 'Đang xóa...' : `Xác nhận xóa (${confirmDeleteType === 'selected' ? selectedIds.size : sortedRecords.length} hồ sơ)`}</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );

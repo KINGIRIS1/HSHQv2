@@ -270,9 +270,36 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Tân Qua
         }
     };
 
+    const generateLTHoSoCode = (recordsList: ArchiveRecord[]) => {
+        const d = new Date();
+        const yy = d.getFullYear().toString().slice(-2);
+        const mm = ('0' + (d.getMonth() + 1)).slice(-2);
+        const dd = ('0' + d.getDate()).slice(-2);
+        const datePrefix = `${yy}${mm}${dd}`;
+
+        let maxSeq = 0;
+        recordsList.forEach((r) => {
+            const code = r.so_hieu || '';
+            if (!code) return;
+            const cleanCode = code.startsWith('LT-') ? code.replace('LT-', '') : code;
+            const parts = cleanCode.split('-');
+            if (parts.length >= 2) {
+                const rDate = parts[0];
+                const rSeq = parts[1];
+                if (rDate && rDate.substring(0, 2) === yy) {
+                    const seqNum = parseInt(rSeq, 10);
+                    if (!isNaN(seqNum) && seqNum > maxSeq) maxSeq = seqNum;
+                }
+            }
+        });
+
+        const nextSeq = (maxSeq + 1).toString().padStart(4, '0');
+        return `LT-${datePrefix}-${nextSeq}`;
+    };
+
     const resetForm = () => {
         setFormData({
-            so_hieu: '',
+            so_hieu: generateLTHoSoCode(records),
             chu_su_dung: '',
             xa_phuong: 'Tân Khai',
             to_ban_do: '',

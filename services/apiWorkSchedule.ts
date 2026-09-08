@@ -20,7 +20,7 @@ export const fetchWorkSchedules = async (): Promise<WorkSchedule[]> => {
         saveToCache(WORK_SCHEDULE_CACHE_KEY, data);
         return data as WorkSchedule[];
     } catch (error) {
-        logError("fetchWorkSchedules", error);
+        logError("fetchWorkSchedules", error, true);
         return getFromCache(WORK_SCHEDULE_CACHE_KEY, []);
     }
 };
@@ -62,7 +62,7 @@ export const saveWorkSchedule = async (schedule: Partial<WorkSchedule>): Promise
         }
         return true;
     } catch (error) {
-        logError("saveWorkSchedule", error);
+        logError("saveWorkSchedule", error, true);
         return false;
     }
 };
@@ -78,7 +78,7 @@ export const deleteWorkSchedule = async (id: string): Promise<boolean> => {
         if (error) throw error;
         return true;
     } catch (error) {
-        logError("deleteWorkSchedule", error);
+        logError("deleteWorkSchedule", error, true);
         return false;
     }
 };

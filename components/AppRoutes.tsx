@@ -231,6 +231,8 @@ interface AppRoutesProps {
   handleOpenRejectReturnModal?: (records: RecordFile[]) => void;
   handleOpenExtendModal?: (records: RecordFile[]) => void;
   handleSyncPendingRecords?: () => Promise<any>;
+  handleBatchUpdateRecords?: (updates: Partial<RecordFile>[]) => Promise<void>;
+  handleBatchDeleteRecords?: (ids: string[]) => Promise<boolean>;
 }
 
 const AppRoutes: React.FC<AppRoutesProps> = (props) => {
@@ -1510,6 +1512,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
           initialTab={props.currentView === 'receive_search' || props.currentView === 'receive_record_search' ? 'search' : receiveRecordSubTab}
           onSave={props.handleAddOrUpdateRecord}
           onDelete={props.handleDeleteRecord}
+          onDeleteBatch={props.handleBatchDeleteRecords}
           wards={wards}
           employees={employees}
           currentUser={currentUser}
@@ -1567,6 +1570,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
         <UtilitiesView
           currentUser={currentUser}
           employees={employees}
+          users={users}
           initialRecordForCorrection={props.recordForMapCorrection}
           records={records}
           onUpdateRecord={(id, num, type) =>
@@ -1583,6 +1587,8 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
           }
           onResetWards={props.onResetWards}
           onSaveRecord={props.handleAddOrUpdateRecord}
+          onBatchUpdateRecords={props.handleBatchUpdateRecords}
+          onDeleteBatchRecords={props.handleBatchDeleteRecords}
           holidays={holidays}
           onRefreshData={props.onRefreshData}
         />

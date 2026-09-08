@@ -89,6 +89,7 @@ interface AppModalsProps {
     onCreateContract?: (record: Partial<RecordFile>) => void;
     handleBulkUpdate: (field: keyof RecordFile, value: any, customDateStr?: string, targetRecordIds?: string[]) => Promise<void>;
     handleBatchUpdateRecords?: (updates: Partial<RecordFile>[]) => Promise<void>;
+    handleBatchDeleteRecords?: (ids: string[]) => Promise<boolean>;
     confirmReturnResult: (receiptNumber: string, receiverName: string, returnedPrice: number, receiptType?: 'Biên Lai' | 'Hóa Đơn', returnReason?: string) => void;
     onConfirmRejectReturnStep?: (optionType: ReturnOptionType, reason: string, returnDateStr: string) => Promise<void>;
     onOpenRejectReturnModal?: (record: RecordFile) => void;
@@ -277,6 +278,7 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
                 users={props.users}
                 currentUser={props.currentUser}
                 onBatchUpdateRecords={props.handleBatchUpdateRecords || (async () => {})}
+                onDeleteBatchRecords={props.handleBatchDeleteRecords}
                 onRefreshData={props.onRefreshData}
             />
 

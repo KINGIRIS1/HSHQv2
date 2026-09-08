@@ -75,7 +75,7 @@ interface RecordModalProps {
   records?: RecordFile[];
 }
 
-const generateHQCode = (dateStr: string, recordsList: RecordFile[] = []) => {
+const generateRecordCode = (dateStr: string, recordsList: RecordFile[] = [], isArchive: boolean = false, recordType: string = '') => {
     const d = new Date(dateStr || new Date());
     const year = d.getFullYear().toString();
     const yy = year.slice(-2);
@@ -83,13 +83,17 @@ const generateHQCode = (dateStr: string, recordsList: RecordFile[] = []) => {
     const dd = ('0' + d.getDate()).slice(-2);
     const datePrefix = `${yy}${mm}${dd}`;
 
+    const rType = (recordType || '').toLowerCase();
+    const isLT = isArchive || rType.startsWith('1.') || rType.includes('1.1') || rType.includes('1.2') || rType.includes('sao lục') || rType.includes('công văn') || rType.includes('cung cấp') || rType.includes('lưu trữ');
+
     let maxSeq = 0;
     recordsList.forEach((r) => {
         if (!r.code) return;
-        const parts = r.code.split('-');
+        const cleanCode = r.code.startsWith('LT-') ? r.code.replace('LT-', '') : (r.code.startsWith('HQ-') ? r.code.replace('HQ-', '') : r.code);
+        const parts = cleanCode.split('-');
         if (parts.length >= 2) {
-            const rDate = parts.length === 3 ? parts[1] : parts[0];
-            const rSeq = parts.length === 3 ? parts[2] : parts[1];
+            const rDate = parts[0];
+            const rSeq = parts[1];
             if (rDate && rDate.substring(0, 2) === yy) {
                 const seqNum = parseInt(rSeq, 10);
                 if (!isNaN(seqNum) && seqNum > maxSeq) maxSeq = seqNum;
@@ -97,8 +101,8 @@ const generateHQCode = (dateStr: string, recordsList: RecordFile[] = []) => {
         }
     });
 
-    const nextSeq = (maxSeq + 1).toString().padStart(3, '0');
-    return `HQ-${datePrefix}-${nextSeq}`;
+    const nextSeq = (maxSeq + 1).toString().padStart(4, '0');
+    return isLT ? `LT-${datePrefix}-${nextSeq}` : `${datePrefix}-${nextSeq}`;
 };
 
 const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, initialData, employees, currentUser, wards, currentView, holidays, records }) => {
@@ -254,7 +258,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
               deadline: '',
               price: undefined,
               status: RecordStatus.RECEIVED,
-              code: generateHQCode(new Date().toISOString(), records),
+              code: generateRecordCode(new Date().toISOString(), records, currentView === 'archive'),
               receivedBy: currentUser?.employeeId || ''
             });
             setAttachedDocs([]);
@@ -685,6 +689,9 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
           updated.returnedPrice = undefined;
         }
         if (field === 'recordType') {
+          if (!initialData) {
+            updated.code = generateRecordCode(String(rDate || new Date().toISOString()), records, currentView === 'archive', String(value || ''));
+          }
           if (!value) {
             updated.price = undefined;
             updated.returnedPrice = undefined;

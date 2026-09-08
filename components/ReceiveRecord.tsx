@@ -20,6 +20,7 @@ import SystemReceiptTemplate from './receive-record/SystemReceiptTemplate';
 interface ReceiveRecordProps {
   onSave: (record: RecordFile) => Promise<RecordFile | null>;
   onDelete: (id: string) => Promise<boolean>;
+  onDeleteBatch?: (ids: string[]) => Promise<boolean>;
   wards: string[];
   employees: Employee[];
   currentUser: User;
@@ -67,7 +68,7 @@ const formatDateKey = (date: Date): string => {
     return `${year}-${month}-${day}`;
 };
 
-const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, employees, currentUser, records = [], holidays, onCreateContract, onHandOverRecords, onBulkUpdate, initialTab = 'create', rolePermissions, departmentPermissions, onReturnResult, onSyncPending }) => {
+const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, onDeleteBatch, wards, employees, currentUser, records = [], holidays, onCreateContract, onHandOverRecords, onBulkUpdate, initialTab = 'create', rolePermissions, departmentPermissions, onReturnResult, onSyncPending }) => {
   const [viewMode, setViewMode] = useState<'create' | 'list' | 'update' | 'vphc' | 'search' | 'extend'>(initialTab === 'bulk' as any ? 'create' : initialTab as any);
 
   const canCreate = !currentUser || isViewAllowedForUser(currentUser, employees || [], 'receive_sub_create', rolePermissions, departmentPermissions);
@@ -138,8 +139,17 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
       return 'CT';
   };
 
-  const calculateNextCode = (wardName: string, dateStr: string, recordType?: string, existingCodes: string[] = []) => {
+  const calculateNextCode = (wardName: string, dateStr: string, recordTypeOrCodes?: string | string[], existingCodes: string[] = []) => {
     if (!dateStr) return '';
+
+    let recordType = '';
+    let extraCodes: string[] = existingCodes;
+
+    if (Array.isArray(recordTypeOrCodes)) {
+        extraCodes = recordTypeOrCodes;
+    } else if (typeof recordTypeOrCodes === 'string') {
+        recordType = recordTypeOrCodes;
+    }
 
     const d = new Date(dateStr);
     const year = d.getFullYear().toString();
@@ -149,7 +159,7 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
     const datePrefix = `${yy}${mm}${dd}`;
     
     const rType = (recordType || '').toLowerCase();
-    const isArchive = rType.startsWith('1.') || rType.includes('sao lục') || rType.includes('công văn') || rType.includes('cung cấp dữ liệu');
+    const isArchive = rType.startsWith('1.') || rType.includes('1.1') || rType.includes('1.2') || rType.includes('sao lục') || rType.includes('công văn') || rType.includes('cung cấp') || rType.includes('lưu trữ');
     
     let maxSeq = 0;
     
@@ -158,7 +168,7 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
         const isCodeArchive = code.startsWith('LT-');
         if (isArchive !== isCodeArchive) return;
 
-        const cleanCode = isCodeArchive ? code.replace('LT-', '') : code;
+        const cleanCode = isCodeArchive ? code.replace('LT-', '') : (code.startsWith('HQ-') ? code.replace('HQ-', '') : code);
         const parts = cleanCode.split('-');
         if (parts.length === 2 || parts.length === 3) {
             const rDate = parts.length === 2 ? parts[0] : parts[1];
@@ -171,7 +181,7 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
     };
 
     combinedRecords.forEach((r: RecordFile) => checkSeq(r.code));
-    existingCodes.forEach(checkSeq);
+    extraCodes.forEach(checkSeq);
 
     const nextSeq = (maxSeq + 1).toString().padStart(4, '0');
     return isArchive ? `LT-${datePrefix}-${nextSeq}` : `${datePrefix}-${nextSeq}`;
@@ -424,6 +434,7 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
                 employees={employees}
                 onEdit={handleEditFromList}
                 onDelete={handleDeleteFromList}
+                onDeleteBatch={onDeleteBatch}
                 onPrint={handlePreviewDocx}
                 onSave={onSave}
                 onReturnResult={onReturnResult}
@@ -438,6 +449,7 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
                 employees={employees}
                 onEdit={handleEditFromList}
                 onDelete={handleDeleteFromList}
+                onDeleteBatch={onDeleteBatch}
                 onPrint={handlePreviewDocx}
                 onSave={onSave}
                 isExtendView={true}

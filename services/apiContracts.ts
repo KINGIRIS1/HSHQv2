@@ -167,7 +167,7 @@ export const fetchContracts = async (): Promise<Contract[]> => {
                 setLocalContracts(merged);
             }
         } catch (error) {
-            logError("fetchContracts background sync", error);
+            logError("fetchContracts background sync", error, true);
         }
     })();
 
@@ -296,7 +296,7 @@ export const fetchPriceList = async (): Promise<PriceItem[]> => {
         if (error) throw error;
         return (data || []).map(mapPriceFromDb);
     } catch (error) {
-        logError("fetchPriceList", error);
+        logError("fetchPriceList", error, true);
         return [];
     }
 };
@@ -311,7 +311,7 @@ export const savePriceListBatch = async (items: PriceItem[]): Promise<boolean> =
         if (error) throw error;
         return true;
     } catch (error) {
-        logError("savePriceListBatch", error);
+        logError("savePriceListBatch", error, true);
         return false;
     }
 };

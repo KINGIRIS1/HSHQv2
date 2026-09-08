@@ -1,11 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import { RecordFile, Employee, User, RecordStatus } from '../types';
-import { X, AlertTriangle, CheckCircle, FileSpreadsheet, RefreshCw, Wrench, ChevronDown, ChevronUp, Search, Info, Check, Filter, Edit3, Save } from 'lucide-react';
+import { X, AlertTriangle, CheckCircle, FileSpreadsheet, RefreshCw, Wrench, ChevronDown, ChevronUp, Search, Info, Check, Filter, Edit3, Save, Trash2, Loader2 } from 'lucide-react';
 import * as XLSX from 'xlsx-js-style';
 
 export interface RecordError {
   code: string;
-  category: 'info' | 'date' | 'check' | 'assign' | 'map';
+  category: 'unupdated' | 'info' | 'date' | 'check' | 'assign' | 'map';
   categoryLabel: string;
   severity: 'high' | 'medium' | 'low';
   message: string;
@@ -20,24 +20,28 @@ export interface DiagnosticItem {
 }
 
 interface BatchErrorDiagnosticModalProps {
-  isOpen: boolean;
-  onClose: () => void;
+  isOpen?: boolean;
+  isEmbedded?: boolean;
+  onClose?: () => void;
   records: RecordFile[];
   employees: Employee[];
-  users: User[];
+  users?: User[];
   currentUser: User | null;
   onBatchUpdateRecords: (updates: Partial<RecordFile>[]) => Promise<void>;
+  onDeleteBatchRecords?: (ids: string[]) => Promise<boolean>;
   onRefreshData?: () => void;
 }
 
 export const BatchErrorDiagnosticModal: React.FC<BatchErrorDiagnosticModalProps> = ({
-  isOpen,
+  isOpen = true,
+  isEmbedded = false,
   onClose,
   records,
   employees,
-  users,
+  users = [],
   currentUser,
   onBatchUpdateRecords,
+  onDeleteBatchRecords,
   onRefreshData,
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -47,10 +51,83 @@ export const BatchErrorDiagnosticModal: React.FC<BatchErrorDiagnosticModalProps>
   const [isFixing, setIsFixing] = useState<boolean>(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [expandedRecordIds, setExpandedRecordIds] = useState<Set<string>>(new Set());
+  const [bgDeleteProgress, setBgDeleteProgress] = useState<{ current: number; total: number } | null>(null);
 
   // Pagination states
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(10);
+
+  // Danh sách hồ sơ nhập nhầm có tên hoặc thông tin "Chưa Cập Nhật"
+  const unupdatedRecords = useMemo(() => {
+    return records.filter((r) => {
+      const name = (r.customerName || '').toLowerCase().replace(/\s+/g, ' ').trim();
+      const code = (r.code || '').toLowerCase().trim();
+      const notes = (r.notes || '').toLowerCase().trim();
+      
+      const isNameUnupdated = !name || 
+                              name.includes('chưa cập nhật') || 
+                              name.includes('chuacapnhat') || 
+                              name.includes('chưa nhập') || 
+                              name.includes('chưa xác định') || 
+                              name.includes('chưa có') || 
+                              name === 'n/a' || 
+                              name === 'null' || 
+                              name === 'undefined' || 
+                              name === '--';
+
+      const isCodeUnupdated = code.includes('chưa cập nhật') || code === 'n/a';
+      const isNotesUnupdated = notes.includes('nhập nhầm chưa cập nhật');
+
+      return isNameUnupdated || isCodeUnupdated || isNotesUnupdated;
+    });
+  }, [records]);
+
+  const handleDeleteUnupdatedRecords = async () => {
+    if (unupdatedRecords.length === 0) {
+      alert('Không tìm thấy hồ sơ nào có thông tin "Chưa Cập Nhật"!');
+      return;
+    }
+    const total = unupdatedRecords.length;
+    if (!window.confirm(`XÁC NHẬN XÓA NGẦM LẦN LƯỢT:\n\nBạn có chắc chắn muốn xóa ngầm lần lượt toàn bộ ${total} hồ sơ "Chưa Cập Nhật"?\n\nHệ thống sẽ tự động chia nhỏ công việc thành từng nhóm (50 hồ sơ/đợt) và xử lý ngầm để ứng dụng luôn mượt mà, không gián đoạn thao tác của bạn.`)) {
+      return;
+    }
+
+    setIsFixing(true);
+    const idsToDelete = unupdatedRecords.map(r => r.id);
+    const CHUNK_SIZE = 50;
+    let processed = 0;
+
+    setBgDeleteProgress({ current: 0, total });
+
+    try {
+      for (let i = 0; i < idsToDelete.length; i += CHUNK_SIZE) {
+        const chunk = idsToDelete.slice(i, i + CHUNK_SIZE);
+        if (onDeleteBatchRecords) {
+          await onDeleteBatchRecords(chunk);
+        } else if (onBatchUpdateRecords) {
+          await onBatchUpdateRecords([]);
+        }
+        processed += chunk.length;
+        const currentProgress = Math.min(processed, total);
+        setBgDeleteProgress({ current: currentProgress, total });
+
+        // Tạm nghỉ 100ms giữa các chunk để thread chính rảnh rỗi cho người dùng thao tác
+        await new Promise(res => setTimeout(res, 100));
+      }
+
+      setSuccessMessage(`Đã hoàn tất xóa ngầm toàn bộ ${total} hồ sơ "Chưa Cập Nhật"!`);
+      setTimeout(() => setSuccessMessage(null), 5000);
+      if (onRefreshData) {
+        await onRefreshData();
+      }
+    } catch (err: any) {
+      console.error('Lỗi khi xóa ngầm hồ sơ Chưa Cập Nhật:', err);
+      alert('Đã xảy ra lỗi khi xóa hồ sơ: ' + (err?.message || 'Không thể kết nối đến máy chủ'));
+    } finally {
+      setIsFixing(false);
+      setBgDeleteProgress(null);
+    }
+  };
 
   // Function to run diagnostic on records
   const diagnosticResults = useMemo<DiagnosticItem[]>(() => {
@@ -58,6 +135,35 @@ export const BatchErrorDiagnosticModal: React.FC<BatchErrorDiagnosticModalProps>
 
     records.forEach((r) => {
       const errors: RecordError[] = [];
+
+      // Check hồ sơ Chưa Cập Nhật
+      const name = (r.customerName || '').toLowerCase().replace(/\s+/g, ' ').trim();
+      const code = (r.code || '').toLowerCase().trim();
+      const notes = (r.notes || '').toLowerCase().trim();
+      const isUnupdated = !name || 
+                          name.includes('chưa cập nhật') || 
+                          name.includes('chuacapnhat') || 
+                          name.includes('chưa nhập') || 
+                          name.includes('chưa xác định') || 
+                          name.includes('chưa có') || 
+                          name === 'n/a' || 
+                          name === 'null' || 
+                          name === 'undefined' || 
+                          name === '--' ||
+                          code.includes('chưa cập nhật') ||
+                          notes.includes('nhập nhầm chưa cập nhật');
+
+      if (isUnupdated) {
+        errors.push({
+          code: 'ERR_UNUPDATED_RECORD',
+          category: 'unupdated',
+          categoryLabel: 'Chưa Cập Nhật (Nhập nhầm)',
+          severity: 'high',
+          message: 'Hồ sơ mang thông tin "Chưa Cập Nhật" (nhập sai / trùng từ Excel).',
+          suggestion: 'Sử dụng nút "Xóa ngầm" để loại bỏ hồ sơ nhập nhầm khỏi hệ thống.',
+          canAutoFix: false,
+        });
+      }
 
       // MẢNG 1: Thông tin cơ bản & Mã hồ sơ
       if (!r.code || !r.code.trim() || r.code === 'N/A') {
@@ -260,6 +366,7 @@ export const BatchErrorDiagnosticModal: React.FC<BatchErrorDiagnosticModalProps>
   const categoryCounts = useMemo(() => {
     const counts = {
       all: diagnosticResults.length,
+      unupdated: 0,
       info: 0,
       date: 0,
       check: 0,
@@ -506,9 +613,10 @@ export const BatchErrorDiagnosticModal: React.FC<BatchErrorDiagnosticModalProps>
     XLSX.writeFile(workbook, fileName);
   };
 
-  return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[100] p-3 sm:p-6 overflow-y-auto animate-in fade-in duration-200">
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-6xl max-h-[90vh] flex flex-col overflow-hidden my-auto">
+  if (!isOpen && !isEmbedded) return null;
+
+  const content = (
+    <div className={isEmbedded ? "w-full h-full flex flex-col overflow-hidden bg-white rounded-2xl shadow-sm border border-slate-200" : "bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-6xl max-h-[90vh] flex flex-col overflow-hidden my-auto"}>
         
         {/* Header */}
         <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between shrink-0 border-b border-slate-800">
@@ -528,12 +636,14 @@ export const BatchErrorDiagnosticModal: React.FC<BatchErrorDiagnosticModalProps>
               </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="text-slate-400 hover:text-white p-2 rounded-xl hover:bg-slate-800 transition-colors"
-          >
-            <X size={20} />
-          </button>
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="text-slate-400 hover:text-white p-2 rounded-xl hover:bg-slate-800 transition-colors"
+            >
+              <X size={20} />
+            </button>
+          )}
         </div>
 
         {/* Notification banner */}
@@ -549,9 +659,82 @@ export const BatchErrorDiagnosticModal: React.FC<BatchErrorDiagnosticModalProps>
           </div>
         )}
 
+        {/* Banner phát hiện hồ sơ Chưa Cập Nhật */}
+        {unupdatedRecords.length > 0 ? (
+          <div className="bg-red-50 border-b border-red-200 px-6 py-3 shrink-0">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-red-100 text-red-600 flex items-center justify-center shrink-0">
+                  <Trash2 size={18} />
+                </div>
+                <div>
+                  <div className="text-sm font-extrabold text-red-900">
+                    Phát hiện <span className="underline decoration-red-500 decoration-2">{unupdatedRecords.length} hồ sơ</span> có thông tin "Chưa Cập Nhật"
+                  </div>
+                  <div className="text-xs text-red-700">
+                    {bgDeleteProgress 
+                      ? `Đang tiến hành xóa ngầm lần lượt theo từng nhóm nhỏ (50 hồ sơ/đợt)... Bạn vẫn có thể dùng phần mềm bình thường.`
+                      : `Bấm nút bên phải để bắt đầu xóa ngầm lần lượt theo từng đợt (50 hồ sơ/đợt, nghỉ 100ms), không gây đơ máy.`}
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={handleDeleteUnupdatedRecords}
+                disabled={isFixing}
+                className="bg-red-600 hover:bg-red-700 active:scale-95 text-white font-bold text-xs px-4 py-2 rounded-xl flex items-center gap-2 shadow-sm transition-all disabled:opacity-50 cursor-pointer"
+              >
+                {bgDeleteProgress ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                <span>
+                  {bgDeleteProgress 
+                    ? `Đang xóa ngầm (${bgDeleteProgress.current}/${bgDeleteProgress.total})...`
+                    : `Xóa ngầm ${unupdatedRecords.length} hồ sơ "Chưa Cập Nhật"`}
+                </span>
+              </button>
+            </div>
+
+            {/* Thanh tiến trình xóa ngầm */}
+            {bgDeleteProgress && (
+              <div className="mt-2.5 w-full bg-red-200/80 rounded-full h-2 overflow-hidden">
+                <div 
+                  className="bg-red-600 h-full transition-all duration-200 rounded-full"
+                  style={{ width: `${Math.round((bgDeleteProgress.current / bgDeleteProgress.total) * 100)}%` }}
+                />
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="bg-emerald-50 border-b border-emerald-200 px-6 py-2.5 shrink-0 flex items-center justify-between">
+            <div className="flex items-center gap-2 text-emerald-800 text-xs font-semibold">
+              <CheckCircle size={16} className="text-emerald-600 shrink-0" />
+              <span>Dữ liệu sạch: Không có hồ sơ mang thông tin "Chưa Cập Nhật". Cơ chế Xóa Ngầm (chia 50 hồ sơ/đợt, nghỉ 100ms) luôn hoạt động tự động khi phát hiện lỗi.</span>
+            </div>
+            <span className="text-[11px] bg-emerald-100 text-emerald-700 font-bold px-2 py-0.5 rounded-md border border-emerald-300/50">0 lỗi Chưa Cập Nhật</span>
+          </div>
+        )}
+
         {/* Category Navigation Bar */}
         <div className="bg-slate-50 border-b border-slate-200 px-6 py-3 shrink-0 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+            <button
+              onClick={() => setSelectedCategory('unupdated')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                selectedCategory === 'unupdated'
+                  ? 'bg-rose-600 text-white shadow-sm'
+                  : 'bg-white text-rose-700 border border-rose-200 hover:bg-rose-50'
+              }`}
+            >
+              <span>Chưa Cập Nhật</span>
+              {unupdatedRecords.length > 0 ? (
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-rose-100 text-rose-800 font-extrabold animate-pulse">
+                  {unupdatedRecords.length}
+                </span>
+              ) : (
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-100 text-slate-500 font-bold">
+                  0
+                </span>
+              )}
+            </button>
+
             <button
               onClick={() => setSelectedCategory('all')}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
@@ -774,9 +957,26 @@ export const BatchErrorDiagnosticModal: React.FC<BatchErrorDiagnosticModalProps>
                     <div className="flex items-center gap-2 shrink-0">
                       <button
                         onClick={() => handleStartEdit(item.record)}
-                        className="flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors border border-blue-200"
+                        className="flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors border border-blue-200 cursor-pointer"
                       >
                         <Edit3 size={14} /> Sửa nhanh
+                      </button>
+
+                      <button
+                        onClick={async () => {
+                          if (window.confirm(`Xác nhận xóa bỏ hồ sơ MS: ${item.record.code || item.record.id} (${item.record.customerName || 'Chưa tên'}) khỏi hệ thống?`)) {
+                            if (onDeleteBatchRecords) {
+                              await onDeleteBatchRecords([item.record.id]);
+                            }
+                            setSuccessMessage('Đã xóa thành công hồ sơ!');
+                            setTimeout(() => setSuccessMessage(null), 3000);
+                            if (onRefreshData) onRefreshData();
+                          }
+                        }}
+                        className="flex items-center gap-1 text-xs font-bold text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100 px-2.5 py-1.5 rounded-lg transition-colors border border-red-200 cursor-pointer"
+                        title="Xóa bỏ hoàn toàn hồ sơ bị lỗi này"
+                      >
+                        <Trash2 size={14} /> Xóa
                       </button>
 
                       <button
@@ -1009,15 +1209,26 @@ export const BatchErrorDiagnosticModal: React.FC<BatchErrorDiagnosticModalProps>
           <div className="text-xs text-slate-500 font-medium">
             * Mọi dữ liệu sửa đổi sẽ được cập nhật trực tiếp vào hệ thống khi bạn thực hiện sửa nhanh hoặc sửa tự động.
           </div>
-          <button
-            onClick={onClose}
-            className="px-5 py-2 bg-slate-800 text-white text-xs font-bold rounded-xl hover:bg-slate-900 transition-colors shadow-sm active:scale-95"
-          >
-            Đóng cửa sổ
-          </button>
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="px-5 py-2 bg-slate-800 text-white text-xs font-bold rounded-xl hover:bg-slate-900 transition-colors shadow-sm active:scale-95"
+            >
+              Đóng cửa sổ
+            </button>
+          )}
         </div>
 
       </div>
+  );
+
+  if (isEmbedded) {
+    return <div className="w-full h-full p-4 overflow-y-auto">{content}</div>;
+  }
+
+  return (
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[100] p-3 sm:p-6 overflow-y-auto animate-in fade-in duration-200">
+      {content}
     </div>
   );
 };

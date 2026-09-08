@@ -355,6 +355,33 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
         return emp ? emp.name : id;
     };
 
+    const generateLTHoSoCode = (recordsList: ArchiveRecord[]) => {
+        const d = new Date();
+        const yy = d.getFullYear().toString().slice(-2);
+        const mm = ('0' + (d.getMonth() + 1)).slice(-2);
+        const dd = ('0' + d.getDate()).slice(-2);
+        const datePrefix = `${yy}${mm}${dd}`;
+
+        let maxSeq = 0;
+        recordsList.forEach((r) => {
+            const code = r.so_hieu || '';
+            if (!code) return;
+            const cleanCode = code.startsWith('LT-') ? code.replace('LT-', '') : code;
+            const parts = cleanCode.split('-');
+            if (parts.length >= 2) {
+                const rDate = parts[0];
+                const rSeq = parts[1];
+                if (rDate && rDate.substring(0, 2) === yy) {
+                    const seqNum = parseInt(rSeq, 10);
+                    if (!isNaN(seqNum) && seqNum > maxSeq) maxSeq = seqNum;
+                }
+            }
+        });
+
+        const nextSeq = (maxSeq + 1).toString().padStart(4, '0');
+        return `LT-${datePrefix}-${nextSeq}`;
+    };
+
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!formData.so_hieu || !formData.trich_yeu) { alert('Vui lòng nhập Số hiệu và Trích yếu.'); return; }
@@ -369,7 +396,7 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
             await loadData();
             setIsFormOpen(false);
             setEditingId(null);
-            setFormData({ type: 'congvan', status: 'draft', so_hieu: '', trich_yeu: '', ngay_thang: new Date().toISOString(), noi_nhan_gui: '' });
+            setFormData({ type: 'congvan', status: 'draft', so_hieu: generateLTHoSoCode(records), trich_yeu: '', ngay_thang: new Date().toISOString(), noi_nhan_gui: '' });
         } else {
             alert('Lỗi khi lưu.');
         }
@@ -647,7 +674,7 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
                                     <Users size={18}/> Giao việc ({selectedIds.size})
                                 </button>
                             )}
-                            <button onClick={() => { setIsFormOpen(true); setEditingId(null); setFormData({type: 'congvan', status: 'draft', so_hieu: '', trich_yeu: '', ngay_thang: new Date().toISOString(), noi_nhan_gui: ''}); }} className="flex items-center gap-2 bg-white text-emerald-600 border border-emerald-200 px-4 py-2 rounded-lg hover:bg-emerald-50 font-bold shadow-sm transition-all">
+                            <button onClick={() => { setIsFormOpen(true); setEditingId(null); setFormData({type: 'congvan', status: 'draft', so_hieu: generateLTHoSoCode(records), trich_yeu: '', ngay_thang: new Date().toISOString(), noi_nhan_gui: ''}); }} className="flex items-center gap-2 bg-white text-emerald-600 border border-emerald-200 px-4 py-2 rounded-lg hover:bg-emerald-50 font-bold shadow-sm transition-all">
                                 <Plus size={18}/> Tạo mới
                             </button>
                         </>

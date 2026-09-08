@@ -8,9 +8,9 @@ export const fetchExcerptHistory = async (): Promise<any[]> => {
         const { data, error } = await supabase.from('excerpt_history').select('*').order('createdAt', { ascending: false }).limit(200);
         if (error) throw error;
         saveToCache(CACHE_KEYS.EXCERPT_HISTORY, data);
-        return data;
+        return data || [];
     } catch (error) {
-        logError("fetchExcerptHistory", error);
+        logError("fetchExcerptHistory", error, true);
         return getFromCache(CACHE_KEYS.EXCERPT_HISTORY, []);
     }
 };
@@ -29,7 +29,7 @@ export const saveExcerptRecord = async (record: any): Promise<boolean> => {
         if (error) throw error;
         return true;
     } catch (error) {
-        logError("saveExcerptRecord", error);
+        logError("saveExcerptRecord", error, true);
         return false;
     }
 };
@@ -46,7 +46,7 @@ export const fetchExcerptCounters = async (): Promise<Record<string, number>> =>
         saveToCache(CACHE_KEYS.EXCERPT_COUNTERS, counters);
         return counters;
     } catch (error) {
-        logError("fetchExcerptCounters", error);
+        logError("fetchExcerptCounters", error, true);
         return getFromCache(CACHE_KEYS.EXCERPT_COUNTERS, {});
     }
 };
@@ -59,7 +59,7 @@ export const saveExcerptCounters = async (counters: Record<string, number>): Pro
         if (error) throw error;
         return true;
     } catch (error) {
-        logError("saveExcerptCounters", error);
+        logError("saveExcerptCounters", error, true);
         return false;
     }
 };
@@ -70,9 +70,9 @@ export const fetchTrichDoHistory = async (): Promise<any[]> => {
         const { data, error } = await supabase.from('trichdo_history').select('*').order('createdAt', { ascending: false }).limit(200);
         if (error) throw error;
         saveToCache(CACHE_KEYS.TRICHDO_HISTORY, data);
-        return data;
+        return data || [];
     } catch (error) {
-        logError("fetchTrichDoHistory", error);
+        logError("fetchTrichDoHistory", error, true);
         return getFromCache(CACHE_KEYS.TRICHDO_HISTORY, []);
     }
 };
@@ -91,7 +91,7 @@ export const saveTrichDoRecord = async (record: any): Promise<boolean> => {
         if (error) throw error;
         return true;
     } catch (error) {
-        logError("saveTrichDoRecord", error);
+        logError("saveTrichDoRecord", error, true);
         return false;
     }
 };
@@ -108,7 +108,7 @@ export const fetchTrichDoCounters = async (): Promise<Record<string, number>> =>
         saveToCache(CACHE_KEYS.TRICHDO_COUNTERS, counters);
         return counters;
     } catch (error) {
-        logError("fetchTrichDoCounters", error);
+        logError("fetchTrichDoCounters", error, true);
         return getFromCache(CACHE_KEYS.TRICHDO_COUNTERS, {});
     }
 };
@@ -121,7 +121,7 @@ export const saveTrichDoCounters = async (counters: Record<string, number>): Pro
         if (error) throw error;
         return true;
     } catch (error) {
-        logError("saveTrichDoCounters", error);
+        logError("saveTrichDoCounters", error, true);
         return false;
     }
 };
