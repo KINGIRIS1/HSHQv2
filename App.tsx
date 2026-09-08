@@ -26,6 +26,7 @@ import MobileLayout from './components/layout/MobileLayout';
 import MobileRoutes from './components/mobile/MobileRoutes';
 import UpdateRequiredModal from './components/UpdateRequiredModal';
 import SubmitModal from './components/receive-record/SubmitModal';
+import HandoverOfficeModal from './components/receive-record/HandoverOfficeModal';
 import BulkSignConfirmModal from './components/BulkSignConfirmModal';
 import GlobalConfirmModal from './components/GlobalConfirmModal';
 import GlobalAlertModal from './components/GlobalAlertModal';
@@ -175,6 +176,8 @@ function App() {
   const [importModalMode, setImportModalMode] = useState<'create' | 'update'>('create');
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [assignTargetRecords, setAssignTargetRecords] = useState<RecordFile[]>([]);
+  const [isHandoverOfficeModalOpen, setIsHandoverOfficeModalOpen] = useState(false);
+  const [handoverOfficeTargetRecords, setHandoverOfficeTargetRecords] = useState<RecordFile[]>([]);
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
   const [isSubmitCheckModalOpen, setIsSubmitCheckModalOpen] = useState(false);
   const [submitTargetRecords, setSubmitTargetRecords] = useState<RecordFile[]>([]);
@@ -887,11 +890,56 @@ function App() {
       }
   }, []);
 
+  const handleConfirmHandoverOffice = useCallback(async (drafterId: string, handoverDateStr: string) => {
+    if (handoverOfficeTargetRecords.length === 0) return;
+    const handoverIso = handoverDateStr
+      ? new Date(handoverDateStr + "T12:00:00").toISOString()
+      : new Date().toISOString();
+
+    const targets = [...handoverOfficeTargetRecords];
+    setIsHandoverOfficeModalOpen(false);
+    setHandoverOfficeTargetRecords([]);
+
+    try {
+      await Promise.all(
+        targets.map(async (record) => {
+          const updates = syncRecordStatusTransition(record, RecordStatus.OFFICE_WORK, {
+            assignedTo: drafterId,
+            customDates: { officeAssignedDate: handoverIso },
+            userName: currentUser?.name || currentUser?.username || 'Hệ thống',
+            userId: currentUser?.id
+          });
+          const updatedRecord: RecordFile = {
+            ...record,
+            ...updates,
+            status: RecordStatus.OFFICE_WORK,
+            surveyorId: record.surveyorId || record.assignedTo || currentUser?.employeeId,
+            drafterId: drafterId,
+            assignedTo: drafterId,
+            officeAssignedDate: handoverIso,
+            fieldCompletedDate: handoverIso,
+          };
+          setRecords(prev => prev.map(r => r.id === record.id ? updatedRecord : r));
+          return updateRecordApi(updatedRecord);
+        })
+      );
+      setToast({ type: 'success', message: `Đã giao việc Biên tập bản đồ thành công.` });
+    } catch (err) {
+      console.error("Lỗi khi bàn giao Nội nghiệp:", err);
+      setToast({ type: 'error', message: "Có lỗi xảy ra khi giao việc Biên tập bản đồ." });
+    }
+  }, [handoverOfficeTargetRecords, currentUser]);
+
   const advanceStatus = useCallback(async (record: RecordFile) => {
       if (record.status === RecordStatus.RECEIVED) { 
           setAssignTargetRecords([record]); 
           setIsAssignModalOpen(true); 
           return; 
+      }
+      if (record.status === RecordStatus.FIELD_WORK) {
+          setHandoverOfficeTargetRecords([record]);
+          setIsHandoverOfficeModalOpen(true);
+          return;
       }
       const isArchive = isArchiveRecordType(record.recordType) || (getDepartmentForRecord(record).toLowerCase().includes('lưu trữ'));
       if (record.status === RecordStatus.ASSIGNED || record.status === RecordStatus.IN_PROGRESS) {
@@ -1641,6 +1689,14 @@ function App() {
                     console.error("Lỗi khi trình ký:", error);
                 });
             }}
+        />
+
+        <HandoverOfficeModal
+            isOpen={isHandoverOfficeModalOpen}
+            onClose={() => setIsHandoverOfficeModalOpen(false)}
+            records={handoverOfficeTargetRecords}
+            employees={employees}
+            onConfirm={handleConfirmHandoverOffice}
         />
 
         <SubmitModal 

@@ -20,6 +20,7 @@ const HandoverOfficeModal: React.FC<HandoverOfficeModalProps> = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDrafterId, setSelectedDrafterId] = useState('');
+  const [handoverDate, setHandoverDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Lọc chỉ nhân sự thuộc Tổ Đo đạc
@@ -54,9 +55,7 @@ const HandoverOfficeModal: React.FC<HandoverOfficeModalProps> = ({
     }
     setIsSubmitting(true);
     try {
-      // Tự động lấy ngày hiện tại trực tiếp giống như Trình ký / Trình kiểm tra
-      const todayStr = new Date().toISOString().split('T')[0];
-      await onConfirm(selectedDrafterId, todayStr);
+      await onConfirm(selectedDrafterId, handoverDate);
       onClose();
     } catch (err) {
       console.error('Error during handover:', err);
@@ -94,6 +93,19 @@ const HandoverOfficeModal: React.FC<HandoverOfficeModalProps> = ({
 
         {/* Modal Body */}
         <div className="p-4 space-y-4 overflow-y-auto flex-1">
+          {/* Ngày giao việc */}
+          <div>
+            <label className="block text-xs font-bold text-gray-700 mb-1.5">
+              Ngày giao Biên tập bản đồ:
+            </label>
+            <input
+              type="date"
+              value={handoverDate}
+              onChange={(e) => setHandoverDate(e.target.value)}
+              className="w-full px-3 py-1.5 text-xs border border-gray-200 rounded-lg bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500 font-bold text-slate-700"
+            />
+          </div>
+
           {/* Chọn chuyên viên biên tập bản đồ (Tổ đo đạc) */}
           <div>
             <label className="block text-xs font-bold text-gray-700 mb-1.5 flex items-center justify-between">

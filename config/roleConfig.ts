@@ -186,7 +186,7 @@ export function isViewAllowedForUser(
     // Bộ quyền con thuộc từng phân hệ chính
     const ONEDOOR_CHILD_PERMS = ['receive_record', 'receive_sub_create', 'receive_sub_bulk', 'receive_sub_list', 'receive_sub_vphc', 'ADD_RECORDS', 'EXPORT_RECORDS'];
     const DODAC_CHILD_PERMS = [
-      'all_records', 'all_sub_all', 'assign_tasks', 'completed_list', 'pending_supplement_list', 'pending_check_list', 'check_list', 'handover_list', 'director_completed',
+      'all_records', 'all_sub_all', 'assign_tasks', 'completed_list', 'measurement_field', 'measurement_office', 'pending_supplement_list', 'pending_check_list', 'check_list', 'handover_list', 'director_completed',
       'dodac_BTN_ASSIGN_STAFF', 'dodac_BTN_SUBMIT_CHECK', 'dodac_BTN_SUBMIT_SIGN', 'dodac_BTN_APPROVE_SIGN', 
       'dodac_BTN_REJECT_RECORD', 'dodac_HANDOVER_RECORDS', 'dodac_BTN_RETURN_RESULT', 'dodac_VIEW_EXCERPTS', 
       'dodac_MANAGE_EXCERPTS', 'dodac_BTN_EXTEND_DEADLINE', 'dodac_EDIT_RECORDS', 'dodac_DELETE_RECORDS', 'dodac_VIEW_DETAILS',
@@ -248,6 +248,8 @@ export function isViewAllowedForUser(
       case 'all_sub_all':
       case 'assign_tasks':
       case 'completed_list':
+      case 'measurement_field':
+      case 'measurement_office':
       case 'pending_supplement_list':
       case 'pending_check_list':
       case 'check_list':

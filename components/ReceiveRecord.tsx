@@ -138,7 +138,7 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
       return 'CT';
   };
 
-  const calculateNextCode = (wardName: string, dateStr: string, existingCodes: string[] = []) => {
+  const calculateNextCode = (wardName: string, dateStr: string, recordType?: string, existingCodes: string[] = []) => {
     if (!dateStr) return '';
 
     const d = new Date(dateStr);
@@ -148,11 +148,18 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
     const dd = ('0' + d.getDate()).slice(-2);
     const datePrefix = `${yy}${mm}${dd}`;
     
+    const rType = (recordType || '').toLowerCase();
+    const isArchive = rType.startsWith('1.') || rType.includes('sao lục') || rType.includes('công văn') || rType.includes('cung cấp dữ liệu');
+    
     let maxSeq = 0;
     
     const checkSeq = (code: string | undefined | null) => {
         if (!code) return;
-        const parts = code.split('-');
+        const isCodeArchive = code.startsWith('LT-');
+        if (isArchive !== isCodeArchive) return;
+
+        const cleanCode = isCodeArchive ? code.replace('LT-', '') : code;
+        const parts = cleanCode.split('-');
         if (parts.length === 2 || parts.length === 3) {
             const rDate = parts.length === 2 ? parts[0] : parts[1];
             const rSeq = parts.length === 2 ? parts[1] : parts[2];
@@ -167,7 +174,7 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
     existingCodes.forEach(checkSeq);
 
     const nextSeq = (maxSeq + 1).toString().padStart(4, '0');
-    return `${datePrefix}-${nextSeq}`;
+    return isArchive ? `LT-${datePrefix}-${nextSeq}` : `${datePrefix}-${nextSeq}`;
   };
 
   // --- LOGIC TÍNH HẠN TRẢ ---

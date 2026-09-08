@@ -362,13 +362,15 @@ export const getShortCode = (ward: string) => {
     return 'CT';
 };
 
-export const getNextGlobalRecordCode = async (dateStr: string): Promise<string> => {
+export const getNextGlobalRecordCode = async (dateStr: string, isArchive = false): Promise<string> => {
     if (!isConfigured) {
         const d = new Date(dateStr);
         const yy = d.getFullYear().toString().slice(-2);
         const mm = ('0' + (d.getMonth() + 1)).slice(-2);
         const dd = ('0' + d.getDate()).slice(-2);
-        return `${yy}${mm}${dd}-${Math.floor(Math.random() * 1000).toString().padStart(4, '0')}`;
+        const datePrefix = `${yy}${mm}${dd}`;
+        const prefix = isArchive ? 'LT-' : '';
+        return `${prefix}${datePrefix}-${Math.floor(Math.random() * 1000).toString().padStart(4, '0')}`;
     }
 
     const d = new Date(dateStr);
@@ -378,7 +380,8 @@ export const getNextGlobalRecordCode = async (dateStr: string): Promise<string> 
     const dd = ('0' + d.getDate()).slice(-2);
     const datePrefix = `${yy}${mm}${dd}`;
     
-    const key = `record_counter_${year}`;
+    // Tách riêng bộ đếm cho Hồ sơ Lưu trữ (isArchive = true) và Hồ sơ Đo đạc
+    const key = isArchive ? `archive_record_counter_${year}` : `record_counter_${year}`;
     let nextSeq = 1;
     let success = false;
     let attempts = 0;
@@ -427,7 +430,8 @@ export const getNextGlobalRecordCode = async (dateStr: string): Promise<string> 
     }
 
     const seqStr = nextSeq.toString().padStart(4, '0');
-    return `${datePrefix}-${seqStr}`;
+    // Với hồ sơ lưu trữ có tiền tố LT-yyMMdd-XXXX
+    return isArchive ? `LT-${datePrefix}-${seqStr}` : `${datePrefix}-${seqStr}`;
 };
 
 // --- CACHE SYNCHRONIZATION HELPERS ---
@@ -497,8 +501,11 @@ export const createRecordApi = async (record: RecordFile): Promise<RecordFile | 
         let finalCode = record.code;
         const isGeneratedFormat = finalCode && (/^[A-ZĐ]{2,3}-\d{6}-\d{3,4}$/.test(finalCode) || /^\d{6}-\d{3,4}$/.test(finalCode));
         
+        const targetTable = getTargetTable(recordToSave);
+        const isArchive = targetTable === 'luutru_records';
+
         if (!finalCode || finalCode.includes('?') || isGeneratedFormat) {
-            finalCode = await getNextGlobalRecordCode(record.receivedDate || new Date().toISOString());
+            finalCode = await getNextGlobalRecordCode(record.receivedDate || new Date().toISOString(), isArchive);
         }
         
         // Luôn đảm bảo id là chuẩn UUID RFC4122 để không bị lỗi 22P02 của PostgreSQL
@@ -513,7 +520,6 @@ export const createRecordApi = async (record: RecordFile): Promise<RecordFile | 
             status: record.status || RecordStatus.RECEIVED
         };
         
-        const targetTable = getTargetTable(recordToSave);
         let payload = sanitizeData(recordToSave, RECORD_DB_COLUMNS);
         payload.id = standardId;
         payload.receivedDate = validReceivedDate;

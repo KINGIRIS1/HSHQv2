@@ -79,6 +79,8 @@ import {
   RefreshCw,
   Undo2,
   CalendarClock,
+  Compass,
+  PenTool,
 } from "lucide-react";
 
 interface AppRoutesProps {
@@ -425,6 +427,8 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
       "all_records",
       "assign_tasks",
       "completed_list",
+      "measurement_field",
+      "measurement_office",
       "pending_supplement_list",
       "pending_check_list",
       "check_list",
@@ -463,6 +467,8 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
       currentView === "archive_assign_tasks"
     )
       title = "Hồ sơ chưa giao";
+    else if (currentView === "measurement_field") title = "Hồ sơ Đo đạc (Thực địa)";
+    else if (currentView === "measurement_office") title = "Hồ sơ Biên tập bản đồ";
     else if (
       currentView === "completed_list" ||
       currentView === "archive_completed_list"
@@ -511,13 +517,22 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                 )}
 
                 {isViewAllowedForUser(currentUser, employees, "completed_list", rolePermissions, departmentPermissions) && (
-                  <button
-                    id="tab-records-completed-list"
-                    onClick={() => props.setCurrentView("completed_list")}
-                    className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "completed_list" ? "border-blue-600 text-blue-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
-                  >
-                    <CheckSquare size={16} /> Đang thực hiện
-                  </button>
+                  <>
+                    <button
+                      id="tab-records-measurement-field"
+                      onClick={() => props.setCurrentView("measurement_field")}
+                      className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "measurement_field" ? "border-blue-600 text-blue-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
+                    >
+                      <Compass size={16} /> Đo đạc
+                    </button>
+                    <button
+                      id="tab-records-measurement-office"
+                      onClick={() => props.setCurrentView("measurement_office")}
+                      className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "measurement_office" ? "border-indigo-600 text-indigo-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
+                    >
+                      <PenTool size={16} /> Biên tập
+                    </button>
+                  </>
                 )}
 
                 {isViewAllowedForUser(currentUser, employees, "pending_check_list", rolePermissions, departmentPermissions) && (
@@ -1064,7 +1079,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
 
                     {/* Bulk Submit Check (Trình Kiểm Tra) */}
                     {hasPermission('dodac_BTN_SUBMIT_CHECK') &&
-                      (currentView === "completed_list") && (
+                      (currentView === "completed_list" || currentView === "measurement_field" || currentView === "measurement_office") && (
                         <button
                           onClick={() => {
                             const targets = records.filter((r) =>

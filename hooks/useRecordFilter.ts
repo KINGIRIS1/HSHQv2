@@ -108,7 +108,7 @@ export const useRecordFilter = (
 
         // Filter for TEAM_LEADER by managed wards in professional/measurement tab
         const isMeasurementViewTab = [
-            'all_records', 'assign_tasks', 'completed_list', 
+            'all_records', 'assign_tasks', 'completed_list', 'measurement_field', 'measurement_office',
             'pending_supplement_list', 'pending_check_list', 'check_list', 'handover_list', 'director_completed'
         ].includes(currentView);
 
@@ -146,6 +146,33 @@ export const useRecordFilter = (
                     return true;
                 }
                 return false;
+            });
+        } else if (currentView === 'measurement_field') {
+            result = result.filter(r => {
+                // Hồ sơ thuộc bước Đo đạc thực địa / Đo đạc bản đồ
+                const isAssigned = Boolean(r.assignedTo && r.assignedTo.trim() !== '');
+                const isExecutingStatus = r.status === RecordStatus.ASSIGNED || r.status === RecordStatus.IN_PROGRESS || r.status === RecordStatus.FIELD_WORK;
+                if (!isAssigned && (!r.status || r.status === RecordStatus.RECEIVED)) return false;
+                if (!isAssigned && !isExecutingStatus && r.status !== RecordStatus.FIELD_WORK) return false;
+
+                if (r.completedDate || r.exportBatch || r.exportDate || r.resultReturnedDate || r.approvalDate) return false;
+                if (r.submissionDate || r.submittedTo) return false;
+                if (r.pendingCheckDate || r.checkedDate || r.checkedBy) return false;
+                if (r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED || r.status === RecordStatus.RETURNED || r.status === RecordStatus.HANDOVER || r.status === RecordStatus.SIGNED || r.status === RecordStatus.PENDING_SIGN || r.status === RecordStatus.PENDING_CHECK || r.status === RecordStatus.CHECKED) return false;
+                
+                // Lọc bỏ hồ sơ đã chuyển sang Biên tập bản đồ
+                if (r.status === RecordStatus.OFFICE_WORK) return false;
+                return true;
+            });
+        } else if (currentView === 'measurement_office') {
+            result = result.filter(r => {
+                // Hồ sơ thuộc bước Biên tập bản đồ
+                if (r.completedDate || r.exportBatch || r.exportDate || r.resultReturnedDate || r.approvalDate) return false;
+                if (r.submissionDate || r.submittedTo) return false;
+                if (r.pendingCheckDate || r.checkedDate || r.checkedBy) return false;
+                if (r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED || r.status === RecordStatus.RETURNED || r.status === RecordStatus.HANDOVER || r.status === RecordStatus.SIGNED || r.status === RecordStatus.PENDING_SIGN || r.status === RecordStatus.PENDING_CHECK || r.status === RecordStatus.CHECKED) return false;
+
+                return r.status === RecordStatus.OFFICE_WORK;
             });
         } else if (currentView === 'completed_list' || currentView === 'archive_completed_list') {
             result = result.filter(r => {
@@ -218,7 +245,7 @@ export const useRecordFilter = (
 
         // Filter by recordType based on view group
         const isArchiveMeasurementView = ['archive_records', 'archive_assign_tasks', 'archive_completed_list', 'archive_pending_check_list', 'archive_check_list', 'archive_handover_list', 'archive_director_completed'].includes(currentView);
-        const isMeasurementView = ['all_records', 'assign_tasks', 'completed_list', 'pending_supplement_list', 'pending_check_list', 'check_list', 'handover_list', 'director_completed'].includes(currentView);
+        const isMeasurementView = ['all_records', 'assign_tasks', 'completed_list', 'measurement_field', 'measurement_office', 'pending_supplement_list', 'pending_check_list', 'check_list', 'handover_list', 'director_completed'].includes(currentView);
         
         // Loại bỏ hoàn toàn các hồ sơ thuộc thủ tục CMD, Tòa án, Thi hành án
         result = result.filter(r => {
@@ -343,7 +370,7 @@ export const useRecordFilter = (
         let approaching = 0;
         if (records.length > 0 && currentUser) {
             const isArchiveMeasurementView = ['archive_records', 'archive_assign_tasks', 'archive_completed_list', 'archive_pending_check_list', 'archive_check_list', 'archive_handover_list', 'archive_director_completed'].includes(currentView);
-            const isMeasurementView = ['all_records', 'assign_tasks', 'completed_list', 'pending_check_list', 'check_list', 'handover_list', 'director_completed'].includes(currentView);
+            const isMeasurementView = ['all_records', 'assign_tasks', 'completed_list', 'measurement_field', 'measurement_office', 'pending_check_list', 'check_list', 'handover_list', 'director_completed'].includes(currentView);
 
             records.forEach(r => {
                 if (r.status === RecordStatus.HANDOVER || r.status === RecordStatus.WITHDRAWN) return; 

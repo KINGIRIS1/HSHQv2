@@ -1157,8 +1157,11 @@ export function syncRecordStatusTransition(
             if (!currentRecord.assignedDate && !updates.assignedDate) {
                 updates.assignedDate = currentRecord.fieldAssignedDate || officeDate;
             }
-            if (!currentRecord.drafterId && (options?.assignedTo || currentRecord.assignedTo)) {
-                updates.drafterId = options?.assignedTo || currentRecord.assignedTo;
+            if (options?.assignedTo) {
+                updates.drafterId = options.assignedTo;
+                updates.assignedTo = options.assignedTo;
+            } else if (!currentRecord.drafterId && currentRecord.assignedTo) {
+                updates.drafterId = currentRecord.assignedTo;
             }
         } else if (newStatus === RecordStatus.COMPLETED_WORK) {
             updates.completedWorkDate = options?.customDates?.completedWorkDate || currentRecord.completedWorkDate || targetDate;

@@ -59,7 +59,7 @@ interface PersonalProfileProps {
   isDirector?: boolean;
   users: User[];
   employees: Employee[];
-  onUpdateStatus: (record: RecordFile, newStatus: RecordStatus) => void;
+  onUpdateStatus: (record: RecordFile, newStatus: RecordStatus, options?: any) => void;
   onUpdateRecord?: (record: RecordFile) => Promise<RecordFile | null>;
   onViewRecord: (record: RecordFile) => void;
   onCreateLiquidation?: (record: RecordFile) => void;
@@ -1023,7 +1023,10 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
 
     // 1. Cập nhật Optimistic UI tức thì 0 giây
     targets.forEach((record) => {
-      onUpdateStatus(record, RecordStatus.OFFICE_WORK);
+      onUpdateStatus(record, RecordStatus.OFFICE_WORK, {
+        assignedTo: drafterId,
+        customDates: { officeAssignedDate: handoverIso }
+      });
     });
 
     // 2. Cập nhật dữ liệu ngầm (KHÔNG ghi statusLogs theo yêu cầu của người dùng)
