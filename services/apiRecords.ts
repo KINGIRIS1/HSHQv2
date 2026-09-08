@@ -600,42 +600,74 @@ export const updateRecordApi = async (record: RecordFile): Promise<RecordFile | 
         return { ...record, _isOfflineSaved: true };
     }
     try {
-        const targetTable = getTargetTable(record);
+        const primaryTable = (record.sourceTable && ['dangky_records', 'land_records', 'luutru_records'].includes(record.sourceTable))
+            ? (record.sourceTable as 'dangky_records' | 'land_records' | 'luutru_records')
+            : getTargetTable(record);
+
+        const candidateTables: ('dangky_records' | 'land_records' | 'luutru_records')[] = Array.from(new Set([
+            primaryTable,
+            getTargetTable(record),
+            'land_records',
+            'dangky_records',
+            'luutru_records'
+        ]));
+
         const payload = sanitizeData(record, RECORD_DB_COLUMNS);
-        let { data, error } = await supabase.from(targetTable).update(payload).eq('id', record.id).select();
-        
-        if (error && (error.code === '22P02' || String(error.message || '').includes('22P02') || String(error.message || '').includes('invalid input syntax'))) {
-            console.warn(`⚠️ [22P02 Fallback] Retrying update on ${targetTable} with 22P02 sanitized payload...`);
-            const fallback22P02Payload = sanitizePayloadFor22P02(payload);
-            const res = await supabase.from(targetTable).update(fallback22P02Payload).eq('id', record.id).select();
-            data = res.data;
-            error = res.error;
-        }
+        let updatedData: any[] | null = null;
+        let finalTable: 'dangky_records' | 'land_records' | 'luutru_records' = primaryTable;
+        let lastError: any = null;
 
-        if (error && (error.code === 'PGRST204' || String(error.code) === '42703' || (error.message && String(error.message).includes('does not exist')))) {
-            console.warn(`⚠️ [Fallback] Database is missing columns. Retrying update on ${targetTable} without new columns...`);
-            const fallbackPayload = sanitizePayloadFor22P02({ ...payload });
-            OPTIONAL_NEW_COLUMNS.forEach(col => delete fallbackPayload[col]);
-            const res = await supabase.from(targetTable).update(fallbackPayload).eq('id', record.id).select();
-            data = res.data;
-            error = res.error;
-        }
+        for (const tbl of candidateTables) {
+            try {
+                let { data, error } = await supabase.from(tbl).update(payload).eq('id', record.id).select();
 
-        // Fallback cập nhật land_records nếu targetTable khác bị lỗi
-        if (error && targetTable !== 'land_records') {
-            const landRes = await supabase.from('land_records').update(sanitizePayloadFor22P02(payload)).eq('id', record.id).select();
-            if (!landRes.error && landRes.data && landRes.data.length > 0) {
-                data = landRes.data;
-                error = null;
+                if (error && (error.code === '22P02' || String(error.message || '').includes('22P02') || String(error.message || '').includes('invalid input syntax'))) {
+                    console.warn(`⚠️ [22P02 Fallback] Retrying update on ${tbl} with 22P02 sanitized payload...`);
+                    const fallback22P02Payload = sanitizePayloadFor22P02(payload);
+                    const res = await supabase.from(tbl).update(fallback22P02Payload).eq('id', record.id).select();
+                    data = res.data;
+                    error = res.error;
+                }
+
+                if (error && (error.code === 'PGRST204' || String(error.code) === '42703' || (error.message && String(error.message).includes('does not exist')))) {
+                    console.warn(`⚠️ [Fallback] Database is missing columns on ${tbl}. Retrying without new columns...`);
+                    const fallbackPayload = sanitizePayloadFor22P02({ ...payload });
+                    OPTIONAL_NEW_COLUMNS.forEach(col => delete fallbackPayload[col]);
+                    const res = await supabase.from(tbl).update(fallbackPayload).eq('id', record.id).select();
+                    data = res.data;
+                    error = res.error;
+                }
+
+                if (!error && data && data.length > 0) {
+                    updatedData = data;
+                    finalTable = tbl;
+                    lastError = null;
+                    break;
+                }
+                if (error) lastError = error;
+            } catch (err) {
+                lastError = err;
             }
         }
-        
-        if (error) throw error;
-        const result = mapRecordFromDb({ ...record, ...(data?.[0] || {}), sourceTable: targetTable }) as RecordFile;
+
+        // Nếu không tìm thấy bản ghi nào ở cả 3 bảng để UPDATE (0 rows matched), thực hiện upsert vào targetTable chuẩn
+        if (!updatedData || updatedData.length === 0) {
+            const targetTable = getTargetTable(record);
+            const upsertPayload = sanitizeData(record, RECORD_DB_COLUMNS);
+            const upsertRes = await supabase.from(targetTable).upsert([upsertPayload]).select();
+            if (!upsertRes.error && upsertRes.data && upsertRes.data.length > 0) {
+                updatedData = upsertRes.data;
+                finalTable = targetTable;
+            } else if (lastError) {
+                throw lastError;
+            }
+        }
+
+        const result = mapRecordFromDb({ ...record, ...(updatedData?.[0] || {}), sourceTable: finalTable }) as RecordFile;
         if (result) {
             await removePendingRecord(result.id);
             syncCacheOnUpdate(result);
-            purgeRecordFromOtherTables(result.id, result.code, targetTable);
+            purgeRecordFromOtherTables(result.id, result.code, finalTable);
             return { ...result, _isOfflineSaved: false };
         }
         return { ...record, _isOfflineSaved: false };
@@ -655,34 +687,67 @@ export const updateRecordFieldsApi = async (id: string, fields: Partial<RecordFi
         return fallbackRecord;
     }
     try {
-        const targetTable = getTargetTable({ id, ...fields });
+        const primaryTable = (fields.sourceTable && ['dangky_records', 'land_records', 'luutru_records'].includes(fields.sourceTable))
+            ? (fields.sourceTable as 'dangky_records' | 'land_records' | 'luutru_records')
+            : getTargetTable({ id, ...fields });
+
+        const candidateTables: ('dangky_records' | 'land_records' | 'luutru_records')[] = Array.from(new Set([
+            primaryTable,
+            getTargetTable({ id, ...fields }),
+            'land_records',
+            'dangky_records',
+            'luutru_records'
+        ]));
+
         const payload = sanitizeData({ id, ...fields } as any, RECORD_DB_COLUMNS);
         delete payload.id;
-        let { data, error } = await supabase.from(targetTable).update(payload).eq('id', id).select();
-        
-        if (error && (error.code === '22P02' || String(error.message || '').includes('22P02') || String(error.message || '').includes('invalid input syntax'))) {
-            console.warn(`⚠️ [22P02 Fallback] Retrying updateRecordFieldsApi on ${targetTable} with 22P02 sanitized payload...`);
-            const fallback22P02Payload = sanitizePayloadFor22P02(payload);
-            const res = await supabase.from(targetTable).update(fallback22P02Payload).eq('id', id).select();
-            data = res.data;
-            error = res.error;
+
+        let updatedData: any[] | null = null;
+        let finalTable: 'dangky_records' | 'land_records' | 'luutru_records' = primaryTable;
+        let lastError: any = null;
+
+        for (const tbl of candidateTables) {
+            try {
+                let { data, error } = await supabase.from(tbl).update(payload).eq('id', id).select();
+
+                if (error && (error.code === '22P02' || String(error.message || '').includes('22P02') || String(error.message || '').includes('invalid input syntax'))) {
+                    console.warn(`⚠️ [22P02 Fallback] Retrying updateRecordFieldsApi on ${tbl} with 22P02 sanitized payload...`);
+                    const fallback22P02Payload = sanitizePayloadFor22P02(payload);
+                    const res = await supabase.from(tbl).update(fallback22P02Payload).eq('id', id).select();
+                    data = res.data;
+                    error = res.error;
+                }
+
+                if (error && (error.code === 'PGRST204' || String(error.code) === '42703' || (error.message && String(error.message).includes('does not exist')))) {
+                    console.warn(`⚠️ [Fallback] Database is missing columns on ${tbl}. Retrying without new columns...`);
+                    const fallbackPayload = sanitizePayloadFor22P02({ ...payload });
+                    OPTIONAL_NEW_COLUMNS.forEach(col => delete fallbackPayload[col]);
+                    const res = await supabase.from(tbl).update(fallbackPayload).eq('id', id).select();
+                    data = res.data;
+                    error = res.error;
+                }
+
+                if (!error && data && data.length > 0) {
+                    updatedData = data;
+                    finalTable = tbl;
+                    lastError = null;
+                    break;
+                }
+                if (error) lastError = error;
+            } catch (err) {
+                lastError = err;
+            }
         }
 
-        if (error && (error.code === 'PGRST204' || String(error.code) === '42703' || (error.message && String(error.message).includes('does not exist')))) {
-            console.warn(`⚠️ [Fallback] Database is missing columns on ${targetTable}. Retrying without new columns...`);
-            const fallbackPayload = sanitizePayloadFor22P02({ ...payload });
-            OPTIONAL_NEW_COLUMNS.forEach(col => delete fallbackPayload[col]);
-            const res = await supabase.from(targetTable).update(fallbackPayload).eq('id', id).select();
-            data = res.data;
-            error = res.error;
+        if (!updatedData || updatedData.length === 0) {
+            if (lastError) throw lastError;
         }
-        
-        if (error) throw error;
-        const result = mapRecordFromDb({ id, ...fields, ...(data?.[0] || {}), sourceTable: targetTable }) as RecordFile;
+
+        const result = mapRecordFromDb({ id, ...fields, ...(updatedData?.[0] || {}), sourceTable: finalTable }) as RecordFile;
         if (result) {
             await removePendingRecord(result.id);
             syncCacheOnUpdate(result);
-            purgeRecordFromOtherTables(result.id, result.code, targetTable);
+            purgeRecordFromOtherTables(result.id, result.code, finalTable);
             return { ...result, _isOfflineSaved: false };
         }
         return { id, ...fields } as RecordFile;

@@ -378,13 +378,6 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                 finalData.completedDate = finalData.exportDate ? finalData.exportDate : new Date().toISOString();
             }
         }
-    } else if (finalData.status !== RecordStatus.WITHDRAWN && finalData.status !== RecordStatus.REJECTED) {
-        finalData.exportBatch = undefined;
-        finalData.exportDate = undefined;
-        finalData.completedDate = undefined;
-        finalData.resultReturnedDate = undefined;
-        finalData.is_handover = false;
-        finalData.handover_date = undefined;
     }
 
     if (isExemptReceipt) {
@@ -607,9 +600,9 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
             updated.assignedDate = value;
           }
           if (field === 'officeAssignedDate') {
-            updated.officeCompletedDate = value;
-          } else {
             updated.officeAssignedDate = value;
+          } else {
+            updated.officeCompletedDate = value;
           }
           if (updated.status === RecordStatus.RECEIVED || updated.status === RecordStatus.FIELD_WORK || updated.status === RecordStatus.ASSIGNED) {
             updated.status = RecordStatus.OFFICE_WORK;
