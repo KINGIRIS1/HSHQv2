@@ -32,10 +32,11 @@ import {
   Calendar,
   SlidersHorizontal,
   RefreshCw,
+  Layers,
 } from "lucide-react";
 import * as XLSX from "xlsx-js-style";
 import { getShortRecordType, isArchiveRecordType, STATUS_LABELS } from "../constants";
-import { confirmAction, cleanSyncNotes } from "../utils/appHelpers";
+import { confirmAction, cleanSyncNotes, isFieldWorkProcedure } from "../utils/appHelpers";
 import { updateRecordApi, fetchContracts } from "../services/api";
 import {
   fetchArchiveRecords,
@@ -43,6 +44,7 @@ import {
   saveArchiveRecord,
 } from "../services/apiArchive";
 import SubmitModal from "./receive-record/SubmitModal";
+import HandoverOfficeModal from "./receive-record/HandoverOfficeModal";
 import SystemAnnexTemplate from "./receive-record/SystemAnnexTemplate";
 import {
   generateDocxBlobAsync,
@@ -157,7 +159,11 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
   const [isSubmitCheckModalOpen, setIsSubmitCheckModalOpen] = useState(false);
+  const [isHandoverOfficeModalOpen, setIsHandoverOfficeModalOpen] = useState(false);
   const [submitTargetRecords, setSubmitTargetRecords] = useState<RecordFile[]>(
+    [],
+  );
+  const [handoverOfficeTargetRecords, setHandoverOfficeTargetRecords] = useState<RecordFile[]>(
     [],
   );
   const [isAnnexModalOpen, setIsAnnexModalOpen] = useState(false);
@@ -250,12 +256,18 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
             r.status !== RecordStatus.RECEIVED &&
             r.status !== RecordStatus.ASSIGNED &&
             r.status !== RecordStatus.IN_PROGRESS &&
+            r.status !== RecordStatus.FIELD_WORK &&
+            r.status !== RecordStatus.OFFICE_WORK &&
             r.status !== RecordStatus.COMPLETED_WORK;
           return reachedCheckStage;
         }
         return false;
       }
-      return r.assignedTo === user.employeeId;
+      return (
+        r.assignedTo === user.employeeId ||
+        r.surveyorId === user.employeeId ||
+        r.drafterId === user.employeeId
+      );
     });
 
     const mappedArchives = archiveRecords
@@ -455,16 +467,29 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
     return filterAndSort([...myRecords], searchTerm, sortConfig);
   }, [myRecords, searchTerm, sortConfig]);
 
-  // 1. Hồ sơ Đang thực hiện (ASSIGNED, IN_PROGRESS, COMPLETED_WORK)
+  // 1. Hồ sơ Đang thực hiện (ASSIGNED, IN_PROGRESS, FIELD_WORK, OFFICE_WORK, COMPLETED_WORK)
   const pendingRecords = useMemo(() => {
-    let list = myRecords.filter(
-      (r) =>
+    let list = myRecords.filter((r) => {
+      const isExecuting =
         r.status === RecordStatus.ASSIGNED ||
         r.status === RecordStatus.IN_PROGRESS ||
-        r.status === RecordStatus.COMPLETED_WORK,
-    );
+        r.status === RecordStatus.FIELD_WORK ||
+        r.status === RecordStatus.OFFICE_WORK ||
+        r.status === RecordStatus.COMPLETED_WORK;
+      if (!isExecuting) return false;
+
+      // Nếu là trạng thái Nội nghiệp và người dùng là Ngoại nghiệp (đã bàn giao đi cho người khác)
+      if (
+        r.status === RecordStatus.OFFICE_WORK &&
+        r.surveyorId === user.employeeId &&
+        r.assignedTo !== user.employeeId
+      ) {
+        return false;
+      }
+      return true;
+    });
     return filterAndSort(list, searchTerm, sortConfig);
-  }, [myRecords, searchTerm, sortConfig]);
+  }, [myRecords, searchTerm, sortConfig, user.employeeId]);
 
   // 3. Hồ sơ Chờ kiểm tra (PENDING_CHECK) - Dành cho Tổ trưởng/Tổ phó
   const pendingCheckRecords = useMemo(() => {
@@ -482,7 +507,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
     return filterAndSort(list, searchTerm, sortConfig);
   }, [myRecords, searchTerm, sortConfig]);
 
-  // 4. Hồ sơ Hoàn thành (SIGNED, HANDOVER, RETURNED, REJECTED, WITHDRAWN)
+  // 4. Hồ sơ Hoàn thành (SIGNED, HANDOVER, RETURNED, REJECTED, WITHDRAWN hoặc Ngoại nghiệp đã giao việc Nội nghiệp)
   const finishedRecords = useMemo(() => {
     let list = myRecords.filter(
       (r) =>
@@ -490,10 +515,11 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
         r.status === RecordStatus.HANDOVER ||
         r.status === RecordStatus.RETURNED ||
         r.status === RecordStatus.REJECTED ||
-        r.status === RecordStatus.WITHDRAWN,
+        r.status === RecordStatus.WITHDRAWN ||
+        (r.surveyorId === user.employeeId && r.assignedTo !== user.employeeId && r.status === RecordStatus.OFFICE_WORK),
     );
     return filterAndSort(list, searchTerm, sortConfig);
-  }, [myRecords, searchTerm, sortConfig]);
+  }, [myRecords, searchTerm, sortConfig, user.employeeId]);
 
   // 5. Hồ sơ Có hẹn nhắc việc
   const reminderRecords = useMemo(() => {
@@ -977,6 +1003,53 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
   const handleForwardToCheck = async (record: RecordFile) => {
     setSubmitTargetRecords([record]);
     setIsSubmitCheckModalOpen(true);
+  };
+
+  const handleOpenHandoverOfficeModal = (record: RecordFile) => {
+    setHandoverOfficeTargetRecords([record]);
+    setIsHandoverOfficeModalOpen(true);
+  };
+
+  const handleConfirmHandoverOffice = async (drafterId: string, handoverDateStr: string) => {
+    const targets = [...handoverOfficeTargetRecords];
+    if (targets.length === 0) return;
+
+    setIsHandoverOfficeModalOpen(false);
+    setHandoverOfficeTargetRecords([]);
+
+    const handoverIso = handoverDateStr
+      ? new Date(handoverDateStr + "T12:00:00").toISOString()
+      : new Date().toISOString();
+
+    // 1. Cập nhật Optimistic UI tức thì 0 giây
+    targets.forEach((record) => {
+      onUpdateStatus(record, RecordStatus.OFFICE_WORK);
+    });
+
+    // 2. Cập nhật dữ liệu ngầm (KHÔNG ghi statusLogs theo yêu cầu của người dùng)
+    try {
+      await Promise.all(
+        targets.map(async (record) => {
+          const updatedRecord: RecordFile = {
+            ...record,
+            status: RecordStatus.OFFICE_WORK,
+            surveyorId: record.surveyorId || record.assignedTo || user.employeeId,
+            drafterId: drafterId,
+            assignedTo: drafterId, // Chuyển việc sang Chuyên viên Nội nghiệp
+            officeAssignedDate: handoverIso,
+            fieldCompletedDate: handoverIso,
+          };
+
+          if (onUpdateRecord) {
+            return onUpdateRecord(updatedRecord);
+          } else {
+            return updateRecordApi(updatedRecord);
+          }
+        })
+      );
+    } catch (err) {
+      console.error("Lỗi khi bàn giao Nội nghiệp:", err);
+    }
   };
 
   const handleSignRecord = async (record: RecordFile) => {
@@ -1790,6 +1863,14 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                                   >
                                     <Send size={14} /> Trình ký
                                   </button>
+                                ) : isFieldWorkProcedure(r.recordType) && r.status === RecordStatus.FIELD_WORK ? (
+                                  <button
+                                    onClick={() => handleOpenHandoverOfficeModal(r)}
+                                    title="Hoàn thành đo thực địa & Giao Chuyên viên Biên tập bản đồ"
+                                    className="px-3 py-1.5 bg-sky-600 text-white rounded-md hover:bg-sky-700 text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all"
+                                  >
+                                    <Layers size={14} /> Giao Biên tập
+                                  </button>
                                 ) : (
                                   <button
                                     onClick={() => handleForwardToCheck(r)}
@@ -1940,6 +2021,14 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                                 className="px-2.5 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold flex items-center gap-1"
                               >
                                 <Send size={12} /> Trình ký
+                              </button>
+                            ) : isFieldWorkProcedure(r.recordType) && r.status === RecordStatus.FIELD_WORK ? (
+                              <button
+                                onClick={() => handleOpenHandoverOfficeModal(r)}
+                                className="px-2.5 py-1.5 bg-sky-600 text-white rounded-lg text-xs font-bold flex items-center gap-1 hover:bg-sky-700"
+                                title="Giao Chuyên viên Biên tập bản đồ"
+                              >
+                                <Layers size={12} /> Giao Biên tập
                               </button>
                             ) : (
                               <button
@@ -2139,6 +2228,18 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
             console.error("Lỗi khi trình kiểm tra:", err);
           }
         }}
+      />
+
+      {/* Modal Giao việc Chuyên viên Nội nghiệp biên tập bản đồ */}
+      <HandoverOfficeModal
+        isOpen={isHandoverOfficeModalOpen}
+        onClose={() => {
+          setIsHandoverOfficeModalOpen(false);
+          setHandoverOfficeTargetRecords([]);
+        }}
+        records={handoverOfficeTargetRecords}
+        employees={employees}
+        onConfirm={handleConfirmHandoverOffice}
       />
 
       {isAnnexModalOpen && annexTargetRecord && (

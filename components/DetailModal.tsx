@@ -10,7 +10,7 @@ import DocxPreviewModal from './DocxPreviewModal';
 import { updateRecordApi, fetchContracts } from '../services/api';
 import SystemReceiptTemplate from './receive-record/SystemReceiptTemplate';
 import SystemAnnexTemplate from './receive-record/SystemAnnexTemplate';
-import { getEmployeeName as getEmpNameHelper, isProcedure2_3, getPureBatchNumber } from '../utils/appHelpers';
+import { getEmployeeName as getEmpNameHelper, isProcedure2_3, getPureBatchNumber, isFieldWorkProcedure, isOfficeOnlySurveyProcedure } from '../utils/appHelpers';
 
 
 interface DetailModalProps {
@@ -964,29 +964,74 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                         <div className="p-6 space-y-0">
                              <TimelineItem 
                                 date={record.receivedDate} 
-                                label="TIẾP NHẬN MỚI" 
+                                label="TIẾP NHẬN" 
                                 icon={UserIcon}
                                 colorClass={{text: 'text-emerald-700', border: 'border-emerald-600', bg: 'bg-emerald-600'}}
                                 subText={record.receivedBy ? (() => {
-                                    const receiver = users.find(u => u.employeeId === record.receivedBy);
-                                    if (!receiver) return undefined;
-                                    const emp = employees.find(e => e.id === receiver.employeeId);
-                                    return `${receiver.name} (${emp?.position || 'Nhân viên'})`;
+                                    const receiver = users.find(u => u.employeeId === record.receivedBy || u.id === record.receivedBy || u.name === record.receivedBy);
+                                    const emp = employees.find(e => e.id === record.receivedBy || e.id === receiver?.employeeId || e.name === record.receivedBy);
+                                    const name = receiver?.name || emp?.name || record.receivedBy;
+                                    return `${name} (${emp?.position || 'Nhân viên'})`;
                                 })() : undefined}
                             />
 
-                            <TimelineItem 
-                                date={record.assignedDate || record.completedWorkDate} 
-                                forceActive={isWorkDone}
-                                label="ĐANG THỰC HIỆN" 
-                                icon={UserIcon}
-                                colorClass={{text: 'text-blue-700', border: 'border-blue-600', bg: 'bg-blue-600'}}
-                                subText={record.assignedTo ? (() => {
-                                    const emp = employees.find(e => e.id === record.assignedTo || e.name === record.assignedTo);
-                                    if (!emp) return record.assignedTo;
-                                    return `${emp.name} (${emp.position || 'Chuyên viên'})`;
-                                })() : undefined}
-                            />
+                            {isFieldWorkProcedure(record.recordType) ? (
+                              <>
+                                <TimelineItem 
+                                    date={record.fieldAssignedDate || (record.status === RecordStatus.FIELD_WORK || record.status === RecordStatus.ASSIGNED ? record.assignedDate : null)} 
+                                    forceActive={Boolean(record.fieldAssignedDate || record.surveyorId || record.status === RecordStatus.FIELD_WORK || record.status === RecordStatus.OFFICE_WORK || isPendingCheckActive || isCheckedActive || isPendingSignActive || isSignedActive || isHandoverActive || isReturnedActive || isWorkDone)}
+                                    label="ĐO ĐẠC THỰC ĐỊA" 
+                                    icon={UserIcon}
+                                    colorClass={{text: 'text-blue-700', border: 'border-blue-600', bg: 'bg-blue-600'}}
+                                    subText={record.surveyorId ? (() => {
+                                        const emp = employees.find(e => e.id === record.surveyorId || e.name === record.surveyorId);
+                                        return emp ? `${emp.name} (${emp.position || 'Chuyên viên Ngoại nghiệp'})` : record.surveyorId;
+                                    })() : (record.assignedTo ? (() => {
+                                        const emp = employees.find(e => e.id === record.assignedTo || e.name === record.assignedTo);
+                                        return emp ? `${emp.name} (${emp.position || 'Chuyên viên'})` : record.assignedTo;
+                                    })() : undefined)}
+                                />
+                                <TimelineItem 
+                                    date={record.officeAssignedDate || record.fieldCompletedDate || (record.status === RecordStatus.OFFICE_WORK ? record.assignedDate : (isPendingCheckActive ? (record.fieldCompletedDate || record.assignedDate) : null))} 
+                                    forceActive={Boolean(record.officeAssignedDate || record.drafterId || record.status === RecordStatus.OFFICE_WORK || isPendingCheckActive || isCheckedActive || isPendingSignActive || isSignedActive || isHandoverActive || isReturnedActive)}
+                                    label="BIÊN TẬP BẢN ĐỒ" 
+                                    icon={UserIcon}
+                                    colorClass={{text: 'text-indigo-700', border: 'border-indigo-600', bg: 'bg-indigo-600'}}
+                                    subText={record.drafterId ? (() => {
+                                        const emp = employees.find(e => e.id === record.drafterId || e.name === record.drafterId);
+                                        return emp ? `${emp.name} (${emp.position || 'Chuyên viên Nội nghiệp'})` : record.drafterId;
+                                    })() : (isPendingCheckActive && record.assignedTo ? (() => {
+                                        const emp = employees.find(e => e.id === record.assignedTo || e.name === record.assignedTo);
+                                        return emp ? `${emp.name} (${emp.position || 'Chuyên viên Nội nghiệp'})` : record.assignedTo;
+                                    })() : undefined)}
+                                />
+                              </>
+                            ) : isOfficeOnlySurveyProcedure(record.recordType) ? (
+                              <TimelineItem 
+                                  date={record.officeAssignedDate || record.assignedDate || record.completedWorkDate} 
+                                  forceActive={isWorkDone || !!record.assignedDate || !!record.officeAssignedDate || record.status === RecordStatus.OFFICE_WORK}
+                                  label="BIÊN TẬP BẢN ĐỒ" 
+                                  icon={UserIcon}
+                                  colorClass={{text: 'text-indigo-700', border: 'border-indigo-600', bg: 'bg-indigo-600'}}
+                                  subText={(record.drafterId || record.assignedTo) ? (() => {
+                                      const emp = employees.find(e => e.id === (record.drafterId || record.assignedTo) || e.name === (record.drafterId || record.assignedTo));
+                                      return emp ? `${emp.name} (${emp.position || 'Chuyên viên Nội nghiệp'})` : (record.drafterId || record.assignedTo);
+                                  })() : undefined}
+                              />
+                            ) : (
+                              <TimelineItem 
+                                  date={record.assignedDate || record.completedWorkDate} 
+                                  forceActive={isWorkDone || Boolean(record.assignedDate || record.assignedTo || record.status === RecordStatus.ASSIGNED || record.status === RecordStatus.IN_PROGRESS)}
+                                  label="ĐANG THỰC HIỆN" 
+                                  icon={UserIcon}
+                                  colorClass={{text: 'text-blue-700', border: 'border-blue-600', bg: 'bg-blue-600'}}
+                                  subText={record.assignedTo ? (() => {
+                                      const emp = employees.find(e => e.id === record.assignedTo || e.name === record.assignedTo);
+                                      if (!emp) return record.assignedTo;
+                                      return `${emp.name} (${emp.position || 'Chuyên viên'})`;
+                                  })() : undefined}
+                              />
+                            )}
 
                             {/* Ẩn mốc kiểm tra cho hồ sơ Lưu trữ */}
                             {!isArchiveRecordType(record.recordType) && (
@@ -1038,7 +1083,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                                 icon={FileCheck}
                                 isLast={true}
                                 colorClass={{text: 'text-emerald-700', border: 'border-emerald-600', bg: 'bg-emerald-600'}}
-                                subText={record.resultReturnedDate && record.receiverName ? `Người nhận: ${record.receiverName}` : undefined}
+                                subText={record.receiverName ? `Người nhận: ${record.receiverName}` : (record.returnedBy ? `Người trả: ${record.returnedBy}` : undefined)}
                             />
                         </div>
                     </div>

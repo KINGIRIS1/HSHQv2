@@ -11,12 +11,14 @@ export const APP_VERSION = '2.1.1';
 
 export const STATUS_LABELS: Record<RecordStatus, string> = {
   [RecordStatus.RECEIVED]: 'Tiếp nhận mới',
-  [RecordStatus.ASSIGNED]: 'Đang thực hiện',
+  [RecordStatus.ASSIGNED]: 'Giao nhân viên',
   [RecordStatus.IN_PROGRESS]: 'Đang thực hiện',
-  [RecordStatus.COMPLETED_WORK]: 'Đang thực hiện',
+  [RecordStatus.FIELD_WORK]: 'Đo đạc thực địa',
+  [RecordStatus.OFFICE_WORK]: 'Biên tập bản đồ',
+  [RecordStatus.COMPLETED_WORK]: 'Đã thực hiện',
   [RecordStatus.PENDING_SUPPLEMENT]: 'Chờ bổ sung',
   [RecordStatus.PENDING_CHECK]: 'Chờ kiểm tra',
-  [RecordStatus.CHECKED]: 'Chờ kiểm tra',
+  [RecordStatus.CHECKED]: 'Đã kiểm tra',
   [RecordStatus.PENDING_SIGN]: 'Chờ ký duyệt',
   [RecordStatus.SIGNED]: 'Chờ bàn giao',
   [RecordStatus.HANDOVER]: 'Đã giao 1 cửa',
@@ -28,8 +30,38 @@ export const STATUS_LABELS: Record<RecordStatus, string> = {
 export const SELECTABLE_STATUSES: { key: RecordStatus; label: string }[] = [
   { key: RecordStatus.RECEIVED, label: 'Tiếp nhận mới' },
   { key: RecordStatus.IN_PROGRESS, label: 'Đang thực hiện' },
+  { key: RecordStatus.FIELD_WORK, label: 'Đo đạc thực địa' },
+  { key: RecordStatus.OFFICE_WORK, label: 'Biên tập bản đồ' },
   { key: RecordStatus.PENDING_SUPPLEMENT, label: 'Chờ bổ sung' },
   { key: RecordStatus.PENDING_CHECK, label: 'Chờ kiểm tra' },
+  { key: RecordStatus.CHECKED, label: 'Đã kiểm tra' },
+  { key: RecordStatus.PENDING_SIGN, label: 'Chờ ký duyệt' },
+  { key: RecordStatus.SIGNED, label: 'Chờ bàn giao' },
+  { key: RecordStatus.HANDOVER, label: 'Đã giao 1 cửa' },
+  { key: RecordStatus.RETURNED, label: 'Đã trả kết quả' },
+  { key: RecordStatus.WITHDRAWN, label: 'CSD rút hồ sơ' },
+  { key: RecordStatus.REJECTED, label: 'Trả hồ sơ' },
+];
+
+export const ARCHIVE_SELECTABLE_STATUSES: { key: RecordStatus; label: string }[] = [
+  { key: RecordStatus.RECEIVED, label: 'Tiếp nhận mới' },
+  { key: RecordStatus.IN_PROGRESS, label: 'Đang thực hiện' },
+  { key: RecordStatus.PENDING_SUPPLEMENT, label: 'Chờ bổ sung' },
+  { key: RecordStatus.PENDING_SIGN, label: 'Chờ ký duyệt' },
+  { key: RecordStatus.SIGNED, label: 'Chờ bàn giao' },
+  { key: RecordStatus.HANDOVER, label: 'Đã giao 1 cửa' },
+  { key: RecordStatus.RETURNED, label: 'Đã trả kết quả' },
+  { key: RecordStatus.WITHDRAWN, label: 'CSD rút hồ sơ' },
+  { key: RecordStatus.REJECTED, label: 'Trả hồ sơ' },
+];
+
+export const SURVEY_SELECTABLE_STATUSES: { key: RecordStatus; label: string }[] = [
+  { key: RecordStatus.RECEIVED, label: 'Tiếp nhận mới' },
+  { key: RecordStatus.FIELD_WORK, label: 'Đo đạc thực địa' },
+  { key: RecordStatus.OFFICE_WORK, label: 'Biên tập bản đồ' },
+  { key: RecordStatus.PENDING_SUPPLEMENT, label: 'Chờ bổ sung' },
+  { key: RecordStatus.PENDING_CHECK, label: 'Chờ kiểm tra' },
+  { key: RecordStatus.CHECKED, label: 'Đã kiểm tra' },
   { key: RecordStatus.PENDING_SIGN, label: 'Chờ ký duyệt' },
   { key: RecordStatus.SIGNED, label: 'Chờ bàn giao' },
   { key: RecordStatus.HANDOVER, label: 'Đã giao 1 cửa' },
@@ -42,6 +74,8 @@ export const STATUS_COLORS: Record<RecordStatus, string> = {
   [RecordStatus.RECEIVED]: 'bg-gray-100 text-gray-800',
   [RecordStatus.ASSIGNED]: 'bg-blue-100 text-blue-800',
   [RecordStatus.IN_PROGRESS]: 'bg-yellow-100 text-yellow-800',
+  [RecordStatus.FIELD_WORK]: 'bg-sky-100 text-sky-800 border border-sky-200',
+  [RecordStatus.OFFICE_WORK]: 'bg-indigo-100 text-indigo-800 border border-indigo-200',
   [RecordStatus.COMPLETED_WORK]: 'bg-cyan-100 text-cyan-800', // MỚI: Đã bổ sung
   [RecordStatus.PENDING_SUPPLEMENT]: 'bg-amber-100 text-amber-900 border border-amber-300 font-bold',
   [RecordStatus.PENDING_CHECK]: 'bg-orange-100 text-orange-800',
@@ -208,6 +242,25 @@ export const isArchiveRecord = (r: Partial<RecordFile> | null | undefined): bool
   const rawLower = String(r.recordType || '').toLowerCase().trim();
   if (rawLower.startsWith('1.') || rawLower.includes('sao lục') || rawLower.includes('sao luc') || rawLower.includes('công văn') || rawLower.includes('cung cấp dữ liệu') || rawLower.includes('cung cấp tài liệu') || rawLower.includes('cung cấp thông tin')) return true;
   return false;
+};
+
+// Kiểm tra hồ sơ có thuộc thủ tục 1.1 (Sao lục / Cung cấp tài liệu / dữ liệu đất đai) hay không
+export const isRecordType11 = (recordOrType: Partial<RecordFile> | string | null | undefined): boolean => {
+  if (!recordOrType) return false;
+  const str = typeof recordOrType === 'string' 
+    ? recordOrType 
+    : String(recordOrType.recordType || recordOrType.content || '');
+  const t = str.toLowerCase().trim();
+  const short = getShortRecordType(str);
+  return short === '1.1 Sao lục' || 
+         t.startsWith('1.1') || 
+         t.includes('sao lục') || 
+         t.includes('sao luc') || 
+         t.includes('cung cấp tài liệu') || 
+         t.includes('cung cấp dữ liệu') || 
+         t.includes('cung cấp thông tin') || 
+         t.includes('cc dl đđ') || 
+         t.includes('cc tl đđ');
 };
 
 export const MOCK_EMPLOYEES: Employee[] = [

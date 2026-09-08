@@ -18,7 +18,9 @@ const RECORD_DB_COLUMNS = [
     'needsMapCorrection', 'explanationPlan',
     'issueNumber', 'entryNumber', 'issueDate', 'residentialArea',
     'price', 'advancePayment', 'isHandedOver',
-    'statusLogs', 'archiveHandoverDate', 'archiveHandoverBatch'
+    'statusLogs', 'archiveHandoverDate', 'archiveHandoverBatch',
+    'surveyorId', 'surveyAssignedDate', 'fieldAssignedDate', 'fieldCompletedDate',
+    'drafterId', 'officeAssignedDate', 'officeCompletedDate'
 ];
 
 /**
@@ -161,7 +163,9 @@ const OPTIONAL_NEW_COLUMNS = [
     'authorizedBy', 'authDocType', 'otherDocs',
     'privateNotes', 'personalNotes', 'checkedBy', 'pendingCheckDate', 'checkedDate', 'completedWorkDate',
     'price', 'advancePayment', 'isHandedOver',
-    'statusLogs', 'archiveHandoverDate', 'archiveHandoverBatch'
+    'statusLogs', 'archiveHandoverDate', 'archiveHandoverBatch',
+    'surveyorId', 'surveyAssignedDate', 'fieldAssignedDate', 'fieldCompletedDate',
+    'drafterId', 'officeAssignedDate', 'officeCompletedDate'
 ];
 
 const fetchTableRecords = async (

@@ -4,6 +4,8 @@ export enum RecordStatus {
   RECEIVED = 'RECEIVED',         // Tiếp nhận
   ASSIGNED = 'ASSIGNED',         // Giao nhân viên
   IN_PROGRESS = 'IN_PROGRESS',   // Đang thực hiện
+  FIELD_WORK = 'FIELD_WORK',     // Ngoại nghiệp: Đo đạc thực địa (Thủ tục 2.2, 2.4, 2.5)
+  OFFICE_WORK = 'OFFICE_WORK',   // Nội nghiệp: Biên tập bản đồ (Thủ tục 2.2, 2.4, 2.5)
   COMPLETED_WORK = 'COMPLETED_WORK', // Đã thực hiện (Mới: Nhân viên làm xong, chưa trình)
   PENDING_SUPPLEMENT = 'PENDING_SUPPLEMENT', // Chờ bổ sung (Trả dừng quy trình)
   PENDING_CHECK = 'PENDING_CHECK', // Chờ kiểm tra
@@ -45,14 +47,14 @@ export const DEFAULT_ROLE_PERMISSIONS: RolePermissions = {
     'luutru_ADD_RECORDS', 'luutru_BTN_ASSIGN_STAFF', 'luutru_BTN_SUBMIT_CHECK', 'luutru_BTN_SUBMIT_SIGN', 'luutru_BTN_APPROVE_SIGN', 'luutru_BTN_REJECT_RECORD', 'luutru_HANDOVER_RECORDS', 'luutru_BTN_RETURN_RESULT', 'luutru_VIEW_ARCHIVE', 'luutru_MANAGE_ARCHIVE', 'luutru_BTN_EXTEND_DEADLINE', 'luutru_EDIT_RECORDS', 'luutru_DELETE_RECORDS', 'luutru_VIEW_DETAILS', 'luutru_BTN_ADVANCE_STATUS'
   ],
   [UserRole.ONEDOOR]: [
-    'receive_record', 'receive_sub_create', 'receive_sub_bulk', 'receive_sub_list', 'receive_sub_vphc', 'ADD_RECORDS',
+    'receive_record', 'receive_sub_create', 'receive_sub_bulk', 'receive_sub_list', 'receive_search', 'receive_record_search', 'ADD_RECORDS',
     'receive_contract', 'VIEW_CONTRACTS', 'ADD_CONTRACTS', 'EDIT_CONTRACTS', 'EXPORT_CONTRACTS',
     'registration_records',
     'excerpt_management', 'VIEW_EXCERPTS',
     'reports', 'VIEW_REPORTS',
     'work_schedule', 'VIEW_SCHEDULE',
     'utilities', 'VIEW_CHAT', 'VIEW_PERSONAL_PROFILE',
-    'BTN_ASSIGN_STAFF', 'BTN_SUBMIT_SIGN', 'BTN_APPROVE_SIGN', 'BTN_SUBMIT_CHECK', 'BTN_REJECT_RECORD', 'HANDOVER_RECORDS', 'BTN_RETURN_RESULT', 'BTN_EXTEND_DEADLINE', 'EDIT_RECORDS', 'DELETE_RECORDS', 'VIEW_DETAILS'
+    'BTN_RETURN_RESULT', 'HANDOVER_RECORDS', 'EDIT_RECORDS', 'DELETE_RECORDS', 'VIEW_DETAILS'
   ],
   [UserRole.EMPLOYEE]: [
     'reports', 'VIEW_REPORTS',
@@ -161,6 +163,16 @@ export interface RecordFile {
   
   status: RecordStatus;   
   assignedTo?: string | null;    
+
+  // Quy trình Đo đạc 2 bước (Ngoại nghiệp & Nội nghiệp cho thủ tục 2.2, 2.4, 2.5)
+  surveyorId?: string | null;            // Chuyên viên Ngoại nghiệp (Đo thực địa)
+  surveyAssignedDate?: string | null;    // Ngày giao ngoại nghiệp
+  fieldAssignedDate?: string | null;     // Ngày giao đo thực địa
+  fieldCompletedDate?: string | null;    // Ngày hoàn thành đo thực địa
+  drafterId?: string | null;             // Chuyên viên Nội nghiệp (Biên tập bản đồ)
+  officeAssignedDate?: string | null;    // Ngày giao nội nghiệp
+  officeCompletedDate?: string | null;   // Ngày hoàn thành nội nghiệp
+
   notes?: string | null;         
   privateNotes?: string | null;  
   personalNotes?: string | null; // Ghi chú cá nhân của nhân viên
@@ -185,6 +197,7 @@ export interface RecordFile {
   receiptNumber?: string | null;     // Số biên lai/hóa đơn
   receiptType?: 'Biên Lai' | 'Hóa Đơn' | string | null; // Loại chứng từ (Biên lai hay Hóa đơn)
   receiverName?: string | null;      // Người nhận kết quả (Mới)
+  returnedBy?: string | null;        // Người thực hiện trả kết quả
   resultReturnedDate?: string | null; // Ngày trả kết quả cho dân
   returnedPrice?: number | null;     // Số tiền thực tế khi trả kết quả (Mới)
 

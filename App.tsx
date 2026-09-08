@@ -7,7 +7,7 @@ import MainLayout from './components/layout/MainLayout';
 import AppRoutes from './components/AppRoutes';
 import AppModals from './components/AppModals';
 
-import { DEFAULT_VISIBLE_COLUMNS, confirmAction, COLUMN_DEFS, processAssignmentTimelineCheck, isProcedure2_3, syncRecordStatusTransition, getDepartmentForRecord, getPureBatchNumber } from './utils/appHelpers';
+import { DEFAULT_VISIBLE_COLUMNS, confirmAction, COLUMN_DEFS, processAssignmentTimelineCheck, isProcedure2_3, syncRecordStatusTransition, getDepartmentForRecord, getPureBatchNumber, isFieldWorkProcedure, isOfficeOnlySurveyProcedure } from './utils/appHelpers';
 import { exportReportToExcel, exportReturnedListToExcel } from './utils/excelExport';
 import { generateReport } from './services/geminiService';
 import { syncTemplatesFromCloud } from './services/docxService'; 
@@ -583,18 +583,7 @@ function App() {
       const synced = syncRecordStatusTransition(existingRecord || {}, newStatus, {
           userName: currentUser?.name || currentUser?.username || 'Hệ thống',
           userId: currentUser?.id,
-          customDates: {
-              receivedDate: targetDateStr,
-              assignedDate: targetDateStr,
-              completedWorkDate: targetDateStr,
-              pendingCheckDate: targetDateStr,
-              checkedDate: targetDateStr,
-              submissionDate: targetDateStr,
-              approvalDate: targetDateStr,
-              completedDate: targetDateStr,
-              exportDate: targetDateStr,
-              resultReturnedDate: targetDateStr
-          }
+          targetDate: targetDateStr
       });
       return synced;
   };
@@ -617,14 +606,16 @@ function App() {
           let recordUpdates: any = {};
 
           if (field === 'status') {
-              recordUpdates = { ...getUpdatesForStatusChange(value as RecordStatus, targetDateStr) };
+              recordUpdates = { ...getUpdatesForStatusChange(value as RecordStatus, targetDateStr, r) };
               recordUpdates.statusLogs = createStatusLog(r, value, 'Cập nhật trạng thái hàng loạt');
               
               if (extraData?.assignedTo) {
                   if (value === RecordStatus.RECEIVED) {
                       recordUpdates.receivedBy = extraData.assignedTo;
-                  } else if (value === RecordStatus.IN_PROGRESS || value === RecordStatus.ASSIGNED) {
+                  } else if (value === RecordStatus.IN_PROGRESS || value === RecordStatus.ASSIGNED || value === RecordStatus.FIELD_WORK || value === RecordStatus.OFFICE_WORK) {
                       recordUpdates.assignedTo = extraData.assignedTo;
+                      if (value === RecordStatus.FIELD_WORK) recordUpdates.surveyorId = extraData.assignedTo;
+                      if (value === RecordStatus.OFFICE_WORK) recordUpdates.drafterId = extraData.assignedTo;
                   } else if (value === RecordStatus.PENDING_CHECK || value === RecordStatus.CHECKED) {
                       recordUpdates.checkedBy = extraData.assignedTo;
                   } else if (value === RecordStatus.PENDING_SIGN || value === RecordStatus.SIGNED) {
@@ -634,55 +625,33 @@ function App() {
                   }
               }
 
+              // Chỉ cập nhật ngày cho đúng bước đang thao tác, không điền ngày cho các bước khác
               if (value === RecordStatus.RECEIVED) {
-                  if (extraData?.customDate) recordUpdates.receivedDate = extraData.customDate;
+                  recordUpdates.receivedDate = targetDateStr;
               } else if (value === RecordStatus.IN_PROGRESS || value === RecordStatus.ASSIGNED) {
-                  if (extraData?.customDate) recordUpdates.assignedDate = extraData.customDate;
+                  recordUpdates.assignedDate = targetDateStr;
+              } else if (value === RecordStatus.FIELD_WORK) {
+                  recordUpdates.fieldAssignedDate = targetDateStr;
+                  if (!r.assignedDate && !recordUpdates.assignedDate) recordUpdates.assignedDate = targetDateStr;
+              } else if (value === RecordStatus.OFFICE_WORK) {
+                  recordUpdates.officeAssignedDate = targetDateStr;
+                  if (!r.assignedDate && !recordUpdates.assignedDate) recordUpdates.assignedDate = r.fieldAssignedDate || targetDateStr;
               } else if (value === RecordStatus.COMPLETED_WORK) {
-                  if (!r.assignedDate) recordUpdates.assignedDate = targetDateStr;
-                  if (extraData?.customDate) recordUpdates.completedWorkDate = extraData.customDate;
+                  recordUpdates.completedWorkDate = targetDateStr;
               } else if (value === RecordStatus.PENDING_CHECK) {
-                  if (!r.assignedDate) recordUpdates.assignedDate = targetDateStr;
-                  if (!r.completedWorkDate) recordUpdates.completedWorkDate = targetDateStr;
-                  if (extraData?.customDate) recordUpdates.pendingCheckDate = extraData.customDate;
+                  recordUpdates.pendingCheckDate = targetDateStr;
               } else if (value === RecordStatus.CHECKED) {
-                  if (!r.assignedDate) recordUpdates.assignedDate = targetDateStr;
-                  if (!r.completedWorkDate) recordUpdates.completedWorkDate = targetDateStr;
-                  if (!r.pendingCheckDate) recordUpdates.pendingCheckDate = targetDateStr;
-                  if (extraData?.customDate) recordUpdates.checkedDate = extraData.customDate;
+                  recordUpdates.checkedDate = targetDateStr;
               } else if (value === RecordStatus.PENDING_SIGN) {
-                  if (!r.assignedDate) recordUpdates.assignedDate = targetDateStr;
-                  if (!r.completedWorkDate) recordUpdates.completedWorkDate = targetDateStr;
-                  if (!r.pendingCheckDate) recordUpdates.pendingCheckDate = targetDateStr;
-                  if (!r.checkedDate) recordUpdates.checkedDate = targetDateStr;
-                  if (extraData?.customDate) recordUpdates.submissionDate = extraData.customDate;
+                  recordUpdates.submissionDate = targetDateStr;
               } else if (value === RecordStatus.SIGNED) {
-                  if (!r.assignedDate) recordUpdates.assignedDate = targetDateStr;
-                  if (!r.completedWorkDate) recordUpdates.completedWorkDate = targetDateStr;
-                  if (!r.pendingCheckDate) recordUpdates.pendingCheckDate = targetDateStr;
-                  if (!r.checkedDate) recordUpdates.checkedDate = targetDateStr;
-                  if (!r.submissionDate) recordUpdates.submissionDate = targetDateStr;
-                  if (extraData?.customDate) recordUpdates.approvalDate = extraData.customDate;
+                  recordUpdates.approvalDate = targetDateStr;
               } else if (value === RecordStatus.HANDOVER) {
-                  if (!r.assignedDate) recordUpdates.assignedDate = targetDateStr;
-                  if (!r.completedWorkDate) recordUpdates.completedWorkDate = targetDateStr;
-                  if (!r.pendingCheckDate) recordUpdates.pendingCheckDate = targetDateStr;
-                  if (!r.checkedDate) recordUpdates.checkedDate = targetDateStr;
-                  if (!r.submissionDate) recordUpdates.submissionDate = targetDateStr;
-                  if (!r.approvalDate) recordUpdates.approvalDate = targetDateStr;
-                  if (extraData?.customDate) recordUpdates.exportDate = extraData.customDate;
+                  recordUpdates.exportDate = targetDateStr;
+                  recordUpdates.completedDate = targetDateStr;
               } else if (value === RecordStatus.RETURNED) {
-                  if (!r.assignedDate) recordUpdates.assignedDate = targetDateStr;
-                  if (!r.completedWorkDate) recordUpdates.completedWorkDate = targetDateStr;
-                  if (!r.pendingCheckDate) recordUpdates.pendingCheckDate = targetDateStr;
-                  if (!r.checkedDate) recordUpdates.checkedDate = targetDateStr;
-                  if (!r.submissionDate) recordUpdates.submissionDate = targetDateStr;
-                  if (!r.approvalDate) recordUpdates.approvalDate = targetDateStr;
-                  if (!r.completedDate) recordUpdates.completedDate = targetDateStr;
-                  if (extraData?.customDate) recordUpdates.resultReturnedDate = extraData.customDate;
-              }
-
-              if (value === RecordStatus.REJECTED || value === RecordStatus.WITHDRAWN) {
+                  recordUpdates.resultReturnedDate = targetDateStr;
+              } else if (value === RecordStatus.REJECTED || value === RecordStatus.WITHDRAWN) {
                   recordUpdates.completedDate = r.completedDate || targetDateStr;
               }
           } else if ((field as string) === 'historyStatus') {
@@ -691,8 +660,20 @@ function App() {
               const stepDate = extraData?.customDate || customDateStr;
 
               if (stepKey === 'ASSIGNED') {
-                  if (empName) recordUpdates.assignedTo = empName;
-                  if (stepDate) recordUpdates.assignedDate = stepDate;
+                  if (empName) {
+                      recordUpdates.assignedTo = empName;
+                      recordUpdates.surveyorId = empName;
+                  }
+                  if (stepDate) {
+                      recordUpdates.assignedDate = stepDate;
+                      recordUpdates.fieldAssignedDate = stepDate;
+                  }
+              } else if (stepKey === 'OFFICE_WORK') {
+                  if (empName) recordUpdates.drafterId = empName;
+                  if (stepDate) {
+                      recordUpdates.officeAssignedDate = stepDate;
+                      recordUpdates.officeCompletedDate = stepDate;
+                  }
               } else if (stepKey === 'CHECKING') {
                   if (empName) recordUpdates.checkedBy = empName;
                   if (stepDate) recordUpdates.checkedDate = stepDate;
@@ -706,11 +687,25 @@ function App() {
                   if (empName) recordUpdates.returnedBy = empName;
                   if (stepDate) recordUpdates.resultReturnedDate = stepDate;
               }
+          } else if ((field as string) === 'officeAssignedDate') {
+              recordUpdates.officeAssignedDate = customDateStr || targetDateStr;
+              recordUpdates.officeCompletedDate = customDateStr || targetDateStr;
           } else if (field === 'assignedTo') {
               recordUpdates.assignedTo = value;
               recordUpdates.assignedDate = customDateStr || r.assignedDate || targetDateStr;
               if (r.status === RecordStatus.RECEIVED) {
-                  recordUpdates.status = RecordStatus.IN_PROGRESS;
+                  if (isFieldWorkProcedure(r.recordType)) {
+                      recordUpdates.status = RecordStatus.FIELD_WORK;
+                      recordUpdates.surveyorId = value;
+                      recordUpdates.surveyAssignedDate = customDateStr || targetDateStr;
+                      recordUpdates.fieldAssignedDate = customDateStr || targetDateStr;
+                  } else if (isOfficeOnlySurveyProcedure(r.recordType)) {
+                      recordUpdates.status = RecordStatus.OFFICE_WORK;
+                      recordUpdates.drafterId = value;
+                      recordUpdates.officeAssignedDate = customDateStr || targetDateStr;
+                  } else {
+                      recordUpdates.status = RecordStatus.IN_PROGRESS;
+                  }
               }
           } else if (field === 'checkedBy' || field === 'submittedTo') {
               recordUpdates[field] = value;

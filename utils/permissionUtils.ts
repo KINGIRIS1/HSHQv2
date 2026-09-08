@@ -218,6 +218,29 @@ export function hasRecordActionPermission(
         return true;
     }
 
+    // Với vai trò Một cửa (ONEDOOR), kiểm tra theo quyền chung của Một cửa
+    if (currentUser.role === UserRole.ONEDOOR || roleStr === 'ONEDOOR') {
+        switch (action) {
+            case 'view':
+                return checkUserPermission('VIEW_DETAILS', currentUser, employees, rolePermissions, departmentPermissions);
+            case 'return':
+                return checkUserPermission('BTN_RETURN_RESULT', currentUser, employees, rolePermissions, departmentPermissions) || 
+                       checkUserPermission('HANDOVER_RECORDS', currentUser, employees, rolePermissions, departmentPermissions);
+            case 'edit':
+                return checkUserPermission('EDIT_RECORDS', currentUser, employees, rolePermissions, departmentPermissions);
+            case 'advance':
+                return checkUserPermission('BTN_ADVANCE_STATUS', currentUser, employees, rolePermissions, departmentPermissions);
+            case 'extend':
+                return checkUserPermission('BTN_EXTEND_DEADLINE', currentUser, employees, rolePermissions, departmentPermissions);
+            case 'reject':
+                return checkUserPermission('BTN_REJECT_RECORD', currentUser, employees, rolePermissions, departmentPermissions);
+            case 'delete':
+                return checkUserPermission('DELETE_RECORDS', currentUser, employees, rolePermissions, departmentPermissions);
+            default:
+                return false;
+        }
+    }
+
     const isArchive = isArchiveRecordType(record.recordType || '') || record.sourceTable === 'luutru_records';
 
     switch (action) {

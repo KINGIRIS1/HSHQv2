@@ -332,7 +332,7 @@ const RecordRow: React.FC<RecordRowProps> = ({
                 const isAdminOrSub = currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.SUBADMIN;
 
                 const canView = isAdminOrSub || (hasPermission ? (
-                  isArchiveRecord ? hasPermission('luutru_VIEW_DETAILS') : hasPermission('dodac_VIEW_DETAILS')
+                  isArchiveRecord ? (hasPermission('luutru_VIEW_DETAILS') || hasPermission('VIEW_DETAILS')) : (hasPermission('dodac_VIEW_DETAILS') || hasPermission('VIEW_DETAILS'))
                 ) : true);
 
                 if (!canView) return null;
@@ -345,7 +345,7 @@ const RecordRow: React.FC<RecordRowProps> = ({
                 const isArchiveRecord = isArchiveRecordType(record.recordType || '') || record.sourceTable === 'luutru_records';
                 const isAdminOrSub = currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.SUBADMIN;
                 const canReturn = isAdminOrSub || (hasPermission ? (
-                  isArchiveRecord ? hasPermission('luutru_BTN_RETURN_RESULT') : hasPermission('dodac_BTN_RETURN_RESULT')
+                  isArchiveRecord ? (hasPermission('luutru_BTN_RETURN_RESULT') || hasPermission('BTN_RETURN_RESULT') || hasPermission('HANDOVER_RECORDS')) : (hasPermission('dodac_BTN_RETURN_RESULT') || hasPermission('BTN_RETURN_RESULT') || hasPermission('HANDOVER_RECORDS'))
                 ) : false);
 
                 if (!canReturn) return null;

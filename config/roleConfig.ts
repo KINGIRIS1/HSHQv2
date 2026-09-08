@@ -22,10 +22,10 @@ export const ROLE_VIEWS_CONFIG: Record<UserRole, RoleConfig> = {
   [UserRole.ONEDOOR]: {
     role: UserRole.ONEDOOR,
     allowedViews: [
-      'dashboard', 'receive_record', 'receive_contract', 
-      'all_records', 'registration_records', 'personal_profile', 
-      'account_settings', 'utilities', 'handover_list', 'archive_handover_list', 'work_schedule', 
-      'archive_records', 'receive_group', 'records_group', 'management_group',
+      'dashboard', 'receive_record', 'receive_search', 'receive_record_search', 'receive_contract', 
+      'registration_records', 'personal_profile', 
+      'account_settings', 'utilities', 'work_schedule', 
+      'receive_group', 'management_group',
       'reports', 'tools_group', 'barcode_generator'
     ]
   },
@@ -175,24 +175,9 @@ export function isViewAllowedForUser(
     }
   }
 
-  // Luôn đảm bảo vai trò ONEDOOR kế thừa toàn bộ danh sách quyền mặc định của Một cửa, và tuyệt đối không có module Đo đạc hoặc Lưu trữ
-  if (user.role === UserRole.ONEDOOR) {
-    const defaultOneDoor = DEFAULT_ROLE_PERMISSIONS[UserRole.ONEDOOR] || [];
-    if (activePerms) {
-      activePerms = Array.from(new Set([...activePerms, ...defaultOneDoor]));
-    } else {
-      activePerms = defaultOneDoor;
-    }
-    const SURVEY_PERMS = [
-      'all_records', 'all_sub_all', 'assign_tasks', 'completed_list',
-      'pending_supplement_list', 'pending_check_list', 'check_list', 'handover_list', 'director_completed', 'survey_list'
-    ];
-    const ARCHIVE_PERMS = [
-      'archive_records', 'archive_sub_all', 'archive_assign_tasks',
-      'archive_completed_list', 'archive_pending_check_list', 'archive_check_list',
-      'archive_handover_list', 'archive_director_completed', 'VIEW_ARCHIVE', 'MANAGE_ARCHIVE'
-    ];
-    activePerms = activePerms.filter(p => !SURVEY_PERMS.includes(p) && !ARCHIVE_PERMS.includes(p) && !p.startsWith('dodac_') && !p.startsWith('luutru_'));
+  // Đảm bảo vai trò ONEDOOR sử dụng quyền mặc định của Một cửa nếu chưa có cấu hình riêng
+  if (user.role === UserRole.ONEDOOR && activePerms === null) {
+    activePerms = DEFAULT_ROLE_PERMISSIONS[UserRole.ONEDOOR] || [];
   }
 
   if (activePerms !== null) {
@@ -226,9 +211,6 @@ export function isViewAllowedForUser(
       case 'receive_group':
         return hasAnyPerm(ONEDOOR_CHILD_PERMS) || hasAnyPerm(CONTRACT_CHILD_PERMS);
       case 'records_group':
-        if (user.role === UserRole.ONEDOOR) {
-          return activePerms.includes('registration_records');
-        }
         const allowDodac = !isUserLuutru(user, employees || []) && (activePerms.includes('all_records') || activePerms.includes('all_sub_all') || activePerms.includes('assign_tasks') || activePerms.includes('completed_list'));
         const allowLuutru = !isUserDodac(user, employees || []) && (activePerms.includes('archive_records') || activePerms.includes('archive_sub_all') || activePerms.includes('archive_assign_tasks') || activePerms.includes('archive_completed_list'));
         const allowReg = activePerms.includes('registration_records');
@@ -244,11 +226,9 @@ export function isViewAllowedForUser(
       case 'receive_record_search':
         return hasAnyPerm(ONEDOOR_CHILD_PERMS);
       case 'all_records':
-        if (user.role === UserRole.ONEDOOR) return false;
         if (isUserLuutru(user, employees || [])) return false;
         return activePerms.includes('all_records') || activePerms.includes('all_sub_all') || activePerms.includes('assign_tasks') || activePerms.includes('completed_list');
       case 'archive_records':
-        if (user.role === UserRole.ONEDOOR) return false;
         if (isUserDodac(user, employees || [])) return false;
         return activePerms.includes('archive_records') || activePerms.includes('archive_sub_all') || activePerms.includes('archive_assign_tasks') || activePerms.includes('archive_completed_list');
       case 'receive_contract':
@@ -271,8 +251,9 @@ export function isViewAllowedForUser(
       case 'pending_supplement_list':
       case 'pending_check_list':
       case 'check_list':
-      case 'handover_list':
       case 'director_completed':
+        return hasAnyPerm(DODAC_CHILD_PERMS);
+      case 'handover_list':
         return hasAnyPerm(DODAC_CHILD_PERMS);
 
       // Child Tabs - Archive Group

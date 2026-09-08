@@ -2,7 +2,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { RecordFile, User, UserRole, RecordStatus, Employee } from '../types';
 import { removeVietnameseTones, isRecordOverdue, isRecordApproaching } from '../utils/appHelpers';
-import { getShortRecordType, isArchiveRecordType, isArchiveRecord } from '../constants';
+import { getShortRecordType, isArchiveRecordType, isArchiveRecord, isRecordType11 } from '../constants';
 
 export const useRecordFilter = (
     records: RecordFile[],
@@ -151,7 +151,7 @@ export const useRecordFilter = (
             result = result.filter(r => {
                 // Hồ sơ đang thực hiện là hồ sơ ĐÃ ĐƯỢC GIAO (có assignedTo hoặc status thuộc nhóm đang thực hiện)
                 const isAssigned = Boolean(r.assignedTo && r.assignedTo.trim() !== '');
-                const isExecutingStatus = r.status === RecordStatus.ASSIGNED || r.status === RecordStatus.IN_PROGRESS || r.status === RecordStatus.COMPLETED_WORK;
+                const isExecutingStatus = r.status === RecordStatus.ASSIGNED || r.status === RecordStatus.IN_PROGRESS || r.status === RecordStatus.FIELD_WORK || r.status === RecordStatus.OFFICE_WORK || r.status === RecordStatus.COMPLETED_WORK;
                 
                 // Nếu chưa được giao và đang ở trạng thái Tiếp nhận mới thì thuộc Chưa giao, không ở Đang thực hiện
                 if (!isAssigned && (!r.status || r.status === RecordStatus.RECEIVED)) return false;
@@ -165,7 +165,7 @@ export const useRecordFilter = (
                 return true;
             });
         } else if (currentView === 'director_completed' || currentView === 'archive_director_completed') {
-            result = result.filter(r => r.submittedTo === currentUser?.employeeId && r.status !== RecordStatus.PENDING_SIGN && r.status !== RecordStatus.RECEIVED && r.status !== RecordStatus.ASSIGNED && r.status !== RecordStatus.IN_PROGRESS && r.status !== RecordStatus.COMPLETED_WORK);
+            result = result.filter(r => r.submittedTo === currentUser?.employeeId && r.status !== RecordStatus.PENDING_SIGN && r.status !== RecordStatus.RECEIVED && r.status !== RecordStatus.ASSIGNED && r.status !== RecordStatus.IN_PROGRESS && r.status !== RecordStatus.FIELD_WORK && r.status !== RecordStatus.OFFICE_WORK && r.status !== RecordStatus.COMPLETED_WORK);
         } else if (currentView === 'handover_list' || currentView === 'archive_handover_list') {
             if (handoverTab === 'today') {
                 // Tab chờ giao: Bao gồm Đã ký HOẶC (Đã rút VÀ chưa có đợt xuất) HOẶC Hồ sơ trả (REJECTED)
@@ -232,7 +232,14 @@ export const useRecordFilter = (
                 result = result.filter(r => getShortRecordType(r.recordType) === filterRecordType || r.recordType === filterRecordType);
             }
         } else if (isMeasurementView) {
-            result = result.filter(r => !isArchiveRecord(r));
+            // Cho phép hiển thị hồ sơ 1.1 (Sao lục / Cung cấp tài liệu đất đai) đối với:
+            // 1) Người dùng thuộc vai trò Một cửa (ONEDOOR) khi xem danh sách hồ sơ
+            // 2) Tab Bàn giao hồ sơ (handover_list) để bàn giao / trả kết quả hồ sơ 1.1 cho người dân
+            if (currentUser?.role === UserRole.ONEDOOR || currentView === 'handover_list') {
+                result = result.filter(r => !isArchiveRecord(r) || isRecordType11(r));
+            } else {
+                result = result.filter(r => !isArchiveRecord(r));
+            }
             if (filterRecordType !== 'all') {
                 result = result.filter(r => getShortRecordType(r.recordType) === filterRecordType || r.recordType === filterRecordType);
             }
@@ -347,7 +354,13 @@ export const useRecordFilter = (
 
                 // Filter by recordType based on view group
                 if (isArchiveMeasurementView && !isArchiveRecord(r)) return;
-                if (isMeasurementView && isArchiveRecord(r)) return;
+                if (isMeasurementView) {
+                    if (currentUser?.role === UserRole.ONEDOOR || currentView === 'handover_list') {
+                        if (isArchiveRecord(r) && !isRecordType11(r)) return;
+                    } else {
+                        if (isArchiveRecord(r)) return;
+                    }
+                }
 
                 if (isRecordOverdue(r)) overdue++;
                 else if (isRecordApproaching(r)) approaching++;

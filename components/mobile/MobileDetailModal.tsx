@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { RecordFile, Employee, User, UserRole, SplitItem, RecordStatus } from '../../types';
 import AutoResizeTextarea from '../AutoResizeTextarea';
-import { getNormalizedWard, getShortRecordType } from '../../constants';
+import { getNormalizedWard, getShortRecordType, isArchiveRecordType } from '../../constants';
 import StatusBadge from '../StatusBadge';
 import { 
   X, MapPin, FileText, User as UserIcon, Receipt, DollarSign, 
@@ -15,7 +15,7 @@ import DocxPreviewModal from '../DocxPreviewModal';
 import { updateRecordApi, fetchContracts } from '../../services/api';
 import SystemReceiptTemplate from '../receive-record/SystemReceiptTemplate';
 import SystemAnnexTemplate from '../receive-record/SystemAnnexTemplate';
-import { cleanSyncNotes, isProcedure2_3, getPureBatchNumber } from '../../utils/appHelpers';
+import { cleanSyncNotes, isProcedure2_3, getPureBatchNumber, isFieldWorkProcedure, isOfficeOnlySurveyProcedure } from '../../utils/appHelpers';
 
 interface MobileDetailModalProps {
   isOpen: boolean;
@@ -422,6 +422,12 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
       RecordStatus.SIGNED, RecordStatus.HANDOVER, RecordStatus.RETURNED
   ].includes(record.status) || !!record.approvalDate;
 
+  const isHandoverActive = !!record.completedDate || !!record.exportDate || !!record.exportBatch || [
+      RecordStatus.HANDOVER, RecordStatus.RETURNED, RecordStatus.WITHDRAWN, RecordStatus.REJECTED
+  ].includes(record.status);
+
+  const isReturnedActive = !!record.resultReturnedDate || record.status === RecordStatus.RETURNED;
+
   const recordTypeLower = (record?.recordType || '').toLowerCase();
 
   return (
@@ -769,40 +775,86 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
               <div className="space-y-0 pt-1">
                 <TimelineItem 
                   date={record.receivedDate} 
-                  label="1. TIẾP NHẬN MỚI" 
+                  label="TIẾP NHẬN" 
                   icon={UserIcon}
                   colorClass={{text: 'text-emerald-600', border: 'border-emerald-600', bg: 'bg-emerald-600'}}
                   subText={record.receivedBy ? (() => {
-                      const receiver = users.find(u => u.employeeId === record.receivedBy);
-                      if (!receiver) return undefined;
-                      const emp = employees.find(e => e.id === receiver.employeeId);
-                      return `${receiver.name} (${emp?.position || 'Nhân viên'})`;
+                      const receiver = users.find(u => u.employeeId === record.receivedBy || u.id === record.receivedBy || u.name === record.receivedBy);
+                      const emp = employees.find(e => e.id === record.receivedBy || e.id === receiver?.employeeId || e.name === record.receivedBy);
+                      const name = receiver?.name || emp?.name || record.receivedBy;
+                      return `${name} (${emp?.position || 'Nhân viên'})`;
                   })() : undefined}
                 />
-                <TimelineItem 
-                  date={record.assignedDate || record.completedWorkDate} 
-                  forceActive={isWorkDone || !!record.assignedDate}
-                  label="2. ĐANG THỰC HIỆN" 
-                  icon={UserIcon}
-                  colorClass={{text: 'text-blue-600', border: 'border-blue-600', bg: 'bg-blue-600'}}
-                  subText={record.assignedTo ? (() => {
-                      const emp = employees.find(e => e.id === record.assignedTo);
-                      if (!emp) return undefined;
-                      return `${emp.name} (${emp.position || 'Chuyên viên'})`;
-                  })() : undefined}
-                />
+                {isFieldWorkProcedure(record.recordType) ? (
+                  <>
+                    <TimelineItem 
+                      date={record.fieldAssignedDate || (record.status === RecordStatus.FIELD_WORK || record.status === RecordStatus.ASSIGNED ? record.assignedDate : null)} 
+                      forceActive={Boolean(record.fieldAssignedDate || record.surveyorId || record.status === RecordStatus.FIELD_WORK || record.status === RecordStatus.OFFICE_WORK || isPendingCheckActive || isCheckedActive || isPendingSignActive || isSignedActive || isHandoverActive || isReturnedActive || isWorkDone)}
+                      label="ĐO ĐẠC THỰC ĐỊA" 
+                      icon={UserIcon}
+                      colorClass={{text: 'text-blue-600', border: 'border-blue-600', bg: 'bg-blue-600'}}
+                      subText={record.surveyorId ? (() => {
+                          const emp = employees.find(e => e.id === record.surveyorId || e.name === record.surveyorId);
+                          return `${emp?.name || record.surveyorId} (${emp?.position || 'Chuyên viên Ngoại nghiệp'})`;
+                      })() : (record.assignedTo ? (() => {
+                          const emp = employees.find(e => e.id === record.assignedTo || e.name === record.assignedTo);
+                          return `${emp?.name || record.assignedTo} (${emp?.position || 'Chuyên viên'})`;
+                      })() : undefined)}
+                    />
+                    <TimelineItem 
+                      date={record.officeAssignedDate || record.fieldCompletedDate || (record.status === RecordStatus.OFFICE_WORK ? record.assignedDate : (isPendingCheckActive ? (record.fieldCompletedDate || record.assignedDate) : null))} 
+                      forceActive={Boolean(record.officeAssignedDate || record.drafterId || record.status === RecordStatus.OFFICE_WORK || isPendingCheckActive || isCheckedActive || isPendingSignActive || isSignedActive || isHandoverActive || isReturnedActive)}
+                      label="BIÊN TẬP BẢN ĐỒ" 
+                      icon={UserIcon}
+                      colorClass={{text: 'text-indigo-600', border: 'border-indigo-600', bg: 'bg-indigo-600'}}
+                      subText={record.drafterId ? (() => {
+                          const emp = employees.find(e => e.id === record.drafterId || e.name === record.drafterId);
+                          return `${emp?.name || record.drafterId} (${emp?.position || 'Chuyên viên Nội nghiệp'})`;
+                      })() : (isPendingCheckActive && record.assignedTo ? (() => {
+                          const emp = employees.find(e => e.id === record.assignedTo || e.name === record.assignedTo);
+                          return `${emp?.name || record.assignedTo} (${emp?.position || 'Chuyên viên Nội nghiệp'})`;
+                      })() : undefined)}
+                    />
+                  </>
+                ) : isOfficeOnlySurveyProcedure(record.recordType) ? (
+                  <TimelineItem 
+                    date={record.officeAssignedDate || record.assignedDate || record.completedWorkDate} 
+                    forceActive={isWorkDone || !!record.assignedDate || !!record.officeAssignedDate || record.status === RecordStatus.OFFICE_WORK}
+                    label="BIÊN TẬP BẢN ĐỒ" 
+                    icon={UserIcon}
+                    colorClass={{text: 'text-indigo-600', border: 'border-indigo-600', bg: 'bg-indigo-600'}}
+                    subText={(record.drafterId || record.assignedTo) ? (() => {
+                        const targetId = record.drafterId || record.assignedTo;
+                        const emp = employees.find(e => e.id === targetId || e.name === targetId);
+                        return `${emp?.name || targetId} (${emp?.position || 'Chuyên viên Nội nghiệp'})`;
+                    })() : undefined}
+                  />
+                ) : (
+                  <TimelineItem 
+                    date={record.assignedDate || record.completedWorkDate} 
+                    forceActive={isWorkDone || Boolean(record.assignedDate || record.assignedTo || record.status === RecordStatus.ASSIGNED || record.status === RecordStatus.IN_PROGRESS)}
+                    label="ĐANG THỰC HIỆN" 
+                    icon={UserIcon}
+                    colorClass={{text: 'text-blue-600', border: 'border-blue-600', bg: 'bg-blue-600'}}
+                    subText={record.assignedTo ? (() => {
+                        const emp = employees.find(e => e.id === record.assignedTo || e.name === record.assignedTo);
+                        return `${emp?.name || record.assignedTo} (${emp?.position || 'Chuyên viên'})`;
+                    })() : undefined}
+                  />
+                )}
 
-                {!(record.recordType === 'Cung cấp tài liệu đất đai' || record.recordType === 'Sao lục' || record.recordType === 'Công văn') && (
+                {!isArchiveRecordType(record.recordType) && (
                   <TimelineItem 
                     date={record.pendingCheckDate || record.checkedDate} 
                     forceActive={isPendingCheckActive || isCheckedActive}
-                    label="3. TRÌNH KIỂM TRA" 
+                    label="TRÌNH KIỂM TRA" 
                     icon={Send}
                     colorClass={{text: 'text-orange-600', border: 'border-orange-600', bg: 'bg-orange-600'}}
                     subText={record.checkedBy ? (() => {
-                        const checker = employees.find(e => e.id === record.checkedBy);
-                        if (!checker) return undefined;
-                        return `${checker.name} (${checker?.position || 'Người kiểm tra'})`;
+                        const checker = employees.find(e => e.id === record.checkedBy || e.name === record.checkedBy);
+                        const userChecker = users.find(u => u.employeeId === record.checkedBy || u.id === record.checkedBy || u.name === record.checkedBy);
+                        const name = checker?.name || userChecker?.name || record.checkedBy;
+                        return `${name} (${checker?.position || 'Người kiểm tra'})`;
                     })() : undefined}
                   />
                 )}
@@ -810,20 +862,20 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                 <TimelineItem 
                   date={record.submissionDate || record.approvalDate} 
                   forceActive={isPendingSignActive || isSignedActive}
-                  label="4. TRÌNH KÝ DUYỆT" 
+                  label="TRÌNH KÝ DUYỆT" 
                   icon={Send}
                   colorClass={{text: 'text-purple-600', border: 'border-purple-600', bg: 'bg-purple-600'}}
                   subText={record.submittedTo ? (() => {
-                      const director = users.find(u => u.employeeId === record.submittedTo);
-                      if (!director) return undefined;
-                      const emp = employees.find(e => e.id === director.employeeId);
-                      return `${director.name} (${emp?.position || (director.role === UserRole.ADMIN ? 'Giám đốc' : 'Phó giám đốc')})`;
+                      const director = users.find(u => u.employeeId === record.submittedTo || u.id === record.submittedTo || u.name === record.submittedTo);
+                      const emp = employees.find(e => e.id === record.submittedTo || e.id === director?.employeeId || e.name === record.submittedTo);
+                      const name = director?.name || emp?.name || record.submittedTo;
+                      return `${name} (${emp?.position || (director?.role === UserRole.ADMIN ? 'Giám đốc' : 'Phó giám đốc')})`;
                   })() : undefined}
                 />
 
                 <TimelineItem 
                   date={record.completedDate} 
-                  label={record.status === RecordStatus.REJECTED ? "5. TRẢ HỒ SƠ" : record.status === RecordStatus.WITHDRAWN ? "5. CSD RÚT HỒ SƠ" : "5. HOÀN THÀNH"} 
+                  label={record.status === RecordStatus.REJECTED ? "TRẢ HỒ SƠ" : record.status === RecordStatus.WITHDRAWN ? "CSD RÚT HỒ SƠ" : "HOÀN THÀNH"} 
                   icon={CheckSquare}
                   isLast={false}
                   colorClass={{text: record.status === RecordStatus.REJECTED ? 'text-red-700' : 'text-green-700', border: record.status === RecordStatus.REJECTED ? 'border-red-600' : 'border-green-600', bg: record.status === RecordStatus.REJECTED ? 'bg-red-600' : 'bg-green-600'}}
@@ -832,10 +884,11 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
 
                 <TimelineItem 
                   date={record.resultReturnedDate} 
-                  label="6. TRẢ KẾT QUẢ" 
+                  label="TRẢ KẾT QUẢ" 
                   icon={FileCheck}
                   isLast={true}
                   colorClass={{text: 'text-emerald-600', border: 'border-emerald-600', bg: 'bg-emerald-600'}}
+                  subText={record.receiverName ? `Người nhận: ${record.receiverName}` : (record.returnedBy ? `Người trả: ${record.returnedBy}` : undefined)}
                 />
               </div>
             </div>

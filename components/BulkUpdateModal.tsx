@@ -201,7 +201,8 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
                             <option value="status">Trạng thái hồ sơ (Quy trình)</option>
                             <option value="historyStatus">Trạng thái hồ sơ (Cập nhật lịch sử)</option>
                             <option value="assignedTo">Người xử lý (Giao việc)</option>
-                            <option value="assignedDate">Ngày giao việc</option>
+                            <option value="assignedDate">Ngày đo đạc / Ngày giao việc</option>
+                            <option value="officeAssignedDate">Ngày Biên tập bản đồ</option>
                             <option value="exportDate">Ngày xuất (Bàn giao)</option>
                             <option value="exportBatch">Đợt xuất (Bàn giao)</option>
                             <option value="deadline">Ngày hẹn trả (Gia hạn)</option>
@@ -237,7 +238,8 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
                                 onChange={(e) => setTargetValue(e.target.value)}
                             >
                                 <option value="">-- Chọn bước quy trình --</option>
-                                <option value="ASSIGNED">Bước 1: Phân công / Giao việc</option>
+                                <option value="ASSIGNED">Bước 1: Đo đạc thực địa / Giao việc</option>
+                                <option value="OFFICE_WORK">Bước 1.2: Biên tập bản đồ</option>
                                 <option value="CHECKING">Bước 2: Chờ kiểm tra kỹ thuật</option>
                                 <option value="SIGNING">Bước 3: Chờ trình ký / Ký duyệt</option>
                                 <option value="COMPLETED">Bước 4: Đã hoàn thành / Bàn giao 1 cửa</option>

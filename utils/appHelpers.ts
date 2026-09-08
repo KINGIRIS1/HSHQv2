@@ -195,27 +195,9 @@ export const calculateDeadlineHelper = (type: string, receivedDateStr: string, h
         daysToAdd = 30;
     }
     
-    // Áp dụng quy ước thời gian: nếu nhận sau 15h dời ngày trả qua sáng hôm sau (tức là cộng thêm 1 ngày làm việc)
-    let isAfter15h = false;
+    let count = 0;
     const parsedStart = parseSafeDate(receivedDateStr);
     const startDate = parsedStart ? new Date(parsedStart.getTime()) : new Date();
-
-    if (receivedDateStr && (receivedDateStr.includes('T') || receivedDateStr.includes(' '))) {
-        if (parsedStart && parsedStart.getHours() >= 15) {
-            isAfter15h = true;
-        }
-    } else {
-        const todayDateStr = formatDateKey(new Date());
-        if (receivedDateStr === todayDateStr && new Date().getHours() >= 15) {
-            isAfter15h = true;
-        }
-    }
-
-    if (isAfter15h) {
-        daysToAdd += 1;
-    }
-
-    let count = 0;
     let currentDate = new Date(startDate.getTime());
     
     // Tạo Set chứa chuỗi ngày nghỉ (YYYY-MM-DD) để tra cứu nhanh và chính xác
@@ -468,7 +450,29 @@ export function processAssignmentTimelineCheck(
     assignedDate: record.assignedDate || newAssignedDateStr,
   };
   if (record.status === RecordStatus.RECEIVED) {
-    updates.status = RecordStatus.IN_PROGRESS;
+    if (isFieldWorkProcedure(record.recordType)) {
+      // Thủ tục 2.2, 2.4, 2.5: Tổ Đo đạc - Đo thực địa (Ngoại nghiệp)
+      updates.status = RecordStatus.FIELD_WORK;
+      updates.surveyorId = newEmployeeId;
+      updates.surveyAssignedDate = newAssignedDateStr;
+      updates.fieldAssignedDate = newAssignedDateStr;
+    } else if (isOfficeOnlySurveyProcedure(record.recordType)) {
+      // Thủ tục 2.1, 2.3: Tổ Đo đạc - Biên tập bản đồ (Nội nghiệp trực tiếp)
+      updates.status = RecordStatus.OFFICE_WORK;
+      updates.drafterId = newEmployeeId;
+      updates.officeAssignedDate = newAssignedDateStr;
+    } else {
+      // Thủ tục nhóm 1.x (Lưu trữ), nhóm 3.x (Đăng ký cấp giấy) và các thủ tục khác: Đang thực hiện
+      updates.status = RecordStatus.IN_PROGRESS;
+    }
+  } else if (record.status === RecordStatus.FIELD_WORK || isFieldWorkProcedure(record.recordType)) {
+    if (!record.surveyorId) {
+      updates.surveyorId = newEmployeeId;
+    }
+  } else if (record.status === RecordStatus.OFFICE_WORK || isOfficeOnlySurveyProcedure(record.recordType)) {
+    if (!record.drafterId) {
+      updates.drafterId = newEmployeeId;
+    }
   }
 
   const firstWard = newEmp?.managedWards?.[0];
@@ -479,7 +483,13 @@ export function processAssignmentTimelineCheck(
 
   if (hasSubsequentSteps || isLaterDate || historyParts.length > 0) {
     const logNote = `Giao NV ${oldEmpName} ngày ${formatDateVN(record.assignedDate) || 'trước đó'}${record.submissionDate ? `, Trình ký ngày ${formatDateVN(record.submissionDate)}` : ''}`;
-    const fullInternalNote = `Cập nhật lại đã giao việc ngày ${formatDateVN(newAssignedDateStr)} (${newEmpName}). Đưa về bước Đang thực hiện. Ghi chú nội bộ: ${logNote} để biết và truy vết.`;
+    const targetRollbackStatus = isOfficeOnlySurveyProcedure(record.recordType)
+      ? RecordStatus.OFFICE_WORK
+      : isFieldWorkProcedure(record.recordType)
+        ? RecordStatus.FIELD_WORK
+        : RecordStatus.IN_PROGRESS;
+    const targetStatusLabel = targetRollbackStatus === RecordStatus.FIELD_WORK ? 'Đo đạc thực địa' : targetRollbackStatus === RecordStatus.OFFICE_WORK ? 'Biên tập bản đồ' : 'Đang thực hiện';
+    const fullInternalNote = `Cập nhật lại đã giao việc ngày ${formatDateVN(newAssignedDateStr)} (${newEmpName}). Đưa về bước ${targetStatusLabel}. Ghi chú nội bộ: ${logNote} để biết và truy vết.`;
 
     const existingPrivate = record.privateNotes || '';
     updates.privateNotes = existingPrivate ? `${existingPrivate}\n${fullInternalNote}` : fullInternalNote;
@@ -488,7 +498,7 @@ export function processAssignmentTimelineCheck(
       id: `${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
       recordId: record.id,
       previousStatus: record.status,
-      newStatus: RecordStatus.IN_PROGRESS,
+      newStatus: targetRollbackStatus,
       changedBy: currentUser?.name || 'Hệ thống',
       changedAt: new Date().toISOString(),
       note: fullInternalNote
@@ -866,7 +876,7 @@ export function calculateEmployeeWorkload(
             // Đang xử lý: Hồ sơ đang PENDING_CHECK / CHECKING được giao cho cán bộ này kiểm tra (hoặc đang phân công xử lý trực tiếp)
             if ((r.status === RecordStatus.PENDING_CHECK || (r.status as string) === 'CHECKING') && (isCheckedBy || isAssigned)) {
                 inProgressPlots += plotCount;
-            } else if ((r.status === RecordStatus.ASSIGNED || r.status === RecordStatus.IN_PROGRESS || r.status === RecordStatus.COMPLETED_WORK) && isAssigned) {
+            } else if ((r.status === RecordStatus.ASSIGNED || r.status === RecordStatus.IN_PROGRESS || r.status === RecordStatus.FIELD_WORK || r.status === RecordStatus.OFFICE_WORK || r.status === RecordStatus.COMPLETED_WORK) && isAssigned) {
                 inProgressPlots += plotCount;
             }
 
@@ -876,13 +886,25 @@ export function calculateEmployeeWorkload(
             }
         } else {
             // Chuyên viên / Tổ viên:
-            // Đang xử lý: Hồ sơ được giao cho chuyên viên xử lý ở các bước chưa trình/hoàn thành (RECEIVED, ASSIGNED, IN_PROGRESS, COMPLETED_WORK)
-            if (isAssigned && (r.status === RecordStatus.RECEIVED || r.status === RecordStatus.ASSIGNED || r.status === RecordStatus.IN_PROGRESS || r.status === RecordStatus.COMPLETED_WORK)) {
+            // Đang xử lý: Hồ sơ được giao cho chuyên viên xử lý ở các bước chưa trình/hoàn thành (RECEIVED, ASSIGNED, IN_PROGRESS, FIELD_WORK, OFFICE_WORK, COMPLETED_WORK)
+            const isSurveyor = (r.surveyorId || '').trim().toLowerCase() === empName || (r.surveyorId || '').trim().toLowerCase() === empId;
+            const isDrafter = (r.drafterId || '').trim().toLowerCase() === empName || (r.drafterId || '').trim().toLowerCase() === empId;
+
+            if (r.status === RecordStatus.FIELD_WORK) {
+                if (isAssigned || isSurveyor) inProgressPlots += plotCount;
+            } else if (r.status === RecordStatus.OFFICE_WORK) {
+                if (isAssigned || isDrafter) {
+                    inProgressPlots += plotCount;
+                } else if (isSurveyor) {
+                    // Ngoại nghiệp đã hoàn thành đo thực địa bàn giao sang nội nghiệp
+                    completedPlots += plotCount;
+                }
+            } else if (isAssigned && (r.status === RecordStatus.RECEIVED || r.status === RecordStatus.ASSIGNED || r.status === RecordStatus.IN_PROGRESS || r.status === RecordStatus.COMPLETED_WORK)) {
                 inProgressPlots += plotCount;
             }
 
             // Đã hoàn thành: Hồ sơ chuyên viên đó chịu trách nhiệm (assignedTo hoặc có log) đã chuyển bước tiếp theo (PENDING_CHECK, CHECKED, PENDING_SIGN, SIGNED, HANDOVER, RETURNED)
-            if ((isAssigned || hasLog) && (r.status === RecordStatus.PENDING_CHECK || r.status === RecordStatus.CHECKED || r.status === RecordStatus.PENDING_SIGN || r.status === RecordStatus.SIGNED || r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED)) {
+            if ((isAssigned || isSurveyor || isDrafter || hasLog) && (r.status === RecordStatus.PENDING_CHECK || r.status === RecordStatus.CHECKED || r.status === RecordStatus.PENDING_SIGN || r.status === RecordStatus.SIGNED || r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED)) {
                 completedPlots += plotCount;
             }
         }
@@ -907,6 +929,55 @@ export function isProcedure2_3(recordType: string | null | undefined): boolean {
            lower === '2.3';
 }
 
+/**
+ * Kiểm tra các thủ tục đo đạc 2 bước (Ngoại nghiệp & Nội nghiệp): 2.2, 2.4, 2.5
+ * 2.2: Trích đo địa chính
+ * 2.4: Cắm mốc ranh giới
+ * 2.5: Tách thửa - Hợp thửa đất
+ */
+export function isFieldWorkProcedure(recordType: string | null | undefined): boolean {
+    if (!recordType) return false;
+    const lower = recordType.toLowerCase().trim();
+    // Khớp mã thủ tục 2.2, 2.4, 2.5
+    if (lower.startsWith('2.2') || lower.startsWith('2.4') || lower.startsWith('2.5')) {
+        return true;
+    }
+    // Khớp tên mô tả nếu không có mã số
+    if (lower.includes('trích đo') || lower.includes('trich do') ||
+        lower.includes('cắm mốc') || lower.includes('cam moc') ||
+        lower.includes('tách - hợp thửa') || lower.includes('tách hợp thửa') || lower.includes('tach hop thua') ||
+        lower.includes('tách thửa') || lower.includes('tach thua') ||
+        lower.includes('hợp thửa') || lower.includes('hop thua')) {
+        if (lower.startsWith('2.1') || lower.startsWith('2.3') || lower.includes('trích lục') || lower.includes('duyệt đơn')) {
+            return false;
+        }
+        return true;
+    }
+    return false;
+}
+
+/**
+ * Kiểm tra xem thủ tục có phải là thủ tục Tổ Đo đạc chỉ thực hiện Biên tập bản đồ (Nội nghiệp trực tiếp) hay không:
+ * 2.1: Trích lục bản đồ địa chính
+ * 2.3: Duyệt đơn & Cung cấp số thửa
+ */
+export function isOfficeOnlySurveyProcedure(recordType: string | null | undefined): boolean {
+    if (!recordType) return false;
+    const lower = recordType.toLowerCase().trim();
+    // Khớp mã thủ tục 2.1 hoặc 2.3
+    if (lower.startsWith('2.1') || lower.startsWith('2.3')) {
+        return true;
+    }
+    // Khớp tên mô tả nếu không có mã số
+    if (lower.includes('trích lục') || lower.includes('trich luc') ||
+        lower.includes('duyệt đơn') || lower.includes('duyet don') ||
+        lower.includes('số thửa') || lower.includes('so thua') ||
+        lower.includes('cung cấp số thửa') || lower.includes('cập nhật số thửa')) {
+        return true;
+    }
+    return false;
+}
+
 export interface StatusTransitionOptions {
     targetDate?: string;
     reason?: string;
@@ -919,6 +990,10 @@ export interface StatusTransitionOptions {
     customDates?: {
         receivedDate?: string | null;
         assignedDate?: string | null;
+        fieldAssignedDate?: string | null;
+        fieldCompletedDate?: string | null;
+        officeAssignedDate?: string | null;
+        officeCompletedDate?: string | null;
         completedWorkDate?: string | null;
         pendingCheckDate?: string | null;
         checkedDate?: string | null;
@@ -941,6 +1016,8 @@ const STATUS_RANK: Record<string, number> = {
     [RecordStatus.RECEIVED]: 0,
     [RecordStatus.ASSIGNED]: 1,
     [RecordStatus.IN_PROGRESS]: 1,
+    [RecordStatus.FIELD_WORK]: 1,
+    [RecordStatus.OFFICE_WORK]: 1.5,
     [RecordStatus.COMPLETED_WORK]: 2,
     [RecordStatus.PENDING_CHECK]: 3,
     [RecordStatus.CHECKED]: 4,
@@ -983,16 +1060,14 @@ export function syncRecordStatusTransition(
         updates.resultReturnedDate = undefined;
         updates.receiverName = undefined;
     } else {
-        // DỌN DẸP NẾU QUAY LÙI BƯỚC (Xóa sạch các mốc ngày và thông tin các bước sau)
+        // DỌN DẸP NẾU QUAY LÙI BƯỚC (Chỉ xóa mốc ngày tương lai, GIỮ NGUYÊN người thực hiện: checkedBy, submittedTo, receiverName, returnedBy)
         if (isRollback) {
             if (newRank < 1) {
                 updates.assignedDate = null as any;
                 updates.completedWorkDate = null as any;
                 updates.pendingCheckDate = null as any;
                 updates.checkedDate = null as any;
-                updates.checkedBy = null as any;
                 updates.submissionDate = null as any;
-                updates.submittedTo = null as any;
                 updates.approvalDate = null as any;
                 updates.completedDate = null as any;
                 updates.exportDate = null as any;
@@ -1000,14 +1075,11 @@ export function syncRecordStatusTransition(
                 updates.is_handover = false;
                 updates.handover_date = null as any;
                 updates.resultReturnedDate = null as any;
-                updates.receiverName = null as any;
             } else if (newRank < 2) {
                 updates.completedWorkDate = null as any;
                 updates.pendingCheckDate = null as any;
                 updates.checkedDate = null as any;
-                updates.checkedBy = null as any;
                 updates.submissionDate = null as any;
-                updates.submittedTo = null as any;
                 updates.approvalDate = null as any;
                 updates.completedDate = null as any;
                 updates.exportDate = null as any;
@@ -1015,13 +1087,10 @@ export function syncRecordStatusTransition(
                 updates.is_handover = false;
                 updates.handover_date = null as any;
                 updates.resultReturnedDate = null as any;
-                updates.receiverName = null as any;
             } else if (newRank < 3) {
                 updates.pendingCheckDate = null as any;
                 updates.checkedDate = null as any;
-                updates.checkedBy = null as any;
                 updates.submissionDate = null as any;
-                updates.submittedTo = null as any;
                 updates.approvalDate = null as any;
                 updates.completedDate = null as any;
                 updates.exportDate = null as any;
@@ -1029,12 +1098,9 @@ export function syncRecordStatusTransition(
                 updates.is_handover = false;
                 updates.handover_date = null as any;
                 updates.resultReturnedDate = null as any;
-                updates.receiverName = null as any;
             } else if (newRank < 4) {
                 updates.checkedDate = null as any;
-                updates.checkedBy = null as any;
                 updates.submissionDate = null as any;
-                updates.submittedTo = null as any;
                 updates.approvalDate = null as any;
                 updates.completedDate = null as any;
                 updates.exportDate = null as any;
@@ -1042,10 +1108,8 @@ export function syncRecordStatusTransition(
                 updates.is_handover = false;
                 updates.handover_date = null as any;
                 updates.resultReturnedDate = null as any;
-                updates.receiverName = null as any;
             } else if (newRank < 5) {
                 updates.submissionDate = null as any;
-                updates.submittedTo = null as any;
                 updates.approvalDate = null as any;
                 updates.completedDate = null as any;
                 updates.exportDate = null as any;
@@ -1053,7 +1117,6 @@ export function syncRecordStatusTransition(
                 updates.is_handover = false;
                 updates.handover_date = null as any;
                 updates.resultReturnedDate = null as any;
-                updates.receiverName = null as any;
             } else if (newRank < 6) {
                 updates.approvalDate = null as any;
                 updates.completedDate = null as any;
@@ -1062,7 +1125,6 @@ export function syncRecordStatusTransition(
                 updates.is_handover = false;
                 updates.handover_date = null as any;
                 updates.resultReturnedDate = null as any;
-                updates.receiverName = null as any;
             } else if (newRank < 7) {
                 updates.completedDate = null as any;
                 updates.exportDate = null as any;
@@ -1070,78 +1132,87 @@ export function syncRecordStatusTransition(
                 updates.is_handover = false;
                 updates.handover_date = null as any;
                 updates.resultReturnedDate = null as any;
-                updates.receiverName = null as any;
             } else if (newRank < 8) {
                 updates.resultReturnedDate = null as any;
-                updates.receiverName = null as any;
             }
         }
 
-        // TỰ ĐỘNG BÙ NGÀY HOẶC SET NGÀY THEO BƯỚC HIỆN TẠI NẾU TIẾN TỚI
-        if (newRank >= 1 && !updates.assignedDate && !currentRecord.assignedDate) {
-            updates.assignedDate = options?.customDates?.assignedDate || targetDate;
-        } else if (options?.customDates?.assignedDate) {
-            updates.assignedDate = options.customDates.assignedDate;
-        }
-
-        if (newRank >= 2 && !updates.completedWorkDate && !currentRecord.completedWorkDate) {
-            updates.completedWorkDate = options?.customDates?.completedWorkDate || targetDate;
-        } else if (options?.customDates?.completedWorkDate) {
-            updates.completedWorkDate = options.customDates.completedWorkDate;
-        }
-
-        if (newRank >= 3 && !updates.pendingCheckDate && !currentRecord.pendingCheckDate) {
-            updates.pendingCheckDate = options?.customDates?.pendingCheckDate || targetDate;
-        } else if (options?.customDates?.pendingCheckDate) {
-            updates.pendingCheckDate = options.customDates.pendingCheckDate;
-        }
-
-        if (newRank >= 4 && !updates.checkedDate && !currentRecord.checkedDate) {
-            updates.checkedDate = options?.customDates?.checkedDate || targetDate;
-        } else if (options?.customDates?.checkedDate) {
-            updates.checkedDate = options.customDates.checkedDate;
-        }
-
-        if (newRank >= 5 && !updates.submissionDate && !currentRecord.submissionDate) {
-            updates.submissionDate = options?.customDates?.submissionDate || targetDate;
-        } else if (options?.customDates?.submissionDate) {
-            updates.submissionDate = options.customDates.submissionDate;
-        }
-
-        if (newRank >= 6 && !updates.approvalDate && !currentRecord.approvalDate) {
-            updates.approvalDate = options?.customDates?.approvalDate || targetDate;
-        } else if (options?.customDates?.approvalDate) {
-            updates.approvalDate = options.customDates.approvalDate;
-        }
-
-        if (newRank >= 7) {
+        // CHỈ CẬP NHẬT NGÀY CỦA ĐÚNG BƯỚC HIỆN TẠI ĐANG THAO TÁC, KHÔNG TỰ ĐỘNG BÙ NGÀY CHO CÁC BƯỚC KHÁC
+        if (newStatus === RecordStatus.RECEIVED) {
+            updates.receivedDate = options?.customDates?.receivedDate || currentRecord.receivedDate || targetDate;
+        } else if (newStatus === RecordStatus.ASSIGNED || newStatus === RecordStatus.IN_PROGRESS) {
+            updates.assignedDate = options?.customDates?.assignedDate || currentRecord.assignedDate || targetDate;
+        } else if (newStatus === RecordStatus.FIELD_WORK) {
+            const fieldDate = options?.customDates?.fieldAssignedDate || options?.customDates?.assignedDate || targetDate;
+            updates.fieldAssignedDate = fieldDate;
+            if (!currentRecord.assignedDate && !updates.assignedDate) {
+                updates.assignedDate = fieldDate;
+            }
+            if (!currentRecord.surveyorId && (options?.assignedTo || currentRecord.assignedTo)) {
+                updates.surveyorId = options?.assignedTo || currentRecord.assignedTo;
+            }
+        } else if (newStatus === RecordStatus.OFFICE_WORK) {
+            const officeDate = options?.customDates?.officeAssignedDate || options?.customDates?.assignedDate || targetDate;
+            updates.officeAssignedDate = officeDate;
+            if (!currentRecord.assignedDate && !updates.assignedDate) {
+                updates.assignedDate = currentRecord.fieldAssignedDate || officeDate;
+            }
+            if (!currentRecord.drafterId && (options?.assignedTo || currentRecord.assignedTo)) {
+                updates.drafterId = options?.assignedTo || currentRecord.assignedTo;
+            }
+        } else if (newStatus === RecordStatus.COMPLETED_WORK) {
+            updates.completedWorkDate = options?.customDates?.completedWorkDate || currentRecord.completedWorkDate || targetDate;
+        } else if (newStatus === RecordStatus.PENDING_CHECK) {
+            updates.pendingCheckDate = options?.customDates?.pendingCheckDate || currentRecord.pendingCheckDate || targetDate;
+            // Backfill survey tracking if missing
+            if (!currentRecord.surveyorId && (currentRecord.assignedTo || updates.assignedTo)) {
+                updates.surveyorId = currentRecord.assignedTo || updates.assignedTo;
+            }
+            if (!currentRecord.drafterId && (currentRecord.assignedTo || updates.assignedTo)) {
+                updates.drafterId = currentRecord.assignedTo || updates.assignedTo;
+            }
+            if (!currentRecord.fieldAssignedDate && (currentRecord.assignedDate || updates.assignedDate)) {
+                updates.fieldAssignedDate = currentRecord.assignedDate || updates.assignedDate;
+            }
+            if (!currentRecord.officeAssignedDate && (currentRecord.assignedDate || updates.assignedDate)) {
+                updates.officeAssignedDate = currentRecord.fieldCompletedDate || currentRecord.assignedDate || updates.assignedDate;
+            }
+        } else if (newStatus === RecordStatus.CHECKED) {
+            updates.checkedDate = options?.customDates?.checkedDate || currentRecord.checkedDate || targetDate;
+        } else if (newStatus === RecordStatus.PENDING_SIGN) {
+            updates.submissionDate = options?.customDates?.submissionDate || currentRecord.submissionDate || targetDate;
+        } else if (newStatus === RecordStatus.SIGNED) {
+            updates.approvalDate = options?.customDates?.approvalDate || currentRecord.approvalDate || targetDate;
+        } else if (newStatus === RecordStatus.HANDOVER) {
             updates.completedDate = options?.customDates?.completedDate || currentRecord.completedDate || targetDate;
             updates.exportDate = options?.exportDate || options?.customDates?.exportDate || currentRecord.exportDate || targetDate;
             if (options?.exportBatch !== undefined) updates.exportBatch = options.exportBatch;
             updates.is_handover = true;
             updates.handover_date = updates.exportDate;
-        }
-
-        if (newRank >= 8) {
+        } else if (newStatus === RecordStatus.RETURNED) {
             updates.resultReturnedDate = options?.resultReturnedDate || options?.customDates?.resultReturnedDate || currentRecord.resultReturnedDate || targetDate;
-            if (!updates.completedDate) updates.completedDate = updates.resultReturnedDate;
+            if (!updates.completedDate && !currentRecord.completedDate) {
+                updates.completedDate = updates.resultReturnedDate;
+            }
             if (options?.receiverName) updates.receiverName = options.receiverName;
             if (options?.receiptNumber) updates.receiptNumber = options.receiptNumber;
             if (options?.returnedPrice !== undefined) updates.returnedPrice = options.returnedPrice;
         }
 
-        // BẢO TOÀN CÁC MỐC NGÀY TRUYỀN VÀO TỪ CUSTOM DATES (Chỉ giữ lại mốc ngày phù hợp với bước hiện tại, không hồi sinh bước tương lai nếu đang rollback)
+        // BẢO TOÀN CÁC MỐC NGÀY NẾU NGƯỜI DÙNG CÓ TRUYỀN VÀO TÙY CHỌN RIÊNG
         if (options?.customDates) {
             if (options.customDates.receivedDate !== undefined && options.customDates.receivedDate !== null && options.customDates.receivedDate !== '') updates.receivedDate = options.customDates.receivedDate;
-            if ((!isRollback || newRank >= 1) && options.customDates.assignedDate !== undefined && options.customDates.assignedDate !== null && options.customDates.assignedDate !== '') updates.assignedDate = options.customDates.assignedDate;
-            if ((!isRollback || newRank >= 2) && options.customDates.completedWorkDate !== undefined && options.customDates.completedWorkDate !== null && options.customDates.completedWorkDate !== '') updates.completedWorkDate = options.customDates.completedWorkDate;
-            if ((!isRollback || newRank >= 3) && options.customDates.pendingCheckDate !== undefined && options.customDates.pendingCheckDate !== null && options.customDates.pendingCheckDate !== '') updates.pendingCheckDate = options.customDates.pendingCheckDate;
-            if ((!isRollback || newRank >= 4) && options.customDates.checkedDate !== undefined && options.customDates.checkedDate !== null && options.customDates.checkedDate !== '') updates.checkedDate = options.customDates.checkedDate;
-            if ((!isRollback || newRank >= 5) && options.customDates.submissionDate !== undefined && options.customDates.submissionDate !== null && options.customDates.submissionDate !== '') updates.submissionDate = options.customDates.submissionDate;
-            if ((!isRollback || newRank >= 6) && options.customDates.approvalDate !== undefined && options.customDates.approvalDate !== null && options.customDates.approvalDate !== '') updates.approvalDate = options.customDates.approvalDate;
-            if ((!isRollback || newRank >= 7) && options.customDates.completedDate !== undefined && options.customDates.completedDate !== null && options.customDates.completedDate !== '') updates.completedDate = options.customDates.completedDate;
-            if ((!isRollback || newRank >= 7) && options.customDates.exportDate !== undefined && options.customDates.exportDate !== null && options.customDates.exportDate !== '') updates.exportDate = options.customDates.exportDate;
-            if ((!isRollback || newRank >= 8) && options.customDates.resultReturnedDate !== undefined && options.customDates.resultReturnedDate !== null && options.customDates.resultReturnedDate !== '') updates.resultReturnedDate = options.customDates.resultReturnedDate;
+            if (options.customDates.assignedDate !== undefined && options.customDates.assignedDate !== null && options.customDates.assignedDate !== '') updates.assignedDate = options.customDates.assignedDate;
+            if (options.customDates.fieldAssignedDate !== undefined && options.customDates.fieldAssignedDate !== null && options.customDates.fieldAssignedDate !== '') updates.fieldAssignedDate = options.customDates.fieldAssignedDate;
+            if (options.customDates.officeAssignedDate !== undefined && options.customDates.officeAssignedDate !== null && options.customDates.officeAssignedDate !== '') updates.officeAssignedDate = options.customDates.officeAssignedDate;
+            if (options.customDates.completedWorkDate !== undefined && options.customDates.completedWorkDate !== null && options.customDates.completedWorkDate !== '') updates.completedWorkDate = options.customDates.completedWorkDate;
+            if (options.customDates.pendingCheckDate !== undefined && options.customDates.pendingCheckDate !== null && options.customDates.pendingCheckDate !== '') updates.pendingCheckDate = options.customDates.pendingCheckDate;
+            if (options.customDates.checkedDate !== undefined && options.customDates.checkedDate !== null && options.customDates.checkedDate !== '') updates.checkedDate = options.customDates.checkedDate;
+            if (options.customDates.submissionDate !== undefined && options.customDates.submissionDate !== null && options.customDates.submissionDate !== '') updates.submissionDate = options.customDates.submissionDate;
+            if (options.customDates.approvalDate !== undefined && options.customDates.approvalDate !== null && options.customDates.approvalDate !== '') updates.approvalDate = options.customDates.approvalDate;
+            if (options.customDates.completedDate !== undefined && options.customDates.completedDate !== null && options.customDates.completedDate !== '') updates.completedDate = options.customDates.completedDate;
+            if (options.customDates.exportDate !== undefined && options.customDates.exportDate !== null && options.customDates.exportDate !== '') updates.exportDate = options.customDates.exportDate;
+            if (options.customDates.resultReturnedDate !== undefined && options.customDates.resultReturnedDate !== null && options.customDates.resultReturnedDate !== '') updates.resultReturnedDate = options.customDates.resultReturnedDate;
         }
     }
 

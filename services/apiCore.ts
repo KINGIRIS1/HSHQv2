@@ -1,7 +1,8 @@
 
 import { supabase, isConfigured } from './supabaseClient';
 import { Contract, PriceItem, Employee, User, RecordStatus } from '../types';
-import { API_BASE_URL } from '../constants'; 
+import { API_BASE_URL, isArchiveRecordType } from '../constants'; 
+import { isFieldWorkProcedure, isOfficeOnlySurveyProcedure } from '../utils/appHelpers';
 import { connectionManager } from './connectionService'; 
 import { setIndexedDBItem, getIndexedDBItem } from './storageService';
 
@@ -218,7 +219,9 @@ export const sanitizeData = (data: any, allowedColumns: string[]) => {
         'deadline', 'assignedDate', 
         'submissionDate', 'approvalDate', 'completedDate', 
         'exportDate', 'issueDate',
-        'pendingCheckDate', 'checkedDate', 'completedWorkDate', 'reminderDate'
+        'pendingCheckDate', 'checkedDate', 'completedWorkDate', 'reminderDate',
+        'surveyAssignedDate', 'fieldAssignedDate', 'fieldCompletedDate',
+        'officeAssignedDate', 'officeCompletedDate'
     ];
 
     dateTimeFields.forEach(field => {
@@ -388,8 +391,19 @@ export const mapRecordFromDb = (item: any): any => {
     r.archiveHandoverDate = keepOnlyDate(val(r.archiveHandoverDate, r.archivehandoverdate, r.archive_handover_date));
     r.archiveHandoverBatch = val(r.archiveHandoverBatch, r.archivehandoverbatch, r.archive_handover_batch);
 
+    // Mappings cho quy trình đo đạc 2 bước (Ngoại nghiệp & Nội nghiệp)
+    r.surveyorId = val(r.surveyorId, r.surveyorid, r.surveyor_id);
+    r.surveyAssignedDate = keepOnlyDate(val(r.surveyAssignedDate, r.surveyassigneddate, r.survey_assigned_date));
+    r.fieldAssignedDate = keepOnlyDate(val(r.fieldAssignedDate, r.fieldassigneddate, r.field_assigned_date));
+    r.fieldCompletedDate = keepOnlyDate(val(r.fieldCompletedDate, r.fieldcompleteddate, r.field_completed_date));
+    r.drafterId = val(r.drafterId, r.drafterid, r.drafter_id);
+    r.officeAssignedDate = keepOnlyDate(val(r.officeAssignedDate, r.officeassigneddate, r.office_assigned_date));
+    r.officeCompletedDate = keepOnlyDate(val(r.officeCompletedDate, r.officecompleteddate, r.office_completed_date));
+
     // Tự động chuẩn hóa nếu trạng thái bị lệch so với tiến trình thực tế
     const currentStatus = (r.status || '').trim();
+    const isArchive = isArchiveRecordType(r.recordType) || r.sourceTable === 'luutru_records';
+
     if (!currentStatus) {
         r.status = RecordStatus.RECEIVED;
     } else if (['ASSIGNED', 'IN_PROGRESS', 'COMPLETED_WORK', 'GIAO_HS'].includes(currentStatus)) {
@@ -403,6 +417,70 @@ export const mapRecordFromDb = (item: any): any => {
             r.status = RecordStatus.CHECKED;
         } else if (r.pendingCheckDate || r.checkedBy) {
             r.status = RecordStatus.PENDING_CHECK;
+        } else if (!isArchive) {
+            // Module Đo đạc: Bỏ hoàn toàn trạng thái "Đang thực hiện" -> Chuyển sang Đo đạc thực địa hoặc Biên tập bản đồ
+            if (isOfficeOnlySurveyProcedure(r.recordType)) {
+                r.status = RecordStatus.OFFICE_WORK;
+            } else {
+                r.status = RecordStatus.FIELD_WORK;
+            }
+        } else {
+            // Module Lưu trữ: Khôi phục lại trạng thái "Đang thực hiện"
+            r.status = RecordStatus.IN_PROGRESS;
+        }
+    } else if (isArchive && (currentStatus === RecordStatus.FIELD_WORK || currentStatus === RecordStatus.OFFICE_WORK)) {
+        // Khôi phục cho hồ sơ lưu trữ nếu bị gán nhầm trạng thái đo đạc
+        r.status = RecordStatus.IN_PROGRESS;
+    }
+
+    // BỔ SUNG DỮ LIỆU ĐỂ TRÁNH BỎ TRỐNG CHO HỒ SƠ ĐO ĐẠC (ĐO ĐẠC THỰC ĐỊA & BIÊN TẬP BẢN ĐỒ)
+    if (!isArchive) {
+        if (isOfficeOnlySurveyProcedure(r.recordType)) {
+            // Thủ tục thuần nội nghiệp (2.1 Trích lục, 2.3 Duyệt đơn & Cung cấp số thửa): Điền vào Biên tập bản đồ
+            if (r.assignedTo && !r.drafterId) r.drafterId = r.assignedTo;
+            if (r.assignedDate && !r.officeAssignedDate) r.officeAssignedDate = r.assignedDate;
+            if (!r.assignedDate && r.officeAssignedDate) r.assignedDate = r.officeAssignedDate;
+        } else if (isFieldWorkProcedure(r.recordType)) {
+            // Thủ tục đo đạc 2 bước (2.2 Trích đo, 2.4 Cắm mốc, 2.5 Tách - Hợp thửa)
+            if (r.assignedTo && !r.surveyorId) r.surveyorId = r.assignedTo;
+            if (r.assignedDate && !r.fieldAssignedDate) r.fieldAssignedDate = r.assignedDate;
+
+            const hasPassedInspection = Boolean(
+                r.pendingCheckDate || r.checkedDate || r.checkedBy ||
+                r.submissionDate || r.submittedTo || r.approvalDate ||
+                r.completedDate || r.resultReturnedDate || r.exportBatch ||
+                r.status === RecordStatus.PENDING_CHECK ||
+                r.status === RecordStatus.CHECKED || r.status === RecordStatus.PENDING_SIGN ||
+                r.status === RecordStatus.SIGNED || r.status === RecordStatus.HANDOVER ||
+                r.status === RecordStatus.RETURNED
+            );
+
+            if (hasPassedInspection) {
+                // Đã qua bước Trình kiểm tra -> Tự động điền đầy đủ cả 2 bước nếu có ngày
+                if (!r.drafterId && (r.assignedTo || r.surveyorId)) r.drafterId = r.assignedTo || r.surveyorId;
+                if (!r.officeAssignedDate) r.officeAssignedDate = r.fieldCompletedDate || r.assignedDate || r.fieldAssignedDate;
+                if (!r.fieldCompletedDate) r.fieldCompletedDate = r.officeAssignedDate || r.assignedDate || r.fieldAssignedDate;
+                if (!r.officeCompletedDate) r.officeCompletedDate = r.pendingCheckDate || r.submissionDate || r.approvalDate || r.completedDate || r.assignedDate;
+            } else if (r.status === RecordStatus.OFFICE_WORK) {
+                // Đang ở bước Biên tập bản đồ
+                if (!r.drafterId && r.assignedTo) r.drafterId = r.assignedTo;
+                if (!r.officeAssignedDate) r.officeAssignedDate = r.assignedDate || r.fieldCompletedDate;
+                if (!r.fieldCompletedDate) r.fieldCompletedDate = r.officeAssignedDate || r.assignedDate;
+            }
+            // Nếu chưa qua kiểm tra và không ở OFFICE_WORK -> CHỈ điền ĐO ĐẠC THỰC ĐỊA nếu đã giao, tuyệt đối không tự điền Biên tập bản đồ và không tự điền receivedDate
+        } else {
+            // Các thủ tục chuyên môn khác
+            if (r.assignedTo) {
+                if (!r.surveyorId) r.surveyorId = r.assignedTo;
+                if (r.assignedDate && !r.fieldAssignedDate) r.fieldAssignedDate = r.assignedDate;
+            }
+        }
+
+        if (!r.assignedDate && (r.fieldAssignedDate || r.officeAssignedDate)) {
+            r.assignedDate = r.fieldAssignedDate || r.officeAssignedDate;
+        }
+        if (!r.assignedTo && (r.surveyorId || r.drafterId)) {
+            r.assignedTo = r.surveyorId || r.drafterId;
         }
     }
 

@@ -555,7 +555,7 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
                     onClick={() => setSubTab('executed')} 
                     className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${subTab === 'executed' ? 'border-orange-600 text-orange-700 bg-white' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
                 >
-                    <CheckCircle size={16}/> Đang thực hiện
+                    <CheckCircle size={16}/> Đã thực hiện
                 </button>
                 <button 
                     onClick={() => setSubTab('sign')} 
