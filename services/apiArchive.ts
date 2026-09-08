@@ -323,15 +323,30 @@ export const fetchArchiveRecords = async (type: 'saoluc' | 'vaoso' | 'congvan'):
         let hasMore = true;
 
         while (hasMore) {
-            const { data, error } = await supabase
+            let query = supabase
                 .from('luutru_records')
                 .select('*')
-                .order('created_at', { ascending: false })
                 .range(page * pageSize, (page + 1) * pageSize - 1);
+
+            // Sắp xếp an toàn theo receivedDate giảm dần (nếu có lỗi cột sẽ bỏ qua)
+            try {
+                query = query.order('receivedDate', { ascending: false, nullsFirst: false });
+            } catch {
+                // ignore
+            }
+
+            const { data, error } = await query;
 
             if (error) {
                 console.warn('Lỗi khi fetch luutru_records:', error);
-                throw error;
+                // Thử fallback query đơn giản nếu có lỗi sắp xếp
+                const fallbackRes = await supabase.from('luutru_records').select('*').limit(1000);
+                if (fallbackRes.data && fallbackRes.data.length > 0) {
+                    const mapped = fallbackRes.data.map(item => mapLuutruDbToArchiveRecord(item));
+                    const filtered = mapped.filter(r => r.type === type);
+                    allData = [...allData, ...filtered];
+                }
+                break;
             }
             
             if (data && data.length > 0) {
@@ -345,12 +360,32 @@ export const fetchArchiveRecords = async (type: 'saoluc' | 'vaoso' | 'congvan'):
             }
         }
 
-        // Khử trùng lặp 100% bằng Map theo id tránh trùng các bản ghi ở ranh giới phân trang
+        // Tự động kiểm tra thêm bản ghi lưu trữ chưa chuyển đổi từ land_records để không sót hồ sơ
+        try {
+            const { data: landData } = await supabase
+                .from('land_records')
+                .select('*')
+                .or('recordType.ilike.%sao lục%,recordType.ilike.%công văn%,recordType.ilike.%1.1%,recordType.ilike.%1.2%,recordType.ilike.%cung cấp%')
+                .limit(500);
+            if (landData && landData.length > 0) {
+                const mappedLand = landData.map(item => mapLuutruDbToArchiveRecord(item)).filter(r => r.type === type);
+                allData = [...allData, ...mappedLand];
+            }
+        } catch (e) {
+            // Không ngắt luồng nếu land_records không có
+        }
+
+        // Khử trùng lặp 100% bằng Map theo id hoặc số hiệu tránh trùng
         const uniqueMap = new Map<string, ArchiveRecord>();
         allData.forEach(r => {
-            if (r && r.id) uniqueMap.set(r.id, r);
+            if (r && (r.id || r.so_hieu)) {
+                const key = r.id || r.so_hieu;
+                uniqueMap.set(key, r);
+            }
         });
-        return Array.from(uniqueMap.values());
+        const result = Array.from(uniqueMap.values());
+        saveToCache(CACHE_KEY_ARCHIVE, result);
+        return result;
     } catch (error: any) {
         logError(`fetchArchiveRecords-${type}`, error, true);
         const cached = getFromCache<ArchiveRecord[]>(CACHE_KEY_ARCHIVE, []);

@@ -32,6 +32,7 @@ interface ReceiveRecordProps {
   rolePermissions?: RolePermissions;
   departmentPermissions?: DepartmentPermissions;
   onReturnResult?: (record: RecordFile) => void;
+  onSyncPending?: () => Promise<any>;
 }
 
 // Hàm chuyển đổi Âm lịch sang Dương lịch (Cố định cho các ngày lễ chính 2024-2026)
@@ -66,7 +67,7 @@ const formatDateKey = (date: Date): string => {
     return `${year}-${month}-${day}`;
 };
 
-const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, employees, currentUser, records = [], holidays, onCreateContract, onHandOverRecords, onBulkUpdate, initialTab = 'create', rolePermissions, departmentPermissions, onReturnResult }) => {
+const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, employees, currentUser, records = [], holidays, onCreateContract, onHandOverRecords, onBulkUpdate, initialTab = 'create', rolePermissions, departmentPermissions, onReturnResult, onSyncPending }) => {
   const [viewMode, setViewMode] = useState<'create' | 'list' | 'update' | 'vphc' | 'search' | 'extend'>(initialTab === 'bulk' as any ? 'create' : initialTab as any);
 
   const canCreate = !currentUser || isViewAllowedForUser(currentUser, employees || [], 'receive_sub_create', rolePermissions, departmentPermissions);
@@ -404,6 +405,7 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, wards, 
                 onPrint={handlePreviewDocx}
                 onCreateContract={onCreateContract}
                 onHandOverRecords={onHandOverRecords}
+                onSyncPending={onSyncPending}
             />
         )}
 

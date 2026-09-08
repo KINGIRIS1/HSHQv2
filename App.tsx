@@ -248,6 +248,7 @@ function App() {
   // --- CUSTOM HOOKS ---
   const { 
       records: rawRecords, employees, users, wards, holidays, rolePermissions, departmentPermissions, connectionStatus, 
+      pendingSyncCount, handleSyncPendingRecords,
       isUpdateAvailable, latestVersion, updateUrl,
       setEmployees, setUsers, setRecords, setWards,
       loadData, handleAddOrUpdateRecord, handleDeleteRecord, handleImportRecords,
@@ -1538,6 +1539,7 @@ function App() {
             handleOpenReturnModal={handleOpenReturnModal}
             handleOpenRejectReturnModal={handleOpenRejectReturnModal}
             handleOpenExtendModal={handleOpenExtendModal}
+            handleSyncPendingRecords={handleSyncPendingRecords}
         />
 
         <AppModals 

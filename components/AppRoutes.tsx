@@ -226,6 +226,7 @@ interface AppRoutesProps {
   onBulkUpdate?: (field: keyof RecordFile, value: any, customDate?: string, targetRecordIds?: string[]) => Promise<void>;
   handleOpenRejectReturnModal?: (records: RecordFile[]) => void;
   handleOpenExtendModal?: (records: RecordFile[]) => void;
+  handleSyncPendingRecords?: () => Promise<any>;
 }
 
 const AppRoutes: React.FC<AppRoutesProps> = (props) => {
@@ -1488,6 +1489,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
           onHandOverRecords={props.handleHandOverRecords}
           onBulkUpdate={props.onBulkUpdate}
           onReturnResult={props.handleOpenReturnModal}
+          onSyncPending={props.handleSyncPendingRecords}
         />
       );
     case "receive_contract":

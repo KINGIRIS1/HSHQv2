@@ -93,9 +93,9 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
       </div>
 
       {/* Header: Căn giữa logo lên trên và chữ xuống dưới trên cả mobile và PC */}
-      <header className="relative top-0 left-0 right-0 z-20 flex flex-col items-center text-center pt-4 pb-1 px-4 sm:pt-6 sm:pb-2">
-        {/* Logo Đồng Nai - Bỏ nền trắng bao ngoài */}
-        <div className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 flex items-center justify-center shrink-0 drop-shadow-[0_4px_8px_rgba(0,0,0,0.85)] mb-1.5 sm:mb-2">
+      <header className="relative top-0 left-0 right-0 z-20 flex flex-col items-center text-center pt-5 pb-2 px-4 sm:pt-8 sm:pb-3">
+        {/* Logo Đồng Nai */}
+        <div className="w-14 h-14 sm:w-16 sm:h-16 md:w-20 md:h-20 flex items-center justify-center shrink-0 drop-shadow-[0_4px_10px_rgba(0,0,0,0.9)] mb-2 sm:mb-2.5">
           <img 
             src="/Logo_Dong_Nai.ico" 
             alt="Logo Đồng Nai" 
@@ -106,129 +106,113 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
           />
         </div>
 
-        {/* Tiêu đề Chi nhánh */}
-        <div className="flex flex-col items-center">
-          <h1 className="text-white text-xs sm:text-sm md:text-base lg:text-lg font-black uppercase tracking-wide leading-snug drop-shadow-[0_2px_4px_rgba(0,0,0,0.95)]">
+        {/* Tiêu đề Chi nhánh - Tăng kích thước chữ hài hòa, rõ ràng */}
+        <div className="flex flex-col items-center max-w-4xl px-2">
+          <h1 className="text-white text-base sm:text-lg md:text-xl lg:text-2xl font-black uppercase tracking-wide leading-snug drop-shadow-[0_2px_6px_rgba(0,0,0,0.95)]">
             VĂN PHÒNG ĐĂNG KÝ THÀNH PHỐ ĐỒNG NAI
           </h1>
-          <h2 className="text-yellow-400 text-xs sm:text-xs md:text-sm lg:text-base font-black uppercase tracking-wide leading-snug drop-shadow-[0_2px_4px_rgba(0,0,0,0.95)]">
+          <h2 className="text-yellow-400 text-sm sm:text-base md:text-lg lg:text-xl font-black uppercase tracking-wide leading-snug mt-0.5 sm:mt-1 drop-shadow-[0_2px_6px_rgba(0,0,0,0.95)]">
             CHI NHÁNH HỚN QUẢN
           </h2>
         </div>
       </header>
 
       {/* Khu vực đăng nhập trung tâm */}
-      <main className="relative z-10 w-full min-h-[calc(100%-140px)] sm:min-h-0 sm:h-full flex items-center justify-center p-4 py-6 sm:py-4">
-        <div className="w-full max-w-2xl flex flex-col items-center">
+      <main className="relative z-10 w-full min-h-[calc(100%-160px)] sm:min-h-0 sm:h-full flex items-center justify-center p-4 py-6 sm:py-4">
+        <div className="w-full max-w-[340px] sm:max-w-[400px] flex flex-col items-center">
           
-          {/* Tiêu đề: ĐĂNG NHẬP HỆ THỐNG */}
-          <h3 className="text-white text-xl sm:text-2xl md:text-3xl font-black uppercase tracking-wider text-center mb-5 sm:mb-8 drop-shadow-[0_2px_6px_rgba(0,0,0,0.95)]">
-            ĐĂNG NHẬP HỆ THỐNG
-          </h3>
+          {/* Tiêu đề: ĐĂNG NHẬP HỆ THỐNG - Căn thẳng hàng hoàn hảo với khung tài khoản/mật khẩu, cỡ chữ vừa vặn không vượt ra ngoài */}
+          <div className="w-full text-center mb-4 sm:mb-6">
+            <h3 className="text-white text-lg sm:text-xl md:text-2xl font-black uppercase tracking-wider leading-tight drop-shadow-[0_2px_6px_rgba(0,0,0,0.95)]">
+              ĐĂNG NHẬP HỆ THỐNG
+            </h3>
+          </div>
 
-          {/* Form & Logo Hớn Quản:
-              - Desktop/Tablet (sm trở lên): Xếp hàng ngang (Form bên trái, Logo bên phải)
-              - Mobile (< sm): Xếp dọc với Form ở TRÊN, Logo Hớn Quản ở DƯỚI các nút thao tác đăng nhập */}
-          <div className="w-full flex flex-col sm:flex-row items-center justify-center gap-6 sm:gap-8">
+          {/* Cụm Form nhập liệu */}
+          <form onSubmit={handleSubmit} className="w-full space-y-3.5 sm:space-y-4">
             
-            {/* Cụm Form nhập liệu */}
-            <form onSubmit={handleSubmit} className="w-full max-w-[320px] sm:max-w-[380px] space-y-3 sm:space-y-3.5">
-              
-              {/* Thông báo lỗi nếu có */}
-              {error && (
-                <div className="bg-red-600/90 text-white text-xs font-semibold px-4 py-2 rounded-xl backdrop-blur-md shadow-lg drop-shadow text-center border border-red-400/50">
-                  {error}
-                </div>
-              )}
-
-              {/* Ô 1: Tài khoản đăng nhập */}
-              <div>
-                <input
-                  type="text"
-                  name="username"
-                  autoComplete="username"
-                  required
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder="Tài khoản đăng nhập"
-                  className="w-full px-4 py-3 sm:py-3.5 bg-slate-100/95 hover:bg-white focus:bg-white text-slate-800 placeholder-slate-500 font-semibold rounded-2xl outline-none shadow-md border border-white/60 focus:ring-2 focus:ring-blue-500 transition-all text-sm sm:text-base"
-                />
+            {/* Thông báo lỗi nếu có */}
+            {error && (
+              <div className="bg-red-600/90 text-white text-xs font-semibold px-4 py-2.5 rounded-xl backdrop-blur-md shadow-lg drop-shadow text-center border border-red-400/50">
+                {error}
               </div>
+            )}
 
-              {/* Ô 2: Mật khẩu */}
-              <div className="relative flex items-center">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  name="password"
-                  autoComplete="current-password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Mật khẩu"
-                  className="w-full pl-4 pr-11 py-3 sm:py-3.5 bg-slate-100/95 hover:bg-white focus:bg-white text-slate-800 placeholder-slate-500 font-semibold rounded-2xl outline-none shadow-md border border-white/60 focus:ring-2 focus:ring-blue-500 transition-all text-sm sm:text-base"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3.5 text-slate-600 hover:text-slate-900 transition-colors p-1"
-                  tabIndex={-1}
-                  title={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
-                >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
-
-              {/* Dòng Checkbox: Ghi nhớ đăng nhập */}
-              <div className="flex items-center pt-0.5">
-                <label className="flex items-center gap-2.5 cursor-pointer select-none group">
-                  <div className="relative flex items-center justify-center">
-                    <input
-                      type="checkbox"
-                      id="rememberMeCheckbox"
-                      checked={rememberMe}
-                      onChange={(e) => setRememberMe(e.target.checked)}
-                      className="peer h-5 w-5 cursor-pointer appearance-none rounded-md bg-white/90 border-2 border-white/80 transition-all checked:bg-blue-600 checked:border-blue-600 hover:border-white focus:outline-none shadow-md shadow-black/20"
-                    />
-                    <Check 
-                      size={14} 
-                      className="pointer-events-none absolute text-white opacity-0 peer-checked:opacity-100 stroke-[3.5] transition-opacity" 
-                    />
-                  </div>
-                  <span className="text-white text-xs sm:text-sm font-bold tracking-wide drop-shadow-[0_2px_4px_rgba(0,0,0,0.95)] group-hover:text-blue-200 transition-colors">
-                    Ghi nhớ đăng nhập
-                  </span>
-                </label>
-              </div>
-
-              {/* Nút Đăng nhập */}
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full bg-[#2563eb] hover:bg-[#1d4ed8] active:bg-[#1e40af] text-white py-3 sm:py-3.5 rounded-2xl font-black text-sm sm:text-base shadow-lg shadow-blue-600/40 flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-75 disabled:cursor-not-allowed border border-blue-400/30 tracking-wide"
-              >
-                {isLoading ? (
-                  <span className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin"></span>
-                ) : (
-                  <>
-                    <LogIn size={18} className="stroke-[2.5]" />
-                    <span>Đăng nhập</span>
-                  </>
-                )}
-              </button>
-            </form>
-
-            {/* Logo Hớn Quản: Bỏ hết nền trắng bao ngoài, hiển thị trong suốt nổi bật trên nền */}
-            <div className="shrink-0 flex items-center justify-center">
-              <div className="w-24 h-24 sm:w-36 sm:h-36 md:w-40 md:h-40 flex items-center justify-center drop-shadow-[0_8px_20px_rgba(0,0,0,0.7)]">
-                <img 
-                  src="/icon.png" 
-                  alt="Logo Hớn Quản" 
-                  className="w-full h-full object-contain"
-                />
-              </div>
+            {/* Ô 1: Tài khoản đăng nhập */}
+            <div>
+              <input
+                type="text"
+                name="username"
+                autoComplete="username"
+                required
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Tài khoản đăng nhập"
+                className="w-full px-4 py-3 sm:py-3.5 bg-slate-100/95 hover:bg-white focus:bg-white text-slate-800 placeholder-slate-500 font-semibold rounded-2xl outline-none shadow-md border border-white/60 focus:ring-2 focus:ring-blue-500 transition-all text-sm sm:text-base"
+              />
             </div>
 
-          </div>
+            {/* Ô 2: Mật khẩu */}
+            <div className="relative flex items-center">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                name="password"
+                autoComplete="current-password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Mật khẩu"
+                className="w-full pl-4 pr-11 py-3 sm:py-3.5 bg-slate-100/95 hover:bg-white focus:bg-white text-slate-800 placeholder-slate-500 font-semibold rounded-2xl outline-none shadow-md border border-white/60 focus:ring-2 focus:ring-blue-500 transition-all text-sm sm:text-base"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3.5 text-slate-600 hover:text-slate-900 transition-colors p-1"
+                tabIndex={-1}
+                title={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+
+            {/* Dòng Checkbox: Ghi nhớ đăng nhập */}
+            <div className="flex items-center pt-0.5">
+              <label className="flex items-center gap-2.5 cursor-pointer select-none group">
+                <div className="relative flex items-center justify-center">
+                  <input
+                    type="checkbox"
+                    id="rememberMeCheckbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    className="peer h-5 w-5 cursor-pointer appearance-none rounded-md bg-white/90 border-2 border-white/80 transition-all checked:bg-blue-600 checked:border-blue-600 hover:border-white focus:outline-none shadow-md shadow-black/20"
+                  />
+                  <Check 
+                    size={14} 
+                    className="pointer-events-none absolute text-white opacity-0 peer-checked:opacity-100 stroke-[3.5] transition-opacity" 
+                  />
+                </div>
+                <span className="text-white text-xs sm:text-sm font-bold tracking-wide drop-shadow-[0_2px_4px_rgba(0,0,0,0.95)] group-hover:text-blue-200 transition-colors">
+                  Ghi nhớ đăng nhập
+                </span>
+              </label>
+            </div>
+
+            {/* Nút Đăng nhập */}
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full bg-[#2563eb] hover:bg-[#1d4ed8] active:bg-[#1e40af] text-white py-3 sm:py-3.5 rounded-2xl font-black text-sm sm:text-base shadow-lg shadow-blue-600/40 flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-75 disabled:cursor-not-allowed border border-blue-400/30 tracking-wide"
+            >
+              {isLoading ? (
+                <span className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin"></span>
+              ) : (
+                <>
+                  <LogIn size={18} className="stroke-[2.5]" />
+                  <span>Đăng nhập</span>
+                </>
+              )}
+            </button>
+          </form>
 
         </div>
       </main>

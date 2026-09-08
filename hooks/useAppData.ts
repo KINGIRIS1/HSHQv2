@@ -7,7 +7,9 @@ import { fetchRecords, fetchEmployees, fetchUsers, fetchUpdateInfo, fetchHoliday
 } from '../services/api';
 import { supabase } from '../services/supabaseClient';
 import { mapRecordFromDb, getFromCache, CACHE_KEYS } from '../services/apiCore';
+import { migrateArchiveRecordsFromLandRecords } from '../services/apiArchive';
 import { getIndexedDBItem } from '../services/storageService';
+import { getPendingSyncCount, syncPendingRecordsToCloud, generateStandardUUID } from '../services/syncQueueService';
 import { DEFAULT_WARDS as STATIC_WARDS, APP_VERSION, MOCK_EMPLOYEES, MOCK_USERS } from '../constants';
 import { migrateUnbatchedRecords, deduplicateRecords } from '../utils/appHelpers';
 import { connectionManager } from '../services/connectionService';
@@ -15,6 +17,7 @@ import { connectionManager } from '../services/connectionService';
 export const useAppData = (currentUser: User | null) => {
     // Khởi tạo danh sách hồ sơ ban đầu (sẽ được nạp tức thì từ IndexedDB & Cloud)
     const [records, setRecords] = useState<RecordFile[]>([]);
+    const [pendingSyncCount, setPendingSyncCount] = useState<number>(0);
     const [employees, setEmployees] = useState<Employee[]>(() => {
         return getFromCache<Employee[]>(CACHE_KEYS.EMPLOYEES, MOCK_EMPLOYEES);
     });
@@ -172,6 +175,21 @@ export const useAppData = (currentUser: User | null) => {
                 });
             }
         }).catch(() => {});
+
+        getPendingSyncCount().then(c => setPendingSyncCount(c));
+
+        const handleSyncUpdate = (e: any) => {
+            if (typeof e.detail?.count === 'number') {
+                setPendingSyncCount(e.detail.count);
+            } else {
+                getPendingSyncCount().then(c => setPendingSyncCount(c));
+            }
+        };
+
+        window.addEventListener('sync_queue_updated', handleSyncUpdate);
+        return () => {
+            window.removeEventListener('sync_queue_updated', handleSyncUpdate);
+        };
     }, []);
 
     // Lắng nghe sự kiện khôi phục kết nối từ connectionManager để reload data ngầm
@@ -218,9 +236,12 @@ export const useAppData = (currentUser: User | null) => {
         return () => clearInterval(intervalId);
     }, [loadData]);
 
-    // Lắng nghe thay đổi Realtime từ bảng land_records
+    // Lắng nghe thay đổi Realtime từ các bảng land_records, luutru_records, dangky_records
     useEffect(() => {
         if (!supabase) return;
+
+        // Chạy migration ngầm nếu còn bản ghi lưu trữ tồn đọng trong land_records
+        migrateArchiveRecordsFromLandRecords().catch(e => console.warn("Archive migration error:", e));
 
         const landRecordsChannel = supabase.channel('land_records_changes')
             .on(
@@ -229,7 +250,7 @@ export const useAppData = (currentUser: User | null) => {
                 (payload) => {
                     setRecords(prev => {
                         if (prev.some(r => r.id === payload.new.id)) return prev;
-                        return [mapRecordFromDb(payload.new) as RecordFile, ...prev];
+                        return [mapRecordFromDb({ ...payload.new, sourceTable: 'land_records' }) as RecordFile, ...prev];
                     });
                 }
             )
@@ -237,7 +258,7 @@ export const useAppData = (currentUser: User | null) => {
                 'postgres_changes',
                 { event: 'UPDATE', schema: 'public', table: 'land_records' },
                 (payload) => {
-                    setRecords(prev => prev.map(r => r.id === payload.new.id ? { ...r, ...mapRecordFromDb(payload.new) } as RecordFile : r));
+                    setRecords(prev => prev.map(r => r.id === payload.new.id ? { ...r, ...mapRecordFromDb({ ...payload.new, sourceTable: 'land_records' }) } as RecordFile : r));
                 }
             )
             .on(
@@ -249,8 +270,64 @@ export const useAppData = (currentUser: User | null) => {
             )
             .subscribe();
 
+        const luutruRecordsChannel = supabase.channel('luutru_records_changes')
+            .on(
+                'postgres_changes',
+                { event: 'INSERT', schema: 'public', table: 'luutru_records' },
+                (payload) => {
+                    setRecords(prev => {
+                        if (prev.some(r => r.id === payload.new.id)) return prev;
+                        return [mapRecordFromDb({ ...payload.new, sourceTable: 'luutru_records' }) as RecordFile, ...prev];
+                    });
+                }
+            )
+            .on(
+                'postgres_changes',
+                { event: 'UPDATE', schema: 'public', table: 'luutru_records' },
+                (payload) => {
+                    setRecords(prev => prev.map(r => r.id === payload.new.id ? { ...r, ...mapRecordFromDb({ ...payload.new, sourceTable: 'luutru_records' }) } as RecordFile : r));
+                }
+            )
+            .on(
+                'postgres_changes',
+                { event: 'DELETE', schema: 'public', table: 'luutru_records' },
+                (payload) => {
+                    setRecords(prev => prev.filter(r => r.id !== payload.old.id));
+                }
+            )
+            .subscribe();
+
+        const dangkyRecordsChannel = supabase.channel('dangky_records_changes')
+            .on(
+                'postgres_changes',
+                { event: 'INSERT', schema: 'public', table: 'dangky_records' },
+                (payload) => {
+                    setRecords(prev => {
+                        if (prev.some(r => r.id === payload.new.id)) return prev;
+                        return [mapRecordFromDb({ ...payload.new, sourceTable: 'dangky_records' }) as RecordFile, ...prev];
+                    });
+                }
+            )
+            .on(
+                'postgres_changes',
+                { event: 'UPDATE', schema: 'public', table: 'dangky_records' },
+                (payload) => {
+                    setRecords(prev => prev.map(r => r.id === payload.new.id ? { ...r, ...mapRecordFromDb({ ...payload.new, sourceTable: 'dangky_records' }) } as RecordFile : r));
+                }
+            )
+            .on(
+                'postgres_changes',
+                { event: 'DELETE', schema: 'public', table: 'dangky_records' },
+                (payload) => {
+                    setRecords(prev => prev.filter(r => r.id !== payload.old.id));
+                }
+            )
+            .subscribe();
+
         return () => {
             supabase.removeChannel(landRecordsChannel);
+            supabase.removeChannel(luutruRecordsChannel);
+            supabase.removeChannel(dangkyRecordsChannel);
         };
     }, []);
 
@@ -333,18 +410,38 @@ export const useAppData = (currentUser: User | null) => {
     }, []);
 
     // --- Record Handlers ---
+    const handleSyncPendingRecords = async () => {
+        try {
+            const result = await syncPendingRecordsToCloud(createRecordApi, updateRecordApi);
+            const currentCount = await getPendingSyncCount();
+            setPendingSyncCount(currentCount);
+            if (result.successCount > 0) {
+                await loadData();
+            }
+            return result;
+        } catch (e) {
+            console.error("Lỗi khi đồng bộ hàng đợi:", e);
+            return { successCount: 0, failCount: 0 };
+        }
+    };
+
     const handleAddOrUpdateRecord = async (recordData: any): Promise<RecordFile | null> => {
         const isEdit = recordData.id && records.find(r => r.id === recordData.id);
         if (isEdit) {
             const updated = await updateRecordApi(recordData);
             if (updated) {
                 setRecords(prev => prev.map(r => r.id === updated.id ? updated : r));
+                const count = await getPendingSyncCount();
+                setPendingSyncCount(count);
                 return updated;
             }
         } else {
-            const newRecord = await createRecordApi({ ...recordData, id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substr(2, 9) });
+            const standardId = (recordData.id && String(recordData.id).includes('-')) ? recordData.id : generateStandardUUID();
+            const newRecord = await createRecordApi({ ...recordData, id: standardId });
             if (newRecord) {
                 setRecords(prev => [newRecord, ...prev.filter(r => r.id !== newRecord.id)]);
+                const count = await getPendingSyncCount();
+                setPendingSyncCount(count);
                 return newRecord;
             }
         }
@@ -425,6 +522,7 @@ export const useAppData = (currentUser: User | null) => {
 
     return {
         records, employees, users, wards, holidays, rolePermissions, departmentPermissions, connectionStatus,
+        pendingSyncCount, handleSyncPendingRecords,
         isUpdateAvailable, latestVersion, updateUrl,
         setWards, setEmployees, setUsers, setRecords,
         loadData,

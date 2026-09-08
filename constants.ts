@@ -192,9 +192,12 @@ export const getFullRecordType = (type: string | null | undefined): string => {
 export const isArchiveRecordType = (type: string | null | undefined): boolean => {
   if (!type) return false;
   const t = type.toLowerCase().trim();
-  if (t.startsWith('1.') || t.startsWith('1.1') || t.startsWith('1.2')) return true;
+  if (t.startsWith('1.') || t.startsWith('1.1') || t.startsWith('1.2') || t === 'saoluc' || t === 'vaoso' || t === 'congvan') return true;
   const short = getShortRecordType(type);
-  return short.startsWith('1.') || short === '1.1 Sao lục' || short === '1.2 Công văn' || t.includes('sao lục') || t.includes('công văn') || t.includes('cung cấp dữ liệu') || t.includes('cung cấp tài liệu');
+  return short.startsWith('1.') || short === '1.1 Sao lục' || short === '1.2 Công văn' ||
+    t.includes('sao lục') || t.includes('sao luc') || t.includes('công văn') || t.includes('cong van') ||
+    t.includes('cung cấp dữ liệu') || t.includes('cung cấp tài liệu') || t.includes('cung cấp thông tin') ||
+    t.includes('cc dl đđ') || t.includes('cc tl đđ') || t.includes('vào sổ');
 };
 
 export const isArchiveRecord = (r: Partial<RecordFile> | null | undefined): boolean => {
@@ -203,7 +206,7 @@ export const isArchiveRecord = (r: Partial<RecordFile> | null | undefined): bool
   if (isArchiveRecordType(r.recordType)) return true;
   if (isArchiveRecordType(r.content)) return true;
   const rawLower = String(r.recordType || '').toLowerCase().trim();
-  if (rawLower.startsWith('1.') || rawLower.includes('sao lục') || rawLower.includes('công văn') || rawLower.includes('cung cấp dữ liệu') || rawLower.includes('cung cấp tài liệu')) return true;
+  if (rawLower.startsWith('1.') || rawLower.includes('sao lục') || rawLower.includes('sao luc') || rawLower.includes('công văn') || rawLower.includes('cung cấp dữ liệu') || rawLower.includes('cung cấp tài liệu') || rawLower.includes('cung cấp thông tin')) return true;
   return false;
 };
 

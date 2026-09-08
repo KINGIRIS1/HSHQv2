@@ -3,7 +3,7 @@ import React, { useState, useMemo } from 'react';
 import * as XLSX from 'xlsx-js-style';
 import { RecordFile } from '../../types';
 import { getNormalizedWard, getShortRecordType } from '../../constants';
-import { Search, Eye, FileSpreadsheet, Pencil, Printer, Trash2, MapPin, FileSignature } from 'lucide-react';
+import { Search, Eye, FileSpreadsheet, Pencil, Printer, Trash2, MapPin, FileSignature, Cloud, CloudOff, RefreshCw, UserCheck, Users } from 'lucide-react';
 
 interface DailyListProps {
   records: RecordFile[];
@@ -17,6 +17,7 @@ interface DailyListProps {
   onPrint: (record: RecordFile) => void;
   onCreateContract?: (record: RecordFile) => void;
   onHandOverRecords?: (recordIds: string[]) => Promise<void>;
+  onSyncPending?: () => Promise<any>;
 }
 
 // Hàm lấy mã viết tắt (Prefix) từ tên Xã/Phường - Đồng bộ với logic sinh mã
@@ -43,10 +44,12 @@ const getShortCode = (ward: string) => {
     return 'CT'; // Mặc định
 };
 
-const DailyList: React.FC<DailyListProps> = ({ records, wards, currentUser, employees, onPreviewExcel, onEdit, onDelete, onPrint, onCreateContract, onHandOverRecords }) => {
+const DailyList: React.FC<DailyListProps> = ({ records, wards, currentUser, employees, onPreviewExcel, onEdit, onDelete, onPrint, onCreateContract, onHandOverRecords, onSyncPending }) => {
   const [filterDate, setFilterDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDept, setSelectedDept] = useState<string>('Tất cả');
+  const [userFilterMode, setUserFilterMode] = useState<'all' | 'me'>('all');
+  const [isSyncing, setIsSyncing] = useState(false);
 
   const filteredDailyRecords = useMemo(() => {
       if (!records) return [];
@@ -59,9 +62,15 @@ const DailyList: React.FC<DailyListProps> = ({ records, wards, currentUser, empl
               return false;
           }
 
-          // Luôn lọc theo user nhận
-          if (r.receivedBy !== currentUser.employeeId) {
-              return false;
+          // Lọc theo người tiếp nhận
+          if (userFilterMode === 'me' && currentUser) {
+              const myEmpId = currentUser.employeeId;
+              const myId = currentUser.id;
+              const myUser = currentUser.username;
+              const recUser = r.receivedBy;
+              if (recUser && recUser !== myEmpId && recUser !== myId && recUser !== myUser) {
+                  return false;
+              }
           }
 
           // 1. Lọc theo ngày nhận
@@ -74,10 +83,10 @@ const DailyList: React.FC<DailyListProps> = ({ records, wards, currentUser, empl
               const typeLower = (r.recordType || '').toLowerCase();
               const deptLower = ((r as any).department || r.returnHandoverDept || '').toLowerCase();
 
-              // Tất cả hồ sơ có mã (hoặc loại) bắt đầu/chứa dạng 2.x là Tổ Đo đạc
+              // Nhóm 2.x: Tổ Đo đạc
               const is2x = codeClean.startsWith('2.') || /^2[.\d]/.test(codeClean) || typeLower.startsWith('2.') || typeLower.includes('2.');
-              // Tất cả hồ sơ có mã (hoặc loại) bắt đầu/chứa dạng 1.x là Tổ Lưu trữ
-              const is1x = codeClean.startsWith('1.') || /^1[.\d]/.test(codeClean) || typeLower.startsWith('1.') || typeLower.includes('1.');
+              // Nhóm 1.x: Tổ Lưu trữ
+              const is1x = codeClean.startsWith('1.') || /^1[.\d]/.test(codeClean) || typeLower.startsWith('1.') || typeLower.includes('1.') || typeLower.includes('sao lục');
 
               if (selectedDept === 'Tổ Đo đạc') {
                   const isDoDac = is2x || 
@@ -94,11 +103,11 @@ const DailyList: React.FC<DailyListProps> = ({ records, wards, currentUser, empl
                                   typeLower.includes('cập nhập');
                   if (!isDoDac) return false;
               } else if (selectedDept === 'Tổ Lưu trữ' || selectedDept === 'Tổ Thông tin lưu trữ') {
-                  const isLuuTru = (is1x || 
+                  const isLuuTru = is1x || 
                                    deptLower.includes('lưu trữ') || 
                                    typeLower.includes('cung cấp') || 
-                                   typeLower.includes('lưu trữ')) &&
-                                   !typeLower.includes('trích lục');
+                                   typeLower.includes('lưu trữ') ||
+                                   typeLower.includes('sao lục');
                   if (!isLuuTru) return false;
               }
           }
@@ -107,7 +116,9 @@ const DailyList: React.FC<DailyListProps> = ({ records, wards, currentUser, empl
           if (searchTerm) {
               const nameMatch = r.customerName?.toLowerCase().includes(searchLower);
               const codeMatch = r.code?.toLowerCase().includes(searchLower);
-              if (!nameMatch && !codeMatch) return false;
+              const wardMatch = r.ward?.toLowerCase().includes(searchLower);
+              const plotMatch = r.landPlot?.toString().toLowerCase().includes(searchLower);
+              if (!nameMatch && !codeMatch && !wardMatch && !plotMatch) return false;
           }
           return true;
       });
@@ -119,7 +130,21 @@ const DailyList: React.FC<DailyListProps> = ({ records, wards, currentUser, empl
           
           return codeA.localeCompare(codeB, undefined, { numeric: true, sensitivity: 'base' });
       });
-  }, [records, filterDate, searchTerm, currentUser, selectedDept]);
+  }, [records, filterDate, searchTerm, currentUser, selectedDept, userFilterMode]);
+
+  const pendingCount = useMemo(() => {
+      return (records || []).filter(r => r._isOfflineSaved).length;
+  }, [records]);
+
+  const handleManualSync = async () => {
+      if (!onSyncPending || isSyncing) return;
+      setIsSyncing(true);
+      try {
+          await onSyncPending();
+      } finally {
+          setIsSyncing(false);
+      }
+  };
 
   const createDailyListWorkbook = () => {
       if (filteredDailyRecords.length === 0) return null;
@@ -271,10 +296,38 @@ const DailyList: React.FC<DailyListProps> = ({ records, wards, currentUser, empl
                     <option value="Tổ Lưu trữ">Tổ Lưu trữ</option>
                 </select>
             </div>
+            <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+                <button
+                    type="button"
+                    onClick={() => setUserFilterMode('all')}
+                    className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-semibold transition-all ${userFilterMode === 'all' ? 'bg-white text-blue-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
+                >
+                    <Users size={14} /> Tất cả người nhận
+                </button>
+                <button
+                    type="button"
+                    onClick={() => setUserFilterMode('me')}
+                    className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-semibold transition-all ${userFilterMode === 'me' ? 'bg-white text-blue-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
+                >
+                    <UserCheck size={14} /> Chỉ của tôi
+                </button>
+            </div>
             <div className="relative flex-1 max-w-sm"> 
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} /> 
-                <input type="text" placeholder="Tìm kiếm..." className="w-full pl-9 pr-4 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /> 
+                <input type="text" placeholder="Tìm kiếm mã, chủ sử dụng, số tờ/thửa..." className="w-full pl-9 pr-4 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /> 
             </div>
+            {pendingCount > 0 && onSyncPending && (
+                <button
+                    type="button"
+                    onClick={handleManualSync}
+                    disabled={isSyncing}
+                    className="flex items-center gap-1.5 bg-amber-50 text-amber-800 border border-amber-300 hover:bg-amber-100 px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-xs"
+                    title="Có hồ sơ đã lưu an toàn trên máy nhưng chưa đẩy lên Cloud"
+                >
+                    <RefreshCw size={14} className={isSyncing ? "animate-spin text-amber-600" : "text-amber-600"} />
+                    {isSyncing ? "Đang đẩy Cloud..." : `Đồng bộ Cloud (${pendingCount})`}
+                </button>
+            )}
             <div className="ml-auto hidden md:flex gap-2">
                 <button onClick={handlePreview} className="flex items-center gap-2 bg-white text-blue-700 border border-blue-300 px-4 py-2 rounded-md hover:bg-blue-50 shadow-xs text-sm font-semibold"> <Eye size={16} className="text-blue-600" /> Xem Excel </button>
                 <button onClick={handleExport} className="flex items-center gap-2 bg-white text-emerald-700 border border-emerald-300 px-4 py-2 rounded-md hover:bg-emerald-50 shadow-xs text-sm font-semibold"> <FileSpreadsheet size={16} className="text-emerald-600" /> Tải Excel </button>
@@ -286,7 +339,7 @@ const DailyList: React.FC<DailyListProps> = ({ records, wards, currentUser, empl
                     <thead className="bg-gray-50 text-xs text-gray-600 uppercase font-bold sticky top-0 shadow-sm">
                         <tr> 
                             <th className="p-3 w-10 text-center">STT</th> 
-                            <th className="p-3 w-[120px]">Mã Hồ Sơ</th> 
+                            <th className="p-3 w-[140px]">Mã Hồ Sơ</th> 
                             <th className="p-3 w-[200px]">Chủ Sử Dụng</th> 
                             <th className="p-3 w-[150px]">Xã / Phường (Đất)</th> 
                             <th className="p-3 w-[65px] text-center">Tờ</th>
@@ -302,7 +355,16 @@ const DailyList: React.FC<DailyListProps> = ({ records, wards, currentUser, empl
                             filteredDailyRecords.map((r, index) => (
                                 <tr key={r.id} className="hover:bg-blue-50/50 group">
                                     <td className="p-3 text-center text-gray-400 align-middle">{index + 1}</td> 
-                                    <td className="p-3 font-mono font-bold text-blue-600 truncate align-middle" title={r.code}>{r.code}</td> 
+                                    <td className="p-3 font-mono font-bold text-blue-600 truncate align-middle" title={r.code}>
+                                        <div className="flex items-center gap-1.5">
+                                            <span>{r.code}</span>
+                                            {r._isOfflineSaved && (
+                                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300 shrink-0" title="Đã lưu an toàn trên máy, chờ đồng bộ Cloud">
+                                                    Máy
+                                                </span>
+                                            )}
+                                        </div>
+                                    </td> 
                                     <td className="p-3 font-medium text-gray-800 truncate align-middle" title={r.customerName}>{r.customerName}</td> 
                                     <td className="p-3 text-gray-700 truncate align-middle font-medium" title={getNormalizedWard(r.ward)}>
                                         {getNormalizedWard(r.ward)}

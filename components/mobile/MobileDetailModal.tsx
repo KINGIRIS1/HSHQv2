@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { RecordFile, Employee, User, UserRole, SplitItem, RecordStatus } from '../../types';
 import AutoResizeTextarea from '../AutoResizeTextarea';
@@ -9,7 +8,7 @@ import {
   CheckCircle2, Circle, Send, FileSignature, CheckSquare, 
   CalendarClock, FileCheck, Calculator, Loader2, StickyNote, 
   Save, Bell, Printer, Pencil, Trash2, Info, ChevronLeft,
-  Phone, Calendar, Hash, FileDown
+  Phone, Calendar, Hash, FileDown, Clock, ShieldAlert
 } from 'lucide-react';
 import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../../services/docxService';
 import DocxPreviewModal from '../DocxPreviewModal';
@@ -68,7 +67,7 @@ const parseOtherDocsForMobile = (raw: string | null | undefined): ParsedDocItem[
         result.push({ name, type, original, copy, note });
       }
       if (result.length > 0) return result;
-    } catch (e) {
+    } catch {
       // JSON parse failed, fallback below
     }
   }
@@ -117,16 +116,16 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
       setPersonalNote(record.personalNotes || '');
       if (record.reminderDate) {
         const d = new Date(record.reminderDate);
-        const localIso = new Date(d.getTime() - (d.getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
+        const localIso = new Date(d.getTime() - (d.getTimezoneOffset() * 60000)).toISOString().slice(0, 10);
         setReminderDate(localIso);
       } else {
         setReminderDate('');
       }
 
+      // Fetch Contract Price & Details
       const fetchPrice = async () => {
         const fetchedContracts = await fetchContracts();
         setContracts(fetchedContracts);
-        // Tìm hợp đồng có cùng mã hồ sơ (qua customerAddress hoặc trường code kế thừa) - Match chính xác
         const match = fetchedContracts.find(c => {
             if (!c || !record) return false;
             const cAddr = (c.customerAddress || '').trim().toLowerCase();
@@ -197,12 +196,6 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
     return `${d}/${m}/${y}`;
   };
 
-  const getEmployeeName = (id?: string | null) => {
-    if (!id) return 'Chưa giao';
-    const emp = employees.find(e => e.id === id);
-    return emp ? emp.name : 'Không xác định';
-  };
-
   const handleSavePersonalNote = async () => {
     setIsSavingNote(true);
     const result = await updateRecordApi({ ...record, personalNotes: personalNote });
@@ -255,7 +248,6 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
               if (onRefreshData) {
                   onRefreshData();
               }
-              // Cập nhật local state tức thời cho UI hiển thị
               record.deadline = extendDate;
               record.privateNotes = newPrivateNotes;
           } else {
@@ -388,28 +380,27 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
   const TimelineItem = ({ date, label, icon: Icon, isLast, colorClass, forceActive, subText }: any) => {
     const isActive = !!date || !!forceActive;
     return (
-      <div className="relative flex gap-4">
+      <div className="relative flex gap-3">
         <div className="flex flex-col items-center">
-          <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 z-10 bg-white ${isActive ? colorClass.border : 'border-gray-200'}`}>
-            {isActive ? <CheckCircle2 size={16} className={colorClass.text} /> : <Circle size={16} className="text-gray-300" />}
+          <div className={`w-7 h-7 rounded-full flex items-center justify-center border-2 z-10 bg-white ${isActive ? colorClass.border : 'border-gray-200'}`}>
+            {isActive ? <CheckCircle2 size={14} className={colorClass.text} /> : <Circle size={14} className="text-gray-300" />}
           </div>
           {!isLast && <div className={`w-0.5 grow ${isActive ? colorClass.bg : 'bg-gray-100'} my-1`}></div>}
         </div>
-        <div className="pb-6 flex-1">
+        <div className="pb-4 flex-1">
           <p className={`text-[10px] font-bold uppercase mb-0.5 ${isActive ? colorClass.text : 'text-gray-400'}`}>{label}</p>
-          <div className="flex items-center gap-2">
-            <Icon size={14} className={isActive ? 'text-gray-500' : 'text-gray-300'} />
-            <span className={`text-sm font-medium ${isActive ? 'text-gray-800' : 'text-gray-400 italic'}`}>
+          <div className="flex items-center gap-1.5">
+            <Icon size={13} className={isActive ? 'text-gray-500' : 'text-gray-300'} />
+            <span className={`text-xs font-semibold ${isActive ? 'text-gray-800' : 'text-gray-400 italic'}`}>
               {date ? formatDate(date) : (forceActive ? 'Đã hoàn tất' : 'Chưa thực hiện')}
             </span>
           </div>
-          {subText && <p className="text-[11px] text-indigo-600 mt-1 italic">{subText}</p>}
+          {subText && <p className="text-[10px] text-indigo-600 mt-0.5 italic">{subText}</p>}
         </div>
       </div>
     );
   };
 
-  // LOGIC CHECK NẾU ĐÃ THỰC HIỆN XONG (Để hiển thị bước "Đã thực hiện")
   const isWorkDone = [
     RecordStatus.COMPLETED_WORK, RecordStatus.PENDING_CHECK, RecordStatus.CHECKED, RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, 
     RecordStatus.HANDOVER, RecordStatus.RETURNED
@@ -433,342 +424,352 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
 
   const recordTypeLower = (record?.recordType || '').toLowerCase();
 
-
   return (
-    <div className="fixed inset-0 bg-white z-[60] flex flex-col animate-slide-in-right pt-[env(safe-area-inset-top,0px)]">
-      {/* Sticky Header & Navigation Tabs */}
-      <div className="sticky top-0 z-10 bg-white border-b border-slate-100 shadow-xs">
-        {/* Title bar */}
-        <div className="px-3 sm:px-6 py-3">
-          <div className="max-w-5xl mx-auto flex items-center justify-between">
-            <div className="flex items-center gap-3 min-w-0">
-              <button onClick={onClose} className="p-1.5 -ml-1 text-slate-600 active:bg-slate-100 rounded-full transition-colors shrink-0 cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center">
-                <ChevronLeft size={24} />
+    <div className="fixed inset-0 bg-slate-50 z-[60] flex flex-col animate-slide-in-right overflow-hidden">
+      {/* Compact Header & Navigation */}
+      <div className="shrink-0 bg-white border-b border-slate-200 shadow-xs pt-[env(safe-area-inset-top,0px)]">
+        {/* Title Bar */}
+        <div className="px-3 py-2 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <button 
+              onClick={onClose} 
+              className="p-1 -ml-1 text-slate-600 hover:text-slate-900 active:bg-slate-100 rounded-lg transition-colors shrink-0 min-w-[36px] min-h-[36px] flex items-center justify-center"
+              aria-label="Đóng"
+            >
+              <ChevronLeft size={22} />
+            </button>
+            <div className="min-w-0 flex flex-col">
+              <span className="font-mono font-bold text-blue-700 text-sm sm:text-base leading-tight truncate">
+                {record.code}
+              </span>
+              <span className="text-[10px] text-slate-500 truncate leading-tight mt-0.5">
+                {getShortRecordType(record.recordType)}
+              </span>
+            </div>
+          </div>
+
+          {/* Header Action Buttons */}
+          <div className="flex items-center gap-1 shrink-0">
+            {canPrintReceipt && (
+              <button 
+                onClick={handlePrintReceipt}
+                disabled={isProcessing}
+                className="p-1.5 text-purple-600 hover:bg-purple-50 active:bg-purple-100 rounded-lg transition-colors shrink-0 min-w-[36px] min-h-[36px] flex items-center justify-center"
+                title="In biên nhận"
+              >
+                {isProcessing ? <Loader2 size={17} className="animate-spin" /> : <Printer size={17} />}
               </button>
-              <div className="min-w-0">
-                <h2 className="font-bold text-blue-700 text-sm sm:text-base font-mono truncate max-w-[260px] sm:max-w-md">{record.code}</h2>
-              </div>
-            </div>
-            <div className="flex items-center gap-1 shrink-0">
-              {onEdit && (
-                <button onClick={() => { onClose(); onEdit(record); }} className="p-2 text-slate-500 hover:text-blue-600 active:bg-slate-100 rounded-xl transition-colors cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center" title="Chỉnh sửa">
-                  <Pencil size={20} />
-                </button>
-              )}
-              {onDelete && (
-                <button onClick={() => { onClose(); onDelete(record); }} className="p-2 text-slate-500 hover:text-red-600 active:bg-slate-100 rounded-xl transition-colors cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center" title="Xóa">
-                  <Trash2 size={20} />
-                </button>
-              )}
-            </div>
+            )}
+            {onEdit && (
+              <button 
+                onClick={() => { onClose(); onEdit(record); }} 
+                className="p-1.5 text-blue-600 hover:bg-blue-50 active:bg-blue-100 rounded-lg transition-colors shrink-0 min-w-[36px] min-h-[36px] flex items-center justify-center" 
+                title="Sửa hồ sơ"
+              >
+                <Pencil size={17} />
+              </button>
+            )}
+            {onDelete && (
+              <button 
+                onClick={() => { onClose(); onDelete(record); }} 
+                className="p-1.5 text-red-500 hover:bg-red-50 active:bg-red-100 rounded-lg transition-colors shrink-0 min-w-[36px] min-h-[36px] flex items-center justify-center" 
+                title="Xóa hồ sơ"
+              >
+                <Trash2 size={17} />
+              </button>
+            )}
+            <button 
+              onClick={onClose}
+              className="p-1.5 text-slate-400 hover:text-slate-600 active:bg-slate-100 rounded-lg transition-colors shrink-0 min-w-[36px] min-h-[36px] flex items-center justify-center ml-0.5"
+              title="Đóng"
+            >
+              <X size={18} />
+            </button>
           </div>
         </div>
 
-        {/* Tab navigation */}
-        <div className="border-t border-slate-100 bg-white">
-          <div className="max-w-5xl mx-auto flex">
+        {/* Tab Navigation */}
+        <div className="border-t border-slate-100 bg-white px-2">
+          <div className="flex text-center">
             <button 
               onClick={() => setActiveTab('info')}
-              className={`flex-1 py-3 text-xs sm:text-sm font-bold transition-all border-b-2 cursor-pointer min-h-[44px] ${activeTab === 'info' ? 'text-blue-600 border-blue-600' : 'text-slate-400 border-transparent'}`}
+              className={`flex-1 py-2 text-xs font-bold transition-all border-b-2 cursor-pointer ${activeTab === 'info' ? 'text-blue-600 border-blue-600 bg-blue-50/30' : 'text-slate-500 border-transparent hover:text-slate-700'}`}
             >
-              Thông tin chi tiết
+              Thông tin
             </button>
             <button 
               onClick={() => setActiveTab('timeline')}
-              className={`flex-1 py-3 text-xs sm:text-sm font-bold transition-all border-b-2 cursor-pointer min-h-[44px] ${activeTab === 'timeline' ? 'text-blue-600 border-blue-600' : 'text-slate-400 border-transparent'}`}
+              className={`flex-1 py-2 text-xs font-bold transition-all border-b-2 cursor-pointer ${activeTab === 'timeline' ? 'text-blue-600 border-blue-600 bg-blue-50/30' : 'text-slate-500 border-transparent hover:text-slate-700'}`}
             >
-              Tiến độ & Nhật ký
+              Tiến độ
             </button>
             <button 
               onClick={() => setActiveTab('notes')}
-              className={`flex-1 py-3 text-xs sm:text-sm font-bold transition-all border-b-2 cursor-pointer min-h-[44px] ${activeTab === 'notes' ? 'text-blue-600 border-blue-600' : 'text-slate-400 border-transparent'}`}
+              className={`flex-1 py-2 text-xs font-bold transition-all border-b-2 cursor-pointer ${activeTab === 'notes' ? 'text-blue-600 border-blue-600 bg-blue-50/30' : 'text-slate-500 border-transparent hover:text-slate-700'}`}
             >
-              Ghi chú
+              Ghi chú & Đính kèm
             </button>
           </div>
         </div>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto bg-slate-50 pb-[calc(2rem+env(safe-area-inset-bottom,0px))]">
-        <div className="max-w-5xl mx-auto p-3 sm:p-6">
-          {activeTab === 'info' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
-            {/* Status & Type */}
-            <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
-              <div className="flex justify-between items-center mb-4">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Trạng thái</span>
+      {/* Main Content Area */}
+      <div className="flex-1 overflow-y-auto bg-slate-100/70 p-2.5 sm:p-4 space-y-2.5 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))]">
+        {activeTab === 'info' && (
+          <div className="space-y-2.5">
+            {/* Status & Timing Banner */}
+            <div className="bg-white p-3 rounded-xl border border-slate-200/80 shadow-xs">
+              <div className="flex items-center justify-between gap-2 pb-2 border-b border-slate-100">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Trạng thái hồ sơ</span>
                 <StatusBadge status={record.status} />
               </div>
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
-                  <FileText size={20} />
+              <div className="grid grid-cols-2 gap-2 pt-2 text-xs">
+                <div className="bg-blue-50/50 p-2 rounded-lg border border-blue-100/60">
+                  <span className="text-[10px] text-blue-600 font-bold uppercase block">Ngày nhận</span>
+                  <span className="font-semibold text-slate-800">{formatDate(record.receivedDate)}</span>
                 </div>
-                <div>
-                  <p className="text-[10px] text-slate-400 font-bold uppercase">Loại hồ sơ</p>
-                  <p className="text-sm font-bold text-slate-800">{getShortRecordType(record.recordType)}</p>
+                <div className="bg-amber-50/50 p-2 rounded-lg border border-amber-100/60">
+                  <span className="text-[10px] text-amber-700 font-bold uppercase block">Hạn trả</span>
+                  <span className="font-bold text-amber-900">{formatDate(record.deadline)}</span>
                 </div>
               </div>
             </div>
 
-            {/* Customer Info */}
-            <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 space-y-4">
-              <h3 className="text-xs font-bold text-blue-600 uppercase flex items-center gap-2">
-                <UserIcon size={16} /> Thông tin khách hàng
-              </h3>
-              <div className="grid grid-cols-1 gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center text-slate-400">
-                    <UserIcon size={16} />
-                  </div>
-                  <div>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase">Họ và tên</p>
-                    <p className="text-sm font-bold text-slate-800">{record.customerName}</p>
-                  </div>
+            {/* Customer Info Card */}
+            <div className="bg-white p-3 rounded-xl border border-slate-200/80 shadow-xs space-y-2">
+              <div className="flex items-center gap-1.5 text-blue-700 font-bold text-xs uppercase">
+                <UserIcon size={14} />
+                <span>Khách hàng</span>
+              </div>
+              <div className="space-y-1.5 text-xs">
+                <div className="flex items-start justify-between">
+                  <span className="text-slate-400 font-medium">Họ & tên:</span>
+                  <span className="font-bold text-slate-900 text-right uppercase">{record.customerName}</span>
                 </div>
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center text-slate-400">
-                    <Phone size={16} />
+                {record.phoneNumber && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400 font-medium">Điện thoại:</span>
+                    <a href={`tel:${record.phoneNumber}`} className="font-bold text-blue-600 flex items-center gap-1 hover:underline">
+                      <Phone size={12} />
+                      {record.phoneNumber}
+                    </a>
                   </div>
-                  <div>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase">Số điện thoại</p>
-                    <p className="text-sm font-bold text-slate-800">{record.phoneNumber || '---'}</p>
-                  </div>
-                </div>
+                )}
                 {record.cccd && (
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center text-slate-400">
-                      <Hash size={16} />
-                    </div>
-                    <div>
-                      <p className="text-[10px] text-slate-400 font-bold uppercase">CCCD/CMND</p>
-                      <p className="text-sm font-bold text-slate-800">{record.cccd}</p>
-                    </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400 font-medium">CCCD/CMND:</span>
+                    <span className="font-mono font-medium text-slate-800">{record.cccd}</span>
+                  </div>
+                )}
+                {record.customerAddress && (
+                  <div className="flex items-start justify-between pt-1 border-t border-slate-100">
+                    <span className="text-slate-400 font-medium shrink-0 mr-2">Địa chỉ khách:</span>
+                    <span className="text-slate-700 text-right leading-snug">{record.customerAddress}</span>
                   </div>
                 )}
               </div>
             </div>
 
-            {/* Land Info */}
-            <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 space-y-4">
-              <h3 className="text-xs font-bold text-green-600 uppercase flex items-center gap-2">
-                <MapPin size={16} /> Thông tin thửa đất
-              </h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2 flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center text-slate-400">
-                    <MapPin size={16} />
-                  </div>
-                  <div>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase">Xã/Phường</p>
-                    <p className="text-sm font-bold text-slate-800">{getNormalizedWard(record.ward)}</p>
-                  </div>
+            {/* Land Info Card */}
+            <div className="bg-white p-3 rounded-xl border border-slate-200/80 shadow-xs space-y-2">
+              <div className="flex items-center gap-1.5 text-emerald-700 font-bold text-xs uppercase">
+                <MapPin size={14} />
+                <span>Thửa đất & Địa chỉ</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="col-span-2 bg-slate-50 p-2 rounded-lg border border-slate-100">
+                  <span className="text-[10px] text-slate-400 font-bold uppercase block">Xã / Phường</span>
+                  <span className="font-bold text-slate-800">{getNormalizedWard(record.ward)}</span>
                 </div>
-                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                  <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">Tờ bản đồ</p>
-                  <p className="text-base font-bold text-slate-800">{record.mapSheet || '-'}</p>
+                <div className="bg-slate-50 p-2 rounded-lg border border-slate-100 text-center">
+                  <span className="text-[10px] text-slate-400 font-bold uppercase block">Tờ bản đồ</span>
+                  <span className="font-bold text-base text-slate-800 font-mono">{record.mapSheet || '-'}</span>
                 </div>
-                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                  <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">Thửa đất</p>
-                  <p className="text-base font-bold text-slate-800">{record.landPlot || '-'}</p>
+                <div className="bg-slate-50 p-2 rounded-lg border border-slate-100 text-center">
+                  <span className="text-[10px] text-slate-400 font-bold uppercase block">Thửa đất</span>
+                  <span className="font-bold text-base text-slate-800 font-mono">{record.landPlot || '-'}</span>
                 </div>
-                
-                {/* Số trích đo & trích lục */}
-                {recordTypeLower.includes('trích đo') && (
-                  <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                    <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">Số trích đo</p>
-                    <p className="text-sm font-bold text-slate-800">{record.measurementNumber || '---'}</p>
+                {record.area && (
+                  <div className="bg-slate-50 p-2 rounded-lg border border-slate-100 text-center">
+                    <span className="text-[10px] text-slate-400 font-bold uppercase block">Diện tích</span>
+                    <span className="font-bold text-slate-800">{record.area} m²</span>
                   </div>
                 )}
-                {recordTypeLower.includes('trích lục') && (
-                  <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                    <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">Số trích lục</p>
-                    <p className="text-sm font-bold text-slate-800">{record.excerptNumber || '---'}</p>
+                {record.measurementNumber && (
+                  <div className="bg-slate-50 p-2 rounded-lg border border-slate-100 text-center">
+                    <span className="text-[10px] text-slate-400 font-bold uppercase block">Số trích đo</span>
+                    <span className="font-bold text-blue-700">{record.measurementNumber}</span>
+                  </div>
+                )}
+                {record.excerptNumber && (
+                  <div className="bg-slate-50 p-2 rounded-lg border border-slate-100 text-center">
+                    <span className="text-[10px] text-slate-400 font-bold uppercase block">Số trích lục</span>
+                    <span className="font-bold text-blue-700">{record.excerptNumber}</span>
                   </div>
                 )}
               </div>
               {record.address && (
-                <div className="pt-2">
-                  <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">Địa chỉ chi tiết</p>
-                  <p className="text-sm font-medium text-slate-700">{record.address}</p>
+                <div className="text-xs pt-1 border-t border-slate-100">
+                  <span className="text-slate-400 font-medium">Vị trí thửa đất: </span>
+                  <span className="text-slate-700 font-medium">{record.address}</span>
                 </div>
               )}
             </div>
 
-            {/* Financial Info */}
-            <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 space-y-4">
-              <h3 className="text-xs font-bold text-orange-600 uppercase flex items-center gap-2">
-                <DollarSign size={16} /> Tài chính & Biên lai
-              </h3>
-              <div className="space-y-3">
-                {(() => {
-                  const isExemptRecord = Boolean(
-                    record.status === RecordStatus.REJECTED || 
-                    record.status === RecordStatus.WITHDRAWN ||
-                    isProcedure2_3(record.recordType) ||
-                    (record.returnedPrice === 0 && !record.receiptNumber && record.status === RecordStatus.RETURNED) ||
-                    (record.statusLogs && record.statusLogs.some(l => 
-                      l.newStatus === RecordStatus.REJECTED || 
-                      l.newStatus === RecordStatus.WITHDRAWN || 
-                      l.note?.includes('Trả hủy') || 
-                      l.note?.includes('rút hồ sơ') || 
-                      l.note?.includes('Miễn thu phí') ||
-                      l.note?.includes('Thủ tục 2.3')
-                    ))
-                  );
-
-                  if (isExemptRecord) {
-                    return null;
-                  }
-
-                  return (
-                    <>
-                      <div className="flex justify-between items-center p-3 bg-blue-50 rounded-xl border border-blue-100">
-                        <div className="flex items-center gap-2">
-                          <Receipt size={16} className="text-blue-600" />
-                          <span className="text-xs font-bold text-blue-700">
-                            {record.receiptType === 'Biên Lai' ? 'SỐ BIÊN LAI' : record.receiptType === 'Hóa Đơn' ? 'SỐ HÓA ĐƠN' : 'SỐ BIÊN LAI / HÓA ĐƠN'}
-                          </span>
-                        </div>
-                        <span className="text-sm font-bold text-blue-800">{record.receiptNumber || '---'}</span>
-                      </div>
-                      <div className="flex justify-between items-center p-3 bg-green-50 rounded-xl border border-green-100">
-                        <div className="flex items-center gap-2">
-                          <DollarSign size={16} className="text-green-600" />
-                          <span className="text-xs font-bold text-green-700">Số Tiền</span>
-                        </div>
-                        <span className="text-sm font-bold text-green-800">
-                          {record.returnedPrice !== undefined && record.returnedPrice !== null
-                            ? record.returnedPrice.toLocaleString('vi-VN') + ' đ'
-                            : (record.recordType === 'Cung cấp tài liệu đất đai'
-                                ? (record.price ? record.price.toLocaleString('vi-VN') + ' đ' : '310.000 đ')
-                                : (contractPrice !== null ? contractPrice.toLocaleString('vi-VN') + ' đ' : '---'))}
-                        </span>
-                      </div>
-                    </>
-                  );
-                })()}
+            {/* Financial Info Card */}
+            <div className="bg-white p-3 rounded-xl border border-slate-200/80 shadow-xs space-y-2">
+              <div className="flex items-center gap-1.5 text-amber-700 font-bold text-xs uppercase">
+                <DollarSign size={14} />
+                <span>Tài chính & Biên lai</span>
+              </div>
+              <div className="space-y-2 text-xs">
+                <div className="flex justify-between items-center p-2 bg-blue-50/60 rounded-lg border border-blue-100">
+                  <span className="font-bold text-blue-800 text-[11px]">
+                    {record.receiptType === 'Biên Lai' ? 'SỐ BIÊN LAI' : record.receiptType === 'Hóa Đơn' ? 'SỐ HÓA ĐƠN' : 'BIÊN LAI / HÓA ĐƠN'}
+                  </span>
+                  <span className="font-bold font-mono text-blue-900">{record.receiptNumber || 'Chưa lập'}</span>
+                </div>
+                <div className="flex justify-between items-center p-2 bg-emerald-50/60 rounded-lg border border-emerald-100">
+                  <span className="font-bold text-emerald-800 text-[11px]">Số tiền phí</span>
+                  <span className="font-bold font-mono text-emerald-900">
+                    {record.returnedPrice !== undefined && record.returnedPrice !== null
+                      ? record.returnedPrice.toLocaleString('vi-VN') + ' đ'
+                      : (record.recordType === 'Cung cấp tài liệu đất đai'
+                          ? (record.price ? record.price.toLocaleString('vi-VN') + ' đ' : '310.000 đ')
+                          : (contractPrice !== null ? contractPrice.toLocaleString('vi-VN') + ' đ' : '---'))}
+                  </span>
+                </div>
                 {liquidationInfo && (
-                  <div className="flex justify-between items-center p-3 bg-orange-50 rounded-xl border border-orange-100">
-                    <div className="flex items-center gap-2">
-                      <Calculator size={16} className="text-orange-600" />
-                      <span className="text-xs font-bold text-orange-700">{liquidationInfo.content}</span>
-                    </div>
-                    <span className="text-sm font-bold text-orange-800">{liquidationInfo.amount.toLocaleString('vi-VN')} đ</span>
-                  </div>
-                )}
-
-                {/* LIÊN KẾT HỢP ĐỒNG */}
-                {record && record.recordType && (getShortRecordType(record.recordType).startsWith('2.2') || getShortRecordType(record.recordType).startsWith('2.4')) && (
-                  <div className="pt-3 border-t border-dashed border-slate-100">
-                    {matchedContract ? (
-                      <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3 flex flex-col gap-2.5">
-                        <div className="flex items-start gap-2.5">
-                          <div className="bg-indigo-100 text-indigo-700 p-2 rounded-lg shrink-0">
-                            <FileText size={16} />
-                          </div>
-                          <div className="text-left">
-                            <span className="text-[10px] text-indigo-500 uppercase font-bold block">Hợp đồng liên kết</span>
-                            <p className="text-xs font-bold text-indigo-900 leading-tight">Số HĐ: {matchedContract.code}</p>
-                            <p className="text-[11px] text-indigo-600 mt-0.5 leading-tight">{matchedContract.serviceType || matchedContract.contractType}</p>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-1 gap-2">
-                          {onCreateLiquidation && (
-                            <button 
-                              onClick={() => {
-                                onCreateLiquidation(record);
-                                onClose();
-                              }}
-                              className="w-full text-center text-xs font-bold bg-green-600 text-white hover:bg-green-700 py-2 rounded-lg transition-colors duration-200 shadow-sm"
-                            >
-                              Thanh lý HĐ
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex flex-col gap-2.5">
-                        <div className="flex items-start gap-2.5">
-                          <div className="bg-slate-200 text-slate-500 p-2 rounded-lg shrink-0">
-                            <FileText size={16} />
-                          </div>
-                          <div className="text-left">
-                            <span className="text-[10px] text-slate-500 uppercase font-bold block">Hợp đồng liên kết</span>
-                            <p className="text-xs font-bold text-slate-700 mt-0.5 leading-normal">Chưa có HĐ</p>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2">
-                          {onCreateContract && (
-                            <button 
-                              onClick={() => {
-                                onCreateContract(record);
-                                onClose();
-                              }}
-                              className="w-full text-center text-xs font-bold bg-blue-600 text-white hover:bg-blue-700 py-2 rounded-lg transition-colors duration-200 shadow-sm"
-                            >
-                              Lập HĐ mới
-                            </button>
-                          )}
-                          {onCreateLiquidation && (
-                            <button 
-                              onClick={() => {
-                                onCreateLiquidation(record);
-                                onClose();
-                              }}
-                              className="w-full text-center text-xs font-bold bg-green-600 text-white hover:bg-green-700 py-2 rounded-lg transition-colors duration-200 shadow-sm"
-                            >
-                              Thanh lý HĐ
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Chi tiết tách thửa */}
-                {contractSplitItems && contractSplitItems.length > 0 && (
-                  <div className="pt-3 border-t border-dashed border-slate-100 space-y-2">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase">Chi tiết tách thửa</p>
-                    <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
-                      {contractSplitItems.map((item, idx) => (
-                        <div key={idx} className="text-xs flex justify-between bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                          <span className="text-slate-600 text-[11px]">
-                            <span className="font-bold text-blue-600 mr-1">Thửa {idx + 1}:</span> 
-                            <span className="font-bold text-slate-700">{item.area || 0} m²</span>
-                            {item.serviceName ? <span className="text-slate-400 ml-1 italic truncate max-w-[120px] inline-block align-bottom">- {item.serviceName}</span> : ''}
-                          </span>
-                          <span className="font-mono font-bold text-green-700 text-[11px] shrink-0 ml-2">
-                            {((item.price || 0) * (item.quantity || 0)).toLocaleString('vi-VN')} đ
-                          </span>
-                        </div>
-                      ))}
-                    </div>
+                  <div className="flex justify-between items-center p-2 bg-orange-50/60 rounded-lg border border-orange-100">
+                    <span className="font-bold text-orange-800 text-[11px]">{liquidationInfo.content}</span>
+                    <span className="font-bold font-mono text-orange-900">{liquidationInfo.amount.toLocaleString('vi-VN')} đ</span>
                   </div>
                 )}
               </div>
+
+              {/* Hợp đồng liên kết */}
+              {record.recordType && (getShortRecordType(record.recordType).startsWith('2.2') || getShortRecordType(record.recordType).startsWith('2.4')) && (
+                <div className="pt-2 border-t border-slate-100">
+                  {matchedContract ? (
+                    <div className="bg-indigo-50/70 border border-indigo-100 rounded-lg p-2.5 flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <span className="text-[10px] text-indigo-500 font-bold uppercase block">Hợp đồng: {matchedContract.code}</span>
+                        <span className="text-[11px] font-bold text-indigo-900 truncate block">{matchedContract.serviceType || matchedContract.contractType}</span>
+                      </div>
+                      {onCreateLiquidation && (
+                        <button 
+                          onClick={() => { onCreateLiquidation(record); onClose(); }}
+                          className="px-2.5 py-1 text-xs font-bold bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 active:scale-95 shrink-0"
+                        >
+                          Thanh lý
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-2 flex items-center justify-between gap-2">
+                      <span className="text-xs text-slate-500">Chưa có hợp đồng</span>
+                      <div className="flex gap-1.5 shrink-0">
+                        {onCreateContract && (
+                          <button 
+                            onClick={() => { onCreateContract(record); onClose(); }}
+                            className="px-2.5 py-1 text-xs font-bold bg-blue-600 text-white rounded-lg hover:bg-blue-700 active:scale-95"
+                          >
+                            Lập HĐ
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Quick Actions Bar */}
+            <div className="bg-white p-3 rounded-xl border border-slate-200/80 shadow-xs space-y-2">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block">Thao tác nhanh</span>
+              <div className="grid grid-cols-2 gap-2">
+                {canPrintReceipt && (
+                  <button 
+                    onClick={handlePrintReceipt}
+                    disabled={isProcessing}
+                    className="flex items-center justify-center gap-1.5 py-2 px-3 bg-purple-600 text-white font-bold text-xs rounded-lg hover:bg-purple-700 active:scale-95 transition-all shadow-xs"
+                  >
+                    {isProcessing ? <Loader2 size={14} className="animate-spin" /> : <Printer size={14} />}
+                    <span>In biên nhận</span>
+                  </button>
+                )}
+                {canPerformAction && (
+                  <button 
+                    onClick={() => setShowExtendForm(!showExtendForm)}
+                    className="flex items-center justify-center gap-1.5 py-2 px-3 bg-amber-600 text-white font-bold text-xs rounded-lg hover:bg-amber-700 active:scale-95 transition-all shadow-xs"
+                  >
+                    <CalendarClock size={14} />
+                    <span>Gia hạn ngày hẹn</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Form Gia Hạn Ngày Hẹn */}
+              {showExtendForm && (
+                <div className="bg-amber-50/60 p-3 rounded-lg border border-amber-200 space-y-2 mt-2 animate-fade-in-down">
+                  <span className="text-xs font-bold text-amber-900 block">Gia hạn ngày hẹn trả kết quả</span>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase block">Ngày hẹn mới</label>
+                    <input 
+                      type="date"
+                      value={extendDate}
+                      onChange={(e) => setExtendDate(e.target.value)}
+                      className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-amber-200"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase block">Lý do gia hạn</label>
+                    <input 
+                      type="text"
+                      placeholder="Ví dụ: Đo đạc lại hiện trường..."
+                      value={extendReason}
+                      onChange={(e) => setExtendReason(e.target.value)}
+                      className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs focus:outline-none focus:ring-2 focus:ring-amber-200"
+                    />
+                  </div>
+                  <div className="flex justify-end gap-2 pt-1">
+                    <button 
+                      onClick={() => setShowExtendForm(false)}
+                      className="px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-200 rounded-lg font-medium"
+                    >
+                      Hủy
+                    </button>
+                    <button 
+                      onClick={handleSaveExtension}
+                      disabled={isExtending}
+                      className="px-3 py-1.5 text-xs bg-amber-600 text-white font-bold rounded-lg hover:bg-amber-700 active:scale-95 flex items-center gap-1"
+                    >
+                      {isExtending ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+                      Lưu gia hạn
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
 
+        {/* Tab 2: Timeline */}
         {activeTab === 'timeline' && (
-          <div className="p-4 space-y-4">
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-              <div className="flex flex-col items-center text-center mb-8 pb-6 border-b border-slate-50">
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">Hạn trả kết quả</p>
-                <p className="text-3xl font-black text-slate-800">{formatDate(record.deadline)}</p>
-                <div className="mt-3 flex items-center gap-2 text-[10px] font-bold text-slate-500 bg-slate-50 px-3 py-1 rounded-full">
-                  <Calendar size={12} /> Ngày nhận: {formatDate(record.receivedDate)}
-                </div>
-
-
+          <div className="space-y-2.5">
+            <div className="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-xs">
+              <div className="text-center pb-3 mb-3 border-b border-slate-100">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block">Hạn trả kết quả</span>
+                <span className="text-xl font-bold text-blue-700 block font-mono mt-0.5">{formatDate(record.deadline)}</span>
+                <span className="text-[11px] text-slate-500 font-medium inline-flex items-center gap-1 mt-1 bg-slate-50 px-2 py-0.5 rounded-full">
+                  <Calendar size={11} /> Tiếp nhận: {formatDate(record.receivedDate)}
+                </span>
               </div>
 
-              <div className="space-y-0">
+              <div className="space-y-0 pt-1">
                 <TimelineItem 
                   date={record.receivedDate} 
-                  label="TIẾP NHẬN MỚI" 
+                  label="1. TIẾP NHẬN MỚI" 
                   icon={UserIcon}
                   colorClass={{text: 'text-emerald-600', border: 'border-emerald-600', bg: 'bg-emerald-600'}}
                   subText={record.receivedBy ? (() => {
@@ -781,22 +782,21 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                 <TimelineItem 
                   date={record.assignedDate || record.completedWorkDate} 
                   forceActive={isWorkDone || !!record.assignedDate}
-                  label="ĐANG THỰC HIỆN" 
+                  label="2. ĐANG THỰC HIỆN" 
                   icon={UserIcon}
                   colorClass={{text: 'text-blue-600', border: 'border-blue-600', bg: 'bg-blue-600'}}
                   subText={record.assignedTo ? (() => {
                       const emp = employees.find(e => e.id === record.assignedTo);
                       if (!emp) return undefined;
-                      return `${emp.name} (${emp.position || 'Chuyên viên'});`
+                      return `${emp.name} (${emp.position || 'Chuyên viên'})`;
                   })() : undefined}
                 />
 
-                {/* Ẩn mốc kiểm tra cho một số loại hồ sơ */}
                 {!(record.recordType === 'Cung cấp tài liệu đất đai' || record.recordType === 'Sao lục' || record.recordType === 'Công văn') && (
                   <TimelineItem 
                     date={record.pendingCheckDate || record.checkedDate} 
                     forceActive={isPendingCheckActive || isCheckedActive}
-                    label="TRÌNH KIỂM TRA" 
+                    label="3. TRÌNH KIỂM TRA" 
                     icon={Send}
                     colorClass={{text: 'text-orange-600', border: 'border-orange-600', bg: 'bg-orange-600'}}
                     subText={record.checkedBy ? (() => {
@@ -810,7 +810,7 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                 <TimelineItem 
                   date={record.submissionDate || record.approvalDate} 
                   forceActive={isPendingSignActive || isSignedActive}
-                  label="TRÌNH KÝ DUYỆT" 
+                  label="4. TRÌNH KÝ DUYỆT" 
                   icon={Send}
                   colorClass={{text: 'text-purple-600', border: 'border-purple-600', bg: 'bg-purple-600'}}
                   subText={record.submittedTo ? (() => {
@@ -823,7 +823,7 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
 
                 <TimelineItem 
                   date={record.completedDate} 
-                  label={record.status === RecordStatus.REJECTED ? "TRẢ HỒ SƠ" : record.status === RecordStatus.WITHDRAWN ? "CSD RÚT HỒ SƠ" : "HOÀN THÀNH"} 
+                  label={record.status === RecordStatus.REJECTED ? "5. TRẢ HỒ SƠ" : record.status === RecordStatus.WITHDRAWN ? "5. CSD RÚT HỒ SƠ" : "5. HOÀN THÀNH"} 
                   icon={CheckSquare}
                   isLast={false}
                   colorClass={{text: record.status === RecordStatus.REJECTED ? 'text-red-700' : 'text-green-700', border: record.status === RecordStatus.REJECTED ? 'border-red-600' : 'border-green-600', bg: record.status === RecordStatus.REJECTED ? 'bg-red-600' : 'bg-green-600'}}
@@ -832,36 +832,38 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
 
                 <TimelineItem 
                   date={record.resultReturnedDate} 
-                  label="TRẢ KẾT QUẢ" 
+                  label="6. TRẢ KẾT QUẢ" 
                   icon={FileCheck}
                   isLast={true}
                   colorClass={{text: 'text-emerald-600', border: 'border-emerald-600', bg: 'bg-emerald-600'}}
                 />
               </div>
             </div>
-
           </div>
         )}
 
+        {/* Tab 3: Notes & Attachments */}
         {activeTab === 'notes' && (
-          <div className="p-4 space-y-4">
-            {/* Nội dung chi tiết */}
-            <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 space-y-3">
-              <h3 className="text-xs font-bold text-purple-600 uppercase flex items-center gap-2">
-                <FileText size={16} /> Nội dung chi tiết (Trích yếu)
-              </h3>
-              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-slate-800 text-sm font-semibold leading-relaxed whitespace-pre-line">
+          <div className="space-y-2.5">
+            {/* Nội dung chi tiết / Trích yếu */}
+            <div className="bg-white p-3 rounded-xl border border-slate-200/80 shadow-xs space-y-1.5">
+              <span className="text-[10px] font-bold text-purple-700 uppercase flex items-center gap-1.5">
+                <FileText size={13} />
+                <span>Nội dung chi tiết (Trích yếu)</span>
+              </span>
+              <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100 text-slate-800 text-xs font-medium leading-relaxed whitespace-pre-line">
                 {cleanSyncNotes(record.content) || 'Không có nội dung chi tiết.'}
               </div>
             </div>
 
             {/* Ghi chú hồ sơ */}
             {cleanSyncNotes(record.notes) && (
-              <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 space-y-3">
-                <h3 className="text-xs font-bold text-blue-600 uppercase flex items-center gap-2">
-                  <StickyNote size={16} /> Ghi chú hồ sơ
-                </h3>
-                <div className="bg-blue-50/40 p-4 rounded-xl border border-blue-100 text-slate-800 text-sm font-medium leading-relaxed whitespace-pre-line">
+              <div className="bg-white p-3 rounded-xl border border-slate-200/80 shadow-xs space-y-1.5">
+                <span className="text-[10px] font-bold text-blue-700 uppercase flex items-center gap-1.5">
+                  <StickyNote size={13} />
+                  <span>Ghi chú hồ sơ</span>
+                </span>
+                <div className="bg-blue-50/40 p-2.5 rounded-lg border border-blue-100 text-slate-800 text-xs font-medium leading-relaxed whitespace-pre-line">
                   {cleanSyncNotes(record.notes)}
                 </div>
               </div>
@@ -872,31 +874,26 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
               const docList = parseOtherDocsForMobile(record.otherDocs);
               if (docList.length === 0) return null;
               return (
-                <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 space-y-3">
-                  <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                    <h3 className="text-xs font-bold text-emerald-600 uppercase flex items-center gap-2">
-                      <FileDown size={16} /> Giấy tờ kèm theo ({docList.length})
-                    </h3>
-                  </div>
-                  <div className="space-y-2">
+                <div className="bg-white p-3 rounded-xl border border-slate-200/80 shadow-xs space-y-2">
+                  <span className="text-[10px] font-bold text-emerald-700 uppercase flex items-center gap-1.5">
+                    <FileDown size={13} />
+                    <span>Giấy tờ kèm theo ({docList.length})</span>
+                  </span>
+                  <div className="space-y-1.5">
                     {docList.map((doc, idx) => (
-                      <div key={idx} className="bg-emerald-50/40 p-3 rounded-xl border border-emerald-100/70 text-slate-800 text-xs space-y-1.5">
-                        <div className="flex items-start justify-between gap-2">
+                      <div key={idx} className="bg-emerald-50/40 p-2 rounded-lg border border-emerald-100/70 text-slate-800 text-xs space-y-1">
+                        <div className="flex items-start justify-between gap-1.5">
                           <span className="font-semibold text-slate-900 leading-snug flex-1">
                             {idx + 1}. {doc.name}
                           </span>
-                          <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] shrink-0 ${
-                            doc.type.toLowerCase().includes('sao') || doc.type.toLowerCase().includes('phô') 
-                              ? 'bg-amber-100 text-amber-800 border border-amber-200' 
-                              : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                          }`}>
+                          <span className="px-1.5 py-0.5 rounded-full font-bold text-[9px] bg-emerald-100 text-emerald-800 border border-emerald-200 shrink-0">
                             {doc.type}
                           </span>
                         </div>
                         {(doc.original > 0 || doc.copy > 0 || doc.note) && (
-                          <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-600 pt-1 border-t border-emerald-100/60">
-                            {doc.original > 0 && <span>Bản chính: <strong className="text-emerald-900">{doc.original}</strong></span>}
-                            {doc.copy > 0 && <span>Bản sao: <strong className="text-amber-900">{doc.copy}</strong></span>}
+                          <div className="flex flex-wrap items-center gap-2 text-[10px] text-slate-600 pt-1 border-t border-emerald-100/60">
+                            {doc.original > 0 && <span>Bản chính: <strong>{doc.original}</strong></span>}
+                            {doc.copy > 0 && <span>Bản sao: <strong>{doc.copy}</strong></span>}
                             {doc.note && <span className="italic text-slate-500">Ghi chú: {doc.note}</span>}
                           </div>
                         )}
@@ -907,55 +904,59 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
               );
             })()}
 
-            {/* Ghi chú nội bộ (Private notes / Read only) */}
+            {/* Ghi chú nội bộ */}
             {record.privateNotes && (
-              <div className="bg-yellow-50 p-4 rounded-2xl border border-yellow-100 space-y-2">
-                <div className="flex items-center gap-2 text-yellow-800 font-bold text-xs uppercase">
-                  <Info size={14} />
+              <div className="bg-amber-50/80 p-3 rounded-xl border border-amber-200 space-y-1">
+                <div className="flex items-center gap-1.5 text-amber-800 font-bold text-[10px] uppercase">
+                  <Info size={12} />
                   <span>Ghi chú nội bộ</span>
                 </div>
-                <p className="text-yellow-900 text-xs italic leading-relaxed whitespace-pre-line">"{record.privateNotes}"</p>
+                <p className="text-amber-900 text-xs italic leading-relaxed whitespace-pre-line">
+                  {record.privateNotes}
+                </p>
               </div>
             )}
 
             {/* Nhắc nhở công việc */}
-            <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 space-y-4">
+            <div className="bg-white p-3 rounded-xl border border-slate-200/80 shadow-xs space-y-2">
               <div className="flex justify-between items-center">
-                <h3 className="text-xs font-bold text-blue-600 uppercase flex items-center gap-2">
-                  <Bell size={16} /> Nhắc nhở công việc
-                </h3>
+                <span className="text-[10px] font-bold text-blue-700 uppercase flex items-center gap-1.5">
+                  <Bell size={13} />
+                  <span>Nhắc nhở công việc</span>
+                </span>
                 <button 
                   onClick={handleSaveReminder} 
                   disabled={isSavingReminder}
-                  className="text-[10px] bg-blue-600 text-white px-4 py-2 rounded-xl font-bold active:scale-95 transition-all disabled:opacity-50"
+                  className="text-[11px] bg-blue-600 text-white px-2.5 py-1 rounded-lg font-bold active:scale-95 transition-all disabled:opacity-50"
                 >
-                  {isSavingReminder ? <Loader2 size={12} className="animate-spin" /> : 'Lưu'}
+                  {isSavingReminder ? <Loader2 size={11} className="animate-spin" /> : 'Lưu'}
                 </button>
               </div>
               <input 
                 type="date" 
-                className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-100 transition-all"
+                className="w-full border border-slate-200 rounded-lg px-2.5 py-2 text-xs bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-100"
                 value={reminderDate}
                 onChange={(e) => setReminderDate(e.target.value)}
               />
             </div>
 
             {/* Ghi chú cá nhân */}
-            <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 space-y-4">
+            <div className="bg-white p-3 rounded-xl border border-slate-200/80 shadow-xs space-y-2">
               <div className="flex justify-between items-center">
-                <h3 className="text-xs font-bold text-blue-600 uppercase flex items-center gap-2">
-                  <StickyNote size={16} /> Ghi chú cá nhân
-                </h3>
+                <span className="text-[10px] font-bold text-blue-700 uppercase flex items-center gap-1.5">
+                  <StickyNote size={13} />
+                  <span>Ghi chú cá nhân (riêng tư)</span>
+                </span>
                 <button 
                   onClick={handleSavePersonalNote} 
                   disabled={isSavingNote}
-                  className="text-[10px] bg-blue-600 text-white px-4 py-2 rounded-xl font-bold active:scale-95 transition-all disabled:opacity-50"
+                  className="text-[11px] bg-blue-600 text-white px-2.5 py-1 rounded-lg font-bold active:scale-95 transition-all disabled:opacity-50"
                 >
-                  {isSavingNote ? <Loader2 size={12} className="animate-spin" /> : 'Lưu'}
+                  {isSavingNote ? <Loader2 size={11} className="animate-spin" /> : 'Lưu'}
                 </button>
               </div>
               <AutoResizeTextarea
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-100"
                 placeholder="Nhập ghi chú riêng của bạn..."
                 value={personalNote}
                 onChange={(e) => setPersonalNote(e.target.value)}
@@ -964,8 +965,8 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
           </div>
         )}
       </div>
-    </div>
 
+      {/* Modals */}
       <DocxPreviewModal
         isOpen={isPreviewOpen}
         onClose={() => setIsPreviewOpen(false)}
@@ -1003,3 +1004,5 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
     </div>
   );
 };
+
+export default MobileDetailModal;

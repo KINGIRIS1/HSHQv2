@@ -1,8 +1,9 @@
 import { supabase, isConfigured } from './supabaseClient';
 import { RecordFile, RecordStatus } from '../types';
 import { MOCK_RECORDS, API_BASE_URL, isArchiveRecordType, getShortRecordType } from '../constants';
-import { logError, getFromCache, saveToCache, CACHE_KEYS, sanitizeData, sanitizePayloadFor22P02, normalizeCode, mapRecordFromDb } from './apiCore';
+import { logError, getFromCache, saveToCache, CACHE_KEYS, sanitizeData, sanitizePayloadFor22P02, normalizeCode, mapRecordFromDb, keepOnlyDate } from './apiCore';
 import { getIndexedDBItem } from './storageService';
+import { addPendingRecord, removePendingRecord, getPendingRecords, syncPendingRecordsToCloud, generateStandardUUID, isValidUUID } from './syncQueueService';
 
 const RECORD_DB_COLUMNS = [
     'id', 'code', 'customerName', 'phoneNumber', 'cccd', 'customerAddress', 'ward', 'landPlot', 'mapSheet', 
@@ -99,17 +100,19 @@ export const purgeRecordFromOtherTables = async (
     const allTables: ('dangky_records' | 'land_records' | 'luutru_records')[] = ['dangky_records', 'land_records', 'luutru_records'];
     const otherTables = allTables.filter(t => t !== keepTable);
 
+    const safeId = id && isValidUUID(id) ? id.trim() : null;
+    const safeCode = code && code.trim().length > 3 && !code.includes('?') ? code.trim() : null;
+
+    if (!safeId && !safeCode) return;
+
     for (const tbl of otherTables) {
         try {
-            let query = supabase.from(tbl).delete();
-            if (id && code) {
-                query = query.or(`id.eq.${id},code.eq.${code}`);
-            } else if (id) {
-                query = query.eq('id', id);
-            } else if (code) {
-                query = query.eq('code', code);
+            if (safeId) {
+                await supabase.from(tbl).delete().eq('id', safeId);
             }
-            await query;
+            if (safeCode) {
+                await supabase.from(tbl).delete().eq('code', safeCode);
+            }
         } catch {
             // Không ngắt luồng nếu bảng đó không có bản ghi
         }
@@ -125,8 +128,8 @@ export const purgeBatchFromOtherTables = async (
     keepTable: 'dangky_records' | 'land_records' | 'luutru_records'
 ) => {
     if (!isConfigured || !keepTable) return;
-    const validIds = ids.filter(Boolean);
-    const validCodes = codes.filter(Boolean);
+    const validIds = ids.filter(id => id && isValidUUID(id));
+    const validCodes = codes.filter(code => code && code.trim().length > 3 && !code.includes('?'));
     if (validIds.length === 0 && validCodes.length === 0) return;
 
     const allTables: ('dangky_records' | 'land_records' | 'luutru_records')[] = ['dangky_records', 'land_records', 'luutru_records'];
@@ -161,85 +164,8 @@ const OPTIONAL_NEW_COLUMNS = [
     'statusLogs', 'archiveHandoverDate', 'archiveHandoverBatch'
 ];
 
-// --- CẤU HÌNH PHÂN NHÓM TẢI 3 GIAI ĐOẠN ƯU TIÊN ---
-// Giai đoạn 1 (Ưu tiên 1): Tiếp nhận mới, đang thực hiện, đã giao 1 cửa
-export const TIER_1_STATUSES = [
-    'RECEIVED', 'received',
-    'ASSIGNED', 'assigned',
-    'IN_PROGRESS', 'in_progress',
-    'COMPLETED_WORK', 'completed_work',
-    'PENDING_SUPPLEMENT', 'pending_supplement',
-    'HANDOVER', 'handover'
-];
-
-// Giai đoạn 2 (Ưu tiên 2): Tiếp tục tới kiểm tra, trình ký, chờ bàn giao
-export const TIER_2_STATUSES = [
-    'PENDING_CHECK', 'pending_check',
-    'CHECKED', 'checked',
-    'PENDING_SIGN', 'pending_sign',
-    'SIGNED', 'signed',
-    'GIAO_HS', 'giao_hs',
-    'REJECTED', 'rejected',
-    'WITHDRAWN', 'withdrawn'
-];
-
-// Giai đoạn 3 (Ưu tiên 3): Đã trả kết quả (và các trạng thái hoàn tất còn lại nếu có)
-export const TIER_3_STATUSES = [
-    'RETURNED', 'returned'
-];
-
-const applyTierFilter = (query: any, tier: 1 | 2 | 3) => {
-    if (tier === 1) {
-        return query.in('status', TIER_1_STATUSES);
-    } else if (tier === 2) {
-        return query.in('status', TIER_2_STATUSES);
-    } else {
-        // Tier 3: RETURNED và các bản ghi còn lại (hoặc status null / rỗng)
-        const excluded = [...TIER_1_STATUSES, ...TIER_2_STATUSES];
-        return query.or(`status.not.in.(${excluded.join(',')}),status.is.null`);
-    }
-};
-
-const fetchPageWithRetry = async (
-    table: 'dangky_records' | 'land_records' | 'luutru_records',
-    tier: 1 | 2 | 3,
-    from: number,
-    to: number,
-    retries = 3,
-    delayMs = 300
-): Promise<any[]> => {
-    for (let attempt = 1; attempt <= retries; attempt++) {
-        try {
-            let q = supabase.from(table).select('*');
-            q = applyTierFilter(q, tier);
-            const { data, error: pageErr } = await q
-                .order('receivedDate', { ascending: false })
-                .order('id', { ascending: true })
-                .range(from, to);
-
-            if (pageErr) {
-                if (attempt === retries) {
-                    console.warn(`Lỗi fetch trang ${from}-${to} của ${table} (Tier ${tier}, lần ${attempt}/${retries}):`, pageErr);
-                    return [];
-                }
-                await new Promise(res => setTimeout(res, delayMs * attempt));
-                continue;
-            }
-            return (data || []).map(item => ({ ...item, sourceTable: table }));
-        } catch (err: any) {
-            if (attempt === retries) {
-                console.warn(`Lỗi ngoại lệ fetch trang ${from}-${to} của ${table} (Tier ${tier}):`, err);
-                return [];
-            }
-            await new Promise(res => setTimeout(res, delayMs * attempt));
-        }
-    }
-    return [];
-};
-
-const fetchTableRecordsByTier = async (
-    table: 'dangky_records' | 'land_records' | 'luutru_records',
-    tier: 1 | 2 | 3
+const fetchTableRecords = async (
+    table: 'dangky_records' | 'land_records' | 'luutru_records'
 ): Promise<any[]> => {
     const step = 1000;
     try {
@@ -248,10 +174,10 @@ const fetchTableRecordsByTier = async (
 
         for (let attempt = 1; attempt <= 3; attempt++) {
             try {
-                let q = supabase.from(table).select('*', { count: 'exact' });
-                q = applyTierFilter(q, tier);
-                const res = await q
-                    .order('receivedDate', { ascending: false })
+                const res = await supabase
+                    .from(table)
+                    .select('*', { count: 'exact' })
+                    .order('receivedDate', { ascending: false, nullsFirst: false })
                     .order('id', { ascending: true })
                     .range(0, step - 1);
 
@@ -291,32 +217,58 @@ const fetchTableRecordsByTier = async (
             ranges.push({ from, to });
         }
 
-        // Tải theo nhóm song song (concurrency = 4) để tốc độ tối ưu nhất
+        // Tải theo nhóm song song (concurrency = 4) để nạp 100% hồ sơ cực nhanh
         const concurrency = 4;
         const remainingPages: any[][] = [];
         for (let i = 0; i < ranges.length; i += concurrency) {
             const chunk = ranges.slice(i, i + concurrency);
             const chunkResults = await Promise.all(
-                chunk.map(r => fetchPageWithRetry(table, tier, r.from, r.to))
+                chunk.map(r => fetchPageDirectWithRetry(table, r.from, r.to))
             );
             remainingPages.push(...chunkResults);
         }
 
         return [mappedFirst, ...remainingPages].flat();
     } catch (err: any) {
-        console.warn(`Lỗi fetch ${table} tier ${tier}:`, err);
+        console.warn(`Lỗi fetch ${table}:`, err);
         return [];
     }
 };
 
-const fetchTierData = async (tier: 1 | 2 | 3): Promise<RecordFile[]> => {
-    const [dangky, land, luutru] = await Promise.all([
-        fetchTableRecordsByTier('dangky_records', tier),
-        fetchTableRecordsByTier('land_records', tier),
-        fetchTableRecordsByTier('luutru_records', tier)
-    ]);
-    const rawList = [...dangky, ...land, ...luutru];
-    return rawList.map(item => mapRecordFromDb(item));
+const fetchPageDirectWithRetry = async (
+    table: 'dangky_records' | 'land_records' | 'luutru_records',
+    from: number,
+    to: number,
+    retries = 3,
+    delayMs = 300
+): Promise<any[]> => {
+    for (let attempt = 1; attempt <= retries; attempt++) {
+        try {
+            const { data, error: pageErr } = await supabase
+                .from(table)
+                .select('*')
+                .order('receivedDate', { ascending: false, nullsFirst: false })
+                .order('id', { ascending: true })
+                .range(from, to);
+
+            if (pageErr) {
+                if (attempt === retries) {
+                    console.warn(`Lỗi fetch trang ${from}-${to} của ${table}:`, pageErr);
+                    return [];
+                }
+                await new Promise(res => setTimeout(res, delayMs * attempt));
+                continue;
+            }
+            return (data || []).map(item => ({ ...item, sourceTable: table }));
+        } catch (err: any) {
+            if (attempt === retries) {
+                console.warn(`Lỗi ngoại lệ fetch trang ${from}-${to} của ${table}:`, err);
+                return [];
+            }
+            await new Promise(res => setTimeout(res, delayMs * attempt));
+        }
+    }
+    return [];
 };
 
 export type TierProgressCallback = (tier: 1 | 2 | 3, recordsSoFar: RecordFile[], isComplete: boolean) => void;
@@ -324,42 +276,62 @@ export type TierProgressCallback = (tier: 1 | 2 | 3, recordsSoFar: RecordFile[],
 export const fetchRecords = async (onProgress?: TierProgressCallback): Promise<RecordFile[]> => {
   if (!isConfigured) {
       console.warn("Supabase chưa được cấu hình.");
-      return [];
+      const pending = await getPendingRecords();
+      return pending;
   }
 
   try {
     const uniqueMap = new Map<string, RecordFile>();
 
-    // 🚀 GIAI ĐOẠN 1 (Ưu tiên 1): Tiếp nhận mới, đang thực hiện, đã giao 1 cửa
-    const tier1 = await fetchTierData(1);
-    tier1.forEach(r => { if (r.id) uniqueMap.set(r.id, r); });
-    const listTier1 = Array.from(uniqueMap.values());
-    console.log(`[Tier 1 Ready] Đã nạp xong ${listTier1.length} hồ sơ ưu tiên 1 (tiếp nhận mới, đang thực hiện, đã giao 1 cửa)`);
-    onProgress?.(1, listTier1, false);
+    // 1. Tải toàn bộ 100% hồ sơ từ cả 3 bảng phân loại song song
+    const [dangky, land, luutru] = await Promise.all([
+        fetchTableRecords('dangky_records'),
+        fetchTableRecords('land_records'),
+        fetchTableRecords('luutru_records')
+    ]);
+    
+    const rawList = [...dangky, ...land, ...luutru];
+    rawList.forEach(item => {
+        const mapped = mapRecordFromDb(item);
+        if (mapped && mapped.id) {
+            uniqueMap.set(mapped.id, mapped);
+        }
+    });
 
-    // 🚀 GIAI ĐOẠN 2 (Ưu tiên 2): Tiếp tục tới kiểm tra, trình ký, chờ bàn giao
-    const tier2 = await fetchTierData(2);
-    tier2.forEach(r => { if (r.id) uniqueMap.set(r.id, r); });
-    const listTier2 = Array.from(uniqueMap.values());
-    console.log(`[Tier 2 Ready] Đã nạp xong tổng cộng ${listTier2.length} hồ sơ (+ kiểm tra, trình ký, chờ bàn giao)`);
-    onProgress?.(2, listTier2, false);
+    // 2. [QUAN TRỌNG NHẤT] Hợp nhất ngay các hồ sơ đang chờ đồng bộ (Sync Queue)
+    // Đảm bảo mọi hồ sơ vừa tiếp nhận hoặc lưu offline KHÔNG BAO GIỜ bị biến mất hay bị ghi đè!
+    const pendingRecords = await getPendingRecords();
+    pendingRecords.forEach(pending => {
+        if (pending && pending.id) {
+            uniqueMap.set(pending.id, { ...(uniqueMap.get(pending.id) || {}), ...pending, _isOfflineSaved: true });
+        }
+    });
 
-    // 🚀 GIAI ĐOẠN 3 (Ưu tiên 3): Đã trả kết quả (tải ngầm sau cùng trong nền)
-    const tier3 = await fetchTierData(3);
-    tier3.forEach(r => { if (r.id) uniqueMap.set(r.id, r); });
     const finalRecords = Array.from(uniqueMap.values());
-    console.log(`[Tier 3 Complete] Đã nạp đầy đủ toàn bộ ${finalRecords.length} hồ sơ hệ thống`);
+    console.log(`[FetchRecords] Đã nạp thành công ${finalRecords.length} hồ sơ (trong đó có ${pendingRecords.length} hồ sơ chờ đồng bộ)`);
 
     if (finalRecords.length > 0) {
         saveToCache(CACHE_KEYS.RECORDS, finalRecords);
     }
     onProgress?.(3, finalRecords, true);
+
+    // 3. Kích hoạt đồng bộ ngầm tự động nếu có hồ sơ tồn đọng
+    if (pendingRecords.length > 0) {
+        setTimeout(() => {
+            syncPendingRecordsToCloud(createRecordApi, updateRecordApi);
+        }, 1200);
+    }
+
     return finalRecords;
 
   } catch (error) {
     logError("fetchRecords", error, true);
-    const idb = await getIndexedDBItem<RecordFile[]>(CACHE_KEYS.RECORDS);
-    return Array.isArray(idb) && idb.length > 0 ? idb : MOCK_RECORDS;
+    const idb = await getIndexedDBItem<RecordFile[]>(CACHE_KEYS.RECORDS) || [];
+    const pendingRecords = await getPendingRecords();
+    const map = new Map<string, RecordFile>();
+    idb.forEach(r => { if (r.id) map.set(r.id, r); });
+    pendingRecords.forEach(r => { if (r.id) map.set(r.id, { ...r, _isOfflineSaved: true }); });
+    return Array.from(map.values());
   }
 };
 
@@ -510,7 +482,12 @@ const syncCacheOnBatchUpdate = async (batchUpdates: Partial<RecordFile>[]) => {
 };
 
 export const createRecordApi = async (record: RecordFile): Promise<RecordFile | null> => {
-    if (!isConfigured) return record;
+    if (!isConfigured) {
+        await addPendingRecord(record, 'CREATE');
+        syncCacheOnCreate({ ...record, _isOfflineSaved: true });
+        return { ...record, _isOfflineSaved: true };
+    }
+
     let recordToSave: RecordFile = record;
     try {
         let finalCode = record.code;
@@ -520,59 +497,84 @@ export const createRecordApi = async (record: RecordFile): Promise<RecordFile | 
             finalCode = await getNextGlobalRecordCode(record.receivedDate || new Date().toISOString());
         }
         
+        // Luôn đảm bảo id là chuẩn UUID RFC4122 để không bị lỗi 22P02 của PostgreSQL
+        const standardId = (recordToSave.id && isValidUUID(recordToSave.id)) ? recordToSave.id : generateStandardUUID();
+        const validReceivedDate = keepOnlyDate(record.receivedDate) || new Date().toISOString().split('T')[0];
+
         recordToSave = { 
             ...record, 
+            id: standardId,
             code: finalCode,
+            receivedDate: validReceivedDate,
             status: record.status || RecordStatus.RECEIVED
         };
-        if (!recordToSave.id) {
-            recordToSave.id = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substr(2, 9);
-        }
         
         const targetTable = getTargetTable(recordToSave);
-        const payload = sanitizeData(recordToSave, RECORD_DB_COLUMNS);
+        let payload = sanitizeData(recordToSave, RECORD_DB_COLUMNS);
+        payload.id = standardId;
+        payload.receivedDate = validReceivedDate;
+
         let { data, error } = await supabase.from(targetTable).insert([payload]).select();
         
+        // 1. Thử lại nếu lỗi kiểu dữ liệu 22P02
         if (error && (error.code === '22P02' || String(error.message || '').includes('22P02') || String(error.message || '').includes('invalid input syntax'))) {
-            console.warn(`⚠️ [22P02 Fallback] Retrying insert into ${targetTable} with 22P02 sanitized payload...`);
+            console.warn(`⚠️ [22P02 Fallback] Thử lại insert vào ${targetTable} với dữ liệu đã chuẩn hóa 22P02...`);
             const fallback22P02Payload = sanitizePayloadFor22P02(payload);
+            if (!isValidUUID(fallback22P02Payload.id)) fallback22P02Payload.id = generateStandardUUID();
             const res = await supabase.from(targetTable).insert([fallback22P02Payload]).select();
             data = res.data;
             error = res.error;
         }
 
+        // 2. Thử lại nếu thiếu cột trên Supabase (PGRST204 / 42703)
         if (error && (error.code === 'PGRST204' || String(error.code) === '42703' || (error.message && String(error.message).includes('does not exist')))) {
-            console.warn(`⚠️ [Fallback] Database is missing columns. Retrying insert into ${targetTable} without new columns...`);
-            if (!(window as any).fallbackAlertShown) {
-                logError("createRecordApi", error, true);
-                (window as any).fallbackAlertShown = true;
-            }
+            console.warn(`⚠️ [Fallback] Bảng ${targetTable} thiếu một số cột mới. Thử lại không kèm cột tùy chọn...`);
             const fallbackPayload = sanitizePayloadFor22P02({ ...payload });
             OPTIONAL_NEW_COLUMNS.forEach(col => delete fallbackPayload[col]);
-            const { data: fallbackData, error: fallbackError } = await supabase.from(targetTable).insert([fallbackPayload]).select();
-            if (fallbackError) throw fallbackError;
-            const result = mapRecordFromDb({ ...recordToSave, ...(fallbackData?.[0] || {}), sourceTable: targetTable }) as RecordFile;
-            if (result) syncCacheOnCreate(result);
-            return result;
+            const res = await supabase.from(targetTable).insert([fallbackPayload]).select();
+            data = res.data;
+            error = res.error;
+        }
+
+        // 3. Fallback sang bảng land_records nếu bảng chuyên biệt (luutru_records / dangky_records) bị lỗi cấu trúc hoặc phân quyền
+        if (error && targetTable !== 'land_records') {
+            console.warn(`⚠️ [Fallback Table] Bảng ${targetTable} gặp lỗi (${error.message || error.code}). Chuyển hướng lưu an toàn sang bảng land_records...`);
+            const landFallbackPayload = sanitizePayloadFor22P02({ ...payload });
+            const landRes = await supabase.from('land_records').insert([landFallbackPayload]).select();
+            if (!landRes.error && landRes.data && landRes.data.length > 0) {
+                data = landRes.data;
+                error = null;
+            }
         }
         
         if (error) throw error;
+
         const result = mapRecordFromDb({ ...recordToSave, ...(data?.[0] || {}), sourceTable: targetTable }) as RecordFile;
         if (result) {
+            // Gỡ khỏi hàng đợi chờ đồng bộ vì đã lên Cloud thành công 100%
+            await removePendingRecord(result.id);
             syncCacheOnCreate(result);
-            // Tự động quét và loại bỏ bản ghi khỏi các bảng khác để không lưu sai phân loại
+            // Dọn dẹp bản ghi cũ nếu có ở các bảng khác
             purgeRecordFromOtherTables(result.id, result.code, targetTable);
+            return { ...result, _isOfflineSaved: false };
         }
-        return result;
-    } catch (error) {
+        return { ...recordToSave, _isOfflineSaved: false };
+    } catch (error: any) {
         logError("createRecordApi", error, true);
-        syncCacheOnCreate(recordToSave);
-        return recordToSave;
+        console.warn(`[Offline Queue] Lưu hồ sơ ${recordToSave.code || recordToSave.id} vào hàng đợi cục bộ để tự động đẩy lên Cloud sau.`);
+        // Lưu hồ sơ vào hàng đợi đồng bộ bền vững (Sync Queue)
+        await addPendingRecord(recordToSave, 'CREATE');
+        syncCacheOnCreate({ ...recordToSave, _isOfflineSaved: true });
+        return { ...recordToSave, _isOfflineSaved: true };
     }
 };
 
 export const updateRecordApi = async (record: RecordFile): Promise<RecordFile | null> => {
-    if (!isConfigured) return record;
+    if (!isConfigured) {
+        await addPendingRecord(record, 'UPDATE');
+        syncCacheOnUpdate({ ...record, _isOfflineSaved: true });
+        return { ...record, _isOfflineSaved: true };
+    }
     try {
         const targetTable = getTargetTable(record);
         const payload = sanitizeData(record, RECORD_DB_COLUMNS);
@@ -588,39 +590,43 @@ export const updateRecordApi = async (record: RecordFile): Promise<RecordFile | 
 
         if (error && (error.code === 'PGRST204' || String(error.code) === '42703' || (error.message && String(error.message).includes('does not exist')))) {
             console.warn(`⚠️ [Fallback] Database is missing columns. Retrying update on ${targetTable} without new columns...`);
-            if (!(window as any).fallbackAlertShown) {
-                logError("updateRecordApi", error, true);
-                (window as any).fallbackAlertShown = true;
-            }
             const fallbackPayload = sanitizePayloadFor22P02({ ...payload });
             OPTIONAL_NEW_COLUMNS.forEach(col => delete fallbackPayload[col]);
-            const { data: fallbackData, error: fallbackError } = await supabase.from(targetTable).update(fallbackPayload).eq('id', record.id).select();
-            if (fallbackError) throw fallbackError;
-            const result = mapRecordFromDb({ ...record, ...(fallbackData?.[0] || {}), sourceTable: targetTable }) as RecordFile;
-            if (result) {
-                syncCacheOnUpdate(result);
-                purgeRecordFromOtherTables(result.id, result.code, targetTable);
+            const res = await supabase.from(targetTable).update(fallbackPayload).eq('id', record.id).select();
+            data = res.data;
+            error = res.error;
+        }
+
+        // Fallback cập nhật land_records nếu targetTable khác bị lỗi
+        if (error && targetTable !== 'land_records') {
+            const landRes = await supabase.from('land_records').update(sanitizePayloadFor22P02(payload)).eq('id', record.id).select();
+            if (!landRes.error && landRes.data && landRes.data.length > 0) {
+                data = landRes.data;
+                error = null;
             }
-            return result;
         }
         
         if (error) throw error;
         const result = mapRecordFromDb({ ...record, ...(data?.[0] || {}), sourceTable: targetTable }) as RecordFile;
         if (result) {
+            await removePendingRecord(result.id);
             syncCacheOnUpdate(result);
             purgeRecordFromOtherTables(result.id, result.code, targetTable);
+            return { ...result, _isOfflineSaved: false };
         }
-        return result;
-    } catch (error) {
+        return { ...record, _isOfflineSaved: false };
+    } catch (error: any) {
         logError("updateRecordApi", error, true);
-        syncCacheOnUpdate(record);
-        return record;
+        await addPendingRecord(record, 'UPDATE');
+        syncCacheOnUpdate({ ...record, _isOfflineSaved: true });
+        return { ...record, _isOfflineSaved: true };
     }
 };
 
 export const updateRecordFieldsApi = async (id: string, fields: Partial<RecordFile>): Promise<RecordFile | null> => {
     if (!isConfigured) {
-        const fallbackRecord = { id, ...fields } as RecordFile;
+        const fallbackRecord = { id, ...fields, _isOfflineSaved: true } as RecordFile;
+        await addPendingRecord(fallbackRecord, 'UPDATE');
         syncCacheOnUpdate(fallbackRecord);
         return fallbackRecord;
     }
@@ -642,26 +648,24 @@ export const updateRecordFieldsApi = async (id: string, fields: Partial<RecordFi
             console.warn(`⚠️ [Fallback] Database is missing columns on ${targetTable}. Retrying without new columns...`);
             const fallbackPayload = sanitizePayloadFor22P02({ ...payload });
             OPTIONAL_NEW_COLUMNS.forEach(col => delete fallbackPayload[col]);
-            const { data: fallbackData, error: fallbackError } = await supabase.from(targetTable).update(fallbackPayload).eq('id', id).select();
-            if (fallbackError) throw fallbackError;
-            const result = mapRecordFromDb({ id, ...fields, ...(fallbackData?.[0] || {}), sourceTable: targetTable }) as RecordFile;
-            if (result) {
-                syncCacheOnUpdate(result);
-                purgeRecordFromOtherTables(result.id, result.code, targetTable);
-            }
-            return result;
+            const res = await supabase.from(targetTable).update(fallbackPayload).eq('id', id).select();
+            data = res.data;
+            error = res.error;
         }
         
         if (error) throw error;
         const result = mapRecordFromDb({ id, ...fields, ...(data?.[0] || {}), sourceTable: targetTable }) as RecordFile;
         if (result) {
+            await removePendingRecord(result.id);
             syncCacheOnUpdate(result);
             purgeRecordFromOtherTables(result.id, result.code, targetTable);
+            return { ...result, _isOfflineSaved: false };
         }
-        return result;
-    } catch (error) {
+        return { id, ...fields } as RecordFile;
+    } catch (error: any) {
         logError("updateRecordFieldsApi", error, true);
-        const fallbackRecord = { id, ...fields } as RecordFile;
+        const fallbackRecord = { id, ...fields, _isOfflineSaved: true } as RecordFile;
+        await addPendingRecord(fallbackRecord, 'UPDATE');
         syncCacheOnUpdate(fallbackRecord);
         return fallbackRecord;
     }

@@ -214,6 +214,7 @@ export interface RecordFile {
 
   // Phân loại bảng Cloud Database
   sourceTable?: 'dangky_records' | 'land_records' | 'archive_records' | 'luutru_records';
+  _isOfflineSaved?: boolean;
 }
 
 export interface RecordStatusLog {
