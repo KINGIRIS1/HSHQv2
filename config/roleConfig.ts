@@ -118,31 +118,45 @@ export function isViewAllowedForUser(
   if (user.employeeId && employees && departmentPermissions) {
     const emp = employees.find(e => e.id === user.employeeId);
     if (emp && emp.department) {
-      const compositeKey = `${emp.department}_${user.role}`;
-      if (departmentPermissions[compositeKey]) {
+      const userDept = emp.department.trim();
+      const userRole = user.role;
+      const compositeKey = `${userDept}_${userRole}`;
+
+      if (departmentPermissions[compositeKey] && Array.isArray(departmentPermissions[compositeKey])) {
         activePerms = departmentPermissions[compositeKey];
         isCustomDeptPerm = true;
-      } else if (departmentPermissions[emp.department]) {
-        activePerms = departmentPermissions[emp.department];
-        isCustomDeptPerm = true;
       } else {
-        const matchingKey = Object.keys(departmentPermissions).find(k => {
-          if (k.endsWith(`_${user.role}`)) {
-            const deptPart = k.replace(`_${user.role}`, '');
-            return matchDepartmentKey(deptPart, emp.department);
-          }
-          return matchDepartmentKey(k, emp.department);
+        // Match with matchDepartmentKey on dept part for the EXACT same role
+        const matchingCompositeKey = Object.keys(departmentPermissions).find(k => {
+          const lastUnderscore = k.lastIndexOf('_');
+          if (lastUnderscore === -1) return false;
+          const deptPart = k.substring(0, lastUnderscore);
+          const rolePart = k.substring(lastUnderscore + 1);
+          return rolePart === userRole && (matchDepartmentKey(deptPart, userDept) || matchDepartmentKey(userDept, deptPart));
         });
-        if (matchingKey && departmentPermissions[matchingKey]) {
-          activePerms = departmentPermissions[matchingKey];
+
+        if (matchingCompositeKey && Array.isArray(departmentPermissions[matchingCompositeKey])) {
+          activePerms = departmentPermissions[matchingCompositeKey];
           isCustomDeptPerm = true;
+        } else if (user.role !== UserRole.ONEDOOR) {
+          // Pure department key without role suffix (only for technical dept roles, not ONEDOOR)
+          const pureDeptKey = Object.keys(departmentPermissions).find(k => {
+            if (k.includes('_ADMIN') || k.includes('_SUBADMIN') || k.includes('_TEAM_LEADER') || k.includes('_EMPLOYEE') || k.includes('_ONEDOOR')) {
+              return false;
+            }
+            return matchDepartmentKey(k, userDept) || matchDepartmentKey(userDept, k);
+          });
+          if (pureDeptKey && Array.isArray(departmentPermissions[pureDeptKey])) {
+            activePerms = departmentPermissions[pureDeptKey];
+            isCustomDeptPerm = true;
+          }
         }
       }
     }
   }
 
   if (activePerms === null) {
-    if (rolePermissions && rolePermissions[user.role]) {
+    if (rolePermissions && rolePermissions[user.role] && Array.isArray(rolePermissions[user.role])) {
       activePerms = rolePermissions[user.role];
     } else if (DEFAULT_ROLE_PERMISSIONS[user.role]) {
       activePerms = DEFAULT_ROLE_PERMISSIONS[user.role];
@@ -209,8 +223,12 @@ export function isViewAllowedForUser(
       case 'receive_group':
         return hasAnyPerm(ONEDOOR_CHILD_PERMS) || hasAnyPerm(CONTRACT_CHILD_PERMS);
       case 'records_group':
-        const allowDodac = !isUserLuutru(user, employees || []) && hasAnyPerm(DODAC_CHILD_PERMS);
-        const allowLuutru = !isUserDodac(user, employees || []) && hasAnyPerm(LUUTRU_CHILD_PERMS);
+        const allowDodac = !isUserLuutru(user, employees || []) && (user.role === UserRole.ONEDOOR 
+          ? (activePerms.includes('all_records') || DODAC_CHILD_PERMS.some(p => p !== 'all_records' && activePerms!.includes(p)))
+          : hasAnyPerm(DODAC_CHILD_PERMS));
+        const allowLuutru = !isUserDodac(user, employees || []) && (user.role === UserRole.ONEDOOR 
+          ? (activePerms.includes('archive_records') || LUUTRU_CHILD_PERMS.some(p => p !== 'archive_records' && activePerms!.includes(p)))
+          : hasAnyPerm(LUUTRU_CHILD_PERMS));
         const allowReg = activePerms.includes('registration_records');
         return allowDodac || allowLuutru || allowReg;
       case 'tools_group':
@@ -225,10 +243,16 @@ export function isViewAllowedForUser(
         return hasAnyPerm(ONEDOOR_CHILD_PERMS);
       case 'all_records':
         if (isUserLuutru(user, employees || [])) return false;
-        return hasAnyPerm(DODAC_CHILD_PERMS);
+        if (user.role === UserRole.ONEDOOR) {
+          return activePerms.includes('all_records') || DODAC_CHILD_PERMS.some(p => p !== 'all_records' && activePerms!.includes(p));
+        }
+        return activePerms.includes('all_records') || hasAnyPerm(DODAC_CHILD_PERMS.filter(p => p !== 'all_records'));
       case 'archive_records':
         if (isUserDodac(user, employees || [])) return false;
-        return hasAnyPerm(LUUTRU_CHILD_PERMS);
+        if (user.role === UserRole.ONEDOOR) {
+          return activePerms.includes('archive_records') || LUUTRU_CHILD_PERMS.some(p => p !== 'archive_records' && activePerms!.includes(p));
+        }
+        return activePerms.includes('archive_records') || hasAnyPerm(LUUTRU_CHILD_PERMS.filter(p => p !== 'archive_records'));
       case 'receive_contract':
         return hasAnyPerm(CONTRACT_CHILD_PERMS);
 

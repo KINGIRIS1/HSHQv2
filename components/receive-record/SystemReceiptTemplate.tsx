@@ -244,7 +244,7 @@ const SystemReceiptTemplate: React.FC<SystemReceiptTemplateProps> = ({ data, rec
         return `ngày ${day} tháng ${month} năm ${year}`;
     };
 
-    const receiverOfficerName = getReceiptReceiverName(data, employees, users, currentUser) || currentUser?.name || currentUser?.username || 'NGUYỄN HỮU TRÍ';
+    const receiverOfficerName = getReceiptReceiverName(data, employees, users, currentUser);
     const currentUserName = receiverOfficerName;
     const wardName = getNormalizedWard(data.ward || '');
 
@@ -479,7 +479,7 @@ const SystemReceiptTemplate: React.FC<SystemReceiptTemplateProps> = ({ data, rec
                                         <div style={{ fontWeight: 'bold', fontSize: '14px', textTransform: 'uppercase' }}>NGƯỜI TIẾP NHẬN HỒ SƠ</div>
                                         <div style={{ fontStyle: 'italic', fontSize: '13px', marginTop: '2px' }}>(Ký và ghi rõ họ tên)</div>
                                     </div>
-                                    <div style={{ fontWeight: 'bold', textTransform: 'uppercase', fontSize: '14px' }}>{currentUserName}</div>
+                                    <div style={{ fontWeight: 'bold', textTransform: 'uppercase', fontSize: '14px', minHeight: '18px' }}>{currentUserName || '\u00A0'}</div>
                                 </div>
                             </div>
 
@@ -541,7 +541,7 @@ const SystemReceiptTemplate: React.FC<SystemReceiptTemplateProps> = ({ data, rec
                                         <td style={{ width: '12%', border: '1px solid black', padding: '5px 6px', textAlign: 'left', verticalAlign: 'top', fontSize: '13px' }}>2.Nhận</td>
                                         <td style={{ width: '29%', border: '1px solid black', padding: '5px 6px', textAlign: 'left', verticalAlign: 'top', fontSize: '13px' }}>
                                             <div style={{ fontWeight: 'bold' }}>Người giao</div>
-                                            <div style={{ marginTop: '45px', textAlign: 'center', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '12px' }}>{currentUserName}</div>
+                                            <div style={{ marginTop: '45px', textAlign: 'center', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '12px', minHeight: '16px' }}>{currentUserName || '\u00A0'}</div>
                                         </td>
                                         <td style={{ width: '29%', border: '1px solid black', padding: '5px 6px', textAlign: 'left', verticalAlign: 'top', fontSize: '13px' }}>
                                             <div style={{ fontWeight: 'bold' }}>Người nhận</div>

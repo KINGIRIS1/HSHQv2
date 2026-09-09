@@ -23,6 +23,7 @@ interface ReceiveRecordProps {
   onDeleteBatch?: (ids: string[]) => Promise<boolean>;
   wards: string[];
   employees: Employee[];
+  users?: User[];
   currentUser: User;
   records?: RecordFile[];
   holidays: Holiday[]; // New prop
@@ -68,7 +69,7 @@ const formatDateKey = (date: Date): string => {
     return `${year}-${month}-${day}`;
 };
 
-const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, onDeleteBatch, wards, employees, currentUser, records = [], holidays, onCreateContract, onHandOverRecords, onBulkUpdate, initialTab = 'create', rolePermissions, departmentPermissions, onReturnResult, onSyncPending }) => {
+const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, onDeleteBatch, wards, employees, users = [], currentUser, records = [], holidays, onCreateContract, onHandOverRecords, onBulkUpdate, initialTab = 'create', rolePermissions, departmentPermissions, onReturnResult, onSyncPending }) => {
   const [viewMode, setViewMode] = useState<'create' | 'list' | 'update' | 'vphc' | 'search' | 'extend'>(initialTab === 'bulk' as any ? 'create' : initialTab as any);
 
   const canCreate = !currentUser || isViewAllowedForUser(currentUser, employees || [], 'receive_sub_create', rolePermissions, departmentPermissions);
@@ -303,9 +304,9 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, onDelet
         HEN_TRA_FULL: deadlineFullString,
         NGAY_HEN_FULL: deadlineFullString,
         
-        NGUOI_NHAN: val(getReceiptReceiverName(dataToUse, employees, undefined, currentUser)), 
-        CAN_BO: val(getReceiptReceiverName(dataToUse, employees, undefined, currentUser)),
-        USER: val(getReceiptReceiverName(dataToUse, employees, undefined, currentUser)),
+        NGUOI_NHAN: val(getReceiptReceiverName(dataToUse, employees, users, currentUser)), 
+        CAN_BO: val(getReceiptReceiverName(dataToUse, employees, users, currentUser)),
+        USER: val(getReceiptReceiverName(dataToUse, employees, users, currentUser)),
         
         NOI_DUNG: val(dataToUse.content),
         CONTENT: val(dataToUse.content),
@@ -469,6 +470,7 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, onDelet
               onClose={() => setSystemReceiptData(null)} 
               currentUser={currentUser}
               employees={employees}
+              users={users}
               onCreateContract={onCreateContract}
           />
       )}

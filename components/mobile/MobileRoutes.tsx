@@ -37,7 +37,7 @@ interface MobileRoutesProps {
   onDeleteAllData: () => Promise<boolean>;
   onHolidaysChanged: () => void;
 
-  handleQuickUpdate?: (id: string, field: keyof RecordFile, value: any) => Promise<void>;
+  handleQuickUpdate?: (id: string, field: keyof RecordFile, value: any, extraUpdates?: any) => Promise<void>;
   handleAddOrUpdateRecord?: (record: RecordFile) => Promise<RecordFile | null>;
   onCreateLiquidation?: (record: RecordFile) => void;
   onMapCorrection?: (record: RecordFile) => void;
@@ -99,9 +99,9 @@ const MobileRoutes: React.FC<MobileRoutesProps> = (props) => {
           isDirector={isDirector}
           users={users}
           employees={employees}
-          onUpdateStatus={(r, status) => {
+          onUpdateStatus={(r, status, options) => {
             if (props.handleQuickUpdate) {
-              props.handleQuickUpdate(r.id, 'status', status);
+              props.handleQuickUpdate(r.id, 'status', status, options);
             }
           }}
           onUpdateRecord={props.handleAddOrUpdateRecord}

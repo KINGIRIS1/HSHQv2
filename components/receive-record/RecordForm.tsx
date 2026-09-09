@@ -245,7 +245,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
         ...formData, 
         id: formData.id || Math.random().toString(36).substr(2, 9), 
         status: formData.status || RecordStatus.RECEIVED,
-        receivedBy: formData.receivedBy || currentUser.employeeId 
+        receivedBy: formData.receivedBy || currentUser?.employeeId || currentUser?.name || currentUser?.username || '' 
     } as RecordFile;
     const savedRecord = await onSave(recordToSave);
     setLoading(false);

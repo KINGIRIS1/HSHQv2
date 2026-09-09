@@ -296,8 +296,8 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
       return;
     }
     const finalData = { ...formData };
-    if (!finalData.receivedBy && currentUser?.employeeId) {
-        finalData.receivedBy = currentUser.employeeId;
+    if (!finalData.receivedBy && currentUser) {
+        finalData.receivedBy = currentUser.employeeId || currentUser.name || currentUser.username || '';
     }
     
     // Chuỗi tiến trình chuẩn bao gồm cả các bước đo thực địa và biên tập bản đồ
@@ -474,11 +474,11 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
           if (newIdx < statusFlow.indexOf(RecordStatus.PENDING_SIGN)) {
             rollbackFields.submissionDate = '';
             rollbackFields.submittedTo = '';
-            rollbackFields.checkedDate = '';
-            rollbackFields.checkedBy = '';
           }
           if (newIdx < statusFlow.indexOf(RecordStatus.PENDING_CHECK)) {
             rollbackFields.pendingCheckDate = '';
+            rollbackFields.checkedDate = '';
+            rollbackFields.checkedBy = '';
           }
           if (newIdx < statusFlow.indexOf(RecordStatus.COMPLETED_WORK)) {
             rollbackFields.completedWorkDate = '';

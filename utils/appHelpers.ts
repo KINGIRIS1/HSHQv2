@@ -1293,6 +1293,9 @@ export function syncRecordStatusTransition(
             updates.completedWorkDate = options?.customDates?.completedWorkDate || currentRecord.completedWorkDate || effectiveTargetDate;
         } else if (newStatus === RecordStatus.PENDING_CHECK) {
             updates.pendingCheckDate = options?.customDates?.pendingCheckDate || currentRecord.pendingCheckDate || effectiveTargetDate;
+            if (options?.checkedBy) {
+                updates.checkedBy = options.checkedBy;
+            }
             // Backfill survey tracking if missing
             if (!currentRecord.surveyorId && (currentRecord.assignedTo || updates.assignedTo)) {
                 updates.surveyorId = currentRecord.assignedTo || updates.assignedTo;
@@ -1390,29 +1393,55 @@ export function deduplicateRecords<T extends { id?: string }>(records: T[]): T[]
 }
 
 /**
- * Lấy tên người tiếp nhận hiển thị trên Biên nhận / Giấy tiếp nhận hồ sơ:
- * 1. Nếu hồ sơ đã từng được gia hạn (Hồ sơ gia hạn): Lấy tên cán bộ thực hiện thao tác gia hạn (lần gia hạn gần nhất).
- * 2. Nếu hồ sơ thông thường (không gia hạn): Cố định theo người tiếp nhận hồ sơ đầu tiên (từ statusLogs lúc RECEIVED, hoặc receivedBy/created_by ban đầu).
- * 3. Fallback: Nếu là hồ sơ mới tạo chưa lưu, lấy currentUser.
+ * Lấy tên người tiếp nhận hiển thị trên Biên nhận / Giấy tiếp nhận hồ sơ / Phiếu kiểm soát:
+ * 1. Điều kiện 1 (Hồ sơ đã từng gia hạn): Lấy tên cán bộ thực hiện thao tác gia hạn (lần gia hạn mới nhất).
+ * 2. Điều kiện 2 (Hồ sơ thông thường): Lấy tên người tiếp nhận hồ sơ ban đầu (từ statusLogs lúc RECEIVED, hoặc receivedBy/created_by ban đầu).
+ * 3. Nếu KHÔNG THỎA MÃN 2 điều kiện trên: Tuyệt đối ĐỂ TRỐNG (trả về chuỗi rỗng "").
+ *    Không tự động gán tài khoản đang xem/in, không dùng tên mặc định.
  */
 export function getReceiptReceiverName(
     record: Partial<RecordFile> | null | undefined,
     employees?: Employee[],
     users?: User[],
-    fallbackCurrentUser?: User | null
+    _fallbackCurrentUser?: User | null
 ): string {
     if (!record) {
-        return fallbackCurrentUser?.name || fallbackCurrentUser?.username || '';
+        return '';
     }
+
+    const customerNameTrimmed = record.customerName?.trim().toLowerCase();
+    const authByTrimmed = record.authorizedBy?.trim().toLowerCase();
+
+    const isCustomerOrCitizen = (name: string | null | undefined): boolean => {
+        if (!name) return false;
+        const low = name.trim().toLowerCase();
+        if (!low) return false;
+        if (customerNameTrimmed && (low === customerNameTrimmed || low.includes(customerNameTrimmed) || customerNameTrimmed.includes(low))) {
+            return true;
+        }
+        if (authByTrimmed && (low === authByTrimmed || low.includes(authByTrimmed) || authByTrimmed.includes(low))) {
+            return true;
+        }
+        return false;
+    };
 
     const resolvePersonName = (identifier: string | null | undefined): string => {
         if (!identifier) return '';
         const trimmed = String(identifier).trim();
         if (!trimmed) return '';
 
+        // Loại trừ tuyệt đối nếu trùng với tên chủ hồ sơ hoặc người nộp ủy quyền
+        if (isCustomerOrCitizen(trimmed)) {
+            return '';
+        }
+
         // Kiểm tra trong danh sách nhân viên (theo id hoặc name)
         if (employees && employees.length > 0) {
-            const emp = employees.find(e => e.id === trimmed || e.name?.toLowerCase() === trimmed.toLowerCase());
+            const emp = employees.find(e => 
+                e.id === trimmed || 
+                e.name?.toLowerCase() === trimmed.toLowerCase() ||
+                (trimmed.length > 4 && e.name && trimmed.toLowerCase().includes(e.name.toLowerCase()))
+            );
             if (emp && emp.name) return emp.name;
         }
 
@@ -1422,15 +1451,17 @@ export function getReceiptReceiverName(
                 u.id === trimmed || 
                 u.employeeId === trimmed || 
                 u.username?.toLowerCase() === trimmed.toLowerCase() || 
-                u.name?.toLowerCase() === trimmed.toLowerCase()
+                u.name?.toLowerCase() === trimmed.toLowerCase() ||
+                (trimmed.length > 4 && u.name && trimmed.toLowerCase().includes(u.name.toLowerCase()))
             );
-            if (usr && usr.name) return usr.name;
+            if (usr && (usr.name || usr.username)) return usr.name || usr.username;
         }
 
-        return trimmed;
+        // Chỉ công nhận cán bộ chính thức trong hệ thống - không tự ý trả về tên ngoài danh sách
+        return '';
     };
 
-    // --- BƯỚC 1: KIỂM TRA HỒ SƠ CÓ GIA HẠN KHÔNG ---
+    // --- ĐIỀU KIỆN 1: KIỂM TRA HỒ SƠ CÓ GIA HẠN KHÔNG ---
     const allNotesText = `${record.privateNotes || ''}\n${record.notes || ''}`;
     if (allNotesText.toLowerCase().includes('gia hạn') || allNotesText.toLowerCase().includes('gia han')) {
         const lines = allNotesText.split('\n').reverse(); // Duyệt từ dưới lên để lấy lần gia hạn mới nhất
@@ -1458,14 +1489,14 @@ export function getReceiptReceiverName(
         }
     }
 
-    // --- BƯỚC 2: HỒ SƠ KHÔNG GIA HẠN -> CỐ ĐỊNH NGƯỜI TIẾP NHẬN ĐẦU TIÊN ---
+    // --- ĐIỀU KIỆN 2: HỒ SƠ THÔNG THƯỜNG -> LẤY NGƯỜI TIẾP NHẬN BAN ĐẦU ---
     // A. Kiểm tra statusLogs xem ai là người tiếp nhận hồ sơ ban đầu
     if (record.statusLogs && Array.isArray(record.statusLogs) && record.statusLogs.length > 0) {
         const receivedLog = record.statusLogs.find(l => 
             l.newStatus === RecordStatus.RECEIVED || 
             l.note?.toLowerCase().includes('tiếp nhận') || 
             l.note?.toLowerCase().includes('nhận hồ sơ')
-        ) || record.statusLogs[0];
+        );
         
         if (receivedLog && receivedLog.changedBy) {
             const resolved = resolvePersonName(receivedLog.changedBy);
@@ -1485,8 +1516,8 @@ export function getReceiptReceiverName(
         if (resolved) return resolved;
     }
 
-    // C. Fallback: currentUser nếu hồ sơ chưa có thông tin
-    return fallbackCurrentUser?.name || fallbackCurrentUser?.username || '';
+    // C. Nếu không thỏa mãn 2 điều kiện trên: Tuyệt đối để trống
+    return '';
 }
 
 

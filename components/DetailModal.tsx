@@ -975,11 +975,19 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                                     label="TRÌNH KIỂM TRA" 
                                     icon={Send}
                                     colorClass={{text: 'text-orange-700', border: 'border-orange-600', bg: 'bg-orange-600'}}
-                                    subText={record.checkedBy ? (() => {
-                                        const checker = employees.find(e => e.id === record.checkedBy || e.name === record.checkedBy);
-                                        if (!checker) return record.checkedBy;
-                                        return `${checker.name} (${checker?.position || 'Người kiểm tra'})`;
-                                    })() : undefined}
+                                    subText={(() => {
+                                        if (record.checkedBy) {
+                                            const checker = employees.find(e => e.id === record.checkedBy || e.name === record.checkedBy) ||
+                                                          users.find(u => u.employeeId === record.checkedBy || u.id === record.checkedBy || u.name === record.checkedBy);
+                                            const name = checker?.name || record.checkedBy;
+                                            const pos = (checker as any)?.position || 'Người kiểm tra';
+                                            return `${name} (${pos})`;
+                                        }
+                                        if (isPendingCheckActive) {
+                                            return 'Chờ phân công kiểm tra';
+                                        }
+                                        return undefined;
+                                    })()}
                                 />
                             )}
 

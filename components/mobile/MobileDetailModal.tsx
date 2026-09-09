@@ -743,12 +743,18 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                     label="TRÌNH KIỂM TRA" 
                     icon={Send}
                     colorClass={{text: 'text-orange-600', border: 'border-orange-600', bg: 'bg-orange-600'}}
-                    subText={record.checkedBy ? (() => {
-                        const checker = employees.find(e => e.id === record.checkedBy || e.name === record.checkedBy);
-                        const userChecker = users.find(u => u.employeeId === record.checkedBy || u.id === record.checkedBy || u.name === record.checkedBy);
-                        const name = checker?.name || userChecker?.name || record.checkedBy;
-                        return `${name} (${checker?.position || 'Người kiểm tra'})`;
-                    })() : undefined}
+                    subText={(() => {
+                        if (record.checkedBy) {
+                            const checker = employees.find(e => e.id === record.checkedBy || e.name === record.checkedBy);
+                            const userChecker = users.find(u => u.employeeId === record.checkedBy || u.id === record.checkedBy || u.name === record.checkedBy);
+                            const name = checker?.name || userChecker?.name || record.checkedBy;
+                            return `${name} (${checker?.position || (userChecker as any)?.position || 'Người kiểm tra'})`;
+                        }
+                        if (isPendingCheckActive) {
+                            return 'Chờ phân công kiểm tra';
+                        }
+                        return undefined;
+                    })()}
                   />
                 )}
 

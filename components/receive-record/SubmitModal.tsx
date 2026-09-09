@@ -30,26 +30,35 @@ const SubmitModal: React.FC<SubmitModalProps> = ({ isOpen, onClose, records, onC
             const pos = emp.position?.toLowerCase() || '';
             
             const isArchiveType = records.some(r => isArchiveRecordType(r.recordType));
-            const isLeader = pos.includes('tổ trưởng') || pos.includes('tổ phó');
+            const isLeader = pos.includes('tổ trưởng') || pos.includes('tổ phó') || pos.includes('trưởng') || pos.includes('phó') || pos.includes('phụ trách');
             
             if (isArchiveType) {
                 const isLuuTru = dept.includes('lưu trữ') || dept.includes('thông tin');
-                return isLuuTru && isLeader;
+                return isLuuTru && (isLeader || u.role === UserRole.ADMIN || u.role === UserRole.SUBADMIN || u.role === UserRole.TEAM_LEADER);
             } else {
-                const isDoDac = dept.includes('đo đạc');
-                return isDoDac && isLeader;
+                const isDoDac = dept.includes('đo đạc') || dept.includes('kỹ thuật');
+                return isDoDac && (isLeader || u.role === UserRole.ADMIN || u.role === UserRole.SUBADMIN || u.role === UserRole.TEAM_LEADER);
             }
         } else {
             // Chế độ trình ký: CHỈ Giám đốc, Phó giám đốc
             const pos = emp.position?.toLowerCase() || '';
             const dept = emp.department?.toLowerCase() || '';
             
-            const isDirectorPos = pos.includes('giám đốc') || pos.includes('phó giám đốc');
+            const isDirectorPos = pos.includes('giám đốc') || pos.includes('phó giám đốc') || pos.includes('lãnh đạo');
             const isDirectorDept = dept.includes('ban giám đốc') || dept.includes('ban lãnh đạo');
             
-            return isDirectorPos || isDirectorDept;
+            return isDirectorPos || isDirectorDept || u.role === UserRole.ADMIN || u.role === UserRole.SUBADMIN;
         }
     });
+
+    // Dự phòng an toàn: nếu bộ lọc quá khắt khe không ra ai, lấy tất cả nhân sự có tài khoản hợp lệ
+    if (targetUsers.length === 0) {
+        targetUsers = users.filter((u: User) => {
+            if (!u.employeeId) return false;
+            const emp = employees.find(e => e.id === u.employeeId);
+            return !!emp;
+        });
+    }
 
     if (!isOpen) return null;
 

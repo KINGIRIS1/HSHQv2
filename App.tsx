@@ -592,12 +592,13 @@ function App() {
       });
   };
 
-  const getUpdatesForStatusChange = (newStatus: RecordStatus, customDateStr?: string, existingRecord?: Partial<RecordFile>) => {
+  const getUpdatesForStatusChange = (newStatus: RecordStatus, customDateStr?: string, existingRecord?: Partial<RecordFile>, options?: any) => {
       const targetDateStr = customDateStr || new Date().toISOString();
       const synced = syncRecordStatusTransition(existingRecord || {}, newStatus, {
           userName: currentUser?.name || currentUser?.username || 'Hệ thống',
           userId: currentUser?.id,
-          targetDate: targetDateStr
+          targetDate: targetDateStr,
+          ...(options || {})
       });
       return synced;
   };
@@ -773,22 +774,25 @@ function App() {
       });
   };
 
-  const handleQuickUpdate = useCallback(async (id: string, field: keyof RecordFile, value: string) => {
+  const handleQuickUpdate = useCallback(async (id: string, field: keyof RecordFile, value: string, extraUpdates?: any) => {
       const record = records.find(r => r.id === id); 
       if (!record) return;
 
       const nowStr = new Date().toISOString();
-      let updates: any = { [field]: value };
+      let updates: any = { [field]: value, ...(extraUpdates || {}) };
       
       if (field === 'status') {
-          updates = getUpdatesForStatusChange(value as RecordStatus);
-          updates.statusLogs = createStatusLog(record, value, 'Cập nhật trạng thái nhanh');
+          updates = { ...getUpdatesForStatusChange(value as RecordStatus, undefined, record, extraUpdates), ...(extraUpdates || {}) };
+          updates.statusLogs = createStatusLog(record, value, extraUpdates?.logNote || 'Cập nhật trạng thái');
           
           if (value === RecordStatus.PENDING_SIGN) {
               updates.completedWorkDate = record.completedWorkDate || nowStr;
               updates.checkedDate = record.checkedDate || nowStr;
           } else if (value === RecordStatus.PENDING_CHECK) {
               updates.completedWorkDate = record.completedWorkDate || nowStr;
+              if (extraUpdates?.checkedBy) {
+                  updates.checkedBy = extraUpdates.checkedBy;
+              }
           }
           
           if (value === RecordStatus.REJECTED || value === RecordStatus.WITHDRAWN) {

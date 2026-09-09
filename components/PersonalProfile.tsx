@@ -2136,16 +2136,11 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
           setIsSubmitCheckModalOpen(false);
           setSubmitTargetRecords([]);
 
-          // 2. Cập nhật Optimistic UI ngay lập tức
-          targets.forEach((record) => {
-            onUpdateStatus(record, RecordStatus.PENDING_CHECK);
-          });
-
           try {
             const nowIso = new Date().toISOString();
             let hasArchive = false;
 
-            // 3. Xử lý đồng thời (parallel) toàn bộ hồ sơ trong nền
+            // 2. Xử lý đồng thời (parallel) toàn bộ hồ sơ trong nền với đầy đủ checkedBy
             await Promise.all(
               targets.map(async (record) => {
                 if (isArchiveRecordType(record.recordType)) {
@@ -2194,6 +2189,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                   if (onUpdateRecord) {
                     return onUpdateRecord(updatedRecord);
                   } else {
+                    onUpdateStatus(record, RecordStatus.PENDING_CHECK, { checkedBy: checkerId });
                     return updateRecordApi(updatedRecord);
                   }
                 }

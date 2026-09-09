@@ -125,6 +125,7 @@ interface AppRoutesProps {
     id: string,
     field: keyof RecordFile,
     value: string,
+    extraUpdates?: any,
   ) => void;
   handleUpdateCurrentAccount: (data: any) => Promise<boolean>;
   onOpenCloudInspector?: () => void;
@@ -1492,8 +1493,8 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
           isDirector={isDirector}
           users={users}
           employees={employees}
-          onUpdateStatus={(r, status) =>
-            props.handleQuickUpdate(r.id, "status", status)
+          onUpdateStatus={(r, status, options) =>
+            props.handleQuickUpdate(r.id, "status", status, options)
           }
           onUpdateRecord={props.handleAddOrUpdateRecord}
           onViewRecord={props.handleViewRecord}
@@ -1516,6 +1517,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
           onDeleteBatch={props.handleBatchDeleteRecords}
           wards={wards}
           employees={employees}
+          users={users}
           currentUser={currentUser}
           records={records}
           holidays={holidays}
