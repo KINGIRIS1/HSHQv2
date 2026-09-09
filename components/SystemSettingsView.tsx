@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Database, AlertTriangle, Cloud, Loader2, CheckCircle, Save, Globe, Calendar, Plus, Trash2, ShieldAlert, Key, FolderArchive, Upload, Download, RefreshCw, FolderOpen, LayoutDashboard, SlidersHorizontal, Eye, EyeOff, ArrowLeft, ArrowRight, ChevronUp, ChevronDown, Search, RotateCcw, FileSpreadsheet, Clock, CheckCircle2 } from 'lucide-react';
 import { Holiday, UserRole, RolePermissions, DepartmentPermissions, DEFAULT_ROLE_PERMISSIONS, AVAILABLE_PERMISSIONS, Employee, RecordStatus, User, RecordFile } from '../types';
 import { fetchHolidays, saveHolidays, testDatabaseConnection, saveUpdateInfo, fetchUpdateInfo, getSystemSetting, saveSystemSetting, fetchSystemEvents } from '../services/api';
-import { fetchRecords } from '../services/apiRecords';
+import { fetchRecords, updateRecordApi } from '../services/apiRecords';
 import { APP_VERSION, DEFAULT_HOLIDAYS, STATUS_LABELS } from '../constants';
 import { confirmAction, calculateDeadlineHelper, matchDepartmentKey } from '../utils/appHelpers';
 import { createFullBackupData, downloadBackupAsFile, saveBackupToServer, restoreFullBackupToSupabase } from '../services/backupService';
@@ -167,6 +167,100 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
   const [isExecutingExcelBackup, setIsExecutingExcelBackup] = useState(false);
   const [lastExcelBackupTimestamp, setLastExcelBackupTimestamp] = useState<number | null>(null);
   const [excelBackupFeedback, setExcelBackupFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  // Date fixing utility states
+  const [isScanningDates, setIsScanningDates] = useState(false);
+  const [mismatchedRecords, setMismatchedRecords] = useState<{ record: RecordFile; extractedDate: string }[]>([]);
+  const [scanPage, setScanPage] = useState(1);
+  const scanPageSize = 10;
+  const [isFixingDates, setIsFixingDates] = useState(false);
+  const [fixProgress, setFixProgress] = useState(0);
+  const [fixMessage, setFixMessage] = useState('');
+
+  const extractDateFromCode = (code: string): string | null => {
+    if (!code) return null;
+    const match = code.match(/(?:^|[^\d])(\d{2})(\d{2})(\d{2})-?/);
+    if (match) {
+      const yy = parseInt(match[1], 10);
+      const mm = parseInt(match[2], 10);
+      const dd = parseInt(match[3], 10);
+      if (mm >= 1 && mm <= 12 && dd >= 1 && dd <= 31) {
+        const fullYear = yy < 50 ? 2000 + yy : 1900 + yy;
+        const formattedMonth = String(mm).padStart(2, '0');
+        const formattedDay = String(dd).padStart(2, '0');
+        return `${fullYear}-${formattedMonth}-${formattedDay}`;
+      }
+    }
+    return null;
+  };
+
+  const handleScanMismatchedDates = () => {
+    if (!records || records.length === 0) {
+      alert('Không có dữ liệu hồ sơ để quét.');
+      return;
+    }
+    setIsScanningDates(true);
+    setTimeout(() => {
+      const list: { record: RecordFile; extractedDate: string }[] = [];
+      records.forEach(r => {
+        const extDate = extractDateFromCode(r.code);
+        if (extDate) {
+          const currentReceived = (r.receivedDate || '').split('T')[0];
+          if (currentReceived !== extDate) {
+            list.push({ record: r, extractedDate: extDate });
+          }
+        }
+      });
+      setMismatchedRecords(list);
+      setScanPage(1);
+      setIsScanningDates(false);
+    }, 300);
+  };
+
+  const handleBatchFixDates = async (targetList?: { record: RecordFile; extractedDate: string }[]) => {
+    const listToFix = targetList || mismatchedRecords;
+    if (listToFix.length === 0) {
+      alert('Không có hồ sơ nào cần sửa.');
+      return;
+    }
+    if (!window.confirm(`Bạn có chắc chắn muốn sửa ngày tiếp nhận và ngày giao nhân viên cho ${listToFix.length} hồ sơ dựa theo mã hồ sơ?`)) {
+      return;
+    }
+
+    setIsFixingDates(true);
+    setFixProgress(0);
+    setFixMessage('Đang chuẩn bị cập nhật...');
+
+    let successCount = 0;
+    for (let i = 0; i < listToFix.length; i++) {
+      const item = listToFix[i];
+      const pct = Math.round(((i + 1) / listToFix.length) * 100);
+      setFixProgress(pct);
+      setFixMessage(`Đang xử lý ${i + 1}/${listToFix.length} (Mã: ${item.record.code})...`);
+
+      const updatedRecord: RecordFile = {
+        ...item.record,
+        receivedDate: item.extractedDate,
+        assignedDate: item.extractedDate
+      };
+
+      try {
+        await updateRecordApi(updatedRecord);
+        successCount++;
+      } catch (e) {
+        console.error("Error fixing record date:", item.record.code, e);
+      }
+
+      if (i % 5 === 0) {
+        await new Promise(r => setTimeout(r, 20));
+      }
+    }
+
+    setIsFixingDates(false);
+    setFixMessage(`Hoàn thành! Đã sửa thành công ${successCount}/${listToFix.length} hồ sơ.`);
+    handleScanMismatchedDates();
+    if (onHolidaysChanged) onHolidaysChanged();
+  };
 
   // Holiday States
   const [holidays, setHolidays] = useState<Holiday[]>([]);
@@ -1369,6 +1463,142 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
 
             {activeTab === 'data' && (
                 <div className="max-w-4xl mx-auto space-y-8">
+                    {/* Hộp công cụ Sửa lỗi Ngày hồ sơ theo mã yymmdd- */}
+                    <div className="border border-purple-100 rounded-[2rem] overflow-hidden bg-white shadow-xl shadow-purple-50/50">
+                        <div className="bg-purple-50 p-5 border-b border-purple-100 flex items-center justify-between flex-wrap gap-4">
+                            <h3 className="text-purple-900 font-black flex items-center gap-2 uppercase tracking-widest text-xs">
+                                <Clock size={18} className="text-purple-700" />
+                                Công cụ Rà soát & Sửa lỗi Ngày Hồ sơ (Dựa theo Mã `yymmdd-`)
+                            </h3>
+                            <button
+                                onClick={handleScanMismatchedDates}
+                                disabled={isScanningDates || isFixingDates}
+                                className="px-5 py-2.5 bg-purple-600 text-white font-black text-xs uppercase tracking-wider rounded-xl hover:bg-purple-700 transition-all flex items-center gap-2 shadow-md shadow-purple-100 disabled:opacity-50"
+                            >
+                                {isScanningDates ? <Loader2 className="animate-spin" size={15} /> : <Search size={15} />}
+                                Quét hồ sơ sai ngày
+                            </button>
+                        </div>
+                        <div className="p-6 space-y-6">
+                            <p className="text-xs text-slate-600 leading-relaxed">
+                                Công cụ này giúp rà soát toàn bộ hồ sơ trong hệ thống, tự động bóc tách ngày tháng chuẩn từ định dạng mã hồ sơ (ví dụ: <code className="bg-slate-100 px-1.5 py-0.5 rounded font-mono text-purple-700 font-bold">260907-...</code>) để khôi phục lại <strong>Ngày tiếp nhận</strong> và <strong>Ngày giao nhân viên</strong> chính xác, khắc phục tình trạng bị ghi đè ngày gần đây.
+                            </p>
+
+                            {/* Progress bar during fixing */}
+                            {isFixingDates && (
+                                <div className="bg-purple-50 border border-purple-200 rounded-2xl p-5 space-y-3">
+                                    <div className="flex items-center justify-between text-xs font-bold text-purple-900">
+                                        <span className="flex items-center gap-2">
+                                            <Loader2 size={16} className="animate-spin text-purple-600" />
+                                            {fixMessage}
+                                        </span>
+                                        <span>{fixProgress}%</span>
+                                    </div>
+                                    <div className="w-full bg-purple-200 h-2.5 rounded-full overflow-hidden">
+                                        <div className="bg-purple-600 h-full transition-all duration-300" style={{ width: `${fixProgress}%` }} />
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Scan Results */}
+                            {mismatchedRecords.length > 0 && !isFixingDates && (
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between flex-wrap gap-3 bg-amber-50 border border-amber-200 px-4 py-3 rounded-xl">
+                                        <div className="text-xs font-bold text-amber-900 flex items-center gap-2">
+                                            <AlertTriangle size={16} className="text-amber-600 shrink-0" />
+                                            Tìm thấy <strong>{mismatchedRecords.length}</strong> hồ sơ có ngày tiếp nhận khác với ngày trong mã số!
+                                        </div>
+                                        <button
+                                            onClick={() => handleBatchFixDates()}
+                                            className="px-4 py-2 bg-amber-600 text-white font-black text-xs uppercase tracking-wider rounded-lg hover:bg-amber-700 transition-all shadow-sm flex items-center gap-1.5"
+                                        >
+                                            <CheckCircle2 size={15} />
+                                            Sửa tất cả ({mismatchedRecords.length} hồ sơ)
+                                        </button>
+                                    </div>
+
+                                    {/* Paginated Table */}
+                                    <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-2xs">
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full text-left border-collapse text-xs">
+                                                <thead>
+                                                    <tr className="bg-slate-100 text-slate-700 uppercase font-black text-[10px] tracking-wider border-b border-slate-200">
+                                                        <th className="p-3.5">Mã hồ sơ</th>
+                                                        <th className="p-3.5">Tên khách hàng / Nội dung</th>
+                                                        <th className="p-3.5">Ngày nhận hiện tại</th>
+                                                        <th className="p-3.5 text-purple-700">Ngày đúng (Từ mã)</th>
+                                                        <th className="p-3.5 text-right">Thao tác</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                                                    {mismatchedRecords
+                                                        .slice((scanPage - 1) * scanPageSize, scanPage * scanPageSize)
+                                                        .map(({ record, extractedDate }) => (
+                                                            <tr key={record.id} className="hover:bg-slate-50 transition-colors">
+                                                                <td className="p-3.5 font-mono font-bold text-slate-900">{record.code}</td>
+                                                                <td className="p-3.5">
+                                                                    <div className="font-bold text-slate-900">{record.customerName || '---'}</div>
+                                                                    <div className="text-[11px] text-slate-500 truncate max-w-xs">{record.content || record.recordType}</div>
+                                                                </td>
+                                                                <td className="p-3.5 text-red-600 font-semibold">
+                                                                    {record.receivedDate ? new Date(record.receivedDate).toLocaleDateString('vi-VN') : 'Trống'}
+                                                                </td>
+                                                                <td className="p-3.5 text-purple-700 font-black">
+                                                                    {new Date(extractedDate).toLocaleDateString('vi-VN')}
+                                                                </td>
+                                                                <td className="p-3.5 text-right">
+                                                                    <button
+                                                                        onClick={() => handleBatchFixDates([{ record, extractedDate }])}
+                                                                        className="px-3 py-1.5 bg-purple-50 text-purple-700 hover:bg-purple-100 font-bold rounded-lg border border-purple-200 transition-all text-[11px]"
+                                                                    >
+                                                                        Sửa hồ sơ này
+                                                                    </button>
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+
+                                        {/* Pagination Controls */}
+                                        {mismatchedRecords.length > scanPageSize && (
+                                            <div className="bg-slate-50 px-4 py-3 border-t border-slate-200 flex items-center justify-between">
+                                                <span className="text-xs text-slate-500">
+                                                    Hiển thị {(scanPage - 1) * scanPageSize + 1} - {Math.min(scanPage * scanPageSize, mismatchedRecords.length)} trong tổng số <strong>{mismatchedRecords.length}</strong> hồ sơ lệch ngày
+                                                </span>
+                                                <div className="flex items-center gap-2">
+                                                    <button
+                                                        onClick={() => setScanPage(p => Math.max(1, p - 1))}
+                                                        disabled={scanPage === 1}
+                                                        className="px-3 py-1 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-40"
+                                                    >
+                                                        Trang trước
+                                                    </button>
+                                                    <span className="text-xs font-bold text-slate-700 px-2">
+                                                        Trang {scanPage} / {Math.ceil(mismatchedRecords.length / scanPageSize)}
+                                                    </span>
+                                                    <button
+                                                        onClick={() => setScanPage(p => Math.min(Math.ceil(mismatchedRecords.length / scanPageSize), p + 1))}
+                                                        disabled={scanPage >= Math.ceil(mismatchedRecords.length / scanPageSize)}
+                                                        className="px-3 py-1 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-40"
+                                                    >
+                                                        Trang sau
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {mismatchedRecords.length === 0 && !isScanningDates && !isFixingDates && (
+                                <div className="text-center py-8 text-slate-400 text-xs font-medium border border-dashed border-slate-200 rounded-2xl">
+                                    Nhấn nút <strong className="text-purple-700">"Quét hồ sơ sai ngày"</strong> ở trên để hệ thống kiểm tra và phát hiện các hồ sơ cần khôi phục ngày tháng.
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
                     {/* Hộp vùng nguy hiểm */}
                     <div className="border border-red-100 rounded-[2rem] overflow-hidden bg-white shadow-xl shadow-red-50/50">
                         <div className="bg-red-50 p-5 border-b border-red-100">

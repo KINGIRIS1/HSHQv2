@@ -537,34 +537,34 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                 <StatusBadge status={displayStatus} />
             </div>
             
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1.5 shrink-0">
                 {onOpenRejectReturnModal && record && (record.status === RecordStatus.PENDING_CHECK || record.status === RecordStatus.CHECKED || record.status === RecordStatus.PENDING_SIGN || record.status === RecordStatus.SIGNED) && (
                     <button
                         onClick={() => { onClose(); onOpenRejectReturnModal(record); }}
-                        className="flex items-center gap-1.5 px-2.5 py-1 bg-rose-50 border border-rose-200 text-rose-700 rounded hover:bg-rose-100 transition-colors text-xs sm:text-sm font-bold shadow-sm"
+                        className="p-1.5 text-rose-600 hover:bg-rose-50 active:bg-rose-100 rounded-lg transition-colors shrink-0 min-w-[36px] min-h-[36px] flex items-center justify-center"
                         title="Trả hồ sơ (Yêu cầu sửa / bổ sung / hủy)"
                     >
-                        <Undo2 size={16} /> Trả hồ sơ
+                        <Undo2 size={18} />
                     </button>
                 )}
 
                 {onOpenExtendModal && record && (
                     <button
                         onClick={() => { onClose(); onOpenExtendModal(record); }}
-                        className="flex items-center gap-1.5 px-2.5 py-1 bg-amber-50 border border-amber-200 text-amber-800 rounded hover:bg-amber-100 transition-colors text-xs sm:text-sm font-bold shadow-sm"
+                        className="p-1.5 text-amber-600 hover:bg-amber-50 active:bg-amber-100 rounded-lg transition-colors shrink-0 min-w-[36px] min-h-[36px] flex items-center justify-center"
                         title="Gia hạn ngày hẹn trả"
                     >
-                        <CalendarClock size={16} /> Gia hạn
+                        <CalendarClock size={18} />
                     </button>
                 )}
 
                 {onCreateLiquidation && record && record.recordType && (getShortRecordType(record.recordType).startsWith('2.2') || getShortRecordType(record.recordType).startsWith('2.4')) && (
                     <button
                         onClick={() => { onClose(); onCreateLiquidation(record); }}
-                        className="flex items-center gap-1.5 px-2.5 py-1 bg-white border border-gray-200 text-gray-600 rounded hover:bg-gray-50 transition-colors text-xs sm:text-sm font-medium"
+                        className="p-1.5 text-emerald-600 hover:bg-emerald-50 active:bg-emerald-100 rounded-lg transition-colors shrink-0 min-w-[36px] min-h-[36px] flex items-center justify-center"
                         title="Thanh lý HĐ"
                     >
-                        <FileCheck size={16} /> Thanh lý HĐ
+                        <FileCheck size={18} />
                     </button>
                 )}
 
@@ -578,10 +578,10 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                             }
                             setIsAnnexModalOpen(true);
                         }}
-                        className="flex items-center gap-1.5 px-2.5 py-1 bg-white border border-rose-200 text-rose-600 rounded hover:bg-rose-50 transition-colors text-xs sm:text-sm font-medium"
+                        className="p-1.5 text-indigo-600 hover:bg-indigo-50 active:bg-indigo-100 rounded-lg transition-colors shrink-0 min-w-[36px] min-h-[36px] flex items-center justify-center"
                         title="In phụ lục hợp đồng"
                     >
-                        <FileDown size={16} /> Phụ lục
+                        <FileDown size={18} />
                     </button>
                 )}
 
@@ -589,29 +589,29 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                     <button 
                         onClick={handlePrintReceipt}
                         disabled={isProcessing}
-                        className="flex items-center gap-1.5 px-2.5 py-1 bg-white border border-blue-200 text-blue-600 rounded hover:bg-blue-50 transition-colors text-xs sm:text-sm font-medium disabled:opacity-50"
+                        className="p-1.5 text-blue-600 hover:bg-blue-50 active:bg-blue-100 rounded-lg transition-colors shrink-0 min-w-[36px] min-h-[36px] flex items-center justify-center disabled:opacity-50"
+                        title="In biên nhận"
                     >
-                        {isProcessing ? <Loader2 size={16} className="animate-spin" /> : <Printer size={16} />}
-                        In biên nhận
+                        {isProcessing ? <Loader2 size={18} className="animate-spin" /> : <Printer size={18} />}
                     </button>
                 )}
                 
                 {onEdit && (
-                    <button onClick={() => { onClose(); onEdit(record); }} className="p-1.5 text-gray-400 hover:text-blue-600 transition-colors" title="Chỉnh sửa">
+                    <button onClick={() => { onClose(); onEdit(record); }} className="p-1.5 text-slate-600 hover:bg-slate-100 active:bg-slate-200 rounded-lg transition-colors shrink-0 min-w-[36px] min-h-[36px] flex items-center justify-center" title="Chỉnh sửa">
                         <Pencil size={18} />
                     </button>
                 )}
                 
                 {onDelete && (
-                    <button onClick={() => { onClose(); onDelete(record); }} className="p-1.5 text-gray-400 hover:text-red-600 transition-colors" title="Xóa">
+                    <button onClick={() => { onClose(); onDelete(record); }} className="p-1.5 text-red-500 hover:bg-red-50 active:bg-red-100 rounded-lg transition-colors shrink-0 min-w-[36px] min-h-[36px] flex items-center justify-center" title="Xóa">
                         <Trash2 size={18} />
                     </button>
                 )}
 
-                <div className="w-px h-6 bg-gray-300 mx-1 hidden sm:block"></div>
+                <div className="w-px h-6 bg-slate-200 mx-1"></div>
 
-                <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors p-1">
-                    <X size={22} />
+                <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-600 active:bg-slate-100 rounded-lg transition-colors shrink-0 min-w-[36px] min-h-[36px] flex items-center justify-center" title="Đóng">
+                    <X size={20} />
                 </button>
             </div>
         </div>
@@ -797,18 +797,6 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                                                     </p>
                                                 </div>
                                             </div>
-
-                                            {onCreateContract && !matchedContract && (
-                                                <button 
-                                                    onClick={() => {
-                                                        onCreateContract(record);
-                                                        onClose();
-                                                    }}
-                                                    className="inline-flex items-center gap-1 text-[11px] font-bold bg-indigo-600 text-white hover:bg-indigo-700 px-2.5 py-1.5 rounded-lg transition-colors shadow-sm whitespace-nowrap shrink-0"
-                                                >
-                                                    Lập HĐ mới
-                                                </button>
-                                            )}
                                         </div>
                                     )}
 
@@ -888,9 +876,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                                             <p className="text-sm font-black text-emerald-800 whitespace-nowrap truncate mt-0.5">
                                                 {record.returnedPrice !== undefined && record.returnedPrice !== null
                                                     ? record.returnedPrice.toLocaleString('vi-VN') + ' đ'
-                                                    : (record.recordType === 'Cung cấp tài liệu đất đai' 
-                                                        ? '310.000 đ' 
-                                                        : (contractPrice !== null && contractPrice !== undefined ? contractPrice.toLocaleString('vi-VN') + ' đ' : '---'))}
+                                                    : '---'}
                                             </p>
                                         </div>
 
@@ -907,27 +893,6 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                                 </div>
                             );
                         })()}
-
-                        {/* Chi tiết tách thửa */}
-                        {contractSplitItems && contractSplitItems.length > 0 && (
-                            <div className="mt-4 pt-4 border-t border-dashed border-gray-200">
-                                <span className="text-[10px] font-bold text-gray-400 block mb-2 uppercase">Chi tiết tách thửa</span>
-                                <div className="space-y-1.5 max-h-40 overflow-y-auto custom-scrollbar pr-1">
-                                    {contractSplitItems.map((item, idx) => (
-                                        <div key={idx} className="text-xs flex justify-between bg-gray-50 p-2 rounded border border-gray-100">
-                                            <span className="text-gray-700">
-                                                <span className="font-bold text-blue-600 mr-1">Thửa {idx + 1}:</span> 
-                                                <span className="font-bold">{item.area || 0} m²</span>
-                                                {item.serviceName ? <span className="text-gray-500 ml-1 italic truncate max-w-[150px] inline-block align-bottom">- {item.serviceName}</span> : ''}
-                                            </span>
-                                            <span className="font-mono font-bold text-green-700 shrink-0 ml-2">
-                                                {((item.price || 0) * (item.quantity || 0)).toLocaleString('vi-VN')} đ
-                                            </span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
 
                         {/* Ghi chú nội bộ */}
                         {record.privateNotes && (

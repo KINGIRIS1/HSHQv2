@@ -187,6 +187,7 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
                     onCreateLiquidation={props.onCreateLiquidation}
                     onCreateContract={props.onCreateContract}
                     onRefreshData={props.onRefreshData}
+                    onOpenExtendModal={props.onOpenExtendModal}
                 />
             ) : (
                 <DetailModal 

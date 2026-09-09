@@ -166,19 +166,69 @@ const RecordRow: React.FC<RecordRowProps> = ({
       case 'landPlot':
         return <td key="landPlot" className={`${cellClass} text-center font-mono text-sm font-bold text-slate-700`}>{record.landPlot || '-'}</td>;
       case 'assigned':
-        const assignedDateVal = record.fieldAssignedDate || record.officeAssignedDate || record.assignedDate;
+        const stageInfo = (() => {
+            let personId: string | null | undefined = record.assignedTo;
+            let dateVal: string | null | undefined = record.assignedDate;
+
+            switch (displayStatus) {
+                case RecordStatus.RECEIVED:
+                    personId = record.receivedBy || record.assignedTo;
+                    dateVal = record.receivedDate || record.assignedDate;
+                    break;
+                case RecordStatus.FIELD_WORK:
+                    personId = record.surveyorId || record.assignedTo;
+                    dateVal = record.fieldAssignedDate || record.surveyAssignedDate || record.assignedDate;
+                    break;
+                case RecordStatus.OFFICE_WORK:
+                    personId = record.drafterId || record.assignedTo;
+                    dateVal = record.officeAssignedDate || record.assignedDate;
+                    break;
+                case RecordStatus.PENDING_CHECK:
+                    personId = record.drafterId || record.surveyorId || record.assignedTo;
+                    dateVal = record.pendingCheckDate || record.assignedDate;
+                    break;
+                case RecordStatus.CHECKED:
+                    personId = record.checkedBy || record.assignedTo;
+                    dateVal = record.checkedDate || record.assignedDate;
+                    break;
+                case RecordStatus.PENDING_SIGN:
+                    personId = record.submittedTo || record.assignedTo;
+                    dateVal = record.submissionDate || record.assignedDate;
+                    break;
+                case RecordStatus.SIGNED:
+                case RecordStatus.HANDOVER:
+                    personId = record.authorizedBy || record.assignedTo;
+                    dateVal = record.approvalDate || record.exportDate || record.assignedDate;
+                    break;
+                case RecordStatus.RETURNED:
+                    personId = record.returnedBy || record.authorizedBy || record.assignedTo;
+                    dateVal = record.resultReturnedDate || record.approvalDate || record.assignedDate;
+                    break;
+                default:
+                    personId = record.assignedTo;
+                    dateVal = record.fieldAssignedDate || record.officeAssignedDate || record.assignedDate;
+                    break;
+            }
+
+            const emp = employees.find(e => e.id === personId || e.name === personId);
+            return {
+                name: emp ? emp.name : (personId || ''),
+                date: dateVal
+            };
+        })();
+
         return (
           <td key="assigned" className={`${cellClass} text-center`}>
-              {employee ? (
+              {stageInfo.name ? (
                   <div className="flex flex-col items-center gap-0.5">
-                      {assignedDateVal && (
-                          <span className="text-xs text-gray-500">{formatDate(assignedDateVal)}</span>
+                      {stageInfo.date && (
+                          <span className="text-xs text-gray-500">{formatDate(stageInfo.date)}</span>
                       )}
-                      <span className="text-xs text-indigo-600 font-bold bg-indigo-50 px-1.5 py-0.5 rounded break-words max-w-full leading-tight" title={employee.name}>{employee.name}</span>
+                      <span className="text-xs text-indigo-600 font-bold bg-indigo-50 px-1.5 py-0.5 rounded break-words max-w-full leading-tight" title={stageInfo.name}>{stageInfo.name}</span>
                   </div>
               ) : (
-                  assignedDateVal ? (
-                      <span className="text-sm text-gray-600">{formatDate(assignedDateVal)}</span>
+                  stageInfo.date ? (
+                      <span className="text-sm text-gray-600">{formatDate(stageInfo.date)}</span>
                   ) : '--'
               )}
           </td>

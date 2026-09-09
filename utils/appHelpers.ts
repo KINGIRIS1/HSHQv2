@@ -1053,6 +1053,7 @@ export function syncRecordStatusTransition(
     const newRank = STATUS_RANK[newStatus] ?? 0;
     const prevRank = currentRecord.status ? (STATUS_RANK[currentRecord.status] ?? 0) : 0;
     const isRollback = prevRank > newRank;
+    const isActuallyChangingStatus = prevStatus !== newStatus;
 
     if (newStatus === RecordStatus.WITHDRAWN || newStatus === RecordStatus.REJECTED) {
         updates.completedDate = options?.customDates?.completedDate || currentRecord.completedDate || targetDate;
@@ -1199,13 +1200,15 @@ export function syncRecordStatusTransition(
             }
         }
 
-        // CHỈ CẬP NHẬT NGÀY CỦA ĐÚNG BƯỚC HIỆN TẠI ĐANG THAO TÁC, KHÔNG TỰ ĐỘNG BÙ NGÀY CHO CÁC BƯỚC KHÁC
+        // BẢO TOÀN NGÀY THÁNG: Chỉ gán ngày mới khi thực sự chuyển sang trạng thái mới và ngày đó chưa có. Nếu chỉ lưu/cập nhật thông tin hồ sơ, tuyệt đối giữ nguyên ngày cũ.
+        const effectiveTargetDate = isActuallyChangingStatus ? targetDate : undefined;
+
         if (newStatus === RecordStatus.RECEIVED) {
-            updates.receivedDate = options?.customDates?.receivedDate || currentRecord.receivedDate || targetDate;
+            updates.receivedDate = options?.customDates?.receivedDate || currentRecord.receivedDate || effectiveTargetDate;
         } else if (newStatus === RecordStatus.ASSIGNED || newStatus === RecordStatus.IN_PROGRESS) {
-            updates.assignedDate = options?.customDates?.assignedDate || currentRecord.assignedDate || targetDate;
+            updates.assignedDate = options?.customDates?.assignedDate || currentRecord.assignedDate || effectiveTargetDate;
         } else if (newStatus === RecordStatus.FIELD_WORK) {
-            const fieldDate = options?.customDates?.fieldAssignedDate || options?.customDates?.assignedDate || targetDate;
+            const fieldDate = options?.customDates?.fieldAssignedDate || options?.customDates?.assignedDate || currentRecord.fieldAssignedDate || effectiveTargetDate;
             updates.fieldAssignedDate = fieldDate;
             if (!currentRecord.assignedDate && !updates.assignedDate) {
                 updates.assignedDate = fieldDate;
@@ -1214,7 +1217,7 @@ export function syncRecordStatusTransition(
                 updates.surveyorId = options?.assignedTo || currentRecord.assignedTo;
             }
         } else if (newStatus === RecordStatus.OFFICE_WORK) {
-            const officeDate = options?.customDates?.officeAssignedDate || options?.customDates?.assignedDate || targetDate;
+            const officeDate = options?.customDates?.officeAssignedDate || options?.customDates?.assignedDate || currentRecord.officeAssignedDate || effectiveTargetDate;
             updates.officeAssignedDate = officeDate;
             if (!currentRecord.assignedDate && !updates.assignedDate) {
                 updates.assignedDate = currentRecord.fieldAssignedDate || officeDate;
@@ -1226,9 +1229,9 @@ export function syncRecordStatusTransition(
                 updates.drafterId = currentRecord.assignedTo;
             }
         } else if (newStatus === RecordStatus.COMPLETED_WORK) {
-            updates.completedWorkDate = options?.customDates?.completedWorkDate || currentRecord.completedWorkDate || targetDate;
+            updates.completedWorkDate = options?.customDates?.completedWorkDate || currentRecord.completedWorkDate || effectiveTargetDate;
         } else if (newStatus === RecordStatus.PENDING_CHECK) {
-            updates.pendingCheckDate = options?.customDates?.pendingCheckDate || currentRecord.pendingCheckDate || targetDate;
+            updates.pendingCheckDate = options?.customDates?.pendingCheckDate || currentRecord.pendingCheckDate || effectiveTargetDate;
             // Backfill survey tracking if missing
             if (!currentRecord.surveyorId && (currentRecord.assignedTo || updates.assignedTo)) {
                 updates.surveyorId = currentRecord.assignedTo || updates.assignedTo;
@@ -1243,21 +1246,21 @@ export function syncRecordStatusTransition(
                 updates.officeAssignedDate = currentRecord.fieldCompletedDate || currentRecord.assignedDate || updates.assignedDate;
             }
         } else if (newStatus === RecordStatus.CHECKED) {
-            updates.checkedDate = options?.customDates?.checkedDate || currentRecord.checkedDate || targetDate;
+            updates.checkedDate = options?.customDates?.checkedDate || currentRecord.checkedDate || effectiveTargetDate;
         } else if (newStatus === RecordStatus.PENDING_SIGN) {
-            updates.submissionDate = options?.customDates?.submissionDate || currentRecord.submissionDate || targetDate;
+            updates.submissionDate = options?.customDates?.submissionDate || currentRecord.submissionDate || effectiveTargetDate;
         } else if (newStatus === RecordStatus.SIGNED) {
-            updates.approvalDate = options?.customDates?.approvalDate || currentRecord.approvalDate || targetDate;
+            updates.approvalDate = options?.customDates?.approvalDate || currentRecord.approvalDate || effectiveTargetDate;
         } else if (newStatus === RecordStatus.HANDOVER) {
-            updates.completedDate = options?.customDates?.completedDate || currentRecord.completedDate || targetDate;
-            updates.exportDate = options?.exportDate || options?.customDates?.exportDate || currentRecord.exportDate || targetDate;
+            updates.completedDate = options?.customDates?.completedDate || currentRecord.completedDate || effectiveTargetDate;
+            updates.exportDate = options?.exportDate || options?.customDates?.exportDate || currentRecord.exportDate || effectiveTargetDate;
             if (options?.exportBatch !== undefined) updates.exportBatch = options.exportBatch;
             updates.is_handover = true;
-            updates.handover_date = updates.exportDate;
+            updates.handover_date = updates.exportDate || currentRecord.handover_date;
         } else if (newStatus === RecordStatus.RETURNED) {
-            updates.resultReturnedDate = options?.resultReturnedDate || options?.customDates?.resultReturnedDate || currentRecord.resultReturnedDate || targetDate;
+            updates.resultReturnedDate = options?.resultReturnedDate || options?.customDates?.resultReturnedDate || currentRecord.resultReturnedDate || effectiveTargetDate;
             if (!updates.completedDate && !currentRecord.completedDate) {
-                updates.completedDate = updates.resultReturnedDate;
+                updates.completedDate = updates.resultReturnedDate || currentRecord.completedDate;
             }
             if (options?.receiverName) updates.receiverName = options.receiverName;
             if (options?.receiptNumber) updates.receiptNumber = options.receiptNumber;

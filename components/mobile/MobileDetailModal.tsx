@@ -29,6 +29,7 @@ interface MobileDetailModalProps {
   onCreateLiquidation?: (record: RecordFile) => void; 
   onCreateContract?: (record: Partial<RecordFile>) => void;
   onRefreshData?: () => void;
+  onOpenExtendModal?: (record: RecordFile) => void;
 }
 
 interface ParsedDocItem {
@@ -82,7 +83,7 @@ const parseOtherDocsForMobile = (raw: string | null | undefined): ParsedDocItem[
 };
 
 export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({ 
-  isOpen, onClose, record, employees, users, currentUser, onEdit, onDelete, onCreateLiquidation, onCreateContract, onRefreshData
+  isOpen, onClose, record, employees, users, currentUser, onEdit, onDelete, onCreateLiquidation, onCreateContract, onRefreshData, onOpenExtendModal
 }) => {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [previewBlob, setPreviewBlob] = useState<Blob | null>(null);
@@ -466,6 +467,20 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                 {isProcessing ? <Loader2 size={17} className="animate-spin" /> : <Printer size={17} />}
               </button>
             )}
+            {record && (
+              <button 
+                onClick={() => { 
+                  onClose(); 
+                  if (onOpenExtendModal) {
+                    onOpenExtendModal(record);
+                  }
+                }} 
+                className="p-1.5 text-amber-600 hover:bg-amber-50 active:bg-amber-100 rounded-lg transition-colors shrink-0 min-w-[36px] min-h-[36px] flex items-center justify-center" 
+                title="Gia hạn ngày hẹn"
+              >
+                <CalendarClock size={17} />
+              </button>
+            )}
             {onEdit && (
               <button 
                 onClick={() => { onClose(); onEdit(record); }} 
@@ -523,22 +538,10 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
       <div className="flex-1 overflow-y-auto bg-slate-100/70 p-2.5 sm:p-4 space-y-2.5 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))]">
         {activeTab === 'info' && (
           <div className="space-y-2.5">
-            {/* Status & Timing Banner */}
-            <div className="bg-white p-3 rounded-xl border border-slate-200/80 shadow-xs">
-              <div className="flex items-center justify-between gap-2 pb-2 border-b border-slate-100">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Trạng thái hồ sơ</span>
-                <StatusBadge status={record.status} />
-              </div>
-              <div className="grid grid-cols-2 gap-2 pt-2 text-xs">
-                <div className="bg-blue-50/50 p-2 rounded-lg border border-blue-100/60">
-                  <span className="text-[10px] text-blue-600 font-bold uppercase block">Ngày nhận</span>
-                  <span className="font-semibold text-slate-800">{formatDate(record.receivedDate)}</span>
-                </div>
-                <div className="bg-amber-50/50 p-2 rounded-lg border border-amber-100/60">
-                  <span className="text-[10px] text-amber-700 font-bold uppercase block">Hạn trả</span>
-                  <span className="font-bold text-amber-900">{formatDate(record.deadline)}</span>
-                </div>
-              </div>
+            {/* Status Banner */}
+            <div className="bg-white p-3 rounded-xl border border-slate-200/80 shadow-xs flex items-center justify-between gap-2">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Trạng thái hồ sơ</span>
+              <StatusBadge status={record.status} />
             </div>
 
             {/* Customer Info Card */}
@@ -595,12 +598,6 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                   <span className="text-[10px] text-slate-400 font-bold uppercase block">Thửa đất</span>
                   <span className="font-bold text-base text-slate-800 font-mono">{record.landPlot || '-'}</span>
                 </div>
-                {record.area && (
-                  <div className="bg-slate-50 p-2 rounded-lg border border-slate-100 text-center">
-                    <span className="text-[10px] text-slate-400 font-bold uppercase block">Diện tích</span>
-                    <span className="font-bold text-slate-800">{record.area} m²</span>
-                  </div>
-                )}
                 {record.measurementNumber && (
                   <div className="bg-slate-50 p-2 rounded-lg border border-slate-100 text-center">
                     <span className="text-[10px] text-slate-400 font-bold uppercase block">Số trích đo</span>
@@ -640,119 +637,19 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                   <span className="font-bold font-mono text-emerald-900">
                     {record.returnedPrice !== undefined && record.returnedPrice !== null
                       ? record.returnedPrice.toLocaleString('vi-VN') + ' đ'
-                      : (record.recordType === 'Cung cấp tài liệu đất đai'
-                          ? (record.price ? record.price.toLocaleString('vi-VN') + ' đ' : '310.000 đ')
-                          : (contractPrice !== null ? contractPrice.toLocaleString('vi-VN') + ' đ' : '---'))}
+                      : '---'}
                   </span>
                 </div>
-                {liquidationInfo && (
-                  <div className="flex justify-between items-center p-2 bg-orange-50/60 rounded-lg border border-orange-100">
-                    <span className="font-bold text-orange-800 text-[11px]">{liquidationInfo.content}</span>
-                    <span className="font-bold font-mono text-orange-900">{liquidationInfo.amount.toLocaleString('vi-VN')} đ</span>
-                  </div>
-                )}
               </div>
 
               {/* Hợp đồng liên kết */}
               {record.recordType && (getShortRecordType(record.recordType).startsWith('2.2') || getShortRecordType(record.recordType).startsWith('2.4')) && (
                 <div className="pt-2 border-t border-slate-100">
-                  {matchedContract ? (
-                    <div className="bg-indigo-50/70 border border-indigo-100 rounded-lg p-2.5 flex items-center justify-between gap-2">
-                      <div className="min-w-0">
-                        <span className="text-[10px] text-indigo-500 font-bold uppercase block">Hợp đồng: {matchedContract.code}</span>
-                        <span className="text-[11px] font-bold text-indigo-900 truncate block">{matchedContract.serviceType || matchedContract.contractType}</span>
-                      </div>
-                      {onCreateLiquidation && (
-                        <button 
-                          onClick={() => { onCreateLiquidation(record); onClose(); }}
-                          className="px-2.5 py-1 text-xs font-bold bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 active:scale-95 shrink-0"
-                        >
-                          Thanh lý
-                        </button>
-                      )}
+                  <div className="bg-indigo-50/70 border border-indigo-100 rounded-lg p-2.5 flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <span className="text-[10px] text-indigo-500 font-bold uppercase block">Hợp đồng số:</span>
+                      <span className="text-[11px] font-bold text-indigo-900 truncate block">{matchedContract ? matchedContract.code : 'Chưa có HĐ'}</span>
                     </div>
-                  ) : (
-                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-2 flex items-center justify-between gap-2">
-                      <span className="text-xs text-slate-500">Chưa có hợp đồng</span>
-                      <div className="flex gap-1.5 shrink-0">
-                        {onCreateContract && (
-                          <button 
-                            onClick={() => { onCreateContract(record); onClose(); }}
-                            className="px-2.5 py-1 text-xs font-bold bg-blue-600 text-white rounded-lg hover:bg-blue-700 active:scale-95"
-                          >
-                            Lập HĐ
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Quick Actions Bar */}
-            <div className="bg-white p-3 rounded-xl border border-slate-200/80 shadow-xs space-y-2">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block">Thao tác nhanh</span>
-              <div className="grid grid-cols-2 gap-2">
-                {canPrintReceipt && (
-                  <button 
-                    onClick={handlePrintReceipt}
-                    disabled={isProcessing}
-                    className="flex items-center justify-center gap-1.5 py-2 px-3 bg-purple-600 text-white font-bold text-xs rounded-lg hover:bg-purple-700 active:scale-95 transition-all shadow-xs"
-                  >
-                    {isProcessing ? <Loader2 size={14} className="animate-spin" /> : <Printer size={14} />}
-                    <span>In biên nhận</span>
-                  </button>
-                )}
-                {canPerformAction && (
-                  <button 
-                    onClick={() => setShowExtendForm(!showExtendForm)}
-                    className="flex items-center justify-center gap-1.5 py-2 px-3 bg-amber-600 text-white font-bold text-xs rounded-lg hover:bg-amber-700 active:scale-95 transition-all shadow-xs"
-                  >
-                    <CalendarClock size={14} />
-                    <span>Gia hạn ngày hẹn</span>
-                  </button>
-                )}
-              </div>
-
-              {/* Form Gia Hạn Ngày Hẹn */}
-              {showExtendForm && (
-                <div className="bg-amber-50/60 p-3 rounded-lg border border-amber-200 space-y-2 mt-2 animate-fade-in-down">
-                  <span className="text-xs font-bold text-amber-900 block">Gia hạn ngày hẹn trả kết quả</span>
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase block">Ngày hẹn mới</label>
-                    <input 
-                      type="date"
-                      value={extendDate}
-                      onChange={(e) => setExtendDate(e.target.value)}
-                      className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-amber-200"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase block">Lý do gia hạn</label>
-                    <input 
-                      type="text"
-                      placeholder="Ví dụ: Đo đạc lại hiện trường..."
-                      value={extendReason}
-                      onChange={(e) => setExtendReason(e.target.value)}
-                      className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs focus:outline-none focus:ring-2 focus:ring-amber-200"
-                    />
-                  </div>
-                  <div className="flex justify-end gap-2 pt-1">
-                    <button 
-                      onClick={() => setShowExtendForm(false)}
-                      className="px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-200 rounded-lg font-medium"
-                    >
-                      Hủy
-                    </button>
-                    <button 
-                      onClick={handleSaveExtension}
-                      disabled={isExtending}
-                      className="px-3 py-1.5 text-xs bg-amber-600 text-white font-bold rounded-lg hover:bg-amber-700 active:scale-95 flex items-center gap-1"
-                    >
-                      {isExtending ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
-                      Lưu gia hạn
-                    </button>
                   </div>
                 </div>
               )}

@@ -98,7 +98,7 @@ export const RecordSearch: React.FC<RecordSearchProps> = ({
     const filterPopoverRef = useRef<HTMLDivElement>(null);
 
     // Check admin rights for batch deletion
-    const isAdmin = currentUser?.role === UserRole.ADMIN || currentUser?.role === 'ADMIN';
+    const isAdmin = currentUser?.role === UserRole.ADMIN || (currentUser?.role as string) === 'ADMIN';
 
     // Batch delete state & ref
     const [isBatchDeleteOpen, setIsBatchDeleteOpen] = useState(false);
