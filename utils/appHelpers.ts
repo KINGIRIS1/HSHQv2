@@ -1,6 +1,6 @@
 
 import { RecordFile, RecordStatus, Employee } from '../types';
-import { DEFAULT_HOLIDAYS } from '../constants';
+import { DEFAULT_HOLIDAYS, isArchiveRecordType } from '../constants';
 
 // --- HÀM TIỆN ÍCH XỬ LÝ CHUỖI TIẾNG VIỆT ---
 export function removeVietnameseTones(str: string): string {
@@ -975,6 +975,74 @@ export function isOfficeOnlySurveyProcedure(recordType: string | null | undefine
         return true;
     }
     return false;
+}
+
+/**
+ * Tự động tính toán/nhận diện trạng thái tiến độ thực tế chính xác của hồ sơ
+ * dựa trên các mốc ngày đã có (từ cao xuống thấp), loại bỏ hoàn toàn việc bị kẹt ở trạng thái IN_PROGRESS cũ
+ */
+export function deriveActualSurveyStatus(record: Partial<RecordFile>): RecordStatus {
+    if (!record) return RecordStatus.RECEIVED;
+    
+    // Nếu hồ sơ đã bị từ chối / rút hồ sơ
+    if (record.status === RecordStatus.WITHDRAWN || record.status === RecordStatus.REJECTED) {
+        return record.status;
+    }
+
+    // 1. Đã trả kết quả (Dân đã nhận kết quả)
+    if (record.resultReturnedDate) {
+        return RecordStatus.RETURNED;
+    }
+
+    // 2. Đã giao 1 cửa / Hoàn thành xuất đợt
+    if (record.completedDate || record.exportDate) {
+        return RecordStatus.HANDOVER;
+    }
+
+    // 3. Đã ký duyệt
+    if (record.approvalDate) {
+        return RecordStatus.SIGNED;
+    }
+
+    // 4. Chờ ký duyệt (Đã trình ký)
+    if (record.submissionDate) {
+        return RecordStatus.PENDING_SIGN;
+    }
+
+    // 5. Đã kiểm tra
+    if (record.checkedDate) {
+        return RecordStatus.CHECKED;
+    }
+
+    // 6. Chờ kiểm tra (Đã trình kiểm tra)
+    if (record.pendingCheckDate) {
+        return RecordStatus.PENDING_CHECK;
+    }
+
+    // 7. Hoàn thành xử lý / Hoàn thành biên tập
+    if (record.completedWorkDate || record.officeCompletedDate) {
+        return RecordStatus.COMPLETED_WORK;
+    }
+
+    const recType = record.recordType || '';
+    const isArchive = isArchiveRecordType(recType);
+
+    // 8. Đang xử lý nội nghiệp / Biên tập bản đồ
+    if (record.officeAssignedDate || (!isArchive && isOfficeOnlySurveyProcedure(recType) && (record.assignedDate || record.assignedTo))) {
+        return RecordStatus.OFFICE_WORK;
+    }
+
+    // 9. Đo đạc thực địa
+    if (record.fieldAssignedDate || record.fieldCompletedDate || (!isArchive && (record.assignedDate || record.assignedTo))) {
+        return RecordStatus.FIELD_WORK;
+    }
+
+    // 10. Đã phân công (Lưu trữ)
+    if (isArchive && (record.assignedDate || record.assignedTo)) {
+        return RecordStatus.ASSIGNED;
+    }
+
+    return record.status || RecordStatus.RECEIVED;
 }
 
 export interface StatusTransitionOptions {

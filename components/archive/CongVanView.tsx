@@ -10,7 +10,8 @@ import AssignModal from '../AssignModal';
 import ArchiveDetailModal from './ArchiveDetailModal';
 import HandoverListModal from './HandoverListModal';
 import ExportHandoverModal from './ExportHandoverModal';
-import { STATUS_LABELS, STATUS_COLORS } from '../../constants';
+import { STATUS_LABELS, STATUS_COLORS, mapStatusToRecordStatus } from '../../constants';
+import StatusBadge from '../StatusBadge';
 import * as XLSX from 'xlsx-js-style';
 
 interface CongVanViewProps {
@@ -542,15 +543,7 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
     };
 
     const mapStatusToEnum = (s: string): RecordStatus => {
-        switch(s) {
-            case 'draft': return RecordStatus.RECEIVED;
-            case 'assigned': return RecordStatus.ASSIGNED;
-            case 'executed': return RecordStatus.COMPLETED_WORK;
-            case 'pending_sign': return RecordStatus.PENDING_SIGN;
-            case 'signed': return RecordStatus.SIGNED;
-            case 'completed': return RecordStatus.RETURNED;
-            default: return RecordStatus.RECEIVED;
-        }
+        return mapStatusToRecordStatus(s);
     };
 
     const isManager = (currentUser.role as string) === 'ADMIN' || (currentUser.role as string) === 'SUBADMIN' || (currentUser.role as string) === 'admin' || (currentUser.role as string) === 'subadmin';
@@ -790,9 +783,7 @@ const CongVanView: React.FC<CongVanViewProps> = ({ currentUser }) => {
                                     <td className="p-3 text-gray-600">{toTitleCase(r.noi_nhan_gui)}</td>
                                     {(subTab === 'all') && (
                                         <td className="p-3 text-center">
-                                            <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${STATUS_COLORS[mapStatusToEnum(r.status)]}`}>
-                                                {STATUS_LABELS[mapStatusToEnum(r.status)]}
-                                            </span>
+                                            <StatusBadge status={r.status} />
                                         </td>
                                     )}
                                     {(subTab !== 'draft') && (

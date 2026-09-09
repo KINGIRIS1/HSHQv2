@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { WifiOff, RotateCw, ShieldCheck, AlertCircle, ServerCrash } from 'lucide-react';
 import { connectionManager, ConnectionState } from '../services/connectionService';
 
@@ -7,23 +7,36 @@ interface ConnectionGuardOverlayProps {
 }
 
 const ConnectionGuardOverlay: React.FC<ConnectionGuardOverlayProps> = ({ onRestored }) => {
-    const [state, setState] = useState<ConnectionState>(connectionManager.getState());
-    const [wasOffline, setWasOffline] = useState(false);
+    const [state, setState] = useState<ConnectionState>(() => connectionManager.getState());
+    const wasOfflineRef = useRef(false);
+    const onRestoredRef = useRef(onRestored);
+    onRestoredRef.current = onRestored;
 
     useEffect(() => {
         const unsubscribe = connectionManager.subscribe((newState) => {
-            setState(newState);
-            if (!newState.isOnline) {
-                setWasOffline(true);
-            } else if (wasOffline && newState.isOnline) {
-                if (onRestored) {
-                    onRestored();
+            setState(prev => {
+                if (
+                    prev.isOnline === newState.isOnline &&
+                    prev.isChecking === newState.isChecking &&
+                    prev.reconnectCountdown === newState.reconnectCountdown &&
+                    prev.failureReason === newState.failureReason
+                ) {
+                    return prev;
                 }
-                setWasOffline(false);
+                return newState;
+            });
+
+            if (!newState.isOnline) {
+                wasOfflineRef.current = true;
+            } else if (wasOfflineRef.current && newState.isOnline) {
+                if (onRestoredRef.current) {
+                    onRestoredRef.current();
+                }
+                wasOfflineRef.current = false;
             }
         });
         return () => unsubscribe();
-    }, [wasOffline, onRestored]);
+    }, []);
 
     // Nếu đang online thì không render gì cả (hoàn toàn mở khóa tương tác)
     if (state.isOnline) {

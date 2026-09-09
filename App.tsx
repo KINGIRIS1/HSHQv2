@@ -312,7 +312,7 @@ function App() {
 
   // Tự động hủy các lựa chọn (deselect) hoặc bỏ tích (uncheck) các hồ sơ đã chọn khi chuyển tab/view
   useEffect(() => {
-    setSelectedRecordIds(new Set());
+    setSelectedRecordIds(prev => prev.size === 0 ? prev : new Set());
   }, [currentView]);
 
   // Permissions

@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { BarChart3, FileSpreadsheet, Loader2, Sparkles, Download, CalendarDays, Printer, Layout, FileText, ListFilter, CheckCircle2, Clock, AlertTriangle, Settings, Key, X, Save, MapPin, UserCheck, ChevronLeft, ChevronRight, PieChart, CheckCircle, Ruler, FolderArchive, CalendarRange, DollarSign } from 'lucide-react';
 import { RecordFile, RecordStatus, Employee, User } from '../types';
-import { getNormalizedWard, STATUS_LABELS, getShortRecordType, isArchiveRecordType } from '../constants';
+import { getNormalizedWard, STATUS_LABELS, getShortRecordType, isArchiveRecordType, mapStatusToRecordStatus } from '../constants';
 import { isRecordOverdue, removeVietnameseTones, isRecordApproaching, parseSafeDate, cleanSyncNotes } from '../utils/appHelpers';
 import { saveGeminiKey, getGeminiKey } from '../services/geminiService';
 import { fetchArchiveRecords } from '../services/apiArchive';
@@ -170,15 +170,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                     const all = [...saoluc, ...vaoso, ...congvan];
                     
                     const mapStatus = (s: string): RecordStatus => {
-                        switch(s) {
-                            case 'draft': return RecordStatus.RECEIVED;
-                            case 'assigned': return RecordStatus.ASSIGNED;
-                            case 'executed': return RecordStatus.COMPLETED_WORK;
-                            case 'pending_sign': return RecordStatus.PENDING_SIGN;
-                            case 'signed': return RecordStatus.SIGNED;
-                            case 'completed': return RecordStatus.RETURNED;
-                            default: return RecordStatus.RECEIVED;
-                        }
+                        return mapStatusToRecordStatus(s);
                     };
 
                     const mapped: RecordFile[] = all.map(r => {
@@ -870,7 +862,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                                                     isOverdue ? 'bg-red-100 text-red-700 border-red-200 font-bold' :
                                                     'bg-blue-50 text-blue-700 border-blue-100'
                                                 }`}>
-                                                    {STATUS_LABELS[r.status]}
+                                                    {STATUS_LABELS[mapStatusToRecordStatus(r.status)] || r.status}
                                                 </span>
                                             </td>
 
@@ -916,7 +908,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                                                         isOverdue ? 'bg-red-100 text-red-700 border-red-200 font-bold' :
                                                         'bg-blue-50 text-blue-700 border-blue-100'
                                                     }`}>
-                                                        {STATUS_LABELS[r.status]}
+                                                        {STATUS_LABELS[mapStatusToRecordStatus(r.status)] || r.status}
                                                     </span>
                                                 </div>
 

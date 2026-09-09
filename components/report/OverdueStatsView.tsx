@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { RecordFile, RecordStatus, Employee } from '../../types';
-import { getNormalizedWard, STATUS_LABELS } from '../../constants';
+import { getNormalizedWard, STATUS_LABELS, mapStatusToRecordStatus } from '../../constants';
 import { isRecordOverdue } from '../../utils/appHelpers';
 import { exportOverdueStatsToExcel } from '../../utils/excelExport';
 import { AlertTriangle, CheckCircle2, Clock, MapPin, ChevronLeft, ChevronRight, Download } from 'lucide-react';
@@ -201,7 +201,7 @@ const OverdueStatsView: React.FC<OverdueStatsViewProps> = ({ records, employees 
                                     <td className="p-3 text-gray-600 truncate max-w-[150px]" title={emp?.name}>{emp ? emp.name : '-'}</td>
                                     <td className="p-3 text-center">
                                         <span className="px-2 py-1 rounded text-xs border bg-gray-50 text-gray-600 border-gray-200">
-                                            {STATUS_LABELS[r.status as RecordStatus]}
+                                            {STATUS_LABELS[mapStatusToRecordStatus(r.status)] || r.status}
                                         </span>
                                     </td>
                                 </tr>

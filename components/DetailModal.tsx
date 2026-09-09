@@ -485,13 +485,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
   };
 
   // LOGIC HIỂN THỊ STATUS
-  const getDisplayStatus = (r: RecordFile) => {
-      if ((r.exportBatch || r.exportDate) && r.status !== RecordStatus.WITHDRAWN && r.status !== RecordStatus.RETURNED && r.status !== RecordStatus.REJECTED) {
-          return RecordStatus.HANDOVER;
-      }
-      return r.status;
-  };
-  const displayStatus = getDisplayStatus(record);
+  const displayStatus = record.status;
   const recordTypeLower = (record?.recordType || '').toLowerCase();
   const isCongVan = record?.recordType ? getShortRecordType(record.recordType) === '1.2 Công văn' : false;
 

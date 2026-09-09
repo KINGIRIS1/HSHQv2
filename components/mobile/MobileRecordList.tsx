@@ -340,7 +340,21 @@ const MobileRecordList: React.FC<MobileRecordListProps> = ({
             <>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
                 {paginatedRecords.map((record) => {
-                  const emp = record.assignedTo ? employees.find(e => e.id === record.assignedTo) : null;
+                  const activeEmpId = (() => {
+                    switch (record.status) {
+                      case RecordStatus.RECEIVED: return record.receivedBy || record.assignedTo;
+                      case RecordStatus.FIELD_WORK: return record.surveyorId || record.assignedTo;
+                      case RecordStatus.OFFICE_WORK: return record.drafterId || record.assignedTo;
+                      case RecordStatus.PENDING_CHECK: return record.checkedBy || record.drafterId || record.surveyorId || record.assignedTo;
+                      case RecordStatus.CHECKED: return record.checkedBy || record.assignedTo;
+                      case RecordStatus.PENDING_SIGN: return record.submittedTo || record.authorizedBy || record.assignedTo;
+                      case RecordStatus.SIGNED:
+                      case RecordStatus.HANDOVER: return record.authorizedBy || record.returnedBy || record.submittedTo || record.assignedTo;
+                      case RecordStatus.RETURNED: return record.returnedBy || record.authorizedBy || record.assignedTo;
+                      default: return record.assignedTo;
+                    }
+                  })();
+                  const emp = activeEmpId ? employees.find(e => e.id === activeEmpId || e.name === activeEmpId) : null;
 
                   return (
                     <div 

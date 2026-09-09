@@ -272,7 +272,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
 
   // Tự động bỏ chọn hồ sơ khi chuyển tab bàn giao
   React.useEffect(() => {
-    props.setSelectedRecordIds?.(new Set());
+    props.setSelectedRecordIds?.((prev: Set<string>) => prev.size === 0 ? prev : new Set());
   }, [props.handoverTab]);
 
   const hasPermission = React.useCallback(

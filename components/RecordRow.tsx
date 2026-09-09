@@ -2,7 +2,7 @@
 import React from 'react';
 import { RecordFile, RecordStatus, Employee, UserRole } from '../types';
 import { getNormalizedWard, getShortRecordType, getWardLabel, isArchiveRecordType } from '../constants';
-import { isRecordOverdue, isRecordApproaching, toTitleCase, formatBatchName, getBatchDisplayParts } from '../utils/appHelpers';
+import { isRecordOverdue, isRecordApproaching, toTitleCase, formatBatchName, getBatchDisplayParts, deriveActualSurveyStatus } from '../utils/appHelpers';
 import StatusBadge from './StatusBadge';
 import { CheckSquare, Square, AlertCircle, Clock, Eye, ArrowRight, Pencil, Trash2, Bell, FileCheck, Phone, Map } from 'lucide-react';
 
@@ -69,19 +69,13 @@ const RecordRow: React.FC<RecordRowProps> = ({
 
   const resultReturnedDateStr = record.resultReturnedDate ? formatDate(record.resultReturnedDate) : '';
 
-  // LOGIC MỚI: Tự động xác định trạng thái hiển thị
-  // Nếu có thông tin xuất (Batch/Date) và chưa hoàn thành (Trả/Rút/Từ chối), coi như là Đã giao 1 cửa
-  const getDisplayStatus = (r: RecordFile) => {
-      if (r.resultReturnedDate) {
-          return RecordStatus.RETURNED;
-      }
-      if ((r.exportBatch || r.exportDate) && r.status !== RecordStatus.WITHDRAWN && r.status !== RecordStatus.RETURNED && r.status !== RecordStatus.REJECTED) {
-          return RecordStatus.HANDOVER;
-      }
-      return r.status;
-  };
-  
-  const displayStatus = getDisplayStatus(record);
+  // Sử dụng trực tiếp trạng thái thực tế của hồ sơ, nếu hồ sơ mang trạng thái cũ IN_PROGRESS thì hiển thị đúng bước thực tế
+  const displayStatus = React.useMemo(() => {
+    if (record.status === RecordStatus.IN_PROGRESS || !record.status) {
+      return deriveActualSurveyStatus(record);
+    }
+    return record.status;
+  }, [record]);
 
   // Class chung cho các ô: Căn giữa cho sự cân đối, tăng padding thông thoáng hơn trên PC
   const cellClass = "p-3 md:p-3.5 align-middle text-slate-700 border-b border-slate-100/80 transition-colors duration-200";
@@ -184,20 +178,20 @@ const RecordRow: React.FC<RecordRowProps> = ({
                     dateVal = record.officeAssignedDate || record.assignedDate;
                     break;
                 case RecordStatus.PENDING_CHECK:
-                    personId = record.drafterId || record.surveyorId || record.assignedTo;
-                    dateVal = record.pendingCheckDate || record.assignedDate;
+                    personId = record.checkedBy || record.drafterId || record.surveyorId || record.assignedTo;
+                    dateVal = record.pendingCheckDate || record.completedWorkDate || record.assignedDate;
                     break;
                 case RecordStatus.CHECKED:
                     personId = record.checkedBy || record.assignedTo;
-                    dateVal = record.checkedDate || record.assignedDate;
+                    dateVal = record.checkedDate || record.pendingCheckDate || record.assignedDate;
                     break;
                 case RecordStatus.PENDING_SIGN:
-                    personId = record.submittedTo || record.assignedTo;
-                    dateVal = record.submissionDate || record.assignedDate;
+                    personId = record.submittedTo || record.authorizedBy || record.assignedTo;
+                    dateVal = record.submissionDate || record.approvalDate || record.assignedDate;
                     break;
                 case RecordStatus.SIGNED:
                 case RecordStatus.HANDOVER:
-                    personId = record.authorizedBy || record.assignedTo;
+                    personId = record.authorizedBy || record.returnedBy || record.submittedTo || record.assignedTo;
                     dateVal = record.approvalDate || record.exportDate || record.assignedDate;
                     break;
                 case RecordStatus.RETURNED:

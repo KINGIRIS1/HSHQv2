@@ -1,13 +1,15 @@
 
 import React from 'react';
 import { RecordStatus } from '../types';
-import { STATUS_LABELS, STATUS_COLORS } from '../constants';
+import { STATUS_LABELS, STATUS_COLORS, mapStatusToRecordStatus } from '../constants';
 
 interface StatusBadgeProps {
-  status: RecordStatus;
+  status: RecordStatus | string;
 }
 
 const StatusBadge: React.FC<StatusBadgeProps> = ({ status }) => {
+  const normalizedStatus = mapStatusToRecordStatus(status);
+
   // Map specific status values to customized bullet colors
   const dotColors: Record<RecordStatus, string> = {
     [RecordStatus.RECEIVED]: 'bg-gray-400',
@@ -27,10 +29,13 @@ const StatusBadge: React.FC<StatusBadgeProps> = ({ status }) => {
     [RecordStatus.REJECTED]: 'bg-rose-500',
   };
 
+  const label = STATUS_LABELS[normalizedStatus] || String(status || 'Chưa xác định');
+  const colorClass = STATUS_COLORS[normalizedStatus] || 'bg-gray-100 text-gray-800';
+
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wide border transition-all duration-200 ${STATUS_COLORS[status]} border-current/10 shadow-sm whitespace-nowrap`}>
-      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotColors[status] || 'bg-gray-400'}`} />
-      <span className="leading-none">{STATUS_LABELS[status]}</span>
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wide border transition-all duration-200 ${colorClass} border-current/10 shadow-sm whitespace-nowrap`}>
+      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotColors[normalizedStatus] || 'bg-gray-400'}`} />
+      <span className="leading-none">{label}</span>
     </span>
   );
 };

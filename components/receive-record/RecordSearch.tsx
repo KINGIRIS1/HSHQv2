@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { RecordFile, Employee, User, RecordStatus, UserRole } from '../../types';
-import { STATUS_LABELS, STATUS_COLORS, RECORD_TYPES } from '../../constants';
+import { STATUS_LABELS, STATUS_COLORS, RECORD_TYPES, mapStatusToRecordStatus } from '../../constants';
+import StatusBadge from '../StatusBadge';
 import { getNormalizedWard, getShortRecordType } from '../../constants';
 import { exportCustomRecordsToExcel } from '../../utils/excelExport';
 import { 
@@ -1194,10 +1195,7 @@ export const RecordSearch: React.FC<RecordSearchProps> = ({
                                                 case 'status':
                                                     return (
                                                         <td key="status" className="p-3 align-middle text-center">
-                                                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border ${STATUS_COLORS[r.status] || 'bg-slate-100 text-slate-800'}`}>
-                                                                <span className="w-1.5 h-1.5 rounded-full bg-current shrink-0" />
-                                                                {STATUS_LABELS[r.status] || r.status}
-                                                            </span>
+                                                            <StatusBadge status={r.status} />
                                                         </td>
                                                     );
                                                 default:

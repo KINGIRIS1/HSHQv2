@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import * as XLSX from 'xlsx-js-style';
 import { RecordFile, RecordStatus, Employee, Holiday } from '../types';
-import { RECORD_TYPES, STATUS_LABELS, STATUS_COLORS, getShortRecordType } from '../constants';
+import { RECORD_TYPES, STATUS_LABELS, STATUS_COLORS, getShortRecordType, isArchiveRecordType } from '../constants';
 import { fetchHolidays } from '../services/api';
 import { X, Upload, FileSpreadsheet, Save, Loader2, Check, RefreshCw, PlusCircle } from 'lucide-react';
 import { calculateDeadlineHelper, migrateUnbatchedRecords, isOfficeOnlySurveyProcedure, isFieldWorkProcedure } from '../utils/appHelpers';
@@ -383,16 +383,17 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
                 } else if (record.completedWorkDate) {
                     record.status = RecordStatus.COMPLETED_WORK;
                 } else if (record.assignedTo || record.assignedDate) {
-                    if (isOfficeOnlySurveyProcedure(record.recordType)) {
+                    const isArch = isArchiveRecordType(record.recordType);
+                    if (isArch) {
+                        record.status = RecordStatus.ASSIGNED;
+                    } else if (isOfficeOnlySurveyProcedure(record.recordType)) {
                         record.status = RecordStatus.OFFICE_WORK;
                         if (record.assignedTo && !record.drafterId) record.drafterId = record.assignedTo;
                         if (record.assignedDate && !record.officeAssignedDate) record.officeAssignedDate = record.assignedDate;
-                    } else if (isFieldWorkProcedure(record.recordType)) {
+                    } else {
                         record.status = RecordStatus.FIELD_WORK;
                         if (record.assignedTo && !record.surveyorId) record.surveyorId = record.assignedTo;
                         if (record.assignedDate && !record.fieldAssignedDate) record.fieldAssignedDate = record.assignedDate;
-                    } else {
-                        record.status = RecordStatus.ASSIGNED;
                     }
                 } else if (mode === 'create') {
                     record.status = RecordStatus.RECEIVED;

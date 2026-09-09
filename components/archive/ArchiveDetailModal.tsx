@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ArchiveRecord } from '../../services/apiArchive';
 import { X, MapPin, FileText, User as UserIcon, CheckCircle2, Circle, Send, FileSignature, CheckSquare, CalendarClock, Trash2, Pencil, Printer, StickyNote, Info } from 'lucide-react';
-import { STATUS_LABELS, STATUS_COLORS } from '../../constants';
+import { STATUS_LABELS, STATUS_COLORS, mapStatusToRecordStatus } from '../../constants';
 import { RecordStatus } from '../../types';
 import StatusBadge from '../StatusBadge';
 
@@ -19,15 +19,7 @@ const ArchiveDetailModal: React.FC<ArchiveDetailModalProps> = ({ isOpen, onClose
 
     // Helper to map Archive status to RecordStatus enum for labels/colors
     const mapStatus = (s: string): RecordStatus => {
-        switch(s) {
-            case 'draft': return RecordStatus.RECEIVED;
-            case 'assigned': return RecordStatus.ASSIGNED;
-            case 'executed': return RecordStatus.COMPLETED_WORK;
-            case 'pending_sign': return RecordStatus.PENDING_SIGN;
-            case 'signed': return RecordStatus.SIGNED;
-            case 'completed': return RecordStatus.RETURNED;
-            default: return RecordStatus.RECEIVED;
-        }
+        return mapStatusToRecordStatus(s);
     };
 
     const currentStatus = mapStatus(record.status);

@@ -4,7 +4,7 @@ import { RecordFile, RecordStatus, Employee, User, UserRole } from '../types';
 import AutoResizeTextarea from './AutoResizeTextarea';
 import { GROUPS, EXTENDED_RECORD_TYPES, STATUS_LABELS, SELECTABLE_STATUSES, ARCHIVE_SELECTABLE_STATUSES, SURVEY_SELECTABLE_STATUSES, getShortRecordType, getWardLabel, getNormalizedWard, isArchiveRecordType } from '../constants';
 import { X, Save, Lock, User as UserIcon, MapPin, FileText, Calendar, FileCheck, ChevronDown, ChevronUp } from 'lucide-react';
-import { calculateDeadlineHelper, getDepartmentForRecord, isProcedure2_3, syncRecordStatusTransition, getPureBatchNumber, groupEmployeesByDepartment, isFieldWorkProcedure, isOfficeOnlySurveyProcedure } from '../utils/appHelpers';
+import { calculateDeadlineHelper, getDepartmentForRecord, isProcedure2_3, syncRecordStatusTransition, getPureBatchNumber, groupEmployeesByDepartment, isFieldWorkProcedure, isOfficeOnlySurveyProcedure, deriveActualSurveyStatus } from '../utils/appHelpers';
 import { fetchContracts } from '../services/api';
 
 interface AttachedDocItem {
@@ -175,6 +175,9 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
             const rLower = String(dataToSet.recordType || '').toLowerCase();
             if ((rLower.includes('1.2') || rLower.includes('công văn') || rLower.includes('cong van') || rLower.includes('sao lục') || dataToSet.recordType === '1.1 Sao lục' || dataToSet.recordType === '1.1 CC DL ĐĐ' || dataToSet.recordType === '1.1 Sao lục hồ sơ' || dataToSet.recordType === '1.1 Cung cấp dữ liệu đất đai') && !dataToSet.price) {
                 dataToSet.price = 310000;
+            }
+            if (!dataToSet.status) {
+                dataToSet.status = RecordStatus.RECEIVED;
             }
             setFormData(dataToSet);
             setAttachedDocs(parseAttachedDocs(initialData.otherDocs));
@@ -554,7 +557,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
           const recType = updated.recordType || '';
           if (isArchiveRecordType(recType)) {
             if (updated.status === RecordStatus.RECEIVED) {
-              updated.status = RecordStatus.IN_PROGRESS;
+              updated.status = RecordStatus.ASSIGNED;
             }
           } else if (isFieldWorkProcedure(recType)) {
             if (!updated.fieldAssignedDate) {
@@ -572,7 +575,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
             }
           } else {
             if (updated.status === RecordStatus.RECEIVED) {
-              updated.status = RecordStatus.IN_PROGRESS;
+              updated.status = RecordStatus.FIELD_WORK;
             }
           }
         }
@@ -648,7 +651,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
           }
           if (updated.status === RecordStatus.RECEIVED) {
             if (isArchiveRecordType(updated.recordType || '')) {
-              updated.status = RecordStatus.IN_PROGRESS;
+              updated.status = RecordStatus.ASSIGNED;
             } else if (isFieldWorkProcedure(updated.recordType || '')) {
               updated.status = RecordStatus.FIELD_WORK;
               if (!updated.fieldAssignedDate) updated.fieldAssignedDate = updated.assignedDate;
@@ -656,7 +659,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
               updated.status = RecordStatus.OFFICE_WORK;
               if (!updated.officeAssignedDate) updated.officeAssignedDate = updated.assignedDate;
             } else {
-              updated.status = RecordStatus.IN_PROGRESS;
+              updated.status = RecordStatus.FIELD_WORK;
             }
           }
         }
@@ -763,6 +766,12 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                                         value={val(formData.status)} 
                                         onChange={(e) => handleChange('status', e.target.value)}
                                     >
+                                        {/* Nếu trạng thái hiện tại là trạng thái cũ hoặc không nằm trong danh mục chuẩn, hiển thị để tránh bị tự nhảy về Tiếp nhận mới */}
+                                        {formData.status && !(isArchive ? ARCHIVE_SELECTABLE_STATUSES : SURVEY_SELECTABLE_STATUSES).some(item => item.key === formData.status) && (
+                                            <option value={formData.status}>
+                                                {STATUS_LABELS[formData.status as RecordStatus] || formData.status} (Chưa chuẩn hóa - Vui lòng chọn lại)
+                                            </option>
+                                        )}
                                         {(isArchive ? ARCHIVE_SELECTABLE_STATUSES : SURVEY_SELECTABLE_STATUSES).map(item => (
                                             <option key={item.key} value={item.key}>{item.label}</option>
                                         ))}
@@ -1154,46 +1163,134 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                                 )}
                             </div>
 
-                            {/* NGƯỜI GIAO XỬ LÝ (1 HÀNG ĐẶT DƯỚI THÔNG TIN NGƯỜI ĐƯỢC ỦY QUYỀN) */}
-                            <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
-                                <label className="block text-xs font-bold text-gray-700 uppercase mb-2 flex items-center justify-between">
-                                    <span className="flex items-center gap-2">
-                                        <UserIcon size={14} className="text-indigo-600" />
-                                        Người giao xử lý
-                                    </span>
-                                    {formData.assignedTo && (
-                                        <span className="text-[11px] text-indigo-600 font-semibold bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
-                                            Đã phân công
-                                        </span>
-                                    )}
-                                </label>
-                                {hasAdminRights ? (
-                                    <select
-                                        id="record-assignedTo-select"
-                                        className="w-full border border-gray-300 rounded-lg px-3 py-2.5 bg-white text-sm font-medium text-gray-800 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all shadow-xs"
-                                        value={formData.assignedTo ? (employees.find(e => e.id === formData.assignedTo || e.name === formData.assignedTo)?.id || formData.assignedTo) : ''}
-                                        onChange={(e) => handleChange('assignedTo', e.target.value)}
-                                    >
-                                        <option value="">-- Chưa giao / Chọn cán bộ xử lý --</option>
-                                        {Object.entries(groupedEmployees).map(([dept, emps]) => (
-                                            <optgroup key={dept} label={dept}>
-                                                {emps.map(emp => (
-                                                    <option key={emp.id} value={emp.id}>
-                                                        {emp.name} ({emp.position || 'Cán bộ'})
-                                                    </option>
+                            {/* CÁN BỘ PHỤ TRÁCH / GIAO XỬ LÝ THEO ĐÚNG TIẾN ĐỘ & TRẠNG THÁI HIỆN TẠI */}
+                            {(() => {
+                                const currentStaffBinding = (() => {
+                                    switch (formData.status) {
+                                        case RecordStatus.RECEIVED:
+                                            return {
+                                                stageTitle: 'Bước Tiếp nhận',
+                                                label: 'Cán bộ Tiếp nhận hồ sơ',
+                                                field: 'receivedBy' as const,
+                                                value: formData.receivedBy || formData.assignedTo || '',
+                                                dateLabel: 'Ngày nhận',
+                                                dateValue: formData.receivedDate
+                                            };
+                                        case RecordStatus.FIELD_WORK:
+                                            return {
+                                                stageTitle: 'Bước Đo đạc thực địa',
+                                                label: 'Cán bộ Đo đạc thực địa (Ngoại nghiệp)',
+                                                field: 'surveyorId' as const,
+                                                value: formData.surveyorId || formData.assignedTo || '',
+                                                dateLabel: 'Ngày giao đo',
+                                                dateValue: formData.fieldAssignedDate || formData.surveyAssignedDate
+                                            };
+                                        case RecordStatus.OFFICE_WORK:
+                                            return {
+                                                stageTitle: 'Bước Biên tập bản đồ',
+                                                label: 'Cán bộ Biên tập bản đồ (Nội nghiệp)',
+                                                field: 'drafterId' as const,
+                                                value: formData.drafterId || formData.assignedTo || '',
+                                                dateLabel: 'Ngày giao biên tập',
+                                                dateValue: formData.officeAssignedDate
+                                            };
+                                        case RecordStatus.PENDING_CHECK:
+                                        case RecordStatus.CHECKED:
+                                            return {
+                                                stageTitle: formData.status === RecordStatus.CHECKED ? 'Bước Đã kiểm tra' : 'Bước Chờ kiểm tra',
+                                                label: 'Cán bộ Kiểm tra hồ sơ',
+                                                field: 'checkedBy' as const,
+                                                value: formData.checkedBy || formData.assignedTo || '',
+                                                dateLabel: 'Ngày kiểm tra',
+                                                dateValue: formData.checkedDate || formData.pendingCheckDate
+                                            };
+                                        case RecordStatus.PENDING_SIGN:
+                                        case RecordStatus.SIGNED:
+                                            return {
+                                                stageTitle: formData.status === RecordStatus.SIGNED ? 'Bước Đã ký duyệt' : 'Bước Trình ký',
+                                                label: 'Lãnh đạo Ký duyệt hồ sơ',
+                                                field: 'submittedTo' as const,
+                                                value: formData.submittedTo || formData.authorizedBy || formData.assignedTo || '',
+                                                dateLabel: 'Ngày ký duyệt',
+                                                dateValue: formData.approvalDate || formData.submissionDate
+                                            };
+                                        case RecordStatus.HANDOVER:
+                                        case RecordStatus.RETURNED:
+                                            return {
+                                                stageTitle: formData.status === RecordStatus.RETURNED ? 'Bước Đã trả kết quả' : 'Bước Giao 1 cửa',
+                                                label: 'Cán bộ Bàn giao / Trả kết quả',
+                                                field: 'returnedBy' as const,
+                                                value: formData.returnedBy || formData.authorizedBy || formData.assignedTo || '',
+                                                dateLabel: 'Ngày trả kết quả',
+                                                dateValue: formData.resultReturnedDate || formData.exportDate
+                                            };
+                                        default:
+                                            return {
+                                                stageTitle: 'Phân công thụ lý',
+                                                label: 'Cán bộ thụ lý / Được giao xử lý',
+                                                field: 'assignedTo' as const,
+                                                value: formData.assignedTo || formData.receivedBy || '',
+                                                dateLabel: 'Ngày phân công',
+                                                dateValue: formData.assignedDate
+                                            };
+                                    }
+                                })();
+
+                                const handleStaffSelectChange = (newEmpId: string) => {
+                                    const { field } = currentStaffBinding;
+                                    handleChange(field, newEmpId);
+                                    if (field === 'surveyorId' || field === 'drafterId' || field === 'assignedTo' || field === 'receivedBy') {
+                                        handleChange('assignedTo', newEmpId);
+                                    }
+                                };
+
+                                const currentEmp = employees.find(e => e.id === currentStaffBinding.value || e.name === currentStaffBinding.value);
+                                const currentEmpDisplay = currentEmp ? `${currentEmp.name} (${currentEmp.position || currentEmp.department || 'Cán bộ'})` : (currentStaffBinding.value || 'Chưa phân công');
+
+                                return (
+                                    <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
+                                        <label className="block text-xs font-bold text-gray-700 uppercase mb-2 flex flex-wrap items-center justify-between gap-2">
+                                            <span className="flex items-center gap-2">
+                                                <UserIcon size={14} className="text-indigo-600" />
+                                                {currentStaffBinding.label}
+                                            </span>
+                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                                <span className="text-[11px] text-indigo-700 font-bold bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
+                                                    {currentStaffBinding.stageTitle}
+                                                </span>
+                                                {currentStaffBinding.dateValue && (
+                                                    <span className="text-[11px] text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                                                        {currentStaffBinding.dateLabel}: {dateVal(currentStaffBinding.dateValue)}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </label>
+                                        {hasAdminRights ? (
+                                            <select
+                                                id="record-assignedTo-select"
+                                                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 bg-white text-sm font-medium text-gray-800 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all shadow-xs"
+                                                value={currentEmp ? currentEmp.id : (currentStaffBinding.value || '')}
+                                                onChange={(e) => handleStaffSelectChange(e.target.value)}
+                                            >
+                                                <option value="">-- Chưa giao / Chọn cán bộ phụ trách ({currentStaffBinding.stageTitle}) --</option>
+                                                {Object.entries(groupedEmployees).map(([dept, emps]) => (
+                                                    <optgroup key={dept} label={dept}>
+                                                        {emps.map(emp => (
+                                                            <option key={emp.id} value={emp.id}>
+                                                                {emp.name} ({emp.position || 'Cán bộ'})
+                                                            </option>
+                                                        ))}
+                                                    </optgroup>
                                                 ))}
-                                            </optgroup>
-                                        ))}
-                                    </select>
-                                ) : (
-                                    <div className="w-full border border-gray-200 rounded-lg px-3 py-2.5 bg-gray-50 text-sm font-semibold text-indigo-800">
-                                        {(() => {
-                                            const emp = employees.find(e => e.id === formData.assignedTo || e.name === formData.assignedTo);
-                                            return emp ? `${emp.name} (${emp.position || 'Cán bộ'})` : (formData.assignedTo || 'Chưa phân công');
-                                        })()}
+                                            </select>
+                                        ) : (
+                                            <div className="w-full border border-gray-200 rounded-lg px-3 py-2.5 bg-gray-50 text-sm font-semibold text-indigo-800">
+                                                {currentEmpDisplay}
+                                            </div>
+                                        )}
                                     </div>
-                                )}
-                            </div>
+                                );
+                            })()}
                         </div>
 
                          {hasAdminRights && isEdit && (

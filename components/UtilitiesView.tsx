@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { FolderCog, Loader2, CheckCircle, AlertCircle, X, Calculator, FileText, Gavel, Info, Table2, Grid, FileSpreadsheet, BookOpen, Wrench } from 'lucide-react';
+import { FolderCog, Loader2, CheckCircle, AlertCircle, X, Calculator, FileText, Gavel, Info, Table2, Grid, FileSpreadsheet, BookOpen } from 'lucide-react';
 import { User as UserType, RecordFile, NotifyFunction, NotifyType, Employee, User } from '../types';
 import { isViewAllowedForUser } from '../config/roleConfig';
 import SoanBienBanTab from './utilities/SoanBienBanTab';
@@ -11,7 +11,6 @@ import ChinhLyBienDongTab from './utilities/ChinhLyBienDongTab';
 import HoSoTachThuaTab from './utilities/HoSoTachThuaTab';
 import ChuyenDoiToBanDoTab from './utilities/ChuyenDoiToBanDoTab';
 import ExcerptManagement from './ExcerptManagement';
-import { MeasurementAndArchiveSyncTab } from './utilities/MeasurementAndArchiveSyncTab';
 import { KiemTraDoDacTab } from './utilities/KiemTraDoDacTab';
 
 interface UtilitiesViewProps {

@@ -1,11 +1,11 @@
 
-import React, { useState, useEffect } from 'react';
-import { Database, AlertTriangle, Cloud, Loader2, CheckCircle, Save, Globe, Calendar, Plus, Trash2, ShieldAlert, Key, FolderArchive, Upload, Download, RefreshCw, FolderOpen, LayoutDashboard, SlidersHorizontal, Eye, EyeOff, ArrowLeft, ArrowRight, ChevronUp, ChevronDown, Search, RotateCcw, FileSpreadsheet, Clock, CheckCircle2 } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Database, AlertTriangle, Cloud, Loader2, CheckCircle, Save, Globe, Calendar, Plus, Trash2, ShieldAlert, Key, FolderArchive, Upload, Download, RefreshCw, FolderOpen, LayoutDashboard, SlidersHorizontal, Eye, EyeOff, ArrowLeft, ArrowRight, ChevronUp, ChevronDown, Search, RotateCcw, FileSpreadsheet, Clock, CheckCircle2, Wrench } from 'lucide-react';
 import { Holiday, UserRole, RolePermissions, DepartmentPermissions, DEFAULT_ROLE_PERMISSIONS, AVAILABLE_PERMISSIONS, Employee, RecordStatus, User, RecordFile } from '../types';
 import { fetchHolidays, saveHolidays, testDatabaseConnection, saveUpdateInfo, fetchUpdateInfo, getSystemSetting, saveSystemSetting, fetchSystemEvents } from '../services/api';
 import { fetchRecords, updateRecordApi } from '../services/apiRecords';
 import { APP_VERSION, DEFAULT_HOLIDAYS, STATUS_LABELS } from '../constants';
-import { confirmAction, calculateDeadlineHelper, matchDepartmentKey } from '../utils/appHelpers';
+import { confirmAction, calculateDeadlineHelper, matchDepartmentKey, deriveActualSurveyStatus, syncRecordStatusTransition } from '../utils/appHelpers';
 import { createFullBackupData, downloadBackupAsFile, saveBackupToServer, restoreFullBackupToSupabase } from '../services/backupService';
 import { 
   getExcelBackupDirectory, 
@@ -259,6 +259,120 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
     setIsFixingDates(false);
     setFixMessage(`Hoàn thành! Đã sửa thành công ${successCount}/${listToFix.length} hồ sơ.`);
     handleScanMismatchedDates();
+    if (onHolidaysChanged) onHolidaysChanged();
+  };
+
+  // Status Normalization Utility States
+  const [isScanningStatus, setIsScanningStatus] = useState(false);
+  const [mismatchedStatusList, setMismatchedStatusList] = useState<{ record: RecordFile; derivedStatus: RecordStatus; reason: string }[]>([]);
+  const [statusScanPage, setStatusScanPage] = useState(1);
+  const statusScanPageSize = 10;
+  const [isFixingStatus, setIsFixingStatus] = useState(false);
+  const [fixStatusProgress, setFixStatusProgress] = useState(0);
+  const [fixStatusMessage, setFixStatusMessage] = useState('');
+  const [statusSearchQuery, setStatusSearchQuery] = useState('');
+  const [statusFilterWard, setStatusFilterWard] = useState('all');
+
+  const statusUniqueWards = useMemo(() => {
+    const set = new Set<string>();
+    records?.forEach(r => {
+      if (r.ward) set.add(r.ward);
+    });
+    return Array.from(set).sort();
+  }, [records]);
+
+  const filteredMismatchedStatusList = useMemo(() => {
+    return mismatchedStatusList.filter(item => {
+      const r = item.record;
+      if (statusFilterWard !== 'all' && r.ward !== statusFilterWard) return false;
+      if (statusSearchQuery.trim()) {
+        const q = statusSearchQuery.toLowerCase();
+        const matchesCode = (r.code || '').toLowerCase().includes(q);
+        const matchesCustomer = (r.customerName || '').toLowerCase().includes(q);
+        const matchesPlot = (r.landPlot || '').toLowerCase().includes(q);
+        const matchesContent = (r.content || '').toLowerCase().includes(q);
+        if (!matchesCode && !matchesCustomer && !matchesPlot && !matchesContent) return false;
+      }
+      return true;
+    });
+  }, [mismatchedStatusList, statusFilterWard, statusSearchQuery]);
+
+  const handleScanMismatchedStatus = () => {
+    if (!records || records.length === 0) {
+      alert('Không có dữ liệu hồ sơ để quét.');
+      return;
+    }
+    setIsScanningStatus(true);
+    setTimeout(() => {
+      const list: { record: RecordFile; derivedStatus: RecordStatus; reason: string }[] = [];
+      records.forEach(r => {
+        if (r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED) return;
+        const derived = deriveActualSurveyStatus(r);
+        const isMismatched = (r.status === RecordStatus.IN_PROGRESS) || (derived !== r.status);
+        
+        if (isMismatched) {
+          let reason = 'Đồng bộ tiến độ chuẩn';
+          if (r.resultReturnedDate) reason = `Đã có ngày trả kết quả (${r.resultReturnedDate.slice(0, 10)})`;
+          else if (r.completedDate || r.exportDate) reason = `Đã bàn giao 1 cửa (${(r.completedDate || r.exportDate || '').slice(0, 10)})`;
+          else if (r.approvalDate) reason = `Đã ký duyệt (${r.approvalDate.slice(0, 10)})`;
+          else if (r.submissionDate) reason = `Đã trình ký (${r.submissionDate.slice(0, 10)})`;
+          else if (r.checkedDate) reason = `Đã kiểm tra (${r.checkedDate.slice(0, 10)})`;
+          else if (r.pendingCheckDate) reason = `Đã trình kiểm tra (${r.pendingCheckDate.slice(0, 10)})`;
+          else if (r.officeAssignedDate || r.officeCompletedDate) reason = `Có mốc biên tập bản đồ`;
+          else if (r.fieldAssignedDate || r.fieldCompletedDate) reason = `Có mốc đo đạc thực địa`;
+          else if (r.assignedDate || r.assignedTo) reason = `Đã phân công cán bộ xử lý`;
+          else if (r.status === RecordStatus.IN_PROGRESS) reason = `Đang mang trạng thái "Đang thực hiện" cũ`;
+
+          list.push({ record: r, derivedStatus: derived, reason });
+        }
+      });
+      setMismatchedStatusList(list);
+      setStatusScanPage(1);
+      setIsScanningStatus(false);
+    }, 300);
+  };
+
+  const handleBatchFixStatus = async (targetList?: { record: RecordFile; derivedStatus: RecordStatus; reason: string }[]) => {
+    const listToFix = targetList || filteredMismatchedStatusList;
+    if (listToFix.length === 0) {
+      alert('Không có hồ sơ nào cần chuẩn hóa.');
+      return;
+    }
+    if (!window.confirm(`Bạn có chắc chắn muốn chuẩn hóa trạng thái cho ${listToFix.length} hồ sơ theo đúng tiến độ thực tế?`)) {
+      return;
+    }
+
+    setIsFixingStatus(true);
+    setFixStatusProgress(0);
+    setFixStatusMessage('Đang chuẩn bị chuẩn hóa trạng thái...');
+
+    let successCount = 0;
+    for (let i = 0; i < listToFix.length; i++) {
+      const item = listToFix[i];
+      const pct = Math.round(((i + 1) / listToFix.length) * 100);
+      setFixStatusProgress(pct);
+      setFixStatusMessage(`Đang xử lý ${i + 1}/${listToFix.length} (Mã: ${item.record.code} -> ${STATUS_LABELS[item.derivedStatus] || item.derivedStatus})...`);
+
+      const updatedRecord: RecordFile = {
+        ...item.record,
+        ...syncRecordStatusTransition(item.record, item.derivedStatus)
+      };
+
+      try {
+        await updateRecordApi(updatedRecord);
+        successCount++;
+      } catch (e) {
+        console.error("Error fixing record status:", item.record.code, e);
+      }
+
+      if (i % 5 === 0) {
+        await new Promise(r => setTimeout(r, 20));
+      }
+    }
+
+    setIsFixingStatus(false);
+    setFixStatusMessage(`Hoàn thành! Đã chuẩn hóa thành công ${successCount}/${listToFix.length} hồ sơ.`);
+    handleScanMismatchedStatus();
     if (onHolidaysChanged) onHolidaysChanged();
   };
 
@@ -1594,6 +1708,186 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                             {mismatchedRecords.length === 0 && !isScanningDates && !isFixingDates && (
                                 <div className="text-center py-8 text-slate-400 text-xs font-medium border border-dashed border-slate-200 rounded-2xl">
                                     Nhấn nút <strong className="text-purple-700">"Quét hồ sơ sai ngày"</strong> ở trên để hệ thống kiểm tra và phát hiện các hồ sơ cần khôi phục ngày tháng.
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Hộp công cụ Chuẩn hóa Trạng thái hồ sơ */}
+                    <div className="border border-indigo-100 rounded-[2rem] overflow-hidden bg-white shadow-xl shadow-indigo-50/50">
+                        <div className="bg-indigo-50 p-5 border-b border-indigo-100 flex items-center justify-between flex-wrap gap-4">
+                            <h3 className="text-indigo-900 font-black flex items-center gap-2 uppercase tracking-widest text-xs">
+                                <Wrench size={18} className="text-indigo-700" />
+                                Công cụ Rà soát & Chuẩn hóa Trạng thái Hồ sơ (Đồng bộ theo Tiến độ thực tế)
+                            </h3>
+                            <button
+                                onClick={handleScanMismatchedStatus}
+                                disabled={isScanningStatus || isFixingStatus}
+                                className="px-5 py-2.5 bg-indigo-600 text-white font-black text-xs uppercase tracking-wider rounded-xl hover:bg-indigo-700 transition-all flex items-center gap-2 shadow-md shadow-indigo-100 disabled:opacity-50"
+                            >
+                                {isScanningStatus ? <Loader2 className="animate-spin" size={15} /> : <Search size={15} />}
+                                Quét hồ sơ sai trạng thái
+                            </button>
+                        </div>
+                        <div className="p-6 space-y-6">
+                            <p className="text-xs text-slate-600 leading-relaxed">
+                                Công cụ này giúp rà soát toàn bộ hồ sơ trong hệ thống, phát hiện các hồ sơ đang bị kẹt ở trạng thái cũ <strong>"Đang thực hiện"</strong> (IN_PROGRESS) hoặc trạng thái không khớp với các mốc ngày tiến độ thực tế (Đo đạc, Biên tập bản đồ, Kiểm tra, Trình ký, Đã ký, Trả kết quả) để tự động đồng bộ và chuẩn hóa hàng loạt.
+                            </p>
+
+                            {/* Progress bar during fixing */}
+                            {isFixingStatus && (
+                                <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-5 space-y-3">
+                                    <div className="flex items-center justify-between text-xs font-bold text-indigo-900">
+                                        <span className="flex items-center gap-2">
+                                            <Loader2 size={16} className="animate-spin text-indigo-600" />
+                                            {fixStatusMessage}
+                                        </span>
+                                        <span>{fixStatusProgress}%</span>
+                                    </div>
+                                    <div className="w-full bg-indigo-200 h-2.5 rounded-full overflow-hidden">
+                                        <div className="bg-indigo-600 h-full transition-all duration-300" style={{ width: `${fixStatusProgress}%` }} />
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Scan Results */}
+                            {mismatchedStatusList.length > 0 && !isFixingStatus && (
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between flex-wrap gap-3 bg-indigo-50 border border-indigo-200 px-4 py-3 rounded-xl">
+                                        <div className="text-xs font-bold text-indigo-900 flex items-center gap-2">
+                                            <AlertTriangle size={16} className="text-indigo-600 shrink-0" />
+                                            Tìm thấy <strong>{filteredMismatchedStatusList.length}/{mismatchedStatusList.length}</strong> hồ sơ cần chuẩn hóa trạng thái!
+                                        </div>
+
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <input
+                                                type="text"
+                                                placeholder="Tìm mã HS, tên, số thửa..."
+                                                value={statusSearchQuery}
+                                                onChange={(e) => {
+                                                    setStatusSearchQuery(e.target.value);
+                                                    setStatusScanPage(1);
+                                                }}
+                                                className="px-3 py-1.5 text-xs bg-white border border-indigo-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 w-44"
+                                            />
+                                            <select
+                                                value={statusFilterWard}
+                                                onChange={(e) => {
+                                                    setStatusFilterWard(e.target.value);
+                                                    setStatusScanPage(1);
+                                                }}
+                                                className="py-1.5 px-2 text-xs bg-white border border-indigo-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                            >
+                                                <option value="all">Tất cả Xã / Phường</option>
+                                                {statusUniqueWards.map(w => (
+                                                    <option key={w} value={w}>{w}</option>
+                                                ))}
+                                            </select>
+                                            <button
+                                                onClick={() => handleBatchFixStatus()}
+                                                className="px-4 py-2 bg-indigo-600 text-white font-black text-xs uppercase tracking-wider rounded-lg hover:bg-indigo-700 transition-all shadow-sm flex items-center gap-1.5"
+                                            >
+                                                <CheckCircle2 size={15} />
+                                                Chuẩn hóa tất cả ({filteredMismatchedStatusList.length} hồ sơ)
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Paginated Table */}
+                                    <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-2xs">
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full text-left border-collapse text-xs">
+                                                <thead>
+                                                    <tr className="bg-slate-100 text-slate-700 uppercase font-black text-[10px] tracking-wider border-b border-slate-200">
+                                                        <th className="p-3.5">Mã hồ sơ</th>
+                                                        <th className="p-3.5">Tên khách hàng / Loại HS</th>
+                                                        <th className="p-3.5">Xã/Phường</th>
+                                                        <th className="p-3.5 text-center">Trạng thái CŨ</th>
+                                                        <th className="p-3.5 text-center">Trạng thái ĐỀ XUẤT</th>
+                                                        <th className="p-3.5">Căn cứ xác định</th>
+                                                        <th className="p-3.5 text-right">Thao tác</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                                                    {filteredMismatchedStatusList.length === 0 ? (
+                                                        <tr>
+                                                            <td colSpan={7} className="p-6 text-center text-slate-400 font-medium">
+                                                                Không tìm thấy hồ sơ nào khớp với bộ lọc tìm kiếm.
+                                                            </td>
+                                                        </tr>
+                                                    ) : (
+                                                        filteredMismatchedStatusList
+                                                            .slice((statusScanPage - 1) * statusScanPageSize, statusScanPage * statusScanPageSize)
+                                                            .map(({ record, derivedStatus, reason }) => (
+                                                                <tr key={record.id} className="hover:bg-slate-50 transition-colors">
+                                                                    <td className="p-3.5 font-mono font-bold text-slate-900">{record.code}</td>
+                                                                    <td className="p-3.5">
+                                                                        <div className="font-bold text-slate-900">{record.customerName || '---'}</div>
+                                                                        <div className="text-[11px] text-slate-500 truncate max-w-xs">{record.content || record.recordType}</div>
+                                                                    </td>
+                                                                    <td className="p-3.5 text-slate-600">{record.ward || '-'}</td>
+                                                                    <td className="p-3.5 text-center">
+                                                                        <span className="px-2 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900">
+                                                                            {STATUS_LABELS[record.status] || record.status}
+                                                                        </span>
+                                                                    </td>
+                                                                    <td className="p-3.5 text-center">
+                                                                        <span className="px-2 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-900 border border-emerald-300">
+                                                                            {STATUS_LABELS[derivedStatus] || derivedStatus}
+                                                                        </span>
+                                                                    </td>
+                                                                    <td className="p-3.5 text-xs text-slate-500">
+                                                                        {reason}
+                                                                    </td>
+                                                                    <td className="p-3.5 text-right">
+                                                                        <button
+                                                                            onClick={() => handleBatchFixStatus([{ record, derivedStatus, reason }])}
+                                                                            className="px-3 py-1.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 font-bold rounded-lg border border-indigo-200 transition-all text-[11px] whitespace-nowrap"
+                                                                        >
+                                                                            Chuẩn hóa
+                                                                        </button>
+                                                                    </td>
+                                                                </tr>
+                                                            ))
+                                                    )}
+                                                </tbody>
+                                            </table>
+                                        </div>
+
+                                        {/* Pagination Controls */}
+                                        {filteredMismatchedStatusList.length > statusScanPageSize && (
+                                            <div className="bg-slate-50 px-4 py-3 border-t border-slate-200 flex items-center justify-between">
+                                                <span className="text-xs text-slate-500">
+                                                    Hiển thị {(statusScanPage - 1) * statusScanPageSize + 1} - {Math.min(statusScanPage * statusScanPageSize, filteredMismatchedStatusList.length)} trong tổng số <strong>{filteredMismatchedStatusList.length}</strong> hồ sơ cần chuẩn hóa
+                                                </span>
+                                                <div className="flex items-center gap-2">
+                                                    <button
+                                                        onClick={() => setStatusScanPage(p => Math.max(1, p - 1))}
+                                                        disabled={statusScanPage === 1}
+                                                        className="px-3 py-1 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-40"
+                                                    >
+                                                        Trang trước
+                                                    </button>
+                                                    <span className="text-xs font-bold text-slate-700 px-2">
+                                                        Trang {statusScanPage} / {Math.ceil(filteredMismatchedStatusList.length / statusScanPageSize)}
+                                                    </span>
+                                                    <button
+                                                        onClick={() => setStatusScanPage(p => Math.min(Math.ceil(filteredMismatchedStatusList.length / statusScanPageSize), p + 1))}
+                                                        disabled={statusScanPage >= Math.ceil(filteredMismatchedStatusList.length / statusScanPageSize)}
+                                                        className="px-3 py-1 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-40"
+                                                    >
+                                                        Trang sau
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {mismatchedStatusList.length === 0 && !isScanningStatus && !isFixingStatus && (
+                                <div className="text-center py-8 text-slate-400 text-xs font-medium border border-dashed border-slate-200 rounded-2xl">
+                                    Nhấn nút <strong className="text-indigo-700">"Quét hồ sơ sai trạng thái"</strong> ở trên để hệ thống kiểm tra và phát hiện các hồ sơ cần chuẩn hóa.
                                 </div>
                             )}
                         </div>

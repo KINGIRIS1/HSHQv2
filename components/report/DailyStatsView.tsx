@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { RecordFile, Employee, RecordStatus } from '../../types';
 import { 
     Download, 
@@ -148,9 +148,15 @@ const DailyStatsView: React.FC<DailyStatsViewProps> = ({
     }, [activeTabType, filteredReceivedRecords, filteredAssignedRecords, filteredHandoverRecords]);
 
     // Send the active filtered list back to the parent component
+    const prevFilteredRef = useRef<RecordFile[]>([]);
     useEffect(() => {
         if (onFilteredRecordsChange) {
-            onFilteredRecordsChange(modalFilteredRecords);
+            const isSame = prevFilteredRef.current.length === modalFilteredRecords.length &&
+                prevFilteredRef.current.every((r, i) => r.id === modalFilteredRecords[i]?.id);
+            if (!isSame) {
+                prevFilteredRef.current = modalFilteredRecords;
+                onFilteredRecordsChange(modalFilteredRecords);
+            }
         }
     }, [modalFilteredRecords, onFilteredRecordsChange]);
 

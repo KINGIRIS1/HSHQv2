@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { RecordFile, RecordStatus, Employee } from '../../types';
 import { getShortRecordType } from '../../constants';
 import { removeVietnameseTones, isProcedure2_3 } from '../../utils/appHelpers';
@@ -239,9 +239,15 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
     }, [filteredRecords, currentPage, pageSize]);
 
     // Notify parent component when revenue filtered records change
+    const prevFilteredRef = useRef<RecordFile[]>([]);
     useEffect(() => {
         if (onFilteredRecordsChange) {
-            onFilteredRecordsChange(filteredRecords);
+            const isSame = prevFilteredRef.current.length === filteredRecords.length &&
+                prevFilteredRef.current.every((r, i) => r.id === filteredRecords[i]?.id);
+            if (!isSame) {
+                prevFilteredRef.current = filteredRecords;
+                onFilteredRecordsChange(filteredRecords);
+            }
         }
     }, [filteredRecords, onFilteredRecordsChange]);
 

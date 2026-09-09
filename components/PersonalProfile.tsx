@@ -1641,8 +1641,9 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                       >
                         <option value="all">Mọi trạng thái</option>
                         <option value={RecordStatus.RECEIVED}>Đã tiếp nhận</option>
+                        <option value={RecordStatus.FIELD_WORK}>Đo đạc thực địa</option>
+                        <option value={RecordStatus.OFFICE_WORK}>Biên tập bản đồ</option>
                         <option value={RecordStatus.ASSIGNED}>Đã giao việc</option>
-                        <option value={RecordStatus.IN_PROGRESS}>Đang thực hiện</option>
                         <option value={RecordStatus.COMPLETED_WORK}>Đã xong việc</option>
                         <option value={RecordStatus.PENDING_CHECK}>Chờ kiểm tra</option>
                         <option value={RecordStatus.CHECKED}>Đã kiểm tra</option>

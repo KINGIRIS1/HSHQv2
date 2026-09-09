@@ -1,6 +1,8 @@
 import React, { useState, useMemo } from 'react';
-import { ShieldAlert, CheckCircle2, Wrench, Download, Upload, RefreshCw, AlertTriangle, Database, Users, Calendar, FileText, Check } from 'lucide-react';
+import { ShieldAlert, CheckCircle2, Wrench, Download, Upload, RefreshCw, AlertTriangle, Database, Users, Calendar, FileText, Check, ArrowRight, Sparkles, Filter } from 'lucide-react';
 import { RecordFile, Employee, NotifyFunction, RecordStatus } from '../../types';
+import { deriveActualSurveyStatus } from '../../utils/appHelpers';
+import { STATUS_LABELS, isArchiveRecordType } from '../../constants';
 
 interface MeasurementAndArchiveSyncTabProps {
     records: RecordFile[];
@@ -17,29 +19,170 @@ export const MeasurementAndArchiveSyncTab: React.FC<MeasurementAndArchiveSyncTab
     onRefreshData,
     notify
 }) => {
-    const [subTab, setSubTab] = useState<'measurement' | 'archive'>('measurement');
+    const [subTab, setSubTab] = useState<'normalize_status' | 'measurement' | 'archive'>('normalize_status');
 
-    // --- MEASUREMENT FIX STATE ---
+    // --- MEASUREMENT STATUS NORMALIZATION STATE ---
+    const [selectedNormalizeIds, setSelectedNormalizeIds] = useState<Set<string>>(new Set());
+    const [isNormalizing, setIsNormalizing] = useState<boolean>(false);
+    const [normalizeSummary, setNormalizeSummary] = useState<{ updatedCount: number; timestamp: string } | null>(null);
+    const [searchQuery, setSearchQuery] = useState<string>('');
+    const [filterWard, setFilterWard] = useState<string>('all');
+
+    // --- MEASUREMENT FIX CHECK STATE ---
     const [inspectorId, setInspectorId] = useState<string>('');
     const [checkDate, setCheckDate] = useState<string>(new Date().toISOString().split('T')[0]);
     const [isProcessing, setIsProcessing] = useState<boolean>(false);
     const [selectedMissingIds, setSelectedMissingIds] = useState<Set<string>>(new Set());
     const [lastResultSummary, setLastResultSummary] = useState<{ updatedCount: number; timestamp: string } | null>(null);
 
-    // Filter measurement records (dept contains 'đo đạc' or 'kỹ thuật' or has measurement data)
+    // Filter measurement records (non-archive records or records with measurement context)
     const measurementRecords = useMemo(() => {
         return records.filter(r => {
+            if (isArchiveRecordType(r.recordType)) return false;
             const dept = ((r as any).department || '').toLowerCase();
-            return dept.includes('đo đạc') || dept.includes('kỹ thuật') || dept.measurementNumber || r.needsMapCorrection;
+            return dept.includes('đo đạc') || dept.includes('kỹ thuật') || dept.measurementNumber || r.needsMapCorrection || true;
         });
     }, [records]);
+
+    // Danh sách hồ sơ cần chuẩn hóa trạng thái (mang IN_PROGRESS hoặc lệch so với các mốc ngày thực tế)
+    const mismatchedStatusRecords = useMemo(() => {
+        return measurementRecords.map(r => {
+            const derived = deriveActualSurveyStatus(r);
+            const isMismatched = (r.status === RecordStatus.IN_PROGRESS) || 
+                                 (derived !== r.status && r.status !== RecordStatus.WITHDRAWN && r.status !== RecordStatus.REJECTED);
+            
+            let reason = 'Đồng bộ tiến độ chuẩn';
+            if (r.resultReturnedDate) reason = `Đã có ngày trả kết quả (${r.resultReturnedDate.slice(0, 10)})`;
+            else if (r.completedDate || r.exportDate) reason = `Đã hoàn thành / giao 1 cửa (${(r.completedDate || r.exportDate || '').slice(0, 10)})`;
+            else if (r.approvalDate) reason = `Đã ký duyệt (${r.approvalDate.slice(0, 10)})`;
+            else if (r.submissionDate) reason = `Đã trình ký (${r.submissionDate.slice(0, 10)})`;
+            else if (r.checkedDate) reason = `Đã kiểm tra (${r.checkedDate.slice(0, 10)})`;
+            else if (r.pendingCheckDate) reason = `Đã trình kiểm tra (${r.pendingCheckDate.slice(0, 10)})`;
+            else if (r.officeAssignedDate || r.officeCompletedDate) reason = `Có mốc biên tập bản đồ (Nội nghiệp)`;
+            else if (r.fieldAssignedDate || r.fieldCompletedDate) reason = `Có mốc đo đạc thực địa (Ngoại nghiệp)`;
+            else if (r.assignedDate || r.assignedTo) reason = `Đã phân công cán bộ thực hiện`;
+            else if (r.status === RecordStatus.IN_PROGRESS) reason = `Đang mang trạng thái "Đang thực hiện" cũ cần chuẩn hóa`;
+
+            return {
+                record: r,
+                derivedStatus: derived,
+                isMismatched,
+                reason
+            };
+        }).filter(item => item.isMismatched);
+    }, [measurementRecords]);
+
+    const uniqueWards = useMemo(() => {
+        const set = new Set<string>();
+        records.forEach(r => {
+            if (r.ward) set.add(r.ward);
+        });
+        return Array.from(set).sort();
+    }, [records]);
+
+    const filteredMismatched = useMemo(() => {
+        return mismatchedStatusRecords.filter(item => {
+            const r = item.record;
+            if (filterWard !== 'all' && r.ward !== filterWard) return false;
+            if (searchQuery.trim()) {
+                const q = searchQuery.toLowerCase();
+                const matchesCode = (r.code || '').toLowerCase().includes(q);
+                const matchesCustomer = (r.customerName || '').toLowerCase().includes(q);
+                const matchesPhone = (r.phoneNumber || '').toLowerCase().includes(q);
+                const matchesPlot = (r.landPlot || '').toLowerCase().includes(q);
+                if (!matchesCode && !matchesCustomer && !matchesPhone && !matchesPlot) return false;
+            }
+            return true;
+        });
+    }, [mismatchedStatusRecords, filterWard, searchQuery]);
 
     // Missing check date or check by
     const missingCheckRecords = useMemo(() => {
         return measurementRecords.filter(r => !r.checkedDate || !r.checkedBy);
     }, [measurementRecords]);
 
-    // Select all / toggle
+    // Backup before run
+    const handleDownloadBackup = () => {
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(records, null, 2));
+        const downloadAnchor = document.createElement('a');
+        downloadAnchor.setAttribute("href", dataStr);
+        downloadAnchor.setAttribute("download", `backup_records_${new Date().toISOString().slice(0, 10)}.json`);
+        document.body.appendChild(downloadAnchor);
+        downloadAnchor.click();
+        downloadAnchor.remove();
+        notify('Đã tải xuống file sao lưu dữ liệu (Backup) an toàn!', 'success');
+    };
+
+    // Toggle Normalize selection
+    const handleToggleSelectAllNormalize = () => {
+        if (selectedNormalizeIds.size === filteredMismatched.length) {
+            setSelectedNormalizeIds(new Set());
+        } else {
+            setSelectedNormalizeIds(new Set(filteredMismatched.map(item => item.record.id)));
+        }
+    };
+
+    const handleToggleSelectNormalize = (id: string) => {
+        const next = new Set(selectedNormalizeIds);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        setSelectedNormalizeIds(next);
+    };
+
+    // Execute Batch Normalize Status
+    const handleExecuteNormalizeStatus = async () => {
+        const targets = filteredMismatched.filter(
+            item => selectedNormalizeIds.size === 0 || selectedNormalizeIds.has(item.record.id)
+        );
+
+        if (targets.length === 0) {
+            notify('Không có hồ sơ nào cần chuẩn hóa trạng thái.', 'info');
+            return;
+        }
+
+        if (!window.confirm(`Xác nhận chuẩn hóa tự động trạng thái cho ${targets.length} hồ sơ theo các mốc ngày tiến độ thực tế?`)) {
+            return;
+        }
+
+        setIsNormalizing(true);
+        try {
+            let count = 0;
+            for (const item of targets) {
+                const r = item.record;
+                const newStatus = item.derivedStatus;
+                const updated: RecordFile = {
+                    ...r,
+                    status: newStatus,
+                    statusLogs: [
+                        ...(r.statusLogs || []),
+                        {
+                            id: Math.random().toString(36).substr(2, 9),
+                            recordId: r.id,
+                            previousStatus: r.status,
+                            newStatus: newStatus,
+                            changedBy: 'Hệ thống (Auto Normalize)',
+                            changedAt: new Date().toISOString(),
+                            note: `Chuẩn hóa trạng thái tự động từ [${STATUS_LABELS[r.status] || r.status}] sang [${STATUS_LABELS[newStatus] || newStatus}]. Lý do: ${item.reason}`
+                        }
+                    ]
+                };
+                await onSaveRecord(updated);
+                count++;
+            }
+
+            if (onRefreshData) await onRefreshData();
+            setNormalizeSummary({ updatedCount: count, timestamp: new Date().toLocaleTimeString() });
+            setSelectedNormalizeIds(new Set());
+            notify(`Đã chuẩn hóa thành công ${count} hồ sơ Đo đạc về đúng tiến độ thực tế!`, 'success');
+        } catch (err) {
+            console.error(err);
+            notify('Có lỗi xảy ra khi chuẩn hóa trạng thái.', 'error');
+        } finally {
+            setIsNormalizing(false);
+        }
+    };
+
+    // Select all / toggle missing checks
     const handleToggleSelectAll = () => {
         if (selectedMissingIds.size === missingCheckRecords.length) {
             setSelectedMissingIds(new Set());
@@ -55,19 +198,7 @@ export const MeasurementAndArchiveSyncTab: React.FC<MeasurementAndArchiveSyncTab
         setSelectedMissingIds(next);
     };
 
-    // Backup before run
-    const handleDownloadBackup = () => {
-        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(records, null, 2));
-        const downloadAnchor = document.createElement('a');
-        downloadAnchor.setAttribute("href", dataStr);
-        downloadAnchor.setAttribute("download", `backup_records_${new Date().toISOString().slice(0, 10)}.json`);
-        document.body.appendChild(downloadAnchor);
-        downloadAnchor.click();
-        downloadAnchor.remove();
-        notify('Đã tải xuống file sao lưu dữ liệu (Backup) an toàn!', 'success');
-    };
-
-    // Execute batch fix for measurement
+    // Execute batch fix for measurement missing checks
     const handleExecuteMeasurementFix = async () => {
         if (!inspectorId) {
             notify('Vui lòng chọn Người kiểm tra (Cán bộ phụ trách)!', 'error');
@@ -193,20 +324,232 @@ export const MeasurementAndArchiveSyncTab: React.FC<MeasurementAndArchiveSyncTab
     return (
         <div className="flex flex-col h-full bg-[#f8fafc] overflow-y-auto p-4 md:p-6 space-y-6">
             {/* Top SubNav */}
-            <div className="flex bg-white border border-slate-200 rounded-xl p-1.5 shadow-sm max-w-xl">
+            <div className="flex flex-wrap bg-white border border-slate-200 rounded-xl p-1.5 shadow-sm max-w-3xl gap-1">
+                <button
+                    onClick={() => setSubTab('normalize_status')}
+                    className={`flex-1 py-2.5 px-4 rounded-lg font-bold text-xs md:text-sm flex items-center justify-center gap-2 transition-all ${subTab === 'normalize_status' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'}`}
+                >
+                    <Sparkles size={16} /> Chuẩn hóa Trạng thái Đo đạc
+                    {mismatchedStatusRecords.length > 0 && (
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${subTab === 'normalize_status' ? 'bg-white text-indigo-700' : 'bg-rose-100 text-rose-700'}`}>
+                            {mismatchedStatusRecords.length}
+                        </span>
+                    )}
+                </button>
                 <button
                     onClick={() => setSubTab('measurement')}
-                    className={`flex-1 py-2.5 px-4 rounded-lg font-bold text-sm flex items-center justify-center gap-2 transition-all ${subTab === 'measurement' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'}`}
+                    className={`flex-1 py-2.5 px-4 rounded-lg font-bold text-xs md:text-sm flex items-center justify-center gap-2 transition-all ${subTab === 'measurement' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'}`}
                 >
-                    <Wrench size={16} /> Vá lỗi Đo đạc (Thiếu ngày kiểm tra)
+                    <Wrench size={16} /> Vá lỗi thiếu ngày kiểm tra
+                    {missingCheckRecords.length > 0 && (
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${subTab === 'measurement' ? 'bg-white text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
+                            {missingCheckRecords.length}
+                        </span>
+                    )}
                 </button>
                 <button
                     onClick={() => setSubTab('archive')}
-                    className={`flex-1 py-2.5 px-4 rounded-lg font-bold text-sm flex items-center justify-center gap-2 transition-all ${subTab === 'archive' ? 'bg-orange-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'}`}
+                    className={`flex-1 py-2.5 px-4 rounded-lg font-bold text-xs md:text-sm flex items-center justify-center gap-2 transition-all ${subTab === 'archive' ? 'bg-orange-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'}`}
                 >
                     <Database size={16} /> Đồng bộ Hồ sơ Lưu trữ
                 </button>
             </div>
+
+            {/* TAB 0: NORMALIZE STATUS TAB */}
+            {subTab === 'normalize_status' && (
+                <div className="space-y-6 animate-fade-in">
+                    {/* Diagnostic Summary Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-xl">
+                                {measurementRecords.length}
+                            </div>
+                            <div>
+                                <h4 className="text-sm font-bold text-slate-500">Tổng số hồ sơ Đo đạc</h4>
+                                <p className="text-xs text-slate-400 mt-0.5">Đang quản lý trong hệ thống</p>
+                            </div>
+                        </div>
+
+                        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center font-bold text-xl">
+                                {mismatchedStatusRecords.length}
+                            </div>
+                            <div>
+                                <h4 className="text-sm font-bold text-rose-600">Hồ sơ cần chuẩn hóa</h4>
+                                <p className="text-xs text-slate-400 mt-0.5">Mang IN_PROGRESS hoặc lệch tiến độ</p>
+                            </div>
+                        </div>
+
+                        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-xl">
+                                {measurementRecords.length - mismatchedStatusRecords.length}
+                            </div>
+                            <div>
+                                <h4 className="text-sm font-bold text-emerald-600">Hồ sơ đã chuẩn hóa</h4>
+                                <p className="text-xs text-slate-400 mt-0.5">Khớp tuyệt đối mốc ngày & trạng thái</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Explanatory Box */}
+                    <div className="bg-indigo-50/70 border border-indigo-200 rounded-2xl p-5 text-indigo-950 shadow-sm">
+                        <div className="flex items-start gap-3">
+                            <Sparkles className="text-indigo-600 shrink-0 mt-0.5" size={20} />
+                            <div className="space-y-1">
+                                <h4 className="font-bold text-sm uppercase tracking-wide text-indigo-900">
+                                    Cơ chế chuẩn hóa trạng thái thông minh & an toàn
+                                </h4>
+                                <p className="text-xs text-indigo-800 leading-relaxed">
+                                    Công cụ quét toàn bộ CSDL và tự động nhận diện mốc tiến độ thực tế cao nhất của hồ sơ (Ngày trả kết quả $\rightarrow$ Ngày giao 1 cửa $\rightarrow$ Ngày ký duyệt $\rightarrow$ Ngày trình ký $\rightarrow$ Ngày kiểm tra $\rightarrow$ Ngày trình kiểm tra $\rightarrow$ Biên tập bản đồ $\rightarrow$ Đo đạc thực địa).
+                                    Toàn bộ hồ sơ bị kẹt ở trạng thái cũ <code>IN_PROGRESS</code> (Đang thực hiện) hoặc lệch bước sẽ được đối chiếu và chuyển đổi chính xác chỉ với 1 thao tác.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Action Toolbar */}
+                    <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                            <button
+                                onClick={handleDownloadBackup}
+                                className="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-100 font-bold text-xs md:text-sm flex items-center gap-2 transition-all shadow-sm"
+                            >
+                                <Download size={16} /> Tải Backup JSON an toàn
+                            </button>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                            <button
+                                onClick={handleExecuteNormalizeStatus}
+                                disabled={isNormalizing || mismatchedStatusRecords.length === 0}
+                                className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs md:text-sm flex items-center gap-2 transition-all shadow-md disabled:opacity-50 cursor-pointer"
+                            >
+                                {isNormalizing ? <RefreshCw className="animate-spin" size={16} /> : <Sparkles size={16} />}
+                                Chuẩn hóa đồng loạt ({selectedNormalizeIds.size > 0 ? selectedNormalizeIds.size : mismatchedStatusRecords.length} hồ sơ)
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Result Notification */}
+                    {normalizeSummary && (
+                        <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-4 rounded-xl flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <CheckCircle2 className="text-emerald-600" size={20} />
+                                <span className="text-sm font-bold">
+                                    Đã chuẩn hóa thành công {normalizeSummary.updatedCount} hồ sơ lúc {normalizeSummary.timestamp}. Dữ liệu đã đồng bộ hoàn toàn!
+                                </span>
+                            </div>
+                            <button onClick={() => setNormalizeSummary(null)} className="text-emerald-600 hover:text-emerald-800 text-xs font-bold cursor-pointer">Đóng</button>
+                        </div>
+                    )}
+
+                    {/* Comparison Table */}
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+                        <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
+                            <div className="flex items-center gap-2">
+                                <ShieldAlert className="text-indigo-600" size={18} />
+                                <h3 className="font-bold text-slate-800 text-sm">
+                                    Danh sách hồ sơ cần chuẩn hóa trạng thái ({filteredMismatched.length}/{mismatchedStatusRecords.length})
+                                </h3>
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                                <div className="relative">
+                                    <input
+                                        type="text"
+                                        placeholder="Tìm mã HS, tên, số thửa..."
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        className="pl-3 pr-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 w-48"
+                                    />
+                                </div>
+                                <select
+                                    value={filterWard}
+                                    onChange={(e) => setFilterWard(e.target.value)}
+                                    className="py-1.5 px-2 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                >
+                                    <option value="all">Tất cả Xã / Phường</option>
+                                    {uniqueWards.map(w => (
+                                        <option key={w} value={w}>{w}</option>
+                                    ))}
+                                </select>
+                                <button 
+                                    onClick={handleToggleSelectAllNormalize}
+                                    className="text-xs font-bold text-indigo-600 hover:underline cursor-pointer ml-2 whitespace-nowrap"
+                                >
+                                    {selectedNormalizeIds.size === filteredMismatched.length && filteredMismatched.length > 0 ? 'Bỏ chọn tất cả' : 'Chọn tất cả'}
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="overflow-x-auto max-h-[480px] overflow-y-auto">
+                            <table className="w-full text-left border-collapse text-xs">
+                                <thead className="bg-slate-100 text-slate-700 uppercase font-bold sticky top-0 z-10">
+                                    <tr>
+                                        <th className="p-3 w-10 text-center">#</th>
+                                        <th className="p-3">Mã HS</th>
+                                        <th className="p-3">Chủ sử dụng</th>
+                                        <th className="p-3">Xã/Phường</th>
+                                        <th className="p-3">Loại thủ tục</th>
+                                        <th className="p-3 text-center">Trạng thái CŨ</th>
+                                        <th className="p-3 text-center"></th>
+                                        <th className="p-3 text-center">Trạng thái ĐỀ XUẤT CHUẨN</th>
+                                        <th className="p-3">Căn cứ nhận diện</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {filteredMismatched.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={9} className="p-8 text-center text-slate-400 font-medium">
+                                                {mismatchedStatusRecords.length === 0 
+                                                    ? 'Tuyệt vời! Toàn bộ hồ sơ Đo đạc đều đã khớp chính xác với tiến độ thực tế, không còn hồ sơ nào bị kẹt ở "Đang thực hiện".'
+                                                    : 'Không tìm thấy hồ sơ nào khớp với bộ lọc tìm kiếm.'}
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        filteredMismatched.map((item, idx) => {
+                                            const r = item.record;
+                                            const isChecked = selectedNormalizeIds.has(r.id);
+                                            return (
+                                                <tr key={r.id} className={`hover:bg-slate-50 transition-colors ${isChecked ? 'bg-indigo-50/40' : ''}`}>
+                                                    <td className="p-3 text-center">
+                                                        <input 
+                                                            type="checkbox"
+                                                            checked={isChecked}
+                                                            onChange={() => handleToggleSelectNormalize(r.id)}
+                                                            className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                                                        />
+                                                    </td>
+                                                    <td className="p-3 font-bold text-blue-600">{r.code}</td>
+                                                    <td className="p-3 font-medium text-slate-800">{r.customerName}</td>
+                                                    <td className="p-3 text-slate-600">{r.ward || '-'}</td>
+                                                    <td className="p-3 text-slate-600 truncate max-w-[180px]" title={r.recordType || ''}>{r.recordType}</td>
+                                                    <td className="p-3 text-center">
+                                                        <span className="px-2 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900">
+                                                            {STATUS_LABELS[r.status] || r.status}
+                                                        </span>
+                                                    </td>
+                                                    <td className="p-3 text-center text-slate-400 font-bold">
+                                                        <ArrowRight size={14} className="inline text-slate-400" />
+                                                    </td>
+                                                    <td className="p-3 text-center">
+                                                        <span className="px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-emerald-100 text-emerald-800 shadow-xs border border-emerald-200">
+                                                            {STATUS_LABELS[item.derivedStatus] || item.derivedStatus}
+                                                        </span>
+                                                    </td>
+                                                    <td className="p-3 text-slate-600 italic">
+                                                        {item.reason}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* TAB 1: MEASUREMENT FIX */}
             {subTab === 'measurement' && (
@@ -228,7 +571,7 @@ export const MeasurementAndArchiveSyncTab: React.FC<MeasurementAndArchiveSyncTab
                                 {missingCheckRecords.length}
                             </div>
                             <div>
-                                <h4 className="text-sm font-bold text-rose-600">Hồ sơ lỗi phân mảnh</h4>
+                                <h4 className="text-sm font-bold text-rose-600">Hồ sơ thiếu thông tin kiểm tra</h4>
                                 <p className="text-xs text-slate-400 mt-0.5">Thiếu ngày/người kiểm tra</p>
                             </div>
                         </div>
@@ -240,20 +583,6 @@ export const MeasurementAndArchiveSyncTab: React.FC<MeasurementAndArchiveSyncTab
                             <div>
                                 <h4 className="text-sm font-bold text-emerald-600">Hồ sơ chuẩn dữ liệu</h4>
                                 <p className="text-xs text-slate-400 mt-0.5">Đã có đủ thông tin kiểm tra</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Analysis & Recommendation Box */}
-                    <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 text-amber-900 shadow-sm">
-                        <div className="flex items-start gap-3">
-                            <AlertTriangle className="text-amber-600 shrink-0 mt-0.5" size={20} />
-                            <div>
-                                <h4 className="font-bold text-sm uppercase tracking-wide">Phân tích đánh giá & Đề xuất phương án an toàn dữ liệu</h4>
-                                <p className="text-xs mt-1 text-amber-800 leading-relaxed">
-                                    <strong>Nguyên nhân lỗi phân mảnh:</strong> Một số hồ sơ đo đạc được chuyển bước qua các mốc ký duyệt hoặc trả kết quả nhưng hệ thống cũ chưa tự động gán mốc <code>checkedDate</code> hoặc <code>checkedBy</code>.
-                                    <br /><strong>Đề xuất giải pháp:</strong> Sử dụng công cụ bên dưới để chọn Cán bộ kiểm tra và Ngày kiểm tra tiêu chuẩn, hệ thống sẽ tự động vá các trường thiếu, đồng thời tự động cập nhật trạng thái hợp lệ mà không làm gián đoạn hay mất mát dữ liệu đang sử dụng. Luôn khuyến nghị <strong>tải file Backup JSON</strong> trước khi thực hiện.
-                                </p>
                             </div>
                         </div>
                     </div>
@@ -309,7 +638,7 @@ export const MeasurementAndArchiveSyncTab: React.FC<MeasurementAndArchiveSyncTab
                         <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-4 rounded-xl flex items-center justify-between">
                             <div className="flex items-center gap-2">
                                 <CheckCircle2 className="text-emerald-600" size={20} />
-                                <span className="text-sm font-bold">Đã vá lỗi thành công {lastResultSummary.updatedCount} hồ sơ lúc {lastResultSummary.timestamp}. Không còn lỗi phân mảnh trong các hồ sơ đã chọn!</span>
+                                <span className="text-sm font-bold">Đã vá lỗi thành công {lastResultSummary.updatedCount} hồ sơ lúc {lastResultSummary.timestamp}. Không còn hồ sơ thiếu kiểm tra trong các mục đã chọn!</span>
                             </div>
                             <button onClick={() => setLastResultSummary(null)} className="text-emerald-600 hover:text-emerald-800 text-xs font-bold">Đóng</button>
                         </div>
@@ -368,7 +697,7 @@ export const MeasurementAndArchiveSyncTab: React.FC<MeasurementAndArchiveSyncTab
                                                     <td className="p-3 text-slate-600">{r.ward}</td>
                                                     <td className="p-3">
                                                         <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
-                                                            {r.status}
+                                                            {STATUS_LABELS[r.status] || r.status}
                                                         </span>
                                                     </td>
                                                     <td className="p-3 text-center">

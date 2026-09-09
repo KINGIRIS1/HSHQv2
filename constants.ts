@@ -88,6 +88,94 @@ export const STATUS_COLORS: Record<RecordStatus, string> = {
   [RecordStatus.REJECTED]: 'bg-red-100 text-red-800',
 };
 
+// Hàm chuẩn hóa và chuyển đổi mọi định dạng trạng thái về RecordStatus chuẩn
+export const mapStatusToRecordStatus = (s: string | undefined | null): RecordStatus => {
+  if (!s) return RecordStatus.RECEIVED;
+  const trimmed = String(s).trim();
+  if (Object.values(RecordStatus).includes(trimmed as RecordStatus)) {
+    return trimmed as RecordStatus;
+  }
+  const lower = trimmed.toLowerCase();
+  switch (lower) {
+    case 'draft':
+    case 'received':
+    case 'tiếp nhận':
+    case 'tiếp nhận mới':
+      return RecordStatus.RECEIVED;
+    case 'assigned':
+    case 'giao nhân viên':
+    case 'đã giao':
+      return RecordStatus.ASSIGNED;
+    case 'in_progress':
+    case 'in progress':
+    case 'đang thực hiện':
+    case 'đang xử lý':
+      return RecordStatus.IN_PROGRESS;
+    case 'field_work':
+    case 'field work':
+    case 'đo đạc thực địa':
+    case 'thực địa':
+      return RecordStatus.FIELD_WORK;
+    case 'office_work':
+    case 'office work':
+    case 'biên tập bản đồ':
+    case 'nội nghiệp':
+      return RecordStatus.OFFICE_WORK;
+    case 'executed':
+    case 'completed_work':
+    case 'completed work':
+    case 'đã thực hiện':
+      return RecordStatus.COMPLETED_WORK;
+    case 'pending_supplement':
+    case 'chờ bổ sung':
+    case 'bổ sung':
+      return RecordStatus.PENDING_SUPPLEMENT;
+    case 'pending_check':
+    case 'pending check':
+    case 'chờ kiểm tra':
+      return RecordStatus.PENDING_CHECK;
+    case 'checked':
+    case 'đã kiểm tra':
+      return RecordStatus.CHECKED;
+    case 'pending_sign':
+    case 'pending sign':
+    case 'chờ ký duyệt':
+    case 'chờ ký':
+    case 'đã trình':
+      return RecordStatus.PENDING_SIGN;
+    case 'signed':
+    case 'chờ bàn giao':
+    case 'đã ký':
+      return RecordStatus.SIGNED;
+    case 'handover':
+    case 'đã giao 1 cửa':
+    case 'giao 1 cửa':
+    case 'giao một cửa':
+      return RecordStatus.HANDOVER;
+    case 'completed':
+    case 'returned':
+    case 'đã trả kết quả':
+    case 'đã trả':
+    case 'trả kết quả':
+      return RecordStatus.RETURNED;
+    case 'withdrawn':
+    case 'csd rút hồ sơ':
+    case 'rút hồ sơ':
+      return RecordStatus.WITHDRAWN;
+    case 'rejected':
+    case 'trả hồ sơ':
+    case 'từ chối':
+      return RecordStatus.REJECTED;
+    default:
+      for (const [key, val] of Object.entries(STATUS_LABELS)) {
+        if (val.toLowerCase() === lower) {
+          return key as RecordStatus;
+        }
+      }
+      return RecordStatus.RECEIVED;
+  }
+};
+
 export const GROUPS = ['Tân Khai', 'Tân Quan', 'Minh Đức', 'Tân Hưng'];
 
 export const DEFAULT_WARDS = [
