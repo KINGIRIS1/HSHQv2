@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { RecordFile, RecordStatus, Employee } from '../../types';
 import { getShortRecordType } from '../../constants';
-import { removeVietnameseTones, isProcedure2_3 } from '../../utils/appHelpers';
+import { removeVietnameseTones } from '../../utils/appHelpers';
 import { FileSpreadsheet, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import * as XLSX from 'xlsx-js-style';
 
@@ -69,9 +69,7 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
                 const contractP = (r as any).contractPrice;
                 const price = Number(r.price) || Number(contractP) || 0;
                 let returned = 0;
-                if (isProcedure2_3(r.recordType)) {
-                    returned = 0;
-                } else if (r.returnedPrice !== undefined && r.returnedPrice !== null && String(r.returnedPrice).trim() !== '' && !isNaN(Number(r.returnedPrice))) {
+                if (r.returnedPrice !== undefined && r.returnedPrice !== null && String(r.returnedPrice).trim() !== '' && !isNaN(Number(r.returnedPrice))) {
                     returned = Number(r.returnedPrice);
                 } else if (r.recordType === 'Cung cấp tài liệu đất đai') {
                     returned = 310000;

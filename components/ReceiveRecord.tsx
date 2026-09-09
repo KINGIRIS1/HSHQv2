@@ -5,7 +5,7 @@ import { getNormalizedWard } from '../constants';
 import { PlusCircle, FileSpreadsheet, LayoutList, Settings, RotateCcw, RefreshCw, Search, CalendarClock } from 'lucide-react';
 import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../services/docxService';
 import * as XLSX from 'xlsx-js-style';
-import { confirmAction, calculateDeadlineHelper } from '../utils/appHelpers';
+import { confirmAction, calculateDeadlineHelper, getReceiptReceiverName } from '../utils/appHelpers';
 import { isViewAllowedForUser } from '../config/roleConfig';
 
 // Components
@@ -303,9 +303,9 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, onDelet
         HEN_TRA_FULL: deadlineFullString,
         NGAY_HEN_FULL: deadlineFullString,
         
-        NGUOI_NHAN: val(currentUser.name), 
-        CAN_BO: val(currentUser.name),
-        USER: val(currentUser.name),
+        NGUOI_NHAN: val(getReceiptReceiverName(dataToUse, employees, undefined, currentUser)), 
+        CAN_BO: val(getReceiptReceiverName(dataToUse, employees, undefined, currentUser)),
+        USER: val(getReceiptReceiverName(dataToUse, employees, undefined, currentUser)),
         
         NOI_DUNG: val(dataToUse.content),
         CONTENT: val(dataToUse.content),
@@ -468,6 +468,7 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, onDelet
               receivingWard={employees.find(e => e.id === currentUser.employeeId)?.managedWards?.[0] || 'Tân Khai'}
               onClose={() => setSystemReceiptData(null)} 
               currentUser={currentUser}
+              employees={employees}
               onCreateContract={onCreateContract}
           />
       )}

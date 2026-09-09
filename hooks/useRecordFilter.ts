@@ -139,9 +139,9 @@ export const useRecordFilter = (
                 result = result.filter(r => isPendingSign(r));
             }
         } else if (currentView === 'pending_check_list' || currentView === 'archive_pending_check_list') {
-            // Tab Kiểm tra: Hiển thị hồ sơ Chờ kiểm tra và Đã kiểm tra
+            // Tab Kiểm tra: Hiển thị hồ sơ Chờ kiểm tra
             result = result.filter(r => {
-                if (r.status === RecordStatus.PENDING_CHECK || r.status === RecordStatus.CHECKED) return true;
+                if (r.status === RecordStatus.PENDING_CHECK) return true;
                 if ((r.pendingCheckDate || r.checkedBy || r.checkedDate) && !(r.submissionDate || r.submittedTo || r.approvalDate || r.exportBatch || r.completedDate || r.resultReturnedDate)) {
                     return true;
                 }
@@ -161,7 +161,7 @@ export const useRecordFilter = (
                 if (r.completedDate || r.exportBatch || r.exportDate || r.resultReturnedDate || r.approvalDate) return false;
                 if (r.submissionDate || r.submittedTo) return false;
                 if (r.pendingCheckDate || r.checkedDate || r.checkedBy) return false;
-                if (r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED || r.status === RecordStatus.RETURNED || r.status === RecordStatus.HANDOVER || r.status === RecordStatus.SIGNED || r.status === RecordStatus.PENDING_SIGN || r.status === RecordStatus.PENDING_CHECK || r.status === RecordStatus.CHECKED) return false;
+                if (r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED || r.status === RecordStatus.RETURNED || r.status === RecordStatus.HANDOVER || r.status === RecordStatus.SIGNED || r.status === RecordStatus.PENDING_SIGN || r.status === RecordStatus.PENDING_CHECK) return false;
                 
                 // Lọc bỏ hồ sơ đã chuyển sang Biên tập bản đồ
                 if (r.status === RecordStatus.OFFICE_WORK) return false;
@@ -173,7 +173,7 @@ export const useRecordFilter = (
                 if (r.completedDate || r.exportBatch || r.exportDate || r.resultReturnedDate || r.approvalDate) return false;
                 if (r.submissionDate || r.submittedTo) return false;
                 if (r.pendingCheckDate || r.checkedDate || r.checkedBy) return false;
-                if (r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED || r.status === RecordStatus.RETURNED || r.status === RecordStatus.HANDOVER || r.status === RecordStatus.SIGNED || r.status === RecordStatus.PENDING_SIGN || r.status === RecordStatus.PENDING_CHECK || r.status === RecordStatus.CHECKED) return false;
+                if (r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED || r.status === RecordStatus.RETURNED || r.status === RecordStatus.HANDOVER || r.status === RecordStatus.SIGNED || r.status === RecordStatus.PENDING_SIGN || r.status === RecordStatus.PENDING_CHECK) return false;
 
                 const isAssigned = Boolean(r.assignedTo && r.assignedTo.trim() !== '');
                 const isOfficeProcedure = isOfficeOnlySurveyProcedure(r.recordType);
@@ -198,7 +198,7 @@ export const useRecordFilter = (
                 if (r.completedDate || r.exportBatch || r.exportDate || r.resultReturnedDate || r.approvalDate) return false;
                 if (r.submissionDate || r.submittedTo) return false;
                 if (r.pendingCheckDate || r.checkedDate || r.checkedBy) return false;
-                if (r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED || r.status === RecordStatus.RETURNED || r.status === RecordStatus.HANDOVER || r.status === RecordStatus.SIGNED || r.status === RecordStatus.PENDING_SIGN || r.status === RecordStatus.PENDING_CHECK || r.status === RecordStatus.CHECKED) return false;
+                if (r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED || r.status === RecordStatus.RETURNED || r.status === RecordStatus.HANDOVER || r.status === RecordStatus.SIGNED || r.status === RecordStatus.PENDING_SIGN || r.status === RecordStatus.PENDING_CHECK) return false;
                 return true;
             });
         } else if (currentView === 'director_completed' || currentView === 'archive_director_completed') {

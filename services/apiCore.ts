@@ -409,12 +409,10 @@ export const mapRecordFromDb = (item: any): any => {
         r.status = RecordStatus.RETURNED;
     } else if (r.completedDate) {
         r.status = RecordStatus.HANDOVER;
-    } else if (r.approvalDate && (!currentStatus || currentStatus === RecordStatus.RECEIVED || currentStatus === RecordStatus.ASSIGNED || currentStatus === RecordStatus.FIELD_WORK || currentStatus === RecordStatus.OFFICE_WORK || currentStatus === RecordStatus.PENDING_CHECK || currentStatus === RecordStatus.CHECKED || currentStatus === RecordStatus.PENDING_SIGN)) {
+    } else if (r.approvalDate && (!currentStatus || currentStatus === RecordStatus.RECEIVED || currentStatus === RecordStatus.ASSIGNED || currentStatus === RecordStatus.FIELD_WORK || currentStatus === RecordStatus.OFFICE_WORK || currentStatus === RecordStatus.PENDING_CHECK || currentStatus === RecordStatus.PENDING_SIGN)) {
         r.status = RecordStatus.SIGNED;
-    } else if ((r.submissionDate || r.submittedTo) && (!currentStatus || currentStatus === RecordStatus.RECEIVED || currentStatus === RecordStatus.ASSIGNED || currentStatus === RecordStatus.FIELD_WORK || currentStatus === RecordStatus.OFFICE_WORK || currentStatus === RecordStatus.PENDING_CHECK || currentStatus === RecordStatus.CHECKED)) {
+    } else if ((r.submissionDate || r.submittedTo || r.checkedDate) && (!currentStatus || currentStatus === RecordStatus.RECEIVED || currentStatus === RecordStatus.ASSIGNED || currentStatus === RecordStatus.FIELD_WORK || currentStatus === RecordStatus.OFFICE_WORK || currentStatus === RecordStatus.PENDING_CHECK)) {
         r.status = RecordStatus.PENDING_SIGN;
-    } else if (r.checkedDate && (!currentStatus || currentStatus === RecordStatus.RECEIVED || currentStatus === RecordStatus.ASSIGNED || currentStatus === RecordStatus.FIELD_WORK || currentStatus === RecordStatus.OFFICE_WORK || currentStatus === RecordStatus.PENDING_CHECK)) {
-        r.status = RecordStatus.CHECKED;
     } else if ((r.pendingCheckDate || r.checkedBy) && (!currentStatus || currentStatus === RecordStatus.RECEIVED || currentStatus === RecordStatus.ASSIGNED || currentStatus === RecordStatus.FIELD_WORK || currentStatus === RecordStatus.OFFICE_WORK)) {
         r.status = RecordStatus.PENDING_CHECK;
     } else if (currentStatus && Object.values(RecordStatus).includes(currentStatus as RecordStatus)) {
@@ -463,7 +461,7 @@ export const mapRecordFromDb = (item: any): any => {
                 r.submissionDate || r.submittedTo || r.approvalDate ||
                 r.completedDate || r.resultReturnedDate || r.exportBatch ||
                 r.status === RecordStatus.PENDING_CHECK ||
-                r.status === RecordStatus.CHECKED || r.status === RecordStatus.PENDING_SIGN ||
+                r.status === RecordStatus.PENDING_SIGN ||
                 r.status === RecordStatus.SIGNED || r.status === RecordStatus.HANDOVER ||
                 r.status === RecordStatus.RETURNED
             );

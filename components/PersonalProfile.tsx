@@ -282,8 +282,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
             else if (rawSt === 'executed' || rawSt === 'completed_work') status = RecordStatus.COMPLETED_WORK;
             else if (rawSt === 'pending_supplement') status = RecordStatus.PENDING_SUPPLEMENT;
             else if (rawSt === 'pending_check') status = RecordStatus.PENDING_CHECK;
-            else if (rawSt === 'checked') status = RecordStatus.CHECKED;
-            else if (rawSt === 'pending_sign') status = RecordStatus.PENDING_SIGN;
+            else if (rawSt === 'checked' || rawSt === 'pending_sign') status = RecordStatus.PENDING_SIGN;
             else if (rawSt === 'signed') status = RecordStatus.SIGNED;
             else if (rawSt === 'handover') status = RecordStatus.HANDOVER;
             else if (rawSt === 'completed') status = RecordStatus.RETURNED;
@@ -321,8 +320,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
             else if (rawSt === 'executed' || rawSt === 'completed_work') status = RecordStatus.COMPLETED_WORK;
             else if (rawSt === 'pending_supplement') status = RecordStatus.PENDING_SUPPLEMENT;
             else if (rawSt === 'pending_check') status = RecordStatus.PENDING_CHECK;
-            else if (rawSt === 'checked') status = RecordStatus.CHECKED;
-            else if (rawSt === 'pending_sign') status = RecordStatus.PENDING_SIGN;
+            else if (rawSt === 'checked' || rawSt === 'pending_sign') status = RecordStatus.PENDING_SIGN;
             else if (rawSt === 'signed') status = RecordStatus.SIGNED;
             else if (rawSt === 'handover') status = RecordStatus.HANDOVER;
             else if (rawSt === 'completed') status = RecordStatus.RETURNED;
@@ -495,8 +493,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
   const pendingCheckRecords = useMemo(() => {
     let list = myRecords.filter(
       (r) =>
-        r.status === RecordStatus.PENDING_CHECK ||
-        r.status === RecordStatus.CHECKED,
+        r.status === RecordStatus.PENDING_CHECK,
     );
     return filterAndSort(list, searchTerm, sortConfig);
   }, [myRecords, searchTerm, sortConfig]);
@@ -869,8 +866,6 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
           updatedRecord.completedWorkDate = nowIso;
         } else if (newStatus === RecordStatus.PENDING_CHECK) {
           updatedRecord.pendingCheckDate = nowIso;
-        } else if (newStatus === RecordStatus.CHECKED) {
-          updatedRecord.checkedDate = nowIso;
         } else if (newStatus === RecordStatus.PENDING_SIGN) {
           updatedRecord.submissionDate = nowIso;
         }
@@ -982,16 +977,6 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
         // Normal Record
         onUpdateStatus(record, RecordStatus.COMPLETED_WORK);
       }
-    }
-  };
-
-  const handleMarkAsChecked = async (record: RecordFile) => {
-    if (
-      await confirmAction(
-        `Xác nhận đã kiểm tra hồ sơ ${record.code}?\nHồ sơ sẽ chuyển sang trạng thái "Đã kiểm tra".`,
-      )
-    ) {
-      onUpdateStatus(record, RecordStatus.CHECKED);
     }
   };
 
@@ -1646,7 +1631,6 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                         <option value={RecordStatus.ASSIGNED}>Đã giao việc</option>
                         <option value={RecordStatus.COMPLETED_WORK}>Đã xong việc</option>
                         <option value={RecordStatus.PENDING_CHECK}>Chờ kiểm tra</option>
-                        <option value={RecordStatus.CHECKED}>Đã kiểm tra</option>
                         <option value={RecordStatus.PENDING_SIGN}>Chờ ký</option>
                         <option value={RecordStatus.SIGNED}>Đã ký</option>
                         <option value={RecordStatus.HANDOVER}>Đã bàn giao</option>
@@ -1884,8 +1868,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                                 ))}
 
                               {activeTab === "pending_check" &&
-                                (r.status === RecordStatus.PENDING_CHECK ||
-                                  r.status === RecordStatus.CHECKED) &&
+                                r.status === RecordStatus.PENDING_CHECK &&
                                 isChecker && (
                                   <button
                                     onClick={() => handleForwardToSign(r)}
@@ -2042,8 +2025,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                             ))}
 
                           {activeTab === "pending_check" &&
-                            (r.status === RecordStatus.PENDING_CHECK ||
-                              r.status === RecordStatus.CHECKED) &&
+                            r.status === RecordStatus.PENDING_CHECK &&
                             isChecker && (
                               <button
                                 onClick={() => handleForwardToSign(r)}

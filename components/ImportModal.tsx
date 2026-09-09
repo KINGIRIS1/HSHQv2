@@ -320,10 +320,8 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
                     explicitStatus = RecordStatus.RETURNED;
                 } else if (sStr.includes('KÝ DUYỆT') || sStr.includes('ĐÃ KÝ') || sStr.includes('SIGNED') || sStr.includes('LÃNH ĐẠO KÝ') || sStr.includes('ĐÃ KÝ DUYỆT')) {
                     explicitStatus = RecordStatus.SIGNED;
-                } else if (sStr.includes('CHỜ KÝ') || sStr.includes('PENDING_SIGN') || sStr.includes('TRÌNH KÝ') || sStr.includes('CHỜ KÝ DUYỆT')) {
+                } else if (sStr.includes('CHỜ KÝ') || sStr.includes('PENDING_SIGN') || sStr.includes('TRÌNH KÝ') || sStr.includes('CHỜ KÝ DUYỆT') || sStr.includes('ĐÃ KIỂM TRA') || sStr.includes('CHECKED') || sStr.includes('ĐÃ KT') || sStr.includes('KIỂM TRA XONG') || sStr.includes('ĐÃ DUYỆT')) {
                     explicitStatus = RecordStatus.PENDING_SIGN;
-                } else if (sStr.includes('ĐÃ KIỂM TRA') || sStr.includes('CHECKED') || sStr.includes('ĐÃ KT') || sStr.includes('KIỂM TRA XONG') || sStr.includes('ĐÃ DUYỆT')) {
-                    explicitStatus = RecordStatus.CHECKED;
                 } else if (sStr.includes('CHỜ KIỂM TRA') || sStr.includes('PENDING_CHECK') || sStr.includes('TRÌNH KIỂM TRA') || sStr.includes('CHỜ KT')) {
                     explicitStatus = RecordStatus.PENDING_CHECK;
                 } else if (sStr.includes('ĐÃ THỰC HIỆN') || sStr.includes('THỰC HIỆN XONG') || sStr.includes('COMPLETED_WORK') || sStr.includes('ĐO ĐẠC XONG') || sStr.includes('HOÀN THÀNH ĐO')) {
@@ -357,8 +355,6 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
                     if (!record.approvalDate) record.approvalDate = nowStr;
                 } else if (explicitStatus === RecordStatus.PENDING_SIGN) {
                     if (!record.submissionDate) record.submissionDate = nowStr;
-                } else if (explicitStatus === RecordStatus.CHECKED) {
-                    if (!record.checkedDate) record.checkedDate = nowStr;
                 } else if (explicitStatus === RecordStatus.PENDING_CHECK) {
                     if (!record.pendingCheckDate) record.pendingCheckDate = nowStr;
                 } else if (explicitStatus === RecordStatus.COMPLETED_WORK) {
@@ -374,10 +370,8 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
                     record.status = RecordStatus.HANDOVER;
                 } else if (record.approvalDate) {
                     record.status = RecordStatus.SIGNED;
-                } else if (record.submissionDate || record.submittedTo) {
+                } else if (record.submissionDate || record.submittedTo || record.checkedDate) {
                     record.status = RecordStatus.PENDING_SIGN;
-                } else if (record.checkedDate) {
-                    record.status = RecordStatus.CHECKED;
                 } else if (record.pendingCheckDate || record.checkedBy) {
                     record.status = RecordStatus.PENDING_CHECK;
                 } else if (record.completedWorkDate) {

@@ -184,7 +184,7 @@ export const mapArchiveRecordToLuutruDb = (r: Partial<ArchiveRecord>): any => {
     else if (rawSt === 'executed') status = RecordStatus.COMPLETED_WORK;
     else if (rawSt === 'pending_supplement') status = RecordStatus.PENDING_SUPPLEMENT;
     else if (rawSt === 'pending_check') status = RecordStatus.PENDING_CHECK;
-    else if (rawSt === 'checked') status = RecordStatus.CHECKED;
+    else if (rawSt === 'checked') status = RecordStatus.PENDING_SIGN;
     else if (rawSt === 'pending_sign') status = RecordStatus.PENDING_SIGN;
     else if (rawSt === 'signed') status = RecordStatus.SIGNED;
     else if (rawSt === 'completed') status = RecordStatus.RETURNED;

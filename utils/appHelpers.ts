@@ -1,5 +1,5 @@
 
-import { RecordFile, RecordStatus, Employee } from '../types';
+import { RecordFile, RecordStatus, Employee, User } from '../types';
 import { DEFAULT_HOLIDAYS, isArchiveRecordType } from '../constants';
 
 // --- HÀM TIỆN ÍCH XỬ LÝ CHUỖI TIẾNG VIỆT ---
@@ -425,7 +425,6 @@ export function processAssignmentTimelineCheck(
     record.approvalDate ||
     record.completedWorkDate ||
     record.status === RecordStatus.PENDING_CHECK ||
-    record.status === RecordStatus.CHECKED ||
     record.status === RecordStatus.PENDING_SIGN ||
     record.status === RecordStatus.SIGNED ||
     record.status === RecordStatus.COMPLETED_WORK
@@ -879,8 +878,8 @@ export function calculateEmployeeWorkload(
                 inProgressPlots += plotCount;
             }
 
-            // Đã hoàn thành: Hồ sơ đã qua bước kiểm tra (CHECKED, PENDING_SIGN, SIGNED, HANDOVER, RETURNED) mà do cán bộ này kiểm tra/xử lý
-            if ((r.status === RecordStatus.CHECKED || r.status === RecordStatus.PENDING_SIGN || r.status === RecordStatus.SIGNED || r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED) && (isCheckedBy || isAssigned || hasLog)) {
+            // Đã hoàn thành: Hồ sơ đã qua bước kiểm tra (PENDING_SIGN, SIGNED, HANDOVER, RETURNED) mà do cán bộ này kiểm tra/xử lý
+            if ((r.status === RecordStatus.PENDING_SIGN || r.status === RecordStatus.SIGNED || r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED) && (isCheckedBy || isAssigned || hasLog)) {
                 completedPlots += plotCount;
             }
         } else {
@@ -902,8 +901,8 @@ export function calculateEmployeeWorkload(
                 inProgressPlots += plotCount;
             }
 
-            // Đã hoàn thành: Hồ sơ chuyên viên đó chịu trách nhiệm (assignedTo hoặc có log) đã chuyển bước tiếp theo (PENDING_CHECK, CHECKED, PENDING_SIGN, SIGNED, HANDOVER, RETURNED)
-            if ((isAssigned || isSurveyor || isDrafter || hasLog) && (r.status === RecordStatus.PENDING_CHECK || r.status === RecordStatus.CHECKED || r.status === RecordStatus.PENDING_SIGN || r.status === RecordStatus.SIGNED || r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED)) {
+            // Đã hoàn thành: Hồ sơ chuyên viên đó chịu trách nhiệm (assignedTo hoặc có log) đã chuyển bước tiếp theo (PENDING_CHECK, PENDING_SIGN, SIGNED, HANDOVER, RETURNED)
+            if ((isAssigned || isSurveyor || isDrafter || hasLog) && (r.status === RecordStatus.PENDING_CHECK || r.status === RecordStatus.PENDING_SIGN || r.status === RecordStatus.SIGNED || r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED)) {
                 completedPlots += plotCount;
             }
         }
@@ -1004,22 +1003,17 @@ export function deriveActualSurveyStatus(record: Partial<RecordFile>): RecordSta
         return RecordStatus.SIGNED;
     }
 
-    // 4. Chờ ký duyệt (Đã trình ký)
-    if (record.submissionDate) {
+    // 4. Chờ ký duyệt (Đã trình ký hoặc có ngày kiểm tra)
+    if (record.submissionDate || record.checkedDate) {
         return RecordStatus.PENDING_SIGN;
     }
 
-    // 5. Đã kiểm tra
-    if (record.checkedDate) {
-        return RecordStatus.CHECKED;
-    }
-
-    // 6. Chờ kiểm tra (Đã trình kiểm tra)
+    // 5. Chờ kiểm tra (Đã trình kiểm tra)
     if (record.pendingCheckDate) {
         return RecordStatus.PENDING_CHECK;
     }
 
-    // 7. Hoàn thành xử lý / Hoàn thành biên tập
+    // 6. Hoàn thành xử lý / Hoàn thành biên tập
     if (record.completedWorkDate || record.officeCompletedDate) {
         return RecordStatus.COMPLETED_WORK;
     }
@@ -1027,17 +1021,17 @@ export function deriveActualSurveyStatus(record: Partial<RecordFile>): RecordSta
     const recType = record.recordType || '';
     const isArchive = isArchiveRecordType(recType);
 
-    // 8. Đang xử lý nội nghiệp / Biên tập bản đồ
+    // 7. Đang xử lý nội nghiệp / Biên tập bản đồ
     if (record.officeAssignedDate || (!isArchive && isOfficeOnlySurveyProcedure(recType) && (record.assignedDate || record.assignedTo))) {
         return RecordStatus.OFFICE_WORK;
     }
 
-    // 9. Đo đạc thực địa
+    // 8. Đo đạc thực địa
     if (record.fieldAssignedDate || record.fieldCompletedDate || (!isArchive && (record.assignedDate || record.assignedTo))) {
         return RecordStatus.FIELD_WORK;
     }
 
-    // 10. Đang thực hiện (Lưu trữ)
+    // 9. Đang thực hiện (Lưu trữ)
     if (isArchive && (record.assignedDate || record.assignedTo)) {
         return RecordStatus.IN_PROGRESS;
     }
@@ -1087,11 +1081,10 @@ const STATUS_RANK: Record<string, number> = {
     [RecordStatus.OFFICE_WORK]: 1.5,
     [RecordStatus.COMPLETED_WORK]: 2,
     [RecordStatus.PENDING_CHECK]: 3,
-    [RecordStatus.CHECKED]: 4,
-    [RecordStatus.PENDING_SIGN]: 5,
-    [RecordStatus.SIGNED]: 6,
-    [RecordStatus.HANDOVER]: 7,
-    [RecordStatus.RETURNED]: 8,
+    [RecordStatus.PENDING_SIGN]: 4,
+    [RecordStatus.SIGNED]: 5,
+    [RecordStatus.HANDOVER]: 6,
+    [RecordStatus.RETURNED]: 7,
     [RecordStatus.WITHDRAWN]: 99,
     [RecordStatus.REJECTED]: 99,
     [RecordStatus.PENDING_SUPPLEMENT]: 1.5
@@ -1313,8 +1306,6 @@ export function syncRecordStatusTransition(
             if (!currentRecord.officeAssignedDate && (currentRecord.assignedDate || updates.assignedDate)) {
                 updates.officeAssignedDate = currentRecord.fieldCompletedDate || currentRecord.assignedDate || updates.assignedDate;
             }
-        } else if (newStatus === RecordStatus.CHECKED) {
-            updates.checkedDate = options?.customDates?.checkedDate || currentRecord.checkedDate || effectiveTargetDate;
         } else if (newStatus === RecordStatus.PENDING_SIGN) {
             updates.submissionDate = options?.customDates?.submissionDate || currentRecord.submissionDate || effectiveTargetDate;
         } else if (newStatus === RecordStatus.SIGNED) {
@@ -1397,6 +1388,107 @@ export function deduplicateRecords<T extends { id?: string }>(records: T[]): T[]
     }
     return Array.from(uniqueMap.values());
 }
+
+/**
+ * Lấy tên người tiếp nhận hiển thị trên Biên nhận / Giấy tiếp nhận hồ sơ:
+ * 1. Nếu hồ sơ đã từng được gia hạn (Hồ sơ gia hạn): Lấy tên cán bộ thực hiện thao tác gia hạn (lần gia hạn gần nhất).
+ * 2. Nếu hồ sơ thông thường (không gia hạn): Cố định theo người tiếp nhận hồ sơ đầu tiên (từ statusLogs lúc RECEIVED, hoặc receivedBy/created_by ban đầu).
+ * 3. Fallback: Nếu là hồ sơ mới tạo chưa lưu, lấy currentUser.
+ */
+export function getReceiptReceiverName(
+    record: Partial<RecordFile> | null | undefined,
+    employees?: Employee[],
+    users?: User[],
+    fallbackCurrentUser?: User | null
+): string {
+    if (!record) {
+        return fallbackCurrentUser?.name || fallbackCurrentUser?.username || '';
+    }
+
+    const resolvePersonName = (identifier: string | null | undefined): string => {
+        if (!identifier) return '';
+        const trimmed = String(identifier).trim();
+        if (!trimmed) return '';
+
+        // Kiểm tra trong danh sách nhân viên (theo id hoặc name)
+        if (employees && employees.length > 0) {
+            const emp = employees.find(e => e.id === trimmed || e.name?.toLowerCase() === trimmed.toLowerCase());
+            if (emp && emp.name) return emp.name;
+        }
+
+        // Kiểm tra trong danh sách tài khoản (theo id, employeeId, username, name)
+        if (users && users.length > 0) {
+            const usr = users.find(u => 
+                u.id === trimmed || 
+                u.employeeId === trimmed || 
+                u.username?.toLowerCase() === trimmed.toLowerCase() || 
+                u.name?.toLowerCase() === trimmed.toLowerCase()
+            );
+            if (usr && usr.name) return usr.name;
+        }
+
+        return trimmed;
+    };
+
+    // --- BƯỚC 1: KIỂM TRA HỒ SƠ CÓ GIA HẠN KHÔNG ---
+    const allNotesText = `${record.privateNotes || ''}\n${record.notes || ''}`;
+    if (allNotesText.toLowerCase().includes('gia hạn') || allNotesText.toLowerCase().includes('gia han')) {
+        const lines = allNotesText.split('\n').reverse(); // Duyệt từ dưới lên để lấy lần gia hạn mới nhất
+        for (const line of lines) {
+            if (line.toLowerCase().includes('gia hạn') || line.toLowerCase().includes('gia han')) {
+                // Khớp mẫu: "(Thực hiện bởi: Nguyễn Văn A)" hoặc "(Bởi: Nguyễn Văn A lúc ...)"
+                const match1 = line.match(/\(Thực hiện bởi:\s*([^)]+?)\)/i);
+                if (match1 && match1[1]) {
+                    const resolved = resolvePersonName(match1[1].trim());
+                    if (resolved) return resolved;
+                }
+
+                const match2 = line.match(/\(Bởi:\s*([^)]+?)(?:\s+lúc|\))/i);
+                if (match2 && match2[1]) {
+                    const resolved = resolvePersonName(match2[1].trim());
+                    if (resolved) return resolved;
+                }
+
+                const match3 = line.match(/(?:Bởi|bởi|bởi cán bộ):\s*([^,\n\r()]+)/i);
+                if (match3 && match3[1]) {
+                    const resolved = resolvePersonName(match3[1].trim());
+                    if (resolved) return resolved;
+                }
+            }
+        }
+    }
+
+    // --- BƯỚC 2: HỒ SƠ KHÔNG GIA HẠN -> CỐ ĐỊNH NGƯỜI TIẾP NHẬN ĐẦU TIÊN ---
+    // A. Kiểm tra statusLogs xem ai là người tiếp nhận hồ sơ ban đầu
+    if (record.statusLogs && Array.isArray(record.statusLogs) && record.statusLogs.length > 0) {
+        const receivedLog = record.statusLogs.find(l => 
+            l.newStatus === RecordStatus.RECEIVED || 
+            l.note?.toLowerCase().includes('tiếp nhận') || 
+            l.note?.toLowerCase().includes('nhận hồ sơ')
+        ) || record.statusLogs[0];
+        
+        if (receivedLog && receivedLog.changedBy) {
+            const resolved = resolvePersonName(receivedLog.changedBy);
+            if (resolved) return resolved;
+        }
+    }
+
+    // B. Kiểm tra trường receivedBy hoặc created_by
+    if (record.receivedBy) {
+        const resolved = resolvePersonName(record.receivedBy);
+        if (resolved) return resolved;
+    }
+
+    const createdBy = (record as any).created_by;
+    if (createdBy) {
+        const resolved = resolvePersonName(createdBy);
+        if (resolved) return resolved;
+    }
+
+    // C. Fallback: currentUser nếu hồ sơ chưa có thông tin
+    return fallbackCurrentUser?.name || fallbackCurrentUser?.username || '';
+}
+
 
 
 

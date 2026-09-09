@@ -246,7 +246,6 @@ export const RecordSearch: React.FC<RecordSearchProps> = ({
         { value: 'DANG_THUC_HIEN', label: 'Đang thực hiện' },
         { value: 'PENDING_SUPPLEMENT', label: 'Chờ bổ sung' },
         { value: 'PENDING_CHECK', label: 'Chờ kiểm tra' },
-        { value: 'CHECKED', label: 'Đã kiểm tra' },
         { value: 'PENDING_SIGN', label: 'Chờ ký duyệt' },
         { value: 'SIGNED', label: 'Chờ bàn giao' },
         { value: 'HANDOVER', label: 'Đã giao 1 cửa' },
@@ -388,8 +387,6 @@ export const RecordSearch: React.FC<RecordSearchProps> = ({
                     targetDateStr = r.assignedDate || r.receivedDate;
                 } else if (targetStatus === RecordStatus.PENDING_CHECK) {
                     targetDateStr = r.pendingCheckDate || r.completedWorkDate || r.assignedDate || r.receivedDate;
-                } else if (targetStatus === RecordStatus.CHECKED) {
-                    targetDateStr = r.checkedDate || r.pendingCheckDate || r.assignedDate || r.receivedDate;
                 } else if (targetStatus === RecordStatus.PENDING_SIGN) {
                     targetDateStr = r.submissionDate || r.checkedDate || r.pendingCheckDate || r.receivedDate;
                 } else if (targetStatus === RecordStatus.SIGNED) {
@@ -517,10 +514,18 @@ export const RecordSearch: React.FC<RecordSearchProps> = ({
     const handleConfirmExtend = async (newDeadline: string, reason: string, executionDateStr: string) => {
         if (!selectedExtendRecord) return;
         try {
+            const userLabel = currentUser?.name || currentUser?.username || 'Cán bộ';
+            const nowStr = new Date().toLocaleString('vi-VN');
+            const extensionLog = `[Gia hạn ngày hẹn] Hạn cũ: ${formatDate(selectedExtendRecord.deadline)} -> Hạn mới: ${formatDate(newDeadline)}. Lý do: ${reason.trim()} (Bởi: ${userLabel} lúc ${nowStr})`;
+            
+            const existingPrivateNotes = selectedExtendRecord.privateNotes || '';
+            const updatedPrivateNotes = existingPrivateNotes ? `${existingPrivateNotes}\n${extensionLog}` : extensionLog;
+
             const updatedRecord: RecordFile = {
                 ...selectedExtendRecord,
                 deadline: newDeadline,
-                notes: `${selectedExtendRecord.notes || ''}\n[Gia hạn] Đến ngày ${formatDate(newDeadline)}. Lý do: ${reason}`.trim()
+                notes: `${selectedExtendRecord.notes || ''}\n[Gia hạn] Đến ngày ${formatDate(newDeadline)}. Lý do: ${reason}`.trim(),
+                privateNotes: updatedPrivateNotes
             };
             await onSave(updatedRecord);
             setSelectedExtendRecord(null);

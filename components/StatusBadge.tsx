@@ -19,7 +19,6 @@ const StatusBadge: React.FC<StatusBadgeProps> = ({ status }) => {
     [RecordStatus.OFFICE_WORK]: 'bg-indigo-500 animate-pulse',
     [RecordStatus.COMPLETED_WORK]: 'bg-cyan-500',
     [RecordStatus.PENDING_CHECK]: 'bg-orange-500',
-    [RecordStatus.CHECKED]: 'bg-teal-500',
     [RecordStatus.PENDING_SIGN]: 'bg-purple-500',
     [RecordStatus.SIGNED]: 'bg-indigo-500',
     [RecordStatus.HANDOVER]: 'bg-green-500 animate-pulse',

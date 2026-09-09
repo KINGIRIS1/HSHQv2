@@ -60,7 +60,7 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
     (targetField === 'historyStatus' && targetValue === 'SIGNING');
 
   const isPendingCheck = 
-    (targetField === 'status' && (targetValue === RecordStatus.PENDING_CHECK || targetValue === RecordStatus.CHECKED)) ||
+    (targetField === 'status' && targetValue === RecordStatus.PENDING_CHECK) ||
     (targetField === 'historyStatus' && targetValue === 'CHECKING');
 
   const isInProgress = 

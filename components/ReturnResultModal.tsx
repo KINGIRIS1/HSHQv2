@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { RecordFile, RecordStatus } from '../types';
-import { X, CheckCircle2, FileCheck, User, Receipt, DollarSign, Loader2, AlertCircle } from 'lucide-react';
+import { RecordFile } from '../types';
+import { X, CheckCircle2, FileCheck, User, Receipt, DollarSign, Loader2 } from 'lucide-react';
 import { fetchContracts } from '../services/api';
-import { isProcedure2_3 } from '../utils/appHelpers';
 
 interface ReturnResultModalProps {
   isOpen: boolean;
@@ -20,14 +19,6 @@ const ReturnResultModal: React.FC<ReturnResultModalProps> = ({
   const [returnedPrice, setReturnedPrice] = useState<string>('');
   const [isLoadingPrice, setIsLoadingPrice] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
-
-  // Tự động nhận diện hồ sơ Trả hủy / CSD rút hồ sơ / Thủ tục 2.3 (Miễn thu phí)
-  const isFeeExempt = Boolean(
-    record?.status === RecordStatus.REJECTED || 
-    record?.status === RecordStatus.WITHDRAWN ||
-    isProcedure2_3(record?.recordType) ||
-    (record?.statusLogs && record.statusLogs.some(l => l.newStatus === RecordStatus.REJECTED || l.newStatus === RecordStatus.WITHDRAWN || l.note?.includes('Trả hủy') || l.note?.includes('rút hồ sơ') || l.note?.includes('Miễn thu phí') || l.note?.includes('Thủ tục 2.3')))
-  );
   
   useEffect(() => {
     if (isOpen && record) {
@@ -35,21 +26,10 @@ const ReturnResultModal: React.FC<ReturnResultModalProps> = ({
         setReceiptNumber(record.receiptNumber || '');
         setReceiverName(record.receiverName || record.customerName || '');
         setErrorMsg('');
-
-        // Nếu là hồ sơ miễn thu phí (Trả hủy / CSD rút / Thủ tục 2.3)
-        if (record.status === RecordStatus.REJECTED || record.status === RecordStatus.WITHDRAWN || isProcedure2_3(record.recordType)) {
-            setReturnedPrice('0');
-            setReceiptNumber('');
-            return;
-        }
         
         const determinePrice = async () => {
             setIsLoadingPrice(true);
             try {
-                if (isProcedure2_3(record.recordType)) {
-                    setReturnedPrice('0');
-                    return;
-                }
                 // 1. Nếu hồ sơ đã có returnedPrice hoặc price được lưu
                 if (record.returnedPrice !== undefined && record.returnedPrice !== null) {
                     setReturnedPrice(record.returnedPrice.toString());
@@ -125,16 +105,6 @@ const ReturnResultModal: React.FC<ReturnResultModalProps> = ({
       e.preventDefault();
       setErrorMsg('');
 
-      if (isFeeExempt) {
-          if (!receiverName.trim()) {
-              setErrorMsg('Vui lòng nhập họ tên người đến nhận lại hồ sơ!');
-              return;
-          }
-          onConfirm('', receiverName.trim(), 0, undefined, '');
-          onClose();
-          return;
-      }
-
       if (!receiptNumber.trim()) {
           setErrorMsg(`Vui lòng nhập số ${receiptType.toLowerCase()}!`);
           return;
@@ -162,16 +132,16 @@ const ReturnResultModal: React.FC<ReturnResultModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[70] p-4 backdrop-blur-sm">
-      <div className={`bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col overflow-hidden animate-fade-in-up border ${isFeeExempt ? 'border-amber-200' : 'border-emerald-100'}`}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col overflow-hidden animate-fade-in-up border border-emerald-100">
         
         {/* Header */}
-        <div className={`px-5 py-4 ${isFeeExempt ? 'bg-amber-50/90 border-amber-200' : 'bg-emerald-50/80 border-emerald-100'} border-b flex justify-between items-center`}>
+        <div className="px-5 py-4 bg-emerald-50/80 border-emerald-100 border-b flex justify-between items-center">
             <div>
-                <h3 className={`font-bold ${isFeeExempt ? 'text-amber-900' : 'text-emerald-900'} text-lg flex items-center gap-2 leading-snug`}>
-                    <FileCheck size={20} className={isFeeExempt ? 'text-amber-700' : 'text-emerald-700'} /> 
-                    {isFeeExempt ? 'Bàn Giao Trả Hồ Sơ' : 'Trả Kết Quả Hồ Sơ'}
+                <h3 className="font-bold text-emerald-900 text-lg flex items-center gap-2 leading-snug">
+                    <FileCheck size={20} className="text-emerald-700" /> 
+                    Trả Kết Quả Hồ Sơ
                 </h3>
-                <p className={`text-xs ${isFeeExempt ? 'text-amber-700' : 'text-emerald-600'} font-bold font-mono mt-0.5`}>
+                <p className="text-xs text-emerald-600 font-bold font-mono mt-0.5">
                     {record.code} {record.customerName ? `— ${record.customerName}` : ''}
                 </p>
             </div>
@@ -191,107 +161,83 @@ const ReturnResultModal: React.FC<ReturnResultModalProps> = ({
                 </div>
             )}
 
-            {/* Thông báo miễn thu phí nếu là Trả hủy, CSD rút hồ sơ hoặc Thủ tục 2.3 */}
-            {isFeeExempt ? (
-                <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl space-y-1.5 shadow-xs">
-                    <div className="flex items-center gap-2 text-amber-900 font-bold text-sm">
-                        <AlertCircle size={18} className="text-amber-600 shrink-0" />
-                        <span>
-                            {record.status === RecordStatus.WITHDRAWN ? 'Hồ sơ CSD rút hồ sơ' : 
-                             record.status === RecordStatus.REJECTED ? 'Hồ sơ Trả hủy' : 
-                             'Hồ sơ Thủ tục 2.3'}
-                        </span>
-                    </div>
-                    <p className="text-xs text-amber-800 leading-relaxed font-medium">
-                        {isProcedure2_3(record.recordType) && record.status !== RecordStatus.WITHDRAWN && record.status !== RecordStatus.REJECTED
-                            ? 'Thủ tục 2.3 Duyệt đơn — Tự động nhận diện & <strong>Miễn thu phí</strong>, không phát hành Hóa đơn/Biên lai.'
-                            : 'Hồ sơ Trả hủy / CSD rút hồ sơ — <strong>Miễn thu phí</strong> và <strong>không phát hành Hóa đơn/Biên lai</strong>.'}
-                    </p>
-                </div>
-            ) : null}
-
             <div className="space-y-4">
-                {/* Khi không thuộc diện miễn phí: Nhập Số Biên lai / Hóa đơn & Số tiền */}
-                {!isFeeExempt && (
-                    <>
-                        {/* Field 1: Số Biên lai / Hóa đơn with toggle */}
-                        <div>
-                            <div className="flex items-center justify-between mb-2">
-                                <label className="block text-sm font-bold text-gray-800 flex items-center gap-2">
-                                    <Receipt size={18} className="text-blue-600"/> 
-                                    <span>Số {receiptType === 'Biên Lai' ? 'Biên Lai' : 'Hóa Đơn'}</span> 
-                                    <span className="text-red-500">*</span>
-                                </label>
-                                <div className="bg-gray-100 p-0.5 rounded-lg flex items-center gap-1 border border-gray-200 text-xs font-medium">
-                                    <button
-                                        type="button"
-                                        onClick={() => setReceiptType('Biên Lai')}
-                                        className={`px-3 py-1 rounded-md transition-all ${receiptType === 'Biên Lai' ? 'bg-white text-emerald-700 font-bold shadow-sm border border-emerald-200' : 'text-gray-500 hover:text-gray-800'}`}
-                                    >
-                                        Biên Lai
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setReceiptType('Hóa Đơn')}
-                                        className={`px-3 py-1 rounded-md transition-all ${receiptType === 'Hóa Đơn' ? 'bg-white text-emerald-700 font-bold shadow-sm border border-emerald-200' : 'text-gray-500 hover:text-gray-800'}`}
-                                    >
-                                        Hóa Đơn
-                                    </button>
-                                </div>
-                            </div>
-                            <input 
-                                type="text"
-                                required
-                                className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none font-medium text-gray-800 placeholder:text-gray-400"
-                                placeholder={`Nhập số ${receiptType.toLowerCase()}...`}
-                                value={receiptNumber}
-                                onChange={(e) => setReceiptNumber(e.target.value)}
-                            />
+                {/* Field 1: Số Biên lai / Hóa đơn with toggle */}
+                <div>
+                    <div className="flex items-center justify-between mb-2">
+                        <label className="block text-sm font-bold text-gray-800 flex items-center gap-2">
+                            <Receipt size={18} className="text-blue-600"/> 
+                            <span>Số {receiptType === 'Biên Lai' ? 'Biên Lai' : 'Hóa Đơn'}</span> 
+                            <span className="text-red-500">*</span>
+                        </label>
+                        <div className="bg-gray-100 p-0.5 rounded-lg flex items-center gap-1 border border-gray-200 text-xs font-medium">
+                            <button
+                                type="button"
+                                onClick={() => setReceiptType('Biên Lai')}
+                                className={`px-3 py-1 rounded-md transition-all ${receiptType === 'Biên Lai' ? 'bg-white text-emerald-700 font-bold shadow-sm border border-emerald-200' : 'text-gray-500 hover:text-gray-800'}`}
+                            >
+                                Biên Lai
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setReceiptType('Hóa Đơn')}
+                                className={`px-3 py-1 rounded-md transition-all ${receiptType === 'Hóa Đơn' ? 'bg-white text-emerald-700 font-bold shadow-sm border border-emerald-200' : 'text-gray-500 hover:text-gray-800'}`}
+                            >
+                                Hóa Đơn
+                            </button>
                         </div>
+                    </div>
+                    <input 
+                        type="text"
+                        required
+                        className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none font-medium text-gray-800 placeholder:text-gray-400"
+                        placeholder={`Nhập số ${receiptType.toLowerCase()}...`}
+                        value={receiptNumber}
+                        onChange={(e) => setReceiptNumber(e.target.value)}
+                    />
+                </div>
 
-                        {/* Field 2: Số tiền */}
-                        <div>
-                            <label className="block text-sm font-bold text-gray-800 mb-2 flex items-center gap-2">
-                                <DollarSign size={18} className="text-amber-500"/> 
-                                <span>Số tiền (VNĐ)</span> 
-                                <span className="text-red-500">*</span>
-                            </label>
-                            <div className="relative">
-                                <input 
-                                    type="number"
-                                    required
-                                    min="0"
-                                    className="w-full border border-gray-300 rounded-xl pl-4 pr-12 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none font-bold text-emerald-700 placeholder:text-gray-400"
-                                    placeholder="Nhập số tiền..."
-                                    value={returnedPrice}
-                                    onChange={(e) => setReturnedPrice(e.target.value)}
-                                    disabled={isLoadingPrice}
-                                />
-                                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">
-                                    {isLoadingPrice ? <Loader2 size={16} className="animate-spin text-emerald-500" /> : 'đ'}
-                                </div>
-                            </div>
-                            {returnedPrice.trim() && !isNaN(parseFloat(returnedPrice)) && (
-                                <p className="text-xs text-emerald-700 font-bold mt-1.5 bg-emerald-50 px-2.5 py-1 rounded-lg inline-block border border-emerald-100">
-                                    Thành tiền: {parseFloat(returnedPrice).toLocaleString('vi-VN')} đ
-                                </p>
-                            )}
-                        </div>
-                    </>
-                )}
-
-                {/* Field 3: Người nhận kết quả / nhận lại hồ sơ */}
+                {/* Field 2: Số tiền */}
                 <div>
                     <label className="block text-sm font-bold text-gray-800 mb-2 flex items-center gap-2">
-                        <User size={18} className={isFeeExempt ? 'text-amber-600' : 'text-purple-600'}/> 
-                        <span>{isFeeExempt ? 'Họ tên người đến nhận lại hồ sơ' : 'Người nhận kết quả'}</span> 
+                        <DollarSign size={18} className="text-amber-500"/> 
+                        <span>Số tiền (VNĐ)</span> 
+                        <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                        <input 
+                            type="number"
+                            required
+                            min="0"
+                            className="w-full border border-gray-300 rounded-xl pl-4 pr-12 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none font-bold text-emerald-700 placeholder:text-gray-400"
+                            placeholder="Nhập số tiền..."
+                            value={returnedPrice}
+                            onChange={(e) => setReturnedPrice(e.target.value)}
+                            disabled={isLoadingPrice}
+                        />
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">
+                            {isLoadingPrice ? <Loader2 size={16} className="animate-spin text-emerald-500" /> : 'đ'}
+                        </div>
+                    </div>
+                    {returnedPrice.trim() && !isNaN(parseFloat(returnedPrice)) && (
+                        <p className="text-xs text-emerald-700 font-bold mt-1.5 bg-emerald-50 px-2.5 py-1 rounded-lg inline-block border border-emerald-100">
+                            Thành tiền: {parseFloat(returnedPrice).toLocaleString('vi-VN')} đ
+                        </p>
+                    )}
+                </div>
+
+                {/* Field 3: Người nhận kết quả */}
+                <div>
+                    <label className="block text-sm font-bold text-gray-800 mb-2 flex items-center gap-2">
+                        <User size={18} className="text-purple-600"/> 
+                        <span>Người nhận kết quả</span> 
                         <span className="text-red-500">*</span>
                     </label>
                     <input 
                         type="text"
                         required
-                        className={`w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:ring-2 ${isFeeExempt ? 'focus:ring-amber-500 focus:border-amber-500' : 'focus:ring-emerald-500 focus:border-emerald-500'} outline-none font-medium text-gray-800 placeholder:text-gray-400 uppercase`}
-                        placeholder={isFeeExempt ? "Họ tên người đến nhận lại hồ sơ..." : "Họ tên người đến nhận..."}
+                        className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none font-medium text-gray-800 placeholder:text-gray-400 uppercase"
+                        placeholder="Họ tên người đến nhận..."
                         value={receiverName}
                         onChange={(e) => setReceiverName(e.target.value)}
                     />
@@ -309,9 +255,9 @@ const ReturnResultModal: React.FC<ReturnResultModalProps> = ({
                 </button>
                 <button 
                     type="submit"
-                    className={`flex items-center gap-2 px-5 py-2.5 ${isFeeExempt ? 'bg-amber-600 hover:bg-amber-700' : 'bg-emerald-600 hover:bg-emerald-700'} text-white rounded-xl font-bold text-sm shadow-sm transition-all active:scale-95 cursor-pointer`}
+                    className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm shadow-sm transition-all active:scale-95 cursor-pointer"
                 >
-                    <CheckCircle2 size={18} /> {isFeeExempt ? 'Xác nhận bàn giao trả' : 'Xác nhận trả kết quả'}
+                    <CheckCircle2 size={18} /> Xác nhận trả kết quả
                 </button>
             </div>
         </form>

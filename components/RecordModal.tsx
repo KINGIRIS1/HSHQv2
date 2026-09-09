@@ -126,20 +126,6 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
   const isOneDoor = currentUser.role === UserRole.ONEDOOR;
   const canEditResult = (hasAdminRights || isOneDoor) && isEdit;
 
-  const isExemptReceipt = Boolean(
-    isProcedure2_3(formData.recordType) ||
-    formData.status === RecordStatus.WITHDRAWN ||
-    formData.status === RecordStatus.REJECTED ||
-    (initialData?.statusLogs && initialData.statusLogs.some(l => 
-        l.newStatus === RecordStatus.REJECTED || 
-        l.newStatus === RecordStatus.WITHDRAWN || 
-        l.note?.includes('Trả hủy') || 
-        l.note?.includes('rút hồ sơ') || 
-        l.note?.includes('Miễn thu phí') ||
-        l.note?.includes('Thủ tục 2.3')
-    ))
-  );
-  
   const isArchiveView = [
     "archive_records",
     "archive_assign_tasks",
@@ -188,10 +174,6 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
 
             // Tự động đồng bộ số tiền (returnedPrice) nếu chưa có giống như màn hình Chi tiết và Trả kết quả
             const determinePrice = async () => {
-                if (isProcedure2_3(dataToSet.recordType)) {
-                    setFormData(prev => ({ ...prev, returnedPrice: 0, price: 0 }));
-                    return;
-                }
                 if (dataToSet.returnedPrice !== undefined && dataToSet.returnedPrice !== null) {
                     return;
                 }
@@ -322,7 +304,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
     const flow = [
         RecordStatus.RECEIVED, RecordStatus.ASSIGNED, RecordStatus.IN_PROGRESS, 
         RecordStatus.FIELD_WORK, RecordStatus.OFFICE_WORK,
-        RecordStatus.COMPLETED_WORK, RecordStatus.PENDING_CHECK, RecordStatus.CHECKED, 
+        RecordStatus.COMPLETED_WORK, RecordStatus.PENDING_CHECK, 
         RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER, RecordStatus.RETURNED
     ];
 
@@ -339,9 +321,6 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                 if (newIdx < flow.indexOf(RecordStatus.COMPLETED_WORK)) finalData.completedWorkDate = null as any;
                 if (newIdx < flow.indexOf(RecordStatus.PENDING_CHECK)) {
                     finalData.pendingCheckDate = null as any;
-                    finalData.checkedDate = null as any;
-                }
-                if (newIdx < flow.indexOf(RecordStatus.CHECKED)) {
                     finalData.checkedDate = null as any;
                 }
                 if (newIdx < flow.indexOf(RecordStatus.PENDING_SIGN)) {
@@ -381,11 +360,6 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                 finalData.completedDate = finalData.exportDate ? finalData.exportDate : new Date().toISOString();
             }
         }
-    }
-
-    if (isExemptReceipt) {
-        finalData.receiptNumber = '';
-        finalData.returnedPrice = 0;
     }
 
     // Áp dụng đồng bộ trạng thái trung tâm
@@ -470,7 +444,6 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
           RecordStatus.OFFICE_WORK,
           RecordStatus.COMPLETED_WORK,
           RecordStatus.PENDING_CHECK,
-          RecordStatus.CHECKED,
           RecordStatus.PENDING_SIGN,
           RecordStatus.SIGNED,
           RecordStatus.HANDOVER,
@@ -501,8 +474,6 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
           if (newIdx < statusFlow.indexOf(RecordStatus.PENDING_SIGN)) {
             rollbackFields.submissionDate = '';
             rollbackFields.submittedTo = '';
-          }
-          if (newIdx < statusFlow.indexOf(RecordStatus.CHECKED)) {
             rollbackFields.checkedDate = '';
             rollbackFields.checkedBy = '';
           }
@@ -540,7 +511,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
             officeCompletedDate: newIdx >= statusFlow.indexOf(RecordStatus.OFFICE_WORK) ? prev.officeCompletedDate : undefined,
             completedWorkDate: newIdx >= statusFlow.indexOf(RecordStatus.COMPLETED_WORK) ? prev.completedWorkDate : undefined,
             pendingCheckDate: newIdx >= statusFlow.indexOf(RecordStatus.PENDING_CHECK) ? prev.pendingCheckDate : undefined,
-            checkedDate: newIdx >= statusFlow.indexOf(RecordStatus.CHECKED) ? prev.checkedDate : undefined,
+            checkedDate: newIdx >= statusFlow.indexOf(RecordStatus.PENDING_SIGN) ? prev.checkedDate : undefined,
             submissionDate: newIdx >= statusFlow.indexOf(RecordStatus.PENDING_SIGN) ? prev.submissionDate : undefined,
             approvalDate: newIdx >= statusFlow.indexOf(RecordStatus.SIGNED) ? prev.approvalDate : undefined,
             completedDate: newIdx >= statusFlow.indexOf(RecordStatus.HANDOVER) ? prev.completedDate : undefined,
@@ -617,18 +588,18 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
 
       if (field === 'checkedDate') {
         if (value && (!updated.status || updated.status === RecordStatus.RECEIVED || updated.status === RecordStatus.ASSIGNED || updated.status === RecordStatus.IN_PROGRESS || updated.status === RecordStatus.FIELD_WORK || updated.status === RecordStatus.OFFICE_WORK || updated.status === RecordStatus.PENDING_CHECK)) {
-          updated.status = RecordStatus.CHECKED;
+          updated.status = RecordStatus.PENDING_SIGN;
         }
       }
 
       if (field === 'submissionDate') {
-        if (value && (!updated.status || updated.status === RecordStatus.RECEIVED || updated.status === RecordStatus.ASSIGNED || updated.status === RecordStatus.IN_PROGRESS || updated.status === RecordStatus.FIELD_WORK || updated.status === RecordStatus.OFFICE_WORK || updated.status === RecordStatus.PENDING_CHECK || updated.status === RecordStatus.CHECKED)) {
+        if (value && (!updated.status || updated.status === RecordStatus.RECEIVED || updated.status === RecordStatus.ASSIGNED || updated.status === RecordStatus.IN_PROGRESS || updated.status === RecordStatus.FIELD_WORK || updated.status === RecordStatus.OFFICE_WORK || updated.status === RecordStatus.PENDING_CHECK)) {
           updated.status = RecordStatus.PENDING_SIGN;
         }
       }
 
       if (field === 'approvalDate') {
-        if (value && (!updated.status || updated.status === RecordStatus.RECEIVED || updated.status === RecordStatus.ASSIGNED || updated.status === RecordStatus.IN_PROGRESS || updated.status === RecordStatus.FIELD_WORK || updated.status === RecordStatus.OFFICE_WORK || updated.status === RecordStatus.PENDING_CHECK || updated.status === RecordStatus.CHECKED || updated.status === RecordStatus.PENDING_SIGN)) {
+        if (value && (!updated.status || updated.status === RecordStatus.RECEIVED || updated.status === RecordStatus.ASSIGNED || updated.status === RecordStatus.IN_PROGRESS || updated.status === RecordStatus.FIELD_WORK || updated.status === RecordStatus.OFFICE_WORK || updated.status === RecordStatus.PENDING_CHECK || updated.status === RecordStatus.PENDING_SIGN)) {
           updated.status = RecordStatus.SIGNED;
         }
       }
@@ -687,9 +658,6 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
           if (!value) {
             updated.price = undefined;
             updated.returnedPrice = undefined;
-          } else if (isProcedure2_3(value)) {
-            updated.price = 0;
-            updated.returnedPrice = 0;
           } else {
             const rLower = String(value || '').toLowerCase();
             if (rLower.includes('1.2') || rLower.includes('công văn') || rLower.includes('cong van') || rLower.includes('sao lục') || value === '1.1 Sao lục' || value === '1.1 CC DL ĐĐ' || value === '1.1 Sao lục hồ sơ' || value === '1.1 Cung cấp dữ liệu đất đai') {
@@ -790,7 +758,6 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                                         RecordStatus.IN_PROGRESS,
                                         RecordStatus.COMPLETED_WORK,
                                         RecordStatus.PENDING_CHECK,
-                                        RecordStatus.CHECKED,
                                         RecordStatus.PENDING_SIGN,
                                         RecordStatus.SIGNED,
                                         RecordStatus.HANDOVER,
@@ -1195,9 +1162,8 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                                                 dateValue: formData.officeAssignedDate
                                             };
                                         case RecordStatus.PENDING_CHECK:
-                                        case RecordStatus.CHECKED:
                                             return {
-                                                stageTitle: formData.status === RecordStatus.CHECKED ? 'Bước Đã kiểm tra' : 'Bước Chờ kiểm tra',
+                                                stageTitle: 'Bước Chờ kiểm tra',
                                                 label: 'Cán bộ Kiểm tra hồ sơ',
                                                 field: 'checkedBy' as const,
                                                 value: formData.checkedBy || formData.assignedTo || '',
@@ -1308,7 +1274,6 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                                 RecordStatus.IN_PROGRESS,
                                 RecordStatus.COMPLETED_WORK,
                                 RecordStatus.PENDING_CHECK,
-                                RecordStatus.CHECKED,
                                 RecordStatus.PENDING_SIGN,
                                 RecordStatus.SIGNED,
                                 RecordStatus.HANDOVER,
@@ -1346,29 +1311,22 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                         {canEditResult && formData.status === RecordStatus.RETURNED && (
                             <div className="bg-emerald-50 p-4 rounded-lg border border-emerald-200">
                                 <h4 className="text-sm font-bold text-emerald-800 flex items-center gap-2 mb-3"><FileCheck size={16} /> TRẢ KẾT QUẢ CHO DÂN</h4>
-                                {isExemptReceipt ? (
-                                    <div className="w-full">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div>
                                         <label className="block text-xs font-bold text-emerald-700 mb-1">Ngày trả kết quả</label>
                                         <input type="date" className="w-full border border-emerald-300 rounded-md px-3 py-2 bg-white font-bold text-emerald-800" value={dateVal(formData.resultReturnedDate)} onChange={(e) => handleChange('resultReturnedDate', e.target.value)} />
                                     </div>
-                                ) : (
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                        <div>
-                                            <label className="block text-xs font-bold text-emerald-700 mb-1">Ngày trả kết quả</label>
-                                            <input type="date" className="w-full border border-emerald-300 rounded-md px-3 py-2 bg-white font-bold text-emerald-800" value={dateVal(formData.resultReturnedDate)} onChange={(e) => handleChange('resultReturnedDate', e.target.value)} />
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-bold text-emerald-700 mb-1">
-                                                {formData.receiptType === 'Biên Lai' ? 'Số Biên lai' : formData.receiptType === 'Hóa Đơn' ? 'Số Hóa đơn' : 'Số Biên lai / Hóa đơn'}
-                                            </label>
-                                            <input type="text" className="w-full border border-emerald-300 rounded-md px-3 py-2 font-mono bg-white" value={val(formData.receiptNumber)} onChange={(e) => handleChange('receiptNumber', e.target.value)} placeholder="Nhập số biên lai/hóa đơn..." />
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-bold text-emerald-700 mb-1">Số tiền (VNĐ)</label>
-                                            <input type="number" className="w-full border border-emerald-300 rounded-md px-3 py-2 font-bold text-emerald-900 bg-white" value={formData.returnedPrice !== undefined && formData.returnedPrice !== null ? formData.returnedPrice : ''} onChange={(e) => handleChange('returnedPrice', parseFloat(e.target.value) || 0)} placeholder="Nhập số tiền..." />
-                                        </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-emerald-700 mb-1">
+                                            {formData.receiptType === 'Biên Lai' ? 'Số Biên lai' : formData.receiptType === 'Hóa Đơn' ? 'Số Hóa đơn' : 'Số Biên lai / Hóa đơn'}
+                                        </label>
+                                        <input type="text" className="w-full border border-emerald-300 rounded-md px-3 py-2 font-mono bg-white" value={val(formData.receiptNumber)} onChange={(e) => handleChange('receiptNumber', e.target.value)} placeholder="Nhập số biên lai/hóa đơn..." />
                                     </div>
-                                )}
+                                    <div>
+                                        <label className="block text-xs font-bold text-emerald-700 mb-1">Số tiền (VNĐ)</label>
+                                        <input type="number" className="w-full border border-emerald-300 rounded-md px-3 py-2 font-bold text-emerald-900 bg-white" value={formData.returnedPrice !== undefined && formData.returnedPrice !== null ? formData.returnedPrice : ''} onChange={(e) => handleChange('returnedPrice', parseFloat(e.target.value) || 0)} placeholder="Nhập số tiền..." />
+                                    </div>
+                                </div>
                             </div>
                         )}
                     </div>

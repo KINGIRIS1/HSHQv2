@@ -89,7 +89,7 @@ export const KiemTraDoDacTab: React.FC<KiemTraDoDacTabProps> = ({
 
         records.forEach(r => {
             const isMeasuringDept = getDepartmentForRecord(r) === 'Tổ Đo đạc' || getDepartmentForRecord(r) === 'Đo đạc';
-            const isAllowedStatus = [RecordStatus.PENDING_CHECK, RecordStatus.CHECKED, RecordStatus.PENDING_SIGN].includes(r.status);
+            const isAllowedStatus = [RecordStatus.PENDING_CHECK, RecordStatus.PENDING_SIGN].includes(r.status);
             const isNotInProgress = r.status !== RecordStatus.IN_PROGRESS;
             
             if (isMeasuringDept && isAllowedStatus && isNotInProgress) {
@@ -265,7 +265,6 @@ export const KiemTraDoDacTab: React.FC<KiemTraDoDacTabProps> = ({
     const eligibleRecords = useMemo(() => {
         const allowedStatuses = [
             RecordStatus.PENDING_CHECK,
-            RecordStatus.CHECKED,
             RecordStatus.PENDING_SIGN,
             RecordStatus.SIGNED,
             RecordStatus.HANDOVER,
@@ -334,7 +333,6 @@ export const KiemTraDoDacTab: React.FC<KiemTraDoDacTabProps> = ({
             } else if (groupBy === 'status') {
                 if (r.status === RecordStatus.PENDING_CHECK) key = 'Chờ kiểm tra';
                 else if (r.status === RecordStatus.PENDING_SIGN) key = 'Chờ ký duyệt';
-                else if (r.status === RecordStatus.CHECKED) key = 'Đã kiểm tra';
                 else key = 'Đã hoàn thành bước kiểm tra';
             } else if (groupBy === 'ward') {
                 key = r.ward || 'Chưa rõ xã/phường';
@@ -443,14 +441,14 @@ export const KiemTraDoDacTab: React.FC<KiemTraDoDacTabProps> = ({
                 assignedDate: assDateVal ? new Date(assDateVal + "T12:00:00").toISOString() : undefined,
                 assignedTo: assToVal || undefined,
                 exportDate: expDateVal ? new Date(expDateVal + "T12:00:00").toISOString() : undefined,
-                status: (record.status === RecordStatus.PENDING_CHECK && inspector) ? RecordStatus.CHECKED : record.status,
+                status: (record.status === RecordStatus.PENDING_CHECK && inspector) ? RecordStatus.PENDING_SIGN : record.status,
                 statusLogs: [
                     ...(record.statusLogs || []),
                     {
                         id: Math.random().toString(36).substr(2, 9),
                         recordId: record.id,
                         previousStatus: record.status,
-                        newStatus: (record.status === RecordStatus.PENDING_CHECK && inspector) ? RecordStatus.CHECKED : record.status,
+                        newStatus: (record.status === RecordStatus.PENDING_CHECK && inspector) ? RecordStatus.PENDING_SIGN : record.status,
                         changedBy: inspector || 'Hệ thống',
                         changedAt: new Date().toISOString(),
                         note: `Cập nhật thủ công kiểm tra đo đạc.`
@@ -521,7 +519,7 @@ export const KiemTraDoDacTab: React.FC<KiemTraDoDacTabProps> = ({
                 setImportStatusText(`Đang xử lý hồ sơ: ${r.code}`);
 
                 const finalStatus = (r.status === RecordStatus.PENDING_CHECK && (updateFields.checkedBy || r.checkedBy))
-                    ? RecordStatus.CHECKED
+                    ? RecordStatus.PENDING_SIGN
                     : r.status;
 
                 const updated: RecordFile = {
@@ -707,7 +705,7 @@ export const KiemTraDoDacTab: React.FC<KiemTraDoDacTabProps> = ({
 
                         const hasPerson = recordUpdates[personField] || targetRecord[personField];
                         const finalStatus = (targetRecord.status === RecordStatus.PENDING_CHECK && personField === 'checkedBy' && hasPerson) 
-                            ? RecordStatus.CHECKED 
+                            ? RecordStatus.PENDING_SIGN 
                             : targetRecord.status;
 
                         if (Object.keys(recordUpdates).length > 0 || finalStatus !== targetRecord.status) {

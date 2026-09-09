@@ -10,7 +10,7 @@ import DocxPreviewModal from './DocxPreviewModal';
 import { updateRecordApi, fetchContracts } from '../services/api';
 import SystemReceiptTemplate from './receive-record/SystemReceiptTemplate';
 import SystemAnnexTemplate from './receive-record/SystemAnnexTemplate';
-import { getEmployeeName as getEmpNameHelper, isProcedure2_3, getPureBatchNumber, isFieldWorkProcedure, isOfficeOnlySurveyProcedure } from '../utils/appHelpers';
+import { getEmployeeName as getEmpNameHelper, getPureBatchNumber, isFieldWorkProcedure, isOfficeOnlySurveyProcedure, getReceiptReceiverName } from '../utils/appHelpers';
 
 
 interface DetailModalProps {
@@ -421,9 +421,9 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
         NGAY_HEN_FULL: deadlineFullString,
         
         // --- NHÓM CÁN BỘ ---
-        NGUOI_NHAN: val(currentUser?.name), 
-        CAN_BO: val(currentUser?.name),
-        USER: val(currentUser?.name),
+        NGUOI_NHAN: val(getReceiptReceiverName(record, employees, users, currentUser)), 
+        CAN_BO: val(getReceiptReceiverName(record, employees, users, currentUser)),
+        USER: val(getReceiptReceiverName(record, employees, users, currentUser)),
         
         // --- NHÓM NỘI DUNG ---
         NOI_DUNG: val(record.content),
@@ -491,15 +491,11 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
 
   // LOGIC CHECK TIẾN ĐỘ & THỜI GIAN (Đồng bộ tuyệt đối theo trạng thái hiện tại hoặc khi có mốc ngày)
   const isWorkDone = !!record.assignedDate || !!record.completedWorkDate || [
-      RecordStatus.ASSIGNED, RecordStatus.IN_PROGRESS, RecordStatus.COMPLETED_WORK, RecordStatus.PENDING_CHECK, RecordStatus.CHECKED, RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER, RecordStatus.RETURNED
+      RecordStatus.ASSIGNED, RecordStatus.IN_PROGRESS, RecordStatus.COMPLETED_WORK, RecordStatus.PENDING_CHECK, RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER, RecordStatus.RETURNED
   ].includes(record.status);
   
   const isPendingCheckActive = !!record.pendingCheckDate || !!record.checkedDate || [
-      RecordStatus.PENDING_CHECK, RecordStatus.CHECKED, RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER, RecordStatus.RETURNED
-  ].includes(record.status);
-
-  const isCheckedActive = !!record.checkedDate || [
-      RecordStatus.CHECKED, RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER, RecordStatus.RETURNED
+      RecordStatus.PENDING_CHECK, RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER, RecordStatus.RETURNED
   ].includes(record.status);
 
   const isPendingSignActive = !!record.submissionDate || !!record.approvalDate || [
@@ -532,7 +528,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
             </div>
             
             <div className="flex items-center gap-1.5 shrink-0">
-                {onOpenRejectReturnModal && record && (record.status === RecordStatus.PENDING_CHECK || record.status === RecordStatus.CHECKED || record.status === RecordStatus.PENDING_SIGN || record.status === RecordStatus.SIGNED) && (
+                {onOpenRejectReturnModal && record && (record.status === RecordStatus.PENDING_CHECK || record.status === RecordStatus.PENDING_SIGN || record.status === RecordStatus.SIGNED) && (
                     <button
                         onClick={() => { onClose(); onOpenRejectReturnModal(record); }}
                         className="p-1.5 text-rose-600 hover:bg-rose-50 active:bg-rose-100 rounded-lg transition-colors shrink-0 min-w-[36px] min-h-[36px] flex items-center justify-center"
@@ -834,59 +830,38 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                         )}
 
                         {/* KHU VỰC THÔNG TIN THU PHÍ & TRẢ KẾT QUẢ */}
-                        {(() => {
-                            const isExemptRecord = Boolean(
-                                record.status === RecordStatus.REJECTED || 
-                                record.status === RecordStatus.WITHDRAWN ||
-                                isProcedure2_3(record.recordType) ||
-                                (record.returnedPrice === 0 && !record.receiptNumber && record.status === RecordStatus.RETURNED) ||
-                                (record.statusLogs && record.statusLogs.some(l => 
-                                    l.newStatus === RecordStatus.REJECTED || 
-                                    l.newStatus === RecordStatus.WITHDRAWN || 
-                                    l.note?.includes('Trả hủy') || 
-                                    l.note?.includes('rút hồ sơ') || 
-                                    l.note?.includes('Miễn thu phí') ||
-                                    l.note?.includes('Thủ tục 2.3')
-                                ))
-                            );
+                        {(record.status === RecordStatus.RETURNED || record.receiptNumber || (record.returnedPrice !== undefined && record.returnedPrice !== null)) && (
+                            <div className="border-t border-gray-100 pt-4 mt-2">
+                                <label className="text-[11px] font-bold text-slate-700 uppercase block mb-2.5 flex items-center gap-1.5">
+                                    <Receipt size={15} className="text-emerald-600" />
+                                    <span>Thông tin Trả kết quả & Thu phí / Lệ phí</span>
+                                </label>
+                                
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    {/* Thẻ Số tiền */}
+                                    <div className="bg-emerald-50/80 p-3 rounded-xl border border-emerald-200/80 flex flex-col justify-center min-w-0">
+                                        <label className="text-[10px] text-emerald-700 uppercase font-bold block whitespace-nowrap truncate">
+                                            Số tiền thu
+                                        </label>
+                                        <p className="text-sm font-black text-emerald-800 whitespace-nowrap truncate mt-0.5">
+                                            {record.returnedPrice !== undefined && record.returnedPrice !== null
+                                                ? record.returnedPrice.toLocaleString('vi-VN') + ' đ'
+                                                : '---'}
+                                        </p>
+                                    </div>
 
-                            if (isExemptRecord) {
-                                return null;
-                            }
-
-                            return (
-                                <div className="border-t border-gray-100 pt-4 mt-2">
-                                    <label className="text-[11px] font-bold text-slate-700 uppercase block mb-2.5 flex items-center gap-1.5">
-                                        <Receipt size={15} className="text-emerald-600" />
-                                        <span>Thông tin Trả kết quả & Thu phí / Lệ phí</span>
-                                    </label>
-                                    
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                        {/* Thẻ Số tiền */}
-                                        <div className="bg-emerald-50/80 p-3 rounded-xl border border-emerald-200/80 flex flex-col justify-center min-w-0">
-                                            <label className="text-[10px] text-emerald-700 uppercase font-bold block whitespace-nowrap truncate">
-                                                Số tiền thu
-                                            </label>
-                                            <p className="text-sm font-black text-emerald-800 whitespace-nowrap truncate mt-0.5">
-                                                {record.returnedPrice !== undefined && record.returnedPrice !== null
-                                                    ? record.returnedPrice.toLocaleString('vi-VN') + ' đ'
-                                                    : '---'}
-                                            </p>
-                                        </div>
-
-                                        {/* Thẻ Số BL/HĐ */}
-                                        <div className="bg-blue-50/80 p-3 rounded-xl border border-blue-200/80 flex flex-col justify-center min-w-0">
-                                            <label className="text-[10px] text-blue-700 uppercase font-bold block whitespace-nowrap truncate">
-                                                {record.receiptType === 'Biên Lai' ? 'SỐ BIÊN LAI' : record.receiptType === 'Hóa Đơn' ? 'SỐ HÓA ĐƠN' : 'SỐ BIÊN LAI / HÓA ĐƠN'}
-                                            </label>
-                                            <p className="text-xs font-black text-blue-900 font-mono whitespace-nowrap truncate mt-0.5">
-                                                {record.receiptNumber || '---'}
-                                            </p>
-                                        </div>
+                                    {/* Thẻ Số BL/HĐ */}
+                                    <div className="bg-blue-50/80 p-3 rounded-xl border border-blue-200/80 flex flex-col justify-center min-w-0">
+                                        <label className="text-[10px] text-blue-700 uppercase font-bold block whitespace-nowrap truncate">
+                                            {record.receiptType === 'Biên Lai' ? 'SỐ BIÊN LAI' : record.receiptType === 'Hóa Đơn' ? 'SỐ HÓA ĐƠN' : 'SỐ BIÊN LAI / HÓA ĐƠN'}
+                                        </label>
+                                        <p className="text-xs font-black text-blue-900 font-mono whitespace-nowrap truncate mt-0.5">
+                                            {record.receiptNumber || '---'}
+                                        </p>
                                     </div>
                                 </div>
-                            );
-                        })()}
+                            </div>
+                        )}
 
                         {/* Ghi chú nội bộ */}
                         {record.privateNotes && (
@@ -938,7 +913,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                               <>
                                 <TimelineItem 
                                     date={record.fieldAssignedDate || (record.status === RecordStatus.FIELD_WORK || record.status === RecordStatus.ASSIGNED ? record.assignedDate : null)} 
-                                    forceActive={Boolean(record.fieldAssignedDate || record.surveyorId || record.status === RecordStatus.FIELD_WORK || record.status === RecordStatus.OFFICE_WORK || isPendingCheckActive || isCheckedActive || isPendingSignActive || isSignedActive || isHandoverActive || isReturnedActive || isWorkDone)}
+                                    forceActive={Boolean(record.fieldAssignedDate || record.surveyorId || record.status === RecordStatus.FIELD_WORK || record.status === RecordStatus.OFFICE_WORK || isPendingCheckActive || isPendingSignActive || isSignedActive || isHandoverActive || isReturnedActive || isWorkDone)}
                                     label="ĐO ĐẠC THỰC ĐỊA" 
                                     icon={UserIcon}
                                     colorClass={{text: 'text-blue-700', border: 'border-blue-600', bg: 'bg-blue-600'}}
@@ -952,7 +927,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                                 />
                                 <TimelineItem 
                                     date={record.officeAssignedDate || record.fieldCompletedDate || (record.status === RecordStatus.OFFICE_WORK ? record.assignedDate : (isPendingCheckActive ? (record.fieldCompletedDate || record.assignedDate) : null))} 
-                                    forceActive={Boolean(record.officeAssignedDate || record.drafterId || record.status === RecordStatus.OFFICE_WORK || isPendingCheckActive || isCheckedActive || isPendingSignActive || isSignedActive || isHandoverActive || isReturnedActive)}
+                                    forceActive={Boolean(record.officeAssignedDate || record.drafterId || record.status === RecordStatus.OFFICE_WORK || isPendingCheckActive || isPendingSignActive || isSignedActive || isHandoverActive || isReturnedActive)}
                                     label="BIÊN TẬP BẢN ĐỒ" 
                                     icon={UserIcon}
                                     colorClass={{text: 'text-indigo-700', border: 'border-indigo-600', bg: 'bg-indigo-600'}}
@@ -996,7 +971,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                             {!isArchiveRecordType(record.recordType) && (
                                 <TimelineItem 
                                     date={record.pendingCheckDate || record.checkedDate} 
-                                    forceActive={isPendingCheckActive || isCheckedActive}
+                                    forceActive={isPendingCheckActive}
                                     label="TRÌNH KIỂM TRA" 
                                     icon={Send}
                                     colorClass={{text: 'text-orange-700', border: 'border-orange-600', bg: 'bg-orange-600'}}
@@ -1063,6 +1038,8 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                 receivingWard={employees.find(e => e.id === currentUser?.employeeId)?.managedWards?.[0] || 'Tân Khai'}
                 onClose={() => setSystemReceiptData(null)} 
                 currentUser={currentUser}
+                employees={employees}
+                users={users}
                 onCreateContract={onCreateContract}
             />
         )}

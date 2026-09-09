@@ -1,7 +1,8 @@
 import React, { useRef } from 'react';
 import Barcode from 'react-barcode';
-import { RecordFile } from '../../types';
+import { RecordFile, Employee, User } from '../../types';
 import { getNormalizedWard, getShortRecordType, getFullRecordType, getWardFullLabel } from '../../constants';
+import { getReceiptReceiverName } from '../../utils/appHelpers';
 import { Printer, FileSignature } from 'lucide-react';
 
 interface SystemReceiptTemplateProps {
@@ -9,10 +10,12 @@ interface SystemReceiptTemplateProps {
     receivingWard: string;
     onClose: () => void;
     currentUser?: any;
+    employees?: Employee[];
+    users?: User[];
     onCreateContract?: (record: Partial<RecordFile>) => void;
 }
 
-const SystemReceiptTemplate: React.FC<SystemReceiptTemplateProps> = ({ data, receivingWard, onClose, currentUser, onCreateContract }) => {
+const SystemReceiptTemplate: React.FC<SystemReceiptTemplateProps> = ({ data, receivingWard, onClose, currentUser, employees, users, onCreateContract }) => {
     const receiptRef = useRef<HTMLDivElement>(null);
     const controlSlipRef = useRef<HTMLDivElement>(null);
 
@@ -241,7 +244,8 @@ const SystemReceiptTemplate: React.FC<SystemReceiptTemplateProps> = ({ data, rec
         return `ngày ${day} tháng ${month} năm ${year}`;
     };
 
-    const currentUserName = currentUser?.name || currentUser?.username || 'NGUYỄN HỮU TRÍ';
+    const receiverOfficerName = getReceiptReceiverName(data, employees, users, currentUser) || currentUser?.name || currentUser?.username || 'NGUYỄN HỮU TRÍ';
+    const currentUserName = receiverOfficerName;
     const wardName = getNormalizedWard(data.ward || '');
 
     const getDisplayLandAddress = () => {

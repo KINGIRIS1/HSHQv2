@@ -15,7 +15,7 @@ import DocxPreviewModal from '../DocxPreviewModal';
 import { updateRecordApi, fetchContracts } from '../../services/api';
 import SystemReceiptTemplate from '../receive-record/SystemReceiptTemplate';
 import SystemAnnexTemplate from '../receive-record/SystemAnnexTemplate';
-import { cleanSyncNotes, isProcedure2_3, getPureBatchNumber, isFieldWorkProcedure, isOfficeOnlySurveyProcedure } from '../../utils/appHelpers';
+import { cleanSyncNotes, getPureBatchNumber, isFieldWorkProcedure, isOfficeOnlySurveyProcedure, getReceiptReceiverName } from '../../utils/appHelpers';
 
 interface MobileDetailModalProps {
   isOpen: boolean;
@@ -349,9 +349,9 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
         DEADLINE: deadlineShortString,
         HEN_TRA_FULL: deadlineFullString,
         NGAY_HEN_FULL: deadlineFullString,
-        NGUOI_NHAN: val(currentUser?.name), 
-        CAN_BO: val(currentUser?.name),
-        USER: val(currentUser?.name),
+        NGUOI_NHAN: val(getReceiptReceiverName(record, employees, users, currentUser)), 
+        CAN_BO: val(getReceiptReceiverName(record, employees, users, currentUser)),
+        USER: val(getReceiptReceiverName(record, employees, users, currentUser)),
         NOI_DUNG: val(record.content),
         CONTENT: val(record.content),
         LOAI_HS: val(record.recordType), 
@@ -403,17 +403,13 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
   };
 
   const isWorkDone = [
-    RecordStatus.COMPLETED_WORK, RecordStatus.PENDING_CHECK, RecordStatus.CHECKED, RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, 
+    RecordStatus.COMPLETED_WORK, RecordStatus.PENDING_CHECK, RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, 
     RecordStatus.HANDOVER, RecordStatus.RETURNED
   ].includes(record.status) || !!record.completedWorkDate;
   
   const isPendingCheckActive = [
-      RecordStatus.PENDING_CHECK, RecordStatus.CHECKED, RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER, RecordStatus.RETURNED
-  ].includes(record.status) || !!record.pendingCheckDate;
-
-  const isCheckedActive = [
-      RecordStatus.CHECKED, RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER, RecordStatus.RETURNED
-  ].includes(record.status) || !!record.checkedDate;
+      RecordStatus.PENDING_CHECK, RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER, RecordStatus.RETURNED
+  ].includes(record.status) || !!record.pendingCheckDate || !!record.checkedDate;
 
   const isPendingSignActive = [
       RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER, RecordStatus.RETURNED
@@ -686,7 +682,7 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                   <>
                     <TimelineItem 
                       date={record.fieldAssignedDate || (record.status === RecordStatus.FIELD_WORK || record.status === RecordStatus.ASSIGNED ? record.assignedDate : null)} 
-                      forceActive={Boolean(record.fieldAssignedDate || record.surveyorId || record.status === RecordStatus.FIELD_WORK || record.status === RecordStatus.OFFICE_WORK || isPendingCheckActive || isCheckedActive || isPendingSignActive || isSignedActive || isHandoverActive || isReturnedActive || isWorkDone)}
+                      forceActive={Boolean(record.fieldAssignedDate || record.surveyorId || record.status === RecordStatus.FIELD_WORK || record.status === RecordStatus.OFFICE_WORK || isPendingCheckActive || isPendingSignActive || isSignedActive || isHandoverActive || isReturnedActive || isWorkDone)}
                       label="ĐO ĐẠC THỰC ĐỊA" 
                       icon={UserIcon}
                       colorClass={{text: 'text-blue-600', border: 'border-blue-600', bg: 'bg-blue-600'}}
@@ -700,7 +696,7 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                     />
                     <TimelineItem 
                       date={record.officeAssignedDate || record.fieldCompletedDate || (record.status === RecordStatus.OFFICE_WORK ? record.assignedDate : (isPendingCheckActive ? (record.fieldCompletedDate || record.assignedDate) : null))} 
-                      forceActive={Boolean(record.officeAssignedDate || record.drafterId || record.status === RecordStatus.OFFICE_WORK || isPendingCheckActive || isCheckedActive || isPendingSignActive || isSignedActive || isHandoverActive || isReturnedActive)}
+                      forceActive={Boolean(record.officeAssignedDate || record.drafterId || record.status === RecordStatus.OFFICE_WORK || isPendingCheckActive || isPendingSignActive || isSignedActive || isHandoverActive || isReturnedActive)}
                       label="BIÊN TẬP BẢN ĐỒ" 
                       icon={UserIcon}
                       colorClass={{text: 'text-indigo-600', border: 'border-indigo-600', bg: 'bg-indigo-600'}}
@@ -743,7 +739,7 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                 {!isArchiveRecordType(record.recordType) && (
                   <TimelineItem 
                     date={record.pendingCheckDate || record.checkedDate} 
-                    forceActive={isPendingCheckActive || isCheckedActive}
+                    forceActive={isPendingCheckActive}
                     label="TRÌNH KIỂM TRA" 
                     icon={Send}
                     colorClass={{text: 'text-orange-600', border: 'border-orange-600', bg: 'bg-orange-600'}}
@@ -929,6 +925,8 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
             receivingWard={employees.find(e => e.id === currentUser?.employeeId)?.managedWards?.[0] || 'Tân Khai'}
             onClose={() => setSystemReceiptData(null)} 
             currentUser={currentUser}
+            employees={employees}
+            users={users}
             onCreateContract={onCreateContract}
         />
       )}

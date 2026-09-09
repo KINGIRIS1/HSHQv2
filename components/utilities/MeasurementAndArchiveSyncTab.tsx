@@ -228,14 +228,14 @@ export const MeasurementAndArchiveSyncTab: React.FC<MeasurementAndArchiveSyncTab
                     ...r,
                     checkedBy: r.checkedBy || inspectorId,
                     checkedDate: r.checkedDate || isoDate,
-                    status: r.status === RecordStatus.RECEIVED || r.status === RecordStatus.ASSIGNED || r.status === RecordStatus.IN_PROGRESS || r.status === RecordStatus.COMPLETED_WORK || r.status === RecordStatus.PENDING_CHECK ? RecordStatus.CHECKED : r.status,
+                    status: r.status === RecordStatus.RECEIVED || r.status === RecordStatus.ASSIGNED || r.status === RecordStatus.IN_PROGRESS || r.status === RecordStatus.COMPLETED_WORK || r.status === RecordStatus.PENDING_CHECK ? RecordStatus.PENDING_SIGN : r.status,
                     statusLogs: [
                         ...(r.statusLogs || []),
                         {
                             id: Math.random().toString(36).substr(2, 9),
                             recordId: r.id,
                             previousStatus: r.status,
-                            newStatus: RecordStatus.CHECKED,
+                            newStatus: RecordStatus.PENDING_SIGN,
                             changedBy: inspectorId,
                             changedAt: new Date().toISOString(),
                             note: `Vá lỗi đồng loạt: Bổ sung ngày kiểm tra (${checkDate}) và người kiểm tra.`

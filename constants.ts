@@ -18,7 +18,6 @@ export const STATUS_LABELS: Record<RecordStatus, string> = {
   [RecordStatus.COMPLETED_WORK]: 'Đã thực hiện',
   [RecordStatus.PENDING_SUPPLEMENT]: 'Chờ bổ sung',
   [RecordStatus.PENDING_CHECK]: 'Chờ kiểm tra',
-  [RecordStatus.CHECKED]: 'Đã kiểm tra',
   [RecordStatus.PENDING_SIGN]: 'Chờ ký duyệt',
   [RecordStatus.SIGNED]: 'Chờ bàn giao',
   [RecordStatus.HANDOVER]: 'Đã giao 1 cửa',
@@ -34,7 +33,6 @@ export const SELECTABLE_STATUSES: { key: RecordStatus; label: string }[] = [
   { key: RecordStatus.OFFICE_WORK, label: 'Biên tập bản đồ' },
   { key: RecordStatus.PENDING_SUPPLEMENT, label: 'Chờ bổ sung' },
   { key: RecordStatus.PENDING_CHECK, label: 'Chờ kiểm tra' },
-  { key: RecordStatus.CHECKED, label: 'Đã kiểm tra' },
   { key: RecordStatus.PENDING_SIGN, label: 'Chờ ký duyệt' },
   { key: RecordStatus.SIGNED, label: 'Chờ bàn giao' },
   { key: RecordStatus.HANDOVER, label: 'Đã giao 1 cửa' },
@@ -61,7 +59,6 @@ export const SURVEY_SELECTABLE_STATUSES: { key: RecordStatus; label: string }[] 
   { key: RecordStatus.OFFICE_WORK, label: 'Biên tập bản đồ' },
   { key: RecordStatus.PENDING_SUPPLEMENT, label: 'Chờ bổ sung' },
   { key: RecordStatus.PENDING_CHECK, label: 'Chờ kiểm tra' },
-  { key: RecordStatus.CHECKED, label: 'Đã kiểm tra' },
   { key: RecordStatus.PENDING_SIGN, label: 'Chờ ký duyệt' },
   { key: RecordStatus.SIGNED, label: 'Chờ bàn giao' },
   { key: RecordStatus.HANDOVER, label: 'Đã giao 1 cửa' },
@@ -79,7 +76,6 @@ export const STATUS_COLORS: Record<RecordStatus, string> = {
   [RecordStatus.COMPLETED_WORK]: 'bg-cyan-100 text-cyan-800', // MỚI: Đã bổ sung
   [RecordStatus.PENDING_SUPPLEMENT]: 'bg-amber-100 text-amber-900 border border-amber-300 font-bold',
   [RecordStatus.PENDING_CHECK]: 'bg-orange-100 text-orange-800',
-  [RecordStatus.CHECKED]: 'bg-teal-100 text-teal-800',
   [RecordStatus.PENDING_SIGN]: 'bg-purple-100 text-purple-800',
   [RecordStatus.SIGNED]: 'bg-indigo-100 text-indigo-800',
   [RecordStatus.HANDOVER]: 'bg-green-100 text-green-800',
@@ -136,7 +132,7 @@ export const mapStatusToRecordStatus = (s: string | undefined | null): RecordSta
       return RecordStatus.PENDING_CHECK;
     case 'checked':
     case 'đã kiểm tra':
-      return RecordStatus.CHECKED;
+      return RecordStatus.PENDING_SIGN;
     case 'pending_sign':
     case 'pending sign':
     case 'chờ ký duyệt':

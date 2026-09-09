@@ -234,8 +234,7 @@ export const BatchErrorDiagnosticModal: React.FC<BatchErrorDiagnosticModalProps>
 
       // MẢNG 3: Kiểm tra & Trình ký
       if (
-        (r.status === RecordStatus.CHECKED ||
-          r.status === RecordStatus.PENDING_SIGN ||
+        (r.status === RecordStatus.PENDING_SIGN ||
           r.status === RecordStatus.SIGNED) &&
         (!r.checkedBy || !r.checkedBy.trim())
       ) {
@@ -252,8 +251,7 @@ export const BatchErrorDiagnosticModal: React.FC<BatchErrorDiagnosticModalProps>
       }
 
       if (
-        (r.status === RecordStatus.CHECKED ||
-          r.status === RecordStatus.PENDING_SIGN) &&
+        r.status === RecordStatus.PENDING_SIGN &&
         !r.pendingCheckDate &&
         !r.checkedDate
       ) {

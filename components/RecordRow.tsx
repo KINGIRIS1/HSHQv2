@@ -186,13 +186,9 @@ const RecordRow: React.FC<RecordRowProps> = ({
                     personId = record.checkedBy || record.drafterId || record.surveyorId || record.assignedTo;
                     dateVal = record.pendingCheckDate || record.completedWorkDate || record.assignedDate;
                     break;
-                case RecordStatus.CHECKED:
-                    personId = record.checkedBy || record.assignedTo;
-                    dateVal = record.checkedDate || record.pendingCheckDate || record.assignedDate;
-                    break;
                 case RecordStatus.PENDING_SIGN:
-                    personId = record.submittedTo || record.assignedTo;
-                    dateVal = record.submissionDate || record.approvalDate || record.assignedDate;
+                    personId = record.submittedTo || record.checkedBy || record.assignedTo;
+                    dateVal = record.submissionDate || record.checkedDate || record.approvalDate || record.assignedDate;
                     break;
                 case RecordStatus.SIGNED:
                     personId = record.submittedTo || record.assignedTo;

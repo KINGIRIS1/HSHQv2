@@ -9,7 +9,6 @@ export enum RecordStatus {
   COMPLETED_WORK = 'COMPLETED_WORK', // Đã thực hiện (Mới: Nhân viên làm xong, chưa trình)
   PENDING_SUPPLEMENT = 'PENDING_SUPPLEMENT', // Chờ bổ sung (Trả dừng quy trình)
   PENDING_CHECK = 'PENDING_CHECK', // Chờ kiểm tra
-  CHECKED = 'CHECKED',           // Đã kiểm tra
   PENDING_SIGN = 'PENDING_SIGN', // Chờ ký duyệt (Đã trình)
   SIGNED = 'SIGNED',             // Đã ký (Lập danh sách ký)
   HANDOVER = 'HANDOVER',         // Giao 1 cửa (Hoàn thành nội bộ)
