@@ -347,10 +347,10 @@ const MobileRecordList: React.FC<MobileRecordListProps> = ({
                       case RecordStatus.OFFICE_WORK: return record.drafterId || record.assignedTo;
                       case RecordStatus.PENDING_CHECK: return record.checkedBy || record.drafterId || record.surveyorId || record.assignedTo;
                       case RecordStatus.CHECKED: return record.checkedBy || record.assignedTo;
-                      case RecordStatus.PENDING_SIGN: return record.submittedTo || record.authorizedBy || record.assignedTo;
-                      case RecordStatus.SIGNED:
-                      case RecordStatus.HANDOVER: return record.authorizedBy || record.returnedBy || record.submittedTo || record.assignedTo;
-                      case RecordStatus.RETURNED: return record.returnedBy || record.authorizedBy || record.assignedTo;
+                      case RecordStatus.PENDING_SIGN: return record.submittedTo || record.assignedTo;
+                      case RecordStatus.SIGNED: return record.submittedTo || record.assignedTo;
+                      case RecordStatus.HANDOVER: return record.assignedTo || record.submittedTo;
+                      case RecordStatus.RETURNED: return record.returnedBy || record.assignedTo;
                       default: return record.assignedTo;
                     }
                   })();

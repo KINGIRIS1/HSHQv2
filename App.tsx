@@ -840,6 +840,10 @@ function App() {
           logMsg = `Trả kết quả cho người dân: ${receiverName} (${typeLabel} số: ${receiptNumber}, Số tiền: ${returnedPrice.toLocaleString('vi-VN')}đ)${returnReason ? ` - Ghi chú: ${returnReason}` : ''}`;
       }
 
+      const returnerName = currentUser?.name || currentUser?.username || 'Hệ thống';
+      const returnerEmployee = employees.find(e => e.id === currentUser?.employeeId || e.name === currentUser?.name || e.id === currentUser?.id);
+      const assigneeValue = returnerEmployee ? returnerEmployee.name : returnerName;
+
       const statusLogs = createStatusLog(returnRecord, RecordStatus.RETURNED, logMsg);
       const updates = { 
           resultReturnedDate: nowStr, 
@@ -848,6 +852,9 @@ function App() {
           receiptType: isExempt ? null : typeLabel,
           receiverName: receiverName,
           returnedPrice: returnedPrice,
+          returnedBy: assigneeValue,
+          assignedTo: assigneeValue,
+          assignedDate: nowStr,
           privateNotes: returnReason 
               ? (returnRecord.privateNotes ? `${returnRecord.privateNotes}\n[Nội dung trả HS]: ${returnReason}` : `[Nội dung trả HS]: ${returnReason}`)
               : returnRecord.privateNotes,
@@ -857,7 +864,7 @@ function App() {
       await updateRecordApi({ ...returnRecord, ...updates });
       setToast({ type: 'success', message: `Đã ghi nhận trả kết quả hồ sơ ${returnRecord.code} cho ${receiverName}.` });
       setReturnRecord(null);
-  }, [returnRecord, createStatusLog]);
+  }, [returnRecord, currentUser, employees, createStatusLog]);
 
   const handleMapCorrectionRequest = useCallback(async (record: RecordFile) => {
       const isArchive = isArchiveRecordType(record.recordType || '') || record.sourceTable === 'luutru_records';

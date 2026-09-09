@@ -69,8 +69,13 @@ const RecordRow: React.FC<RecordRowProps> = ({
 
   const resultReturnedDateStr = record.resultReturnedDate ? formatDate(record.resultReturnedDate) : '';
 
-  // Sử dụng trực tiếp trạng thái thực tế của hồ sơ, nếu hồ sơ mang trạng thái cũ IN_PROGRESS thì hiển thị đúng bước thực tế
+  // Sử dụng trực tiếp trạng thái thực tế của hồ sơ, nếu hồ sơ đo đạc mang trạng thái cũ IN_PROGRESS thì hiển thị đúng bước thực tế
   const displayStatus = React.useMemo(() => {
+    const isArchive = isArchiveRecordType(record.recordType || '') || record.sourceTable === 'luutru_records';
+    if (isArchive) {
+      if (record.status) return record.status;
+      return deriveActualSurveyStatus(record);
+    }
     if (record.status === RecordStatus.IN_PROGRESS || !record.status) {
       return deriveActualSurveyStatus(record);
     }
@@ -186,17 +191,20 @@ const RecordRow: React.FC<RecordRowProps> = ({
                     dateVal = record.checkedDate || record.pendingCheckDate || record.assignedDate;
                     break;
                 case RecordStatus.PENDING_SIGN:
-                    personId = record.submittedTo || record.authorizedBy || record.assignedTo;
+                    personId = record.submittedTo || record.assignedTo;
                     dateVal = record.submissionDate || record.approvalDate || record.assignedDate;
                     break;
                 case RecordStatus.SIGNED:
+                    personId = record.submittedTo || record.assignedTo;
+                    dateVal = record.approvalDate || record.submissionDate || record.assignedDate;
+                    break;
                 case RecordStatus.HANDOVER:
-                    personId = record.authorizedBy || record.returnedBy || record.submittedTo || record.assignedTo;
-                    dateVal = record.approvalDate || record.exportDate || record.assignedDate;
+                    personId = record.assignedTo || record.submittedTo;
+                    dateVal = record.exportDate || record.completedDate || record.approvalDate || record.assignedDate;
                     break;
                 case RecordStatus.RETURNED:
-                    personId = record.returnedBy || record.authorizedBy || record.assignedTo;
-                    dateVal = record.resultReturnedDate || record.approvalDate || record.assignedDate;
+                    personId = record.returnedBy || record.assignedTo;
+                    dateVal = record.resultReturnedDate || record.assignedDate || record.approvalDate;
                     break;
                 default:
                     personId = record.assignedTo;

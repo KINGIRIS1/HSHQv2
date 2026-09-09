@@ -835,7 +835,7 @@ export const KiemTraDoDacTab: React.FC<KiemTraDoDacTabProps> = ({
 
             let signerName = '';
             if ([RecordStatus.SIGNED, RecordStatus.HANDOVER, RecordStatus.RETURNED].includes(r.status)) {
-                signerName = getEmployeeName(r.submittedTo || r.authorizedBy);
+                signerName = getEmployeeName(r.submittedTo);
             }
 
             dataRows.push([

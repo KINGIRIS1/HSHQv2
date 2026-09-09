@@ -1037,9 +1037,9 @@ export function deriveActualSurveyStatus(record: Partial<RecordFile>): RecordSta
         return RecordStatus.FIELD_WORK;
     }
 
-    // 10. Đã phân công (Lưu trữ)
+    // 10. Đang thực hiện (Lưu trữ)
     if (isArchive && (record.assignedDate || record.assignedTo)) {
-        return RecordStatus.ASSIGNED;
+        return RecordStatus.IN_PROGRESS;
     }
 
     return record.status || RecordStatus.RECEIVED;
@@ -1333,6 +1333,11 @@ export function syncRecordStatusTransition(
             if (options?.receiverName) updates.receiverName = options.receiverName;
             if (options?.receiptNumber) updates.receiptNumber = options.receiptNumber;
             if (options?.returnedPrice !== undefined) updates.returnedPrice = options.returnedPrice;
+            if (options?.userName) {
+                updates.returnedBy = options.userName;
+                updates.assignedTo = options.userName;
+            }
+            updates.assignedDate = updates.resultReturnedDate;
         }
 
         // BẢO TOÀN CÁC MỐC NGÀY NẾU NGƯỜI DÙNG CÓ TRUYỀN VÀO TÙY CHỌN RIÊNG

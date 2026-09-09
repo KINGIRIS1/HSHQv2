@@ -1210,7 +1210,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                                                 stageTitle: formData.status === RecordStatus.SIGNED ? 'Bước Đã ký duyệt' : 'Bước Trình ký',
                                                 label: 'Lãnh đạo Ký duyệt hồ sơ',
                                                 field: 'submittedTo' as const,
-                                                value: formData.submittedTo || formData.authorizedBy || formData.assignedTo || '',
+                                                value: formData.submittedTo || formData.assignedTo || '',
                                                 dateLabel: 'Ngày ký duyệt',
                                                 dateValue: formData.approvalDate || formData.submissionDate
                                             };
@@ -1220,7 +1220,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                                                 stageTitle: formData.status === RecordStatus.RETURNED ? 'Bước Đã trả kết quả' : 'Bước Giao 1 cửa',
                                                 label: 'Cán bộ Bàn giao / Trả kết quả',
                                                 field: 'returnedBy' as const,
-                                                value: formData.returnedBy || formData.authorizedBy || formData.assignedTo || '',
+                                                value: formData.returnedBy || formData.assignedTo || '',
                                                 dateLabel: 'Ngày trả kết quả',
                                                 dateValue: formData.resultReturnedDate || formData.exportDate
                                             };

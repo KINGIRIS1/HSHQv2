@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { RecordFile, RecordStatus } from '../types';
-import AutoResizeTextarea from './AutoResizeTextarea';
-import { X, CheckCircle2, FileCheck, User, Receipt, DollarSign, Loader2, AlertCircle, FileText } from 'lucide-react';
+import { X, CheckCircle2, FileCheck, User, Receipt, DollarSign, Loader2, AlertCircle } from 'lucide-react';
 import { fetchContracts } from '../services/api';
 import { isProcedure2_3 } from '../utils/appHelpers';
 
@@ -19,7 +18,6 @@ const ReturnResultModal: React.FC<ReturnResultModalProps> = ({
   const [receiptNumber, setReceiptNumber] = useState('');
   const [receiverName, setReceiverName] = useState('');
   const [returnedPrice, setReturnedPrice] = useState<string>('');
-  const [returnReason, setReturnReason] = useState<string>('');
   const [isLoadingPrice, setIsLoadingPrice] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -36,7 +34,6 @@ const ReturnResultModal: React.FC<ReturnResultModalProps> = ({
         setReceiptType((record.receiptType as 'Biên Lai' | 'Hóa Đơn') || 'Biên Lai');
         setReceiptNumber(record.receiptNumber || '');
         setReceiverName(record.receiverName || record.customerName || '');
-        setReturnReason('');
         setErrorMsg('');
 
         // Nếu là hồ sơ miễn thu phí (Trả hủy / CSD rút / Thủ tục 2.3)
@@ -133,7 +130,7 @@ const ReturnResultModal: React.FC<ReturnResultModalProps> = ({
               setErrorMsg('Vui lòng nhập họ tên người đến nhận lại hồ sơ!');
               return;
           }
-          onConfirm('', receiverName.trim(), 0, undefined, returnReason.trim());
+          onConfirm('', receiverName.trim(), 0, undefined, '');
           onClose();
           return;
       }
@@ -159,7 +156,7 @@ const ReturnResultModal: React.FC<ReturnResultModalProps> = ({
           return;
       }
 
-      onConfirm(receiptNumber.trim(), receiverName.trim(), priceNum, receiptType, returnReason.trim());
+      onConfirm(receiptNumber.trim(), receiverName.trim(), priceNum, receiptType, '');
       onClose();
   };
 
@@ -299,30 +296,6 @@ const ReturnResultModal: React.FC<ReturnResultModalProps> = ({
                         onChange={(e) => setReceiverName(e.target.value)}
                     />
                 </div>
-
-                {/* Field 4: Lý do / Nội dung bàn giao trả (nếu có) */}
-                <div>
-                    <label className="block text-sm font-bold text-gray-800 mb-2 flex items-center gap-2">
-                        <FileText size={18} className="text-blue-600"/> 
-                        <span>Lý do / Nội dung bàn giao trả</span>
-                        <span className="text-xs font-normal text-gray-400">(Tùy chọn)</span>
-                    </label>
-                    <AutoResizeTextarea 
-                        className={`w-full border border-gray-300 rounded-xl px-4 py-2 text-sm focus:ring-2 ${isFeeExempt ? 'focus:ring-amber-500 focus:border-amber-500' : 'focus:ring-emerald-500 focus:border-emerald-500'} outline-none font-medium text-gray-800 placeholder:text-gray-400`}
-                        placeholder={isFeeExempt ? "Ghi chú lý do trả hoặc tình trạng giấy tờ khi bàn giao..." : "Nội dung ghi chú thêm khi trả kết quả (nếu có)..."}
-                        value={returnReason}
-                        onChange={(e) => setReturnReason(e.target.value)}
-                    />
-                </div>
-            </div>
-
-            {/* Note notice */}
-            <div className="bg-gray-50/90 p-3.5 rounded-xl text-xs text-gray-600 leading-relaxed border border-gray-200/80 italic">
-                {isFeeExempt ? (
-                    <span>Lưu ý: Hệ thống sẽ tự động cập nhật trạng thái hồ sơ thành <strong className="text-gray-800 not-italic">Đã trả kết quả</strong> (với mức phí <strong>0đ - Miễn thu phí</strong>) và ghi nhận ngày trả là hôm nay.</span>
-                ) : (
-                    <span>Lưu ý: Hệ thống sẽ tự động cập nhật trạng thái hồ sơ thành <strong className="text-gray-800 not-italic">Đã trả kết quả</strong> và ghi nhận ngày trả là hôm nay.</span>
-                )}
             </div>
 
             {/* Actions */}

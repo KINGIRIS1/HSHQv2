@@ -4,7 +4,7 @@ import { Database, AlertTriangle, Cloud, Loader2, CheckCircle, Save, Globe, Cale
 import { Holiday, UserRole, RolePermissions, DepartmentPermissions, DEFAULT_ROLE_PERMISSIONS, AVAILABLE_PERMISSIONS, Employee, RecordStatus, User, RecordFile } from '../types';
 import { fetchHolidays, saveHolidays, testDatabaseConnection, saveUpdateInfo, fetchUpdateInfo, getSystemSetting, saveSystemSetting, fetchSystemEvents } from '../services/api';
 import { fetchRecords, updateRecordApi } from '../services/apiRecords';
-import { APP_VERSION, DEFAULT_HOLIDAYS, STATUS_LABELS } from '../constants';
+import { APP_VERSION, DEFAULT_HOLIDAYS, STATUS_LABELS, isArchiveRecordType } from '../constants';
 import { confirmAction, calculateDeadlineHelper, matchDepartmentKey, deriveActualSurveyStatus, syncRecordStatusTransition } from '../utils/appHelpers';
 import { createFullBackupData, downloadBackupAsFile, saveBackupToServer, restoreFullBackupToSupabase } from '../services/backupService';
 import { 
@@ -308,7 +308,8 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
       records.forEach(r => {
         if (r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED) return;
         const derived = deriveActualSurveyStatus(r);
-        const isMismatched = (r.status === RecordStatus.IN_PROGRESS) || (derived !== r.status);
+        const isArchive = isArchiveRecordType(r.recordType || '') || r.sourceTable === 'luutru_records';
+        const isMismatched = isArchive ? (derived !== r.status) : ((r.status === RecordStatus.IN_PROGRESS) || (derived !== r.status));
         
         if (isMismatched) {
           let reason = 'Đồng bộ tiến độ chuẩn';
