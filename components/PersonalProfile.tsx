@@ -23,6 +23,7 @@ import {
   CheckSquare,
   ClipboardList,
   FileDown,
+  FileSpreadsheet,
   Undo,
   FileX,
   Filter,
@@ -1487,51 +1488,50 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
       {/* MAIN CONTENT */}
       <div className="flex-1 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col min-h-0">
         {/* SEARCH & ACTIONS */}
-        <div className="p-4 border-b border-gray-100 bg-gray-50 flex flex-col md:flex-row justify-between items-center gap-3 shrink-0">
-          <div className="flex items-center gap-2 w-full md:w-auto">
-            <div className="relative flex-1 md:w-72">
-              <Search
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                size={16}
-              />
-              <input
-                type="text"
-                placeholder={`Tìm trong ${getTabLabel()}...`}
-                className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white shadow-sm"
-                value={searchTerm}
-                onChange={(e) => {
-                  setSearchTerm(e.target.value);
-                  setCurrentPage(1);
-                }}
-              />
-            </div>
-
-            {!isDirector && (
-              <button
-                onClick={() => {
-                  setActiveTab(activeTab === "reminder" ? "pending" : "reminder");
-                  setCurrentPage(1);
-                  setSearchTerm("");
-                }}
-                className={`flex items-center gap-1 px-2.5 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap shadow-sm border ${
-                  activeTab === "reminder"
-                    ? "bg-pink-600 text-white border-pink-700"
-                    : "bg-white text-pink-700 border-pink-200 hover:bg-pink-50"
-                }`}
-                title={`Nhắc việc (${reminderRecords.length})`}
-              >
-                <Bell size={16} />
-                <span>({reminderRecords.length})</span>
-              </button>
-            )}
+        <div className="p-3 md:p-4 border-b border-gray-100 bg-gray-50 flex items-center gap-2 shrink-0 w-full">
+          <div className="relative flex-1 min-w-0">
+            <Search
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+              size={16}
+            />
+            <input
+              type="text"
+              placeholder={`Tìm trong ${getTabLabel()}...`}
+              className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-xs md:text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white shadow-sm font-medium"
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setCurrentPage(1);
+              }}
+            />
           </div>
 
-          <div className="flex items-center justify-end gap-2 w-full md:w-auto">
+          {!isDirector && (
+            <button
+              onClick={() => {
+                setActiveTab(activeTab === "reminder" ? "pending" : "reminder");
+                setCurrentPage(1);
+                setSearchTerm("");
+              }}
+              className={`flex items-center gap-1 px-2.5 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap shadow-sm border shrink-0 ${
+                activeTab === "reminder"
+                  ? "bg-pink-600 text-white border-pink-700"
+                  : "bg-white text-pink-700 border-pink-200 hover:bg-pink-50"
+              }`}
+              title={`Nhắc việc (${reminderRecords.length})`}
+            >
+              <Bell size={16} />
+              <span className="hidden sm:inline">({reminderRecords.length})</span>
+            </button>
+          )}
+
+          {/* Cụm Bộ lọc & Xuất Excel ngoài cùng bên tay phải */}
+          <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
             {/* LỌC BUTTON (POPOVER LIKE ĐO ĐẠC) */}
             <div className="relative inline-block" ref={filterPopoverRef}>
               <button
                 onClick={() => setIsFilterPopoverOpen(!isFilterPopoverOpen)}
-                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-sm font-bold transition-all shadow-sm cursor-pointer bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 ${
+                className={`flex items-center gap-1.5 p-2 md:px-3 md:py-2 rounded-lg text-xs md:text-sm font-bold transition-all shadow-sm cursor-pointer bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 shrink-0 ${
                   activeFilterCount > 0
                     ? "border-blue-300 text-blue-700 bg-blue-50/50"
                     : ""
@@ -1540,16 +1540,18 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
               >
                 <Filter size={16} />
                 {activeFilterCount > 0 && (
-                  <span className="bg-red-500 text-white text-[11px] px-1.5 py-0.2 rounded-full font-extrabold">
+                  <span className="bg-red-500 text-white text-[10px] md:text-[11px] px-1.5 py-0.2 rounded-full font-extrabold">
                     {activeFilterCount}
                   </span>
                 )}
-                {isFilterPopoverOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                <span className="hidden md:inline">
+                  {isFilterPopoverOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                </span>
               </button>
 
               {/* POPOVER DROPDOWN CARD */}
               {isFilterPopoverOpen && (
-                <div className="absolute left-0 sm:left-auto sm:right-0 mt-2 w-[calc(100vw-2rem)] sm:w-96 max-w-sm bg-white rounded-2xl shadow-2xl border border-slate-200 p-4 z-50 animate-fade-in text-gray-800">
+                <div className="absolute right-0 mt-2 w-[calc(100vw-2rem)] sm:w-96 max-w-sm bg-white rounded-2xl shadow-2xl border border-slate-200 p-4 z-50 animate-fade-in text-gray-800">
                   {/* Popover Header */}
                   <div className="flex items-center justify-between pb-3 border-b border-gray-100 mb-3">
                     <div className="flex items-center gap-2 font-bold text-blue-700 text-base">
@@ -1660,11 +1662,11 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
             {/* XUẤT EXCEL BUTTON */}
             <button
               onClick={handleExportExcel}
-              className="flex items-center justify-center p-2 bg-white text-emerald-700 border border-emerald-300 hover:bg-emerald-50 rounded-lg transition-all shadow-xs cursor-pointer ml-auto md:ml-0 active:scale-95"
+              className="flex items-center justify-center p-2 bg-white text-emerald-700 border border-emerald-300 hover:bg-emerald-50 rounded-lg transition-all shadow-xs cursor-pointer shrink-0 active:scale-95"
               title={`Xuất danh sách ${displayRecords.length} hồ sơ ra file Excel`}
               aria-label="Xuất file Excel"
             >
-              <FileDown size={18} className="text-emerald-600" />
+              <FileSpreadsheet size={18} className="text-emerald-600" />
             </button>
           </div>
         </div>

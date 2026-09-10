@@ -412,15 +412,35 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
 
     try {
       setIsExportingExcel(true);
-      const isSurvey = props.currentView === "all_records";
-      const titleText = isSurvey
-        ? "DANH SÁCH HỒ SƠ ĐO ĐẠC (KẾT QUẢ LỌC)"
-        : "DANH SÁCH HỒ SƠ LƯU TRỮ (KẾT QUẢ LỌC)";
+
+      if (
+        (props.currentView === "handover_list" || props.currentView === "archive_handover_list") &&
+        props.handoverTab === "returned"
+      ) {
+        props.handleExportReturnedList();
+        return;
+      }
+
+      let tabName = "Hồ sơ";
+      if (props.currentView === "assign_tasks" || props.currentView === "archive_assign_tasks") tabName = "Giao việc";
+      else if (props.currentView === "measurement_field") tabName = "Đo đạc Thực địa";
+      else if (props.currentView === "measurement_office") tabName = "Biên tập bản đồ";
+      else if (props.currentView === "completed_list" || props.currentView === "archive_completed_list") tabName = "Đang thực hiện";
+      else if (props.currentView === "pending_check_list" || props.currentView === "archive_pending_check_list") tabName = "Chờ kiểm tra nội nghiệp";
+      else if (props.currentView === "check_list" || props.currentView === "archive_check_list") tabName = "Phê duyệt";
+      else if (props.currentView === "director_completed" || props.currentView === "archive_director_completed") tabName = "Hoàn thành";
+      else if (props.currentView === "handover_list" || props.currentView === "archive_handover_list") tabName = "Bàn giao hồ sơ";
+      else if (props.currentView === "all_records") tabName = "Hồ sơ đo đạc";
+      else if (props.currentView === "archive_records") tabName = "Hồ sơ lưu trữ";
+
+      const isSurvey = !props.currentView?.startsWith("archive_");
+      const titleText = `DANH SÁCH ${isSurvey ? "HỒ SƠ ĐO ĐẠC" : "HỒ SƠ LƯU TRỮ"} - ${tabName.toUpperCase()} (KẾT QUẢ LỌC)`;
 
       const now = new Date();
       const datePart = `${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}`;
       const timePart = `${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}${now.getSeconds().toString().padStart(2, '0')}`;
-      const prefix = isSurvey ? "Danh_Sach_Ho_So_Do_Dac_Loc" : "Danh_Sach_Ho_So_Luu_Tru_Loc";
+      const slug = removeVietnameseTones(tabName).replace(/[^a-zA-Z0-9]/g, "_");
+      const prefix = `${isSurvey ? "Do_Dac" : "Luu_Tru"}_${slug}`;
       const fileName = `${prefix}_${datePart}_${timePart}.xlsx`;
 
       await exportCustomRecordsToExcel(props.filteredRecords, employees, titleText, fileName);
@@ -756,18 +776,237 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                 />
               </div>
 
-              {isAllRecordsTab && (
+              <div className="relative inline-block shrink-0" ref={filterPopoverRef}>
                 <button
-                  id="btn-export-filtered-records-excel"
-                  onClick={handleExportFilteredExcel}
-                  disabled={isExportingExcel || props.filteredRecords.length === 0}
-                  className="flex items-center justify-center p-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed text-white rounded-lg shadow-sm transition-all cursor-pointer shrink-0 active:scale-95"
-                  title={`Xuất file Excel theo kết quả lọc (${props.filteredRecords.length} hồ sơ)`}
-                  aria-label="Xuất file Excel"
+                  onClick={() => setIsFilterPopoverOpen(!isFilterPopoverOpen)}
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-bold transition-all shadow-sm bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 cursor-pointer ${
+                    activeFilterCount > 0
+                      ? "border-blue-300 text-blue-700 bg-blue-50/50"
+                      : ""
+                  }`}
+                  title="Mở bộ lọc tìm kiếm"
                 >
-                  <FileSpreadsheet size={18} />
+                  <Filter size={16} />
+
+                  {activeFilterCount > 0 && (
+                    <span className="bg-red-500 text-white text-[11px] px-1.5 py-0.2 rounded-full font-extrabold">
+                      {activeFilterCount}
+                    </span>
+                  )}
+                  {isFilterPopoverOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                 </button>
-              )}
+
+                {/* POPOVER DROPDOWN CARD */}
+                {isFilterPopoverOpen && (
+                  <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 p-4 z-50 animate-fade-in text-gray-800">
+                    {/* Popover Header */}
+                    <div className="flex items-center justify-between pb-3 border-b border-gray-100 mb-3">
+                      <div className="flex items-center gap-2 font-bold text-blue-700 text-base">
+                        <Filter size={18} />
+                        <span>Bộ lọc tìm kiếm</span>
+                      </div>
+                      <button
+                        onClick={() => setIsFilterPopoverOpen(false)}
+                        className="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100 transition-colors"
+                      >
+                        <X size={18} />
+                      </button>
+                    </div>
+
+                    <div className="space-y-3.5 max-h-[75vh] overflow-y-auto pr-1">
+                      {/* 1. Thời gian */}
+                      <div>
+                        <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 mb-1">
+                          <Calendar size={14} className="text-gray-500" />
+                          <span>Thời gian:</span>
+                        </label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <span className="text-[11px] text-gray-500 font-medium block mb-0.5">Từ ngày</span>
+                            <input
+                              type="date"
+                              value={props.filterFromDate}
+                              onChange={(e) => props.setFilterFromDate(e.target.value)}
+                              className="w-full text-xs border border-gray-200 rounded-lg p-2 font-medium bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                          </div>
+                          <div>
+                            <span className="text-[11px] text-gray-500 font-medium block mb-0.5">Đến ngày</span>
+                            <input
+                              type="date"
+                              value={props.filterToDate}
+                              onChange={(e) => props.setFilterToDate(e.target.value)}
+                              className="w-full text-xs border border-gray-200 rounded-lg p-2 font-medium bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 2. Loại hồ sơ */}
+                      {isMeasurementView && (
+                        <div>
+                          <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 mb-1">
+                            <Filter size={14} className="text-gray-500" />
+                            <span>Loại hồ sơ:</span>
+                          </label>
+                          <select
+                            value={props.filterRecordType}
+                            onChange={(e) => props.setFilterRecordType(e.target.value)}
+                            className="w-full text-sm border border-gray-200 rounded-lg p-2 font-medium bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          >
+                            <option value="all">Tất cả loại HS</option>
+                            <option value="2.1 Trích lục">2.1 Trích lục</option>
+                            <option value="2.2 Trích đo">2.2 Trích đo</option>
+                            <option value="2.3 Duyệt đơn">2.3 Duyệt đơn</option>
+                            <option value="2.4 Cắm mốc">2.4 Cắm mốc</option>
+                            <option value="2.5 Tách-Hợp thửa">2.5 Tách-Hợp thửa</option>
+                          </select>
+                        </div>
+                      )}
+
+                      {isArchiveMeasurementView && (
+                        <div>
+                          <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 mb-1">
+                            <Filter size={14} className="text-gray-500" />
+                            <span>Loại hồ sơ:</span>
+                          </label>
+                          <select
+                            value={props.filterRecordType}
+                            onChange={(e) => props.setFilterRecordType(e.target.value)}
+                            className="w-full text-sm border border-gray-200 rounded-lg p-2 font-medium bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          >
+                            <option value="all">Tất cả loại HS</option>
+                            <option value="1.1 Sao lục">1.1 Sao lục</option>
+                            <option value="1.2 Công văn">1.2 Công văn</option>
+                          </select>
+                        </div>
+                      )}
+
+                      {!isMeasurementView && !isArchiveMeasurementView && (
+                        <div>
+                          <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 mb-1">
+                            <Filter size={14} className="text-gray-500" />
+                            <span>Loại hồ sơ:</span>
+                          </label>
+                          <select
+                            value={props.filterRecordType}
+                            onChange={(e) => props.setFilterRecordType(e.target.value)}
+                            className="w-full text-sm border border-gray-200 rounded-lg p-2 font-medium bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          >
+                            <option value="all">Tất cả loại HS</option>
+                            <option value="2.1 Trích lục">2.1 Trích lục</option>
+                            <option value="2.2 Trích đo">2.2 Trích đo</option>
+                            <option value="2.3 Duyệt đơn">2.3 Duyệt đơn</option>
+                            <option value="2.4 Cắm mốc">2.4 Cắm mốc</option>
+                            <option value="2.5 Tách-Hợp thửa">2.5 Tách-Hợp thửa</option>
+                            <option value="1.1 Sao lục">1.1 Sao lục</option>
+                            <option value="1.2 Công văn">1.2 Công văn</option>
+                          </select>
+                        </div>
+                      )}
+
+                      {/* 3. Trạng thái hồ sơ */}
+                      {!isStatusFilterHidden && (
+                        <div>
+                          <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 mb-1">
+                            <SlidersHorizontal size={14} className="text-gray-500" />
+                            <span>Trạng thái hồ sơ:</span>
+                          </label>
+                          <select
+                            value={props.filterStatus}
+                            onChange={(e) => props.setFilterStatus(e.target.value)}
+                            className="w-full text-sm border border-gray-200 rounded-lg p-2 font-medium bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          >
+                            <option value="all">Mọi trạng thái</option>
+                            {statusFilterOptions.map((item) => (
+                              <option key={item.key} value={item.key}>
+                                {item.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+
+                      {/* 4. Cán bộ xử lý */}
+                      {canPerformAction && (
+                        <div>
+                          <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 mb-1">
+                            <UserIcon size={14} className="text-gray-500" />
+                            <span>Cán bộ xử lý:</span>
+                          </label>
+                          <select
+                            value={props.filterEmployee}
+                            onChange={(e) => props.setFilterEmployee(e.target.value)}
+                            className="w-full text-sm border border-gray-200 rounded-lg p-2 font-medium bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          >
+                            <option value="all">Tất cả cán bộ</option>
+                            <option value="unassigned">Chưa giao</option>
+                            {Object.entries(groupEmployeesByDepartment(employees)).map(([dept, emps]) => (
+                              <optgroup key={dept} label={dept}>
+                                {emps.map((emp) => (
+                                  <option key={emp.id} value={emp.id}>
+                                    {emp.name} ({emp.position || 'Cán bộ'})
+                                  </option>
+                                ))}
+                              </optgroup>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+
+                      {/* 5. Xã / Phường */}
+                      <div>
+                        <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 mb-1">
+                          <MapPin size={14} className="text-gray-500" />
+                          <span>Xã/Phường:</span>
+                        </label>
+                        <select
+                          value={props.filterWard}
+                          onChange={(e) => props.setFilterWard(e.target.value)}
+                          className="w-full text-sm border border-gray-200 rounded-lg p-2 font-medium bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="all">Tất cả Xã/Phường</option>
+                          {wards.map((w) => (
+                            <option key={w} value={w}>
+                              {getNormalizedWard(w)}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* 7. Reset filters button */}
+                      <div className="pt-2">
+                        <button
+                          onClick={() => {
+                            props.setFilterFromDate("");
+                            props.setFilterToDate("");
+                            if (props.setFilterAssignedFromDate) props.setFilterAssignedFromDate("");
+                            if (props.setFilterAssignedToDate) props.setFilterAssignedToDate("");
+                            props.setFilterWard("all");
+                            props.setFilterRecordType("all");
+                            props.setFilterStatus("all");
+                            props.setFilterEmployee("all");
+                          }}
+                          className="w-full py-2 border border-red-200 text-red-600 rounded-xl hover:bg-red-50 text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer"
+                        >
+                          <RefreshCw size={14} /> Xóa tất cả bộ lọc
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <button
+                id="btn-export-filtered-records-excel"
+                onClick={handleExportFilteredExcel}
+                disabled={isExportingExcel || props.filteredRecords.length === 0}
+                className="flex items-center justify-center p-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed text-white rounded-lg shadow-sm transition-all cursor-pointer shrink-0 active:scale-95"
+                title={`Xuất file Excel theo kết quả lọc (${props.filteredRecords.length} hồ sơ)`}
+                aria-label="Xuất file Excel"
+              >
+                <FileSpreadsheet size={18} />
+              </button>
             </div>
           </div>
 
@@ -822,230 +1061,6 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                 {/* Đã loại bỏ nút Chốt HS lưu theo yêu cầu */}
               </div>
             )}
-
-            {currentView !== "handover_list" &&
-              currentView !== "archive_handover_list" && (
-                <div className="relative inline-block" ref={filterPopoverRef}>
-                  <button
-                    onClick={() => setIsFilterPopoverOpen(!isFilterPopoverOpen)}
-                    className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-sm font-bold transition-all shadow-sm bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 cursor-pointer ${
-                      activeFilterCount > 0
-                        ? "border-blue-300 text-blue-700 bg-blue-50/50"
-                        : ""
-                    }`}
-                    title="Mở bộ lọc tìm kiếm"
-                  >
-                    <Filter size={16} />
-
-                    {activeFilterCount > 0 && (
-                      <span className="bg-red-500 text-white text-[11px] px-1.5 py-0.2 rounded-full font-extrabold">
-                        {activeFilterCount}
-                      </span>
-                    )}
-                    {isFilterPopoverOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                  </button>
-
-                  {/* POPOVER DROPDOWN CARD */}
-                  {isFilterPopoverOpen && (
-                    <div className="absolute left-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 p-4 z-50 animate-fade-in text-gray-800">
-                      {/* Popover Header */}
-                      <div className="flex items-center justify-between pb-3 border-b border-gray-100 mb-3">
-                        <div className="flex items-center gap-2 font-bold text-blue-700 text-base">
-                          <Filter size={18} />
-                          <span>Bộ lọc tìm kiếm</span>
-                        </div>
-                        <button
-                          onClick={() => setIsFilterPopoverOpen(false)}
-                          className="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100 transition-colors"
-                        >
-                          <X size={18} />
-                        </button>
-                      </div>
-
-                      <div className="space-y-3.5 max-h-[75vh] overflow-y-auto pr-1">
-                        {/* 1. Thời gian */}
-                        <div>
-                          <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 mb-1">
-                            <Calendar size={14} className="text-gray-500" />
-                            <span>Thời gian:</span>
-                          </label>
-                          <div className="grid grid-cols-2 gap-2">
-                            <div>
-                              <span className="text-[11px] text-gray-500 font-medium block mb-0.5">Từ ngày</span>
-                              <input
-                                type="date"
-                                value={props.filterFromDate}
-                                onChange={(e) => props.setFilterFromDate(e.target.value)}
-                                className="w-full text-xs border border-gray-200 rounded-lg p-2 font-medium bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                              />
-                            </div>
-                            <div>
-                              <span className="text-[11px] text-gray-500 font-medium block mb-0.5">Đến ngày</span>
-                              <input
-                                type="date"
-                                value={props.filterToDate}
-                                onChange={(e) => props.setFilterToDate(e.target.value)}
-                                className="w-full text-xs border border-gray-200 rounded-lg p-2 font-medium bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                              />
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* 2. Loại hồ sơ */}
-                        {isMeasurementView && (
-                          <div>
-                            <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 mb-1">
-                              <Filter size={14} className="text-gray-500" />
-                              <span>Loại hồ sơ:</span>
-                            </label>
-                            <select
-                              value={props.filterRecordType}
-                              onChange={(e) => props.setFilterRecordType(e.target.value)}
-                              className="w-full text-sm border border-gray-200 rounded-lg p-2 font-medium bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            >
-                              <option value="all">Tất cả loại HS</option>
-                              <option value="2.1 Trích lục">2.1 Trích lục</option>
-                              <option value="2.2 Trích đo">2.2 Trích đo</option>
-                              <option value="2.3 Duyệt đơn">2.3 Duyệt đơn</option>
-                              <option value="2.4 Cắm mốc">2.4 Cắm mốc</option>
-                              <option value="2.5 Tách-Hợp thửa">2.5 Tách-Hợp thửa</option>
-                            </select>
-                          </div>
-                        )}
-
-                        {isArchiveMeasurementView && (
-                          <div>
-                            <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 mb-1">
-                              <Filter size={14} className="text-gray-500" />
-                              <span>Loại hồ sơ:</span>
-                            </label>
-                            <select
-                              value={props.filterRecordType}
-                              onChange={(e) => props.setFilterRecordType(e.target.value)}
-                              className="w-full text-sm border border-gray-200 rounded-lg p-2 font-medium bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            >
-                              <option value="all">Tất cả loại HS</option>
-                              <option value="1.1 Sao lục">1.1 Sao lục</option>
-                              <option value="1.2 Công văn">1.2 Công văn</option>
-                            </select>
-                          </div>
-                        )}
-
-                        {!isMeasurementView && !isArchiveMeasurementView && (
-                          <div>
-                            <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 mb-1">
-                              <Filter size={14} className="text-gray-500" />
-                              <span>Loại hồ sơ:</span>
-                            </label>
-                            <select
-                              value={props.filterRecordType}
-                              onChange={(e) => props.setFilterRecordType(e.target.value)}
-                              className="w-full text-sm border border-gray-200 rounded-lg p-2 font-medium bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            >
-                              <option value="all">Tất cả loại HS</option>
-                              <option value="2.1 Trích lục">2.1 Trích lục</option>
-                              <option value="2.2 Trích đo">2.2 Trích đo</option>
-                              <option value="2.3 Duyệt đơn">2.3 Duyệt đơn</option>
-                              <option value="2.4 Cắm mốc">2.4 Cắm mốc</option>
-                              <option value="2.5 Tách-Hợp thửa">2.5 Tách-Hợp thửa</option>
-                              <option value="1.1 Sao lục">1.1 Sao lục</option>
-                              <option value="1.2 Công văn">1.2 Công văn</option>
-                            </select>
-                          </div>
-                        )}
-
-                        {/* 3. Trạng thái hồ sơ */}
-                        {!isStatusFilterHidden && (
-                          <div>
-                            <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 mb-1">
-                              <SlidersHorizontal size={14} className="text-gray-500" />
-                              <span>Trạng thái hồ sơ:</span>
-                            </label>
-                            <select
-                              value={props.filterStatus}
-                              onChange={(e) => props.setFilterStatus(e.target.value)}
-                              className="w-full text-sm border border-gray-200 rounded-lg p-2 font-medium bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            >
-                              <option value="all">Mọi trạng thái</option>
-                              {statusFilterOptions.map((item) => (
-                                <option key={item.key} value={item.key}>
-                                  {item.label}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                        )}
-
-                        {/* 4. Cán bộ xử lý */}
-                        {canPerformAction && (
-                          <div>
-                            <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 mb-1">
-                              <UserIcon size={14} className="text-gray-500" />
-                              <span>Cán bộ xử lý:</span>
-                            </label>
-                            <select
-                              value={props.filterEmployee}
-                              onChange={(e) => props.setFilterEmployee(e.target.value)}
-                              className="w-full text-sm border border-gray-200 rounded-lg p-2 font-medium bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            >
-                              <option value="all">Tất cả cán bộ</option>
-                              <option value="unassigned">Chưa giao</option>
-                              {Object.entries(groupEmployeesByDepartment(employees)).map(([dept, emps]) => (
-                                <optgroup key={dept} label={dept}>
-                                  {emps.map((emp) => (
-                                    <option key={emp.id} value={emp.id}>
-                                      {emp.name} ({emp.position || 'Cán bộ'})
-                                    </option>
-                                  ))}
-                                </optgroup>
-                              ))}
-                            </select>
-                          </div>
-                        )}
-
-                        {/* 5. Xã / Phường */}
-                        <div>
-                          <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 mb-1">
-                            <MapPin size={14} className="text-gray-500" />
-                            <span>Xã/Phường:</span>
-                          </label>
-                          <select
-                            value={props.filterWard}
-                            onChange={(e) => props.setFilterWard(e.target.value)}
-                            className="w-full text-sm border border-gray-200 rounded-lg p-2 font-medium bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          >
-                            <option value="all">Tất cả Xã/Phường</option>
-                            {wards.map((w) => (
-                              <option key={w} value={w}>
-                                {getNormalizedWard(w)}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        {/* 7. Reset filters button */}
-                        <div className="pt-2">
-                          <button
-                            onClick={() => {
-                              props.setFilterFromDate("");
-                              props.setFilterToDate("");
-                              if (props.setFilterAssignedFromDate) props.setFilterAssignedFromDate("");
-                              if (props.setFilterAssignedToDate) props.setFilterAssignedToDate("");
-                              props.setFilterWard("all");
-                              props.setFilterRecordType("all");
-                              props.setFilterStatus("all");
-                              props.setFilterEmployee("all");
-                            }}
-                            className="w-full py-2 border border-red-200 text-red-600 rounded-xl hover:bg-red-50 text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer"
-                          >
-                            <RefreshCw size={14} /> Xóa tất cả bộ lọc
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
 
             {(currentView === "all_records" ||
               currentView === "archive_records") && (
@@ -1274,19 +1289,6 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                   )}
                 </>
               )}
-              {/* Tab "Đã trả kết quả": Xuất Excel TKQ */}
-              {(currentView === "handover_list" ||
-                currentView === "archive_handover_list") &&
-                props.handoverTab === "returned" && (
-                  <button
-                    onClick={props.handleExportReturnedList}
-                    className="flex items-center justify-center p-2 bg-white text-emerald-700 border border-emerald-300 rounded-lg hover:bg-emerald-50 shadow-xs transition-all cursor-pointer shrink-0 active:scale-95"
-                    title="Xuất file Excel cho danh sách Đã trả kết quả (TKQ)"
-                    aria-label="Xuất file Excel cho danh sách Đã trả kết quả (TKQ)"
-                  >
-                    <FileSpreadsheet size={18} className="text-emerald-600" />
-                  </button>
-                )}
 
               {/* Các tab "Chờ bàn giao" & "Chờ trả kết quả": Nút Xuất DS */}
               {(currentView === "director_completed" ||
