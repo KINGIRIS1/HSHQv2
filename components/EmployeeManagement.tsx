@@ -1,9 +1,10 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Employee, User } from '../types';
-import { Plus, Trash2, Save, User as UserIcon, FileSpreadsheet, Download, List, Edit2, CheckSquare, Search } from 'lucide-react';
+import { Plus, Trash2, Save, User as UserIcon, FileSpreadsheet, Download, List, Edit2, CheckSquare, Search, Filter } from 'lucide-react';
 import * as XLSX from 'xlsx-js-style';
 import { confirmAction } from '../utils/appHelpers';
+import { DEPARTMENTS, POSITIONS } from '../constants';
 
 interface EmployeeManagementProps {
   employees: Employee[];
@@ -21,9 +22,10 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
   currentUser
 }) => {
   const [activeTab, setActiveTab] = useState<'list' | 'detail'>('list');
-  const [editingEmployee, setEditingEmployee] = useState<Partial<Employee>>({ id: '', name: '', department: '', position: '', managedWards: [] });
+  const [editingEmployee, setEditingEmployee] = useState<Partial<Employee>>({ id: '', name: '', department: 'Tổ Đo đạc', position: 'Nhân viên', managedWards: [] });
   const [isNew, setIsNew] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedDeptFilter, setSelectedDeptFilter] = useState<string>('ALL');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Reset form khi chuyển sang tab list (optional)
@@ -53,8 +55,8 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
       setEditingEmployee({ 
           id: `NV${Math.floor(Math.random()*1000)}`, 
           name: '', 
-          department: '', 
-          position: '',
+          department: 'Tổ Đo đạc', 
+          position: 'Nhân viên',
           managedWards: [] 
       });
       setIsNew(true);
@@ -64,6 +66,14 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
   const handleSave = () => {
     if (!editingEmployee.name || !editingEmployee.id) {
         alert('Vui lòng nhập tên và mã nhân viên');
+        return;
+    }
+    if (!editingEmployee.department) {
+        alert('Vui lòng chọn phòng ban');
+        return;
+    }
+    if (!editingEmployee.position) {
+        alert('Vui lòng chọn chức vụ');
         return;
     }
     const newEmp = editingEmployee as Employee;
@@ -91,8 +101,11 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
   const handleDownloadSample = () => {
       const headers = ["MÃ NV", "HỌ TÊN", "PHÒNG BAN", "CHỨC VỤ", "PHỤ TRÁCH"];
       const data = [
-          ["NV001", "Trần Văn B", "Kỹ thuật", "Trưởng phòng", "Tân Quan, Minh Đức"],
-          ["NV002", "Lê Thị C", "Văn phòng", "Nhân viên", ""],
+          ["NV001", "Nguyễn Văn A", "Ban Giám đốc", "Giám Đốc", ""],
+          ["NV002", "Trần Văn B", "Tổ Đo đạc", "Tổ Trưởng", "Tân Quan, Minh Đức"],
+          ["NV003", "Lê Thị C", "Tổ Lưu trữ", "Viên chức", ""],
+          ["NV004", "Phạm Văn D", "Tổ Cấp giấy", "Nhân viên", ""],
+          ["NV005", "Hoàng Thị E", "Tổ Hành chính", "Nhân viên", ""]
       ];
       const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
       const wb = XLSX.utils.book_new();
@@ -120,8 +133,8 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
            
            const id = String(normalizedRow['MÃ NHÂN VIÊN'] || normalizedRow['MÃ NV'] || normalizedRow['ID'] || '');
            const name = String(normalizedRow['HỌ TÊN'] || normalizedRow['TÊN'] || normalizedRow['NAME'] || '');
-           const department = String(normalizedRow['PHÒNG BAN'] || normalizedRow['CHỨC VỤ'] || normalizedRow['DEPARTMENT'] || '');
-           const position = String(normalizedRow['CHỨC VỤ'] || normalizedRow['POSITION'] || '');
+           const department = String(normalizedRow['PHÒNG BAN'] || normalizedRow['DEPARTMENT'] || 'Tổ Đo đạc');
+           const position = String(normalizedRow['CHỨC VỤ'] || normalizedRow['POSITION'] || 'Nhân viên');
            const wardsRaw = String(normalizedRow['PHỤ TRÁCH'] || normalizedRow['XÃ PHƯỜNG'] || normalizedRow['KHU VỰC'] || '');
 
            if (id && name) {
@@ -142,12 +155,15 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
   };
 
   // Filter employees
-  const filteredEmployees = employees.filter(emp => 
-    emp.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    emp.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    emp.department.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (emp.position && emp.position.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const filteredEmployees = employees.filter(emp => {
+    const matchSearch = emp.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      emp.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (emp.department && emp.department.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (emp.position && emp.position.toLowerCase().includes(searchTerm.toLowerCase()));
+    
+    const matchDept = selectedDeptFilter === 'ALL' || emp.department === selectedDeptFilter;
+    return matchSearch && matchDept;
+  });
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col h-full overflow-hidden animate-fade-in-up">
@@ -181,18 +197,33 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
             {/* TAB 1: DANH SÁCH */}
             {activeTab === 'list' && (
                 <div className="h-full flex flex-col">
-                    <div className="p-4 bg-white border-b border-gray-200 flex flex-col sm:flex-row justify-between items-center gap-4 shrink-0">
-                        <div className="relative flex-1 w-full max-w-md">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                            <input 
-                                type="text" 
-                                placeholder="Tìm tên, mã nhân viên, phòng ban, chức vụ..." 
-                                className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm transition-all"
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                            />
+                    <div className="p-4 bg-white border-b border-gray-200 flex flex-col md:flex-row justify-between items-center gap-3 shrink-0">
+                        <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full md:w-auto flex-1 max-w-2xl">
+                            <div className="relative flex-1 w-full">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                                <input 
+                                    type="text" 
+                                    placeholder="Tìm tên, mã NV, chức vụ..." 
+                                    className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm transition-all"
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                />
+                            </div>
+                            <div className="w-full sm:w-auto flex items-center gap-1.5 shrink-0">
+                                <Filter size={15} className="text-gray-400 hidden sm:block" />
+                                <select 
+                                    value={selectedDeptFilter}
+                                    onChange={(e) => setSelectedDeptFilter(e.target.value)}
+                                    className="w-full sm:w-auto border border-gray-200 rounded-xl px-3 py-2 text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 bg-white shadow-sm cursor-pointer"
+                                >
+                                    <option value="ALL">-- Tất cả phòng ban --</option>
+                                    {DEPARTMENTS.map(dept => (
+                                        <option key={dept} value={dept}>{dept}</option>
+                                    ))}
+                                </select>
+                            </div>
                         </div>
-                        <div className="flex gap-2 w-full sm:w-auto overflow-x-auto no-scrollbar pb-1 sm:pb-0">
+                        <div className="flex gap-2 w-full md:w-auto overflow-x-auto no-scrollbar pb-1 md:pb-0 justify-end">
                             <input 
                                 type="file" 
                                 ref={fileInputRef}
@@ -304,24 +335,30 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-600 mb-2">Phòng ban</label>
-                                    <input 
-                                        type="text" 
+                                    <label className="block text-sm font-medium text-gray-600 mb-2">Phòng ban <span className="text-red-500">*</span></label>
+                                    <select 
                                         value={editingEmployee.department || ''}
                                         onChange={(e) => handleChange('department', e.target.value)}
-                                        className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                                        placeholder="Ví dụ: Phòng Kỹ Thuật"
-                                    />
+                                        className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-white cursor-pointer"
+                                    >
+                                        <option value="">-- Chọn phòng ban --</option>
+                                        {DEPARTMENTS.map(dept => (
+                                            <option key={dept} value={dept}>{dept}</option>
+                                        ))}
+                                    </select>
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-600 mb-2">Chức vụ</label>
-                                    <input 
-                                        type="text" 
+                                    <label className="block text-sm font-medium text-gray-600 mb-2">Chức vụ <span className="text-red-500">*</span></label>
+                                    <select 
                                         value={editingEmployee.position || ''}
                                         onChange={(e) => handleChange('position', e.target.value)}
-                                        className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                                        placeholder="Ví dụ: Trưởng phòng"
-                                    />
+                                        className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-white cursor-pointer"
+                                    >
+                                        <option value="">-- Chọn chức vụ --</option>
+                                        {POSITIONS.map(pos => (
+                                            <option key={pos} value={pos}>{pos}</option>
+                                        ))}
+                                    </select>
                                 </div>
                             </div>
 

@@ -113,8 +113,6 @@ export function isViewAllowedForUser(
   // Evaluate Department-Role permissions first, then Role-based permissions
   let activePerms: string[] | null = null;
 
-  let isCustomDeptPerm = false;
-
   if (user.employeeId && employees && departmentPermissions) {
     const emp = employees.find(e => e.id === user.employeeId);
     if (emp && emp.department) {
@@ -124,7 +122,6 @@ export function isViewAllowedForUser(
 
       if (departmentPermissions[compositeKey] && Array.isArray(departmentPermissions[compositeKey])) {
         activePerms = departmentPermissions[compositeKey];
-        isCustomDeptPerm = true;
       } else {
         // Match with matchDepartmentKey on dept part for the EXACT same role
         const matchingCompositeKey = Object.keys(departmentPermissions).find(k => {
@@ -137,9 +134,8 @@ export function isViewAllowedForUser(
 
         if (matchingCompositeKey && Array.isArray(departmentPermissions[matchingCompositeKey])) {
           activePerms = departmentPermissions[matchingCompositeKey];
-          isCustomDeptPerm = true;
-        } else if (user.role !== UserRole.ONEDOOR) {
-          // Pure department key without role suffix (only for technical dept roles, not ONEDOOR)
+        } else {
+          // Match pure department key without role suffix
           const pureDeptKey = Object.keys(departmentPermissions).find(k => {
             if (k.includes('_ADMIN') || k.includes('_SUBADMIN') || k.includes('_TEAM_LEADER') || k.includes('_EMPLOYEE') || k.includes('_ONEDOOR')) {
               return false;
@@ -148,7 +144,6 @@ export function isViewAllowedForUser(
           });
           if (pureDeptKey && Array.isArray(departmentPermissions[pureDeptKey])) {
             activePerms = departmentPermissions[pureDeptKey];
-            isCustomDeptPerm = true;
           }
         }
       }
@@ -160,32 +155,6 @@ export function isViewAllowedForUser(
       activePerms = rolePermissions[user.role];
     } else if (DEFAULT_ROLE_PERMISSIONS[user.role]) {
       activePerms = DEFAULT_ROLE_PERMISSIONS[user.role];
-    }
-  }
-
-  // Luôn áp dụng quy tắc phân tách thuộc tính tổ chuyên môn (Department isolation) cho nhân viên/tổ trưởng:
-  // - Tài khoản thuộc Tổ Đo đạc (không thuộc Lưu trữ) sẽ không thể thấy Tab Lưu trữ
-  // - Tài khoản thuộc Tổ Lưu trữ (không thuộc Đo đạc) sẽ không thể thấy Tab Đo đạc
-  if (user.employeeId && employees && activePerms) {
-    const emp = employees.find(e => e.id === user.employeeId);
-    if (emp && emp.department) {
-      const isDodac = matchDepartmentKey('đo đạc', emp.department);
-      const isLuutru = matchDepartmentKey('lưu trữ', emp.department);
-
-      if (isDodac && !isLuutru) {
-        const ARCHIVE_PERMS = [
-          'archive_records', 'archive_sub_all', 'archive_assign_tasks',
-          'archive_completed_list', 'archive_pending_check_list', 'archive_check_list',
-          'archive_handover_list', 'archive_director_completed', 'VIEW_ARCHIVE', 'MANAGE_ARCHIVE'
-        ];
-        activePerms = activePerms.filter(p => !ARCHIVE_PERMS.includes(p) && !p.startsWith('luutru_'));
-      } else if (isLuutru && !isDodac) {
-        const SURVEY_PERMS = [
-          'all_records', 'all_sub_all', 'assign_tasks', 'completed_list',
-          'pending_supplement_list', 'pending_check_list', 'check_list', 'handover_list', 'director_completed', 'survey_list'
-        ];
-        activePerms = activePerms.filter(p => !SURVEY_PERMS.includes(p) && !p.startsWith('dodac_'));
-      }
     }
   }
 
@@ -221,40 +190,25 @@ export function isViewAllowedForUser(
     switch (viewId) {
       // Main Tab Groups in Top Navigation
       case 'receive_group':
-        return hasAnyPerm(ONEDOOR_CHILD_PERMS) || hasAnyPerm(CONTRACT_CHILD_PERMS);
+        return activePerms.includes('receive_record') || activePerms.includes('receive_contract') || activePerms.includes('ADD_RECORDS') || activePerms.includes('VIEW_CONTRACTS') || hasAnyPerm(ONEDOOR_CHILD_PERMS) || hasAnyPerm(CONTRACT_CHILD_PERMS);
       case 'records_group':
-        const allowDodac = !isUserLuutru(user, employees || []) && (user.role === UserRole.ONEDOOR 
-          ? (activePerms.includes('all_records') || DODAC_CHILD_PERMS.some(p => p !== 'all_records' && activePerms!.includes(p)))
-          : hasAnyPerm(DODAC_CHILD_PERMS));
-        const allowLuutru = !isUserDodac(user, employees || []) && (user.role === UserRole.ONEDOOR 
-          ? (activePerms.includes('archive_records') || LUUTRU_CHILD_PERMS.some(p => p !== 'archive_records' && activePerms!.includes(p)))
-          : hasAnyPerm(LUUTRU_CHILD_PERMS));
-        const allowReg = activePerms.includes('registration_records');
-        return allowDodac || allowLuutru || allowReg;
+        return activePerms.includes('all_records') || activePerms.includes('archive_records') || activePerms.includes('registration_records');
       case 'tools_group':
-        return activePerms.includes('reports') || activePerms.includes('VIEW_REPORTS') || activePerms.includes('excerpt_management') || activePerms.includes('MANAGE_EXCERPTS') || activePerms.includes('VIEW_EXCERPTS') || activePerms.includes('dodac_VIEW_EXCERPTS') || activePerms.includes('dodac_MANAGE_EXCERPTS') || activePerms.includes('utilities') || activePerms.includes('work_schedule');
+        return activePerms.includes('reports') || activePerms.includes('VIEW_REPORTS') || activePerms.includes('excerpt_management') || activePerms.includes('MANAGE_EXCERPTS') || activePerms.includes('VIEW_EXCERPTS') || activePerms.includes('dodac_VIEW_EXCERPTS') || activePerms.includes('dodac_MANAGE_EXCERPTS') || activePerms.includes('utilities') || activePerms.includes('SYSTEM_SETTINGS') || activePerms.includes('VIEW_CHAT');
       case 'management_group':
-        return activePerms.includes('work_schedule') || activePerms.includes('VIEW_SCHEDULE') || activePerms.includes('personal_profile') || activePerms.includes('VIEW_PERSONAL_PROFILE');
+        return activePerms.includes('work_schedule') || activePerms.includes('VIEW_SCHEDULE') || activePerms.includes('MANAGE_SCHEDULE') || activePerms.includes('personal_profile') || activePerms.includes('VIEW_PERSONAL_PROFILE');
 
-      // Main Tabs - Tự động bật quyền xem tab nếu người dùng có bất kỳ quyền con nào trong phân hệ
+      // Main Tabs - Hiển thị tab dựa chính xác theo cấu hình phân quyền đã cấp
       case 'receive_record':
       case 'receive_search':
       case 'receive_record_search':
-        return hasAnyPerm(ONEDOOR_CHILD_PERMS);
+        return activePerms.includes('receive_record') || activePerms.includes('receive_sub_create') || activePerms.includes('receive_sub_list') || activePerms.includes('ADD_RECORDS');
       case 'all_records':
-        if (isUserLuutru(user, employees || [])) return false;
-        if (user.role === UserRole.ONEDOOR) {
-          return activePerms.includes('all_records') || DODAC_CHILD_PERMS.some(p => p !== 'all_records' && activePerms!.includes(p));
-        }
-        return activePerms.includes('all_records') || hasAnyPerm(DODAC_CHILD_PERMS.filter(p => p !== 'all_records'));
+        return activePerms.includes('all_records');
       case 'archive_records':
-        if (isUserDodac(user, employees || [])) return false;
-        if (user.role === UserRole.ONEDOOR) {
-          return activePerms.includes('archive_records') || LUUTRU_CHILD_PERMS.some(p => p !== 'archive_records' && activePerms!.includes(p));
-        }
-        return activePerms.includes('archive_records') || hasAnyPerm(LUUTRU_CHILD_PERMS.filter(p => p !== 'archive_records'));
+        return activePerms.includes('archive_records');
       case 'receive_contract':
-        return hasAnyPerm(CONTRACT_CHILD_PERMS);
+        return activePerms.includes('receive_contract') || activePerms.includes('VIEW_CONTRACTS') || activePerms.includes('ADD_CONTRACTS');
 
       case 'registration_records':
         return activePerms.includes('registration_records');
@@ -262,33 +216,46 @@ export function isViewAllowedForUser(
       // Child Tabs - Receive Group
       case 'receive_sub_create':
       case 'receive_sub_bulk':
+        return activePerms.includes('receive_record') || activePerms.includes('receive_sub_create') || activePerms.includes('ADD_RECORDS');
       case 'receive_sub_list':
+        return activePerms.includes('receive_record') || activePerms.includes('receive_sub_list');
       case 'receive_sub_vphc':
-        return hasAnyPerm(ONEDOOR_CHILD_PERMS);
+        return activePerms.includes('receive_record') || activePerms.includes('receive_sub_vphc');
 
-      // Child Tabs - All Records Group
+      // Child Tabs - All Records Group (Đo đạc)
       case 'all_sub_all':
+        return activePerms.includes('all_records') || activePerms.includes('all_sub_all') || activePerms.includes('dodac_VIEW_DETAILS');
       case 'assign_tasks':
+        return activePerms.includes('all_records') || activePerms.includes('assign_tasks') || activePerms.includes('dodac_BTN_ASSIGN_STAFF');
       case 'completed_list':
       case 'measurement_field':
       case 'measurement_office':
       case 'pending_supplement_list':
+        return activePerms.includes('all_records') || activePerms.includes('completed_list') || activePerms.includes('dodac_VIEW_DETAILS');
       case 'pending_check_list':
+        return activePerms.includes('all_records') || activePerms.includes('pending_check_list') || activePerms.includes('dodac_BTN_SUBMIT_CHECK');
       case 'check_list':
+        return activePerms.includes('all_records') || activePerms.includes('check_list') || activePerms.includes('dodac_BTN_SUBMIT_SIGN');
       case 'director_completed':
-        return hasAnyPerm(DODAC_CHILD_PERMS);
+        return activePerms.includes('all_records') || activePerms.includes('director_completed') || activePerms.includes('dodac_BTN_APPROVE_SIGN');
       case 'handover_list':
-        return hasAnyPerm(DODAC_CHILD_PERMS);
+        return activePerms.includes('all_records') || activePerms.includes('handover_list') || activePerms.includes('dodac_HANDOVER_RECORDS');
 
-      // Child Tabs - Archive Group
+      // Child Tabs - Archive Group (Lưu trữ)
       case 'archive_sub_all':
+        return activePerms.includes('archive_records') || activePerms.includes('archive_sub_all') || activePerms.includes('luutru_VIEW_DETAILS');
       case 'archive_assign_tasks':
+        return activePerms.includes('archive_records') || activePerms.includes('archive_assign_tasks') || activePerms.includes('luutru_BTN_ASSIGN_STAFF');
       case 'archive_completed_list':
+        return activePerms.includes('archive_records') || activePerms.includes('archive_completed_list') || activePerms.includes('luutru_VIEW_DETAILS');
       case 'archive_pending_check_list':
+        return activePerms.includes('archive_records') || activePerms.includes('archive_pending_check_list') || activePerms.includes('luutru_BTN_SUBMIT_CHECK');
       case 'archive_check_list':
+        return activePerms.includes('archive_records') || activePerms.includes('archive_check_list') || activePerms.includes('luutru_BTN_SUBMIT_SIGN');
       case 'archive_handover_list':
+        return activePerms.includes('archive_records') || activePerms.includes('archive_handover_list') || activePerms.includes('luutru_HANDOVER_RECORDS');
       case 'archive_director_completed':
-        return hasAnyPerm(LUUTRU_CHILD_PERMS);
+        return activePerms.includes('archive_records') || activePerms.includes('archive_director_completed') || activePerms.includes('luutru_BTN_APPROVE_SIGN');
 
       // Other Standalone Views
       case 'excerpt_management':
@@ -296,11 +263,11 @@ export function isViewAllowedForUser(
       case 'reports':
         return activePerms.includes('reports') || activePerms.includes('VIEW_REPORTS');
       case 'work_schedule':
-        return activePerms.includes('work_schedule') || activePerms.includes('VIEW_SCHEDULE');
+        return activePerms.includes('work_schedule') || activePerms.includes('VIEW_SCHEDULE') || activePerms.includes('MANAGE_SCHEDULE');
       case 'system_dashboard':
-        return activePerms.includes('system_dashboard') || activePerms.includes('SYSTEM_SETTINGS');
+        return activePerms.includes('system_dashboard') || activePerms.includes('SYSTEM_SETTINGS') || activePerms.includes('MANAGE_USERS') || activePerms.includes('MANAGE_EMPLOYEES');
       case 'utilities':
-        return activePerms.includes('utilities') || activePerms.includes('SYSTEM_SETTINGS');
+        return activePerms.includes('utilities') || activePerms.includes('SYSTEM_SETTINGS') || activePerms.includes('VIEW_CHAT');
 
       default:
         return activePerms.includes(viewId) || activePerms.includes(`dodac_${viewId}`) || activePerms.includes(`luutru_${viewId}`);

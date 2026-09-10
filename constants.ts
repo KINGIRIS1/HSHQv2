@@ -6,6 +6,28 @@ import { RecordStatus, Employee, RecordFile, User, UserRole, Contract } from './
 // Nếu dùng Mạng LAN (Local), đổi lại thành 'http://localhost:3005'
 export const API_BASE_URL = 'https://lrnfdksqepztnihrkgrr.supabase.co'; 
 
+// PHÒNG BAN & CHỨC VỤ CHUẨN HÓA CỐ ĐỊNH
+export const DEPARTMENTS = [
+  'Ban Giám đốc',
+  'Tổ Lưu trữ',
+  'Tổ Đo đạc',
+  'Tổ Cấp giấy',
+  'Tổ Hành chính'
+] as const;
+
+export type DepartmentType = typeof DEPARTMENTS[number];
+
+export const POSITIONS = [
+  'Giám Đốc',
+  'Phó Giám Đốc',
+  'Tổ Trưởng',
+  'Tổ Phó',
+  'Viên chức',
+  'Nhân viên'
+] as const;
+
+export type PositionType = typeof POSITIONS[number];
+
 // PHIÊN BẢN HIỆN TẠI CỦA ỨNG DỤNG
 export const APP_VERSION = '2.1.1';
 

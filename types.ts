@@ -48,7 +48,6 @@ export const DEFAULT_ROLE_PERMISSIONS: RolePermissions = {
   [UserRole.ONEDOOR]: [
     'receive_record', 'receive_sub_create', 'receive_sub_bulk', 'receive_sub_list', 'receive_search', 'receive_record_search', 'ADD_RECORDS',
     'receive_contract', 'VIEW_CONTRACTS', 'ADD_CONTRACTS', 'EDIT_CONTRACTS', 'EXPORT_CONTRACTS',
-    'registration_records',
     'excerpt_management', 'VIEW_EXCERPTS',
     'reports', 'VIEW_REPORTS',
     'work_schedule', 'VIEW_SCHEDULE',

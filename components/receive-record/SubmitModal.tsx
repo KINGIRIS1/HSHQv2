@@ -101,7 +101,11 @@ const SubmitModal: React.FC<SubmitModalProps> = ({ isOpen, onClose, records, onC
                                     <div className="ml-3">
                                         <span className="block text-sm font-medium text-gray-900">{director.name}</span>
                                         <span className="block text-xs text-gray-500">
-                                            {employees.find(e => e.id === director.employeeId)?.position || (director.role === UserRole.ADMIN ? 'Giám đốc' : 'Phó giám đốc')}
+                                            {(() => {
+                                                const emp = employees.find(e => e.id === director.employeeId);
+                                                if (!emp) return director.role === UserRole.ADMIN ? 'Giám Đốc' : 'Phó Giám Đốc';
+                                                return `${emp.position || 'Cán bộ'}${emp.department ? ` • ${emp.department}` : ''}`;
+                                            })()}
                                         </span>
                                     </div>
                                 </label>

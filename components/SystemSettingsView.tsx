@@ -18,8 +18,11 @@ import {
 import { isConfigured } from '../services/supabaseClient';
 
 const PERMISSION_DEPARTMENTS = [
+  { id: 'Ban Giám đốc', name: 'Ban Giám đốc', label: 'Ban Giám đốc', desc: 'Ban lãnh đạo đơn vị, ký duyệt và chỉ đạo chung' },
   { id: 'Tổ Lưu trữ', name: 'Tổ Lưu trữ', label: 'Tổ Lưu trữ', desc: 'Bộ phận phụ trách lưu trữ, khai thác thông tin đất đai và hồ sơ lưu trữ' },
-  { id: 'Tổ Đo đạc', name: 'Tổ Đo đạc', label: 'Tổ Đo đạc', desc: 'Bộ phận phụ trách đo đạc, chỉnh lý bản đồ và trích đo địa chính' }
+  { id: 'Tổ Đo đạc', name: 'Tổ Đo đạc', label: 'Tổ Đo đạc', desc: 'Bộ phận phụ trách đo đạc, chỉnh lý bản đồ và trích đo địa chính' },
+  { id: 'Tổ Cấp giấy', name: 'Tổ Cấp giấy', label: 'Tổ Cấp giấy', desc: 'Bộ phận phụ trách đăng ký, cấp giấy chứng nhận quyền sử dụng đất' },
+  { id: 'Tổ Hành chính', name: 'Tổ Hành chính', label: 'Tổ Hành chính', desc: 'Bộ phận hành chính, văn phòng, tiếp nhận một cửa' }
 ];
 
 const ROLES_FOR_DEPARTMENT = [
@@ -190,26 +193,19 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
   const [permissionTab, setPermissionTab] = useState<'department' | 'role'>('department');
 
   const allDepartmentOptions = React.useMemo(() => {
-    const excludedNormalized = [
-      'tổ đăng ký cấp giấy',
-      'quản trị hệ thống',
-      'ban giám đốc',
-      'một cửa',
-      'tổ 1 cửa'
-    ];
-
-    const baseList = PERMISSION_DEPARTMENTS.map(d => d.id).filter(id => !excludedNormalized.includes(id.toLowerCase().trim()));
+    const baseList = PERMISSION_DEPARTMENTS.map(d => d.id);
     const resultList: string[] = [];
 
     const addDept = (name: string) => {
       const trimmed = name.trim();
-      const lower = trimmed.toLowerCase();
-      if (excludedNormalized.includes(lower)) return;
+      if (!trimmed) return;
 
       let standardName = trimmed;
       if (matchDepartmentKey('đo đạc', trimmed)) standardName = 'Tổ Đo đạc';
       else if (matchDepartmentKey('lưu trữ', trimmed)) standardName = 'Tổ Lưu trữ';
+      else if (matchDepartmentKey('cấp giấy', trimmed) || matchDepartmentKey('đăng ký', trimmed)) standardName = 'Tổ Cấp giấy';
       else if (matchDepartmentKey('hành chính', trimmed)) standardName = 'Tổ Hành chính';
+      else if (matchDepartmentKey('giám đốc', trimmed)) standardName = 'Ban Giám đốc';
 
       const isDuplicate = resultList.some(existing => {
         if (existing.toLowerCase() === standardName.toLowerCase()) return true;
@@ -232,7 +228,7 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
       });
     }
 
-    return resultList.length > 0 ? resultList : ['Tổ Lưu trữ', 'Tổ Đo đạc'];
+    return resultList.length > 0 ? resultList : ['Ban Giám đốc', 'Tổ Lưu trữ', 'Tổ Đo đạc', 'Tổ Cấp giấy', 'Tổ Hành chính'];
   }, [employees]);
 
   // Contract Number Settings States
@@ -575,7 +571,15 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
 
   const getDefaultDeptPerms = (deptName: string, role: string): string[] => {
       const basePerms = rolePermissions[role] || DEFAULT_ROLE_PERMISSIONS[role as UserRole] || [];
-      if (matchDepartmentKey('đo đạc', deptName)) {
+      if (matchDepartmentKey('giám đốc', deptName)) {
+          return [
+              'all_records', 'archive_records', 'registration_records', 'excerpt_management',
+              'reports', 'VIEW_REPORTS', 'work_schedule', 'VIEW_SCHEDULE', 'utilities', 'SYSTEM_SETTINGS', 'VIEW_CHAT', 'VIEW_PERSONAL_PROFILE',
+              'dodac_BTN_APPROVE_SIGN', 'dodac_VIEW_DETAILS', 'dodac_VIEW_EXCERPTS',
+              'luutru_BTN_APPROVE_SIGN', 'luutru_VIEW_DETAILS', 'luutru_VIEW_ARCHIVE',
+              'VIEW_DETAILS'
+          ];
+      } else if (matchDepartmentKey('đo đạc', deptName)) {
           const ARCHIVE_PERMS = [
               'archive_records', 'archive_sub_all', 'archive_assign_tasks',
               'archive_completed_list', 'archive_pending_check_list', 'archive_check_list',
@@ -588,6 +592,13 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
               'pending_check_list', 'check_list', 'handover_list', 'director_completed', 'survey_list'
           ];
           return basePerms.filter(p => !SURVEY_PERMS.includes(p) && !p.startsWith('dodac_'));
+      } else if (matchDepartmentKey('cấp giấy', deptName) || matchDepartmentKey('đăng ký', deptName)) {
+          return [
+              'registration_records', 'reports', 'VIEW_REPORTS', 'work_schedule', 'VIEW_SCHEDULE',
+              'utilities', 'VIEW_CHAT', 'VIEW_PERSONAL_PROFILE'
+          ];
+      } else if (matchDepartmentKey('hành chính', deptName) || matchDepartmentKey('một cửa', deptName)) {
+          return DEFAULT_ROLE_PERMISSIONS[UserRole.ONEDOOR] || [];
       }
       return basePerms;
   };
@@ -1206,13 +1217,14 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                             </div>
 
                             {/* Role selector within Department */}
-                            <div className="flex items-center gap-4 pt-1 border-t border-slate-100">
+                            <div className="flex items-center gap-4 pt-1 border-t border-slate-100 overflow-x-auto no-scrollbar">
                                 <span className="text-[11px] font-black uppercase tracking-wider text-slate-500 shrink-0">
                                     VAI TRÒ TRONG TỔ:
                                 </span>
                                 {[
-                                    { role: UserRole.TEAM_LEADER, label: 'TEAM_LEADER' },
-                                    { role: UserRole.EMPLOYEE, label: 'EMPLOYEE' }
+                                    { role: UserRole.TEAM_LEADER, label: 'TEAM_LEADER (Tổ trưởng/Phó)' },
+                                    { role: UserRole.EMPLOYEE, label: 'EMPLOYEE (Nhân viên)' },
+                                    { role: UserRole.ONEDOOR, label: 'ONEDOOR (Một cửa)' }
                                 ].map((item) => {
                                     const isSelected = selectedRole === item.role;
                                     return (
@@ -1220,7 +1232,7 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                                             key={item.role}
                                             type="button"
                                             onClick={() => setSelectedRole(item.role)}
-                                            className={`text-xs font-black tracking-wider uppercase transition-all pb-0.5 border-b-2 ${
+                                            className={`text-xs font-black tracking-wider uppercase transition-all pb-0.5 border-b-2 whitespace-nowrap ${
                                                 isSelected
                                                     ? 'border-purple-600 text-purple-800'
                                                     : 'border-transparent text-slate-400 hover:text-slate-600 font-bold'
