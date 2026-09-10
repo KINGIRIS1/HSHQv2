@@ -1640,6 +1640,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
           wards={wards}
           onDeleteAllData={props.handleDeleteAllData}
           onHolidaysChanged={props.onRefreshData}
+          onRecordsUpdated={props.onRefreshData}
           onOpenCloudInspector={props.onOpenCloudInspector}
         />
       );

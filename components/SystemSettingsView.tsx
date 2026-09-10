@@ -16,6 +16,7 @@ import {
   EXCEL_BACKUP_PERIOD_DAYS 
 } from '../services/excelBackupService';
 import { isConfigured } from '../services/supabaseClient';
+import FixAssignedDatesTool from './FixAssignedDatesTool';
 
 const PERMISSION_DEPARTMENTS = [
   { id: 'Ban Giám đốc', name: 'Ban Giám đốc', label: 'Ban Giám đốc', desc: 'Ban lãnh đạo đơn vị, ký duyệt và chỉ đạo chung' },
@@ -139,6 +140,7 @@ interface SystemSettingsViewProps {
   records?: RecordFile[];
   onOpenCloudInspector?: () => void;
   fixedTab?: 'general' | 'holidays' | 'permissions' | 'data';
+  onRecordsUpdated?: () => void;
 }
 
 const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ 
@@ -148,7 +150,8 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
   users,
   records,
   onOpenCloudInspector,
-  fixedTab
+  fixedTab,
+  onRecordsUpdated
 }) => {
   const [activeTab, setActiveTab] = useState<'general' | 'holidays' | 'permissions' | 'data'>(fixedTab || 'general');
 
@@ -1380,7 +1383,12 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
             )}
 
             {activeTab === 'data' && (
-                <div className="max-w-4xl mx-auto space-y-8">
+                <div className="max-w-5xl mx-auto space-y-8">
+                    {/* Công cụ Sửa lỗi ngày giao Đo đạc thực địa và ngày Biên tập bản đồ (09/09/2026) */}
+                    <FixAssignedDatesTool 
+                        records={records} 
+                        onRecordsUpdated={onRecordsUpdated || onHolidaysChanged} 
+                    />
 
                     {/* Hộp vùng nguy hiểm */}
                     <div className="border border-red-100 rounded-[2rem] overflow-hidden bg-white shadow-xl shadow-red-50/50">

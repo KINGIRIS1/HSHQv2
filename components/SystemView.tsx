@@ -18,6 +18,7 @@ interface SystemViewProps {
     wards: string[];
     onDeleteAllData: () => Promise<boolean>;
     onHolidaysChanged: () => void;
+    onRecordsUpdated?: () => void;
     onOpenCloudInspector?: () => void;
 }
 
@@ -34,6 +35,7 @@ const SystemView: React.FC<SystemViewProps> = ({
     wards,
     onDeleteAllData,
     onHolidaysChanged,
+    onRecordsUpdated,
     onOpenCloudInspector
 }) => {
     const isAdmin = currentUser.role === UserRole.ADMIN;
@@ -133,6 +135,7 @@ const SystemView: React.FC<SystemViewProps> = ({
                         users={users}
                         records={records}
                         onOpenCloudInspector={onOpenCloudInspector}
+                        onRecordsUpdated={onRecordsUpdated || onHolidaysChanged}
                     />
                 )}
             </div>
