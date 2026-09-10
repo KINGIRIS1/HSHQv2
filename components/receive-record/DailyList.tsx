@@ -329,8 +329,22 @@ const DailyList: React.FC<DailyListProps> = ({ records, wards, currentUser, empl
                 </button>
             )}
             <div className="ml-auto hidden md:flex gap-2">
-                <button onClick={handlePreview} className="flex items-center gap-2 bg-white text-blue-700 border border-blue-300 px-4 py-2 rounded-md hover:bg-blue-50 shadow-xs text-sm font-semibold"> <Eye size={16} className="text-blue-600" /> Xem Excel </button>
-                <button onClick={handleExport} className="flex items-center gap-2 bg-white text-emerald-700 border border-emerald-300 px-4 py-2 rounded-md hover:bg-emerald-50 shadow-xs text-sm font-semibold"> <FileSpreadsheet size={16} className="text-emerald-600" /> Tải Excel </button>
+                <button 
+                    onClick={handlePreview} 
+                    className="flex items-center justify-center bg-white text-blue-700 border border-blue-300 p-2 rounded-md hover:bg-blue-50 shadow-xs transition-all active:scale-95 cursor-pointer"
+                    title="Xem trước bảng Excel"
+                    aria-label="Xem trước bảng Excel"
+                > 
+                    <Eye size={18} className="text-blue-600" /> 
+                </button>
+                <button 
+                    onClick={handleExport} 
+                    className="flex items-center justify-center bg-white text-emerald-700 border border-emerald-300 p-2 rounded-md hover:bg-emerald-50 shadow-xs transition-all active:scale-95 cursor-pointer"
+                    title="Xuất file Excel"
+                    aria-label="Xuất file Excel"
+                > 
+                    <FileSpreadsheet size={18} className="text-emerald-600" /> 
+                </button>
             </div>
         </div>
         <div className="flex-1 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col min-h-0">

@@ -914,14 +914,11 @@ export const RecordSearch: React.FC<RecordSearchProps> = ({
                         {/* Excel Export */}
                         <button
                             onClick={handleExportExcel}
-                            className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-white text-emerald-700 border border-emerald-300 hover:bg-emerald-50 rounded-lg font-bold shadow-xs transition-all active:scale-95 cursor-pointer select-none"
+                            className="inline-flex items-center justify-center p-2 bg-white text-emerald-700 border border-emerald-300 hover:bg-emerald-50 rounded-lg shadow-xs transition-all active:scale-95 cursor-pointer select-none"
                             title={selectedIds.size > 0 ? `Xuất Excel ${selectedIds.size} hồ sơ đã chọn` : `Xuất Excel toàn bộ ${sortedRecords.length} hồ sơ`}
+                            aria-label="Xuất file Excel"
                         >
                             <FileSpreadsheet size={18} className="text-emerald-600 shrink-0" />
-                            <span className="font-bold text-[14px] leading-tight">Xuất Excel</span>
-                            <span className="bg-emerald-100 text-emerald-800 text-xs font-black px-2.5 py-0.5 rounded-full shadow-inner tracking-wider">
-                                {(selectedIds.size > 0 ? selectedIds.size : sortedRecords.length).toLocaleString('vi-VN')}
-                            </span>
                         </button>
 
                         {/* Column visibility and ordering selector matched perfectly to "Tất cả hồ sơ" */}

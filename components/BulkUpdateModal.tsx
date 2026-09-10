@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { RecordFile, Employee, RecordStatus } from '../types';
-import { STATUS_LABELS, SELECTABLE_STATUSES } from '../constants';
+import { STATUS_LABELS, SELECTABLE_STATUSES, SURVEY_SELECTABLE_STATUSES, ARCHIVE_SELECTABLE_STATUSES, isArchiveRecordType } from '../constants';
 import { X, CheckCircle2, Layers, ArrowRight, UserCheck, Calendar } from 'lucide-react';
 import { getDepartmentForRecord, calculateEmployeeWorkload, getPureBatchNumber, groupEmployeesByDepartment } from '../utils/appHelpers';
 
@@ -53,6 +53,13 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
   const detectedDept = deptFromView || (activeRecordsToUpdate.length > 0 
     ? getDepartmentForRecord(activeRecordsToUpdate[0]) 
     : 'Tổ Đo đạc');
+
+  const isArchiveContext = currentView?.startsWith('archive_') || (activeRecordsToUpdate.length > 0 && activeRecordsToUpdate.every(r => isArchiveRecordType(r.recordType)));
+  const isSurveyContext = !isArchiveContext;
+
+  const selectableStatusList = isSurveyContext 
+    ? SURVEY_SELECTABLE_STATUSES.filter(item => item.key !== RecordStatus.IN_PROGRESS)
+    : ARCHIVE_SELECTABLE_STATUSES;
 
   // Classify selected target statuses
   const isPendingSign = 
@@ -225,7 +232,7 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
                                 onChange={(e) => setTargetValue(e.target.value)}
                             >
                                 <option value="">-- Chọn trạng thái mới --</option>
-                                {SELECTABLE_STATUSES.map(item => (
+                                {selectableStatusList.map(item => (
                                     <option key={item.key} value={item.key}>{item.label}</option>
                                 ))}
                             </select>

@@ -985,8 +985,13 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                             </button>
                         )}
 
-                        <button onClick={handleExportExcel} className="hidden md:flex items-center gap-2 bg-white text-emerald-700 border border-emerald-300 px-3 py-1.5 rounded-md font-bold text-sm hover:bg-emerald-50 shadow-xs">
-                            <FileSpreadsheet size={16} className="text-emerald-600"/> Xuất Excel
+                        <button 
+                            onClick={handleExportExcel} 
+                            className="hidden md:flex items-center justify-center bg-white text-emerald-700 border border-emerald-300 p-2 rounded-md hover:bg-emerald-50 shadow-xs transition-colors active:scale-95 shrink-0"
+                            title="Xuất file Excel"
+                            aria-label="Xuất file Excel"
+                        >
+                            <FileSpreadsheet size={18} className="text-emerald-600"/>
                         </button>
                         <button onClick={() => {
                             if (selectedIds.size > 0) {

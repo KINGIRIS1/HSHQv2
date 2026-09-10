@@ -9,10 +9,18 @@ import {
   RolePermissions,
   DepartmentPermissions,
   DEFAULT_ROLE_PERMISSIONS,
+  RecordStatus,
 } from "../types";
-import { STATUS_LABELS, SELECTABLE_STATUSES, getNormalizedWard } from "../constants";
+import {
+  STATUS_LABELS,
+  SELECTABLE_STATUSES,
+  SURVEY_SELECTABLE_STATUSES,
+  ARCHIVE_SELECTABLE_STATUSES,
+  getNormalizedWard,
+} from "../constants";
 import { COLUMN_DEFS, removeVietnameseTones, matchDepartmentKey, groupEmployeesByDepartment } from "../utils/appHelpers";
 import { checkUserPermission } from "../utils/permissionUtils";
+import { exportCustomRecordsToExcel } from "../utils/excelExport";
 
 // Components
 import DashboardView from "./DashboardView";
@@ -374,6 +382,56 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
     return count;
   }, [props.filterFromDate, props.filterToDate, props.filterWard, props.filterRecordType, props.filterStatus, props.filterEmployee, isStatusFilterHidden]);
 
+  const [isExportingExcel, setIsExportingExcel] = React.useState(false);
+
+  // Tự động chuyển trạng thái lọc về 'all' nếu chuyển sang module Đo đạc mà trước đó đang chọn IN_PROGRESS
+  React.useEffect(() => {
+    const isMeasurement = [
+      "all_records",
+      "assign_tasks",
+      "completed_list",
+      "measurement_field",
+      "measurement_office",
+      "pending_supplement_list",
+      "pending_check_list",
+      "check_list",
+      "handover_list",
+      "director_completed",
+    ].includes(props.currentView || '');
+
+    if (isMeasurement && props.filterStatus === RecordStatus.IN_PROGRESS) {
+      props.setFilterStatus('all');
+    }
+  }, [props.currentView, props.filterStatus, props.setFilterStatus]);
+
+  const handleExportFilteredExcel = async () => {
+    if (!props.filteredRecords || props.filteredRecords.length === 0) {
+      alert("Không có hồ sơ nào phù hợp với kết quả lọc để xuất.");
+      return;
+    }
+
+    try {
+      setIsExportingExcel(true);
+      const isSurvey = props.currentView === "all_records";
+      const titleText = isSurvey
+        ? "DANH SÁCH HỒ SƠ ĐO ĐẠC (KẾT QUẢ LỌC)"
+        : "DANH SÁCH HỒ SƠ LƯU TRỮ (KẾT QUẢ LỌC)";
+
+      const now = new Date();
+      const datePart = `${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}`;
+      const timePart = `${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}${now.getSeconds().toString().padStart(2, '0')}`;
+      const prefix = isSurvey ? "Danh_Sach_Ho_So_Do_Dac_Loc" : "Danh_Sach_Ho_So_Luu_Tru_Loc";
+      const fileName = `${prefix}_${datePart}_${timePart}.xlsx`;
+
+      await exportCustomRecordsToExcel(props.filteredRecords, employees, titleText, fileName);
+    } catch (error: any) {
+      console.error("Lỗi xuất excel:", error);
+      alert(error?.message || "Đã xảy ra lỗi khi xuất file Excel.");
+    } finally {
+      setIsExportingExcel(false);
+    }
+  };
+
   const navigateToReceiveRecordSubTab = (subTab: 'create' | 'list' | 'bulk' | 'update' | 'vphc' | 'search' | 'extend') => {
     ignoreSubTabResetRef.current = true;
     setReceiveRecordSubTab(subTab);
@@ -452,6 +510,13 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
     ].includes(currentView);
 
     const isSpecializedTab = !["all_records", "archive_records"].includes(currentView);
+    const isAllRecordsTab = currentView === "all_records" || currentView === "archive_records";
+
+    const statusFilterOptions = isMeasurementView
+      ? SURVEY_SELECTABLE_STATUSES.filter(item => item.key !== RecordStatus.IN_PROGRESS)
+      : isArchiveMeasurementView
+      ? ARCHIVE_SELECTABLE_STATUSES
+      : SELECTABLE_STATUSES;
 
     let title = "Danh sách Hồ sơ";
     if (
@@ -667,8 +732,8 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
         )}
 
         <div className="p-4 border-b border-gray-100 flex flex-col gap-4">
-          <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-            <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-3">
+            <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2 shrink-0">
               {title}
               {!canPerformAction && (
                 <span className="text-xs font-normal text-gray-500 px-2 py-0.5 bg-gray-100 rounded-full border">
@@ -676,18 +741,33 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                 </span>
               )}
             </h2>
-            <div className="relative flex-1 sm:w-64 max-w-md">
-              <Search
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                size={18}
-              />
-              <input
-                type="text"
-                placeholder="Tìm kiếm..."
-                className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                value={props.searchTerm}
-                onChange={(e) => props.setSearchTerm(e.target.value)}
-              />
+            <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end flex-1 max-w-xl">
+              <div className="relative flex-1 sm:w-64">
+                <Search
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                  size={18}
+                />
+                <input
+                  type="text"
+                  placeholder="Tìm kiếm..."
+                  className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={props.searchTerm}
+                  onChange={(e) => props.setSearchTerm(e.target.value)}
+                />
+              </div>
+
+              {isAllRecordsTab && (
+                <button
+                  id="btn-export-filtered-records-excel"
+                  onClick={handleExportFilteredExcel}
+                  disabled={isExportingExcel || props.filteredRecords.length === 0}
+                  className="flex items-center justify-center p-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed text-white rounded-lg shadow-sm transition-all cursor-pointer shrink-0 active:scale-95"
+                  title={`Xuất file Excel theo kết quả lọc (${props.filteredRecords.length} hồ sơ)`}
+                  aria-label="Xuất file Excel"
+                >
+                  <FileSpreadsheet size={18} />
+                </button>
+              )}
             </div>
           </div>
 
@@ -887,7 +967,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                               className="w-full text-sm border border-gray-200 rounded-lg p-2 font-medium bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                             >
                               <option value="all">Mọi trạng thái</option>
-                              {SELECTABLE_STATUSES.map((item) => (
+                              {statusFilterOptions.map((item) => (
                                 <option key={item.key} value={item.key}>
                                   {item.label}
                                 </option>
@@ -1200,10 +1280,11 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                 props.handoverTab === "returned" && (
                   <button
                     onClick={props.handleExportReturnedList}
-                    className="flex items-center gap-1.5 bg-white text-emerald-700 border border-emerald-300 px-3.5 py-1.5 rounded-lg hover:bg-emerald-50 text-sm font-bold shadow-xs transition-all cursor-pointer whitespace-nowrap"
+                    className="flex items-center justify-center p-2 bg-white text-emerald-700 border border-emerald-300 rounded-lg hover:bg-emerald-50 shadow-xs transition-all cursor-pointer shrink-0 active:scale-95"
                     title="Xuất file Excel cho danh sách Đã trả kết quả (TKQ)"
+                    aria-label="Xuất file Excel cho danh sách Đã trả kết quả (TKQ)"
                   >
-                    <FileSpreadsheet size={16} className="text-emerald-600" /> Xuất Excel TKQ
+                    <FileSpreadsheet size={18} className="text-emerald-600" />
                   </button>
                 )}
 

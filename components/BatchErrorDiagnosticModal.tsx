@@ -873,11 +873,11 @@ export const BatchErrorDiagnosticModal: React.FC<BatchErrorDiagnosticModalProps>
 
             <button
               onClick={handleExportErrorReportExcel}
-              className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3.5 py-1.5 rounded-lg shadow-sm active:scale-95 transition-all"
+              className="flex items-center justify-center bg-emerald-600 hover:bg-emerald-700 text-white p-2 rounded-lg shadow-sm active:scale-95 transition-all"
               title="Xuất file Excel nghiên cứu khắc phục"
+              aria-label="Xuất file Excel nghiên cứu khắc phục"
             >
-              <FileSpreadsheet size={15} />
-              <span>Xuất Báo Cáo Excel</span>
+              <FileSpreadsheet size={16} />
             </button>
           </div>
         </div>

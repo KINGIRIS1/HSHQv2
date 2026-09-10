@@ -10,6 +10,7 @@ import {
     Save, 
     RefreshCw, 
     FileText, 
+    FileSpreadsheet,
     Check, 
     ArrowRight, 
     HelpCircle, 
@@ -981,11 +982,11 @@ export const KiemTraDoDacTab: React.FC<KiemTraDoDacTabProps> = ({
                 <div className="flex items-center gap-3 text-xs self-start xl:self-auto">
                     <button
                         onClick={handleExportExcel}
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg flex items-center gap-1.5 font-bold shadow-sm transition-colors cursor-pointer"
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white p-2 rounded-lg flex items-center justify-center font-bold shadow-sm transition-colors cursor-pointer active:scale-95"
                         title="Xuất danh sách hồ sơ đang hiển thị ra tệp Excel"
+                        aria-label="Xuất file Excel"
                     >
-                        <FileText size={14} />
-                        Xuất Excel
+                        <FileSpreadsheet size={18} />
                     </button>
                     <div className="bg-amber-50 border border-amber-200 text-amber-800 px-3 py-1.5 rounded-lg flex items-center gap-1.5 font-semibold">
                         <AlertCircle size={14} className="text-amber-600" />

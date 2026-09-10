@@ -982,7 +982,8 @@ export const generateRecordsWorkbookBase64 = async (
 export const exportCustomRecordsToExcel = async (
     records: RecordFile[],
     employees: Employee[],
-    titleText: string = "DANH SÁCH HỒ SƠ"
+    titleText: string = "DANH SÁCH HỒ SƠ",
+    customFileName?: string
 ) => {
     if (records.length === 0) {
         alert("Không có hồ sơ nào để xuất.");
@@ -991,7 +992,7 @@ export const exportCustomRecordsToExcel = async (
 
     try {
         const wb = await createRecordsWorkbook(records, employees, titleText);
-        const fileName = `Danh_Sach_Ho_So_${new Date().getTime()}.xlsx`;
+        const fileName = customFileName || `Danh_Sach_Ho_So_${new Date().getTime()}.xlsx`;
         XLSX.writeFile(wb, fileName);
     } catch (err: any) {
         alert(err.message || "Lỗi khi xuất file Excel.");

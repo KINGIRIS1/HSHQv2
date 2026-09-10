@@ -1657,17 +1657,14 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
               )}
             </div>
 
-            {/* XUẤT EXCEL BUTTON WITH EMBEDDED RECORD COUNT PILL */}
+            {/* XUẤT EXCEL BUTTON */}
             <button
               onClick={handleExportExcel}
-              className="flex items-center gap-2 px-3.5 py-1.5 bg-white text-emerald-700 border border-emerald-300 hover:bg-emerald-50 rounded-lg text-sm font-bold transition-all whitespace-nowrap shadow-xs cursor-pointer ml-auto md:ml-0"
-              title="Xuất danh sách hồ sơ ra file Excel"
+              className="flex items-center justify-center p-2 bg-white text-emerald-700 border border-emerald-300 hover:bg-emerald-50 rounded-lg transition-all shadow-xs cursor-pointer ml-auto md:ml-0 active:scale-95"
+              title={`Xuất danh sách ${displayRecords.length} hồ sơ ra file Excel`}
+              aria-label="Xuất file Excel"
             >
-              <FileDown size={16} className="text-emerald-600" />
-              <span>Xuất Excel</span>
-              <span className="bg-emerald-100 text-emerald-800 text-xs px-2.5 py-0.5 rounded-full font-extrabold tracking-wide">
-                {displayRecords.length}
-              </span>
+              <FileDown size={18} className="text-emerald-600" />
             </button>
           </div>
         </div>

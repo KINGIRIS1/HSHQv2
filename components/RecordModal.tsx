@@ -684,6 +684,12 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
   const showMsr = !isArchive && (recTypeLower.includes('trích đo') || recTypeLower.includes('đo đạc') || recTypeLower.includes('đo') || recTypeLower.includes('tách thửa') || (!recTypeLower.includes('trích đo') && !recTypeLower.includes('trích lục')));
   const showExc = !isArchive && (recTypeLower.includes('trích lục') || (!recTypeLower.includes('trích đo') && !recTypeLower.includes('trích lục')));
 
+  const statusSelectOptions = useMemo(() => {
+    return isArchive
+      ? ARCHIVE_SELECTABLE_STATUSES
+      : SURVEY_SELECTABLE_STATUSES.filter(item => item.key !== RecordStatus.IN_PROGRESS);
+  }, [isArchive]);
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[100] p-0 md:p-4 backdrop-blur-sm">
       <div className="bg-white md:rounded-xl shadow-2xl w-full max-w-4xl h-full md:max-h-[95vh] flex flex-col animate-fade-in-up">
@@ -735,12 +741,12 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                                         onChange={(e) => handleChange('status', e.target.value)}
                                     >
                                         {/* Nếu trạng thái hiện tại là trạng thái cũ hoặc không nằm trong danh mục chuẩn, hiển thị để tránh bị tự nhảy về Tiếp nhận mới */}
-                                        {formData.status && !(isArchive ? ARCHIVE_SELECTABLE_STATUSES : SURVEY_SELECTABLE_STATUSES).some(item => item.key === formData.status) && (
+                                        {formData.status && !statusSelectOptions.some(item => item.key === formData.status) && (
                                             <option value={formData.status}>
                                                 {STATUS_LABELS[formData.status as RecordStatus] || formData.status} (Chưa chuẩn hóa - Vui lòng chọn lại)
                                             </option>
                                         )}
-                                        {(isArchive ? ARCHIVE_SELECTABLE_STATUSES : SURVEY_SELECTABLE_STATUSES).map(item => (
+                                        {statusSelectOptions.map(item => (
                                             <option key={item.key} value={item.key}>{item.label}</option>
                                         ))}
                                     </select>
