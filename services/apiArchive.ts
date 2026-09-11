@@ -2,6 +2,7 @@ import { supabase, isConfigured } from './supabaseClient';
 import { logError, getFromCache, saveToCache, sanitizeData, sanitizePayloadFor22P02 } from './apiCore';
 import { RecordFile, RecordStatus } from '../types';
 import { isArchiveRecordType, getShortRecordType } from '../constants';
+import { setIndexedDBItem, getIndexedDBItem } from './storageService';
 
 // --- TYPES ---
 export interface ArchiveRecord {
@@ -22,6 +23,10 @@ export interface ArchiveRecord {
 let MOCK_ARCHIVE: ArchiveRecord[] = [];
 
 const CACHE_KEY_ARCHIVE = 'offline_archive_records';
+export const CACHE_KEY_LUUTRU_RECORDS = 'offline_luutru_records';
+
+// In-memory cache for instant 0ms access
+let memoryArchiveRecordsCache: RecordFile[] | null = null;
 
 const ARCHIVE_DB_COLUMNS = [
     'id', 'code', 'customerName', 'phoneNumber', 'cccd', 'customerAddress', 'ward', 'landPlot', 'mapSheet', 
@@ -309,6 +314,96 @@ export const migrateArchiveRecordsFromLandRecords = async () => {
 
 // Giữ alias tương thích
 export const migrateCungCapTaiLieu = migrateArchiveRecordsFromLandRecords;
+
+export const getCachedArchiveRecords = async (): Promise<RecordFile[]> => {
+    if (memoryArchiveRecordsCache && memoryArchiveRecordsCache.length > 0) {
+        return memoryArchiveRecordsCache;
+    }
+    try {
+        const idb = await getIndexedDBItem<RecordFile[]>(CACHE_KEY_LUUTRU_RECORDS);
+        if (Array.isArray(idb) && idb.length > 0) {
+            memoryArchiveRecordsCache = idb;
+            return idb;
+        }
+    } catch {
+        // ignore
+    }
+    return [];
+};
+
+export const fetchAllArchiveRecordsAsRecordFiles = async (): Promise<RecordFile[]> => {
+    if (!isConfigured) {
+        const cached = getFromCache<ArchiveRecord[]>(CACHE_KEY_ARCHIVE, []);
+        if (MOCK_ARCHIVE.length === 0 && cached.length > 0) MOCK_ARCHIVE = cached;
+        const res = MOCK_ARCHIVE.map(r => {
+            const row = mapArchiveRecordToLuutruDb(r);
+            return mapArchiveDbToRecordFile(row);
+        });
+        memoryArchiveRecordsCache = res;
+        return res;
+    }
+
+    try {
+        let allRecords: RecordFile[] = [];
+        let page = 0;
+        const pageSize = 1000;
+        let hasMore = true;
+
+        while (hasMore) {
+            let query = supabase
+                .from('luutru_records')
+                .select('*')
+                .range(page * pageSize, (page + 1) * pageSize - 1);
+
+            try {
+                query = query.order('receivedDate', { ascending: false, nullsFirst: false });
+            } catch {
+                // ignore sort error
+            }
+
+            const { data, error } = await query;
+
+            if (error) {
+                console.warn('Lỗi khi fetch all luutru_records:', error);
+                const fallbackRes = await supabase.from('luutru_records').select('*').limit(1000);
+                if (fallbackRes.data && fallbackRes.data.length > 0) {
+                    allRecords = fallbackRes.data.map(item => mapArchiveDbToRecordFile(item));
+                }
+                break;
+            }
+
+            if (data && data.length > 0) {
+                const mapped = data.map(item => mapArchiveDbToRecordFile(item));
+                allRecords = [...allRecords, ...mapped];
+                if (data.length < pageSize) hasMore = false;
+                else page++;
+            } else {
+                hasMore = false;
+            }
+        }
+
+        // Khử trùng lặp 100% bằng Map theo id
+        const uniqueMap = new Map<string, RecordFile>();
+        allRecords.forEach(r => {
+            if (r && r.id) {
+                uniqueMap.set(r.id, r);
+            }
+        });
+
+        const result = Array.from(uniqueMap.values());
+        
+        // Cập nhật bộ nhớ đệm RAM & IndexedDB
+        if (result.length > 0) {
+            memoryArchiveRecordsCache = result;
+            setIndexedDBItem(CACHE_KEY_LUUTRU_RECORDS, result).catch(() => {});
+        }
+
+        return result;
+    } catch (error: any) {
+        logError('fetchAllArchiveRecordsAsRecordFiles', error, true);
+        return memoryArchiveRecordsCache || [];
+    }
+};
 
 export const fetchArchiveRecords = async (type: 'saoluc' | 'vaoso' | 'congvan'): Promise<ArchiveRecord[]> => {
     if (!isConfigured) {

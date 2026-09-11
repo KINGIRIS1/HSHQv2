@@ -82,7 +82,18 @@ export const exportReportToExcel = async (
     }
 };
 
-export const exportDailyStatsToExcel = (records: RecordFile[], employees: Employee[], receiveFrom: string, receiveTo: string, deadlineFrom: string, deadlineTo: string, assignedFrom?: string, assignedTo?: string, handoverFrom?: string, handoverTo?: string) => {
+export const exportDailyStatsToExcel = async (
+    records: RecordFile[], 
+    employees: Employee[], 
+    receiveFrom: string, 
+    receiveTo: string, 
+    deadlineFrom: string, 
+    deadlineTo: string, 
+    assignedFrom?: string, 
+    assignedTo?: string, 
+    handoverFrom?: string, 
+    handoverTo?: string
+) => {
     if (records.length === 0) {
         alert("Không có hồ sơ nào để xuất.");
         return;
@@ -95,129 +106,33 @@ export const exportDailyStatsToExcel = (records: RecordFile[], employees: Employ
         return `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getFullYear()}`;
     };
 
-    const tableHeader = [
-        "STT", 
-        "Mã Hồ Sơ", 
-        "Chủ Sử Dụng", 
-        "Xã/Phường", 
-        "Ngày Nhận", 
-        "Ngày Hẹn Trả", 
-        "Ngày Giao NV",
-        "Ngày Hoàn Thành",
-        "NV Xử Lý", 
-        "Trạng Thái"
-    ];
-
-    const dataRows = records.map((r, i) => {
-        const emp = employees.find(e => e.id === r.assignedTo);
-        return [
-            i + 1,
-            r.code,
-            r.customerName,
-            getNormalizedWard(r.ward || undefined),
-            formatDate(r.receivedDate),
-            formatDate(r.deadline),
-            formatDate(r.assignedDate),
-            formatDate(r.completedDate || r.resultReturnedDate),
-            emp ? emp.name : '',
-            STATUS_LABELS[r.status] || r.status
-        ];
-    });
-
-    let subtitle = "THỐNG KÊ THEO NGÀY";
+    let subtitle = "THỐNG KÊ HỒ SƠ THEO NGÀY";
+    const details: string[] = [];
     if (receiveFrom || receiveTo) {
-        subtitle += `\nNgày nhận: ${receiveFrom ? formatDate(receiveFrom) : '...'} - ${receiveTo ? formatDate(receiveTo) : '...'}`;
+        details.push(`Tiếp nhận: ${receiveFrom ? formatDate(receiveFrom) : '...'} - ${receiveTo ? formatDate(receiveTo) : '...'}`);
     }
     if (deadlineFrom || deadlineTo) {
-        subtitle += `\nNgày hẹn trả: ${deadlineFrom ? formatDate(deadlineFrom) : '...'} - ${deadlineTo ? formatDate(deadlineTo) : '...'}`;
+        details.push(`Hẹn trả: ${deadlineFrom ? formatDate(deadlineFrom) : '...'} - ${deadlineTo ? formatDate(deadlineTo) : '...'}`);
     }
     if (assignedFrom || assignedTo) {
-        subtitle += `\nNgày giao NV: ${assignedFrom ? formatDate(assignedFrom) : '...'} - ${assignedTo ? formatDate(assignedTo) : '...'}`;
+        details.push(`Giao NV: ${assignedFrom ? formatDate(assignedFrom) : '...'} - ${assignedTo ? formatDate(assignedTo) : '...'}`);
     }
     if (handoverFrom || handoverTo) {
-        subtitle += `\nNgày giao 1 cửa: ${handoverFrom ? formatDate(handoverFrom) : '...'} - ${handoverTo ? formatDate(handoverTo) : '...'}`;
+        details.push(`Giao 1 cửa: ${handoverFrom ? formatDate(handoverFrom) : '...'} - ${handoverTo ? formatDate(handoverTo) : '...'}`);
     }
 
-    const wsData = [
-        ["CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM"],
-        ["Độc lập - Tự do - Hạnh phúc"],
-        [],
-        ["DANH SÁCH HỒ SƠ THỐNG KÊ"],
-        [subtitle],
-        [],
-        tableHeader,
-        ...dataRows
-    ];
+    const titleText = details.length > 0 ? `${subtitle} (${details.join(', ')})` : subtitle;
 
-    const ws = XLSX.utils.aoa_to_sheet(wsData);
-
-    const totalCols = tableHeader.length - 1;
-    ws['!merges'] = [
-        { s: { r: 0, c: 0 }, e: { r: 0, c: totalCols } },
-        { s: { r: 1, c: 0 }, e: { r: 1, c: totalCols } },
-        { s: { r: 3, c: 0 }, e: { r: 3, c: totalCols } },
-        { s: { r: 4, c: 0 }, e: { r: 4, c: totalCols } }
-    ];
-
-    if(ws['A1']) ws['A1'].s = { font: { name: "Times New Roman", sz: 14, bold: true }, alignment: { horizontal: "center" } };
-    if(ws['A2']) ws['A2'].s = { font: { name: "Times New Roman", sz: 12, bold: true, underline: true }, alignment: { horizontal: "center" } };
-    if(ws['A4']) ws['A4'].s = { font: { name: "Times New Roman", sz: 16, bold: true, color: { rgb: "0000FF" } }, alignment: { horizontal: "center" } };
-    if(ws['A5']) ws['A5'].s = { font: { name: "Times New Roman", sz: 12, italic: true }, alignment: { horizontal: "center", wrapText: true } };
-
-    const headerStyle = { 
-        font: { name: "Times New Roman", sz: 11, bold: true }, 
-        border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }, 
-        fill: { fgColor: { rgb: "E0E0E0" } }, 
-        alignment: { horizontal: "center", vertical: "center", wrapText: true } 
-    };
-    const cellStyle = { 
-        font: { name: "Times New Roman", sz: 11 }, 
-        border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } },
-        alignment: { vertical: "center", wrapText: true }
-    };
-    const centerStyle = { ...cellStyle, alignment: { horizontal: "center", vertical: "center" } };
-
-    const headerRowIdx = 6;
-    const dataStartIdx = 7;
-
-    for (let c = 0; c <= totalCols; c++) {
-        const headerRef = XLSX.utils.encode_cell({ r: headerRowIdx, c });
-        if (!ws[headerRef]) ws[headerRef] = { v: "", t: "s" };
-        ws[headerRef].s = headerStyle;
-
-        for (let r = dataStartIdx; r < dataStartIdx + dataRows.length; r++) {
-            const cellRef = XLSX.utils.encode_cell({ r, c });
-            if (!ws[cellRef]) ws[cellRef] = { v: "", t: "s" };
-            
-            if ([0, 4, 5, 6, 7, 9].includes(c)) ws[cellRef].s = centerStyle;
-            else ws[cellRef].s = cellStyle;
-        }
+    try {
+        const wb = await createRecordsWorkbook(records, employees, titleText);
+        const fileName = `ThongKe_TheoNgay_${new Date().getTime()}.xlsx`;
+        XLSX.writeFile(wb, fileName);
+    } catch (err: any) {
+        alert(err.message || "Lỗi khi xuất file Excel thống kê.");
     }
-
-    // Styling
-    ws['!cols'] = [
-        { wch: 5 },  // STT
-        { wch: 15 }, // Mã HS
-        { wch: 30 }, // Chủ sử dụng
-        { wch: 20 }, // Xã
-        { wch: 15 }, // Ngày nhận
-        { wch: 15 }, // Ngày hẹn trả
-        { wch: 15 }, // Ngày giao NV
-        { wch: 15 }, // Ngày hoàn thành
-        { wch: 25 }, // NV
-        { wch: 20 }  // Trạng thái
-    ];
-
-    autoFitColumns(ws, 8, 55);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "ThongKe");
-    
-    const fileName = `ThongKe_${new Date().getTime()}.xlsx`;
-    XLSX.writeFile(wb, fileName);
 };
 
 export const exportReturnedListToExcel = (records: RecordFile[], fromDateStr?: string, toDateStr?: string, wardName?: string) => {
-    // ... Giữ nguyên code cũ cho exportReturnedListToExcel ...
     if (records.length === 0) {
         alert("Không có hồ sơ nào để xuất.");
         return;
@@ -278,7 +193,7 @@ export const exportReturnedListToExcel = (records: RecordFile[], fromDateStr?: s
     const ws = XLSX.utils.aoa_to_sheet([]);
 
     const border = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
-    const titleStyle = { font: { name: "Times New Roman", sz: 14, bold: true }, alignment: { horizontal: "center" } };
+    const titleStyle = { font: { name: "Times New Roman", sz: 14, bold: true }, alignment: { horizontal: "center", vertical: "center" } };
     
     const headerStyle = { 
         font: { name: "Times New Roman", sz: 11, bold: true }, 
@@ -290,9 +205,9 @@ export const exportReturnedListToExcel = (records: RecordFile[], fromDateStr?: s
     const cellStyle = { 
         font: { name: "Times New Roman", sz: 11 }, 
         border, 
-        alignment: { vertical: "center", wrapText: true } 
+        alignment: { horizontal: "left", vertical: "center", wrapText: true } 
     };
-    const centerStyle = { ...cellStyle, alignment: { horizontal: "center", vertical: "center" } };
+    const centerStyle = { ...cellStyle, alignment: { horizontal: "center", vertical: "center", wrapText: true } };
 
     XLSX.utils.sheet_add_aoa(ws, [
         ["CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM"],
@@ -306,28 +221,28 @@ export const exportReturnedListToExcel = (records: RecordFile[], fromDateStr?: s
 
     XLSX.utils.sheet_add_aoa(ws, dataRows, { origin: "A8" });
 
-    const lastColIdx = 11;
+    const totalCols = tableHeader.length - 1;
     if(!ws['!merges']) ws['!merges'] = [];
     ws['!merges'].push(
-        { s: { r: 0, c: 0 }, e: { r: 0, c: lastColIdx } },
-        { s: { r: 1, c: 0 }, e: { r: 1, c: lastColIdx } },
-        { s: { r: 3, c: 0 }, e: { r: 3, c: lastColIdx } },
-        { s: { r: 4, c: 0 }, e: { r: 4, c: lastColIdx } }
+        { s: { r: 0, c: 0 }, e: { r: 0, c: totalCols } },
+        { s: { r: 1, c: 0 }, e: { r: 1, c: totalCols } },
+        { s: { r: 3, c: 0 }, e: { r: 3, c: totalCols } },
+        { s: { r: 4, c: 0 }, e: { r: 4, c: totalCols } }
     );
 
     ws['!cols'] = [
-        { wch: 5 }, { wch: 15 }, { wch: 25 }, { wch: 20 }, { wch: 7 }, { wch: 7 }, { wch: 20 }, { wch: 12 }, { wch: 12 }, { wch: 15 }, { wch: 20 }, { wch: 20 }
+        { wch: 5 }, { wch: 18 }, { wch: 22 }, { wch: 18 }, { wch: 7 }, { wch: 7 }, { wch: 20 }, { wch: 14 }, { wch: 12 }, { wch: 14 }, { wch: 18 }, { wch: 35 }
     ];
 
     if(ws['A1']) ws['A1'].s = titleStyle;
-    if(ws['A2']) ws['A2'].s = { font: { name: "Times New Roman", sz: 12, bold: true, underline: true }, alignment: { horizontal: "center" } };
-    if(ws['A4']) ws['A4'].s = { font: { name: "Times New Roman", sz: 14, bold: true, color: { rgb: "0000FF" } }, alignment: { horizontal: "center" } };
-    if(ws['A5']) ws['A5'].s = { font: { name: "Times New Roman", sz: 12, italic: true }, alignment: { horizontal: "center" } };
+    if(ws['A2']) ws['A2'].s = { font: { name: "Times New Roman", sz: 12, bold: true, underline: true }, alignment: { horizontal: "center", vertical: "center" } };
+    if(ws['A4']) ws['A4'].s = { font: { name: "Times New Roman", sz: 14, bold: true, color: { rgb: "0000FF" } }, alignment: { horizontal: "center", vertical: "center" } };
+    if(ws['A5']) ws['A5'].s = { font: { name: "Times New Roman", sz: 12, italic: true }, alignment: { horizontal: "center", vertical: "center" } };
 
     const headerRow = 6;
     const dataStart = 7;
     
-    for (let c = 0; c <= lastColIdx; c++) {
+    for (let c = 0; c <= totalCols; c++) {
         const headerRef = XLSX.utils.encode_cell({ r: headerRow, c });
         if (!ws[headerRef]) ws[headerRef] = { v: "", t: "s" };
         ws[headerRef].s = headerStyle; 
@@ -342,23 +257,67 @@ export const exportReturnedListToExcel = (records: RecordFile[], fromDateStr?: s
     }
 
     const footerStart = dataStart + dataRows.length + 2;
-    XLSX.utils.sheet_add_aoa(ws, [
-        ["NGƯỜI LẬP BIỂU", "", "", "", "", "THỦ TRƯỞNG ĐƠN VỊ", "", "", "", ""],
-        ["(Ký, họ tên)", "", "", "", "", "(Ký, họ tên)", "", "", "", ""]
-    ], { origin: { r: footerStart, c: 0 } });
+    const numCols = tableHeader.length;
+    let blockWidth = Math.floor(numCols / 3);
+    if (blockWidth < 3) blockWidth = Math.min(3, Math.floor(numCols / 2));
+    if (blockWidth < 2) blockWidth = 2;
+
+    const leftStart = 0;
+    const leftEnd = Math.min(leftStart + blockWidth - 1, Math.floor(totalCols / 2) - 1);
+    const rightEnd = totalCols;
+    const rightStart = Math.max(leftEnd + 1, rightEnd - blockWidth + 1);
+
+    const footerRow1 = new Array(numCols).fill("");
+    const footerRow2 = new Array(numCols).fill("");
+    footerRow1[leftStart] = "NGƯỜI LẬP BIỂU";
+    footerRow2[leftStart] = "(Ký, họ tên)";
+    footerRow1[rightStart] = "THỦ TRƯỞNG ĐƠN VỊ";
+    footerRow2[rightStart] = "(Ký, họ tên, đóng dấu)";
+
+    XLSX.utils.sheet_add_aoa(ws, [footerRow1, footerRow2], { origin: { r: footerStart, c: 0 } });
 
     ws['!merges'].push(
-        { s: { r: footerStart, c: 0 }, e: { r: footerStart, c: 2 } },
-        { s: { r: footerStart + 1, c: 0 }, e: { r: footerStart + 1, c: 2 } },
-        { s: { r: footerStart, c: 7 }, e: { r: footerStart, c: 11 } },
-        { s: { r: footerStart + 1, c: 7 }, e: { r: footerStart + 1, c: 11 } }
+        { s: { r: footerStart, c: leftStart }, e: { r: footerStart, c: leftEnd } },
+        { s: { r: footerStart + 1, c: leftStart }, e: { r: footerStart + 1, c: leftEnd } },
+        { s: { r: footerStart, c: rightStart }, e: { r: footerStart, c: rightEnd } },
+        { s: { r: footerStart + 1, c: rightStart }, e: { r: footerStart + 1, c: rightEnd } }
     );
 
-    const footerTitleStyle = { font: { name: "Times New Roman", sz: 12, bold: true }, alignment: { horizontal: "center" } };
-    const leftTitle = XLSX.utils.encode_cell({r: footerStart, c: 0});
-    const rightTitle = XLSX.utils.encode_cell({r: footerStart, c: 7});
-    if(ws[leftTitle]) ws[leftTitle].s = footerTitleStyle;
-    if(ws[rightTitle]) ws[rightTitle].s = footerTitleStyle;
+    const footerTitleStyle = { font: { name: "Times New Roman", sz: 12, bold: true }, alignment: { horizontal: "center", vertical: "center" } };
+    const footerNoteStyle = { font: { name: "Times New Roman", sz: 11, italic: true }, alignment: { horizontal: "center", vertical: "center" } };
+
+    for (let c = leftStart; c <= leftEnd; c++) {
+        const titleRef = XLSX.utils.encode_cell({ r: footerStart, c });
+        const noteRef = XLSX.utils.encode_cell({ r: footerStart + 1, c });
+        if (ws[titleRef]) ws[titleRef].s = footerTitleStyle;
+        if (ws[noteRef]) ws[noteRef].s = footerNoteStyle;
+    }
+    for (let c = rightStart; c <= rightEnd; c++) {
+        const titleRef = XLSX.utils.encode_cell({ r: footerStart, c });
+        const noteRef = XLSX.utils.encode_cell({ r: footerStart + 1, c });
+        if (ws[titleRef]) ws[titleRef].s = footerTitleStyle;
+        if (ws[noteRef]) ws[noteRef].s = footerNoteStyle;
+    }
+
+    const rowsMeta: any[] = [];
+    rowsMeta[0] = { hpt: 24, hpx: 30 };
+    rowsMeta[1] = { hpt: 20, hpx: 25 };
+    rowsMeta[2] = { hpt: 10, hpx: 12 };
+    rowsMeta[3] = { hpt: 24, hpx: 30 };
+    rowsMeta[4] = { hpt: 20, hpx: 25 };
+    rowsMeta[5] = { hpt: 10, hpx: 12 };
+    rowsMeta[6] = { hpt: 24, hpx: 30 };
+
+    for (let r = dataStart; r < dataStart + dataRows.length; r++) {
+        rowsMeta[r] = { hpt: 20, hpx: 25 };
+    }
+
+    rowsMeta[footerStart - 2] = { hpt: 12, hpx: 15 };
+    rowsMeta[footerStart - 1] = { hpt: 12, hpx: 15 };
+    rowsMeta[footerStart] = { hpt: 24, hpx: 30 };
+    rowsMeta[footerStart + 1] = { hpt: 20, hpx: 25 };
+
+    ws['!rows'] = rowsMeta;
 
     autoFitColumns(ws, 8, 55);
     XLSX.utils.book_append_sheet(wb, ws, "DS_Tra_KQ");
@@ -372,128 +331,23 @@ export const exportReturnedListToExcel = (records: RecordFile[], fromDateStr?: s
     XLSX.writeFile(wb, fileName);
 };
 
-export const exportOverdueStatsToExcel = (records: any[], employees: Employee[], filterType: string) => {
+export const exportOverdueStatsToExcel = async (records: any[], employees: Employee[], filterType: string) => {
     if (records.length === 0) {
         alert("Không có hồ sơ nào để xuất.");
         return;
     }
 
-    const formatDate = (dStr: string | null | undefined) => {
-        if (!dStr) return '';
-        const date = new Date(dStr);
-        if (isNaN(date.getTime())) return '';
-        return `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getFullYear()}`;
-    };
+    let subtitle = "BÁO CÁO THỐNG KÊ HỒ SƠ TRỄ HẠN";
+    if (filterType === 'pending') subtitle += " (CHƯA CÓ KẾT QUẢ)";
+    if (filterType === 'completed') subtitle += " (ĐÃ CÓ KẾT QUẢ)";
 
-    const wb = XLSX.utils.book_new();
-
-    const tableHeader = [
-        "STT", 
-        "Mã Hồ Sơ", 
-        "Chủ Sử Dụng", 
-        "Xã/Phường", 
-        "Loại Trễ", 
-        "Ngày Nhận", 
-        "Ngày Hẹn Trả", 
-        "Hoàn Thành",
-        "NV Xử Lý", 
-        "Trạng Thái"
-    ];
-
-    const dataRows = records.map((r, i) => {
-        const emp = employees.find(e => e.id === r.assignedTo);
-        const isPendingOverdue = r._overdueType === 'pending';
-        return [
-            i + 1,
-            r.code,
-            r.customerName,
-            getNormalizedWard(r.ward || undefined),
-            isPendingOverdue ? 'Chưa có kết quả' : 'Đã có kết quả',
-            formatDate(r.receivedDate),
-            formatDate(r.deadline),
-            formatDate(r.completedDate),
-            emp ? emp.name : '',
-            STATUS_LABELS[r.status as RecordStatus] || r.status
-        ];
-    });
-
-    let subtitle = "THỐNG KÊ HỒ SƠ TRỄ HẠN";
-    if (filterType === 'pending') subtitle += " (Chưa có kết quả)";
-    if (filterType === 'completed') subtitle += " (Đã có kết quả)";
-
-    const wsData = [
-        ["CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM"],
-        ["Độc lập - Tự do - Hạnh phúc"],
-        [],
-        ["DANH SÁCH HỒ SƠ THỐNG KÊ"],
-        [subtitle],
-        [],
-        tableHeader,
-        ...dataRows
-    ];
-
-    const ws = XLSX.utils.aoa_to_sheet(wsData);
-
-    const totalCols = tableHeader.length - 1;
-    ws['!merges'] = [
-        { s: { r: 0, c: 0 }, e: { r: 0, c: totalCols } },
-        { s: { r: 1, c: 0 }, e: { r: 1, c: totalCols } },
-        { s: { r: 3, c: 0 }, e: { r: 3, c: totalCols } },
-        { s: { r: 4, c: 0 }, e: { r: 4, c: totalCols } }
-    ];
-
-    if(ws['A1']) ws['A1'].s = { font: { name: "Times New Roman", sz: 14, bold: true }, alignment: { horizontal: "center" } };
-    if(ws['A2']) ws['A2'].s = { font: { name: "Times New Roman", sz: 12, bold: true, underline: true }, alignment: { horizontal: "center" } };
-    if(ws['A4']) ws['A4'].s = { font: { name: "Times New Roman", sz: 16, bold: true, color: { rgb: "0000FF" } }, alignment: { horizontal: "center" } };
-    if(ws['A5']) ws['A5'].s = { font: { name: "Times New Roman", sz: 12, italic: true }, alignment: { horizontal: "center", wrapText: true } };
-
-    const headerStyle = { 
-        font: { name: "Times New Roman", sz: 11, bold: true }, 
-        border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }, 
-        fill: { fgColor: { rgb: "E0E0E0" } }, 
-        alignment: { horizontal: "center", vertical: "center", wrapText: true } 
-    };
-    const cellStyle = { 
-        font: { name: "Times New Roman", sz: 11 }, 
-        border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } },
-        alignment: { vertical: "center", wrapText: true }
-    };
-    const centerStyle = { ...cellStyle, alignment: { horizontal: "center", vertical: "center" } };
-
-    const headerRowIdx = 6;
-    const dataStartIdx = 7;
-
-    for (let c = 0; c <= totalCols; c++) {
-        const headerRef = XLSX.utils.encode_cell({ r: headerRowIdx, c });
-        if (!ws[headerRef]) ws[headerRef] = { v: "", t: "s" };
-        ws[headerRef].s = headerStyle;
-
-        for (let r = dataStartIdx; r < dataStartIdx + dataRows.length; r++) {
-            const cellRef = XLSX.utils.encode_cell({ r, c });
-            if (!ws[cellRef]) ws[cellRef] = { v: "", t: "s" };
-            
-            if ([0, 4, 5, 6, 7, 9].includes(c)) ws[cellRef].s = centerStyle;
-            else ws[cellRef].s = cellStyle;
-        }
+    try {
+        const wb = await createRecordsWorkbook(records, employees, subtitle);
+        const fileName = `Danh_Sach_Tre_Han_${filterType}_${new Date().getTime()}.xlsx`;
+        XLSX.writeFile(wb, fileName);
+    } catch (err: any) {
+        alert(err.message || "Lỗi khi xuất file Excel hồ sơ trễ hạn.");
     }
-
-    ws['!cols'] = [
-        { wch: 5 },  // STT
-        { wch: 15 }, // Mã HS
-        { wch: 30 }, // Chủ sử dụng
-        { wch: 20 }, // Xã
-        { wch: 15 }, // Loại trễ
-        { wch: 12 }, // Ngày nhận
-        { wch: 12 }, // Ngày hẹn
-        { wch: 12 }, // Ngày Xong
-        { wch: 20 }, // NV Xử lý
-        { wch: 15 }  // Trạng thái
-    ];
-
-    autoFitColumns(ws, 8, 55);
-    XLSX.utils.book_append_sheet(wb, ws, "HoSoTreHan");
-    const fileName = `Danh_Sach_Tre_Han_${filterType}_${new Date().getTime()}.xlsx`;
-    XLSX.writeFile(wb, fileName);
 };
 
 export const createRecordsWorkbook = async (
@@ -612,7 +466,8 @@ export const createRecordsWorkbook = async (
             ];
         });
     } else {
-        // Cấu trúc đầy đủ: Trạng thái nằm ngay sau Hẹn trả, Ghi chú ra ngoài cùng bên phải
+        // Cấu trúc đầy đủ 22 cột:
+        // Cột cơ bản (0-9) -> Các cột giai đoạn (10-20) -> Cột Ghi chú (21)
         const fullHeader = [
             "STT", 
             "Mã Hồ Sơ", 
@@ -706,33 +561,29 @@ export const createRecordsWorkbook = async (
             ];
         });
 
-        // Kiểm tra tính linh động: nếu xuất ở các tab chuyên môn mà các cột từ 10 đến 20 hoàn toàn không có dữ liệu,
-        // ta giữ lại các cột thực tế có dữ liệu và luôn đưa cột Ghi Chú (cột cuối) về ngoài cùng bên phải.
-        // Chỉ lọc các cột trung gian (từ index 10: Ngày Giao NV đến index 20: Số Tiền)
+        // Cơ chế "Cắt giảm linh động":
+        // 1. Cột cơ bản luôn giữ: index 0..9 (STT, Mã HS, Chủ Sử Dụng, Xã/Phường, Tờ, Thửa, Loại HS, Ngày Nhận, Hẹn Trả, Trạng Thái)
+        const baseIndices = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+
+        // 2. Cột giai đoạn trung gian (index 10: Ngày Giao NV -> index 20: Số Tiền):
+        // Chỉ giữ lại những cột THỰC SỰ có dữ liệu phát sinh trong danh sách xuất
         const activeIntermediateCols: number[] = [];
         for (let colIdx = 10; colIdx <= 20; colIdx++) {
-            const hasData = fullDataRows.some(row => row[colIdx] !== '' && row[colIdx] !== null && row[colIdx] !== undefined);
+            const hasData = fullDataRows.some(row => {
+                const val = row[colIdx];
+                return val !== '' && val !== null && val !== undefined && String(val).trim() !== '';
+            });
             if (hasData) {
                 activeIntermediateCols.push(colIdx);
             }
         }
 
-        // Nếu là danh sách tổng hợp / tra cứu có dữ liệu hoặc nếu có ít nhất 1 cột trung gian có dữ liệu
-        // Nếu không có bất kỳ cột trung gian nào (ví dụ chỉ mới tiếp nhận), thu gọn linh động
-        const isCompact = activeIntermediateCols.length === 0;
-        
-        if (isCompact) {
-            // Chỉ giữ: STT (0) -> Trạng Thái (9) và Ghi Chú (21)
-            const keptIndices = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 21];
-            tableHeader = keptIndices.map(idx => fullHeader[idx]);
-            colWidths = keptIndices.map(idx => fullColWidths[idx]);
-            dataRows = fullDataRows.map(row => keptIndices.map(idx => row[idx]));
-        } else {
-            // Giữ nguyên toàn bộ 22 cột
-            tableHeader = fullHeader;
-            colWidths = fullColWidths;
-            dataRows = fullDataRows;
-        }
+        // 3. Cột Ghi Chú (index 21) luôn được đưa về ngoài cùng bên phải của bảng tính
+        const keptIndices = [...baseIndices, ...activeIntermediateCols, 21];
+
+        tableHeader = keptIndices.map(idx => fullHeader[idx]);
+        colWidths = keptIndices.map(idx => fullColWidths[idx]);
+        dataRows = fullDataRows.map(row => keptIndices.map(idx => row[idx]));
     }
 
     const wb = XLSX.utils.book_new();
@@ -787,7 +638,7 @@ export const createRecordsWorkbook = async (
         { s: { r: 4, c: 0 }, e: { r: 4, c: totalCols } }
     );
 
-    // Apply strict column widths
+    // Áp dụng độ rộng cột linh động
     ws['!cols'] = colWidths;
 
     if(ws['A1']) ws['A1'].s = titleStyle;
@@ -804,7 +655,11 @@ export const createRecordsWorkbook = async (
         ws[headerRef].s = headerStyle; 
 
         const colTitle = tableHeader[c];
-        const isCenterCol = ["STT", "Tờ", "Thửa", "Ngày Nhận", "Hẹn Trả", "Thời Hạn Cũ", "Thời Hạn Mới", "Trạng Thái", "Ngày Giao NV", "Ngày Trình KT", "Ngày Trình Ký", "Hoàn Thành", "Đợt", "Ngày Trả KQ", "Số BL/HĐ"].includes(colTitle);
+        const isCenterCol = [
+            "STT", "Tờ", "Thửa", "Ngày Nhận", "Hẹn Trả", "Thời Hạn Cũ", "Thời Hạn Mới", 
+            "Trạng Thái", "Ngày Giao NV", "Ngày Trình KT", "Ngày Trình Ký", "Hoàn Thành", 
+            "Đợt", "Ngày Trả KQ", "Số BL/HĐ"
+        ].includes(colTitle);
         const isRightCol = colTitle === "Số Tiền";
 
         for (let r = dataStartIdx; r < dataStartIdx + dataRows.length; r++) {
@@ -817,52 +672,68 @@ export const createRecordsWorkbook = async (
         }
     }
 
+    // Chân trang ký tên: Tự động căn đối xứng theo số lượng cột thực tế
     const footerStart = dataStartIdx + dataRows.length + 2;
-    const splitCol = Math.floor(totalCols / 2);
+    const numCols = tableHeader.length;
+    let blockWidth = Math.floor(numCols / 3);
+    if (blockWidth < 3) blockWidth = Math.min(3, Math.floor(numCols / 2));
+    if (blockWidth < 2) blockWidth = 2;
 
-    XLSX.utils.sheet_add_aoa(ws, [
-        ["NGƯỜI LẬP BIỂU", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "THỦ TRƯỞNG ĐƠN VỊ", "", "", "", ""],
-        ["(Ký, họ tên)", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "(Ký, họ tên, đóng dấu)", "", "", "", ""]
-    ], { origin: { r: footerStart, c: 0 } });
+    const leftStart = 0;
+    const leftEnd = Math.min(leftStart + blockWidth - 1, Math.floor(totalCols / 2) - 1);
+    const rightEnd = totalCols;
+    const rightStart = Math.max(leftEnd + 1, rightEnd - blockWidth + 1);
+
+    const footerRow1 = new Array(numCols).fill("");
+    const footerRow2 = new Array(numCols).fill("");
+    footerRow1[leftStart] = "NGƯỜI LẬP BIỂU";
+    footerRow2[leftStart] = "(Ký, họ tên)";
+    footerRow1[rightStart] = "THỦ TRƯỞNG ĐƠN VỊ";
+    footerRow2[rightStart] = "(Ký, họ tên, đóng dấu)";
+
+    XLSX.utils.sheet_add_aoa(ws, [footerRow1, footerRow2], { origin: { r: footerStart, c: 0 } });
 
     ws['!merges'].push(
-        { s: { r: footerStart, c: 0 }, e: { r: footerStart, c: Math.min(3, splitCol) } },
-        { s: { r: footerStart + 1, c: 0 }, e: { r: footerStart + 1, c: Math.min(3, splitCol) } },
-        { s: { r: footerStart, c: Math.max(splitCol + 1, totalCols - 4) }, e: { r: footerStart, c: totalCols } },
-        { s: { r: footerStart + 1, c: Math.max(splitCol + 1, totalCols - 4) }, e: { r: footerStart + 1, c: totalCols } }
+        { s: { r: footerStart, c: leftStart }, e: { r: footerStart, c: leftEnd } },
+        { s: { r: footerStart + 1, c: leftStart }, e: { r: footerStart + 1, c: leftEnd } },
+        { s: { r: footerStart, c: rightStart }, e: { r: footerStart, c: rightEnd } },
+        { s: { r: footerStart + 1, c: rightStart }, e: { r: footerStart + 1, c: rightEnd } }
     );
 
     const footerTitleStyle = { font: { name: "Times New Roman", sz: 12, bold: true }, alignment: { horizontal: "center", vertical: "center" } };
     const footerNoteStyle = { font: { name: "Times New Roman", sz: 11, italic: true }, alignment: { horizontal: "center", vertical: "center" } };
 
-    const leftTitle = XLSX.utils.encode_cell({r: footerStart, c: 0});
-    const leftNote = XLSX.utils.encode_cell({r: footerStart + 1, c: 0});
-    const rightTitle = XLSX.utils.encode_cell({r: footerStart, c: Math.max(splitCol + 1, totalCols - 4)});
-    const rightNote = XLSX.utils.encode_cell({r: footerStart + 1, c: Math.max(splitCol + 1, totalCols - 4)});
+    for (let c = leftStart; c <= leftEnd; c++) {
+        const titleRef = XLSX.utils.encode_cell({ r: footerStart, c });
+        const noteRef = XLSX.utils.encode_cell({ r: footerStart + 1, c });
+        if (ws[titleRef]) ws[titleRef].s = footerTitleStyle;
+        if (ws[noteRef]) ws[noteRef].s = footerNoteStyle;
+    }
+    for (let c = rightStart; c <= rightEnd; c++) {
+        const titleRef = XLSX.utils.encode_cell({ r: footerStart, c });
+        const noteRef = XLSX.utils.encode_cell({ r: footerStart + 1, c });
+        if (ws[titleRef]) ws[titleRef].s = footerTitleStyle;
+        if (ws[noteRef]) ws[noteRef].s = footerNoteStyle;
+    }
 
-    if(ws[leftTitle]) ws[leftTitle].s = footerTitleStyle;
-    if(ws[leftNote]) ws[leftNote].s = footerNoteStyle;
-    if(ws[rightTitle]) ws[rightTitle].s = footerTitleStyle;
-    if(ws[rightNote]) ws[rightNote].s = footerNoteStyle;
-
-    // Row heights configuration: 30px for title/headers/signatures, 25px for data rows
+    // Cấu hình chiều cao dòng tiêu chuẩn (30px tiêu đề/header/chữ ký, 25px dòng dữ liệu)
     const rowsMeta: any[] = [];
-    rowsMeta[0] = { hpt: 28, hpx: 30 }; // Quốc hiệu
-    rowsMeta[1] = { hpt: 24, hpx: 26 }; // Tiêu ngữ
+    rowsMeta[0] = { hpt: 24, hpx: 30 }; // Quốc hiệu
+    rowsMeta[1] = { hpt: 20, hpx: 25 }; // Tiêu ngữ
     rowsMeta[2] = { hpt: 10, hpx: 12 }; // Khoảng cách
-    rowsMeta[3] = { hpt: 30, hpx: 32 }; // Tiêu đề chính
-    rowsMeta[4] = { hpt: 24, hpx: 26 }; // Ngày xuất
+    rowsMeta[3] = { hpt: 24, hpx: 30 }; // Tiêu đề chính
+    rowsMeta[4] = { hpt: 20, hpx: 25 }; // Ngày xuất
     rowsMeta[5] = { hpt: 10, hpx: 12 }; // Khoảng cách
-    rowsMeta[6] = { hpt: 28, hpx: 30 }; // Header bảng
+    rowsMeta[6] = { hpt: 24, hpx: 30 }; // Header bảng
 
     for (let r = dataStartIdx; r < dataStartIdx + dataRows.length; r++) {
-        rowsMeta[r] = { hpt: 22, hpx: 25 }; // Dữ liệu hồ sơ
+        rowsMeta[r] = { hpt: 20, hpx: 25 }; // Dữ liệu hồ sơ
     }
 
     rowsMeta[footerStart - 2] = { hpt: 12, hpx: 15 };
     rowsMeta[footerStart - 1] = { hpt: 12, hpx: 15 };
-    rowsMeta[footerStart] = { hpt: 28, hpx: 30 }; // Chữ ký tiêu đề
-    rowsMeta[footerStart + 1] = { hpt: 22, hpx: 25 }; // Chữ ký ghi chú
+    rowsMeta[footerStart] = { hpt: 24, hpx: 30 }; // Chữ ký tiêu đề
+    rowsMeta[footerStart + 1] = { hpt: 20, hpx: 25 }; // Chữ ký ghi chú
 
     ws['!rows'] = rowsMeta;
 

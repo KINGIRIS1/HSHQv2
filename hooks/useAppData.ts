@@ -7,7 +7,7 @@ import { fetchRecords, fetchEmployees, fetchUsers, fetchUpdateInfo, fetchHoliday
 } from '../services/api';
 import { supabase } from '../services/supabaseClient';
 import { mapRecordFromDb, getFromCache, CACHE_KEYS } from '../services/apiCore';
-import { migrateArchiveRecordsFromLandRecords } from '../services/apiArchive';
+import { migrateArchiveRecordsFromLandRecords, fetchAllArchiveRecordsAsRecordFiles } from '../services/apiArchive';
 import { getIndexedDBItem } from '../services/storageService';
 import { getPendingSyncCount, syncPendingRecordsToCloud, generateStandardUUID } from '../services/syncQueueService';
 import { DEFAULT_WARDS as STATIC_WARDS, APP_VERSION, MOCK_EMPLOYEES, MOCK_USERS } from '../constants';
@@ -149,6 +149,9 @@ export const useAppData = (currentUser: User | null) => {
                 setLatestVersion(updateInfo.version);
                 setUpdateUrl(updateInfo.url);
             }
+
+            // Tải ngầm kho hồ sơ lưu trữ vào RAM & IndexedDB để vào Báo cáo Lưu trữ tức thì 0ms
+            fetchAllArchiveRecordsAsRecordFiles().catch(() => {});
         } catch (error) {
             console.warn("Lỗi tải dữ liệu hoặc mất mạng, đang sử dụng dữ liệu đệm từ IndexedDB:", error);
             setConnectionStatus('offline');

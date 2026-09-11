@@ -1052,66 +1052,68 @@ export const RecordSearch: React.FC<RecordSearchProps> = ({
                                         {/* Actions cell matched to standard row actions */}
                                         <td className="p-3 text-center align-middle sticky right-0 bg-white/90 backdrop-blur-xs border-l border-gray-100">
                                             {isExtendView ? (
-                                                <div className="flex justify-center items-center gap-1.5">
+                                                <div className="flex justify-center items-center py-0.5">
                                                     <button
-                                                        onClick={() => setSelectedDetailRecord(r)}
-                                                        className="p-1.5 text-slate-600 hover:text-green-700 hover:bg-green-100/80 rounded transition-colors border border-slate-200/80 bg-white cursor-pointer shadow-xs"
-                                                        title="Xem chi tiết"
+                                                        onClick={() => onPrint(r)}
+                                                        className="p-1.5 text-purple-600 hover:bg-purple-100 rounded transition-colors border border-purple-200 bg-purple-50 cursor-pointer shadow-xs"
+                                                        title="In biên nhận"
                                                     >
-                                                        <Eye size={15} />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => setSelectedExtendRecord(r)}
-                                                        className="p-1.5 text-indigo-700 hover:bg-indigo-100 rounded transition-colors border border-indigo-200 bg-indigo-50 cursor-pointer shadow-xs"
-                                                        title="Gia hạn hẹn trả"
-                                                    >
-                                                        <CalendarClock size={15} />
+                                                        <Printer size={15} />
                                                     </button>
                                                 </div>
                                             ) : (
-                                                <div className="flex items-center justify-center gap-1.5 py-0.5">
-                                                    <button
-                                                        onClick={() => setSelectedDetailRecord(r)}
-                                                        className="p-1.5 text-slate-600 hover:text-green-700 hover:bg-green-100/80 rounded transition-colors border border-slate-200/80 bg-white cursor-pointer shadow-xs"
-                                                        title="Xem chi tiết"
-                                                    >
-                                                        <Eye size={15} />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => onEdit(r)}
-                                                        className="p-1.5 text-blue-600 hover:bg-blue-100 rounded transition-colors border border-blue-200 bg-blue-50/50 cursor-pointer shadow-xs"
-                                                        title="Chỉnh sửa"
-                                                    >
-                                                        <Pencil size={15} />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => setSelectedExtendRecord(r)}
-                                                        className="p-1.5 text-indigo-700 hover:bg-indigo-100 rounded transition-colors border border-indigo-200 bg-indigo-50 cursor-pointer shadow-xs"
-                                                        title="Gia hạn hẹn trả"
-                                                    >
-                                                        <CalendarClock size={15} />
-                                                    </button>
-                                                    {onReturnResult && r.status === 'HANDOVER' && !r.resultReturnedDate ? (
+                                                <div className="flex flex-col items-center justify-center gap-1 py-0.5">
+                                                    {/* Hàng trên: Xem chi tiết & Gia hạn hẹn trả / Trả kết quả */}
+                                                    <div className="flex items-center gap-1">
                                                         <button
-                                                            onClick={() => onReturnResult(r)}
-                                                            className="p-1.5 text-emerald-700 hover:bg-emerald-100 rounded transition-colors border border-emerald-200 bg-emerald-50 cursor-pointer animate-pulse shadow-xs"
-                                                            title="Trả kết quả"
+                                                            onClick={() => setSelectedDetailRecord(r)}
+                                                            className="p-1 text-slate-600 hover:text-green-700 hover:bg-green-100/80 rounded transition-colors border border-slate-200/80 bg-white cursor-pointer shadow-xs"
+                                                            title="Xem chi tiết"
                                                         >
-                                                            <FileCheck size={15} />
+                                                            <Eye size={15} />
                                                         </button>
-                                                    ) : (currentUser?.role === 'ADMIN' || currentUser?.role === 'SUBADMIN' || currentUser?.role === 'TEAM_LEADER') ? (
+                                                        {onReturnResult && r.status === 'HANDOVER' && !r.resultReturnedDate ? (
+                                                            <button
+                                                                onClick={() => onReturnResult(r)}
+                                                                className="p-1 text-emerald-700 hover:bg-emerald-100 rounded transition-colors border border-emerald-200 bg-emerald-50 cursor-pointer animate-pulse shadow-xs"
+                                                                title="Trả kết quả"
+                                                            >
+                                                                <FileCheck size={15} />
+                                                            </button>
+                                                        ) : (
+                                                            <button
+                                                                onClick={() => setSelectedExtendRecord(r)}
+                                                                className="p-1 text-indigo-700 hover:bg-indigo-100 rounded transition-colors border border-indigo-200 bg-indigo-50 cursor-pointer shadow-xs"
+                                                                title="Gia hạn hẹn trả"
+                                                            >
+                                                                <CalendarClock size={15} />
+                                                            </button>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Hàng dưới: Chỉnh sửa & Xóa */}
+                                                    <div className="flex items-center gap-1">
                                                         <button
-                                                            onClick={async () => {
-                                                                if (confirm(`Bạn có chắc muốn xóa hồ sơ ${r.code}?`)) {
-                                                                    await onDelete(r);
-                                                                }
-                                                            }}
-                                                            className="p-1.5 text-red-600 hover:bg-red-100 rounded transition-colors border border-red-200 bg-red-50/50 cursor-pointer shadow-xs"
-                                                            title="Xóa"
+                                                            onClick={() => onEdit(r)}
+                                                            className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors border border-blue-200 bg-blue-50/50 cursor-pointer shadow-xs"
+                                                            title="Chỉnh sửa"
                                                         >
-                                                            <Trash2 size={15} />
+                                                            <Pencil size={15} />
                                                         </button>
-                                                    ) : null}
+                                                        {(currentUser?.role === 'ADMIN' || currentUser?.role === 'SUBADMIN' || currentUser?.role === 'TEAM_LEADER') && (
+                                                            <button
+                                                                onClick={async () => {
+                                                                    if (confirm(`Bạn có chắc muốn xóa hồ sơ ${r.code}?`)) {
+                                                                        await onDelete(r);
+                                                                    }
+                                                                }}
+                                                                className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors border border-red-200 bg-red-50/50 cursor-pointer shadow-xs"
+                                                                title="Xóa"
+                                                            >
+                                                                <Trash2 size={15} />
+                                                            </button>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             )}
                                         </td>

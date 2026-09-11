@@ -5,7 +5,7 @@ import { RecordFile, RecordStatus, Employee, User } from '../types';
 import { getNormalizedWard, STATUS_LABELS, getShortRecordType, isArchiveRecordType, mapStatusToRecordStatus } from '../constants';
 import { isRecordOverdue, removeVietnameseTones, isRecordApproaching, parseSafeDate, cleanSyncNotes } from '../utils/appHelpers';
 import { saveGeminiKey, getGeminiKey } from '../services/geminiService';
-import { fetchArchiveRecords } from '../services/apiArchive';
+import { fetchArchiveRecords, fetchAllArchiveRecordsAsRecordFiles, getCachedArchiveRecords } from '../services/apiArchive';
 import EmployeeStatsView from './report/EmployeeStatsView';
 import WardStatsView from './report/WardStatsView';
 import DailyStatsView from './report/DailyStatsView';
@@ -157,59 +157,77 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
     const [dailyStatsRecords, setDailyStatsRecords] = useState<RecordFile[]>([]);
     const [revenueStatsRecords, setRevenueStatsRecords] = useState<RecordFile[]>([]);
 
+    // Tải trước kho lưu trữ tức thì từ RAM / IndexedDB khi vào màn hình Báo cáo (0ms)
+    useEffect(() => {
+        let isMounted = true;
+        // 1. Đọc ngay từ cache RAM / IndexedDB tức thì không chờ đợi
+        getCachedArchiveRecords().then(cached => {
+            if (isMounted && Array.isArray(cached) && cached.length > 0) {
+                setArchiveRecords(cached);
+            }
+        }).catch(() => {});
+
+        // 2. Kích hoạt tải ngầm để cập nhật dữ liệu mới nhất (Stale-While-Revalidate)
+        const syncArchive = async () => {
+            try {
+                const fresh = await fetchAllArchiveRecordsAsRecordFiles();
+                if (isMounted && Array.isArray(fresh) && fresh.length > 0) {
+                    const cungCapFromMain = records.filter(r => isArchiveRecordType(r.recordType) || r.sourceTable === 'luutru_records');
+                    const map = new Map<string, RecordFile>();
+                    fresh.forEach(r => { if (r && r.id) map.set(r.id, r); });
+                    cungCapFromMain.forEach(r => {
+                        if (!r || !r.id) return;
+                        if (!map.has(r.id)) {
+                            map.set(r.id, r);
+                        } else {
+                            const existing = map.get(r.id)!;
+                            map.set(r.id, { ...existing, ...r, sourceTable: 'luutru_records' });
+                        }
+                    });
+                    setArchiveRecords(Array.from(map.values()));
+                }
+            } catch (e) {
+                console.warn("Lỗi sync ngầm luutru records:", e);
+            }
+        };
+
+        syncArchive();
+
+        return () => {
+            isMounted = false;
+        };
+    }, []);
+
     useEffect(() => {
         if (mainTab === 'archive') {
             const loadArchive = async () => {
-                setIsArchiveLoading(true);
+                // Nếu chưa có dữ liệu trong state, thử nạp ngay từ cache tức thì (0ms)
+                if (archiveRecords.length === 0) {
+                    const cached = await getCachedArchiveRecords();
+                    if (cached && cached.length > 0) {
+                        setArchiveRecords(cached);
+                    } else {
+                        setIsArchiveLoading(true);
+                    }
+                }
                 try {
-                    const [saoluc, vaoso, congvan] = await Promise.all([
-                        fetchArchiveRecords('saoluc'),
-                        fetchArchiveRecords('vaoso'),
-                        fetchArchiveRecords('congvan')
-                    ]);
-                    const all = [...saoluc, ...vaoso, ...congvan];
+                    // 1. Tải danh sách hồ sơ đầy đủ trực tiếp từ bảng luutru_records (đầy đủ 43 trường dữ liệu)
+                    const directArchiveRecords = await fetchAllArchiveRecordsAsRecordFiles();
                     
-                    const mapStatus = (s: string): RecordStatus => {
-                        return mapStatusToRecordStatus(s);
-                    };
+                    // 2. Lấy các hồ sơ lưu trữ từ danh sách records hiện hành (nếu có)
+                    const cungCapRecordsFromMain = records.filter(r => isArchiveRecordType(r.recordType) || r.sourceTable === 'luutru_records');
 
-                    const mapped: RecordFile[] = all.map(r => {
-                        const rawWard = r.data?.xa_phuong || r.data?.dia_danh || '';
-                        const rawCode = r.data?.ma_ho_so || r.so_hieu || '';
-                        const rawCustomer = r.data?.ten_chu_su_dung || r.noi_nhan_gui || '';
-                        
-                        return {
-                            id: r.id,
-                            code: rawCode,
-                            customerName: String(rawCustomer).replace(/\n/g, ' '),
-                            ward: rawWard,
-                            mapSheet: r.data?.to_ban_do || r.data?.so_to || '',
-                            landPlot: r.data?.thua_dat || r.data?.so_thua || '',
-                            receivedDate: r.data?.ngay_nhan || r.ngay_thang || r.created_at,
-                            deadline: r.data?.hen_tra || '',
-                            status: mapStatus(r.status),
-                            assignedTo: r.data?.assigned_to || '',
-                            notes: r.trich_yeu || r.data?.loai_bien_dong || '',
-                            recordType: r.data?.recordType || (r.type === 'saoluc' ? 'Sao lục' : r.type === 'vaoso' ? 'Vào sổ' : 'Công văn'),
-                            address: rawWard,
-                            phoneNumber: '',
-                            content: r.trich_yeu || r.data?.loai_bien_dong || ''
-                        } as RecordFile;
-                    });
-                    
-                    const cungCapRecordsFromMain = records.filter(r => isArchiveRecordType(r.recordType));
-
-                    // Khử trùng lặp 100%: Dùng Map theo ID để mỗi hồ sơ chỉ xuất hiện duy nhất 1 lần trong báo cáo
+                    // 3. Khử trùng lặp 100% và hợp nhất dữ liệu giữ nguyên mọi trường chi tiết
                     const archiveMap = new Map<string, RecordFile>();
 
-                    // 1. Nạp từ mapped (fetch trực tiếp từ luutru_records theo phân loại)
-                    mapped.forEach(r => {
+                    // Nạp các bản ghi từ bảng luutru_records
+                    directArchiveRecords.forEach(r => {
                         if (r && r.id) {
                             archiveMap.set(r.id, r);
                         }
                     });
 
-                    // 2. Nạp thêm hồ sơ lưu trữ từ danh sách records chung (nếu chưa có thì thêm, có rồi thì giữ dữ liệu chi tiết nhất)
+                    // Hợp nhất với danh sách main records nếu có thêm thông tin cập nhật mới nhất
                     cungCapRecordsFromMain.forEach(r => {
                         if (!r || !r.id) return;
                         if (!archiveMap.has(r.id)) {
@@ -217,12 +235,33 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                         } else {
                             const existing = archiveMap.get(r.id)!;
                             archiveMap.set(r.id, {
-                                ...r,
                                 ...existing,
-                                customerName: existing.customerName || r.customerName,
-                                notes: existing.notes || r.notes,
-                                content: existing.content || r.content,
-                                recordType: existing.recordType || r.recordType,
+                                ...r,
+                                customerName: r.customerName || existing.customerName,
+                                code: r.code || existing.code,
+                                ward: r.ward || existing.ward,
+                                mapSheet: r.mapSheet || existing.mapSheet,
+                                landPlot: r.landPlot || existing.landPlot,
+                                receivedDate: r.receivedDate || existing.receivedDate,
+                                deadline: r.deadline || existing.deadline,
+                                assignedDate: r.assignedDate || existing.assignedDate,
+                                assignedTo: r.assignedTo || existing.assignedTo,
+                                completedWorkDate: r.completedWorkDate || existing.completedWorkDate || r.completedDate || existing.completedDate,
+                                completedDate: r.completedDate || existing.completedDate || r.completedWorkDate || existing.completedWorkDate,
+                                pendingCheckDate: r.pendingCheckDate || existing.pendingCheckDate,
+                                checkedBy: r.checkedBy || existing.checkedBy,
+                                checkedDate: r.checkedDate || existing.checkedDate,
+                                submissionDate: r.submissionDate || existing.submissionDate,
+                                approvalDate: r.approvalDate || existing.approvalDate,
+                                resultReturnedDate: r.resultReturnedDate || existing.resultReturnedDate,
+                                receiptNumber: r.receiptNumber || existing.receiptNumber,
+                                exportBatch: r.exportBatch || existing.exportBatch,
+                                exportDate: r.exportDate || existing.exportDate,
+                                notes: r.notes || existing.notes,
+                                content: r.content || existing.content,
+                                recordType: r.recordType || existing.recordType,
+                                status: r.status || existing.status,
+                                sourceTable: 'luutru_records'
                             });
                         }
                     });
@@ -236,7 +275,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
             };
             loadArchive();
         }
-    }, [mainTab, records]);
+    }, [mainTab]);
 
     const activeRecords = useMemo(() => {
         let base = mainTab === 'measurement' 
