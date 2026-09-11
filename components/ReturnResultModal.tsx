@@ -68,9 +68,8 @@ const ReturnResultModal: React.FC<ReturnResultModalProps> = ({
                 });
                 
                 if (match) {
-                    const priceVal = match.liquidationAmount !== null && match.liquidationAmount !== undefined
-                        ? match.liquidationAmount
-                        : (match.totalAmount ?? 0);
+                    const isLiquidated = Boolean(match.liquidationAmount && match.liquidationAmount > 0 && match.liquidationDate);
+                    const priceVal = (isLiquidated ? match.liquidationAmount : match.totalAmount) ?? 0;
                     setReturnedPrice(priceVal.toString());
                     return;
                 }

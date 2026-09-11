@@ -157,8 +157,8 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                   setContractPrice(match.totalAmount ?? null);
                   setContractSplitItems(match.splitItems || null);
 
-                  // GIÁ TRỊ THANH LÝ (Lấy từ liquidationAmount - nếu đã nhập)
-                  if (match.liquidationAmount !== null && match.liquidationAmount !== undefined) {
+                  // GIÁ TRỊ THANH LÝ (Chỉ hiển thị nếu đã thực tế thanh lý chính thức)
+                  if (match.liquidationAmount !== null && match.liquidationAmount !== undefined && match.liquidationAmount > 0 && match.liquidationDate) {
                       
                       let liquidationLabel = 'Thanh lý hợp đồng';
                       const cType = (match.contractType || '').toLowerCase();

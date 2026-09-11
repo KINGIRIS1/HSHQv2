@@ -192,7 +192,7 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
           setMatchedContract(match);
           setContractPrice(match.totalAmount ?? null);
           setContractSplitItems(match.splitItems || null);
-          if (match.liquidationAmount !== null && match.liquidationAmount !== undefined) {
+          if (match.liquidationAmount !== null && match.liquidationAmount !== undefined && match.liquidationAmount > 0 && match.liquidationDate) {
             let liquidationLabel = 'Thanh lý hợp đồng';
             const cType = (match.contractType || '').toLowerCase();
             const sType = (match.serviceType || '').toLowerCase();

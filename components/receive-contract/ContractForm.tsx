@@ -44,8 +44,8 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
     code: '', customerName: '', phoneNumber: '', address: '', ward: '', landPlot: '', mapSheet: '', area: 0,
     contractType: 'Đo đạc', serviceType: '', areaType: '', plotCount: 1, markerCount: 1, quantity: 1, 
     unitPrice: 0, vatRate: 8, vatAmount: 0, totalAmount: 0, deposit: 0, content: '',
-    createdDate: todayStr, liquidationDate: todayStr, status: 'PENDING',
-    liquidationArea: 0, liquidationAmount: 0 // Init
+    createdDate: todayStr, liquidationDate: undefined, status: 'PENDING',
+    liquidationArea: undefined, liquidationAmount: undefined
   });
 
   const [isManual, setIsManual] = useState<boolean>(false);
@@ -56,7 +56,7 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
               ...initialData,
               liquidationArea: (mode === 'liquidation' && !initialData.liquidationArea) ? initialData.area : initialData.liquidationArea,
               liquidationAmount: (mode === 'liquidation' && !initialData.liquidationAmount) ? initialData.totalAmount : initialData.liquidationAmount,
-              liquidationDate: initialData.liquidationDate || todayStr
+              liquidationDate: mode === 'liquidation' ? (initialData.liquidationDate || todayStr) : initialData.liquidationDate
           });
           
           const items = initialData.splitItems || [];
@@ -77,8 +77,8 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
               code: '', customerName: '', phoneNumber: '', address: '', ward: '', landPlot: '', mapSheet: '', area: 0,
               contractType: 'Đo đạc', serviceType: '', areaType: '', plotCount: 1, markerCount: 1, quantity: 1, 
               unitPrice: 0, vatRate: 8, vatAmount: 0, totalAmount: 0, deposit: 0, content: '',
-              createdDate: todayStr, liquidationDate: todayStr, status: 'PENDING',
-              liquidationArea: 0, liquidationAmount: 0
+              createdDate: todayStr, liquidationDate: undefined, status: 'PENDING',
+              liquidationArea: undefined, liquidationAmount: undefined
           });
           setTachThuaItems([]);
           setDoDacItems([]);
@@ -89,11 +89,14 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
 
   // Separate, stable effect for checking duplicate contracts
   useEffect(() => {
-      if (mode === 'contract' && formData.customerAddress && contracts) {
+      // Chỉ cảnh báo nếu đang ở chế độ LẬP MỚI HỢP ĐỒNG (không có initialData?.id)
+      const isEditingMode = Boolean(initialData?.id);
+      if (mode === 'contract' && !isEditingMode && formData.customerAddress && contracts) {
           const duplicateContract = contracts.find(c => 
               c.customerAddress && 
               c.customerAddress.trim().toLowerCase() === formData.customerAddress?.trim().toLowerCase() && 
-              c.id !== formData.id
+              c.id !== formData.id &&
+              c.code !== formData.code
           );
           if (duplicateContract) {
               setNotification(prev => {
@@ -107,7 +110,7 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
       } else {
           setNotification(prev => prev?.type === 'error' && prev.message.startsWith('CẢNH BÁO:') ? null : prev);
       }
-  }, [formData.customerAddress, formData.id, mode, contracts]); 
+  }, [formData.customerAddress, formData.id, formData.code, mode, contracts, initialData?.id]); 
 
   // Scroll to notification
   useEffect(() => {
@@ -153,13 +156,18 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
   // Init Liquidation Data if missing (Fallback logic)
   useEffect(() => {
       if (mode === 'liquidation') {
-          // Khi vào mode liquidation, nếu chưa có diện tích thanh lý thì lấy diện tích hợp đồng
+          // Khi vào mode liquidation, nếu chưa có diện tích thanh lý thì lấy diện tích hợp đồng, tự động gán ngày thanh lý là hôm nay nếu chưa có
           setFormData(prev => {
               const targetVal = (prev.liquidationArea !== undefined && prev.liquidationArea !== null && prev.liquidationArea > 0) ? prev.liquidationArea : prev.area;
-              if (prev.liquidationArea === targetVal) return prev;
+              const d = new Date();
+              const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+              const targetDate = prev.liquidationDate || todayStr;
+              
+              if (prev.liquidationArea === targetVal && prev.liquidationDate === targetDate) return prev;
               return { 
                   ...prev, 
-                  liquidationArea: targetVal
+                  liquidationArea: targetVal,
+                  liquidationDate: targetDate
               };
           });
       }
@@ -435,7 +443,9 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
           // Kiểm tra xem hồ sơ này đã có hợp đồng hay chưa
           const duplicateContract = contracts?.find(c => 
               c.customerAddress && 
-              c.customerAddress.trim().toLowerCase() === found.code.trim().toLowerCase()
+              c.customerAddress.trim().toLowerCase() === found.code.trim().toLowerCase() &&
+              c.id !== formData.id &&
+              c.code !== formData.code
           );
 
           if (recType.includes('trích lục')) {
@@ -480,7 +490,8 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
               suggestedService = match ? match.serviceName : 'Trích đo chỉnh lý bản đồ địa chính';
           }
 
-          if (duplicateContract) {
+          const isEditingMode = Boolean(initialData?.id);
+          if (duplicateContract && !isEditingMode) {
               setNotification({
                   type: 'error',
                   message: `CẢNH BÁO: Hồ sơ ${found.code} đã có hợp đồng trước đó với Số Hợp Đồng: ${duplicateContract.code}! Tránh lập trùng 1 bộ hồ sơ 2 số hợp đồng.`
@@ -541,12 +552,14 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
           }
       }
 
-      // Kiểm tra trùng lắp hợp đồng cho cùng 1 hồ sơ trước khi lưu
-      if (mode === 'contract' && formData.customerAddress && contracts) {
+      // Kiểm tra trùng lắp hợp đồng cho cùng 1 hồ sơ trước khi lưu (chỉ kiểm tra khi lập mới)
+      const isEditingMode = Boolean(initialData?.id);
+      if (mode === 'contract' && !isEditingMode && formData.customerAddress && contracts) {
           const duplicateContract = contracts.find(c => 
               c.customerAddress && 
               c.customerAddress.trim().toLowerCase() === formData.customerAddress?.trim().toLowerCase() && 
-              c.id !== formData.id
+              c.id !== formData.id &&
+              c.code !== formData.code
           );
           if (duplicateContract) {
               const confirmSave = await confirmAction(
@@ -582,7 +595,8 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
           vatRate: derivedPricing.vatRate,
           vatAmount: derivedPricing.vatAmount,
           totalAmount: derivedPricing.totalAmount,
-          liquidationAmount: mode === 'liquidation' ? derivedPricing.totalAmount : (formData.liquidationAmount || derivedPricing.totalAmount),
+          liquidationAmount: mode === 'liquidation' ? derivedPricing.totalAmount : formData.liquidationAmount,
+          liquidationDate: mode === 'liquidation' ? (formData.liquidationDate || todayStr) : formData.liquidationDate,
           isManualCode: isManual
       } as Contract & { isManualCode?: boolean };
       
@@ -606,7 +620,8 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
               vatRate: derivedPricing.vatRate,
               vatAmount: derivedPricing.vatAmount,
               totalAmount: derivedPricing.totalAmount,
-              liquidationAmount: mode === 'liquidation' ? derivedPricing.totalAmount : (formData.liquidationAmount || derivedPricing.totalAmount)
+              liquidationAmount: mode === 'liquidation' ? derivedPricing.totalAmount : formData.liquidationAmount,
+              liquidationDate: mode === 'liquidation' ? (formData.liquidationDate || todayStr) : formData.liquidationDate
           }));
 
           // Tự động in sau khi lưu thành công với mã hợp đồng chính thức vừa chốt
@@ -620,7 +635,8 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
               vatRate: derivedPricing.vatRate,
               vatAmount: derivedPricing.vatAmount,
               totalAmount: derivedPricing.totalAmount,
-              liquidationAmount: mode === 'liquidation' ? derivedPricing.totalAmount : (formData.liquidationAmount || derivedPricing.totalAmount)
+              liquidationAmount: mode === 'liquidation' ? derivedPricing.totalAmount : formData.liquidationAmount,
+              liquidationDate: mode === 'liquidation' ? (formData.liquidationDate || todayStr) : formData.liquidationDate
           };
           onPrint(finalDataToPrint, mode);
 
@@ -1246,7 +1262,7 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
                 disabled={loading} 
                 className={`px-6 2xl:px-10 py-2 2xl:py-3 text-white rounded-lg font-bold text-xs sm:text-sm 2xl:text-base shadow-md transition-all active:scale-95 disabled:opacity-70 flex items-center justify-center gap-1.5 cursor-pointer ${isLiquidationMode ? 'bg-orange-600 hover:bg-orange-700 shadow-orange-500/20' : 'bg-purple-600 hover:bg-purple-700 shadow-purple-500/20'}`}
             >
-                <Save size={16} /> {loading ? 'Đang xử lý...' : (initialData ? 'CẬP NHẬT VÀ IN' : 'LƯU VÀ IN')}
+                <Save size={16} /> {loading ? 'Đang xử lý...' : (isLiquidationMode ? 'LƯU VÀ IN' : (initialData ? 'CẬP NHẬT VÀ IN' : 'LƯU VÀ IN'))}
             </button>
         </div>
     </form>

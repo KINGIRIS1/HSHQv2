@@ -1,8 +1,9 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import Barcode from 'react-barcode';
-import { RecordFile, Employee, User } from '../../types';
+import { RecordFile, Employee, User, Contract } from '../../types';
 import { getNormalizedWard, getShortRecordType, getFullRecordType, getWardFullLabel } from '../../constants';
 import { getReceiptReceiverName } from '../../utils/appHelpers';
+import { fetchContracts } from '../../services/apiContracts';
 import { Printer, FileSignature } from 'lucide-react';
 
 interface SystemReceiptTemplateProps {
@@ -18,6 +19,26 @@ interface SystemReceiptTemplateProps {
 const SystemReceiptTemplate: React.FC<SystemReceiptTemplateProps> = ({ data, receivingWard, onClose, currentUser, employees, users, onCreateContract }) => {
     const receiptRef = useRef<HTMLDivElement>(null);
     const controlSlipRef = useRef<HTMLDivElement>(null);
+    const [existingContract, setExistingContract] = useState<Contract | null>(null);
+
+    useEffect(() => {
+        let isMounted = true;
+        if (data?.code) {
+            fetchContracts()
+                .then(list => {
+                    if (!isMounted) return;
+                    const normalize = (s: string | undefined) => String(s || '').trim().toLowerCase();
+                    const code = normalize(data?.code);
+                    const found = list.find(c => 
+                        (c.customerAddress && normalize(c.customerAddress) === code) ||
+                        (normalize(c.code) === code)
+                    );
+                    setExistingContract(found || null);
+                })
+                .catch(() => {});
+        }
+        return () => { isMounted = false; };
+    }, [data?.code]);
 
     const printPages = (pages: string[], title: string) => {
         const printWindow = window.open('', '_blank');
@@ -359,23 +380,27 @@ const SystemReceiptTemplate: React.FC<SystemReceiptTemplateProps> = ({ data, rec
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
                 <div className="flex justify-between items-center p-4 border-b">
-                    <h2 className="text-xl font-bold">In Biên Nhận & Quy trình</h2>
-                    <div className="flex space-x-2">
+                    <h2 className="text-xl font-bold text-gray-800">In</h2>
+                    <div className="flex flex-wrap gap-2 items-center">
                         {onCreateContract && data && data.recordType && (getShortRecordType(data.recordType).startsWith('2.2') || getShortRecordType(data.recordType).startsWith('2.4')) && (
-                            <button onClick={() => { onCreateContract(data); onClose(); }} className="flex items-center px-4 py-2 bg-amber-600 text-white rounded hover:bg-amber-700">
-                                <FileSignature className="w-4 h-4 mr-2" /> Lập Hợp Đồng
+                            <button 
+                                onClick={() => { onCreateContract(data); onClose(); }} 
+                                className={`flex items-center px-4 py-2 text-white rounded font-medium transition-colors shadow-xs ${existingContract ? 'bg-amber-600 hover:bg-amber-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}
+                                title={existingContract ? `Đã có HĐ: ${existingContract.code} - Nhấn để sửa` : 'Lập hợp đồng mới'}
+                            >
+                                <FileSignature className="w-4 h-4 mr-1.5" /> {existingContract ? 'Sửa hợp đồng' : 'Lập hợp đồng'}
                             </button>
                         )}
-                        <button onClick={handlePrintReceipt} className="flex items-center px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
-                            <Printer className="w-4 h-4 mr-2" /> In Biên Nhận
+                        <button onClick={handlePrintReceipt} className="flex items-center px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 font-medium transition-colors shadow-xs">
+                            <Printer className="w-4 h-4 mr-1.5" /> Biên Nhận
                         </button>
-                        <button onClick={handlePrintControlSlip} className="flex items-center px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700">
-                            <Printer className="w-4 h-4 mr-2" /> In Quy Trình
+                        <button onClick={handlePrintControlSlip} className="flex items-center px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 font-medium transition-colors shadow-xs">
+                            <Printer className="w-4 h-4 mr-1.5" /> Quy trình
                         </button>
-                        <button onClick={handlePrintAll} className="flex items-center px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
-                            <Printer className="w-4 h-4 mr-2" /> In Tất Cả
+                        <button onClick={handlePrintAll} className="flex items-center px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-medium transition-colors shadow-xs">
+                            <Printer className="w-4 h-4 mr-1.5" /> In All
                         </button>
-                        <button onClick={onClose} className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300">
+                        <button onClick={onClose} className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 font-medium transition-colors">
                             Đóng
                         </button>
                     </div>
@@ -403,7 +428,8 @@ const SystemReceiptTemplate: React.FC<SystemReceiptTemplateProps> = ({ data, rec
                                 </div>
                                 <div style={{ width: '48%', textAlign: 'center' }}>
                                     <div style={{ fontWeight: 'bold', fontSize: '14.5px', whiteSpace: 'nowrap' }}>CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</div>
-                                    <div style={{ fontWeight: 'bold', textDecoration: 'underline', marginBottom: '4px', fontSize: '14px' }}>Độc lập - Tự do - Hạnh phúc</div>
+                                    <div style={{ fontWeight: 'bold', fontSize: '14px' }}>Độc lập - Tự do - Hạnh phúc</div>
+                                    <div style={{ borderBottom: '1.5px solid #000', width: '130px', margin: '3px auto 4px auto' }}></div>
                                     <div style={{ fontStyle: 'italic', marginTop: '10px', fontSize: '13.5px' }}>{getNormalizedWard(receivingWard)}, {formatDateOnly(new Date())}</div>
                                 </div>
                             </div>
@@ -507,7 +533,8 @@ const SystemReceiptTemplate: React.FC<SystemReceiptTemplateProps> = ({ data, rec
                                 </div>
                                 <div style={{ width: '48%', textAlign: 'center' }}>
                                     <div style={{ fontWeight: 'bold', fontSize: '14.5px', whiteSpace: 'nowrap' }}>CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</div>
-                                    <div style={{ fontWeight: 'bold', textDecoration: 'underline', marginBottom: '4px', fontSize: '14px' }}>Độc lập - Tự do - Hạnh phúc</div>
+                                    <div style={{ fontWeight: 'bold', fontSize: '14px' }}>Độc lập - Tự do - Hạnh phúc</div>
+                                    <div style={{ borderBottom: '1.5px solid #000', width: '130px', margin: '3px auto 4px auto' }}></div>
                                 </div>
                             </div>
 

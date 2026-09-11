@@ -5,7 +5,7 @@ import { getNormalizedWard, getShortRecordType, RECORD_TYPES } from '../../const
 import { 
     Search, Eye, FileSpreadsheet, Pencil, Printer, Trash2, 
     FileSignature, FileEdit, RefreshCw, Filter, ChevronDown, ChevronUp, 
-    X, RotateCcw, Calendar, UserCheck, Layers, Building2
+    X, RotateCcw, Calendar, UserCheck, Layers, Building2, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { fetchContracts } from '../../services/api';
 
@@ -53,8 +53,11 @@ const DailyList: React.FC<DailyListProps> = ({
   
   const [searchTerm, setSearchTerm] = useState('');
   const [isFilterPopoverOpen, setIsFilterPopoverOpen] = useState(false);
-  const [isSyncing, setIsSyncing] = useState(false);
   const [contracts, setContracts] = useState<Contract[]>([]);
+
+  // Pagination State (20 records / page)
+  const [currentPage, setCurrentPage] = useState(1);
+  const recordsPerPage = 20;
 
   const filterPopoverRef = useRef<HTMLDivElement>(null);
 
@@ -257,6 +260,18 @@ const DailyList: React.FC<DailyListProps> = ({
       });
   }, [records, filterFromDate, filterToDate, selectedReceiver, selectedRecordType, selectedDept, searchTerm, currentUser, employees]);
 
+  // Reset to page 1 whenever filters change
+  useEffect(() => {
+      setCurrentPage(1);
+  }, [filterFromDate, filterToDate, selectedReceiver, selectedRecordType, selectedDept, searchTerm]);
+
+  // Paginated records
+  const totalPages = Math.ceil(filteredDailyRecords.length / recordsPerPage) || 1;
+  const paginatedDailyRecords = useMemo(() => {
+      const start = (currentPage - 1) * recordsPerPage;
+      return filteredDailyRecords.slice(start, start + recordsPerPage);
+  }, [filteredDailyRecords, currentPage, recordsPerPage]);
+
   // Check contract existence for a given record
   const getContractForRecord = (record: RecordFile) => {
       if (!contracts || contracts.length === 0 || !record) return undefined;
@@ -285,20 +300,6 @@ const DailyList: React.FC<DailyListProps> = ({
       });
   };
 
-  const pendingCount = useMemo(() => {
-      return (records || []).filter(r => r._isOfflineSaved).length;
-  }, [records]);
-
-  const handleManualSync = async () => {
-      if (!onSyncPending || isSyncing) return;
-      setIsSyncing(true);
-      try {
-          await onSyncPending();
-          await loadContractsData();
-      } finally {
-          setIsSyncing(false);
-      }
-  };
 
   const createDailyListWorkbook = () => {
       if (filteredDailyRecords.length === 0) return null;
@@ -393,6 +394,10 @@ const DailyList: React.FC<DailyListProps> = ({
               else ws[ref].s = cellStyle;
           } 
       }
+
+      // Header Styles
+      if (ws['A1']) ws['A1'].s = { font: { name: "Times New Roman", sz: 12, bold: true }, alignment: { horizontal: "center" } };
+      if (ws['A2']) ws['A2'].s = { font: { name: "Times New Roman", sz: 12, bold: true }, border: { bottom: { style: "medium" } }, alignment: { horizontal: "center" } };
 
       // Footer Styles
       const sigTitleStyle = { font: { name: "Times New Roman", sz: 12, bold: true }, alignment: { horizontal: "center" } };
@@ -636,19 +641,6 @@ const DailyList: React.FC<DailyListProps> = ({
                         )}
                     </div>
 
-                    {/* Offline Sync Button if any */}
-                    {pendingCount > 0 && onSyncPending && (
-                        <button
-                            type="button"
-                            onClick={handleManualSync}
-                            disabled={isSyncing}
-                            className="flex items-center gap-1.5 bg-amber-50 text-amber-800 border border-amber-300 hover:bg-amber-100 px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer"
-                            title="Có hồ sơ đã lưu an toàn trên máy nhưng chưa đẩy lên Cloud"
-                        >
-                            <RefreshCw size={14} className={isSyncing ? "animate-spin text-amber-600" : "text-amber-600"} />
-                            <span className="hidden sm:inline">{isSyncing ? "Đang đẩy Cloud..." : `Đồng bộ Cloud (${pendingCount})`}</span>
-                        </button>
-                    )}
 
                     {/* Excel Actions */}
                     <button 
@@ -672,40 +664,33 @@ const DailyList: React.FC<DailyListProps> = ({
         {/* Records Table */}
         <div className="flex-1 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col min-h-0">
             <div className="overflow-auto flex-1">
-                <table className="w-full text-left table-fixed min-w-[1200px]">
+                <table className="w-full text-left table-fixed min-w-[1150px]">
                     <thead className="bg-gray-50 text-xs text-gray-600 uppercase font-bold sticky top-0 shadow-sm z-10">
                         <tr> 
-                            <th className="p-3 w-10 text-center">STT</th> 
+                            <th className="p-3 w-12 text-center">STT</th> 
                             <th className="p-3 w-[140px]">Mã Hồ Sơ</th> 
-                            <th className="p-3 w-[200px]">Chủ Sử Dụng</th> 
+                            <th className="p-3 w-[190px]">Chủ Sử Dụng</th> 
                             <th className="p-3 w-[150px]">Xã / Phường (Đất)</th> 
-                            <th className="p-3 w-[65px] text-center">Tờ</th>
-                            <th className="p-3 w-[65px] text-center">Thửa</th>
+                            <th className="p-3 w-[60px] text-center">Tờ</th>
+                            <th className="p-3 w-[60px] text-center">Thửa</th>
                             <th className="p-3 w-[140px]">Loại Hồ Sơ</th> 
-                            <th className="p-3 text-center w-[110px]">Ngày Nhận</th>
-                            <th className="p-3 text-center w-[110px]">Hẹn Trả</th> 
+                            <th className="p-3 text-center w-[140px]">Thời Hạn Xử Lý</th>
                             <th className="p-3 w-[180px]">Ghi Chú</th>
-                            <th className="p-3 w-[130px] text-center bg-gray-100/50 sticky right-0 shadow-l">Thao Tác</th>
+                            <th className="p-3 w-[110px] text-center bg-gray-100/50 sticky right-0 shadow-l">Thao Tác</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 text-xs">
-                        {filteredDailyRecords.length > 0 ? (
-                            filteredDailyRecords.map((r, index) => {
+                        {paginatedDailyRecords.length > 0 ? (
+                            paginatedDailyRecords.map((r, index) => {
                                 const existingContract = getContractForRecord(r);
                                 const is2xRecord = r.recordType && (getShortRecordType(r.recordType).startsWith('2.2') || getShortRecordType(r.recordType).startsWith('2.4') || (r.code || '').startsWith('2.'));
+                                const actualIndex = (currentPage - 1) * recordsPerPage + index + 1;
 
                                 return (
                                     <tr key={r.id} className="hover:bg-blue-50/50 group">
-                                        <td className="p-3 text-center text-gray-400 align-middle">{index + 1}</td> 
+                                        <td className="p-3 text-center text-gray-400 font-mono align-middle">{actualIndex}</td> 
                                         <td className="p-3 font-mono font-bold text-blue-600 truncate align-middle" title={r.code}>
-                                            <div className="flex items-center gap-1.5">
-                                                <span>{r.code}</span>
-                                                {r._isOfflineSaved && (
-                                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300 shrink-0" title="Đã lưu an toàn trên máy, chờ đồng bộ Cloud">
-                                                        Máy
-                                                    </span>
-                                                )}
-                                            </div>
+                                            <span>{r.code}</span>
                                         </td> 
                                         <td className="p-3 font-medium text-gray-800 truncate align-middle" title={r.customerName}>{r.customerName}</td> 
                                         <td className="p-3 text-gray-700 truncate align-middle font-medium" title={getNormalizedWard(r.ward)}>
@@ -714,42 +699,69 @@ const DailyList: React.FC<DailyListProps> = ({
                                         <td className="p-3 text-center font-mono align-middle">{r.mapSheet || '-'}</td>
                                         <td className="p-3 text-center font-mono align-middle">{r.landPlot || '-'}</td>
                                         <td className="p-3 text-gray-600 truncate align-middle" title={r.recordType || ''}>{getShortRecordType(r.recordType)}</td> 
-                                        <td className="p-3 text-center text-gray-700 font-mono align-middle">{r.receivedDate ? new Date(r.receivedDate).toLocaleDateString('vi-VN') : '-'}</td>
-                                        <td className="p-3 text-center text-blue-700 font-mono font-bold align-middle">{r.deadline ? new Date(r.deadline).toLocaleDateString('vi-VN') : '-'}</td> 
+                                        <td className="p-2.5 text-center text-xs font-mono align-middle">
+                                            <div className="flex flex-col items-center justify-center gap-0.5">
+                                                <span className="text-gray-600 font-medium">
+                                                    <span className="text-[10px] text-gray-400 font-sans mr-1">Nhận:</span>
+                                                    {r.receivedDate ? new Date(r.receivedDate).toLocaleDateString('vi-VN') : '-'}
+                                                </span>
+                                                <span className="font-bold text-blue-700 bg-blue-50/80 px-1.5 py-0.5 rounded border border-blue-100/60">
+                                                    <span className="text-[10px] text-blue-500 font-sans mr-1">Trả:</span>
+                                                    {r.deadline ? new Date(r.deadline).toLocaleDateString('vi-VN') : '-'}
+                                                </span>
+                                            </div>
+                                        </td>
                                         <td className="p-3 text-gray-500 italic truncate align-middle" title={r.content || ''}>{r.content}</td>
                                         <td className="p-2 align-middle text-center sticky right-0 bg-white group-hover:bg-blue-50/50 shadow-l">
-                                            <div className="flex items-center justify-center gap-1.5">
-                                                <button onClick={() => onEdit(r)} className="p-1.5 text-blue-600 hover:bg-blue-100 rounded transition-colors cursor-pointer" title="Sửa hồ sơ">
-                                                    <Pencil size={15} />
-                                                </button>
-                                                
-                                                {/* If contract already exists: show Edit Contract button, else show Create Contract button */}
-                                                {is2xRecord && onCreateContract && (
-                                                    existingContract ? (
-                                                        <button 
-                                                            onClick={() => onCreateContract(r)} 
-                                                            className="p-1.5 text-teal-600 hover:bg-teal-100 rounded transition-colors cursor-pointer" 
-                                                            title={`Sửa hợp đồng đã lập (Số: ${existingContract.code || 'Đã tạo'})`}
-                                                        >
-                                                            <FileEdit size={15} />
-                                                        </button>
-                                                    ) : (
-                                                        <button 
-                                                            onClick={() => onCreateContract(r)} 
-                                                            className="p-1.5 text-amber-600 hover:bg-amber-100 rounded transition-colors cursor-pointer" 
-                                                            title="Lập hợp đồng"
-                                                        >
-                                                            <FileSignature size={15} />
-                                                        </button>
-                                                    )
-                                                )}
+                                            <div className="flex flex-col items-center justify-center gap-1">
+                                                {/* Hàng 1: Sửa hồ sơ & Hợp đồng */}
+                                                <div className="flex items-center justify-center gap-1">
+                                                    <button 
+                                                        onClick={() => onEdit(r)} 
+                                                        className="p-1.5 text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 rounded border border-blue-200/80 transition-all cursor-pointer shadow-2xs" 
+                                                        title="Sửa hồ sơ"
+                                                    >
+                                                        <Pencil size={13} />
+                                                    </button>
+                                                    
+                                                    {is2xRecord && onCreateContract && (
+                                                        existingContract ? (
+                                                            <button 
+                                                                onClick={() => onCreateContract(r)} 
+                                                                className="p-1.5 text-teal-700 hover:text-teal-900 bg-teal-50 hover:bg-teal-100 rounded border border-teal-200/80 transition-all cursor-pointer shadow-2xs" 
+                                                                title={`Sửa hợp đồng đã lập (${existingContract.code || 'Đã tạo'})`}
+                                                            >
+                                                                <FileEdit size={13} />
+                                                            </button>
+                                                        ) : (
+                                                            <button 
+                                                                onClick={() => onCreateContract(r)} 
+                                                                className="p-1.5 text-amber-700 hover:text-amber-900 bg-amber-50 hover:bg-amber-100 rounded border border-amber-200/80 transition-all cursor-pointer shadow-2xs" 
+                                                                title="Lập hợp đồng"
+                                                            >
+                                                                <FileSignature size={13} />
+                                                            </button>
+                                                        )
+                                                    )}
+                                                </div>
 
-                                                <button onClick={() => onPrint(r)} className="p-1.5 text-purple-600 hover:bg-purple-100 rounded transition-colors cursor-pointer" title="In biên nhận">
-                                                    <Printer size={15} />
-                                                </button>
-                                                <button onClick={() => onDelete(r)} className="p-1.5 text-red-500 hover:bg-red-100 rounded transition-colors cursor-pointer" title="Xóa hồ sơ">
-                                                    <Trash2 size={15} />
-                                                </button>
+                                                {/* Hàng 2: In biên nhận & Xóa */}
+                                                <div className="flex items-center justify-center gap-1">
+                                                    <button 
+                                                        onClick={() => onPrint(r)} 
+                                                        className="p-1.5 text-purple-600 hover:text-purple-800 bg-purple-50 hover:bg-purple-100 rounded border border-purple-200/80 transition-all cursor-pointer shadow-2xs" 
+                                                        title="In biên nhận"
+                                                    >
+                                                        <Printer size={13} />
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => onDelete(r)} 
+                                                        className="p-1.5 text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100 rounded border border-red-200/80 transition-all cursor-pointer shadow-2xs" 
+                                                        title="Xóa hồ sơ"
+                                                    >
+                                                        <Trash2 size={13} />
+                                                    </button>
+                                                </div>
                                             </div>
                                         </td>
                                     </tr>
@@ -757,7 +769,7 @@ const DailyList: React.FC<DailyListProps> = ({
                             })
                         ) : ( 
                             <tr>
-                                <td colSpan={11} className="p-12 text-center text-gray-400 italic">
+                                <td colSpan={10} className="p-12 text-center text-gray-400 italic">
                                     Không có hồ sơ tiếp nhận nào phù hợp với bộ lọc đang chọn.
                                 </td>
                             </tr> 
@@ -765,6 +777,41 @@ const DailyList: React.FC<DailyListProps> = ({
                     </tbody>
                 </table>
             </div>
+
+            {/* Pagination Footer */}
+            {filteredDailyRecords.length > 0 && (
+                <div className="px-4 py-2.5 bg-gray-50 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs font-medium text-gray-600">
+                    <div>
+                        Hiển thị từ <span className="font-bold text-gray-900">{(currentPage - 1) * recordsPerPage + 1}</span> đến{' '}
+                        <span className="font-bold text-gray-900">{Math.min(currentPage * recordsPerPage, filteredDailyRecords.length)}</span> trên tổng số{' '}
+                        <span className="font-bold text-blue-600">{filteredDailyRecords.length}</span> hồ sơ
+                    </div>
+                    
+                    <div className="flex items-center gap-1.5">
+                        <button
+                            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                            disabled={currentPage === 1}
+                            className="px-2.5 py-1 rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-medium flex items-center gap-1 shadow-2xs cursor-pointer"
+                        >
+                            <ChevronLeft size={14} />
+                            <span>Trang trước</span>
+                        </button>
+                        
+                        <span className="px-3 py-1 font-bold text-gray-800 bg-white border border-gray-200 rounded-lg shadow-2xs">
+                            Trang {currentPage} / {totalPages}
+                        </span>
+                        
+                        <button
+                            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                            disabled={currentPage >= totalPages}
+                            className="px-2.5 py-1 rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-medium flex items-center gap-1 shadow-2xs cursor-pointer"
+                        >
+                            <span>Trang sau</span>
+                            <ChevronRight size={14} />
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     </div>
   );

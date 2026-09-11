@@ -655,13 +655,13 @@ const ReceiveContract: React.FC<ReceiveContractProps> = ({ onSave, wards, curren
                 onClick={() => { setActiveModule('contract'); setEditingContract(undefined); }}
                 className={`px-3.5 md:px-5 py-2 rounded-lg font-bold text-xs md:text-sm transition-all border whitespace-nowrap flex items-center gap-1.5 ${activeModule === 'contract' ? 'bg-white text-purple-700 border-purple-200 shadow-xs' : 'bg-gray-100/80 text-gray-600 border-transparent hover:bg-gray-200'}`}
             >
-                <FileText size={16} /> Lập Hợp Đồng
+                <FileText size={16} /> Hợp đồng
             </button>
             <button 
                 onClick={() => { setActiveModule('liquidation'); setEditingContract(undefined); }}
                 className={`px-3.5 md:px-5 py-2 rounded-lg font-bold text-xs md:text-sm transition-all border whitespace-nowrap flex items-center gap-1.5 ${activeModule === 'liquidation' ? 'bg-white text-green-700 border-green-200 shadow-xs' : 'bg-gray-100/80 text-gray-600 border-transparent hover:bg-gray-200'}`}
             >
-                <FileCheck size={16} /> Thanh Lý Hợp Đồng
+                <FileCheck size={16} /> Thanh lý
             </button>
             <button 
                 onClick={() => { setActiveModule('list'); }}

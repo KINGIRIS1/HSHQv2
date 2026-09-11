@@ -55,9 +55,9 @@ const ContractList: React.FC<ContractListProps> = ({ contracts: propContracts, o
           return timeB - timeA;
       });
 
-      // Chỉ cho phép thanh lý với các hồ sơ 2.3 (Đo đạc) và 2.4 (Cắm mốc)
+      // Trong danh sách Thanh lý: Chỉ hiển thị các hợp đồng ĐÃ ĐƯỢC THANH LÝ THỰC TẾ (có liquidationAmount > 0 và liquidationDate)
       if (viewMode === 'liquidation') {
-          list = list.filter(c => c.contractType === 'Đo đạc' || c.contractType === 'Cắm mốc');
+          list = list.filter(c => (c.contractType === 'Đo đạc' || c.contractType === 'Cắm mốc') && Boolean(c.liquidationAmount && c.liquidationAmount > 0 && c.liquidationDate));
       }
 
       if (!searchTerm) return list;
