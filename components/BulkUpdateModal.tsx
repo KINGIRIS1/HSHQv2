@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { RecordFile, Employee, RecordStatus } from '../types';
 import { STATUS_LABELS, SURVEY_SELECTABLE_STATUSES, ARCHIVE_SELECTABLE_STATUSES, isArchiveRecordType, isArchiveRecord } from '../constants';
 import { X, CheckCircle2, Layers, ArrowRight, UserCheck, Calendar, History, User, Building2, Clock, Info } from 'lucide-react';
-import { getDepartmentForRecord, calculateEmployeeWorkload, getPureBatchNumber, groupEmployeesByDepartment } from '../utils/appHelpers';
+import { getDepartmentForRecord, getPureBatchNumber, groupEmployeesByDepartment } from '../utils/appHelpers';
 
 interface BulkUpdateModalProps {
   isOpen: boolean;
@@ -451,14 +451,11 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
                             <option value="">-- Giữ nguyên / Không đổi cán bộ --</option>
                             {Object.entries(groupEmployeesByDepartment(filteredEmployees)).map(([dept, emps]) => (
                                 <optgroup key={dept} label={dept}>
-                                    {emps.map(emp => {
-                                        const stats = calculateEmployeeWorkload(allRecords || [], emp);
-                                        return (
-                                            <option key={emp.id} value={emp.name}>
-                                                {emp.name} ({emp.position || 'Cán bộ'}) - [Đang làm: {stats.inProgressPlots} | Xong: {stats.completedPlots}]
-                                            </option>
-                                        );
-                                    })}
+                                    {emps.map(emp => (
+                                        <option key={emp.id} value={emp.name}>
+                                            {emp.name} ({emp.position || 'Cán bộ'})
+                                        </option>
+                                    ))}
                                 </optgroup>
                             ))}
                         </select>

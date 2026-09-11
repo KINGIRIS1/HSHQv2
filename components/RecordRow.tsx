@@ -390,7 +390,7 @@ const RecordRow: React.FC<RecordRowProps> = ({
                 );
               })()}
               
-              {onReturnResult && (displayStatus === RecordStatus.HANDOVER || displayStatus === RecordStatus.SIGNED) && !record.resultReturnedDate && (() => {
+              {onReturnResult && displayStatus === RecordStatus.HANDOVER && !record.resultReturnedDate && (() => {
                 const isArchiveRecord = isArchiveRecordType(record.recordType || '') || record.sourceTable === 'luutru_records';
                 const isAdmin = currentUser?.role === UserRole.ADMIN;
                 const canReturn = isAdmin || (hasPermission ? (
