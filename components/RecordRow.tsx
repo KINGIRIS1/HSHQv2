@@ -378,9 +378,9 @@ const RecordRow: React.FC<RecordRowProps> = ({
             <div className="flex items-center gap-1">
               {(() => {
                 const isArchiveRecord = isArchiveRecordType(record.recordType || '') || record.sourceTable === 'luutru_records';
-                const isAdminOrSub = currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.SUBADMIN;
+                const isAdmin = currentUser?.role === UserRole.ADMIN;
 
-                const canView = isAdminOrSub || (hasPermission ? (
+                const canView = isAdmin || (hasPermission ? (
                   isArchiveRecord ? (hasPermission('luutru_VIEW_DETAILS') || hasPermission('VIEW_DETAILS')) : (hasPermission('dodac_VIEW_DETAILS') || hasPermission('VIEW_DETAILS'))
                 ) : true);
 
@@ -392,8 +392,8 @@ const RecordRow: React.FC<RecordRowProps> = ({
               
               {onReturnResult && (displayStatus === RecordStatus.HANDOVER || displayStatus === RecordStatus.SIGNED) && !record.resultReturnedDate && (() => {
                 const isArchiveRecord = isArchiveRecordType(record.recordType || '') || record.sourceTable === 'luutru_records';
-                const isAdminOrSub = currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.SUBADMIN;
-                const canReturn = isAdminOrSub || (hasPermission ? (
+                const isAdmin = currentUser?.role === UserRole.ADMIN;
+                const canReturn = isAdmin || (hasPermission ? (
                   isArchiveRecord ? (hasPermission('luutru_BTN_RETURN_RESULT') || hasPermission('BTN_RETURN_RESULT') || hasPermission('HANDOVER_RECORDS')) : (hasPermission('dodac_BTN_RETURN_RESULT') || hasPermission('BTN_RETURN_RESULT') || hasPermission('HANDOVER_RECORDS'))
                 ) : false);
 
@@ -405,12 +405,12 @@ const RecordRow: React.FC<RecordRowProps> = ({
                 );
               })()}
 
-              {displayStatus !== RecordStatus.HANDOVER && displayStatus !== RecordStatus.WITHDRAWN && displayStatus !== RecordStatus.REJECTED && !record.resultReturnedDate && currentUser?.role !== 'ONEDOOR' && (() => {
+              {displayStatus !== RecordStatus.HANDOVER && displayStatus !== RecordStatus.WITHDRAWN && displayStatus !== RecordStatus.REJECTED && !record.resultReturnedDate && (() => {
                 const isArchiveRecord = isArchiveRecordType(record.recordType || '') || record.sourceTable === 'luutru_records';
-                const isAdminOrSub = currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.SUBADMIN;
+                const isAdmin = currentUser?.role === UserRole.ADMIN;
                 
-                const canAdvance = isAdminOrSub || (hasPermission ? (
-                  isArchiveRecord ? hasPermission('luutru_BTN_ADVANCE_STATUS') : hasPermission('dodac_BTN_ADVANCE_STATUS')
+                const canAdvance = isAdmin || (hasPermission ? (
+                  isArchiveRecord ? (hasPermission('luutru_BTN_ADVANCE_STATUS') || hasPermission('BTN_ADVANCE_STATUS')) : (hasPermission('dodac_BTN_ADVANCE_STATUS') || hasPermission('BTN_ADVANCE_STATUS'))
                 ) : false);
 
                 if (!canAdvance) return null;
@@ -422,12 +422,12 @@ const RecordRow: React.FC<RecordRowProps> = ({
 
             {/* Hàng dưới: Sửa & Xóa */}
             <div className="flex items-center gap-1">
-              {currentUser?.role !== 'ONEDOOR' && currentUser?.role !== UserRole.ONEDOOR && (() => {
+              {(() => {
                 const isArchiveRecord = isArchiveRecordType(record.recordType || '') || record.sourceTable === 'luutru_records';
-                const isAdminOrSub = currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.SUBADMIN;
+                const isAdmin = currentUser?.role === UserRole.ADMIN;
 
-                const canEdit = isAdminOrSub || (hasPermission ? (
-                  isArchiveRecord ? hasPermission('luutru_EDIT_RECORDS') : hasPermission('dodac_EDIT_RECORDS')
+                const canEdit = isAdmin || (hasPermission ? (
+                  isArchiveRecord ? (hasPermission('luutru_EDIT_RECORDS') || hasPermission('EDIT_RECORDS')) : (hasPermission('dodac_EDIT_RECORDS') || hasPermission('EDIT_RECORDS'))
                 ) : false);
 
                 if (!canEdit) return null;
@@ -436,12 +436,12 @@ const RecordRow: React.FC<RecordRowProps> = ({
                 );
               })()}
 
-              {(currentUser?.role === 'ADMIN' || currentUser?.role === 'SUBADMIN' || currentUser?.role === 'TEAM_LEADER' || currentUser?.role === UserRole.TEAM_LEADER) && (() => {
+              {(() => {
                 const isArchiveRecord = isArchiveRecordType(record.recordType || '') || record.sourceTable === 'luutru_records';
-                const isAdminOrSub = currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.SUBADMIN;
+                const isAdmin = currentUser?.role === UserRole.ADMIN;
 
-                const canDelete = isAdminOrSub || (hasPermission ? (
-                  isArchiveRecord ? hasPermission('luutru_DELETE_RECORDS') : hasPermission('dodac_DELETE_RECORDS')
+                const canDelete = isAdmin || (hasPermission ? (
+                  isArchiveRecord ? (hasPermission('luutru_DELETE_RECORDS') || hasPermission('DELETE_RECORDS')) : (hasPermission('dodac_DELETE_RECORDS') || hasPermission('DELETE_RECORDS'))
                 ) : false);
 
                 if (!canDelete) return null;

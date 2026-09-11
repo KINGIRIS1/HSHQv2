@@ -134,6 +134,10 @@ server.use((req: Request, res: Response, next: NextFunction) => {
 });
 
 // Custom Routes
+server.get('/api/ping', (req: Request, res: Response) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.status(200).json({ status: 'ok', timestamp: Date.now() });
+});
 server.post('/api/backup', (req: Request, res: Response) => {
     try {
         const { backupData, customDirectory } = req.body;

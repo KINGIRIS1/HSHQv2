@@ -800,74 +800,178 @@ export const createRecordsWorkbook = async (
         return `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getFullYear()}`;
     };
 
-    const tableHeader = [
-        "STT", 
-        "Mã hồ sơ", 
-        "Chủ sử dụng", 
-        "Địa chỉ", 
-        "Tờ",
-        "Thửa",
-        "loại hồ sơ", 
-        "ngày nhận", 
-        "ngày trả", 
-        "Ngày giao NV",
-        "NV xử lý",
-        "Ngày Trình Kiểm tra",
-        "Người kiểm tra",
-        "Ngày Trình ký",
-        "Người Ký duyệt",
-        "Hoàn Thành",
-        "Đợt",
-        "Ngày trả kết quả",
-        "trạng thái",
-        "Số BL/HĐ",
-        "Số Tiền"
-    ];
+    const isGiaHanList = titleText.toUpperCase().includes("GIA HẠN") || titleText.toUpperCase().includes("GIA HAN");
 
-    const dataRows = records.map((r, i) => {
-        const contractInfo = getContractInfo(r.code);
-        
-        let rawPrice = '';
-        if ((r as any).calcReturned !== undefined && (r as any).calcReturned !== null) {
-            rawPrice = (r as any).calcReturned.toLocaleString('vi-VN');
-        } else if (r.returnedPrice !== undefined && r.returnedPrice !== null) {
-            rawPrice = r.returnedPrice.toLocaleString('vi-VN');
-        } else if (r.price !== undefined && r.price !== null) {
-            rawPrice = r.price.toLocaleString('vi-VN');
-        } else {
-            rawPrice = contractInfo.amount;
-        }
+    let tableHeader: string[] = [];
+    let colWidths: { wch: number }[] = [];
+    let dataRows: any[][] = [];
 
-        return [
-            i + 1,
-            r.code,
-            r.customerName,
-            getNormalizedWard(r.ward || (r as any).assignedWard || undefined),
-            r.mapSheet || '',
-            r.landPlot || '',
-            getShortRecordType(r.recordType || undefined),
-            formatDate(r.receivedDate),
-            formatDate(r.deadline),
-            formatDate(r.assignedDate),
-            getEmployeeName(r.assignedTo || undefined),
-            formatDate(r.pendingCheckDate),
-            getEmployeeName(r.checkedBy || undefined),
-            formatDate(r.submissionDate),
-            getEmployeeName(r.submittedTo || undefined),
-            formatDate(r.completedDate),
-            r.exportBatch || (r as any).handoverBatch || '',
-            formatDate(r.resultReturnedDate || r.exportDate),
-            STATUS_LABELS[r.status] || r.status,
-            r.receiptNumber || (r as any).contractNumber || '',
-            rawPrice
+    if (isGiaHanList) {
+        tableHeader = [
+            "STT", 
+            "Mã Hồ Sơ", 
+            "Chủ Sử Dụng", 
+            "Xã / Phường", 
+            "Tờ", 
+            "Thửa", 
+            "Loại Hồ Sơ", 
+            "Thời Hạn Cũ", 
+            "Thời Hạn Mới", 
+            "Ghi Chú / Lý Do Gia Hạn",
+            "Giao Nhân Viên",
+            "Hoàn Thành / Đợt",
+            "Trạng Thái"
         ];
-    });
+
+        colWidths = [
+            { wch: 5 },  // STT
+            { wch: 18 }, // Mã Hồ Sơ
+            { wch: 22 }, // Chủ Sử Dụng
+            { wch: 16 }, // Xã / Phường
+            { wch: 7 },  // Tờ
+            { wch: 7 },  // Thửa
+            { wch: 20 }, // Loại Hồ Sơ
+            { wch: 12 }, // Thời Hạn Cũ
+            { wch: 12 }, // Thời Hạn Mới
+            { wch: 35 }, // Ghi Chú / Lý Do Gia Hạn
+            { wch: 18 }, // Giao Nhân Viên
+            { wch: 14 }, // Hoàn Thành / Đợt
+            { wch: 15 }  // Trạng Thái
+        ];
+
+        dataRows = records.map((r, i) => {
+            const pNotes = r.privateNotes || '';
+            const notes = r.notes || '';
+            const oldMatch = pNotes.match(/Hạn cũ:\s*([0-9/.\-]+)/i) || notes.match(/Hạn cũ:\s*([0-9/.\-]+)/i);
+            let oldDeadline = '';
+            if (oldMatch && oldMatch[1]) {
+                oldDeadline = oldMatch[1];
+            } else if (r.deadline) {
+                const d = new Date(r.deadline);
+                if (!isNaN(d.getTime())) {
+                    const prevD = new Date(d);
+                    prevD.setDate(prevD.getDate() - 7);
+                    oldDeadline = `${String(prevD.getDate()).padStart(2, '0')}/${String(prevD.getMonth() + 1).padStart(2, '0')}/${prevD.getFullYear()}`;
+                }
+            }
+
+            const cleanNote = cleanSyncNotes(r.notes || r.content || '');
+
+            return [
+                i + 1,
+                r.code,
+                r.customerName,
+                getNormalizedWard(r.ward || (r as any).assignedWard || undefined),
+                r.mapSheet || '',
+                r.landPlot || '',
+                getShortRecordType(r.recordType || undefined),
+                oldDeadline || formatDate(r.receivedDate),
+                formatDate(r.deadline),
+                cleanNote,
+                getEmployeeName(r.assignedTo || undefined),
+                r.exportBatch || (r as any).handoverBatch || formatDate(r.completedDate),
+                STATUS_LABELS[r.status] || r.status
+            ];
+        });
+    } else {
+        tableHeader = [
+            "STT", 
+            "Mã Hồ Sơ", 
+            "Chủ Sử Dụng", 
+            "Xã / Phường", 
+            "Tờ",
+            "Thửa",
+            "Loại Hồ Sơ", 
+            "Ngày Nhận", 
+            "Hẹn Trả", 
+            "Ghi Chú",
+            "Ngày Giao NV",
+            "NV Xử Lý",
+            "Ngày Trình KT",
+            "Người KT",
+            "Ngày Trình Ký",
+            "Người Ký Duyệt",
+            "Hoàn Thành",
+            "Đợt",
+            "Ngày Trả KQ",
+            "Trạng Thái",
+            "Số BL/HĐ",
+            "Số Tiền"
+        ];
+
+        colWidths = [
+            { wch: 5 },  // STT
+            { wch: 18 }, // Mã Hồ Sơ
+            { wch: 22 }, // Chủ Sử Dụng
+            { wch: 16 }, // Xã / Phường
+            { wch: 7 },  // Tờ
+            { wch: 7 },  // Thửa
+            { wch: 20 }, // Loại Hồ Sơ
+            { wch: 12 }, // Ngày Nhận
+            { wch: 12 }, // Hẹn Trả
+            { wch: 35 }, // Ghi Chú (rộng rãi, tự xuống dòng)
+            { wch: 12 }, // Ngày Giao NV
+            { wch: 18 }, // NV Xử Lý
+            { wch: 12 }, // Ngày Trình KT
+            { wch: 18 }, // Người KT
+            { wch: 12 }, // Ngày Trình Ký
+            { wch: 18 }, // Người Ký Duyệt
+            { wch: 12 }, // Hoàn Thành
+            { wch: 10 }, // Đợt
+            { wch: 12 }, // Ngày Trả KQ
+            { wch: 15 }, // Trạng Thái
+            { wch: 15 }, // Số BL/HĐ
+            { wch: 15 }  // Số Tiền
+        ];
+
+        dataRows = records.map((r, i) => {
+            const contractInfo = getContractInfo(r.code);
+            
+            let rawPrice = '';
+            if ((r as any).calcReturned !== undefined && (r as any).calcReturned !== null) {
+                rawPrice = (r as any).calcReturned.toLocaleString('vi-VN');
+            } else if (r.returnedPrice !== undefined && r.returnedPrice !== null) {
+                rawPrice = r.returnedPrice.toLocaleString('vi-VN');
+            } else if (r.price !== undefined && r.price !== null) {
+                rawPrice = r.price.toLocaleString('vi-VN');
+            } else {
+                rawPrice = contractInfo.amount;
+            }
+
+            const cleanNote = cleanSyncNotes(r.notes || r.content || '');
+
+            return [
+                i + 1,
+                r.code,
+                r.customerName,
+                getNormalizedWard(r.ward || (r as any).assignedWard || undefined),
+                r.mapSheet || '',
+                r.landPlot || '',
+                getShortRecordType(r.recordType || undefined),
+                formatDate(r.receivedDate),
+                formatDate(r.deadline),
+                cleanNote,
+                formatDate(r.assignedDate),
+                getEmployeeName(r.assignedTo || undefined),
+                formatDate(r.pendingCheckDate),
+                getEmployeeName(r.checkedBy || undefined),
+                formatDate(r.submissionDate),
+                getEmployeeName(r.submittedTo || undefined),
+                formatDate(r.completedDate),
+                r.exportBatch || (r as any).handoverBatch || '',
+                formatDate(r.resultReturnedDate || r.exportDate),
+                STATUS_LABELS[r.status] || r.status,
+                r.receiptNumber || (r as any).contractNumber || '',
+                rawPrice
+            ];
+        });
+    }
 
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet([]);
 
     const border = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
-    const titleStyle = { font: { name: "Times New Roman", sz: 14, bold: true }, alignment: { horizontal: "center" } };
+    const titleStyle = { font: { name: "Times New Roman", sz: 14, bold: true }, alignment: { horizontal: "center", vertical: "center" } };
     
     const headerStyle = { 
         font: { name: "Times New Roman", sz: 11, bold: true }, 
@@ -879,10 +983,18 @@ export const createRecordsWorkbook = async (
     const cellStyle = { 
         font: { name: "Times New Roman", sz: 11 }, 
         border, 
-        alignment: { vertical: "center", wrapText: true } 
+        alignment: { horizontal: "left", vertical: "center", wrapText: true } 
     };
-    const centerStyle = { ...cellStyle, alignment: { horizontal: "center", vertical: "center" } };
-    const rightStyle = { ...cellStyle, alignment: { horizontal: "right", vertical: "center" } };
+    const centerStyle = { 
+        font: { name: "Times New Roman", sz: 11 }, 
+        border, 
+        alignment: { horizontal: "center", vertical: "center", wrapText: true } 
+    };
+    const rightStyle = { 
+        font: { name: "Times New Roman", sz: 11 }, 
+        border, 
+        alignment: { horizontal: "right", vertical: "center", wrapText: true } 
+    };
 
     const todayStr = new Date().toLocaleDateString('vi-VN');
 
@@ -907,34 +1019,13 @@ export const createRecordsWorkbook = async (
         { s: { r: 4, c: 0 }, e: { r: 4, c: totalCols } }
     );
 
-    ws['!cols'] = [
-        { wch: 5 },  // STT
-        { wch: 15 }, // Mã HS
-        { wch: 25 }, // Chủ SD
-        { wch: 18 }, // Địa Chỉ (Xã)
-        { wch: 7 },  // Tờ
-        { wch: 7 },  // Thửa
-        { wch: 15 }, // Loại HS
-        { wch: 12 }, // Ngày nhận
-        { wch: 12 }, // Ngày trả
-        { wch: 12 }, // Ngày giao NV
-        { wch: 18 }, // NV xử lý
-        { wch: 12 }, // Ngày Trình Kiểm tra
-        { wch: 18 }, // Người kiểm tra
-        { wch: 12 }, // Ngày Trình ký
-        { wch: 18 }, // Người Ký duyệt
-        { wch: 12 }, // Hoàn Thành
-        { wch: 10 }, // Đợt
-        { wch: 12 }, // Ngày trả kết quả
-        { wch: 15 }, // Trạng thái
-        { wch: 15 }, // Số BL/HĐ
-        { wch: 15 }  // Số Tiền
-    ];
+    // Apply strict column widths
+    ws['!cols'] = colWidths;
 
     if(ws['A1']) ws['A1'].s = titleStyle;
-    if(ws['A2']) ws['A2'].s = { font: { name: "Times New Roman", sz: 12, bold: true, underline: true }, alignment: { horizontal: "center" } };
-    if(ws['A4']) ws['A4'].s = { font: { name: "Times New Roman", sz: 14, bold: true, color: { rgb: "0000FF" } }, alignment: { horizontal: "center" } };
-    if(ws['A5']) ws['A5'].s = { font: { name: "Times New Roman", sz: 12, italic: true }, alignment: { horizontal: "center" } };
+    if(ws['A2']) ws['A2'].s = { font: { name: "Times New Roman", sz: 12, bold: true, underline: true }, alignment: { horizontal: "center", vertical: "center" } };
+    if(ws['A4']) ws['A4'].s = { font: { name: "Times New Roman", sz: 14, bold: true, color: { rgb: "0000FF" } }, alignment: { horizontal: "center", vertical: "center" } };
+    if(ws['A5']) ws['A5'].s = { font: { name: "Times New Roman", sz: 12, italic: true }, alignment: { horizontal: "center", vertical: "center" } };
 
     const headerRowIdx = 6;
     const dataStartIdx = 7;
@@ -948,33 +1039,69 @@ export const createRecordsWorkbook = async (
             const cellRef = XLSX.utils.encode_cell({ r, c });
             if (!ws[cellRef]) ws[cellRef] = { v: "", t: "s" };
             
-            if ([0, 3, 4, 5, 7, 8, 9, 11, 13, 15, 16, 17, 18].includes(c)) ws[cellRef].s = centerStyle;
-            else if (c === 20) ws[cellRef].s = rightStyle;
-            else ws[cellRef].s = cellStyle;
+            if (isGiaHanList) {
+                // Gia hạn: STT(0), Tờ(4), Thửa(5), Hạn cũ(7), Hạn mới(8), Hoàn thành(11), Trạng thái(12)
+                if ([0, 4, 5, 7, 8, 11, 12].includes(c)) ws[cellRef].s = centerStyle;
+                else ws[cellRef].s = cellStyle;
+            } else {
+                // Tra cứu / Chuyên môn
+                if ([0, 4, 5, 7, 8, 10, 12, 14, 16, 17, 18, 19].includes(c)) ws[cellRef].s = centerStyle;
+                else if (c === 21) ws[cellRef].s = rightStyle;
+                else ws[cellRef].s = cellStyle;
+            }
         }
     }
 
     const footerStart = dataStartIdx + dataRows.length + 2;
+    const splitCol = Math.floor(totalCols / 2);
+
     XLSX.utils.sheet_add_aoa(ws, [
         ["NGƯỜI LẬP BIỂU", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "THỦ TRƯỞNG ĐƠN VỊ", "", "", "", ""],
         ["(Ký, họ tên)", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "(Ký, họ tên, đóng dấu)", "", "", "", ""]
     ], { origin: { r: footerStart, c: 0 } });
 
     ws['!merges'].push(
-        { s: { r: footerStart, c: 0 }, e: { r: footerStart, c: 3 } },
-        { s: { r: footerStart + 1, c: 0 }, e: { r: footerStart + 1, c: 3 } },
-        { s: { r: footerStart, c: 15 }, e: { r: footerStart, c: 20 } },
-        { s: { r: footerStart + 1, c: 15 }, e: { r: footerStart + 1, c: 20 } }
+        { s: { r: footerStart, c: 0 }, e: { r: footerStart, c: Math.min(3, splitCol) } },
+        { s: { r: footerStart + 1, c: 0 }, e: { r: footerStart + 1, c: Math.min(3, splitCol) } },
+        { s: { r: footerStart, c: Math.max(splitCol + 1, totalCols - 4) }, e: { r: footerStart, c: totalCols } },
+        { s: { r: footerStart + 1, c: Math.max(splitCol + 1, totalCols - 4) }, e: { r: footerStart + 1, c: totalCols } }
     );
 
-    const footerTitleStyle = { font: { name: "Times New Roman", sz: 12, bold: true }, alignment: { horizontal: "center" } };
-    const leftTitle = XLSX.utils.encode_cell({r: footerStart, c: 0});
-    const rightTitle = XLSX.utils.encode_cell({r: footerStart, c: 15});
-    if(ws[leftTitle]) ws[leftTitle].s = footerTitleStyle;
-    if(ws[rightTitle]) ws[rightTitle].s = footerTitleStyle;
+    const footerTitleStyle = { font: { name: "Times New Roman", sz: 12, bold: true }, alignment: { horizontal: "center", vertical: "center" } };
+    const footerNoteStyle = { font: { name: "Times New Roman", sz: 11, italic: true }, alignment: { horizontal: "center", vertical: "center" } };
 
-    autoFitColumns(ws, 8, 55);
-    XLSX.utils.book_append_sheet(wb, ws, "DanhSach");
+    const leftTitle = XLSX.utils.encode_cell({r: footerStart, c: 0});
+    const leftNote = XLSX.utils.encode_cell({r: footerStart + 1, c: 0});
+    const rightTitle = XLSX.utils.encode_cell({r: footerStart, c: Math.max(splitCol + 1, totalCols - 4)});
+    const rightNote = XLSX.utils.encode_cell({r: footerStart + 1, c: Math.max(splitCol + 1, totalCols - 4)});
+
+    if(ws[leftTitle]) ws[leftTitle].s = footerTitleStyle;
+    if(ws[leftNote]) ws[leftNote].s = footerNoteStyle;
+    if(ws[rightTitle]) ws[rightTitle].s = footerTitleStyle;
+    if(ws[rightNote]) ws[rightNote].s = footerNoteStyle;
+
+    // Row heights configuration: 30px for title/headers/signatures, 25px for data rows
+    const rowsMeta: any[] = [];
+    rowsMeta[0] = { hpt: 28, hpx: 30 }; // Quốc hiệu
+    rowsMeta[1] = { hpt: 24, hpx: 26 }; // Tiêu ngữ
+    rowsMeta[2] = { hpt: 10, hpx: 12 }; // Khoảng cách
+    rowsMeta[3] = { hpt: 30, hpx: 32 }; // Tiêu đề chính
+    rowsMeta[4] = { hpt: 24, hpx: 26 }; // Ngày xuất
+    rowsMeta[5] = { hpt: 10, hpx: 12 }; // Khoảng cách
+    rowsMeta[6] = { hpt: 28, hpx: 30 }; // Header bảng
+
+    for (let r = dataStartIdx; r < dataStartIdx + dataRows.length; r++) {
+        rowsMeta[r] = { hpt: 22, hpx: 25 }; // Dữ liệu hồ sơ
+    }
+
+    rowsMeta[footerStart - 2] = { hpt: 12, hpx: 15 };
+    rowsMeta[footerStart - 1] = { hpt: 12, hpx: 15 };
+    rowsMeta[footerStart] = { hpt: 28, hpx: 30 }; // Chữ ký tiêu đề
+    rowsMeta[footerStart + 1] = { hpt: 22, hpx: 25 }; // Chữ ký ghi chú
+
+    ws['!rows'] = rowsMeta;
+
+    XLSX.utils.book_append_sheet(wb, ws, isGiaHanList ? "HoSoGiaHan" : "DanhSach");
     return wb;
 };
 

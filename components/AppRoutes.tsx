@@ -314,7 +314,6 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
   // canPerformAction reflects whether the user has at least one active action permission
   const canPerformAction =
     isAdmin ||
-    isSubadmin ||
     hasPermission('VIEW_DETAILS') ||
     hasPermission('dodac_VIEW_DETAILS') ||
     hasPermission('luutru_VIEW_DETAILS') ||
@@ -1270,10 +1269,13 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                           props.handleMarkAsRejected();
                         }
                       }}
-                      className="flex items-center gap-1.5 bg-rose-600 text-white px-3.5 py-1.5 rounded-lg hover:bg-rose-700 text-sm font-bold shadow-sm transition-all cursor-pointer whitespace-nowrap"
-                      title="Trả hồ sơ"
+                      className="p-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700 shadow-sm transition-all cursor-pointer relative"
+                      title={`Trả hồ sơ (${props.selectedRecordIds.size} hồ sơ đã chọn)`}
                     >
-                      <Undo2 size={16} /> Trả hồ sơ ({props.selectedRecordIds.size})
+                      <Undo2 size={16} />
+                      <span className="absolute -top-1.5 -right-1.5 bg-rose-900 text-white text-[10px] font-bold px-1.5 py-0.2 rounded-full border border-white">
+                        {props.selectedRecordIds.size}
+                      </span>
                     </button>
                   )}
 
@@ -1281,10 +1283,13 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                   {isAdmin && (
                     <button
                       onClick={() => props.setIsBulkUpdateModalOpen(true)}
-                      className="flex items-center gap-1.5 bg-orange-600 text-white px-3.5 py-1.5 rounded-lg hover:bg-orange-700 shadow-sm text-sm font-bold animate-pulse cursor-pointer whitespace-nowrap"
-                      title="Xử lý All"
+                      className="p-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 shadow-sm transition-all cursor-pointer relative"
+                      title={`Xử lý All (${props.selectedRecordIds.size} hồ sơ đã chọn)`}
                     >
-                      <Layers size={16} /> Xử lý All ({props.selectedRecordIds.size})
+                      <Layers size={16} />
+                      <span className="absolute -top-1.5 -right-1.5 bg-orange-900 text-white text-[10px] font-bold px-1.5 py-0.2 rounded-full border border-white">
+                        {props.selectedRecordIds.size}
+                      </span>
                     </button>
                   )}
                 </>

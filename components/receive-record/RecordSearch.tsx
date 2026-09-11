@@ -494,11 +494,19 @@ export const RecordSearch: React.FC<RecordSearchProps> = ({
             return;
         }
 
-        const titleText = selectedIds.size > 0 
-            ? `DANH SÁCH ${recordsToExport.length} HỒ SƠ ĐƯỢC CHỌN`
-            : `DANH SÁCH TRA CỨU HỒ SƠ (${sortedRecords.length} BẢN GHI)`;
+        const titleText = isExtendView
+            ? (selectedIds.size > 0 
+                ? `DANH SÁCH ${recordsToExport.length} HỒ SƠ GIA HẠN ĐƯỢC CHỌN`
+                : `DANH SÁCH HỒ SƠ GIA HẠN (${sortedRecords.length} BẢN GHI)`)
+            : (selectedIds.size > 0 
+                ? `DANH SÁCH ${recordsToExport.length} HỒ SƠ ĐƯỢC CHỌN`
+                : `DANH SÁCH TRA CỨU HỒ SƠ (${sortedRecords.length} BẢN GHI)`);
 
-        await exportCustomRecordsToExcel(recordsToExport, employees, titleText);
+        const fileName = isExtendView
+            ? `Danh_Sach_Ho_So_Gia_Han_${new Date().getTime()}.xlsx`
+            : `Danh_Sach_Tra_Cuu_${new Date().getTime()}.xlsx`;
+
+        await exportCustomRecordsToExcel(recordsToExport, employees, titleText, fileName);
     };
 
     // Confirm Extend Deadline callback

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { User, UserRole } from '../../types';
+import { NetworkPingIndicator } from '../NetworkPingIndicator';
 import { 
   LayoutDashboard, 
   FileText, 
@@ -74,7 +75,9 @@ const MobileLayout: React.FC<MobileLayoutProps> = ({
             </div>
             <h1 className="font-bold text-base sm:text-lg tracking-tight truncate">QLHS Mobile</h1>
           </div>
-          <div className="flex items-center gap-1.5 sm:gap-3">
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <NetworkPingIndicator />
+
             <button className="relative min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-white/10 rounded-full transition-colors cursor-pointer">
               <Bell size={20} />
               {activeRemindersCount > 0 && (

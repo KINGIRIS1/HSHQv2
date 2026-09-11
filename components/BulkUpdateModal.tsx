@@ -286,7 +286,7 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
             <div>
                 <h3 className="font-bold text-gray-800 text-base flex items-center gap-2">
                     <Layers size={18} className="text-orange-600" />
-                    Thao tác xử lý All (Cập nhật hàng loạt)
+                    Xử lý All
                 </h3>
                 <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1.5">
                     Số lượng hồ sơ: <strong className="font-bold text-orange-600">{activeRecordsToUpdate.length}</strong> hồ sơ
@@ -320,11 +320,8 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
                                 setStatusEmployee('');
                             }}
                         >
-                            <option value="status">Trạng thái hồ sơ (Quy trình)</option>
-                            <option value="historyStatus">Trạng thái hồ sơ (Cập nhật lịch sử)</option>
-                            <option value="assignedTo">Người xử lý (Giao việc)</option>
-                            <option value="assignedDate">Ngày đo đạc / Ngày giao việc</option>
-                            <option value="officeAssignedDate">Ngày Biên tập bản đồ</option>
+                            <option value="status">Trang thái Quy trình</option>
+                            <option value="historyStatus">Cập nhập Trang thái lịch sử</option>
                             <option value="exportDate">Ngày xuất (Bàn giao)</option>
                             <option value="exportBatch">Đợt xuất (Bàn giao)</option>
                             <option value="deadline">Ngày hẹn trả (Gia hạn)</option>

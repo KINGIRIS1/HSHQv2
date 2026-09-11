@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { User, Employee } from '../types';
 import { Save, Lock, User as UserIcon, Briefcase, CheckCircle, AlertCircle, Loader2, ShieldCheck, Bell } from 'lucide-react';
+import { DEPARTMENTS, POSITIONS } from '../constants';
 
 interface AccountSettingsViewProps {
   currentUser: User;
@@ -228,29 +229,41 @@ const AccountSettingsView: React.FC<AccountSettingsViewProps> = ({
                                         <div>
                                             <label className="block text-sm font-medium text-gray-600 mb-2">Phòng ban</label>
                                             <div className="relative">
-                                                <input 
-                                                    type="text" 
+                                                <select 
                                                     value={department}
                                                     disabled={isLoading}
                                                     onChange={(e) => setDepartment(e.target.value)}
-                                                    className="w-full border border-gray-200 rounded-xl px-4 py-3 pl-11 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all disabled:bg-gray-50 font-medium text-slate-700"
-                                                    placeholder="Nhập phòng ban..."
-                                                />
-                                                <Briefcase size={18} className="absolute left-4 top-3.5 text-gray-400" />
+                                                    className="w-full border border-gray-200 rounded-xl px-4 py-3 pl-11 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all disabled:bg-gray-50 font-medium text-slate-700 bg-white cursor-pointer"
+                                                >
+                                                    <option value="">-- Chọn phòng ban --</option>
+                                                    {DEPARTMENTS.map(d => (
+                                                        <option key={d} value={d}>{d}</option>
+                                                    ))}
+                                                    {department && !DEPARTMENTS.includes(department as any) && (
+                                                        <option value={department}>{department}</option>
+                                                    )}
+                                                </select>
+                                                <Briefcase size={18} className="absolute left-4 top-3.5 text-gray-400 pointer-events-none" />
                                             </div>
                                         </div>
                                         <div>
                                             <label className="block text-sm font-medium text-gray-600 mb-2">Chức vụ</label>
                                             <div className="relative">
-                                                <input 
-                                                    type="text" 
+                                                <select 
                                                     value={position}
                                                     disabled={isLoading}
                                                     onChange={(e) => setPosition(e.target.value)}
-                                                    className="w-full border border-gray-200 rounded-xl px-4 py-3 pl-11 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all disabled:bg-gray-50 font-medium text-slate-700"
-                                                    placeholder="Nhập chức vụ..."
-                                                />
-                                                <UserIcon size={18} className="absolute left-4 top-3.5 text-gray-400" />
+                                                    className="w-full border border-gray-200 rounded-xl px-4 py-3 pl-11 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all disabled:bg-gray-50 font-medium text-slate-700 bg-white cursor-pointer"
+                                                >
+                                                    <option value="">-- Chọn chức vụ --</option>
+                                                    {POSITIONS.map(p => (
+                                                        <option key={p} value={p}>{p}</option>
+                                                    ))}
+                                                    {position && !POSITIONS.includes(position as any) && (
+                                                        <option value={position}>{position}</option>
+                                                    )}
+                                                </select>
+                                                <UserIcon size={18} className="absolute left-4 top-3.5 text-gray-400 pointer-events-none" />
                                             </div>
                                         </div>
                                     </div>

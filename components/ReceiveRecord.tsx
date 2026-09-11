@@ -368,7 +368,7 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, onDelet
             )}
             {canList && (
               <button onClick={() => setViewMode('list')} className={`flex items-center gap-2 px-3.5 py-1.5 rounded-md text-sm font-semibold transition-all whitespace-nowrap cursor-pointer ${viewMode === 'list' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}>
-                  <LayoutList size={16} /> Danh sách hôm nay
+                  <LayoutList size={16} /> Danh sách tiếp nhận
               </button>
             )}
             <button 
@@ -417,6 +417,9 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, onDelet
                 wards={wards}
                 currentUser={currentUser}
                 employees={employees}
+                users={users}
+                rolePermissions={rolePermissions}
+                departmentPermissions={departmentPermissions}
                 onPreviewExcel={handlePreviewExcel}
                 onEdit={handleEditFromList}
                 onDelete={handleDeleteFromList}

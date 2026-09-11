@@ -102,8 +102,8 @@ export function isViewAllowedForUser(
     return matchDepartmentKey('lưu trữ', emp.department) && !matchDepartmentKey('đo đạc', emp.department);
   };
 
-  // Admin và Subadmin luôn có toàn quyền truy cập tất cả các view/tab, không bị giới hạn bởi Tổ chuyên môn
-  if (user.role === UserRole.ADMIN || user.role === UserRole.SUBADMIN) return true;
+  // Admin luôn có toàn quyền truy cập tất cả các view/tab, không bị giới hạn bởi Tổ chuyên môn
+  if (user.role === UserRole.ADMIN) return true;
 
   // Views that are always accessible to any logged in user
   if (['dashboard', 'personal_profile', 'account_settings'].includes(viewId)) {

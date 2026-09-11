@@ -22,13 +22,11 @@ export function checkUserPermission(
 ): boolean {
     if (!currentUser) return false;
 
-    // Admin and Subadmin have unrestricted full access
+    // Admin has unrestricted full access
     const roleStr = String(currentUser.role || '');
     if (
         currentUser.role === UserRole.ADMIN ||
-        currentUser.role === UserRole.SUBADMIN ||
-        roleStr === 'ADMIN' ||
-        roleStr === 'SUBADMIN'
+        roleStr === 'ADMIN'
     ) {
         return true;
     }
@@ -36,13 +34,13 @@ export function checkUserPermission(
     // Fallback to localStorage if not passed
     if (!departmentPermissions && typeof window !== 'undefined') {
         try {
-            const stored = localStorage.getItem('department_permissions');
+            const stored = localStorage.getItem('sys_setting_department_permissions') || localStorage.getItem('department_permissions');
             if (stored) departmentPermissions = JSON.parse(stored);
         } catch (_) {}
     }
     if (!rolePermissions && typeof window !== 'undefined') {
         try {
-            const stored = localStorage.getItem('role_permissions');
+            const stored = localStorage.getItem('sys_setting_role_permissions') || localStorage.getItem('role_permissions');
             if (stored) rolePermissions = JSON.parse(stored);
         } catch (_) {}
     }
@@ -211,9 +209,7 @@ export function hasRecordActionPermission(
     const roleStr = String(currentUser.role || '');
     if (
         currentUser.role === UserRole.ADMIN ||
-        currentUser.role === UserRole.SUBADMIN ||
-        roleStr === 'ADMIN' ||
-        roleStr === 'SUBADMIN'
+        roleStr === 'ADMIN'
     ) {
         return true;
     }
@@ -277,10 +273,6 @@ export function hasRecordActionPermission(
                 departmentPermissions
             );
         case 'delete':
-            // Xóa requires Team Leader or above AND specific delete permission
-            if (currentUser.role !== UserRole.TEAM_LEADER && roleStr !== 'TEAM_LEADER') {
-                return false;
-            }
             return checkUserPermission(
                 isArchive ? 'luutru_DELETE_RECORDS' : 'dodac_DELETE_RECORDS',
                 currentUser,

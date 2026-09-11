@@ -124,6 +124,10 @@ export const useAppData = (currentUser: User | null) => {
                         if (!parsed[roleKey]) {
                             parsed[roleKey] = DEFAULT_ROLE_PERMISSIONS[roleKey as UserRole] || [];
                         }
+                        // Nếu SUBADMIN có dấu '*', mở rộng thành danh sách quyền rõ ràng để tuân thủ phân quyền
+                        if (roleKey === UserRole.SUBADMIN && Array.isArray(parsed[roleKey]) && parsed[roleKey].includes('*')) {
+                            parsed[roleKey] = DEFAULT_ROLE_PERMISSIONS[UserRole.SUBADMIN] || [];
+                        }
                     });
                     setRolePermissions(parsed);
                 } catch (e) {

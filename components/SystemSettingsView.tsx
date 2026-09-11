@@ -517,6 +517,10 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                   if (!parsed[roleKey]) {
                       parsed[roleKey] = DEFAULT_ROLE_PERMISSIONS[roleKey as UserRole] || [];
                   }
+                  // Nếu SUBADMIN có dấu '*', mở rộng thành danh sách quyền rõ ràng
+                  if (roleKey === UserRole.SUBADMIN && Array.isArray(parsed[roleKey]) && parsed[roleKey].includes('*')) {
+                      parsed[roleKey] = DEFAULT_ROLE_PERMISSIONS[UserRole.SUBADMIN] || [];
+                  }
               });
               setRolePermissions(parsed);
           } catch (e) {
@@ -530,6 +534,12 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
       if (savedDeptPerms) {
           try {
               const parsedDept = JSON.parse(savedDeptPerms);
+              // Lọc bỏ dấu '*' trong department permissions để tuân thủ phân quyền
+              Object.keys(parsedDept).forEach(k => {
+                  if (Array.isArray(parsedDept[k]) && parsedDept[k].includes('*')) {
+                      parsedDept[k] = parsedDept[k].filter((p: string) => p !== '*');
+                  }
+              });
               setDepartmentPermissions(parsedDept);
           } catch (e) {
               console.error("Failed to parse department_permissions", e);
@@ -539,8 +549,21 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
 
   const handleSavePermissions = async () => {
       setIsSavingPermissions(true);
-      const successRole = await saveSystemSetting('role_permissions', JSON.stringify(rolePermissions));
-      const successDept = await saveSystemSetting('department_permissions', JSON.stringify(departmentPermissions));
+      const rolePermsStr = JSON.stringify(rolePermissions);
+      const deptPermsStr = JSON.stringify(departmentPermissions);
+
+      // Lưu đồng thời vào localStorage để áp dụng ngay lập tức
+      if (typeof window !== 'undefined') {
+          try {
+              localStorage.setItem('sys_setting_role_permissions', rolePermsStr);
+              localStorage.setItem('sys_setting_department_permissions', deptPermsStr);
+              localStorage.setItem('role_permissions', rolePermsStr);
+              localStorage.setItem('department_permissions', deptPermsStr);
+          } catch (_) {}
+      }
+
+      const successRole = await saveSystemSetting('role_permissions', rolePermsStr);
+      const successDept = await saveSystemSetting('department_permissions', deptPermsStr);
       setIsSavingPermissions(false);
       if (successRole && successDept) {
           if (onHolidaysChanged) onHolidaysChanged();
@@ -558,6 +581,12 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
       }
   };
 
+  const expandWildcardIfNeeded = (perms: string[]): string[] => {
+      if (!perms.includes('*')) return perms;
+      const allPermIds = PERMISSION_GROUPS.flatMap(g => g.items.map(i => i.id));
+      return Array.from(new Set([...perms.filter(p => p !== '*'), ...allPermIds]));
+  };
+
   const getRelatedKeysToRemove = (id: string): string[] => {
       const toRemove = [id];
       if (id.startsWith('dodac_') || id.startsWith('luutru_')) {
@@ -568,8 +597,29 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
           if (raw === 'BTN_SUBMIT_SIGN') toRemove.push('SIGN_RECORDS');
           if (raw === 'BTN_REJECT_RECORD') toRemove.push('REJECT_RECORDS');
           if (raw === 'BTN_RETURN_RESULT') toRemove.push('RETURN_RECORDS');
+      } else {
+          toRemove.push(`dodac_${id}`, `luutru_${id}`);
+          if (id === 'ASSIGN_RECORDS' || id === 'BTN_ASSIGN_STAFF') toRemove.push('dodac_BTN_ASSIGN_STAFF', 'luutru_BTN_ASSIGN_STAFF');
+          if (id === 'CHECK_RECORDS' || id === 'BTN_SUBMIT_CHECK') toRemove.push('dodac_BTN_SUBMIT_CHECK', 'luutru_BTN_SUBMIT_CHECK');
+          if (id === 'SIGN_RECORDS' || id === 'BTN_SUBMIT_SIGN') toRemove.push('dodac_BTN_SUBMIT_SIGN', 'luutru_BTN_SUBMIT_SIGN');
+          if (id === 'REJECT_RECORDS' || id === 'BTN_REJECT_RECORD') toRemove.push('dodac_BTN_REJECT_RECORD', 'luutru_BTN_REJECT_RECORD');
+          if (id === 'RETURN_RECORDS' || id === 'BTN_RETURN_RESULT') toRemove.push('dodac_BTN_RETURN_RESULT', 'luutru_BTN_RETURN_RESULT');
       }
       return toRemove;
+  };
+
+  const getRelatedKeysToAdd = (id: string): string[] => {
+      const toAdd = [id];
+      if (id.startsWith('dodac_') || id.startsWith('luutru_')) {
+          const raw = id.replace(/^(dodac_|luutru_)/, '');
+          toAdd.push(raw);
+          if (raw === 'BTN_ASSIGN_STAFF') toAdd.push('ASSIGN_RECORDS');
+          if (raw === 'BTN_SUBMIT_CHECK') toAdd.push('CHECK_RECORDS');
+          if (raw === 'BTN_SUBMIT_SIGN') toAdd.push('SIGN_RECORDS');
+          if (raw === 'BTN_REJECT_RECORD') toAdd.push('REJECT_RECORDS');
+          if (raw === 'BTN_RETURN_RESULT') toAdd.push('RETURN_RECORDS');
+      }
+      return toAdd;
   };
 
   const getDefaultDeptPerms = (deptName: string, role: string): string[] => {
@@ -613,14 +663,14 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
           const compositeKey = `${selectedDepartmentScope}_${selectedRole}`;
           if (departmentPermissions && departmentPermissions[compositeKey]) {
               const deptPerms = departmentPermissions[compositeKey];
-              return deptPerms.includes('*') || deptPerms.includes(permissionId);
+              return deptPerms.includes(permissionId);
           }
           const defaultPerms = getDefaultDeptPerms(selectedDepartmentScope, selectedRole as string);
-          return defaultPerms.includes('*') || defaultPerms.includes(permissionId);
+          return defaultPerms.includes(permissionId);
       }
 
       const perms = rolePermissions[selectedRole as string] || DEFAULT_ROLE_PERMISSIONS[selectedRole as UserRole] || [];
-      return perms.includes('*') || perms.includes(permissionId);
+      return perms.includes(permissionId);
   };
 
   const toggleDeptRolePerm = (permissionId: string) => {
@@ -629,24 +679,28 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
       if (selectedDepartmentScope !== 'all') {
           const compositeKey = `${selectedDepartmentScope}_${selectedRole}`;
           setDepartmentPermissions(prev => {
-              const current = prev[compositeKey] || getDefaultDeptPerms(selectedDepartmentScope, selectedRole as string);
+              const base = prev[compositeKey] || getDefaultDeptPerms(selectedDepartmentScope, selectedRole as string);
+              const current = expandWildcardIfNeeded(base);
               const isRemoving = current.includes(permissionId);
               const keysToRemove = getRelatedKeysToRemove(permissionId);
+              const keysToAdd = getRelatedKeysToAdd(permissionId);
               const updated = isRemoving
-                  ? current.filter(p => !keysToRemove.includes(p))
-                  : [...current, permissionId];
+                  ? current.filter(p => !keysToRemove.includes(p) && p !== '*')
+                  : Array.from(new Set([...current, ...keysToAdd]));
               return { ...prev, [compositeKey]: updated };
           });
           return;
       }
 
       setRolePermissions(prev => {
-          const current = prev[selectedRole as string] || DEFAULT_ROLE_PERMISSIONS[selectedRole as UserRole] || [];
+          const base = prev[selectedRole as string] || DEFAULT_ROLE_PERMISSIONS[selectedRole as UserRole] || [];
+          const current = expandWildcardIfNeeded(base);
           const isRemoving = current.includes(permissionId);
           const keysToRemove = getRelatedKeysToRemove(permissionId);
+          const keysToAdd = getRelatedKeysToAdd(permissionId);
           const updated = isRemoving
-              ? current.filter(p => !keysToRemove.includes(p))
-              : [...current, permissionId];
+              ? current.filter(p => !keysToRemove.includes(p) && p !== '*')
+              : Array.from(new Set([...current, ...keysToAdd]));
           return { ...prev, [selectedRole as string]: updated };
       });
   };
@@ -657,22 +711,26 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
       if (selectedDepartmentScope !== 'all') {
           const compositeKey = `${selectedDepartmentScope}_${selectedRole}`;
           setDepartmentPermissions(prev => {
-              const current = prev[compositeKey] || getDefaultDeptPerms(selectedDepartmentScope, selectedRole as string);
+              const base = prev[compositeKey] || getDefaultDeptPerms(selectedDepartmentScope, selectedRole as string);
+              const current = expandWildcardIfNeeded(base);
               const allKeysToRemove = itemIds.flatMap(getRelatedKeysToRemove);
+              const allKeysToAdd = itemIds.flatMap(getRelatedKeysToAdd);
               const updated = selectAll
-                  ? Array.from(new Set([...current, ...itemIds]))
-                  : current.filter(p => !allKeysToRemove.includes(p));
+                  ? Array.from(new Set([...current, ...allKeysToAdd]))
+                  : current.filter(p => !allKeysToRemove.includes(p) && p !== '*');
               return { ...prev, [compositeKey]: updated };
           });
           return;
       }
 
       setRolePermissions(prev => {
-          const current = prev[selectedRole as string] || DEFAULT_ROLE_PERMISSIONS[selectedRole as UserRole] || [];
+          const base = prev[selectedRole as string] || DEFAULT_ROLE_PERMISSIONS[selectedRole as UserRole] || [];
+          const current = expandWildcardIfNeeded(base);
           const allKeysToRemove = itemIds.flatMap(getRelatedKeysToRemove);
+          const allKeysToAdd = itemIds.flatMap(getRelatedKeysToAdd);
           const updated = selectAll
-              ? Array.from(new Set([...current, ...itemIds]))
-              : current.filter(p => !allKeysToRemove.includes(p));
+              ? Array.from(new Set([...current, ...allKeysToAdd]))
+              : current.filter(p => !allKeysToRemove.includes(p) && p !== '*');
           return { ...prev, [selectedRole as string]: updated };
       });
   };
@@ -1314,22 +1372,14 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                                             <div className="flex items-center gap-2">
                                                 <button
                                                     type="button"
-                                                    onClick={() => {
-                                                        group.items.forEach(item => {
-                                                            if (!isPermChecked(item.id)) toggleDeptRolePerm(item.id);
-                                                        });
-                                                    }}
+                                                    onClick={() => toggleCategoryAll(filteredItems.map(item => item.id), true)}
                                                     className="text-[11px] font-bold text-purple-700 hover:text-purple-900 bg-purple-50 hover:bg-purple-100 px-2.5 py-1 rounded-lg border border-purple-200 transition-all"
                                                 >
                                                     Chọn tất cả
                                                 </button>
                                                 <button
                                                     type="button"
-                                                    onClick={() => {
-                                                        group.items.forEach(item => {
-                                                            if (isPermChecked(item.id)) toggleDeptRolePerm(item.id);
-                                                        });
-                                                    }}
+                                                    onClick={() => toggleCategoryAll(filteredItems.map(item => item.id), false)}
                                                     className="text-[11px] font-bold text-slate-600 hover:text-slate-800 bg-white hover:bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200 transition-all"
                                                 >
                                                     Bỏ chọn

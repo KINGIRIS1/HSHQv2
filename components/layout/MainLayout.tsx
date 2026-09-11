@@ -6,6 +6,7 @@ import { User, UserRole, RolePermissions, DepartmentPermissions, Employee } from
 import { isViewAllowedForUser } from '../../config/roleConfig';
 import UpdateRequiredModal from '../UpdateRequiredModal';
 import AdminBackupWarningBanner from '../AdminBackupWarningBanner';
+import { NetworkPingIndicator } from '../NetworkPingIndicator';
 
 interface MainLayoutProps {
     children: React.ReactNode;
@@ -108,8 +109,10 @@ const MainLayout: React.FC<MainLayoutProps> = ({
                     </div>
                 </div>
 
-                {/* RIGHT: USER INFO */}
-                <div className="relative flex items-center gap-3">
+                {/* RIGHT: USER INFO & NETWORK PING */}
+                <div className="relative flex items-center gap-2 sm:gap-3">
+                    <NetworkPingIndicator />
+
                     <button 
                         onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
                         className="flex items-center gap-3 group cursor-pointer hover:bg-white/10 p-1.5 rounded-lg transition-colors outline-none focus:ring-2 focus:ring-blue-400/50"
