@@ -18,7 +18,8 @@ class ConnectionManager {
     private failureReason: string | undefined = undefined;
     private reconnectCountdown: number = 5;
     private consecutiveFailures: number = 0;
-    private readonly MAX_CONSECUTIVE_FAILURES_BEFORE_OFFLINE = 3; // Chỉ chuyển Offline khi thất bại 3 lần liên tiếp
+    // Tăng ngưỡng thất bại liên tiếp lên 5 lần để tránh false alarm khi mạng chỉ lag nhẹ 1-2s
+    private readonly MAX_CONSECUTIVE_FAILURES_BEFORE_OFFLINE = 5;
     private listeners: Set<ConnectionListener> = new Set();
     private heartbeatTimer: any = null;
     private countdownTimer: any = null;
@@ -29,13 +30,13 @@ class ConnectionManager {
             window.addEventListener('online', this.handleBrowserOnline);
             window.addEventListener('offline', this.handleBrowserOffline);
             
-            // Khởi động nhịp tim định kỳ (45s khi bình thường để giảm tải)
-            this.startHeartbeat(45000);
+            // Nhịp tim kiểm tra định kỳ 60s khi bình thường
+            this.startHeartbeat(60000);
 
-            // Kiểm tra kết nối ban đầu sau khi app nạp xong
+            // Kiểm tra kết nối ban đầu sau khi app nạp xong 3s
             setTimeout(() => {
                 this.ping();
-            }, 2500);
+            }, 3000);
         }
     }
 
@@ -85,7 +86,7 @@ class ConnectionManager {
     };
 
     public reportNetworkError(context: string, error?: any) {
-        // Tránh gián đoạn: Nếu trình duyệt vẫn online thì không ép Offline ngay, chỉ ghi nhận để ping ngầm
+        // Nếu trình duyệt vẫn online thì không ép Offline ngay, chỉ ghi nhận để ping ngầm kiểm chứng
         if (typeof navigator !== 'undefined' && !navigator.onLine) {
             this.handleBrowserOffline();
             return;
@@ -107,6 +108,12 @@ class ConnectionManager {
         }
     }
 
+    /**
+     * Cơ chế ping đa tầng thông minh (Multi-Tier Resilient Ping):
+     * 1. Kiểm tra trạng thái mạng của trình duyệt (navigator.onLine)
+     * 2. Ping nhẹ tới chính domain web app để xác nhận Internet vẫn hoạt động
+     * 3. Ping tới Supabase với timeout an toàn 25 giây
+     */
     public async ping(): Promise<boolean> {
         if (this.checkInProgress) {
             return this.checkInProgress;
@@ -118,31 +125,46 @@ class ConnectionManager {
         this.checkInProgress = (async () => {
             let success = false;
             try {
+                // Tầng 1: Kiểm tra phần cứng mạng
                 if (typeof navigator !== 'undefined' && !navigator.onLine) {
                     throw new Error("Trình duyệt đang ở chế độ Offline");
                 }
 
-                // Thực hiện ping nhẹ tới Supabase với timeout 12 giây
+                // Tầng 2 & 3: Ping kiểm chứng máy chủ với timeout 25s (chống timeout oan khi mạng trễ)
                 const timeoutPromise = new Promise<never>((_, reject) => 
-                    setTimeout(() => reject(new Error("Timeout phản hồi kết nối máy chủ")), 12000)
+                    setTimeout(() => reject(new Error("Timeout phản hồi kết nối")), 25000)
                 );
 
                 const pingPromise = (async () => {
+                    let internetOk = false;
+                    try {
+                        // Thử ping nhẹ vào static asset nội bộ của ứng dụng trước
+                        const staticResp = await fetch(`${window.location.origin}/favicon.ico?_ping=${Date.now()}`, { 
+                            method: 'HEAD', 
+                            cache: 'no-store' 
+                        }).catch(() => null);
+                        if (staticResp && (staticResp.ok || staticResp.status < 500)) {
+                            internetOk = true;
+                        }
+                    } catch {
+                        // Bỏ qua lỗi favicon
+                    }
+
                     if (isConfigured && supabase) {
+                        // Ping kiểm tra Supabase
                         const { error } = await supabase.from('system_settings').select('key').limit(1);
-                        // Chỉ coi là lỗi mất mạng nếu thực sự lỗi mạng kết nối, không tính lỗi bảng chưa tồn tại hoặc phân quyền
+                        
+                        // Chỉ coi là lỗi kết nối nếu thật sự lỗi mạng, bỏ qua các mã lỗi logic dữ liệu
                         if (error && error.code !== 'PGRST116' && error.code !== '42P01' && error.code !== '42501' && (error.message?.includes('fetch') || error.message?.includes('network') || error.message?.includes('Failed to fetch'))) {
+                            // Nếu static app vẫn truy cập được, mạng máy khách vẫn bình thường -> coi như tạm kết nối
+                            if (internetOk) {
+                                return true;
+                            }
                             throw error;
                         }
                         return true;
                     } else {
-                        // Thử fetch nhẹ favicon hoặc origin
-                        try {
-                            const r = await fetch(window.location.origin + '/icon.png?t=' + Date.now(), { method: 'HEAD', cache: 'no-store' });
-                            return r.ok || r.status < 500;
-                        } catch {
-                            return true; // Fallback an toàn
-                        }
+                        return internetOk || true;
                     }
                 })();
 
@@ -163,7 +185,7 @@ class ConnectionManager {
                     this.isOnline = true;
                     this.failureReason = undefined;
                     this.stopReconnectLoop();
-                    this.startHeartbeat(45000);
+                    this.startHeartbeat(60000);
                     if (!prevOnline) {
                         console.log("✅ Kết nối Internet & Máy chủ đã ổn định!");
                         if (typeof window !== 'undefined') {
@@ -172,14 +194,14 @@ class ConnectionManager {
                     }
                 } else {
                     this.consecutiveFailures += 1;
-                    // Chỉ chuyển sang offline khi thất bại liên tiếp đủ ngưỡng
+                    // Chỉ chuyển sang offline khi thất bại liên tiếp đủ ngưỡng (>= 5 lần)
                     if (this.consecutiveFailures >= this.MAX_CONSECUTIVE_FAILURES_BEFORE_OFFLINE) {
                         this.isOnline = false;
-                        this.failureReason = "Không thể kết nối đến máy chủ sau 3 lần thử. Vui lòng kiểm tra đường truyền.";
+                        this.failureReason = "Không thể kết nối đến máy chủ sau nhiều lần thử. Vui lòng kiểm tra đường truyền.";
                         this.startReconnectLoop();
                     } else {
-                        // Nếu chỉ rớt 1-2 lần, giữ nguyên isOnline để không gián đoạn người dùng và thử lại sau 3s
-                        setTimeout(() => this.ping(), 3000);
+                        // Nếu chỉ rớt 1-4 lần, giữ nguyên isOnline để không làm gián đoạn người dùng và thử lại sau 5s
+                        setTimeout(() => this.ping(), 5000);
                     }
                 }
 

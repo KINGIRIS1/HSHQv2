@@ -118,8 +118,10 @@ export const logError = (context: string, error: any, silent: boolean = false) =
     }
 
     if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('configuration') || msg.includes('Load failed') || msg.includes('ERR_INTERNET_DISCONNECTED')) {
-        console.error(`❌ [Lỗi kết nối] ${context}: Không thể kết nối tới cơ sở dữ liệu Cloud Supabase. Vui lòng kiểm tra lại mạng.`);
-        connectionManager.reportNetworkError(context, error);
+        console.warn(`⚠️ [Lỗi kết nối] ${context}: Không thể kết nối tới cơ sở dữ liệu Cloud Supabase.`);
+        if (!silent) {
+            connectionManager.reportNetworkError(context, error);
+        }
     } else if (code === '42P01' || code === 'PGRST205' || (typeof msg === 'string' && msg.includes('schema cache'))) {
         console.error(`❌ Lỗi tại ${context}: Bảng dữ liệu chưa tồn tại trên Supabase! (Code: ${code || 'PGRST205'})`);
         if (!silent) {

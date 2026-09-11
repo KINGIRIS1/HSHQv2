@@ -817,10 +817,10 @@ export const createRecordsWorkbook = async (
             "Loại Hồ Sơ", 
             "Thời Hạn Cũ", 
             "Thời Hạn Mới", 
-            "Ghi Chú / Lý Do Gia Hạn",
+            "Trạng Thái",
             "Giao Nhân Viên",
             "Hoàn Thành / Đợt",
-            "Trạng Thái"
+            "Ghi Chú / Lý Do Gia Hạn"
         ];
 
         colWidths = [
@@ -833,10 +833,10 @@ export const createRecordsWorkbook = async (
             { wch: 20 }, // Loại Hồ Sơ
             { wch: 12 }, // Thời Hạn Cũ
             { wch: 12 }, // Thời Hạn Mới
-            { wch: 35 }, // Ghi Chú / Lý Do Gia Hạn
+            { wch: 15 }, // Trạng Thái
             { wch: 18 }, // Giao Nhân Viên
             { wch: 14 }, // Hoàn Thành / Đợt
-            { wch: 15 }  // Trạng Thái
+            { wch: 35 }  // Ghi Chú / Lý Do Gia Hạn (ngoài cùng bên phải)
         ];
 
         dataRows = records.map((r, i) => {
@@ -867,14 +867,15 @@ export const createRecordsWorkbook = async (
                 getShortRecordType(r.recordType || undefined),
                 oldDeadline || formatDate(r.receivedDate),
                 formatDate(r.deadline),
-                cleanNote,
+                STATUS_LABELS[r.status] || r.status,
                 getEmployeeName(r.assignedTo || undefined),
                 r.exportBatch || (r as any).handoverBatch || formatDate(r.completedDate),
-                STATUS_LABELS[r.status] || r.status
+                cleanNote
             ];
         });
     } else {
-        tableHeader = [
+        // Cấu trúc đầy đủ: Trạng thái nằm ngay sau Hẹn trả, Ghi chú ra ngoài cùng bên phải
+        const fullHeader = [
             "STT", 
             "Mã Hồ Sơ", 
             "Chủ Sử Dụng", 
@@ -884,7 +885,7 @@ export const createRecordsWorkbook = async (
             "Loại Hồ Sơ", 
             "Ngày Nhận", 
             "Hẹn Trả", 
-            "Ghi Chú",
+            "Trạng Thái",
             "Ngày Giao NV",
             "NV Xử Lý",
             "Ngày Trình KT",
@@ -894,12 +895,12 @@ export const createRecordsWorkbook = async (
             "Hoàn Thành",
             "Đợt",
             "Ngày Trả KQ",
-            "Trạng Thái",
             "Số BL/HĐ",
-            "Số Tiền"
+            "Số Tiền",
+            "Ghi Chú"
         ];
 
-        colWidths = [
+        const fullColWidths = [
             { wch: 5 },  // STT
             { wch: 18 }, // Mã Hồ Sơ
             { wch: 22 }, // Chủ Sử Dụng
@@ -909,7 +910,7 @@ export const createRecordsWorkbook = async (
             { wch: 20 }, // Loại Hồ Sơ
             { wch: 12 }, // Ngày Nhận
             { wch: 12 }, // Hẹn Trả
-            { wch: 35 }, // Ghi Chú (rộng rãi, tự xuống dòng)
+            { wch: 15 }, // Trạng Thái
             { wch: 12 }, // Ngày Giao NV
             { wch: 18 }, // NV Xử Lý
             { wch: 12 }, // Ngày Trình KT
@@ -919,12 +920,13 @@ export const createRecordsWorkbook = async (
             { wch: 12 }, // Hoàn Thành
             { wch: 10 }, // Đợt
             { wch: 12 }, // Ngày Trả KQ
-            { wch: 15 }, // Trạng Thái
             { wch: 15 }, // Số BL/HĐ
-            { wch: 15 }  // Số Tiền
+            { wch: 15 }, // Số Tiền
+            { wch: 35 }  // Ghi Chú (rộng rãi, tự xuống dòng)
         ];
 
-        dataRows = records.map((r, i) => {
+        // Lập toàn bộ hàng dữ liệu
+        const fullDataRows = records.map((r, i) => {
             const contractInfo = getContractInfo(r.code);
             
             let rawPrice = '';
@@ -950,7 +952,7 @@ export const createRecordsWorkbook = async (
                 getShortRecordType(r.recordType || undefined),
                 formatDate(r.receivedDate),
                 formatDate(r.deadline),
-                cleanNote,
+                STATUS_LABELS[r.status] || r.status,
                 formatDate(r.assignedDate),
                 getEmployeeName(r.assignedTo || undefined),
                 formatDate(r.pendingCheckDate),
@@ -960,11 +962,39 @@ export const createRecordsWorkbook = async (
                 formatDate(r.completedDate),
                 r.exportBatch || (r as any).handoverBatch || '',
                 formatDate(r.resultReturnedDate || r.exportDate),
-                STATUS_LABELS[r.status] || r.status,
                 r.receiptNumber || (r as any).contractNumber || '',
-                rawPrice
+                rawPrice,
+                cleanNote
             ];
         });
+
+        // Kiểm tra tính linh động: nếu xuất ở các tab chuyên môn mà các cột từ 10 đến 20 hoàn toàn không có dữ liệu,
+        // ta giữ lại các cột thực tế có dữ liệu và luôn đưa cột Ghi Chú (cột cuối) về ngoài cùng bên phải.
+        // Chỉ lọc các cột trung gian (từ index 10: Ngày Giao NV đến index 20: Số Tiền)
+        const activeIntermediateCols: number[] = [];
+        for (let colIdx = 10; colIdx <= 20; colIdx++) {
+            const hasData = fullDataRows.some(row => row[colIdx] !== '' && row[colIdx] !== null && row[colIdx] !== undefined);
+            if (hasData) {
+                activeIntermediateCols.push(colIdx);
+            }
+        }
+
+        // Nếu là danh sách tổng hợp / tra cứu có dữ liệu hoặc nếu có ít nhất 1 cột trung gian có dữ liệu
+        // Nếu không có bất kỳ cột trung gian nào (ví dụ chỉ mới tiếp nhận), thu gọn linh động
+        const isCompact = activeIntermediateCols.length === 0;
+        
+        if (isCompact) {
+            // Chỉ giữ: STT (0) -> Trạng Thái (9) và Ghi Chú (21)
+            const keptIndices = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 21];
+            tableHeader = keptIndices.map(idx => fullHeader[idx]);
+            colWidths = keptIndices.map(idx => fullColWidths[idx]);
+            dataRows = fullDataRows.map(row => keptIndices.map(idx => row[idx]));
+        } else {
+            // Giữ nguyên toàn bộ 22 cột
+            tableHeader = fullHeader;
+            colWidths = fullColWidths;
+            dataRows = fullDataRows;
+        }
     }
 
     const wb = XLSX.utils.book_new();
@@ -1035,20 +1065,17 @@ export const createRecordsWorkbook = async (
         if (!ws[headerRef]) ws[headerRef] = { v: "", t: "s" };
         ws[headerRef].s = headerStyle; 
 
+        const colTitle = tableHeader[c];
+        const isCenterCol = ["STT", "Tờ", "Thửa", "Ngày Nhận", "Hẹn Trả", "Thời Hạn Cũ", "Thời Hạn Mới", "Trạng Thái", "Ngày Giao NV", "Ngày Trình KT", "Ngày Trình Ký", "Hoàn Thành", "Đợt", "Ngày Trả KQ", "Số BL/HĐ"].includes(colTitle);
+        const isRightCol = colTitle === "Số Tiền";
+
         for (let r = dataStartIdx; r < dataStartIdx + dataRows.length; r++) {
             const cellRef = XLSX.utils.encode_cell({ r, c });
             if (!ws[cellRef]) ws[cellRef] = { v: "", t: "s" };
             
-            if (isGiaHanList) {
-                // Gia hạn: STT(0), Tờ(4), Thửa(5), Hạn cũ(7), Hạn mới(8), Hoàn thành(11), Trạng thái(12)
-                if ([0, 4, 5, 7, 8, 11, 12].includes(c)) ws[cellRef].s = centerStyle;
-                else ws[cellRef].s = cellStyle;
-            } else {
-                // Tra cứu / Chuyên môn
-                if ([0, 4, 5, 7, 8, 10, 12, 14, 16, 17, 18, 19].includes(c)) ws[cellRef].s = centerStyle;
-                else if (c === 21) ws[cellRef].s = rightStyle;
-                else ws[cellRef].s = cellStyle;
-            }
+            if (isCenterCol) ws[cellRef].s = centerStyle;
+            else if (isRightCol) ws[cellRef].s = rightStyle;
+            else ws[cellRef].s = cellStyle;
         }
     }
 
