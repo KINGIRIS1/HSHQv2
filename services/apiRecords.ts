@@ -956,22 +956,28 @@ export const forceUpdateRecordsBatchApi = async (records: RecordFile[], onProgre
     };
 
     try {
-        const rawCodes = records.map(r => r.code).filter(c => c);
+        const rawCodes = records.map(r => r.code).filter(c => Boolean(c && String(c).trim()));
         if (rawCodes.length === 0) return { success: true, count: 0 };
 
         let updateCount = 0;
-        const CHUNK_SIZE = 500;
+        const allModifiedRecords: RecordFile[] = [];
+        const CHUNK_SIZE = 100; // Chia nhỏ 100 dòng để URL query .in() của Supabase / PostgREST không bị tràn URL độ dài (Bad Request)
 
         for (let i = 0; i < records.length; i += CHUNK_SIZE) {
             const chunkRecords = records.slice(i, i + CHUNK_SIZE);
-            const chunkCodes = chunkRecords.map(r => r.code).filter(c => c);
+            const chunkCodes = chunkRecords.map(r => r.code).filter(c => Boolean(c && String(c).trim()));
             
             const searchCodesSet = new Set<string>();
             chunkCodes.forEach(code => {
                 getCodeSearchVariants(code).forEach(variant => {
-                    searchCodesSet.add(variant);
+                    if (variant && variant.length <= 100) {
+                        searchCodesSet.add(variant);
+                    }
                 });
-                searchCodesSet.add(normalizeCode(code));
+                const norm = normalizeCode(code);
+                if (norm && norm.length <= 100) {
+                    searchCodesSet.add(norm);
+                }
             });
             const searchCodes = Array.from(searchCodesSet);
 
@@ -980,28 +986,61 @@ export const forceUpdateRecordsBatchApi = async (records: RecordFile[], onProgre
                 continue;
             }
 
-            const [{ data: existingLand, error: landError }, { data: existingLuutru, error: luutruError }, { data: existingDangky, error: dangkyError }] = await Promise.all([
-                supabase.from('land_records').select('*').in('code', searchCodes),
-                supabase.from('luutru_records').select('*').in('code', searchCodes),
-                supabase.from('dangky_records').select('*').in('code', searchCodes)
+            // Truy vấn từng bảng an toàn, tránh văng lỗi nếu một bảng không tồn tại hoặc lỗi phân quyền
+            const queryTableSafe = async (tableName: 'land_records' | 'luutru_records' | 'dangky_records') => {
+                try {
+                    // Cắt searchCodes thành từng batch nhỏ tối đa 60 mã để query URL ngắn và ổn định
+                    const SUB_BATCH = 60;
+                    const results: any[] = [];
+                    for (let s = 0; s < searchCodes.length; s += SUB_BATCH) {
+                        const subCodes = searchCodes.slice(s, s + SUB_BATCH);
+                        const { data, error } = await supabase.from(tableName).select('*').in('code', subCodes);
+                        if (error) {
+                            if (error.code === 'PGRST205' || error.code === '42P01' || error.message?.includes('does not exist')) {
+                                return [];
+                            }
+                            console.warn(`Query on ${tableName} returned error:`, error.message);
+                            continue;
+                        }
+                        if (data && data.length > 0) {
+                            results.push(...data);
+                        }
+                    }
+                    return results;
+                } catch {
+                    return [];
+                }
+            };
+
+            const [existingLand, existingLuutru, existingDangky] = await Promise.all([
+                queryTableSafe('land_records'),
+                queryTableSafe('luutru_records'),
+                queryTableSafe('dangky_records')
             ]);
 
-            if (landError) throw landError;
-
             const dbMap = new Map<string, { record: any; table: 'land_records' | 'luutru_records' | 'dangky_records' }>();
-            if (existingLand) {
+            if (existingLand && existingLand.length > 0) {
                 existingLand.forEach((r: any) => {
-                    if (r.code) dbMap.set(normalizeCode(r.code), { record: r, table: 'land_records' });
+                    if (r.code) {
+                        dbMap.set(normalizeCode(r.code), { record: r, table: 'land_records' });
+                        dbMap.set(String(r.code).trim().toLowerCase(), { record: r, table: 'land_records' });
+                    }
                 });
             }
-            if (existingLuutru) {
+            if (existingLuutru && existingLuutru.length > 0) {
                 existingLuutru.forEach((r: any) => {
-                    if (r.code) dbMap.set(normalizeCode(r.code), { record: r, table: 'luutru_records' });
+                    if (r.code) {
+                        dbMap.set(normalizeCode(r.code), { record: r, table: 'luutru_records' });
+                        dbMap.set(String(r.code).trim().toLowerCase(), { record: r, table: 'luutru_records' });
+                    }
                 });
             }
-            if (existingDangky) {
+            if (existingDangky && existingDangky.length > 0) {
                 existingDangky.forEach((r: any) => {
-                    if (r.code) dbMap.set(normalizeCode(r.code), { record: r, table: 'dangky_records' });
+                    if (r.code) {
+                        dbMap.set(normalizeCode(r.code), { record: r, table: 'dangky_records' });
+                        dbMap.set(String(r.code).trim().toLowerCase(), { record: r, table: 'dangky_records' });
+                    }
                 });
             }
 
@@ -1011,7 +1050,8 @@ export const forceUpdateRecordsBatchApi = async (records: RecordFile[], onProgre
 
             chunkRecords.forEach((excelRecord) => {
                 const normCode = normalizeCode(excelRecord.code);
-                const dbEntry = dbMap.get(normCode);
+                const exactLower = String(excelRecord.code || '').trim().toLowerCase();
+                const dbEntry = dbMap.get(normCode) || dbMap.get(exactLower);
                 
                 if (dbEntry) {
                     const merged = { ...dbEntry.record };
@@ -1022,7 +1062,7 @@ export const forceUpdateRecordsBatchApi = async (records: RecordFile[], onProgre
                         const isValidValue = newVal !== null && newVal !== undefined && newVal !== '';
                         
                         if (isValidValue && key !== 'id') {
-                            if (String(merged[key]) !== String(newVal)) {
+                            if (String(merged[key] ?? '') !== String(newVal)) {
                                 merged[key] = newVal;
                                 hasChange = true;
                             }
@@ -1030,6 +1070,10 @@ export const forceUpdateRecordsBatchApi = async (records: RecordFile[], onProgre
                     });
 
                     if (hasChange) {
+                        // Đảm bảo UUID chuẩn
+                        if (!merged.id || !isValidUUID(merged.id)) {
+                            merged.id = generateStandardUUID();
+                        }
                         const sanitized = sanitizeData(merged, RECORD_DB_COLUMNS);
                         if (dbEntry.table === 'luutru_records') {
                             luutruUpdates.push(sanitized);
@@ -1038,6 +1082,7 @@ export const forceUpdateRecordsBatchApi = async (records: RecordFile[], onProgre
                         } else {
                             landUpdates.push(sanitized);
                         }
+                        allModifiedRecords.push(merged as RecordFile);
                         updateCount++;
                     }
                 }
@@ -1045,26 +1090,40 @@ export const forceUpdateRecordsBatchApi = async (records: RecordFile[], onProgre
 
             const upsertIntoTable = async (table: 'land_records' | 'luutru_records' | 'dangky_records', updates: any[]) => {
                 if (updates.length === 0) return;
-                let { error: upsertError } = await supabase.from(table).upsert(updates);
-                
-                if (upsertError && (upsertError.code === '22P02' || String(upsertError.message || '').includes('22P02') || String(upsertError.message || '').includes('invalid input syntax'))) {
-                    console.warn(`⚠️ [22P02 Fallback] Retrying chunk target upsert into ${table} with 22P02 sanitized payload...`);
-                    const fallback22P02 = sanitizePayloadFor22P02(updates);
-                    const res = await supabase.from(table).upsert(fallback22P02);
-                    upsertError = res.error;
-                }
+                const UPSERT_CHUNK = 50;
+                for (let u = 0; u < updates.length; u += UPSERT_CHUNK) {
+                    const upChunk = updates.slice(u, u + UPSERT_CHUNK);
+                    let { error: upsertError } = await supabase.from(table).upsert(upChunk);
+                    
+                    if (upsertError && (upsertError.code === '22P02' || String(upsertError.message || '').includes('22P02') || String(upsertError.message || '').includes('invalid input syntax'))) {
+                        console.warn(`⚠️ [22P02 Fallback] Retrying chunk target upsert into ${table} with 22P02 sanitized payload...`);
+                        const fallback22P02 = sanitizePayloadFor22P02(upChunk);
+                        const res = await supabase.from(table).upsert(fallback22P02);
+                        upsertError = res.error;
+                    }
 
-                if (upsertError && (upsertError.code === 'PGRST204' || String(upsertError.code) === '42703' || (upsertError.message && String(upsertError.message).includes('does not exist')))) {
-                    console.warn(`⚠️ [Fallback] Retrying chunk target upsert into ${table} without new columns...`);
-                    const fallbackPayload = updates.map(p => {
-                        const fp = sanitizePayloadFor22P02({ ...p });
-                        OPTIONAL_NEW_COLUMNS.forEach(col => delete fp[col]);
-                        return fp;
-                    });
-                    const { error: fallbackError } = await supabase.from(table).upsert(fallbackPayload);
-                    if (fallbackError) throw fallbackError;
-                } else if (upsertError) {
-                    throw upsertError;
+                    if (upsertError && (upsertError.code === 'PGRST204' || String(upsertError.code) === '42703' || (upsertError.message && String(upsertError.message).includes('does not exist')))) {
+                        console.warn(`⚠️ [Fallback] Retrying chunk target upsert into ${table} without new columns...`);
+                        const fallbackPayload = upChunk.map(p => {
+                            const fp = sanitizePayloadFor22P02({ ...p });
+                            OPTIONAL_NEW_COLUMNS.forEach(col => delete fp[col]);
+                            return fp;
+                        });
+                        const { error: fallbackError } = await supabase.from(table).upsert(fallbackPayload);
+                        if (fallbackError) {
+                            if (table === 'dangky_records' && (fallbackError.code === '42P01' || fallbackError.code === 'PGRST205')) {
+                                await supabase.from('land_records').upsert(fallbackPayload);
+                            } else {
+                                throw fallbackError;
+                            }
+                        }
+                    } else if (upsertError) {
+                        if (table === 'dangky_records' && (upsertError.code === '42P01' || upsertError.code === 'PGRST205')) {
+                            await supabase.from('land_records').upsert(upChunk);
+                        } else {
+                            throw upsertError;
+                        }
+                    }
                 }
             };
 
@@ -1077,6 +1136,11 @@ export const forceUpdateRecordsBatchApi = async (records: RecordFile[], onProgre
             if (onProgress) {
                 onProgress(Math.min(i + CHUNK_SIZE, records.length), records.length);
             }
+        }
+
+        // Cập nhật bộ nhớ đệm (Cache/IndexedDB) cho các hồ sơ vừa được cập nhật
+        if (allModifiedRecords.length > 0) {
+            syncCacheOnBatchUpdate(allModifiedRecords);
         }
 
         return { success: true, count: updateCount };

@@ -2,7 +2,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { RecordFile, User, UserRole, RecordStatus, Employee } from '../types';
 import { removeVietnameseTones, isRecordOverdue, isRecordApproaching, isOfficeOnlySurveyProcedure } from '../utils/appHelpers';
-import { getShortRecordType, isArchiveRecordType, isArchiveRecord, isRecordType11 } from '../constants';
+import { getShortRecordType, isArchiveRecordType, isArchiveRecord } from '../constants';
 
 export const useRecordFilter = (
     records: RecordFile[],
@@ -269,14 +269,8 @@ export const useRecordFilter = (
                 result = result.filter(r => getShortRecordType(r.recordType) === filterRecordType || r.recordType === filterRecordType);
             }
         } else if (isMeasurementView) {
-            // Cho phép hiển thị hồ sơ 1.1 (Sao lục / Cung cấp tài liệu đất đai) đối với:
-            // 1) Người dùng thuộc vai trò Một cửa (ONEDOOR) khi xem danh sách hồ sơ
-            // 2) Tab Bàn giao hồ sơ (handover_list) để bàn giao / trả kết quả hồ sơ 1.1 cho người dân
-            if (currentUser?.role === UserRole.ONEDOOR || currentView === 'handover_list') {
-                result = result.filter(r => !isArchiveRecord(r) || isRecordType11(r));
-            } else {
-                result = result.filter(r => !isArchiveRecord(r));
-            }
+            // Loại bỏ hoàn toàn hồ sơ lưu trữ khỏi toàn bộ module Đo đạc (Hồ sơ lưu trữ có phân hệ & Giao 1 cửa riêng)
+            result = result.filter(r => !isArchiveRecord(r));
             if (filterRecordType !== 'all') {
                 result = result.filter(r => getShortRecordType(r.recordType) === filterRecordType || r.recordType === filterRecordType);
             }
@@ -391,13 +385,7 @@ export const useRecordFilter = (
 
                 // Filter by recordType based on view group
                 if (isArchiveMeasurementView && !isArchiveRecord(r)) return;
-                if (isMeasurementView) {
-                    if (currentUser?.role === UserRole.ONEDOOR || currentView === 'handover_list') {
-                        if (isArchiveRecord(r) && !isRecordType11(r)) return;
-                    } else {
-                        if (isArchiveRecord(r)) return;
-                    }
-                }
+                if (isMeasurementView && isArchiveRecord(r)) return;
 
                 if (isRecordOverdue(r)) overdue++;
                 else if (isRecordApproaching(r)) approaching++;

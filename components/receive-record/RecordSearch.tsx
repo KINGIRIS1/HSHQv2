@@ -562,30 +562,30 @@ export const RecordSearch: React.FC<RecordSearchProps> = ({
                     {isExtendView ? "Hồ Sơ Gia Hạn" : "Tra cứu hồ sơ"}
                 </h2>
 
-                <div className="flex items-center gap-2 flex-1 sm:max-w-xl md:max-w-2xl justify-end w-full">
+                <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end flex-1 max-w-xl">
                     {/* Search box */}
-                    <div className="relative flex-1 min-w-0">
+                    <div className="relative flex-1 sm:w-64">
                         <Search
                             className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                            size={16}
+                            size={18}
                         />
                         <input
                             type="text"
                             placeholder="Tìm kiếm..."
-                            className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                            className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                             value={searchKeyword}
                             onChange={(e) => setSearchKeyword(e.target.value)}
                         />
                     </div>
 
                     {/* Cụm Bộ lọc & Xuất Excel ngoài cùng bên tay phải */}
-                    <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
+                    <div className="flex items-center gap-2 shrink-0">
                         
                         {/* Popover Filter button style copied from "Tất cả hồ sơ" */}
-                        <div className="relative inline-block text-left" ref={filterPopoverRef}>
+                        <div className="relative inline-block shrink-0" ref={filterPopoverRef}>
                             <button
                                 onClick={() => setIsFilterPopoverOpen(!isFilterPopoverOpen)}
-                                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-sm font-bold transition-all shadow-sm bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 cursor-pointer ${
+                                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-bold transition-all shadow-sm bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 cursor-pointer ${
                                     activeFilterCount > 0
                                         ? "border-blue-300 text-blue-700 bg-blue-50/50"
                                         : ""
@@ -1052,75 +1052,66 @@ export const RecordSearch: React.FC<RecordSearchProps> = ({
                                         {/* Actions cell matched to standard row actions */}
                                         <td className="p-3 text-center align-middle sticky right-0 bg-white/90 backdrop-blur-xs border-l border-gray-100">
                                             {isExtendView ? (
-                                                <div className="flex justify-center items-center">
+                                                <div className="flex justify-center items-center gap-1.5">
                                                     <button
-                                                        onClick={() => onPrint(r)}
-                                                        className="flex items-center justify-center p-2 text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-lg border border-amber-200 transition-all cursor-pointer shadow-xs active:scale-95"
-                                                        title="In biên nhận"
-                                                        aria-label="In biên nhận"
+                                                        onClick={() => setSelectedDetailRecord(r)}
+                                                        className="p-1.5 text-slate-600 hover:text-green-700 hover:bg-green-100/80 rounded transition-colors border border-slate-200/80 bg-white cursor-pointer shadow-xs"
+                                                        title="Xem chi tiết"
                                                     >
-                                                        <Printer size={16} />
+                                                        <Eye size={15} />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setSelectedExtendRecord(r)}
+                                                        className="p-1.5 text-indigo-700 hover:bg-indigo-100 rounded transition-colors border border-indigo-200 bg-indigo-50 cursor-pointer shadow-xs"
+                                                        title="Gia hạn hẹn trả"
+                                                    >
+                                                        <CalendarClock size={15} />
                                                     </button>
                                                 </div>
                                             ) : (
-                                                <div className="flex flex-col items-center justify-center gap-1 py-0.5">
-                                                    {/* Hàng trên: Xem, In biên nhận & Gia hạn */}
-                                                    <div className="flex items-center gap-1">
+                                                <div className="flex items-center justify-center gap-1.5 py-0.5">
+                                                    <button
+                                                        onClick={() => setSelectedDetailRecord(r)}
+                                                        className="p-1.5 text-slate-600 hover:text-green-700 hover:bg-green-100/80 rounded transition-colors border border-slate-200/80 bg-white cursor-pointer shadow-xs"
+                                                        title="Xem chi tiết"
+                                                    >
+                                                        <Eye size={15} />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => onEdit(r)}
+                                                        className="p-1.5 text-blue-600 hover:bg-blue-100 rounded transition-colors border border-blue-200 bg-blue-50/50 cursor-pointer shadow-xs"
+                                                        title="Chỉnh sửa"
+                                                    >
+                                                        <Pencil size={15} />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setSelectedExtendRecord(r)}
+                                                        className="p-1.5 text-indigo-700 hover:bg-indigo-100 rounded transition-colors border border-indigo-200 bg-indigo-50 cursor-pointer shadow-xs"
+                                                        title="Gia hạn hẹn trả"
+                                                    >
+                                                        <CalendarClock size={15} />
+                                                    </button>
+                                                    {onReturnResult && r.status === 'HANDOVER' && !r.resultReturnedDate ? (
                                                         <button
-                                                            onClick={() => setSelectedDetailRecord(r)}
-                                                            className="p-1 text-slate-600 hover:text-green-700 hover:bg-green-100/80 rounded transition-colors border border-slate-200/80 bg-white cursor-pointer"
-                                                            title="Xem chi tiết"
+                                                            onClick={() => onReturnResult(r)}
+                                                            className="p-1.5 text-emerald-700 hover:bg-emerald-100 rounded transition-colors border border-emerald-200 bg-emerald-50 cursor-pointer animate-pulse shadow-xs"
+                                                            title="Trả kết quả"
                                                         >
-                                                            <Eye size={15} />
+                                                            <FileCheck size={15} />
                                                         </button>
+                                                    ) : (currentUser?.role === 'ADMIN' || currentUser?.role === 'SUBADMIN' || currentUser?.role === 'TEAM_LEADER') ? (
                                                         <button
-                                                            onClick={() => onPrint(r)}
-                                                            className="p-1 text-amber-700 hover:bg-amber-100 rounded transition-colors border border-amber-200 bg-amber-50 cursor-pointer"
-                                                            title="In biên nhận"
+                                                            onClick={async () => {
+                                                                if (confirm(`Bạn có chắc muốn xóa hồ sơ ${r.code}?`)) {
+                                                                    await onDelete(r);
+                                                                }
+                                                            }}
+                                                            className="p-1.5 text-red-600 hover:bg-red-100 rounded transition-colors border border-red-200 bg-red-50/50 cursor-pointer shadow-xs"
+                                                            title="Xóa"
                                                         >
-                                                            <Printer size={15} />
+                                                            <Trash2 size={15} />
                                                         </button>
-                                                        <button
-                                                            onClick={() => setSelectedExtendRecord(r)}
-                                                            className="p-1 text-indigo-700 hover:bg-indigo-100 rounded transition-colors border border-indigo-200 bg-indigo-50 cursor-pointer"
-                                                            title="Gia hạn hẹn trả"
-                                                        >
-                                                            <CalendarClock size={15} />
-                                                        </button>
-                                                    </div>
-                                                    {/* Hàng dưới: Sửa & (Trả kết quả hoặc Xóa hoặc Placeholder) */}
-                                                    <div className="flex items-center gap-1">
-                                                        <button
-                                                            onClick={() => onEdit(r)}
-                                                            className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors border border-blue-200 bg-blue-50/50 cursor-pointer"
-                                                            title="Chỉnh sửa"
-                                                        >
-                                                            <Pencil size={15} />
-                                                        </button>
-                                                        {onReturnResult && r.status === 'HANDOVER' && !r.resultReturnedDate ? (
-                                                            <button
-                                                                onClick={() => onReturnResult(r)}
-                                                                className="p-1 text-emerald-700 hover:bg-emerald-100 rounded transition-colors border border-emerald-200 bg-emerald-50 cursor-pointer animate-pulse"
-                                                                title="Trả kết quả"
-                                                            >
-                                                                <FileCheck size={15} />
-                                                            </button>
-                                                        ) : (currentUser?.role === 'ADMIN' || currentUser?.role === 'SUBADMIN' || currentUser?.role === 'TEAM_LEADER') ? (
-                                                            <button
-                                                                onClick={async () => {
-                                                                    if (confirm(`Bạn có chắc muốn xóa hồ sơ ${r.code}?`)) {
-                                                                        await onDelete(r);
-                                                                    }
-                                                                }}
-                                                                className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors border border-red-200 bg-red-50/50 cursor-pointer"
-                                                                title="Xóa"
-                                                            >
-                                                                <Trash2 size={15} />
-                                                            </button>
-                                                        ) : (
-                                                            <div className="w-[25px] h-[25px]" />
-                                                        )}
-                                                    </div>
+                                                    ) : null}
                                                 </div>
                                             )}
                                         </td>

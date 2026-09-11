@@ -1488,16 +1488,16 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
       {/* MAIN CONTENT */}
       <div className="flex-1 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col min-h-0">
         {/* SEARCH & ACTIONS */}
-        <div className="p-3 md:p-4 border-b border-gray-100 bg-gray-50 flex items-center gap-2 shrink-0 w-full">
-          <div className="relative flex-1 min-w-0">
+        <div className="p-3 md:p-4 border-b border-gray-100 bg-gray-50 flex items-center gap-2.5 shrink-0 w-full">
+          <div className="relative flex-1 sm:w-64 min-w-0">
             <Search
               className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-              size={16}
+              size={18}
             />
             <input
               type="text"
               placeholder={`Tìm trong ${getTabLabel()}...`}
-              className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-xs md:text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white shadow-sm font-medium"
+              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
               value={searchTerm}
               onChange={(e) => {
                 setSearchTerm(e.target.value);
@@ -1513,7 +1513,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                 setCurrentPage(1);
                 setSearchTerm("");
               }}
-              className={`flex items-center gap-1 px-2.5 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap shadow-sm border shrink-0 ${
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap shadow-sm border shrink-0 cursor-pointer ${
                 activeTab === "reminder"
                   ? "bg-pink-600 text-white border-pink-700"
                   : "bg-white text-pink-700 border-pink-200 hover:bg-pink-50"
@@ -1526,12 +1526,12 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
           )}
 
           {/* Cụm Bộ lọc & Xuất Excel ngoài cùng bên tay phải */}
-          <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
             {/* LỌC BUTTON (POPOVER LIKE ĐO ĐẠC) */}
-            <div className="relative inline-block" ref={filterPopoverRef}>
+            <div className="relative inline-block shrink-0" ref={filterPopoverRef}>
               <button
                 onClick={() => setIsFilterPopoverOpen(!isFilterPopoverOpen)}
-                className={`flex items-center gap-1.5 p-2 md:px-3 md:py-2 rounded-lg text-xs md:text-sm font-bold transition-all shadow-sm cursor-pointer bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 shrink-0 ${
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-bold transition-all shadow-sm cursor-pointer bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 shrink-0 ${
                   activeFilterCount > 0
                     ? "border-blue-300 text-blue-700 bg-blue-50/50"
                     : ""

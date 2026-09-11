@@ -438,9 +438,9 @@ const DailyList: React.FC<DailyListProps> = ({
   return (
     <div className="flex flex-col h-full space-y-4 animate-fade-in">
         {/* Toolbar Header */}
-        <div className="bg-white p-3 md:p-4 rounded-xl border border-gray-200 shadow-sm flex flex-wrap items-center justify-between gap-3 shrink-0">
+        <div className="bg-white p-3 md:p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 shrink-0">
             {/* Left side: Tab Title / Summary */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
                 <span className="text-sm md:text-base font-bold text-gray-800">Danh sách tiếp nhận</span>
                 <span className="text-xs bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-0.5 rounded-full font-bold">
                     {filteredDailyRecords.length} hồ sơ
@@ -448,222 +448,224 @@ const DailyList: React.FC<DailyListProps> = ({
             </div>
 
             {/* Right side: Search + Filter + Offline Sync + Excel Actions */}
-            <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 ml-auto">
+            <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end flex-1 max-w-xl">
                 {/* Search Box */}
-                <div className="relative w-44 sm:w-56 md:w-64"> 
-                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={15} /> 
+                <div className="relative flex-1 sm:w-64"> 
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} /> 
                     <input 
                         type="text" 
-                        placeholder="Tìm kiếm hồ sơ..." 
-                        className="w-full pl-8 pr-3 py-1.5 border border-gray-200 rounded-lg text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" 
+                        placeholder="Tìm kiếm..." 
+                        className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" 
                         value={searchTerm} 
                         onChange={(e) => setSearchTerm(e.target.value)} 
                     /> 
                 </div>
 
-                {/* Popup Filter Button (Only Filter Icon + Active Badge) */}
-                <div className="relative inline-block text-left" ref={filterPopoverRef}>
-                    <button
-                        type="button"
-                        onClick={() => setIsFilterPopoverOpen(!isFilterPopoverOpen)}
-                        className={`relative p-2 rounded-lg text-xs md:text-sm transition-all shadow-xs border cursor-pointer flex items-center justify-center ${
-                            activeFilterCount > 0
-                                ? "border-blue-400 text-blue-700 bg-blue-50 hover:bg-blue-100"
-                                : "border-gray-200 text-gray-600 bg-white hover:bg-gray-50"
-                        }`}
-                        title="Bộ lọc danh sách tiếp nhận"
-                    >
-                        <Filter size={16} className={activeFilterCount > 0 ? "text-blue-600" : "text-gray-600"} />
-                        {activeFilterCount > 0 && (
-                            <span className="absolute -top-1.5 -right-1.5 bg-blue-600 text-white text-[10px] w-4 h-4 rounded-full font-bold flex items-center justify-center shadow-xs">
-                                {activeFilterCount}
-                            </span>
-                        )}
-                    </button>
+                <div className="flex items-center gap-2 shrink-0">
+                    {/* Popup Filter Button (Only Filter Icon + Active Badge) */}
+                    <div className="relative inline-block text-left shrink-0" ref={filterPopoverRef}>
+                        <button
+                            type="button"
+                            onClick={() => setIsFilterPopoverOpen(!isFilterPopoverOpen)}
+                            className={`relative p-2 rounded-lg text-sm transition-all shadow-xs border cursor-pointer flex items-center justify-center ${
+                                activeFilterCount > 0
+                                    ? "border-blue-400 text-blue-700 bg-blue-50 hover:bg-blue-100"
+                                    : "border-gray-200 text-gray-600 bg-white hover:bg-gray-50"
+                            }`}
+                            title="Bộ lọc danh sách tiếp nhận"
+                        >
+                            <Filter size={16} className={activeFilterCount > 0 ? "text-blue-600" : "text-gray-600"} />
+                            {activeFilterCount > 0 && (
+                                <span className="absolute -top-1.5 -right-1.5 bg-blue-600 text-white text-[10px] w-4 h-4 rounded-full font-bold flex items-center justify-center shadow-xs">
+                                    {activeFilterCount}
+                                </span>
+                            )}
+                        </button>
 
-                    {/* Filter Popover Dropdown Panel */}
-                    {isFilterPopoverOpen && (
-                        <div className="absolute right-0 mt-2 w-[340px] sm:w-[420px] bg-white rounded-2xl shadow-2xl border border-slate-200 p-4 z-50 animate-fade-in text-gray-800">
-                            {/* Popover Header */}
-                            <div className="flex items-center justify-between pb-3 border-b border-gray-100 mb-3">
-                                <div className="flex items-center gap-2 font-bold text-blue-700 text-sm md:text-base">
-                                    <Filter size={18} />
-                                    <span>Bộ lọc danh sách tiếp nhận</span>
+                        {/* Filter Popover Dropdown Panel */}
+                        {isFilterPopoverOpen && (
+                            <div className="absolute right-0 mt-2 w-[340px] sm:w-[420px] bg-white rounded-2xl shadow-2xl border border-slate-200 p-4 z-50 animate-fade-in text-gray-800">
+                                {/* Popover Header */}
+                                <div className="flex items-center justify-between pb-3 border-b border-gray-100 mb-3">
+                                    <div className="flex items-center gap-2 font-bold text-blue-700 text-sm md:text-base">
+                                        <Filter size={18} />
+                                        <span>Bộ lọc danh sách tiếp nhận</span>
+                                    </div>
+                                    <button
+                                        onClick={() => setIsFilterPopoverOpen(false)}
+                                        className="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100 transition-colors cursor-pointer"
+                                    >
+                                        <X size={18} />
+                                    </button>
                                 </div>
-                                <button
-                                    onClick={() => setIsFilterPopoverOpen(false)}
-                                    className="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100 transition-colors cursor-pointer"
-                                >
-                                    <X size={18} />
-                                </button>
-                            </div>
 
-                            <div className="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
-                                {/* 1. Date Range Filter */}
-                                <div>
-                                    <div className="flex items-center justify-between mb-1.5">
-                                        <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700">
-                                            <Calendar size={14} className="text-blue-600" />
-                                            <span>Thời gian tiếp nhận:</span>
+                                <div className="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
+                                    {/* 1. Date Range Filter */}
+                                    <div>
+                                        <div className="flex items-center justify-between mb-1.5">
+                                            <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700">
+                                                <Calendar size={14} className="text-blue-600" />
+                                                <span>Thời gian tiếp nhận:</span>
+                                            </label>
+                                            <div className="flex items-center gap-1">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleQuickDate('today')}
+                                                    className="px-2 py-0.5 text-[11px] font-medium bg-gray-100 hover:bg-blue-50 hover:text-blue-600 rounded text-gray-600 transition-colors cursor-pointer"
+                                                >
+                                                    Hôm nay
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleQuickDate('week')}
+                                                    className="px-2 py-0.5 text-[11px] font-medium bg-gray-100 hover:bg-blue-50 hover:text-blue-600 rounded text-gray-600 transition-colors cursor-pointer"
+                                                >
+                                                    Tuần này
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleQuickDate('month')}
+                                                    className="px-2 py-0.5 text-[11px] font-medium bg-gray-100 hover:bg-blue-50 hover:text-blue-600 rounded text-gray-600 transition-colors cursor-pointer"
+                                                >
+                                                    Tháng này
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <div>
+                                                <span className="text-[11px] text-gray-500 font-medium block mb-0.5">Từ ngày</span>
+                                                <input
+                                                    type="date"
+                                                    value={filterFromDate}
+                                                    onChange={(e) => setFilterFromDate(e.target.value)}
+                                                    className="w-full text-xs border border-gray-200 rounded-lg p-2 font-medium bg-gray-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                                />
+                                            </div>
+                                            <div>
+                                                <span className="text-[11px] text-gray-500 font-medium block mb-0.5">Đến ngày</span>
+                                                <input
+                                                    type="date"
+                                                    value={filterToDate}
+                                                    onChange={(e) => setFilterToDate(e.target.value)}
+                                                    className="w-full text-xs border border-gray-200 rounded-lg p-2 font-medium bg-gray-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* 2. OneDoor Receiver Filter */}
+                                    <div>
+                                        <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 mb-1.5">
+                                            <UserCheck size={14} className="text-blue-600" />
+                                            <span>Nhân viên tiếp nhận (Một cửa):</span>
                                         </label>
-                                        <div className="flex items-center gap-1">
-                                            <button
-                                                type="button"
-                                                onClick={() => handleQuickDate('today')}
-                                                className="px-2 py-0.5 text-[11px] font-medium bg-gray-100 hover:bg-blue-50 hover:text-blue-600 rounded text-gray-600 transition-colors cursor-pointer"
-                                            >
-                                                Hôm nay
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => handleQuickDate('week')}
-                                                className="px-2 py-0.5 text-[11px] font-medium bg-gray-100 hover:bg-blue-50 hover:text-blue-600 rounded text-gray-600 transition-colors cursor-pointer"
-                                            >
-                                                Tuần này
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => handleQuickDate('month')}
-                                                className="px-2 py-0.5 text-[11px] font-medium bg-gray-100 hover:bg-blue-50 hover:text-blue-600 rounded text-gray-600 transition-colors cursor-pointer"
-                                            >
-                                                Tháng này
-                                            </button>
-                                        </div>
+                                        <select
+                                            value={selectedReceiver}
+                                            onChange={(e) => setSelectedReceiver(e.target.value)}
+                                            className="w-full text-xs md:text-sm border border-gray-200 rounded-lg p-2 font-medium bg-gray-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                                        >
+                                            {currentUser && (
+                                                <option value={currentUser.employeeId || currentUser.id || currentUser.username || 'ME'}>
+                                                    Chỉ mình tôi ({currentUser.name || currentUser.username})
+                                                </option>
+                                            )}
+                                            <option value="ALL">Tất cả nhân viên Một cửa</option>
+                                            {oneDoorEmployees.map(emp => (
+                                                <option key={emp.id} value={emp.id}>
+                                                    {emp.name} ({emp.position || 'Nhân viên'} - {emp.department || 'Một cửa'})
+                                                </option>
+                                            ))}
+                                        </select>
                                     </div>
-                                    <div className="grid grid-cols-2 gap-2">
-                                        <div>
-                                            <span className="text-[11px] text-gray-500 font-medium block mb-0.5">Từ ngày</span>
-                                            <input
-                                                type="date"
-                                                value={filterFromDate}
-                                                onChange={(e) => setFilterFromDate(e.target.value)}
-                                                className="w-full text-xs border border-gray-200 rounded-lg p-2 font-medium bg-gray-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                            />
-                                        </div>
-                                        <div>
-                                            <span className="text-[11px] text-gray-500 font-medium block mb-0.5">Đến ngày</span>
-                                            <input
-                                                type="date"
-                                                value={filterToDate}
-                                                onChange={(e) => setFilterToDate(e.target.value)}
-                                                className="w-full text-xs border border-gray-200 rounded-lg p-2 font-medium bg-gray-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                            />
-                                        </div>
+
+                                    {/* 3. Record Type (Procedure) Filter */}
+                                    <div>
+                                        <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 mb-1.5">
+                                            <Layers size={14} className="text-blue-600" />
+                                            <span>Loại hồ sơ (Thủ tục):</span>
+                                        </label>
+                                        <select
+                                            value={selectedRecordType}
+                                            onChange={(e) => setSelectedRecordType(e.target.value)}
+                                            className="w-full text-xs md:text-sm border border-gray-200 rounded-lg p-2 font-medium bg-gray-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                                        >
+                                            <option value="ALL">Tất cả loại hồ sơ</option>
+                                            {RECORD_TYPES.map((type, idx) => (
+                                                <option key={idx} value={type}>{type}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    {/* 4. Professional Department Filter */}
+                                    <div>
+                                        <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 mb-1.5">
+                                            <Building2 size={14} className="text-blue-600" />
+                                            <span>Tổ chuyên môn xử lý:</span>
+                                        </label>
+                                        <select
+                                            value={selectedDept}
+                                            onChange={(e) => setSelectedDept(e.target.value)}
+                                            className="w-full text-xs md:text-sm border border-gray-200 rounded-lg p-2 font-medium bg-gray-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                                        >
+                                            <option value="ALL">Tất cả tổ chuyên môn</option>
+                                            <option value="Tổ Đo đạc">Tổ Đo đạc</option>
+                                            <option value="Tổ Lưu trữ">Tổ Lưu trữ</option>
+                                        </select>
                                     </div>
                                 </div>
 
-                                {/* 2. OneDoor Receiver Filter */}
-                                <div>
-                                    <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 mb-1.5">
-                                        <UserCheck size={14} className="text-blue-600" />
-                                        <span>Nhân viên tiếp nhận (Một cửa):</span>
-                                    </label>
-                                    <select
-                                        value={selectedReceiver}
-                                        onChange={(e) => setSelectedReceiver(e.target.value)}
-                                        className="w-full text-xs md:text-sm border border-gray-200 rounded-lg p-2 font-medium bg-gray-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                                {/* Popover Footer Actions */}
+                                <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={handleResetFilter}
+                                        className="flex items-center gap-1 text-xs font-semibold text-gray-500 hover:text-gray-800 transition-colors p-1.5 rounded hover:bg-gray-100 cursor-pointer"
                                     >
-                                        {currentUser && (
-                                            <option value={currentUser.employeeId || currentUser.id || currentUser.username || 'ME'}>
-                                                Chỉ mình tôi ({currentUser.name || currentUser.username})
-                                            </option>
-                                        )}
-                                        <option value="ALL">Tất cả nhân viên Một cửa</option>
-                                        {oneDoorEmployees.map(emp => (
-                                            <option key={emp.id} value={emp.id}>
-                                                {emp.name} ({emp.position || 'Nhân viên'} - {emp.department || 'Một cửa'})
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-
-                                {/* 3. Record Type (Procedure) Filter */}
-                                <div>
-                                    <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 mb-1.5">
-                                        <Layers size={14} className="text-blue-600" />
-                                        <span>Loại hồ sơ (Thủ tục):</span>
-                                    </label>
-                                    <select
-                                        value={selectedRecordType}
-                                        onChange={(e) => setSelectedRecordType(e.target.value)}
-                                        className="w-full text-xs md:text-sm border border-gray-200 rounded-lg p-2 font-medium bg-gray-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                                        <RotateCcw size={13} />
+                                        <span>Đặt lại mặc định</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsFilterPopoverOpen(false)}
+                                        className="px-4 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 transition-colors shadow-xs cursor-pointer"
                                     >
-                                        <option value="ALL">Tất cả loại hồ sơ</option>
-                                        {RECORD_TYPES.map((type, idx) => (
-                                            <option key={idx} value={type}>{type}</option>
-                                        ))}
-                                    </select>
-                                </div>
-
-                                {/* 4. Professional Department Filter */}
-                                <div>
-                                    <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 mb-1.5">
-                                        <Building2 size={14} className="text-blue-600" />
-                                        <span>Tổ chuyên môn xử lý:</span>
-                                    </label>
-                                    <select
-                                        value={selectedDept}
-                                        onChange={(e) => setSelectedDept(e.target.value)}
-                                        className="w-full text-xs md:text-sm border border-gray-200 rounded-lg p-2 font-medium bg-gray-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
-                                    >
-                                        <option value="ALL">Tất cả tổ chuyên môn</option>
-                                        <option value="Tổ Đo đạc">Tổ Đo đạc</option>
-                                        <option value="Tổ Lưu trữ">Tổ Lưu trữ</option>
-                                    </select>
+                                        Áp dụng ({filteredDailyRecords.length} hồ sơ)
+                                    </button>
                                 </div>
                             </div>
+                        )}
+                    </div>
 
-                            {/* Popover Footer Actions */}
-                            <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between gap-2">
-                                <button
-                                    type="button"
-                                    onClick={handleResetFilter}
-                                    className="flex items-center gap-1 text-xs font-semibold text-gray-500 hover:text-gray-800 transition-colors p-1.5 rounded hover:bg-gray-100 cursor-pointer"
-                                >
-                                    <RotateCcw size={13} />
-                                    <span>Đặt lại mặc định</span>
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setIsFilterPopoverOpen(false)}
-                                    className="px-4 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 transition-colors shadow-xs cursor-pointer"
-                                >
-                                    Áp dụng ({filteredDailyRecords.length} hồ sơ)
-                                </button>
-                            </div>
-                        </div>
+                    {/* Offline Sync Button if any */}
+                    {pendingCount > 0 && onSyncPending && (
+                        <button
+                            type="button"
+                            onClick={handleManualSync}
+                            disabled={isSyncing}
+                            className="flex items-center gap-1.5 bg-amber-50 text-amber-800 border border-amber-300 hover:bg-amber-100 px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer"
+                            title="Có hồ sơ đã lưu an toàn trên máy nhưng chưa đẩy lên Cloud"
+                        >
+                            <RefreshCw size={14} className={isSyncing ? "animate-spin text-amber-600" : "text-amber-600"} />
+                            <span className="hidden sm:inline">{isSyncing ? "Đang đẩy Cloud..." : `Đồng bộ Cloud (${pendingCount})`}</span>
+                        </button>
                     )}
-                </div>
 
-                {/* Offline Sync Button if any */}
-                {pendingCount > 0 && onSyncPending && (
-                    <button
-                        type="button"
-                        onClick={handleManualSync}
-                        disabled={isSyncing}
-                        className="flex items-center gap-1.5 bg-amber-50 text-amber-800 border border-amber-300 hover:bg-amber-100 px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer"
-                        title="Có hồ sơ đã lưu an toàn trên máy nhưng chưa đẩy lên Cloud"
-                    >
-                        <RefreshCw size={14} className={isSyncing ? "animate-spin text-amber-600" : "text-amber-600"} />
-                        <span className="hidden sm:inline">{isSyncing ? "Đang đẩy Cloud..." : `Đồng bộ Cloud (${pendingCount})`}</span>
+                    {/* Excel Actions */}
+                    <button 
+                        onClick={handlePreview} 
+                        className="p-2 bg-white text-blue-700 border border-blue-300 rounded-lg hover:bg-blue-50 text-xs font-semibold shadow-xs transition-all active:scale-95 cursor-pointer"
+                        title="Xem trước bảng Excel"
+                    > 
+                        <Eye size={16} className="text-blue-600" />
                     </button>
-                )}
-
-                {/* Excel Actions */}
-                <button 
-                    onClick={handlePreview} 
-                    className="p-2 bg-white text-blue-700 border border-blue-300 rounded-lg hover:bg-blue-50 text-xs font-semibold shadow-xs transition-all active:scale-95 cursor-pointer"
-                    title="Xem trước bảng Excel"
-                > 
-                    <Eye size={16} className="text-blue-600" />
-                </button>
-                <button 
-                    onClick={handleExport} 
-                    className="p-2 bg-white text-emerald-700 border border-emerald-300 rounded-lg hover:bg-emerald-50 text-xs font-semibold shadow-xs transition-all active:scale-95 cursor-pointer"
-                    title="Xuất file Excel và Bàn giao"
-                > 
-                    <FileSpreadsheet size={16} className="text-emerald-600" />
-                </button>
+                    <button 
+                        onClick={handleExport} 
+                        className="p-2 bg-white text-emerald-700 border border-emerald-300 rounded-lg hover:bg-emerald-50 text-xs font-semibold shadow-xs transition-all active:scale-95 cursor-pointer"
+                        title="Xuất file Excel và Bàn giao"
+                    > 
+                        <FileSpreadsheet size={16} className="text-emerald-600" />
+                    </button>
+                </div>
             </div>
         </div>
 
