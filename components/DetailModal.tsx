@@ -13,6 +13,56 @@ import SystemAnnexTemplate from './receive-record/SystemAnnexTemplate';
 import { getEmployeeName as getEmpNameHelper, getPureBatchNumber, isFieldWorkProcedure, isOfficeOnlySurveyProcedure, getReceiptReceiverName } from '../utils/appHelpers';
 
 
+interface ParsedDocItem {
+  name: string;
+  type: string;
+  original: number;
+  copy: number;
+  note?: string;
+}
+
+const parseOtherDocsForDetail = (raw: string | null | undefined): ParsedDocItem[] => {
+  if (!raw) return [];
+  const str = raw.trim();
+  if (!str) return [];
+
+  if (str.startsWith('[') || str.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(str);
+      const arr = Array.isArray(parsed) ? parsed : [parsed];
+      const result: ParsedDocItem[] = [];
+      
+      for (const item of arr) {
+        if (!item) continue;
+        if (typeof item === 'string') {
+          if (item.trim()) result.push({ name: item.trim(), type: 'Bản chính', original: 1, copy: 0 });
+          continue;
+        }
+        const name = (item.name || item.ten || item.title || item.docName || '').trim();
+        if (!name) continue;
+
+        const type = item.type || item.loai || item.copyType || (item.original ? 'Bản chính' : item.copy ? 'Bản sao' : 'Bản chính');
+        const original = typeof item.original === 'number' ? item.original : (item.soBanChinh ? Number(item.soBanChinh) : (type === 'Bản chính' ? 1 : 0));
+        const copy = typeof item.copy === 'number' ? item.copy : (item.soBanSao ? Number(item.soBanSao) : (type === 'Bản sao' ? 1 : 0));
+        const note = item.note || item.ghiChu || '';
+
+        result.push({ name, type, original, copy, note });
+      }
+      if (result.length > 0) return result;
+    } catch {
+      // JSON parse failed, fallback below
+    }
+  }
+
+  const parts = str.split(/\n|\|/).map(s => s.trim()).filter(Boolean);
+  return parts.map(p => ({
+    name: p,
+    type: 'Bản chính',
+    original: 1,
+    copy: 0
+  }));
+};
+
 interface DetailModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -134,10 +184,12 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
 
               } else {
                   setMatchedContract(null);
-                  // Fallback: Nếu không có hợp đồng nhưng là hồ sơ Trích lục -> Hiển thị 53.163
+                  // Fallback: Nếu không có hợp đồng nhưng là hồ sơ Trích lục -> Hiển thị 53.163, Sao lục -> 310.000
                   const type = (record.recordType || '').toLowerCase();
                   if (type.includes('trích lục')) {
                       setContractPrice(53163);
+                  } else if (type.includes('sao lục') || type.includes('sao luc')) {
+                      setContractPrice(310000);
                   } else {
                       setContractPrice(null);
                   }
@@ -610,8 +662,8 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
         <div className="flex-1 overflow-y-auto p-3 sm:p-6">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
                 
-                {/* COLUMN 1: THÔNG TIN CHUNG */}
-                <div className="space-y-6 order-2 lg:order-1">
+                {/* COLUMN 1: THÔNG TIN CHUNG, ĐỊA CHÍNH, HỢP ĐỒNG & TÀI CHÍNH */}
+                <div className="space-y-6 order-1">
                     {/* KHÁCH HÀNG */}
                     <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
                         <h3 className="text-xs font-bold text-blue-600 uppercase mb-4 flex items-center gap-2 border-l-4 border-blue-600 pl-2">
@@ -712,76 +764,29 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                         )}
                     </div>
 
-                    {/* REMINDER */}
-                    <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
-                        <div className="flex justify-between items-center mb-3">
-                            <h4 className="text-xs font-bold text-blue-600 uppercase flex items-center gap-2">
-                                <Bell size={16} /> Hẹn giờ nhắc việc
-                            </h4>
-                            <button 
-                                onClick={handleSaveReminder} 
-                                disabled={isSavingReminder}
-                                className="text-[10px] bg-blue-600 text-white px-3 py-1.5 rounded flex items-center gap-1 hover:bg-blue-700 disabled:opacity-50 font-bold transition-all"
-                            >
-                                {isSavingReminder ? <Loader2 size={10} className="animate-spin" /> : <Save size={10} />} Lưu
-                            </button>
-                        </div>
-                        <input 
-                            type="date" 
-                            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all"
-                            value={reminderDate}
-                            onChange={(e) => setReminderDate(e.target.value)}
-                        />
-                    </div>
+                    {/* HỢP ĐỒNG SỐ & SỐ TRÍCH ĐO / TRÍCH LỤC (NGAY SAU THÔNG TIN ĐỊA CHÍNH) */}
+                    {(() => {
+                        const isArchive = isArchiveRecordType(record?.recordType || '');
+                        const isContractProcedure = !!(record?.recordType && (getShortRecordType(record.recordType).startsWith('2.2') || getShortRecordType(record.recordType).startsWith('2.4')));
+                        const hasExcerptOrMeasurement = !isArchive && !!(recordTypeLower.includes('trích đo') || recordTypeLower.includes('trích lục') || record?.measurementNumber || record?.excerptNumber);
 
-                    {/* PERSONAL NOTE */}
-                    <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
-                        <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-2 text-blue-600 font-bold text-xs uppercase">
-                                <StickyNote size={16} />
-                                <span>Ghi chú cá nhân</span>
-                            </div>
-                            <button 
-                                onClick={handleSavePersonalNote} 
-                                disabled={isSavingNote}
-                                className="text-[10px] bg-blue-600 text-white px-3 py-1.5 rounded flex items-center gap-1 hover:bg-blue-700 disabled:opacity-50 font-bold transition-all"
-                            >
-                                {isSavingNote ? <Loader2 size={10} className="animate-spin" /> : <Save size={10} />}
-                                Lưu
-                            </button>
-                        </div>
-                        <AutoResizeTextarea
-                            className="w-full bg-white border border-gray-200 rounded-lg p-3 text-sm text-gray-800 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                            placeholder="Nhập ghi chú riêng của bạn..."
-                            value={personalNote}
-                            onChange={(e) => setPersonalNote(e.target.value)}
-                        />
-                    </div>
-                </div>
+                        if (!isContractProcedure && !hasExcerptOrMeasurement && !matchedContract) return null;
 
-                {/* COLUMN 2: CHI TIẾT & TÀI CHÍNH */}
-                <div className="space-y-6 order-3 lg:order-2">
-                    {/* NỘI DUNG */}
-                    <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm h-full flex flex-col">
-                        {/* HÀNG BÁO HỢP ĐỒNG (CHỈ ÁP DỤNG CHO 2.2 VÀ 2.4) & SỐ TRÍCH ĐO / TRÍCH LỤC */}
-                        {(() => {
-                            const isArchive = isArchiveRecordType(record?.recordType || '');
-                            const isContractProcedure = !!(record?.recordType && (getShortRecordType(record.recordType).startsWith('2.2') || getShortRecordType(record.recordType).startsWith('2.4')));
-                            const hasExcerptOrMeasurement = !isArchive && !!(recordTypeLower.includes('trích đo') || recordTypeLower.includes('trích lục') || record?.measurementNumber || record?.excerptNumber);
-
-                            if (!isContractProcedure && !hasExcerptOrMeasurement) return null;
-
-                            return (
-                                <div className={`grid grid-cols-1 ${isContractProcedure && hasExcerptOrMeasurement ? 'sm:grid-cols-2' : ''} gap-3 mb-4`}>
-                                    {/* CỘT HỢP ĐỒNG LIÊN KẾT - CHỈ XUẤT HIỆN CHO THỦ TỤC 2.2 & 2.4 */}
-                                    {isContractProcedure && (
+                        return (
+                            <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+                                <h3 className="text-xs font-bold text-indigo-600 uppercase mb-3 flex items-center gap-2 border-l-4 border-indigo-600 pl-2">
+                                    <FileText size={16}/> Hợp đồng & Trích đo / Trích lục
+                                </h3>
+                                <div className={`grid grid-cols-1 ${(isContractProcedure || matchedContract) && hasExcerptOrMeasurement ? 'sm:grid-cols-2' : ''} gap-3`}>
+                                    {/* HỢP ĐỒNG LIÊN KẾT */}
+                                    {(isContractProcedure || matchedContract) && (
                                         <div className="bg-indigo-50/80 border border-indigo-100 rounded-xl p-3 flex items-center justify-between gap-2">
                                             <div className="flex items-center gap-2.5 min-w-0">
                                                 <div className="bg-indigo-200 text-indigo-700 p-2 rounded-lg shrink-0">
                                                     <FileText size={16} />
                                                 </div>
                                                 <div className="text-left truncate">
-                                                    <span className="text-[10px] text-indigo-600 uppercase font-bold block">Hợp đồng số :</span>
+                                                    <span className="text-[10px] text-indigo-600 uppercase font-bold block">Hợp đồng số:</span>
                                                     <p className="text-xs font-bold text-indigo-950 truncate">
                                                         {matchedContract ? matchedContract.code : 'Chưa có HĐ'}
                                                     </p>
@@ -790,7 +795,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                                         </div>
                                     )}
 
-                                    {/* CỘT SỐ TRÍCH ĐO / SỐ TRÍCH LỤC */}
+                                    {/* SỐ TRÍCH ĐO / SỐ TRÍCH LỤC */}
                                     {hasExcerptOrMeasurement && (
                                         <div className="bg-purple-50/80 border border-purple-100 rounded-xl p-3 flex items-center gap-2.5">
                                             <div className="bg-purple-200 text-purple-700 p-2 rounded-lg shrink-0">
@@ -809,77 +814,44 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                                         </div>
                                     )}
                                 </div>
-                            );
-                        })()}
+                            </div>
+                        );
+                    })()}
 
-                        <h3 className="text-xs font-bold text-purple-600 uppercase mb-4 flex items-center gap-2 border-l-4 border-purple-600 pl-2">
-                            <FileText size={16}/> Nội dung chi tiết
+                    {/* DƯỚI CÙNG LÀ TÀI CHÍNH & BIÊN LAI */}
+                    <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+                        <h3 className="text-xs font-bold text-emerald-700 uppercase mb-4 flex items-center gap-2 border-l-4 border-emerald-600 pl-2">
+                            <Receipt size={16}/> Tài chính & Biên lai
                         </h3>
                         
-                        <div className="bg-gray-50 p-4 rounded-lg border border-gray-100 text-gray-800 text-sm font-medium mb-4 min-h-0 whitespace-pre-wrap">
-                            {record.content || 'Không có nội dung chi tiết.'}
-                        </div>
-
-                        {record.explanationPlan && (
-                            <div className="mb-6">
-                                <label className="text-[10px] text-purple-500 uppercase font-bold block mb-1">Phương án giải trình</label>
-                                <div className="bg-purple-50 p-3 rounded-lg border border-purple-100 text-purple-900 text-sm font-medium">
-                                    {record.explanationPlan}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* KHU VỰC THÔNG TIN THU PHÍ & TRẢ KẾT QUẢ */}
-                        {(record.status === RecordStatus.RETURNED || record.receiptNumber || (record.returnedPrice !== undefined && record.returnedPrice !== null)) && (
-                            <div className="border-t border-gray-100 pt-4 mt-2">
-                                <label className="text-[11px] font-bold text-slate-700 uppercase block mb-2.5 flex items-center gap-1.5">
-                                    <Receipt size={15} className="text-emerald-600" />
-                                    <span>Thông tin Trả kết quả & Thu phí / Lệ phí</span>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {/* Thẻ Số BL/HĐ */}
+                            <div className="bg-blue-50/80 p-3 rounded-xl border border-blue-200/80 flex flex-col justify-center min-w-0">
+                                <label className="text-[10px] text-blue-700 uppercase font-bold block whitespace-nowrap truncate">
+                                    {record.receiptType === 'Biên Lai' ? 'SỐ BIÊN LAI' : record.receiptType === 'Hóa Đơn' ? 'SỐ HÓA ĐƠN' : 'SỐ BIÊN LAI / HÓA ĐƠN'}
                                 </label>
-                                
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                    {/* Thẻ Số tiền */}
-                                    <div className="bg-emerald-50/80 p-3 rounded-xl border border-emerald-200/80 flex flex-col justify-center min-w-0">
-                                        <label className="text-[10px] text-emerald-700 uppercase font-bold block whitespace-nowrap truncate">
-                                            Số tiền thu
-                                        </label>
-                                        <p className="text-sm font-black text-emerald-800 whitespace-nowrap truncate mt-0.5">
-                                            {record.returnedPrice !== undefined && record.returnedPrice !== null
-                                                ? record.returnedPrice.toLocaleString('vi-VN') + ' đ'
-                                                : '---'}
-                                        </p>
-                                    </div>
-
-                                    {/* Thẻ Số BL/HĐ */}
-                                    <div className="bg-blue-50/80 p-3 rounded-xl border border-blue-200/80 flex flex-col justify-center min-w-0">
-                                        <label className="text-[10px] text-blue-700 uppercase font-bold block whitespace-nowrap truncate">
-                                            {record.receiptType === 'Biên Lai' ? 'SỐ BIÊN LAI' : record.receiptType === 'Hóa Đơn' ? 'SỐ HÓA ĐƠN' : 'SỐ BIÊN LAI / HÓA ĐƠN'}
-                                        </label>
-                                        <p className="text-xs font-black text-blue-900 font-mono whitespace-nowrap truncate mt-0.5">
-                                            {record.receiptNumber || '---'}
-                                        </p>
-                                    </div>
-                                </div>
+                                <p className="text-xs font-black text-blue-900 font-mono whitespace-nowrap truncate mt-0.5">
+                                    {record.receiptNumber || '---'}
+                                </p>
                             </div>
-                        )}
 
-                        {/* Ghi chú nội bộ */}
-                        {record.privateNotes && (
-                            <div className="mt-4 pt-4 border-t border-dashed border-gray-200">
-                                <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
-                                    <div className="flex items-center gap-2 mb-1 text-yellow-800 font-bold text-xs">
-                                        <Info size={14} />
-                                        <span>Ghi chú nội bộ</span>
-                                    </div>
-                                    <p className="text-yellow-900 text-xs italic">"{record.privateNotes}"</p>
-                                </div>
+                            {/* Thẻ Số tiền */}
+                            <div className="bg-emerald-50/80 p-3 rounded-xl border border-emerald-200/80 flex flex-col justify-center min-w-0">
+                                <label className="text-[10px] text-emerald-700 uppercase font-bold block whitespace-nowrap truncate">
+                                    Số tiền thu
+                                </label>
+                                <p className="text-sm font-black text-emerald-800 whitespace-nowrap truncate mt-0.5">
+                                    {record.returnedPrice !== undefined && record.returnedPrice !== null
+                                        ? record.returnedPrice.toLocaleString('vi-VN') + ' đ'
+                                        : (record.price ? record.price.toLocaleString('vi-VN') + ' đ' : '---')}
+                                </p>
                             </div>
-                        )}
+                        </div>
                     </div>
                 </div>
 
-                {/* COLUMN 3: TIẾN ĐỘ & NHẮC VIỆC */}
-                <div className="space-y-6 order-1 lg:order-3">
+                {/* COLUMN 2: TIẾN ĐỘ & THỜI GIAN */}
+                <div className="space-y-6 order-2">
                     {/* TIMELINE */}
                     <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
                         <div className="bg-indigo-600 px-5 py-3 flex items-center gap-2">
@@ -1029,6 +1001,122 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                             />
                         </div>
                     </div>
+                </div>
+
+                {/* COLUMN 3: NỘI DUNG CHI TIẾT (TRÍCH YẾU), GIẤY TỜ KÈM THEO, HẸN GIỜ LÀM VIỆC, GHI CHÚ CÁ NHÂN */}
+                <div className="space-y-6 order-3">
+                    {/* NỘI DUNG CHI TIẾT (TRÍCH YẾU) */}
+                    <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col">
+                        <h3 className="text-xs font-bold text-purple-600 uppercase mb-3 flex items-center gap-2 border-l-4 border-purple-600 pl-2">
+                            <FileText size={16}/> Nội dung chi tiết (Trích yếu)
+                        </h3>
+                        
+                        <div className="bg-gray-50 p-4 rounded-lg border border-gray-100 text-gray-800 text-sm font-medium mb-3 min-h-0 whitespace-pre-wrap">
+                            {record.content || 'Không có nội dung chi tiết.'}
+                        </div>
+
+                        {record.explanationPlan && (
+                            <div>
+                                <label className="text-[10px] text-purple-500 uppercase font-bold block mb-1">Phương án giải trình</label>
+                                <div className="bg-purple-50 p-3 rounded-lg border border-purple-100 text-purple-900 text-sm font-medium">
+                                    {record.explanationPlan}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* GIẤY TỜ KÈM THEO */}
+                    {(() => {
+                        const docList = parseOtherDocsForDetail(record.otherDocs);
+                        return (
+                            <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <h3 className="text-xs font-bold text-emerald-700 uppercase flex items-center gap-2 border-l-4 border-emerald-600 pl-2">
+                                        <FileDown size={16} />
+                                        <span>Giấy tờ kèm theo {docList.length > 0 ? `(${docList.length})` : ''}</span>
+                                    </h3>
+                                </div>
+                                {docList.length > 0 ? (
+                                    <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                                        {docList.map((doc, idx) => (
+                                            <div key={idx} className="bg-emerald-50/50 p-2.5 rounded-lg border border-emerald-100 text-slate-800 text-xs space-y-1">
+                                                <div className="flex items-start justify-between gap-2">
+                                                    <span className="font-semibold text-slate-900 leading-snug">{doc.name}</span>
+                                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 shrink-0">
+                                                        {doc.type}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center gap-3 text-[11px] text-slate-500">
+                                                    <span>Bản chính: <strong className="text-slate-700">{doc.original}</strong></span>
+                                                    <span>Bản sao: <strong className="text-slate-700">{doc.copy}</strong></span>
+                                                    {doc.note && <span className="italic text-slate-400">({doc.note})</span>}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <p className="text-xs text-gray-400 italic">Không có giấy tờ kèm theo.</p>
+                                )}
+                            </div>
+                        );
+                    })()}
+
+                    {/* HẸN GIỜ LÀM VIỆC */}
+                    <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+                        <div className="flex justify-between items-center mb-3">
+                            <h4 className="text-xs font-bold text-blue-600 uppercase flex items-center gap-2 border-l-4 border-blue-600 pl-2">
+                                <Bell size={16} /> Hẹn giờ làm việc
+                            </h4>
+                            <button 
+                                onClick={handleSaveReminder} 
+                                disabled={isSavingReminder}
+                                className="text-[10px] bg-blue-600 text-white px-3 py-1.5 rounded flex items-center gap-1 hover:bg-blue-700 disabled:opacity-50 font-bold transition-all cursor-pointer"
+                            >
+                                {isSavingReminder ? <Loader2 size={10} className="animate-spin" /> : <Save size={10} />} Lưu
+                            </button>
+                        </div>
+                        <input 
+                            type="date" 
+                            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all"
+                            value={reminderDate}
+                            onChange={(e) => setReminderDate(e.target.value)}
+                        />
+                    </div>
+
+                    {/* GHI CHÚ CÁ NHÂN */}
+                    <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+                        <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2 text-blue-600 font-bold text-xs uppercase border-l-4 border-blue-600 pl-2">
+                                <StickyNote size={16} />
+                                <span>Ghi chú cá nhân</span>
+                            </div>
+                            <button 
+                                onClick={handleSavePersonalNote} 
+                                disabled={isSavingNote}
+                                className="text-[10px] bg-blue-600 text-white px-3 py-1.5 rounded flex items-center gap-1 hover:bg-blue-700 disabled:opacity-50 font-bold transition-all cursor-pointer"
+                            >
+                                {isSavingNote ? <Loader2 size={10} className="animate-spin" /> : <Save size={10} />}
+                                Lưu
+                            </button>
+                        </div>
+                        <AutoResizeTextarea
+                            className="w-full bg-white border border-gray-200 rounded-lg p-3 text-sm text-gray-800 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                            placeholder="Nhập ghi chú riêng của bạn..."
+                            value={personalNote}
+                            onChange={(e) => setPersonalNote(e.target.value)}
+                        />
+                    </div>
+
+                    {/* GHI CHÚ NỘI BỘ */}
+                    {record.privateNotes && (
+                        <div className="bg-yellow-50 p-4 rounded-xl border border-yellow-200">
+                            <div className="flex items-center gap-2 mb-1 text-yellow-800 font-bold text-xs">
+                                <Info size={14} />
+                                <span>Ghi chú nội bộ</span>
+                            </div>
+                            <p className="text-yellow-900 text-xs italic">"{record.privateNotes}"</p>
+                        </div>
+                    )}
                 </div>
 
             </div>

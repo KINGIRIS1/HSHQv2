@@ -171,6 +171,15 @@ export const exportReportToExcel = async (
             rawPrice = contractInfo.amount;
         }
 
+        const typeLower = (r.recordType || '').toLowerCase();
+        if (!rawPrice || rawPrice === '0') {
+            if (typeLower.includes('trích lục')) {
+                rawPrice = (53163).toLocaleString('vi-VN');
+            } else if (typeLower.includes('sao lục') || typeLower.includes('sao luc')) {
+                rawPrice = (310000).toLocaleString('vi-VN');
+            }
+        }
+
         return [
             i + 1,
             r.code,

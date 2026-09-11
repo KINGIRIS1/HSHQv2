@@ -625,18 +625,28 @@ function App() {
               recordUpdates.statusLogs = createStatusLog(r, value, 'Cập nhật trạng thái hàng loạt');
               
               if (extraData?.assignedTo) {
+                  const selectedEmp = employees.find(e => e.id === extraData?.assignedTo || e.name === extraData?.assignedTo);
+                  const empId = selectedEmp ? selectedEmp.id : extraData.assignedTo;
+                  const empName = selectedEmp ? selectedEmp.name : extraData.assignedTo;
+
                   if (value === RecordStatus.RECEIVED) {
-                      recordUpdates.receivedBy = extraData.assignedTo;
-                  } else if (value === RecordStatus.IN_PROGRESS || value === RecordStatus.ASSIGNED || value === RecordStatus.FIELD_WORK || value === RecordStatus.OFFICE_WORK) {
-                      recordUpdates.assignedTo = extraData.assignedTo;
-                      if (value === RecordStatus.FIELD_WORK) recordUpdates.surveyorId = extraData.assignedTo;
-                      if (value === RecordStatus.OFFICE_WORK) recordUpdates.drafterId = extraData.assignedTo;
+                      recordUpdates.receivedBy = empId;
+                  } else if (value === RecordStatus.FIELD_WORK) {
+                      recordUpdates.surveyorId = empId;
+                      recordUpdates.assignedTo = empId;
+                  } else if (value === RecordStatus.OFFICE_WORK) {
+                      recordUpdates.drafterId = empId;
+                      recordUpdates.assignedTo = empId;
+                  } else if (value === RecordStatus.IN_PROGRESS || value === RecordStatus.ASSIGNED) {
+                      recordUpdates.assignedTo = empId;
                   } else if (value === RecordStatus.PENDING_CHECK) {
-                      recordUpdates.checkedBy = extraData.assignedTo;
+                      recordUpdates.checkedBy = empId;
                   } else if (value === RecordStatus.PENDING_SIGN || value === RecordStatus.SIGNED) {
-                      recordUpdates.submittedTo = extraData.assignedTo;
+                      recordUpdates.submittedTo = empId;
+                  } else if (value === RecordStatus.HANDOVER || value === RecordStatus.RETURNED) {
+                      recordUpdates.returnedBy = empName || empId;
                   } else {
-                      recordUpdates.assignedTo = extraData.assignedTo;
+                      recordUpdates.assignedTo = empId;
                   }
               }
 
@@ -655,13 +665,16 @@ function App() {
                   recordUpdates.completedWorkDate = targetDateStr;
               } else if (value === RecordStatus.PENDING_CHECK) {
                   recordUpdates.pendingCheckDate = targetDateStr;
+                  recordUpdates.checkedDate = targetDateStr;
               } else if (value === RecordStatus.PENDING_SIGN) {
                   recordUpdates.submissionDate = targetDateStr;
               } else if (value === RecordStatus.SIGNED) {
                   recordUpdates.approvalDate = targetDateStr;
+                  if (!r.submissionDate && !recordUpdates.submissionDate) recordUpdates.submissionDate = targetDateStr;
               } else if (value === RecordStatus.HANDOVER) {
                   recordUpdates.exportDate = targetDateStr;
                   recordUpdates.completedDate = targetDateStr;
+                  recordUpdates.handover_date = targetDateStr;
               } else if (value === RecordStatus.RETURNED) {
                   recordUpdates.resultReturnedDate = targetDateStr;
               } else if (value === RecordStatus.REJECTED || value === RecordStatus.WITHDRAWN) {
@@ -669,35 +682,63 @@ function App() {
               }
           } else if ((field as string) === 'historyStatus') {
               const stepKey = String(value);
-              const empName = extraData?.assignedTo;
+              const selectedEmp = employees.find(e => e.id === extraData?.assignedTo || e.name === extraData?.assignedTo);
+              const empName = selectedEmp ? selectedEmp.name : extraData?.assignedTo;
+              const empId = selectedEmp ? selectedEmp.id : extraData?.assignedTo;
               const stepDate = extraData?.customDate || customDateStr;
+              const finalStaff = empName || empId;
 
-              if (stepKey === 'ASSIGNED') {
-                  if (empName) {
-                      recordUpdates.assignedTo = empName;
-                      recordUpdates.surveyorId = empName;
+              if (stepKey === 'RECEIVED') {
+                  if (finalStaff) recordUpdates.receivedBy = empId || empName;
+                  if (stepDate) recordUpdates.receivedDate = stepDate;
+              } else if (stepKey === 'FIELD_WORK' || stepKey === 'ASSIGNED') {
+                  if (finalStaff) {
+                      recordUpdates.assignedTo = empId || empName;
+                      recordUpdates.surveyorId = empId || empName;
                   }
                   if (stepDate) {
                       recordUpdates.assignedDate = stepDate;
                       recordUpdates.fieldAssignedDate = stepDate;
                   }
+              } else if (stepKey === 'IN_PROGRESS') {
+                  if (finalStaff) {
+                      recordUpdates.assignedTo = empId || empName;
+                  }
+                  if (stepDate) {
+                      recordUpdates.assignedDate = stepDate;
+                  }
               } else if (stepKey === 'OFFICE_WORK') {
-                  if (empName) recordUpdates.drafterId = empName;
+                  if (finalStaff) {
+                      recordUpdates.drafterId = empId || empName;
+                  }
                   if (stepDate) {
                       recordUpdates.officeAssignedDate = stepDate;
                       recordUpdates.officeCompletedDate = stepDate;
                   }
-              } else if (stepKey === 'CHECKING') {
-                  if (empName) recordUpdates.checkedBy = empName;
-                  if (stepDate) recordUpdates.checkedDate = stepDate;
-              } else if (stepKey === 'SIGNING') {
-                  if (empName) recordUpdates.submittedTo = empName;
-                  if (stepDate) recordUpdates.approvalDate = stepDate;
-              } else if (stepKey === 'COMPLETED') {
-                  if (empName) recordUpdates.created_by = empName;
-                  if (stepDate) recordUpdates.completedDate = stepDate;
+              } else if (stepKey === 'CHECKING' || stepKey === 'PENDING_CHECK') {
+                  if (finalStaff) recordUpdates.checkedBy = empId || empName;
+                  if (stepDate) {
+                      recordUpdates.pendingCheckDate = stepDate;
+                      recordUpdates.checkedDate = stepDate;
+                  }
+              } else if (stepKey === 'SIGNING' || stepKey === 'PENDING_SIGN') {
+                  if (finalStaff) recordUpdates.submittedTo = empId || empName;
+                  if (stepDate) {
+                      recordUpdates.submissionDate = stepDate;
+                      recordUpdates.approvalDate = stepDate;
+                  }
+              } else if (stepKey === 'COMPLETED' || stepKey === 'HANDOVER') {
+                  if (finalStaff) {
+                      recordUpdates.returnedBy = finalStaff;
+                      recordUpdates.created_by = finalStaff;
+                  }
+                  if (stepDate) {
+                      recordUpdates.completedDate = stepDate;
+                      recordUpdates.exportDate = stepDate;
+                      recordUpdates.handover_date = stepDate;
+                  }
               } else if (stepKey === 'RETURNED') {
-                  if (empName) recordUpdates.returnedBy = empName;
+                  if (finalStaff) recordUpdates.returnedBy = finalStaff;
                   if (stepDate) recordUpdates.resultReturnedDate = stepDate;
               }
           } else if ((field as string) === 'officeAssignedDate') {

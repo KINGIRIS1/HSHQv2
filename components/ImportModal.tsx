@@ -279,11 +279,6 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
                 record.deadline = calculateDeadline(record.recordType, record.receivedDate);
             }
 
-            const rTypeStr = String(record.recordType || '').toLowerCase();
-            if (rTypeStr.includes('1.2') || rTypeStr.includes('công văn') || rTypeStr.includes('cong van') || rTypeStr.includes('cung cấp tài liệu') || rTypeStr.includes('sao lục') || record.recordType === '1.1 CC DL ĐĐ' || record.recordType === '1.1 Sao lục') {
-                if (!record.price) record.price = 310000;
-            }
-
             const exportBatchRaw = getVal(['ĐỢT', 'BATCH', 'exportbatch', 'export_batch', 'exportBatch']);
             if (exportBatchRaw !== undefined) {
                 const numStr = String(exportBatchRaw).replace(/[^0-9]/g, '');

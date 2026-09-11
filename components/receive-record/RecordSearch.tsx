@@ -1056,7 +1056,7 @@ export const RecordSearch: React.FC<RecordSearchProps> = ({
                                                 </div>
                                             ) : (
                                                 <div className="flex flex-col items-center justify-center gap-1 py-0.5">
-                                                    {/* Hàng trên: Xem & Gia hạn */}
+                                                    {/* Hàng trên: Xem, In biên nhận & Gia hạn */}
                                                     <div className="flex items-center gap-1">
                                                         <button
                                                             onClick={() => setSelectedDetailRecord(r)}
@@ -1064,6 +1064,13 @@ export const RecordSearch: React.FC<RecordSearchProps> = ({
                                                             title="Xem chi tiết"
                                                         >
                                                             <Eye size={15} />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => onPrint(r)}
+                                                            className="p-1 text-amber-700 hover:bg-amber-100 rounded transition-colors border border-amber-200 bg-amber-50 cursor-pointer"
+                                                            title="In biên nhận"
+                                                        >
+                                                            <Printer size={15} />
                                                         </button>
                                                         <button
                                                             onClick={() => setSelectedExtendRecord(r)}

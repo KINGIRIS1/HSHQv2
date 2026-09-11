@@ -71,8 +71,6 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
                 let returned = 0;
                 if (r.returnedPrice !== undefined && r.returnedPrice !== null && String(r.returnedPrice).trim() !== '' && !isNaN(Number(r.returnedPrice))) {
                     returned = Number(r.returnedPrice);
-                } else if (r.recordType === 'Cung cấp tài liệu đất đai') {
-                    returned = 310000;
                 } else if (contractP !== undefined && contractP !== null && !isNaN(Number(contractP)) && Number(contractP) > 0) {
                     returned = Number(contractP);
                 } else if (r.price !== undefined && r.price !== null && !isNaN(Number(r.price)) && Number(r.price) > 0) {
@@ -80,8 +78,33 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
                 } else if (r.status === RecordStatus.RETURNED || r.status === RecordStatus.HANDOVER) {
                     returned = price;
                 }
+
+                if (returned === 0) {
+                    const rType = (r.recordType || '').toLowerCase();
+                    if (rType.includes('trích lục')) returned = 53163;
+                    else if (rType.includes('sao lục') || rType.includes('sao luc')) returned = 310000;
+                }
                 
                 const receiptType = getRecordReceiptType(r);
+
+                // Determine staff who confirmed result handover (Nhân viên TKQ)
+                let returnedStaffName = '—';
+                if (r.returnedBy) {
+                    const emp = employees.find(e => e.id === r.returnedBy || e.name === r.returnedBy);
+                    returnedStaffName = emp ? emp.name : r.returnedBy;
+                } else if (r.statusLogs && r.statusLogs.length > 0) {
+                    const returnLog = [...r.statusLogs].reverse().find(l => l.newStatus === RecordStatus.RETURNED || l.newStatus === 'Đã trả kết quả');
+                    if (returnLog?.changedBy) {
+                        const emp = employees.find(e => e.id === returnLog.changedBy || e.name === returnLog.changedBy);
+                        returnedStaffName = emp ? emp.name : returnLog.changedBy;
+                    }
+                }
+                if (returnedStaffName === '—' && (r.status === RecordStatus.RETURNED || r.status === RecordStatus.HANDOVER)) {
+                    if (r.assignedTo) {
+                        const emp = employees.find(e => e.id === r.assignedTo || e.name === r.assignedTo);
+                        returnedStaffName = emp ? emp.name : r.assignedTo;
+                    }
+                }
 
                 // Determine assigned ward for resolving the record
                 let assignedWard = r.ward || r.handoverWard || '';
@@ -109,7 +132,8 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
                     calcPrice: price,
                     calcReturned: returned,
                     computedReceiptType: receiptType,
-                    assignedWard
+                    assignedWard,
+                    returnedStaffName
                 };
             })
             // Only include records with revenue or receipt/invoice recorded
@@ -192,7 +216,8 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
                 const matchName = removeVietnameseTones(r.customerName || '').toLowerCase().includes(term);
                 const matchReceipt = removeVietnameseTones(r.receiptNumber || '').toLowerCase().includes(term);
                 const matchWard = removeVietnameseTones(r.assignedWard || '').toLowerCase().includes(term);
-                if (!matchCode && !matchName && !matchReceipt && !matchWard) return false;
+                const matchStaff = removeVietnameseTones((r as any).returnedStaffName || '').toLowerCase().includes(term);
+                if (!matchCode && !matchName && !matchReceipt && !matchWard && !matchStaff) return false;
             }
 
             return true;
@@ -267,7 +292,7 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
             'Loại chứng từ': r.computedReceiptType,
             'Số BL/HĐ': r.receiptNumber || '—',
             'Số tiền thu (Đ)': r.calcReturned,
-            'Xã phân công giải quyết': r.assignedWard
+            'Nhân viên TKQ': (r as any).returnedStaffName || '—'
         }));
 
         const worksheet = XLSX.utils.json_to_sheet(rows);
@@ -360,11 +385,12 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
                                 <th className="p-3.5 w-32">MÃ HỒ SƠ</th>
                                 <th className="p-3.5 min-w-[180px]">THÔNG TIN CHỦ SỬ DỤNG</th>
                                 <th className="p-3.5 w-36">LOẠI HỒ SƠ</th>
+                                <th className="p-3.5 w-36">XÃ PHÂN CÔNG GIẢI QUYẾT</th>
                                 <th className="p-3.5 w-32 text-center">NGÀY THU TIỀN</th>
                                 <th className="p-3.5 w-32 text-center">LOẠI CHỨNG TỪ</th>
                                 <th className="p-3.5 w-32 text-center">SỐ BIÊN LAI/HĐ</th>
                                 <th className="p-3.5 w-36 text-right">SỐ TIỀN THU</th>
-                                <th className="p-3.5 w-44">XÃ PHÂN CÔNG GIẢI QUYẾT</th>
+                                <th className="p-3.5 w-44">NHÂN VIÊN TKQ</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -384,6 +410,11 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
                                             </td>
                                             <td className="p-3.5 text-slate-600 font-medium">
                                                 {getShortRecordType(r.recordType)}
+                                            </td>
+                                            <td className="p-3.5 text-slate-700 font-medium">
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                                                    {r.assignedWard || 'Chưa phân công'}
+                                                </span>
                                             </td>
                                             <td className="p-3.5 text-center text-slate-500 font-medium">
                                                 {(() => {
@@ -416,8 +447,8 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
                                                 {r.calcReturned.toLocaleString('vi-VN')} đ
                                             </td>
                                             <td className="p-3.5 text-slate-700 font-medium">
-                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
-                                                    {r.assignedWard}
+                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200/60">
+                                                    {(r as any).returnedStaffName || '—'}
                                                 </span>
                                             </td>
                                         </tr>
@@ -425,7 +456,7 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
                                 })
                             ) : (
                                 <tr>
-                                    <td colSpan={9} className="p-12 text-center text-slate-400 italic">
+                                    <td colSpan={10} className="p-12 text-center text-slate-400 italic">
                                         Không tìm thấy dữ liệu nguồn thu phù hợp.
                                     </td>
                                 </tr>
@@ -476,10 +507,13 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
                                                 <span className="text-slate-400">Ngày thu:</span> <span className="font-medium text-slate-800">{dateStr}</span>
                                             </div>
                                             <div>
-                                                <span className="text-slate-400">Số tiền:</span> <span className="font-mono font-bold text-emerald-600">{r.calcReturned.toLocaleString('vi-VN')} đ</span>
+                                                <span className="text-slate-400">Xã phân công:</span> <span className="font-semibold text-slate-800">{r.assignedWard || 'Chưa phân công'}</span>
                                             </div>
                                             <div>
-                                                <span className="text-slate-400">Địa bàn:</span> <span className="font-medium text-slate-800">{r.assignedWard}</span>
+                                                <span className="text-slate-400">Số tiền:</span> <span className="font-mono font-bold text-emerald-600">{r.calcReturned.toLocaleString('vi-VN')} đ</span>
+                                            </div>
+                                            <div className="col-span-2">
+                                                <span className="text-slate-400">Nhân viên TKQ:</span> <span className="font-medium text-slate-800">{(r as any).returnedStaffName || '—'}</span>
                                             </div>
                                         </div>
                                     </div>

@@ -4,7 +4,7 @@ import { RecordFile, RecordStatus, Employee, User, UserRole } from '../types';
 import AutoResizeTextarea from './AutoResizeTextarea';
 import { GROUPS, EXTENDED_RECORD_TYPES, STATUS_LABELS, SELECTABLE_STATUSES, ARCHIVE_SELECTABLE_STATUSES, SURVEY_SELECTABLE_STATUSES, getShortRecordType, getWardLabel, getNormalizedWard, isArchiveRecordType } from '../constants';
 import { X, Save, Lock, User as UserIcon, MapPin, FileText, Calendar, FileCheck, ChevronDown, ChevronUp } from 'lucide-react';
-import { calculateDeadlineHelper, getDepartmentForRecord, isProcedure2_3, syncRecordStatusTransition, getPureBatchNumber, groupEmployeesByDepartment, isFieldWorkProcedure, isOfficeOnlySurveyProcedure, deriveActualSurveyStatus } from '../utils/appHelpers';
+import { calculateDeadlineHelper, getDepartmentForRecord, isProcedure2_3, syncRecordStatusTransition, getPureBatchNumber, groupEmployeesByDepartment, isFieldWorkProcedure, isOfficeOnlySurveyProcedure, deriveActualSurveyStatus, getDerivedStatusFromDates, cleanFutureMilestoneDates } from '../utils/appHelpers';
 import { fetchContracts } from '../services/api';
 
 interface AttachedDocItem {
@@ -159,9 +159,6 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
         if (initialData) {
             const dataToSet = { ...initialData };
             const rLower = String(dataToSet.recordType || '').toLowerCase();
-            if ((rLower.includes('1.2') || rLower.includes('công văn') || rLower.includes('cong van') || rLower.includes('sao lục') || dataToSet.recordType === '1.1 Sao lục' || dataToSet.recordType === '1.1 CC DL ĐĐ' || dataToSet.recordType === '1.1 Sao lục hồ sơ' || dataToSet.recordType === '1.1 Cung cấp dữ liệu đất đai') && !dataToSet.price) {
-                dataToSet.price = 310000;
-            }
             if (!dataToSet.status) {
                 dataToSet.status = RecordStatus.RECEIVED;
             }
@@ -184,13 +181,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                     return;
                 }
 
-                // 2. Cung cấp tài liệu đất đai hoặc 1.2 Công văn
-                if (rLower.includes('cung cấp tài liệu') || rLower.includes('cung cấp tldđ') || rLower.includes('cung cấp tlđđ') || rLower.includes('1.2') || rLower.includes('công văn') || rLower.includes('cong van')) {
-                    setFormData(prev => ({ ...prev, returnedPrice: 310000 }));
-                    return;
-                }
-
-                // 3. Tra cứu hợp đồng giống DetailModal
+                // 2. Tra cứu hợp đồng giống DetailModal
                 try {
                     const fetchedContracts = await fetchContracts();
                     const match = fetchedContracts.find(c => {
@@ -231,6 +222,12 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                 // 4. Trích lục bản đồ địa chính
                 if (rLower.includes('trích lục')) {
                     setFormData(prev => ({ ...prev, returnedPrice: 53163 }));
+                    return;
+                }
+
+                // 5. Sao lục hồ sơ địa chính
+                if (rLower.includes('sao lục') || rLower.includes('sao luc')) {
+                    setFormData(prev => ({ ...prev, returnedPrice: 310000 }));
                     return;
                 }
             };
@@ -295,75 +292,40 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
       alert("Vui lòng chọn loại hồ sơ / thủ tục trước khi lưu!");
       return;
     }
-    const finalData = { ...formData };
+    let finalData: any = { ...formData };
     if (!finalData.receivedBy && currentUser) {
         finalData.receivedBy = currentUser.employeeId || currentUser.name || currentUser.username || '';
     }
     
-    // Chuỗi tiến trình chuẩn bao gồm cả các bước đo thực địa và biên tập bản đồ
-    const flow = [
-        RecordStatus.RECEIVED, RecordStatus.ASSIGNED, RecordStatus.IN_PROGRESS, 
-        RecordStatus.FIELD_WORK, RecordStatus.OFFICE_WORK,
-        RecordStatus.COMPLETED_WORK, RecordStatus.PENDING_CHECK, 
-        RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER, RecordStatus.RETURNED
-    ];
+    const isArchive = isArchiveRecordType(finalData.recordType || '') || ((finalData as any).department && String((finalData as any).department).toLowerCase().includes('lưu trữ'));
 
-    if (hasAdminRights && finalData.status) {
-        if (initialData?.status && finalData.status !== initialData?.status) {
-            const prevIdx = flow.indexOf(initialData.status);
-            const newIdx = flow.indexOf(finalData.status);
-
-            if (newIdx >= 0 && prevIdx >= 0 && newIdx < prevIdx) {
-                // Quay lùi bước -> Chỉ dọn dẹp các mốc ngày tương lai, GIỮ NGUYÊN người thực hiện (checkedBy, submittedTo, receiverName)
-                if (newIdx < flow.indexOf(RecordStatus.ASSIGNED)) {
-                    finalData.assignedDate = null as any;
-                }
-                if (newIdx < flow.indexOf(RecordStatus.COMPLETED_WORK)) finalData.completedWorkDate = null as any;
-                if (newIdx < flow.indexOf(RecordStatus.PENDING_CHECK)) {
-                    finalData.pendingCheckDate = null as any;
-                    finalData.checkedDate = null as any;
-                }
-                if (newIdx < flow.indexOf(RecordStatus.PENDING_SIGN)) {
-                    finalData.submissionDate = null as any;
-                }
-                if (newIdx < flow.indexOf(RecordStatus.SIGNED)) {
-                    finalData.approvalDate = null as any;
-                }
-                if (newIdx < flow.indexOf(RecordStatus.HANDOVER)) {
-                    finalData.completedDate = null as any;
-                    finalData.exportBatch = null as any;
-                    finalData.exportDate = null as any;
-                    finalData.is_handover = false;
-                    finalData.handover_date = null as any;
-                    finalData.resultReturnedDate = null as any;
-                }
-            }
-        }
-    }
-
-    if (finalData.status === RecordStatus.WITHDRAWN && !finalData.completedDate) finalData.completedDate = new Date().toISOString();
-    if (finalData.status === RecordStatus.REJECTED && !finalData.completedDate) finalData.completedDate = new Date().toISOString();
-    
     if (finalData.exportBatch !== undefined && finalData.exportBatch !== null) {
         finalData.exportBatch = getPureBatchNumber(finalData.exportBatch) || undefined;
     }
 
-    const curIdx = finalData.status ? flow.indexOf(finalData.status) : -1;
-    if (curIdx >= flow.indexOf(RecordStatus.HANDOVER)) {
-        if (finalData.resultReturnedDate && finalData.status !== RecordStatus.RETURNED) {
-            finalData.status = RecordStatus.RETURNED;
-            if (!finalData.completedDate) finalData.completedDate = finalData.resultReturnedDate;
-        }
-        if ((finalData.exportBatch || finalData.exportDate) && finalData.status !== RecordStatus.WITHDRAWN && finalData.status !== RecordStatus.RETURNED && finalData.status !== RecordStatus.REJECTED) {
-            finalData.status = RecordStatus.HANDOVER;
-            if (!finalData.completedDate) {
-                finalData.completedDate = finalData.exportDate ? finalData.exportDate : new Date().toISOString();
-            }
-        }
+    if (finalData.status === RecordStatus.WITHDRAWN && !finalData.completedDate) finalData.completedDate = new Date().toISOString();
+    if (finalData.status === RecordStatus.REJECTED && !finalData.completedDate) finalData.completedDate = new Date().toISOString();
+
+    // 1. Tự động kiểm tra và mở khóa:
+    // Nếu trạng thái đang là RETURNED nhưng người dùng đã xóa resultReturnedDate
+    // -> Tự động quay lùi trạng thái về mốc thời gian cao nhất còn lại (Bàn giao, Đã duyệt ký, Trình ký, ...)
+    if (finalData.status === RecordStatus.RETURNED && (!finalData.resultReturnedDate || String(finalData.resultReturnedDate).trim() === '')) {
+        finalData.status = getDerivedStatusFromDates(finalData, { isArchive });
     }
 
-    // Áp dụng đồng bộ trạng thái trung tâm
+    // 2. Nếu có điền resultReturnedDate và không ở trạng thái hủy/từ chối -> Trạng thái là Đã trả kết quả
+    if (finalData.resultReturnedDate && String(finalData.resultReturnedDate).trim() !== '' && finalData.status !== RecordStatus.WITHDRAWN && finalData.status !== RecordStatus.REJECTED) {
+        finalData.status = RecordStatus.RETURNED;
+        if (!finalData.completedDate) finalData.completedDate = finalData.resultReturnedDate;
+    }
+
     const targetStatus = finalData.status || RecordStatus.RECEIVED;
+
+    // 3. Dọn dẹp triệt để các mốc ngày và thông tin tương lai vượt quá targetStatus
+    const cleanedMilestones = cleanFutureMilestoneDates(finalData, targetStatus);
+    finalData = { ...finalData, ...cleanedMilestones };
+
+    // 4. Áp dụng đồng bộ trạng thái trung tâm
     const syncedUpdates = syncRecordStatusTransition(initialData || {}, targetStatus, {
         userName: currentUser.name || currentUser.username || 'Hệ thống',
         userId: currentUser.id,
@@ -391,8 +353,8 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
         returnedPrice: finalData.returnedPrice
     });
 
-    // Gộp dữ liệu: syncedUpdates cung cấp các giá trị tự động, nhưng ưu tiên tối thượng cho các trường người dùng chỉnh sửa trong form
-    const mergedData = {
+    // 5. Gộp dữ liệu an toàn
+    const mergedData: any = {
         ...syncedUpdates,
         ...finalData,
     };
@@ -415,7 +377,9 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
     ] as const;
 
     for (const df of dateFields) {
-        if (finalData[df] !== undefined && finalData[df] !== '') {
+        if (cleanedMilestones[df] === null) {
+            mergedData[df] = null;
+        } else if (finalData[df] !== undefined && finalData[df] !== '') {
             mergedData[df] = finalData[df];
         } else if (syncedUpdates[df] !== undefined && syncedUpdates[df] !== '') {
             mergedData[df] = syncedUpdates[df];
@@ -436,177 +400,122 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
       
       if (field === 'status') {
         const newStatus = value as RecordStatus;
-        const statusFlow = [
-          RecordStatus.RECEIVED,
-          RecordStatus.ASSIGNED,
-          RecordStatus.IN_PROGRESS,
-          RecordStatus.FIELD_WORK,
-          RecordStatus.OFFICE_WORK,
-          RecordStatus.COMPLETED_WORK,
-          RecordStatus.PENDING_CHECK,
-          RecordStatus.PENDING_SIGN,
-          RecordStatus.SIGNED,
-          RecordStatus.HANDOVER,
-          RecordStatus.RETURNED
-        ];
-        const oldIdx = prev.status ? statusFlow.indexOf(prev.status) : -1;
-        const newIdx = statusFlow.indexOf(newStatus);
-
-        let rollbackFields: Partial<RecordFile> = {};
-        if (newIdx >= 0) {
-          if (newIdx < statusFlow.indexOf(RecordStatus.RETURNED)) {
-            rollbackFields.resultReturnedDate = '';
-            rollbackFields.receiptNumber = '';
-            rollbackFields.returnedPrice = 0;
-          }
-          if (newIdx < statusFlow.indexOf(RecordStatus.HANDOVER)) {
-            rollbackFields.completedDate = '';
-            rollbackFields.exportBatch = '';
-            rollbackFields.exportDate = '';
-            rollbackFields.is_handover = false;
-            rollbackFields.handover_date = '';
-            rollbackFields.handoverWard = null;
-            rollbackFields.receiverName = '';
-          }
-          if (newIdx < statusFlow.indexOf(RecordStatus.SIGNED)) {
-            rollbackFields.approvalDate = '';
-          }
-          if (newIdx < statusFlow.indexOf(RecordStatus.PENDING_SIGN)) {
-            rollbackFields.submissionDate = '';
-            rollbackFields.submittedTo = '';
-          }
-          if (newIdx < statusFlow.indexOf(RecordStatus.PENDING_CHECK)) {
-            rollbackFields.pendingCheckDate = '';
-            rollbackFields.checkedDate = '';
-            rollbackFields.checkedBy = '';
-          }
-          if (newIdx < statusFlow.indexOf(RecordStatus.COMPLETED_WORK)) {
-            rollbackFields.completedWorkDate = '';
-          }
-          if (newIdx < statusFlow.indexOf(RecordStatus.OFFICE_WORK)) {
-            rollbackFields.officeAssignedDate = '';
-            rollbackFields.officeCompletedDate = '';
-            rollbackFields.drafterId = '';
-          }
-          if (newIdx < statusFlow.indexOf(RecordStatus.FIELD_WORK)) {
-            rollbackFields.fieldAssignedDate = '';
-            rollbackFields.fieldCompletedDate = '';
-            rollbackFields.surveyorId = '';
-          }
-          if (newIdx < statusFlow.indexOf(RecordStatus.ASSIGNED) || newStatus === RecordStatus.RECEIVED) {
-            rollbackFields.assignedDate = '';
-            rollbackFields.assignedTo = '';
-          }
-        }
+        const cleanedMilestones = cleanFutureMilestoneDates(prev, newStatus);
+        
+        const rollbackFields: Partial<RecordFile> = {};
+        Object.keys(cleanedMilestones).forEach(k => {
+            if ((cleanedMilestones as any)[k] === null) {
+                (rollbackFields as any)[k] = '';
+            }
+        });
 
         const synced = syncRecordStatusTransition(prev, newStatus, {
           userName: currentUser.name || currentUser.username || 'Hệ thống',
           userId: currentUser.id,
           customDates: {
             receivedDate: prev.receivedDate,
-            assignedDate: newIdx >= statusFlow.indexOf(RecordStatus.ASSIGNED) ? prev.assignedDate : undefined,
-            fieldAssignedDate: newIdx >= statusFlow.indexOf(RecordStatus.FIELD_WORK) ? prev.fieldAssignedDate : undefined,
-            fieldCompletedDate: newIdx >= statusFlow.indexOf(RecordStatus.FIELD_WORK) ? prev.fieldCompletedDate : undefined,
-            officeAssignedDate: newIdx >= statusFlow.indexOf(RecordStatus.OFFICE_WORK) ? prev.officeAssignedDate : undefined,
-            officeCompletedDate: newIdx >= statusFlow.indexOf(RecordStatus.OFFICE_WORK) ? prev.officeCompletedDate : undefined,
-            completedWorkDate: newIdx >= statusFlow.indexOf(RecordStatus.COMPLETED_WORK) ? prev.completedWorkDate : undefined,
-            pendingCheckDate: newIdx >= statusFlow.indexOf(RecordStatus.PENDING_CHECK) ? prev.pendingCheckDate : undefined,
-            checkedDate: newIdx >= statusFlow.indexOf(RecordStatus.PENDING_SIGN) ? prev.checkedDate : undefined,
-            submissionDate: newIdx >= statusFlow.indexOf(RecordStatus.PENDING_SIGN) ? prev.submissionDate : undefined,
-            approvalDate: newIdx >= statusFlow.indexOf(RecordStatus.SIGNED) ? prev.approvalDate : undefined,
-            completedDate: newIdx >= statusFlow.indexOf(RecordStatus.HANDOVER) ? prev.completedDate : undefined,
-            exportDate: newIdx >= statusFlow.indexOf(RecordStatus.HANDOVER) ? prev.exportDate : undefined,
-            resultReturnedDate: newIdx >= statusFlow.indexOf(RecordStatus.RETURNED) ? prev.resultReturnedDate : undefined
+            assignedDate: prev.assignedDate,
+            fieldAssignedDate: prev.fieldAssignedDate,
+            fieldCompletedDate: prev.fieldCompletedDate,
+            officeAssignedDate: prev.officeAssignedDate,
+            officeCompletedDate: prev.officeCompletedDate,
+            completedWorkDate: prev.completedWorkDate,
+            pendingCheckDate: prev.pendingCheckDate,
+            checkedDate: prev.checkedDate,
+            submissionDate: prev.submissionDate,
+            approvalDate: prev.approvalDate,
+            completedDate: prev.completedDate,
+            exportDate: prev.exportDate,
+            resultReturnedDate: prev.resultReturnedDate
           }
         });
-        updated = { ...updated, ...synced, ...rollbackFields };
+        updated = { ...updated, ...synced, ...rollbackFields, status: newStatus };
       }
 
-      // Tự động chuyển trạng thái khi điền ngày giao việc / ngày đo đạc / ngày biên tập
-      if (field === 'assignedDate') {
-        if (value) {
-          const recType = updated.recordType || '';
-          if (isArchiveRecordType(recType)) {
-            if (updated.status === RecordStatus.RECEIVED) {
-              updated.status = RecordStatus.ASSIGNED;
+      // Tự động đồng bộ trạng thái khi thay đổi hoặc xóa các mốc ngày tháng
+      const milestoneDateFields: (keyof RecordFile)[] = [
+        'resultReturnedDate',
+        'completedDate',
+        'exportDate',
+        'approvalDate',
+        'submissionDate',
+        'checkedDate',
+        'pendingCheckDate',
+        'completedWorkDate',
+        'officeCompletedDate',
+        'officeAssignedDate',
+        'fieldCompletedDate',
+        'fieldAssignedDate',
+        'assignedDate'
+      ];
+
+      if (milestoneDateFields.includes(field)) {
+        const isArchive = isArchiveRecordType(updated.recordType || '') || ((updated as any).department && String((updated as any).department).toLowerCase().includes('lưu trữ'));
+        
+        if (!value) {
+            // Khi xóa mốc ngày: Tự động đưa về trạng thái ứng với mốc thời gian còn lại gần nhất
+            if (updated.status !== RecordStatus.WITHDRAWN && updated.status !== RecordStatus.REJECTED) {
+                const derivedStatus = getDerivedStatusFromDates(updated, { isArchive });
+                updated.status = derivedStatus;
+                const cleaned = cleanFutureMilestoneDates(updated, derivedStatus);
+                Object.keys(cleaned).forEach(k => {
+                    if ((cleaned as any)[k] === null) {
+                        (updated as any)[k] = '';
+                    }
+                });
             }
-          } else if (isFieldWorkProcedure(recType)) {
-            if (!updated.fieldAssignedDate) {
-              updated.fieldAssignedDate = value;
+        } else {
+            // Khi điền hoặc chọn mốc ngày:
+            if (field === 'resultReturnedDate') {
+                if (updated.status !== RecordStatus.WITHDRAWN && updated.status !== RecordStatus.REJECTED) {
+                    updated.status = RecordStatus.RETURNED;
+                    if (!updated.completedDate) updated.completedDate = value;
+                }
+            } else if (field === 'completedDate' || field === 'exportDate') {
+                if (updated.status !== RecordStatus.WITHDRAWN && updated.status !== RecordStatus.REJECTED && updated.status !== RecordStatus.RETURNED) {
+                    updated.status = RecordStatus.HANDOVER;
+                }
+            } else if (field === 'approvalDate') {
+                if (updated.status !== RecordStatus.WITHDRAWN && updated.status !== RecordStatus.REJECTED && updated.status !== RecordStatus.RETURNED && updated.status !== RecordStatus.HANDOVER) {
+                    updated.status = RecordStatus.SIGNED;
+                }
+            } else if (field === 'submissionDate' || field === 'checkedDate') {
+                if (updated.status !== RecordStatus.WITHDRAWN && updated.status !== RecordStatus.REJECTED && updated.status !== RecordStatus.RETURNED && updated.status !== RecordStatus.HANDOVER && updated.status !== RecordStatus.SIGNED) {
+                    updated.status = RecordStatus.PENDING_SIGN;
+                }
+            } else if (field === 'pendingCheckDate') {
+                if (updated.status !== RecordStatus.WITHDRAWN && updated.status !== RecordStatus.REJECTED && updated.status !== RecordStatus.RETURNED && updated.status !== RecordStatus.HANDOVER && updated.status !== RecordStatus.SIGNED && updated.status !== RecordStatus.PENDING_SIGN) {
+                    updated.status = RecordStatus.PENDING_CHECK;
+                }
+            } else if (field === 'completedWorkDate') {
+                if (updated.status === RecordStatus.RECEIVED || updated.status === RecordStatus.ASSIGNED || updated.status === RecordStatus.FIELD_WORK || updated.status === RecordStatus.OFFICE_WORK) {
+                    updated.status = isArchive ? RecordStatus.ASSIGNED : RecordStatus.COMPLETED_WORK;
+                }
+            } else if (field === 'officeAssignedDate' || field === 'officeCompletedDate') {
+                if (field === 'officeAssignedDate' && !updated.assignedDate) updated.assignedDate = value;
+                if (updated.status === RecordStatus.RECEIVED || updated.status === RecordStatus.FIELD_WORK || updated.status === RecordStatus.ASSIGNED) {
+                    updated.status = isArchive ? RecordStatus.ASSIGNED : RecordStatus.OFFICE_WORK;
+                }
+            } else if (field === 'fieldAssignedDate' || field === 'fieldCompletedDate') {
+                if (field === 'fieldAssignedDate' && !updated.assignedDate) updated.assignedDate = value;
+                if (updated.status === RecordStatus.RECEIVED) {
+                    updated.status = isArchive ? RecordStatus.ASSIGNED : RecordStatus.FIELD_WORK;
+                }
+            } else if (field === 'assignedDate') {
+                if (updated.status === RecordStatus.RECEIVED) {
+                    if (isArchive) {
+                        updated.status = RecordStatus.ASSIGNED;
+                    } else if (isFieldWorkProcedure(updated.recordType || '')) {
+                        updated.status = RecordStatus.FIELD_WORK;
+                        if (!updated.fieldAssignedDate) updated.fieldAssignedDate = value;
+                    } else if (isOfficeOnlySurveyProcedure(updated.recordType || '')) {
+                        updated.status = RecordStatus.OFFICE_WORK;
+                        if (!updated.officeAssignedDate) updated.officeAssignedDate = value;
+                    } else {
+                        updated.status = RecordStatus.FIELD_WORK;
+                    }
+                }
             }
-            if (updated.status === RecordStatus.RECEIVED) {
-              updated.status = RecordStatus.FIELD_WORK;
-            }
-          } else if (isOfficeOnlySurveyProcedure(recType)) {
-            if (!updated.officeAssignedDate) {
-              updated.officeAssignedDate = value;
-            }
-            if (updated.status === RecordStatus.RECEIVED) {
-              updated.status = RecordStatus.OFFICE_WORK;
-            }
-          } else {
-            if (updated.status === RecordStatus.RECEIVED) {
-              updated.status = RecordStatus.FIELD_WORK;
-            }
-          }
-        }
-      }
-
-      if (field === 'fieldAssignedDate' || field === 'fieldCompletedDate') {
-        if (value) {
-          if (field === 'fieldAssignedDate') {
-            updated.fieldAssignedDate = value;
-            updated.assignedDate = value;
-          } else {
-            updated.fieldCompletedDate = value;
-          }
-          if (updated.status === RecordStatus.RECEIVED) {
-            updated.status = RecordStatus.FIELD_WORK;
-          }
-        }
-      }
-
-      if (field === 'officeAssignedDate' || field === 'officeCompletedDate') {
-        if (value) {
-          if (field === 'officeAssignedDate') {
-            updated.officeAssignedDate = value;
-            updated.assignedDate = value;
-          } else {
-            updated.officeCompletedDate = value;
-          }
-          if (updated.status === RecordStatus.RECEIVED || updated.status === RecordStatus.FIELD_WORK || updated.status === RecordStatus.ASSIGNED) {
-            updated.status = RecordStatus.OFFICE_WORK;
-          }
-        }
-      }
-
-      if (field === 'pendingCheckDate') {
-        if (value && (!updated.status || updated.status === RecordStatus.RECEIVED || updated.status === RecordStatus.ASSIGNED || updated.status === RecordStatus.IN_PROGRESS || updated.status === RecordStatus.FIELD_WORK || updated.status === RecordStatus.OFFICE_WORK)) {
-          updated.status = RecordStatus.PENDING_CHECK;
-        }
-      }
-
-      if (field === 'checkedDate') {
-        if (value && (!updated.status || updated.status === RecordStatus.RECEIVED || updated.status === RecordStatus.ASSIGNED || updated.status === RecordStatus.IN_PROGRESS || updated.status === RecordStatus.FIELD_WORK || updated.status === RecordStatus.OFFICE_WORK || updated.status === RecordStatus.PENDING_CHECK)) {
-          updated.status = RecordStatus.PENDING_SIGN;
-        }
-      }
-
-      if (field === 'submissionDate') {
-        if (value && (!updated.status || updated.status === RecordStatus.RECEIVED || updated.status === RecordStatus.ASSIGNED || updated.status === RecordStatus.IN_PROGRESS || updated.status === RecordStatus.FIELD_WORK || updated.status === RecordStatus.OFFICE_WORK || updated.status === RecordStatus.PENDING_CHECK)) {
-          updated.status = RecordStatus.PENDING_SIGN;
-        }
-      }
-
-      if (field === 'approvalDate') {
-        if (value && (!updated.status || updated.status === RecordStatus.RECEIVED || updated.status === RecordStatus.ASSIGNED || updated.status === RecordStatus.IN_PROGRESS || updated.status === RecordStatus.FIELD_WORK || updated.status === RecordStatus.OFFICE_WORK || updated.status === RecordStatus.PENDING_CHECK || updated.status === RecordStatus.PENDING_SIGN)) {
-          updated.status = RecordStatus.SIGNED;
-        }
-      }
-
-      if (field === 'completedDate') {
-        if (value && updated.status !== RecordStatus.WITHDRAWN && updated.status !== RecordStatus.REJECTED && updated.status !== RecordStatus.RETURNED) {
-          updated.status = RecordStatus.HANDOVER;
         }
       }
 
@@ -658,11 +567,6 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
           if (!value) {
             updated.price = undefined;
             updated.returnedPrice = undefined;
-          } else {
-            const rLower = String(value || '').toLowerCase();
-            if (rLower.includes('1.2') || rLower.includes('công văn') || rLower.includes('cong van') || rLower.includes('sao lục') || value === '1.1 Sao lục' || value === '1.1 CC DL ĐĐ' || value === '1.1 Sao lục hồ sơ' || value === '1.1 Cung cấp dữ liệu đất đai') {
-              updated.price = 310000;
-            }
           }
         }
       }
@@ -1263,6 +1167,70 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                             })()}
                         </div>
 
+                        {/* THÔNG TIN TRẢ KẾT QUẢ & THU PHÍ (ĐẶT TRÊN GHI CHÚ NỘI BỘ) */}
+                        {isEdit && (canEditResult || hasAdminRights) && (
+                            <div className="bg-emerald-50/70 p-4 rounded-lg border border-emerald-200 shadow-sm">
+                                <h4 className="text-xs font-bold text-emerald-800 uppercase flex items-center gap-2 mb-3">
+                                    <FileCheck size={16} className="text-emerald-600" />
+                                    <span>Thông tin Trả kết quả & Biên lai / Hóa đơn</span>
+                                </h4>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div>
+                                        <label className="block text-xs font-bold text-emerald-800 mb-1">
+                                            Ngày trả kết quả
+                                        </label>
+                                        <input 
+                                            type="date" 
+                                            className="w-full border border-emerald-300 rounded-md px-3 py-2 bg-white font-bold text-emerald-800 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none" 
+                                            value={dateVal(formData.resultReturnedDate)} 
+                                            onChange={(e) => handleChange('resultReturnedDate', e.target.value)} 
+                                        />
+                                    </div>
+                                    <div>
+                                        <div className="flex items-center justify-between mb-1">
+                                            <label className="block text-xs font-bold text-emerald-800">
+                                                {formData.receiptType === 'Biên Lai' ? 'Số Biên lai' : formData.receiptType === 'Hóa Đơn' ? 'Số Hóa đơn' : 'Số Biên lai / Hóa đơn'}
+                                            </label>
+                                            <div className="flex items-center gap-2 text-[10px]">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleChange('receiptType', formData.receiptType === 'Biên Lai' ? 'Hóa Đơn' : 'Biên Lai')}
+                                                    className="text-emerald-700 underline hover:text-emerald-900 font-semibold"
+                                                >
+                                                    {formData.receiptType === 'Biên Lai' ? 'Đổi sang HĐ' : 'Đổi sang BL'}
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <input 
+                                            type="text" 
+                                            className="w-full border border-emerald-300 rounded-md px-3 py-2 font-mono bg-white text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none" 
+                                            value={val(formData.receiptNumber)} 
+                                            onChange={(e) => handleChange('receiptNumber', e.target.value)} 
+                                            placeholder="Nhập số biên lai/hóa đơn..." 
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-emerald-800 mb-1">
+                                            Số tiền (VNĐ)
+                                        </label>
+                                        <input 
+                                            type="number" 
+                                            className="w-full border border-emerald-300 rounded-md px-3 py-2 font-bold text-emerald-900 bg-white text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none" 
+                                            value={formData.returnedPrice !== undefined && formData.returnedPrice !== null ? formData.returnedPrice : (formData.price !== undefined && formData.price !== null ? formData.price : '')} 
+                                            onChange={(e) => {
+                                                const valNum = parseFloat(e.target.value) || 0;
+                                                handleChange('returnedPrice', valNum);
+                                                if (formData.price === undefined || formData.price === null) {
+                                                    handleChange('price', valNum);
+                                                }
+                                            }} 
+                                            placeholder="Nhập số tiền..." 
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                          {hasAdminRights && isEdit && (
                             <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
                                 <div className="flex items-center gap-2 mb-1"><Lock size={14} className="text-yellow-600" /><label className="text-xs font-bold text-yellow-800 uppercase">Ghi chú nội bộ</label></div>
@@ -1311,28 +1279,6 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                                 </div>
                             );
                         })()}
-
-                        {canEditResult && formData.status === RecordStatus.RETURNED && (
-                            <div className="bg-emerald-50 p-4 rounded-lg border border-emerald-200">
-                                <h4 className="text-sm font-bold text-emerald-800 flex items-center gap-2 mb-3"><FileCheck size={16} /> TRẢ KẾT QUẢ CHO DÂN</h4>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    <div>
-                                        <label className="block text-xs font-bold text-emerald-700 mb-1">Ngày trả kết quả</label>
-                                        <input type="date" className="w-full border border-emerald-300 rounded-md px-3 py-2 bg-white font-bold text-emerald-800" value={dateVal(formData.resultReturnedDate)} onChange={(e) => handleChange('resultReturnedDate', e.target.value)} />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-bold text-emerald-700 mb-1">
-                                            {formData.receiptType === 'Biên Lai' ? 'Số Biên lai' : formData.receiptType === 'Hóa Đơn' ? 'Số Hóa đơn' : 'Số Biên lai / Hóa đơn'}
-                                        </label>
-                                        <input type="text" className="w-full border border-emerald-300 rounded-md px-3 py-2 font-mono bg-white" value={val(formData.receiptNumber)} onChange={(e) => handleChange('receiptNumber', e.target.value)} placeholder="Nhập số biên lai/hóa đơn..." />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-bold text-emerald-700 mb-1">Số tiền (VNĐ)</label>
-                                        <input type="number" className="w-full border border-emerald-300 rounded-md px-3 py-2 font-bold text-emerald-900 bg-white" value={formData.returnedPrice !== undefined && formData.returnedPrice !== null ? formData.returnedPrice : ''} onChange={(e) => handleChange('returnedPrice', parseFloat(e.target.value) || 0)} placeholder="Nhập số tiền..." />
-                                    </div>
-                                </div>
-                            </div>
-                        )}
                     </div>
                 </div>
             </form>

@@ -158,22 +158,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
                 setAttachedDocs([]);
                 newData.otherDocs = '';
             } else {
-                const vLower = String(value || '').toLowerCase();
-                if (
-                    value === '1.1 Sao lục' || 
-                    value === '1.1 CC DL ĐĐ' || 
-                    value === 'Cung cấp tài liệu đất đai' || 
-                    value === '1.1 Cung cấp dữ liệu đất đai' ||
-                    value === '1.1 Sao lục hồ sơ' ||
-                    vLower.includes('sao lục') ||
-                    vLower.includes('1.2') || 
-                    vLower.includes('công văn') || 
-                    vLower.includes('cong van')
-                ) {
-                    newData.price = 310000;
-                } else {
-                    newData.price = null;
-                }
+                newData.price = null;
 
                 // Auto-populate default documents for "1.1 Sao lục hồ sơ" and "Hồ sơ đo đạc" (starts with 2.)
                 if (value === '1.1 Sao lục hồ sơ' || value === '1.1 Sao lục' || value === '1.1 Cung cấp dữ liệu đất đai' || value === '1.1 CC DL ĐĐ' || value.startsWith('2.')) {

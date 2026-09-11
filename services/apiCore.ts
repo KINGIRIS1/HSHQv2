@@ -405,9 +405,11 @@ export const mapRecordFromDb = (item: any): any => {
     const isArchive = isArchiveRecordType(r.recordType) || r.sourceTable === 'luutru_records';
     const isOfficeProcedure = isOfficeOnlySurveyProcedure(r.recordType);
 
-    if (r.resultReturnedDate) {
+    if (currentStatus === RecordStatus.WITHDRAWN || currentStatus === RecordStatus.REJECTED) {
+        r.status = currentStatus as RecordStatus;
+    } else if (r.resultReturnedDate) {
         r.status = RecordStatus.RETURNED;
-    } else if (r.completedDate) {
+    } else if (r.completedDate && (!currentStatus || currentStatus === RecordStatus.RETURNED || currentStatus === RecordStatus.HANDOVER || currentStatus === RecordStatus.RECEIVED || currentStatus === RecordStatus.ASSIGNED || currentStatus === RecordStatus.FIELD_WORK || currentStatus === RecordStatus.OFFICE_WORK || currentStatus === RecordStatus.PENDING_CHECK || currentStatus === RecordStatus.PENDING_SIGN || currentStatus === RecordStatus.SIGNED)) {
         r.status = RecordStatus.HANDOVER;
     } else if (r.approvalDate && (!currentStatus || currentStatus === RecordStatus.RECEIVED || currentStatus === RecordStatus.ASSIGNED || currentStatus === RecordStatus.FIELD_WORK || currentStatus === RecordStatus.OFFICE_WORK || currentStatus === RecordStatus.PENDING_CHECK || currentStatus === RecordStatus.PENDING_SIGN)) {
         r.status = RecordStatus.SIGNED;

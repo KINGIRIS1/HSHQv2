@@ -107,6 +107,43 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
 
   const [activeTab, setActiveTab] = useState<'info' | 'timeline' | 'notes'>('info');
 
+  // Swipe gesture detection to switch tabs
+  const touchStartXRef = React.useRef<number | null>(null);
+  const touchStartYRef = React.useRef<number | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartXRef.current = e.touches[0].clientX;
+    touchStartYRef.current = e.touches[0].clientY;
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartXRef.current === null || touchStartYRef.current === null) return;
+    const touchEndX = e.changedTouches[0].clientX;
+    const touchEndY = e.changedTouches[0].clientY;
+    const deltaX = touchEndX - touchStartXRef.current;
+    const deltaY = touchEndY - touchStartYRef.current;
+
+    // Trigger swipe if horizontal displacement is >= 40px and predominantly horizontal
+    if (Math.abs(deltaX) >= 40 && Math.abs(deltaX) > Math.abs(deltaY) * 1.25) {
+      const tabs: Array<'info' | 'timeline' | 'notes'> = ['info', 'timeline', 'notes'];
+      const currentIndex = tabs.indexOf(activeTab);
+      if (deltaX < 0) {
+        // Swiped left -> Next tab
+        if (currentIndex < tabs.length - 1) {
+          setActiveTab(tabs[currentIndex + 1]);
+        }
+      } else {
+        // Swiped right -> Previous tab
+        if (currentIndex > 0) {
+          setActiveTab(tabs[currentIndex - 1]);
+        }
+      }
+    }
+
+    touchStartXRef.current = null;
+    touchStartYRef.current = null;
+  };
+
   // State cho Phụ lục
   const [isAnnexModalOpen, setIsAnnexModalOpen] = useState(false);
   const [contracts, setContracts] = useState<any[]>([]);
@@ -171,6 +208,7 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
           setMatchedContract(null);
           const type = (record.recordType || '').toLowerCase();
           if (type.includes('trích lục')) setContractPrice(53163);
+          else if (type.includes('sao lục') || type.includes('sao luc')) setContractPrice(310000);
           else setContractPrice(null);
           setContractSplitItems(null);
           setLiquidationInfo(null);
@@ -531,7 +569,11 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 overflow-y-auto bg-slate-100/70 p-2.5 sm:p-4 space-y-2.5 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))]">
+      <div 
+        className="flex-1 overflow-y-auto bg-slate-100/70 p-2.5 sm:p-4 space-y-2.5 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] touch-pan-y"
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
         {activeTab === 'info' && (
           <div className="space-y-2.5">
             {/* Status Banner */}

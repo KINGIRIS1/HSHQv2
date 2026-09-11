@@ -1001,11 +1001,11 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                 id="btn-export-filtered-records-excel"
                 onClick={handleExportFilteredExcel}
                 disabled={isExportingExcel || props.filteredRecords.length === 0}
-                className="flex items-center justify-center p-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed text-white rounded-lg shadow-sm transition-all cursor-pointer shrink-0 active:scale-95"
+                className="flex items-center justify-center p-2 bg-white text-emerald-700 border border-emerald-300 hover:bg-emerald-50 rounded-lg shadow-xs transition-all cursor-pointer shrink-0 active:scale-95 disabled:bg-gray-100 disabled:text-gray-400 disabled:border-gray-200 disabled:cursor-not-allowed"
                 title={`Xuất file Excel theo kết quả lọc (${props.filteredRecords.length} hồ sơ)`}
                 aria-label="Xuất file Excel"
               >
-                <FileSpreadsheet size={18} />
+                <FileSpreadsheet size={18} className="text-emerald-600 shrink-0" />
               </button>
             </div>
           </div>
