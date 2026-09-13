@@ -963,7 +963,8 @@ export const BatchErrorDiagnosticModal: React.FC<BatchErrorDiagnosticModalProps>
 
                       <button
                         onClick={async () => {
-                          if (window.confirm(`Xác nhận xóa bỏ hồ sơ MS: ${item.record.code || item.record.id} (${item.record.customerName || 'Chưa tên'}) khỏi hệ thống?`)) {
+                          const recordCode = item.record.code || item.record.id;
+                          if (await confirmAction(`Bạn có đồng ý xóa mã hồ sơ số ${recordCode} không?`, 'Xác nhận xóa hồ sơ')) {
                             if (onDeleteBatchRecords) {
                               await onDeleteBatchRecords([item.record.id]);
                             }

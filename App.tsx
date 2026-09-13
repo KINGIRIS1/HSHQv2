@@ -36,6 +36,7 @@ import { checkAndTriggerWeeklyBackup, downloadBackupAsFile } from './services/ba
 import { checkAndTriggerPeriodicExcelBackup, performExcelBackup } from './services/excelBackupService';
 import CloudDatabaseInspector from './components/CloudDatabaseInspector';
 import ConnectionGuardOverlay from './components/ConnectionGuardOverlay';
+import { DriveSyncToastContainer } from './components/common/DriveSyncToastContainer';
 
 function App() {
   const isMobile = useIsMobile(768);
@@ -1476,8 +1477,20 @@ function App() {
             handleDeleteAllData={handleDeleteAllData}
             onRefreshData={loadData}
             confirmAssign={confirmAssign}
-            handleDeleteRecord={() => { if(deletingRecord) handleDeleteRecord(deletingRecord.id); }}
-            confirmDelete={(r) => handleDeleteRecord(r.id)}
+            handleDeleteRecord={() => { 
+                if (deletingRecord) { 
+                    handleDeleteRecord(deletingRecord.id); 
+                    setDeletingRecord(null);
+                    setIsDeleteModalOpen(false);
+                    if (viewingRecord && viewingRecord.id === deletingRecord.id) {
+                        setViewingRecord(null);
+                    }
+                } 
+            }}
+            confirmDelete={(r) => {
+                setDeletingRecord(r);
+                setIsDeleteModalOpen(true);
+            }}
             handleExcelPreview={(wb, name) => { setPreviewWorkbook(wb); setPreviewExcelName(name); setIsExcelPreviewOpen(true); }}
             executeBatchExport={executeBatchExport}
             executeReturnBatchHandover={executeReturnBatchHandover}
@@ -1706,8 +1719,20 @@ function App() {
             handleDeleteAllData={handleDeleteAllData}
             onRefreshData={loadData}
             confirmAssign={confirmAssign}
-            handleDeleteRecord={() => { if(deletingRecord) handleDeleteRecord(deletingRecord.id); }}
-            confirmDelete={(r) => handleDeleteRecord(r.id)}
+            handleDeleteRecord={() => { 
+                if (deletingRecord) { 
+                    handleDeleteRecord(deletingRecord.id); 
+                    setDeletingRecord(null);
+                    setIsDeleteModalOpen(false);
+                    if (viewingRecord && viewingRecord.id === deletingRecord.id) {
+                        setViewingRecord(null);
+                    }
+                } 
+            }}
+            confirmDelete={(r) => {
+                setDeletingRecord(r);
+                setIsDeleteModalOpen(true);
+            }}
             handleExcelPreview={(wb, name) => { setPreviewWorkbook(wb); setPreviewExcelName(name); setIsExcelPreviewOpen(true); }}
             executeBatchExport={executeBatchExport}
             executeReturnBatchHandover={executeReturnBatchHandover}
@@ -1889,6 +1914,7 @@ function App() {
             loadData();
           }}
         />
+        <DriveSyncToastContainer />
     </MainLayout>
   );
 }

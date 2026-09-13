@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { 
   Upload, FileText, Trash2, Download, Eye, AlertCircle, 
-  CheckCircle2, Folder, ExternalLink, HelpCircle 
+  CheckCircle2, Folder, ExternalLink, HelpCircle, Clock, Loader2
 } from 'lucide-react';
 import { AttachedFileMeta, AttachmentDocType } from '../../types';
 import { 
@@ -13,8 +13,11 @@ import {
   saveAttachmentBlob, 
   downloadAttachment, 
   previewAttachment, 
+  isPreviewableFile,
   deleteAttachmentBlob,
-  getGoogleDriveIncomingUrl 
+  getGoogleDriveIncomingUrl,
+  preparePendingSingleAttachment,
+  deleteFileFromGoogleDriveScript
 } from '../../services/attachmentStorage';
 
 interface RecordAttachmentManagerProps {
@@ -65,50 +68,20 @@ export const RecordAttachmentManager: React.FC<RecordAttachmentManagerProps> = (
       const existingSameTypeCount = newFiles.filter(f => f.docType === selectedDocType).length;
       const sequenceIndex = existingSameTypeCount + 1;
 
-      // Đổi tên tệp tự động theo cú pháp: [Mã_HS]_[Tên_Viết_Tắt]_[STT].[ext]
-      const standardizedName = generateStandardizedFileName(
-        recordCode || 'HS-MOI',
-        selectedDocType,
-        sequenceIndex,
-        file.name
-      );
-
-      const fileId = `att_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-
-      // Đọc base64 cho tệp nhỏ < 1.5MB để dự phòng offline
-      let base64Data: string | undefined = undefined;
-      if (file.size <= 1.5 * 1024 * 1024) {
-        try {
-          base64Data = await new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result as string);
-            reader.onerror = () => resolve(undefined);
-            reader.readAsDataURL(file);
-          });
-        } catch {
-          base64Data = undefined;
-        }
+      try {
+        const meta = await preparePendingSingleAttachment(
+          file,
+          recordCode || 'HS-MOI',
+          selectedDocType,
+          sequenceIndex,
+          department || 'Tổ Đo đạc',
+          'Tiếp nhận'
+        );
+        newFiles.push(meta);
+        addedCount++;
+      } catch (err: any) {
+        setErrorMsg(err.message || `Lỗi khi lưu tạm tệp ${file.name}`);
       }
-
-      const meta: AttachedFileMeta = {
-        id: fileId,
-        recordCode: recordCode || 'HS-MOI',
-        originalName: file.name,
-        fileName: standardizedName,
-        docType: selectedDocType,
-        docTypeLabel: DOC_TYPE_LABELS[selectedDocType] || 'Tài liệu',
-        fileSize: file.size,
-        fileType: file.type || 'application/octet-stream',
-        uploadedAt: new Date().toISOString(),
-        department: department || 'Tổ Đo đạc',
-        storageId: fileId,
-        base64Data,
-      };
-
-      // Lưu trữ Blob vào IndexedDB
-      await saveAttachmentBlob(meta, file);
-      newFiles.push(meta);
-      addedCount++;
     }
 
     setIsProcessing(false);
@@ -123,14 +96,33 @@ export const RecordAttachmentManager: React.FC<RecordAttachmentManagerProps> = (
     } else if (rejectedImagesCount > 0 && addedCount === 0) {
       setErrorMsg(`Từ chối ${rejectedImagesCount} tệp ảnh! Hệ thống chỉ hỗ trợ lưu trữ tệp tài liệu (PDF, Word, Excel, CAD/DWG...), không lưu tệp ảnh.`);
     } else if (addedCount > 0) {
-      setSuccessMsg(`Đã thêm thành công ${addedCount} tệp đính kèm và tự động đổi tên theo mã hồ sơ.`);
+      setSuccessMsg(`Đã lưu tạm thành công ${addedCount} tệp đính kèm. Tệp sẽ được tự động đồng bộ lên Google Drive khi bấm Lưu/In/Cập nhật.`);
       setTimeout(() => setSuccessMsg(null), 4000);
     }
   };
 
   const handleDelete = async (fileId: string) => {
     if (readOnly) return;
-    await deleteAttachmentBlob(fileId);
+    const targetFile = attachedFiles.find(f => f.id === fileId);
+    
+    // Cập nhật trạng thái đang xóa tệp để hiển thị spinner
+    onChange(attachedFiles.map(f => f.id === fileId ? { ...f, status: 'deleting' } : f));
+
+    if (targetFile?.driveFileId) {
+      // Gọi xóa tệp trên Google Drive (chuyển vào thùng rác)
+      try {
+        await deleteFileFromGoogleDriveScript(targetFile.driveFileId);
+      } catch (err) {
+        console.warn('Lỗi xóa tệp trên Google Drive:', err);
+      }
+    }
+
+    try {
+      await deleteAttachmentBlob(fileId);
+    } catch {
+      // bỏ qua nếu lỗi
+    }
+
     const updated = attachedFiles.filter(f => f.id !== fileId);
     onChange(updated);
   };
@@ -271,6 +263,27 @@ export const RecordAttachmentManager: React.FC<RecordAttachmentManagerProps> = (
                     <span>{file.docTypeLabel}</span>
                     <span>•</span>
                     <span>{formatFileSize(file.fileSize)}</span>
+                    {file.status === 'uploading' ? (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9px] bg-blue-100 text-blue-800 font-bold shrink-0 animate-pulse">
+                        <Loader2 size={10} className="animate-spin" />
+                        Đang đẩy Drive...
+                      </span>
+                    ) : file.status === 'deleting' ? (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9px] bg-rose-100 text-rose-800 font-bold shrink-0 animate-pulse">
+                        <Loader2 size={10} className="animate-spin" />
+                        Đang xóa Drive...
+                      </span>
+                    ) : file.driveUrl || file.driveFileId ? (
+                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] bg-emerald-100 text-emerald-800 font-bold shrink-0">
+                        <CheckCircle2 size={10} />
+                        Drive
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] bg-amber-100 text-amber-800 font-bold shrink-0" title="Tệp đang được lưu tạm trên máy, sẽ tự động tải lên Google Drive khi bấm Lưu/In">
+                        <Clock size={10} />
+                        Lưu tạm
+                      </span>
+                    )}
                     {file.originalName && file.originalName !== file.fileName && (
                       <>
                         <span>•</span>
@@ -285,14 +298,16 @@ export const RecordAttachmentManager: React.FC<RecordAttachmentManagerProps> = (
 
               {/* Thao tác Xem / Tải về / Xóa */}
               <div className="flex items-center gap-1 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => previewAttachment(file)}
-                  className="p-1.5 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
-                  title="Xem trước"
-                >
-                  <Eye size={15} />
-                </button>
+                {isPreviewableFile(file) && (
+                  <button
+                    type="button"
+                    onClick={() => previewAttachment(file)}
+                    className="p-1.5 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors cursor-pointer"
+                    title="Xem trước"
+                  >
+                    <Eye size={15} />
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => downloadAttachment(file)}
@@ -304,11 +319,16 @@ export const RecordAttachmentManager: React.FC<RecordAttachmentManagerProps> = (
                 {!readOnly && (
                   <button
                     type="button"
+                    disabled={file.status === 'deleting' || file.status === 'uploading'}
                     onClick={() => handleDelete(file.id)}
-                    className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors"
-                    title="Xóa tệp"
+                    className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors disabled:opacity-50"
+                    title={file.status === 'deleting' ? 'Đang xóa...' : 'Xóa tệp'}
                   >
-                    <Trash2 size={15} />
+                    {file.status === 'deleting' ? (
+                      <Loader2 size={15} className="animate-spin text-rose-600" />
+                    ) : (
+                      <Trash2 size={15} />
+                    )}
                   </button>
                 )}
               </div>

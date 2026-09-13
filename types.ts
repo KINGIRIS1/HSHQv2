@@ -284,6 +284,11 @@ export interface AttachedFileMeta {
   stage?: string; // 'Tiếp nhận' | 'Biên tập bản đồ' | 'Trình kiểm tra' | 'Trình ký' | 'Ký duyệt'
   storageId?: string; // Khóa trong IndexedDB
   base64Data?: string; // Dữ liệu base64 dự phòng cho tệp nhỏ (<1MB)
+  driveUrl?: string; // Link xem trực tiếp tệp được lưu trên Google Drive
+  driveFileId?: string; // ID của tệp trên Google Drive
+  uploadError?: string; // Lỗi/Cảnh báo nếu chưa tải lên Google Drive được
+  sha256?: string; // Mã băm SHA-256 nội dung tệp để kiểm tra trùng lặp
+  status?: 'idle' | 'uploading' | 'deleting' | 'error'; // Trạng thái xử lý ngầm
 }
 
 export interface RecordStatusLog {

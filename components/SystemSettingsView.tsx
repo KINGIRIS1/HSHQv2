@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Database, AlertTriangle, Cloud, Loader2, CheckCircle, Save, Globe, Calendar, Plus, Trash2, ShieldAlert, Key, FolderArchive, Upload, Download, RefreshCw, FolderOpen, LayoutDashboard, SlidersHorizontal, Eye, EyeOff, ArrowLeft, ArrowRight, ChevronUp, ChevronDown, Search, RotateCcw, FileSpreadsheet, Clock, CheckCircle2, ExternalLink } from 'lucide-react';
+import { Database, AlertTriangle, Cloud, Loader2, CheckCircle, Save, Globe, Calendar, Plus, Trash2, ShieldAlert, Key, FolderArchive, Upload, Download, RefreshCw, FolderOpen, LayoutDashboard, SlidersHorizontal, Eye, EyeOff, ArrowLeft, ArrowRight, ChevronUp, ChevronDown, Search, RotateCcw, FileSpreadsheet, Clock, CheckCircle2, ExternalLink, Copy, Code, HelpCircle, Check } from 'lucide-react';
 import { Holiday, UserRole, RolePermissions, DepartmentPermissions, DEFAULT_ROLE_PERMISSIONS, AVAILABLE_PERMISSIONS, Employee, RecordStatus, User, RecordFile } from '../types';
 import { fetchHolidays, saveHolidays, testDatabaseConnection, saveUpdateInfo, fetchUpdateInfo, getSystemSetting, saveSystemSetting, fetchSystemEvents } from '../services/api';
 import { fetchRecords } from '../services/apiRecords';
@@ -16,7 +16,7 @@ import {
   EXCEL_BACKUP_PERIOD_DAYS 
 } from '../services/excelBackupService';
 import { isConfigured } from '../services/supabaseClient';
-import { getGoogleDriveIncomingUrl, setGoogleDriveIncomingUrl } from '../services/attachmentStorage';
+import { getGoogleDriveIncomingUrl, setGoogleDriveIncomingUrl, getGoogleDriveScriptUrl, setGoogleDriveScriptUrl, testGoogleDriveScriptConnection } from '../services/attachmentStorage';
 
 const PERMISSION_DEPARTMENTS = [
   { id: 'Ban Giám đốc', name: 'Ban Giám đốc', label: 'Ban Giám đốc', desc: 'Ban lãnh đạo đơn vị, ký duyệt và chỉ đạo chung' },
@@ -174,12 +174,353 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
 
   // Google Drive URL Cấu hình lưu trữ hồ sơ tiếp nhận
   const [driveUrl, setDriveUrl] = useState<string>(getGoogleDriveIncomingUrl());
+  const [driveScriptUrl, setDriveScriptUrl] = useState<string>(getGoogleDriveScriptUrl());
   const [isDriveSaved, setIsDriveSaved] = useState<boolean>(false);
+  const [isTestingDrive, setIsTestingDrive] = useState<boolean>(false);
+  const [driveTestFeedback, setDriveTestFeedback] = useState<{ success: boolean; message: string; driveUrl?: string } | null>(null);
+  const [showAppsScriptGuide, setShowAppsScriptGuide] = useState<boolean>(false);
+  const [hasCopiedScript, setHasCopiedScript] = useState<boolean>(false);
+
+  const APPS_SCRIPT_CODE_TEMPLATE = `/**
+ * ============================================================================
+ * GOOGLE APPS SCRIPT WEB APP - DÀNH CHO HỆ THỐNG QUẢN LÝ HỒ SƠ (QLHS)
+ * CHỨC NĂNG: QUẢN LÝ TỆP ĐÍNH KÈM THÀNH PHẦN HỒ SƠ TRÊN GOOGLE DRIVE
+ * ============================================================================
+ * 
+ * PHÂN CÔNG VÀ NGUYÊN TẮC HOẠT ĐỘNG:
+ * - Google Drive CHỈ LƯU TỆP THÀNH PHẦN HỒ SƠ (PDF, DOCX, XLSX, JPG, PNG, MAP, SCAN...)
+ * - KHÔNG LƯU DỮ LIỆU HỆ THỐNG / DATABASE / HOẠT ĐỘNG NGHIỆP VỤ NÀO LÊN DRIVE.
+ * - CẤU TRÚC THƯ MỤC: QLHS - FILE HỒ SƠ / [Mã_Hồ_Sơ] / [Các_Tệp_Đính_Kèm]
+ * ============================================================================
+ */
+
+// Tên thư mục gốc mặc định của Hệ thống Quản lý Hồ sơ trên Google Drive
+var ROOT_FOLDER_NAME = "QLHS - FILE HỒ SƠ";
+
+/**
+ * 1. HÀM KIỂM TRA QUYỀN TRUY CẬP GOOGLE DRIVE (CHẠY THỬ LẦN ĐẦU)
+ * Bấm nút "Chạy/Run" hàm này trên Apps Script để cấp quyền (Review permissions)
+ */
+function testDrivePermission() {
+  var rootFolder = getOrCreateRootFolder();
+  Logger.log("SUCCESS: Đã cấp quyền truy cập Google Drive thành công. Thư mục gốc: " + rootFolder.getName());
+}
+
+/**
+ * 2. WEB APP GET ENDPOINT - KIỂM TRA KẾT NỐI VÀ QUYỀN DRIVE THỰC TẾ
+ */
+function doGet(e) {
+  try {
+    var rootFolder = getOrCreateRootFolder();
+    return jsonResponse({
+      status: "ok",
+      drive: true,
+      message: "Google Drive hoạt động bình thường",
+      rootFolderName: rootFolder.getName()
+    });
+  } catch (error) {
+    return jsonResponse({
+      status: "error",
+      drive: false,
+      message: "Không thể truy cập Google Drive: " + error.toString()
+    });
+  }
+}
+
+/**
+ * 3. WEB APP POST ENDPOINT - XỬ LÝ ĐỦ LUỒNG UPLOAD / DELETE FILE
+ */
+function doPost(e) {
+  var lock = LockService.getScriptLock();
+  // Khóa tiến trình tối đa 30 giây để chống race condition (trùng lặp khi upload đồng thời)
+  try {
+    lock.waitLock(30000);
+  } catch (lockErr) {
+    return jsonResponse({
+      status: "error",
+      message: "Hệ thống đang bận xử lý tệp khác. Vui lòng thử lại sau vài giây."
+    });
+  }
+
+  try {
+    if (!e || !e.postData || !e.postData.contents) {
+      return jsonResponse({
+        status: "error",
+        message: "Dữ liệu yêu cầu không hợp lệ hoặc rỗng."
+      });
+    }
+
+    var data;
+    try {
+      data = JSON.parse(e.postData.contents);
+    } catch (parseErr) {
+      return jsonResponse({
+        status: "error",
+        message: "Dữ liệu yêu cầu không phải chuỗi JSON hợp lệ."
+      });
+    }
+
+    var action = data.action || "uploadFile";
+
+    // Phân luồng xử lý theo hành động
+    if (action === "deleteFile" || action === "delete") {
+      return deleteFile(data);
+    } else if (action === "uploadFile" || action === "upload") {
+      return uploadFile(data);
+    } else {
+      return jsonResponse({
+        status: "error",
+        message: "Hành động '" + action + "' không được hỗ trợ."
+      });
+    }
+  } catch (err) {
+    logActivity("SYSTEM_ERROR", "N/A", "N/A", "N/A", false, err.toString());
+    return jsonResponse({
+      status: "error",
+      message: "Lỗi hệ thống WebApp: " + err.toString()
+    });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * 4. HÀM TẢI VÀ CẬP NHẬT TỆP THÀNH PHẦN HỒ SƠ LÊN GOOGLE DRIVE
+ */
+function uploadFile(data) {
+  // Validate dữ liệu đầu vào
+  var valError = validateUploadRequest(data);
+  if (valError) {
+    return jsonResponse({ status: "error", message: valError });
+  }
+
+  var recordCode = cleanString(data.recordCode);
+  var fileName = cleanString(data.fileName);
+  var mimeType = data.mimeType || "application/octet-stream";
+  var base64Data = data.base64Data || data.base64 || data.fileData;
+
+  if (base64Data.indexOf(",") !== -1) {
+    base64Data = base64Data.split(",")[1];
+  }
+
+  // Giải mã Base64 thành Blob nhị phân giữ nguyên vẹn dữ liệu
+  var decodedBytes = Utilities.base64Decode(base64Data);
+  var blob = Utilities.newBlob(decodedBytes, mimeType, fileName);
+
+  // Lấy hoặc tạo thư mục theo mã hồ sơ
+  var folderResult = getOrCreateRecordFolder(recordCode, data.folderId);
+  if (folderResult.error) {
+    return jsonResponse({ status: "error", message: folderResult.error });
+  }
+  var recordFolder = folderResult.folder;
+
+  // Tìm file đã tồn tại trùng tên trong thư mục mã hồ sơ
+  var existingFile = findExistingFile(recordFolder, fileName);
+  var driveFile;
+
+  if (existingFile) {
+    // Để giữ nguyên tính toàn vẹn dữ liệu nhị phân (PDF, DOCX, XLSX, Ảnh...),
+    // ta xóa bản cũ vào thùng rác và tạo bản mới cùng tên trong thư mục mã hồ sơ
+    try {
+      existingFile.setTrashed(true);
+    } catch (trashErr) {
+      Logger.log("Cảnh báo khi chuyển tệp cũ vào thùng rác: " + trashErr.toString());
+    }
+    driveFile = recordFolder.createFile(blob);
+  } else {
+    driveFile = recordFolder.createFile(blob);
+  }
+
+  // KIỂM TRA FILE SAU KHI TẠO / CẬP NHẬT
+  if (!driveFile || !driveFile.getId()) {
+    logActivity("UPLOAD", recordCode, fileName, "FAIL", false, "Không tạo được fileId");
+    return jsonResponse({
+      status: "error",
+      message: "Không thể tạo tệp trên Google Drive."
+    });
+  }
+
+  var actualId = driveFile.getId();
+  var actualUrl = driveFile.getUrl();
+
+  logActivity("UPLOAD", recordCode, fileName, actualId, true, "Thành công");
+
+  return jsonResponse({
+    status: "success",
+    driveFileId: actualId,
+    driveUrl: actualUrl,
+    fileName: fileName,
+    recordCode: recordCode,
+    mimeType: mimeType
+  });
+}
+
+/**
+ * 5. HÀM XÓA TỆP THÀNH PHẦN HỒ SƠ (CHUYỂN VÀO THÙNG RÁC)
+ */
+function deleteFile(data) {
+  var fileId = data.fileId || data.driveFileId;
+  if (!fileId) {
+    return jsonResponse({
+      status: "error",
+      message: "Thiếu tham số 'fileId' để thực hiện xóa tệp."
+    });
+  }
+
+  try {
+    var fileObj = DriveApp.getFileById(fileId);
+    
+    fileObj.setTrashed(true);
+    logActivity("DELETE", "N/A", fileObj.getName(), fileId, true, "Đã chuyển vào thùng rác");
+
+    return jsonResponse({
+      status: "success",
+      driveFileId: fileId,
+      message: "Đã chuyển tệp vào thùng rác Google Drive thành công."
+    });
+  } catch (err) {
+    logActivity("DELETE", "N/A", "N/A", fileId, false, err.toString());
+    return jsonResponse({
+      status: "error",
+      message: "Không tìm thấy tệp hoặc không có quyền xóa: " + err.toString()
+    });
+  }
+}
+
+/**
+ * 6. HÀM LẤY HOẶC TẠO THƯ MỤC GỐC QLHS - FILE HỒ SƠ
+ */
+function getOrCreateRootFolder() {
+  var folders = DriveApp.getFoldersByName(ROOT_FOLDER_NAME);
+  if (folders.hasNext()) {
+    return folders.next();
+  }
+  return DriveApp.createFolder(ROOT_FOLDER_NAME);
+}
+
+/**
+ * 7. HÀM LẤY HOẶC TẠO THƯ MỤC CON THEO MÃ HỒ SƠ
+ */
+function getOrCreateRecordFolder(recordCode, customFolderId) {
+  if (customFolderId && String(customFolderId).trim() !== "") {
+    try {
+      var customFolder = DriveApp.getFolderById(String(customFolderId).trim());
+      if (customFolder) {
+        return { folder: getSubFolderByName(customFolder, recordCode) };
+      }
+    } catch (err) {
+      return { error: "Mã thư mục tùy chỉnh (folderId) không hợp lệ hoặc không có quyền truy cập: " + customFolderId };
+    }
+  }
+
+  var rootFolder = getOrCreateRootFolder();
+  var recordFolder = getSubFolderByName(rootFolder, recordCode);
+  return { folder: recordFolder };
+}
+
+/**
+ * Hàm hỗ trợ lấy thư mục con theo tên trong 1 thư mục mẹ (tạo mới nếu chưa có)
+ */
+function getSubFolderByName(parentFolder, subFolderName) {
+  var folders = parentFolder.getFoldersByName(subFolderName);
+  if (folders.hasNext()) {
+    return folders.next();
+  }
+  return parentFolder.createFolder(subFolderName);
+}
+
+/**
+ * 8. HÀM TÌM TỆP ĐÃ TỒN TẠI TRONG THƯ MỤC
+ */
+function findExistingFile(folder, fileName) {
+  var files = folder.getFilesByName(fileName);
+  if (files.hasNext()) {
+    return files.next();
+  }
+  return null;
+}
+
+/**
+ * 9. HÀM VALIDATE DỮ LIỆU UPLOAD
+ */
+function validateUploadRequest(data) {
+  if (!data.recordCode || String(data.recordCode).trim() === "") {
+    return "Mã hồ sơ (recordCode) không được rỗng.";
+  }
+  if (!data.fileName || String(data.fileName).trim() === "") {
+    return "Tên tệp (fileName) không được rỗng.";
+  }
+  var base64 = data.base64Data || data.base64 || data.fileData;
+  if (!base64 || String(base64).trim() === "") {
+    return "Nội dung tệp (base64Data) không được rỗng.";
+  }
+  return null;
+}
+
+/**
+ * 10. HÀM CHUẨN HÓA PHẢN HỒI JSON
+ */
+function jsonResponse(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+/**
+ * 11. HÀM GHI LOG HỆ THỐNG VÀO LOGGER (KHÔNG GHI BASE64)
+ */
+function logActivity(action, recordCode, fileName, fileId, isSuccess, detail) {
+  var timestamp = Utilities.formatDate(new Date(), "GMT+7", "yyyy-MM-dd HH:mm:ss");
+  var logText = "[" + timestamp + "] ACTION: " + action + 
+                " | RECORD: " + recordCode + 
+                " | FILE: " + fileName + 
+                " | ID: " + fileId + 
+                " | RESULT: " + (isSuccess ? "SUCCESS" : "ERROR") + 
+                " | DETAIL: " + detail;
+  Logger.log(logText);
+}
+
+function cleanString(str) {
+  if (!str) return "";
+  return String(str).trim();
+}`;
+
+  const handleCopyScript = () => {
+    navigator.clipboard.writeText(APPS_SCRIPT_CODE_TEMPLATE);
+    setHasCopiedScript(true);
+    setTimeout(() => setHasCopiedScript(false), 3000);
+  };
 
   const handleSaveDriveUrl = () => {
+    let cleanScriptUrl = driveScriptUrl.trim();
+    if (cleanScriptUrl.endsWith('/dev')) {
+      cleanScriptUrl = cleanScriptUrl.replace(/\/dev$/, '/exec');
+      setDriveScriptUrl(cleanScriptUrl);
+    }
     setGoogleDriveIncomingUrl(driveUrl);
+    setGoogleDriveScriptUrl(cleanScriptUrl);
     setIsDriveSaved(true);
     setTimeout(() => setIsDriveSaved(false), 3000);
+  };
+
+  const handleTestDriveConnection = async () => {
+    setIsTestingDrive(true);
+    setDriveTestFeedback(null);
+    try {
+      let cleanScriptUrl = driveScriptUrl.trim();
+      if (cleanScriptUrl.endsWith('/dev')) {
+        cleanScriptUrl = cleanScriptUrl.replace(/\/dev$/, '/exec');
+        setDriveScriptUrl(cleanScriptUrl);
+      }
+      const res = await testGoogleDriveScriptConnection(cleanScriptUrl);
+      setDriveTestFeedback(res);
+    } catch (e: any) {
+      setDriveTestFeedback({
+        success: false,
+        message: `Lỗi: ${e?.message || 'Không thể kiểm tra'}`,
+      });
+    } finally {
+      setIsTestingDrive(false);
+    }
   };
 
   // Excel Periodic Auto-Backup
@@ -1016,6 +1357,191 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                         )}
                     </div>
 
+                    {/* Google Drive Incoming URL Config */}
+                    <div className="bg-white border border-blue-100 rounded-2xl p-5 shadow-sm space-y-4">
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-gray-100">
+                            <div>
+                                <h3 className="font-black text-slate-800 flex items-center gap-2 tracking-tight text-base">
+                                    <FolderOpen size={20} className="text-blue-600" />
+                                    Đường dẫn Google Drive lưu trữ đính kèm
+                                </h3>
+                                <p className="text-xs text-slate-500 font-medium mt-1">
+                                    Cấu hình đường dẫn thư mục Google Drive dùng để mở trực tiếp thư mục lưu trữ tệp đính kèm hồ sơ tiếp nhận từ biên nhận.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold text-slate-600 mb-1.5">1. Link thư mục Google Drive (URL Thư mục dùng chung)</label>
+                                <div className="relative w-full">
+                                    <Globe size={16} className="absolute left-4 top-3.5 text-gray-400" />
+                                    <input 
+                                        type="text" 
+                                        className="w-full border border-gray-200 rounded-xl px-4 py-2.5 pl-11 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none transition-all" 
+                                        placeholder="https://drive.google.com/drive/folders/..." 
+                                        value={driveUrl || ''} 
+                                        onChange={(e) => setDriveUrl(e.target.value)} 
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-slate-600 mb-1.5 flex items-center justify-between">
+                                    <span>2. Google Apps Script WebApp URL (Dùng để đính kèm file tự động lưu trực tiếp vào Drive)</span>
+                                    {driveScriptUrl.endsWith('/dev') && (
+                                        <span className="text-[11px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                                            ⚠️ Phát hiện link /dev (Sẽ tự chuyển thành /exec khi lưu)
+                                        </span>
+                                    )}
+                                </label>
+                                <div className="relative w-full">
+                                    <Cloud size={16} className="absolute left-4 top-3.5 text-gray-400" />
+                                    <input 
+                                        type="text" 
+                                        className="w-full border border-gray-200 rounded-xl px-4 py-2.5 pl-11 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none transition-all" 
+                                        placeholder="https://script.google.com/macros/s/.../exec" 
+                                        value={driveScriptUrl || ''} 
+                                        onChange={(e) => setDriveScriptUrl(e.target.value)} 
+                                    />
+                                </div>
+                                <p className="text-[11px] text-slate-400 mt-1">
+                                    Dán WebApp URL tạo từ Google Apps Script (kết thúc bằng <strong>/exec</strong>, chọn Access: <strong>Anyone</strong>) để mọi tệp đính kèm tự động đẩy thẳng lên thư mục Drive của bạn.
+                                </p>
+                            </div>
+
+                            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
+                                <div className="flex items-center gap-2 w-full sm:w-auto">
+                                    <button
+                                        type="button"
+                                        onClick={handleSaveDriveUrl}
+                                        className="flex-1 sm:flex-none px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95 cursor-pointer shrink-0"
+                                    >
+                                        <Save size={14} />
+                                        <span>Lưu thiết lập</span>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={handleTestDriveConnection}
+                                        disabled={isTestingDrive || !driveScriptUrl}
+                                        className="flex-1 sm:flex-none px-4 py-2.5 bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer shrink-0 disabled:opacity-50"
+                                    >
+                                        {isTestingDrive ? (
+                                            <>
+                                                <Loader2 size={14} className="animate-spin text-purple-600" />
+                                                <span>Đang thử kết nối...</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <RefreshCw size={14} className="text-purple-600" />
+                                                <span>Kiểm tra kết nối WebApp</span>
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
+
+                                {driveUrl && (
+                                    <a
+                                        href={driveUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-800 hover:underline"
+                                    >
+                                        <ExternalLink size={14} />
+                                        <span>Mở kiểm tra thư mục Google Drive</span>
+                                    </a>
+                                )}
+                            </div>
+
+                            {driveTestFeedback && (
+                                <div className={`p-3 rounded-xl text-xs font-medium border flex items-start gap-2.5 ${
+                                    driveTestFeedback.success 
+                                        ? 'bg-emerald-50 border-emerald-200 text-emerald-900' 
+                                        : 'bg-amber-50 border-amber-200 text-amber-900'
+                                }`}>
+                                    {driveTestFeedback.success ? (
+                                        <CheckCircle2 size={16} className="text-emerald-600 shrink-0 mt-0.5" />
+                                    ) : (
+                                        <AlertTriangle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+                                    )}
+                                    <div className="space-y-1">
+                                        <p className="font-bold">{driveTestFeedback.message}</p>
+                                        {driveTestFeedback.driveUrl && (
+                                            <a 
+                                                href={driveTestFeedback.driveUrl} 
+                                                target="_blank" 
+                                                rel="noopener noreferrer"
+                                                className="inline-flex items-center gap-1 text-emerald-700 hover:underline font-bold"
+                                            >
+                                                <ExternalLink size={12} />
+                                                Xem file thử nghiệm đã tải lên thành công trên Google Drive
+                                            </a>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {isDriveSaved && (
+                                <div className="p-2.5 rounded-xl text-xs font-bold bg-emerald-50 border border-emerald-200 text-emerald-800 flex items-center gap-2">
+                                    <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                                    <span>Đã lưu thành công cấu hình Google Drive!</span>
+                                </div>
+                            )}
+
+                            {/* Hướng dẫn tạo & Cấp quyền Google Apps Script */}
+                            <div className="mt-4 border border-blue-200 rounded-xl overflow-hidden bg-blue-50/50">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowAppsScriptGuide(!showAppsScriptGuide)}
+                                    className="w-full px-4 py-3 bg-blue-100/60 hover:bg-blue-100 text-blue-900 font-bold text-xs flex items-center justify-between transition-colors cursor-pointer"
+                                >
+                                    <span className="flex items-center gap-2">
+                                        <Code size={16} className="text-blue-700" />
+                                        Hướng dẫn khắc phục lỗi & Mã Google Apps Script chuẩn (Tải trực tiếp vào Drive)
+                                    </span>
+                                    {showAppsScriptGuide ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                                </button>
+
+                                {showAppsScriptGuide && (
+                                    <div className="p-4 space-y-4 text-xs text-slate-700 border-t border-blue-200 bg-white">
+                                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-1.5 text-amber-900">
+                                            <p className="font-bold flex items-center gap-1.5 text-amber-800">
+                                                <AlertTriangle size={15} className="text-amber-600" />
+                                                Khắc phục lỗi "Exception: Truy cập bị từ chối: DriveApp":
+                                            </p>
+                                            <ol className="list-decimal pl-5 space-y-1 text-slate-700 font-medium">
+                                                <li>Mở trang <a href="https://script.google.com" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline font-bold">script.google.com</a> chứa mã Google Apps Script của bạn.</li>
+                                                <li>Ở thanh công cụ trên cùng, chọn hàm <code>testDrivePermission</code> rồi bấm <strong>Chạy (Run)</strong>.</li>
+                                                <li>Google sẽ hiện cửa sổ yêu cầu <strong>Cấp quyền ứng dụng (Review permissions)</strong> ➔ Chọn email ➔ Bấm <strong>Nâng cao (Advanced)</strong> ➔ Bấm <strong>Đi tới... (Go to... Unsafe)</strong> ➔ Bấm <strong>Cho phép (Allow)</strong>.</li>
+                                                <li>Bấm nút <strong>Triển khai (Deploy)</strong> ➔ <strong>Quản lý bản triển khai (Manage deployments)</strong>.</li>
+                                                <li>Nhấn biểu tượng <strong>Cây bút (Chỉnh sửa)</strong> ➔ Chọn Phiên bản: <strong>"Phiên bản mới (New version)"</strong>.</li>
+                                                <li>Đảm bảo mục Thực thi: <strong>"Tôi (Me)"</strong> và Ai có quyền: <strong>"Bất kỳ ai (Anyone)"</strong> ➔ Bấm <strong>Triển khai (Deploy)</strong>.</li>
+                                            </ol>
+                                        </div>
+
+                                        <div>
+                                            <div className="flex items-center justify-between mb-2">
+                                                <span className="font-bold text-slate-800">Mã nguồn Google Apps Script hoàn chỉnh:</span>
+                                                <button
+                                                    type="button"
+                                                    onClick={handleCopyScript}
+                                                    className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-[11px] font-bold transition-colors cursor-pointer shadow-xs"
+                                                >
+                                                    {hasCopiedScript ? <Check size={13} /> : <Copy size={13} />}
+                                                    {hasCopiedScript ? 'Đã sao chép mã!' : 'Sao chép mã Apps Script'}
+                                                </button>
+                                            </div>
+                                            <pre className="p-3 bg-slate-900 text-slate-100 rounded-xl font-mono text-[11px] leading-relaxed overflow-x-auto max-h-72 select-all border border-slate-800">
+                                                {APPS_SCRIPT_CODE_TEMPLATE}
+                                            </pre>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
                     {/* Manual Update Config */}
                     <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
                         <h3 className="font-black text-gray-700 flex items-center gap-2 mb-6 tracking-tight">
@@ -1447,102 +1973,6 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
 
             {activeTab === 'data' && (
                 <div className="max-w-5xl mx-auto space-y-8">
-                    {/* Hộp cấu hình Google Drive Lưu trữ dữ liệu tiếp nhận */}
-                    <div className="border border-blue-100 rounded-[2rem] overflow-hidden bg-white shadow-xl shadow-blue-50/50">
-                        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-5 border-b border-blue-100 flex items-center justify-between">
-                            <h3 className="text-blue-800 font-black flex items-center gap-2 uppercase tracking-widest text-xs">
-                                <Globe size={18} className="text-blue-600" />
-                                Đường dẫn Google Drive lưu trữ hồ sơ tiếp nhận đầu vào
-                            </h3>
-                            <span className="text-[10px] font-bold px-2.5 py-1 bg-blue-100 text-blue-800 rounded-full">
-                                Cấu hình chung
-                            </span>
-                        </div>
-                        <div className="p-6 md:p-8 space-y-6">
-                            <div>
-                                <p className="text-xs text-slate-600 font-medium leading-relaxed mb-4">
-                                    Thiết lập đường dẫn (URL) thư mục Google Drive dùng chung của đơn vị để lưu trữ và liên kết các tài liệu scan / tệp đính kèm khi tiếp nhận hồ sơ đầu vào theo từng tổ chuyên môn.
-                                </p>
-
-                                <div className="space-y-2">
-                                    <label className="block text-xs font-black uppercase tracking-wider text-slate-700">
-                                        Đường dẫn liên kết thư mục Google Drive:
-                                    </label>
-                                    <div className="flex flex-col sm:flex-row gap-3">
-                                        <input
-                                            type="url"
-                                            value={driveUrl}
-                                            onChange={(e) => setDriveUrl(e.target.value)}
-                                            placeholder="Ví dụ: https://drive.google.com/drive/folders/1a2b3c4d5e..."
-                                            className="flex-1 px-4 py-3 text-sm font-medium border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-slate-50 focus:bg-white transition-all shadow-inner"
-                                        />
-                                        <button
-                                            type="button"
-                                            onClick={handleSaveDriveUrl}
-                                            className="px-6 py-3 bg-blue-600 text-white font-black text-xs uppercase tracking-widest rounded-xl hover:bg-blue-700 transition-all shadow-md shadow-blue-100 flex items-center justify-center gap-2 shrink-0 active:scale-95 cursor-pointer"
-                                        >
-                                            <Save size={16} />
-                                            Lưu cấu hình
-                                        </button>
-                                        {driveUrl && (
-                                            <a
-                                                href={driveUrl}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="px-5 py-3 bg-emerald-600 text-white font-black text-xs uppercase tracking-widest rounded-xl hover:bg-emerald-700 transition-all shadow-md shadow-emerald-100 flex items-center justify-center gap-2 shrink-0 active:scale-95 cursor-pointer"
-                                            >
-                                                <ExternalLink size={16} />
-                                                Mở Google Drive
-                                            </a>
-                                        )}
-                                    </div>
-                                    {isDriveSaved && (
-                                        <div className="flex items-center gap-2 text-xs font-bold text-emerald-600 mt-2">
-                                            <CheckCircle size={15} />
-                                            Đã lưu đường dẫn Google Drive thành công! Toàn bộ giao diện tiếp nhận và chuyên môn đã được cập nhật.
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Bảng hướng dẫn phân loại theo tổ chuyên môn */}
-                            <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-4">
-                                <h5 className="text-xs font-black text-slate-700 uppercase tracking-wider mb-2">
-                                    Quy định phân loại hồ sơ & tệp theo Tổ chuyên môn (Theo tiền tố Mã thủ tục):
-                                </h5>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
-                                    <div className="bg-white p-3 rounded-lg border border-purple-100 shadow-sm">
-                                        <div className="font-bold text-purple-700 mb-1 flex items-center gap-1.5">
-                                            <span className="w-2 h-2 rounded-full bg-purple-500"></span>
-                                            Tổ Lưu trữ (Mã 1.x)
-                                        </div>
-                                        <p className="text-slate-500 text-[11px]">
-                                            Thủ tục: <strong>1.1</strong> Sao lục, <strong>1.2</strong> Công văn, Cung cấp dữ liệu.
-                                        </p>
-                                    </div>
-                                    <div className="bg-white p-3 rounded-lg border border-blue-100 shadow-sm">
-                                        <div className="font-bold text-blue-700 mb-1 flex items-center gap-1.5">
-                                            <span className="w-2 h-2 rounded-full bg-blue-500"></span>
-                                            Tổ Đo đạc (Mã 2.x)
-                                        </div>
-                                        <p className="text-slate-500 text-[11px]">
-                                            Thủ tục: <strong>2.1</strong> Trích lục, <strong>2.2</strong> Trích đo, <strong>2.3</strong> Duyệt đơn, <strong>2.4</strong> Cắm mốc, <strong>2.5</strong> Tách-Hợp thửa.
-                                        </p>
-                                    </div>
-                                    <div className="bg-white p-3 rounded-lg border border-emerald-100 shadow-sm">
-                                        <div className="font-bold text-emerald-700 mb-1 flex items-center gap-1.5">
-                                            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                                            Tổ Cấp giấy (Mã 3.x)
-                                        </div>
-                                        <p className="text-slate-500 text-[11px]">
-                                            Thủ tục: <strong>3.1</strong> Đăng ký biến động, <strong>3.2</strong> Cấp đổi / cấp lại GCN.
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
                     {/* Hộp vùng nguy hiểm */}
                     <div className="border border-red-100 rounded-[2rem] overflow-hidden bg-white shadow-xl shadow-red-50/50">
                         <div className="bg-red-50 p-5 border-b border-red-100">

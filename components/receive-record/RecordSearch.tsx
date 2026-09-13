@@ -1103,13 +1103,9 @@ export const RecordSearch: React.FC<RecordSearchProps> = ({
                                                         </button>
                                                         {(currentUser?.role === 'ADMIN' || currentUser?.role === 'SUBADMIN' || currentUser?.role === 'TEAM_LEADER') && (
                                                             <button
-                                                                onClick={async () => {
-                                                                    if (confirm(`Bạn có chắc muốn xóa hồ sơ ${r.code}?`)) {
-                                                                        await onDelete(r);
-                                                                    }
-                                                                }}
+                                                                onClick={() => onDelete(r)}
                                                                 className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors border border-red-200 bg-red-50/50 cursor-pointer shadow-xs"
-                                                                title="Xóa"
+                                                                title="Xóa hồ sơ"
                                                             >
                                                                 <Trash2 size={15} />
                                                             </button>
@@ -1180,11 +1176,9 @@ export const RecordSearch: React.FC<RecordSearchProps> = ({
                         setSelectedDetailRecord(null);
                         onEdit(r);
                     }}
-                    onDelete={async (r) => {
-                        if (confirm(`Bạn có chắc muốn xóa hồ sơ ${r.code}?`)) {
-                            await onDelete(r);
-                            setSelectedDetailRecord(null);
-                        }
+                    onDelete={(r) => {
+                        setSelectedDetailRecord(null);
+                        onDelete(r);
                     }}
                 />
             )}

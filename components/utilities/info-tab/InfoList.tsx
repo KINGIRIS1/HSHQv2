@@ -32,9 +32,10 @@ const InfoList: React.FC<InfoListProps> = ({ data, onEdit, onDelete, onRefresh, 
         });
     }, [data, searchTerm, filterDate]);
 
-    const handleDelete = async (id: string) => {
-        if (await confirmAction("Xóa phiếu cung cấp thông tin này?")) {
-            onDelete(id);
+    const handleDelete = async (item: ThongTinRecord) => {
+        const codeNumber = item.data.formData?.SO_VAO_SO || item.customer_name || item.id;
+        if (await confirmAction(`Bạn có đồng ý xóa mã hồ sơ số ${codeNumber} không?`, 'Xác nhận xóa hồ sơ')) {
+            onDelete(item.id);
         }
     };
 
@@ -118,7 +119,7 @@ const InfoList: React.FC<InfoListProps> = ({ data, onEdit, onDelete, onRefresh, 
                                     <div className="flex justify-center gap-2">
                                         <button onClick={() => onPrint(item)} className="p-1.5 text-purple-600 hover:bg-purple-50 rounded border border-transparent hover:border-purple-200" title="Xem & In"><FileText size={16}/></button>
                                         <button onClick={() => onEdit(item)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded border border-transparent hover:border-blue-200" title="Sửa"><Edit size={16}/></button>
-                                        <button onClick={() => handleDelete(item.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded border border-transparent hover:border-red-200" title="Xóa"><Trash2 size={16}/></button>
+                                        <button onClick={() => handleDelete(item)} className="p-1.5 text-red-500 hover:bg-red-50 rounded border border-transparent hover:border-red-200" title="Xóa"><Trash2 size={16}/></button>
                                     </div>
                                 </td>
                             </tr>

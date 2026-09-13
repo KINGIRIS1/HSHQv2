@@ -217,9 +217,13 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
             
             <DeleteConfirmModal 
                 isOpen={props.isDeleteModalOpen} 
-                onClose={() => props.setIsDeleteModalOpen(false)} 
+                onClose={() => {
+                    props.setIsDeleteModalOpen(false);
+                    props.setDeletingRecord(null);
+                }} 
                 onConfirm={props.handleDeleteRecord} 
-                message={`Bạn có chắc chắn muốn xóa hồ sơ ${props.deletingRecord?.code}?`} 
+                title="Xác nhận xóa hồ sơ"
+                message={props.deletingRecord?.code ? `Bạn có đồng ý xóa mã hồ sơ số ${props.deletingRecord.code} không?` : undefined} 
                 record={props.deletingRecord}
             />
             

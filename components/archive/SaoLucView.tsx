@@ -440,9 +440,10 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Tân Qua
         }
     };
 
-    const handleDelete = async (id: string) => {
-        if (await confirmAction('Xóa hồ sơ sao lục này?')) {
-            await deleteArchiveRecord(id);
+    const handleDelete = async (r: ArchiveRecord) => {
+        const codeNumber = r.so_hieu || r.id;
+        if (await confirmAction(`Bạn có đồng ý xóa mã hồ sơ số ${codeNumber} không?`, 'Xác nhận xóa hồ sơ')) {
+            await deleteArchiveRecord(r.id);
             loadData();
         }
     };
@@ -1030,7 +1031,7 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Tân Qua
                                                 {isManager && (
                                                     <>
                                                         <button onClick={() => handleEdit(r)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded" title="Sửa"><Edit size={14}/></button>
-                                                        <button onClick={() => handleDelete(r.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded" title="Xóa"><Trash2 size={14}/></button>
+                                                        <button onClick={() => handleDelete(r)} className="p-1.5 text-red-500 hover:bg-red-50 rounded" title="Xóa"><Trash2 size={14}/></button>
                                                     </>
                                                 )}
                                             </div>

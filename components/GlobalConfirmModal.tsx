@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { setGlobalConfirmCallback } from '../utils/appHelpers';
-import { Trash2, AlertTriangle, CheckCircle2, PenTool, HelpCircle } from 'lucide-react';
+import { Trash2, AlertTriangle, CheckCircle2, PenTool, HelpCircle, X } from 'lucide-react';
 
 const GlobalConfirmModal = () => {
     const [isOpen, setIsOpen] = useState(false);
@@ -19,14 +19,27 @@ const GlobalConfirmModal = () => {
         });
     }, []);
 
-    if (!isOpen) return null;
-
     const handleClose = (result: boolean) => {
         setIsOpen(false);
         if (resolveFn) {
             resolveFn(result);
+            setResolveFn(null);
         }
     };
+
+    // Lắng nghe phím Escape để đóng hộp thoại mà không thực hiện thao tác (trả về false)
+    useEffect(() => {
+        if (!isOpen) return;
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                handleClose(false);
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [isOpen, resolveFn]);
+
+    if (!isOpen) return null;
 
     const isDelete = /xóa|hủy|loại bỏ/i.test(title + ' ' + message);
     const isSign = /ký|duyệt|trình/i.test(title + ' ' + message);
@@ -39,8 +52,27 @@ const GlobalConfirmModal = () => {
     }
 
     return (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[9999] flex items-center justify-center p-4 animate-fade-in">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-100 animate-scale-up">
+        <div 
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[9999] flex items-center justify-center p-4 animate-fade-in"
+            onClick={(e) => {
+                // Bấm ra ngoài nền đen để đóng hộp thoại mà KHÔNG thực hiện (trả về false)
+                if (e.target === e.currentTarget) {
+                    handleClose(false);
+                }
+            }}
+        >
+            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-100 animate-scale-up">
+                {/* Nút tắt dấu X ở góc trên bên phải - nếu tắt bằng dấu X thì không xóa */}
+                <button
+                    type="button"
+                    onClick={() => handleClose(false)}
+                    className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 hover:bg-slate-100 p-2 rounded-xl transition-colors cursor-pointer z-10"
+                    title="Tắt hộp thoại (Không thực hiện)"
+                    aria-label="Tắt hộp thoại"
+                >
+                    <X size={20} />
+                </button>
+
                 {/* Body Content */}
                 <div className="p-6 sm:p-8 flex flex-col items-center text-center">
                     {/* Visual Status Indicator */}
@@ -60,9 +92,15 @@ const GlobalConfirmModal = () => {
                     </h3>
                     
                     {/* Modal Message */}
-                    <p className="text-sm text-slate-500 whitespace-pre-line leading-relaxed max-w-md">
+                    <p className="text-sm text-slate-600 whitespace-pre-line leading-relaxed max-w-md font-medium">
                         {message}
                     </p>
+
+                    {isDelete && (
+                        <p className="text-xs text-slate-400 mt-2">
+                            Nếu bạn tắt dấu <strong>X</strong> hoặc chọn <strong>Hủy</strong>, hành động sẽ được hủy bỏ an toàn.
+                        </p>
+                    )}
                 </div>
                 
                 {/* Modal Footer Actions */}
@@ -85,7 +123,7 @@ const GlobalConfirmModal = () => {
                                     : 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/10'
                         }`}
                     >
-                        Xác nhận
+                        {isDelete ? 'Đồng ý xóa' : 'Xác nhận'}
                     </button>
                 </div>
             </div>

@@ -266,9 +266,10 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
         }
     };
 
-    const handleDelete = async (id: string) => {
-        if (await confirmAction("Bạn có chắc chắn muốn xóa hồ sơ này?")) {
-            await deleteArchiveRecord(id);
+    const handleDelete = async (r: ArchiveRecord) => {
+        const codeNumber = r.so_hieu || r.id;
+        if (await confirmAction(`Bạn có đồng ý xóa mã hồ sơ số ${codeNumber} không?`, 'Xác nhận xóa hồ sơ')) {
+            await deleteArchiveRecord(r.id);
             loadData();
         }
     };
@@ -1278,7 +1279,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                                                     </>
                                                 )}
                                                 <button 
-                                                    onClick={() => handleDelete(r.id)} 
+                                                    onClick={() => handleDelete(r)} 
                                                     className="p-2 text-gray-500 bg-white border border-gray-200 hover:text-red-600 hover:bg-red-50 hover:border-red-300 rounded-lg transition-colors shadow-sm" 
                                                     title="Xóa dòng này"
                                                 >

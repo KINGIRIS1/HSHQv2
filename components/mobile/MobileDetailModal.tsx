@@ -14,7 +14,7 @@ import {
 import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../../services/docxService';
 import DocxPreviewModal from '../DocxPreviewModal';
 import { updateRecordApi, fetchContracts } from '../../services/api';
-import { previewAttachment, downloadAttachment } from '../../services/attachmentStorage';
+import { previewAttachment, downloadAttachment, isPreviewableFile } from '../../services/attachmentStorage';
 import SystemReceiptTemplate from '../receive-record/SystemReceiptTemplate';
 import SystemAnnexTemplate from '../receive-record/SystemAnnexTemplate';
 import { cleanSyncNotes, getPureBatchNumber, isFieldWorkProcedure, isOfficeOnlySurveyProcedure, getReceiptReceiverName } from '../../utils/appHelpers';
@@ -933,14 +933,16 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                                 {doc.attachedFile.fileName}
                               </span>
                               <div className="flex items-center gap-1.5 shrink-0">
-                                <button
-                                  type="button"
-                                  onClick={() => previewAttachment(doc.attachedFile!)}
-                                  className="text-blue-600 hover:text-blue-800 p-0.5 rounded cursor-pointer"
-                                  title="Xem trước"
-                                >
-                                  <Eye size={12} />
-                                </button>
+                                {isPreviewableFile(doc.attachedFile) && (
+                                  <button
+                                    type="button"
+                                    onClick={() => previewAttachment(doc.attachedFile!)}
+                                    className="text-blue-600 hover:text-blue-800 p-0.5 rounded cursor-pointer"
+                                    title="Xem trước"
+                                  >
+                                    <Eye size={12} />
+                                  </button>
+                                )}
                                 <button
                                   type="button"
                                   onClick={() => downloadAttachment(doc.attachedFile!)}
@@ -1005,14 +1007,16 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                                 {comp.attachedFile.fileName}
                               </span>
                               <div className="flex items-center gap-1.5 shrink-0">
-                                <button
-                                  type="button"
-                                  onClick={() => previewAttachment(comp.attachedFile!)}
-                                  className="text-blue-600 hover:text-blue-800 p-0.5 rounded cursor-pointer"
-                                  title="Xem trước"
-                                >
-                                  <Eye size={12} />
-                                </button>
+                                {isPreviewableFile(comp.attachedFile) && (
+                                  <button
+                                    type="button"
+                                    onClick={() => previewAttachment(comp.attachedFile!)}
+                                    className="text-blue-600 hover:text-blue-800 p-0.5 rounded cursor-pointer"
+                                    title="Xem trước"
+                                  >
+                                    <Eye size={12} />
+                                  </button>
+                                )}
                                 <button
                                   type="button"
                                   onClick={() => downloadAttachment(comp.attachedFile!)}

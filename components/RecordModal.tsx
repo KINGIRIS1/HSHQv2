@@ -6,7 +6,7 @@ import { GROUPS, EXTENDED_RECORD_TYPES, STATUS_LABELS, SELECTABLE_STATUSES, ARCH
 import { X, Save, Lock, User as UserIcon, MapPin, FileText, Calendar, FileCheck, ChevronDown, ChevronUp, Paperclip, Upload, Eye, Download, ExternalLink, Loader2, CheckCircle2, Plus } from 'lucide-react';
 import { calculateDeadlineHelper, getDepartmentForRecord, isProcedure2_3, syncRecordStatusTransition, getPureBatchNumber, groupEmployeesByDepartment, isFieldWorkProcedure, isOfficeOnlySurveyProcedure, deriveActualSurveyStatus, getDerivedStatusFromDates, cleanFutureMilestoneDates } from '../utils/appHelpers';
 import { fetchContracts } from '../services/api';
-import { processAndSaveSingleAttachment, previewAttachment, downloadAttachment, getGoogleDriveIncomingUrl, isAllowedDocFile } from '../services/attachmentStorage';
+import { preparePendingSingleAttachment, uploadPendingAttachmentsToDrive, enqueueRecordForBackgroundDriveSync, processAndSaveSingleAttachment, previewAttachment, downloadAttachment, getGoogleDriveIncomingUrl, isAllowedDocFile, isPreviewableFile } from '../services/attachmentStorage';
 import DossierComponentSection from './receive-record/DossierComponentSection';
 
 const parseAttachedDocs = (otherDocsStr: string | null | undefined): AttachedDocItem[] => {
@@ -302,7 +302,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
           setUploadingDocIdx(index);
           const targetDoc = attachedDocs[index];
           const docName = targetDoc?.name?.trim() || 'Giấy tờ kèm theo';
-          const savedMeta = await processAndSaveSingleAttachment(
+          const savedMeta = await preparePendingSingleAttachment(
               file,
               formData.code || 'HS',
               docName,
@@ -323,7 +323,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
               attachedFiles: [...(prev.attachedFiles || []).filter(f => f.id !== savedMeta.id), savedMeta]
           }));
       } catch (err: any) {
-          alert(err.message || 'Lỗi khi tải tệp đính kèm');
+          alert(err.message || 'Lỗi khi lưu tạm tệp đính kèm');
       } finally {
           setUploadingDocIdx(null);
       }
@@ -345,14 +345,26 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.recordType || !formData.recordType.trim()) {
       alert("Vui lòng chọn loại hồ sơ / thủ tục trước khi lưu!");
       return;
     }
-    let finalData: any = { ...formData };
-    finalData.dossierComponents = dossierComponents;
+
+    const finalCode = (formData.code || 'HS').trim();
+
+    const cleanAttachedFiles: AttachedFileMeta[] = formData.attachedFiles || [];
+    const cleanAttachedDocs: AttachedDocItem[] = [...attachedDocs];
+    const cleanDossierComponents: DossierComponentItem[] = [...dossierComponents];
+
+    let finalData: any = { 
+      ...formData,
+      code: finalCode,
+      attachedFiles: cleanAttachedFiles,
+      otherDocs: JSON.stringify(cleanAttachedDocs),
+      dossierComponents: cleanDossierComponents
+    };
     if (!finalData.receivedBy && currentUser) {
         finalData.receivedBy = currentUser.employeeId || currentUser.name || currentUser.username || '';
     }
@@ -463,6 +475,9 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
 
     onSubmit(cleanData as any);
     onClose();
+
+    // Đồng bộ tệp ngầm trong nền lên Google Drive (Background Sync - 0ms delay cho UI)
+    enqueueRecordForBackgroundDriveSync(cleanData as any);
   };
 
   const handleChange = (field: keyof RecordFile, value: any) => {
@@ -1050,20 +1065,22 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                                                                 <div className="inline-flex items-center justify-center gap-1 px-1.5 py-0.5 rounded bg-emerald-50 border border-emerald-200 text-emerald-900 text-[11px]">
                                                                     <button
                                                                         type="button"
-                                                                        title={`Xem tệp: ${doc.attachedFile.fileName}`}
-                                                                        onClick={() => previewAttachment(doc.attachedFile!)}
+                                                                        title={isPreviewableFile(doc.attachedFile) ? `Xem tệp: ${doc.attachedFile.fileName}` : `Tải tệp: ${doc.attachedFile.fileName}`}
+                                                                        onClick={() => isPreviewableFile(doc.attachedFile) ? previewAttachment(doc.attachedFile!) : downloadAttachment(doc.attachedFile!)}
                                                                         className="p-0.5 text-emerald-700 hover:text-emerald-900 rounded cursor-pointer"
                                                                     >
                                                                         <CheckCircle2 size={12} />
                                                                     </button>
-                                                                    <button
-                                                                        type="button"
-                                                                        title={`Xem trước (${doc.attachedFile.fileName})`}
-                                                                        onClick={() => previewAttachment(doc.attachedFile!)}
-                                                                        className="p-0.5 text-slate-500 hover:text-blue-600 rounded cursor-pointer"
-                                                                    >
-                                                                        <Eye size={12} />
-                                                                    </button>
+                                                                    {isPreviewableFile(doc.attachedFile) && (
+                                                                        <button
+                                                                            type="button"
+                                                                            title={`Xem trước (${doc.attachedFile.fileName})`}
+                                                                            onClick={() => previewAttachment(doc.attachedFile!)}
+                                                                            className="p-0.5 text-slate-500 hover:text-blue-600 rounded cursor-pointer"
+                                                                        >
+                                                                            <Eye size={12} />
+                                                                        </button>
+                                                                    )}
                                                                     <button
                                                                         type="button"
                                                                         title="Tải về"

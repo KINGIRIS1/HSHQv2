@@ -32,9 +32,10 @@ const VPHCList: React.FC<VPHCListProps> = ({ data, onEdit, onDelete, onRefresh, 
         });
     }, [data, searchTerm, filterDate]);
 
-    const handleDelete = async (id: string) => {
-        if (await confirmAction("Bạn có chắc chắn muốn xóa biên bản này khỏi hệ thống?")) {
-            onDelete(id);
+    const handleDelete = async (item: VphcRecord) => {
+        const codeNumber = item.customer_name || item.id;
+        if (await confirmAction(`Bạn có đồng ý xóa mã hồ sơ số ${codeNumber} không?`, 'Xác nhận xóa hồ sơ')) {
+            onDelete(item.id);
         }
     };
 
@@ -177,7 +178,7 @@ const VPHCList: React.FC<VPHCListProps> = ({ data, onEdit, onDelete, onRefresh, 
                                             <Edit size={16}/>
                                         </button>
                                         <button 
-                                            onClick={() => handleDelete(item.id)} 
+                                            onClick={() => handleDelete(item)} 
                                             className="p-1.5 text-red-500 hover:bg-red-50 rounded border border-transparent hover:border-red-200" 
                                             title="Xóa"
                                         >

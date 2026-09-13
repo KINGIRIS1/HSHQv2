@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
-import { Plus, Trash2, Paperclip, Eye, Download, FileText, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { Plus, Trash2, Paperclip, Eye, Download, FileText, CheckCircle, Clock, AlertCircle, Loader2 } from 'lucide-react';
 import { DossierComponentItem, AttachedFileMeta } from '../../types';
-import { processAndSaveSingleAttachment, previewAttachment, downloadAttachment, isAllowedDocFile } from '../../services/attachmentStorage';
+import { preparePendingSingleAttachment, processAndSaveSingleAttachment, previewAttachment, downloadAttachment, isAllowedDocFile, isPreviewableFile, deleteAttachmentBlob, deleteFileFromGoogleDriveScript } from '../../services/attachmentStorage';
 
 interface DossierComponentSectionProps {
   recordCode: string;
@@ -77,12 +77,12 @@ export const DossierComponentSection: React.FC<DossierComponentSectionProps> = (
 
     try {
       const sequenceIndex = calculateSequence(id, docName);
-      const meta = await processAndSaveSingleAttachment(
+      const meta = await preparePendingSingleAttachment(
         file,
         recordCode || 'HS',
         docName,
         sequenceIndex,
-        department,
+        department || 'Bộ phận làm việc',
         stage
       );
 
@@ -99,6 +99,15 @@ export const DossierComponentSection: React.FC<DossierComponentSectionProps> = (
   };
 
   const handleRemoveFile = (id: string) => {
+    const item = components.find((c) => c.id === id);
+    if (item?.attachedFile?.driveFileId) {
+      deleteFileFromGoogleDriveScript(item.attachedFile.driveFileId).catch(err => {
+        console.warn('Lỗi xóa tệp trên Google Drive:', err);
+      });
+    }
+    if (item?.attachedFile?.id) {
+      deleteAttachmentBlob(item.attachedFile.id).catch(() => {});
+    }
     onChange(
       components.map((c) => (c.id === id ? { ...c, attachedFile: undefined } : c))
     );
@@ -199,23 +208,37 @@ export const DossierComponentSection: React.FC<DossierComponentSectionProps> = (
                   {/* Cột 2: File đính kèm thu nhỏ bằng cột hình thức */}
                   <td className="py-2 px-2 text-center">
                     {item.attachedFile ? (
-                      <div className="inline-flex items-center justify-center gap-1 px-1.5 py-0.5 rounded bg-emerald-50 border border-emerald-200 text-emerald-900 text-[11px]">
+                      <div className={`inline-flex items-center justify-center gap-1 px-1.5 py-0.5 rounded text-[11px] border ${
+                        item.attachedFile.driveUrl || item.attachedFile.driveFileId
+                          ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                          : 'bg-amber-50 border-amber-200 text-amber-900'
+                      }`}>
                         <button
                           type="button"
-                          onClick={() => previewAttachment(item.attachedFile!)}
-                          title={`Xem tệp: ${item.attachedFile.fileName}`}
-                          className="p-0.5 text-emerald-700 hover:text-emerald-900 rounded cursor-pointer"
+                          onClick={() => isPreviewableFile(item.attachedFile) ? previewAttachment(item.attachedFile!) : downloadAttachment(item.attachedFile!)}
+                          title={
+                            item.attachedFile.driveUrl || item.attachedFile.driveFileId
+                              ? `Đã lưu Google Drive: ${item.attachedFile.fileName}`
+                              : `Lưu tạm máy - Đang đồng bộ Drive ngầm: ${item.attachedFile.fileName}`
+                          }
+                          className="p-0.5 rounded cursor-pointer"
                         >
-                          <CheckCircle size={12} />
+                          {item.attachedFile.driveUrl || item.attachedFile.driveFileId ? (
+                            <CheckCircle size={12} className="text-emerald-700 hover:text-emerald-900" />
+                          ) : (
+                            <Clock size={12} className="text-amber-600 hover:text-amber-800 animate-pulse" />
+                          )}
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => previewAttachment(item.attachedFile!)}
-                          className="p-0.5 text-slate-500 hover:text-blue-600 rounded cursor-pointer"
-                          title={`Xem trước (${item.attachedFile.fileName})`}
-                        >
-                          <Eye size={12} />
-                        </button>
+                        {isPreviewableFile(item.attachedFile) && (
+                          <button
+                            type="button"
+                            onClick={() => previewAttachment(item.attachedFile!)}
+                            className="p-0.5 text-slate-500 hover:text-blue-600 rounded cursor-pointer"
+                            title={`Xem trước (${item.attachedFile.fileName})`}
+                          >
+                            <Eye size={12} />
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={() => downloadAttachment(item.attachedFile!)}

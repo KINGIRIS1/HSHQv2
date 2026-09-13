@@ -199,6 +199,26 @@ export const useAppData = (currentUser: User | null) => {
         };
     }, []);
 
+    // Lắng nghe sự kiện hoàn tất đồng bộ tệp ngầm Google Drive để cập nhật giao diện tức thì
+    useEffect(() => {
+        const handleRecordAttachmentsUpdated = (e: any) => {
+            const updated = e?.detail;
+            if (updated && updated.id) {
+                setRecords(prev => prev.map(r => r.id === updated.id ? {
+                    ...r,
+                    attachedFiles: updated.attachedFiles,
+                    otherDocs: updated.otherDocs,
+                    dossierComponents: updated.dossierComponents,
+                } : r));
+            }
+        };
+
+        window.addEventListener('RECORD_ATTACHMENTS_UPDATED', handleRecordAttachmentsUpdated);
+        return () => {
+            window.removeEventListener('RECORD_ATTACHMENTS_UPDATED', handleRecordAttachmentsUpdated);
+        };
+    }, []);
+
     // Lắng nghe sự kiện khôi phục kết nối từ connectionManager để reload data ngầm
     useEffect(() => {
         const unsubscribe = connectionManager.subscribe((state) => {

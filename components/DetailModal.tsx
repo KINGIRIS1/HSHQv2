@@ -11,7 +11,7 @@ import { updateRecordApi, fetchContracts } from '../services/api';
 import SystemReceiptTemplate from './receive-record/SystemReceiptTemplate';
 import SystemAnnexTemplate from './receive-record/SystemAnnexTemplate';
 import { getEmployeeName as getEmpNameHelper, getPureBatchNumber, isFieldWorkProcedure, isOfficeOnlySurveyProcedure, getReceiptReceiverName } from '../utils/appHelpers';
-import { previewAttachment, downloadAttachment, getGoogleDriveIncomingUrl } from '../services/attachmentStorage';
+import { previewAttachment, downloadAttachment, getGoogleDriveIncomingUrl, isPreviewableFile } from '../services/attachmentStorage';
 import { checkUserPermission, hasRecordActionPermission } from '../utils/permissionUtils';
 
 
@@ -1083,26 +1083,25 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
 
                                                             {/* File đính kèm của giấy tờ */}
                                                             {doc.attachedFile && (
-                                                                <div className="flex items-center gap-1.5 bg-white px-2 py-0.5 rounded border border-emerald-200 text-emerald-800 font-mono text-[10px]">
-                                                                    <Paperclip size={11} className="text-emerald-600" />
-                                                                    <span className="font-semibold truncate max-w-[140px] sm:max-w-[200px]" title={doc.attachedFile.fileName}>
-                                                                        {doc.attachedFile.fileName}
-                                                                    </span>
+                                                                <div className="flex items-center gap-1 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 text-emerald-800 text-[11px]" title={`Tệp đính kèm: ${doc.attachedFile.fileName}`}>
+                                                                    <Paperclip size={12} className="text-emerald-600 shrink-0" />
+                                                                    {isPreviewableFile(doc.attachedFile) && (
+                                                                        <button
+                                                                            type="button"
+                                                                            title={`Xem trước tệp (${doc.attachedFile.fileName})`}
+                                                                            onClick={() => previewAttachment(doc.attachedFile!)}
+                                                                            className="text-blue-600 hover:text-blue-800 p-0.5 rounded hover:bg-blue-100 cursor-pointer"
+                                                                        >
+                                                                            <Eye size={13} />
+                                                                        </button>
+                                                                    )}
                                                                     <button
                                                                         type="button"
-                                                                        title="Xem nhanh tệp"
-                                                                        onClick={() => previewAttachment(doc.attachedFile!)}
-                                                                        className="text-blue-600 hover:text-blue-800 p-0.5 rounded hover:bg-blue-50 cursor-pointer"
-                                                                    >
-                                                                        <Eye size={12} />
-                                                                    </button>
-                                                                    <button
-                                                                        type="button"
-                                                                        title="Tải tệp về máy"
+                                                                        title={`Tải tệp (${doc.attachedFile.fileName})`}
                                                                         onClick={() => downloadAttachment(doc.attachedFile!)}
-                                                                        className="text-emerald-700 hover:text-emerald-900 p-0.5 rounded hover:bg-emerald-50 cursor-pointer"
+                                                                        className="text-emerald-700 hover:text-emerald-900 p-0.5 rounded hover:bg-emerald-100 cursor-pointer"
                                                                     >
-                                                                        <Download size={12} />
+                                                                        <Download size={13} />
                                                                     </button>
                                                                 </div>
                                                             )}
@@ -1177,26 +1176,25 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                                                     </span>
 
                                                     {comp.attachedFile ? (
-                                                        <div className="flex items-center gap-1.5 bg-white px-2 py-0.5 rounded border border-blue-200 text-blue-900 font-mono text-[10px]">
-                                                            <Paperclip size={11} className="text-blue-600 shrink-0" />
-                                                            <span className="font-semibold truncate max-w-[140px] sm:max-w-[200px]" title={comp.attachedFile.fileName}>
-                                                                {comp.attachedFile.fileName}
-                                                            </span>
+                                                        <div className="flex items-center gap-1 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200 text-blue-800 text-[11px]" title={`Tệp đính kèm: ${comp.attachedFile.fileName}`}>
+                                                            <Paperclip size={12} className="text-blue-600 shrink-0" />
+                                                            {isPreviewableFile(comp.attachedFile) && (
+                                                                <button
+                                                                    type="button"
+                                                                    title={`Xem trước tệp (${comp.attachedFile.fileName})`}
+                                                                    onClick={() => previewAttachment(comp.attachedFile!)}
+                                                                    className="text-blue-600 hover:text-blue-800 p-0.5 rounded hover:bg-blue-100 cursor-pointer"
+                                                                >
+                                                                    <Eye size={13} />
+                                                                </button>
+                                                            )}
                                                             <button
                                                                 type="button"
-                                                                title="Xem nhanh tệp"
-                                                                onClick={() => previewAttachment(comp.attachedFile!)}
-                                                                className="text-blue-600 hover:text-blue-800 p-0.5 rounded hover:bg-blue-50 cursor-pointer"
-                                                            >
-                                                                <Eye size={12} />
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                title="Tải tệp về máy"
+                                                                title={`Tải tệp (${comp.attachedFile.fileName})`}
                                                                 onClick={() => downloadAttachment(comp.attachedFile!)}
-                                                                className="text-emerald-700 hover:text-emerald-900 p-0.5 rounded hover:bg-emerald-50 cursor-pointer"
+                                                                className="text-blue-700 hover:text-blue-900 p-0.5 rounded hover:bg-blue-100 cursor-pointer"
                                                             >
-                                                                <Download size={12} />
+                                                                <Download size={13} />
                                                             </button>
                                                         </div>
                                                     ) : (

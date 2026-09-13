@@ -39,6 +39,7 @@ import * as XLSX from "xlsx-js-style";
 import { getShortRecordType, isArchiveRecordType, STATUS_LABELS } from "../constants";
 import { confirmAction, cleanSyncNotes, isFieldWorkProcedure } from "../utils/appHelpers";
 import { updateRecordApi, fetchContracts } from "../services/api";
+import { enqueueRecordForBackgroundDriveSync, hasPendingRecordAttachments } from "../services/attachmentStorage";
 import {
   fetchArchiveRecords,
   ArchiveRecord,
@@ -1031,6 +1032,10 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
             ...(components ? { dossierComponents: components } : {}),
           };
 
+          if (components && hasPendingRecordAttachments(updatedRecord)) {
+            enqueueRecordForBackgroundDriveSync(updatedRecord);
+          }
+
           if (onUpdateRecord) {
             return onUpdateRecord(updatedRecord);
           } else {
@@ -1098,6 +1103,11 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
         approvalDate: nowIso,
         dossierComponents: newComponents,
       };
+
+      if (hasPendingRecordAttachments(updatedRecord)) {
+        enqueueRecordForBackgroundDriveSync(updatedRecord);
+      }
+
       if (onUpdateRecord) {
         await onUpdateRecord(updatedRecord);
       } else {
@@ -1176,6 +1186,10 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
               submissionDate: nowIso,
               ...(components ? { dossierComponents: components } : {}),
             };
+
+            if (components && hasPendingRecordAttachments(updatedRecord)) {
+              enqueueRecordForBackgroundDriveSync(updatedRecord);
+            }
 
             if (onUpdateRecord) {
               return onUpdateRecord(updatedRecord);

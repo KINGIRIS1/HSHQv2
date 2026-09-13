@@ -8,9 +8,10 @@ import { AlertTriangle, CheckCircle2, Clock, MapPin, ChevronLeft, ChevronRight, 
 interface OverdueStatsViewProps {
     records: RecordFile[];
     employees: Employee[];
+    onFilteredRecordsChange?: (filtered: RecordFile[]) => void;
 }
 
-const OverdueStatsView: React.FC<OverdueStatsViewProps> = ({ records, employees }) => {
+const OverdueStatsView: React.FC<OverdueStatsViewProps> = ({ records, employees, onFilteredRecordsChange }) => {
     const [filterType, setFilterType] = useState<'all' | 'completed' | 'pending'>('all');
     const [selectedEmployee, setSelectedEmployee] = useState<string>('all');
     const [currentPage, setCurrentPage] = useState(1);
@@ -83,11 +84,14 @@ const OverdueStatsView: React.FC<OverdueStatsViewProps> = ({ records, employees 
 
     const totalPages = Math.ceil(overdueData.filteredRecords.length / itemsPerPage);
 
-    // Reset page when filter changes
+    // Reset page when filter changes & notify parent of filtered records
     React.useEffect(() => {
         setCurrentPage(1);
         setMobileVisibleCount(20);
-    }, [filterType, selectedEmployee]);
+        if (onFilteredRecordsChange) {
+            onFilteredRecordsChange(overdueData.filteredRecords);
+        }
+    }, [filterType, selectedEmployee, overdueData.filteredRecords, onFilteredRecordsChange]);
 
     const formatDate = (d?: string | null) => {
         if (!d) return '-';

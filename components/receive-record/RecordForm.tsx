@@ -4,8 +4,8 @@ import { RecordFile, Holiday, RecordStatus, User, Employee, AttachedDocItem, Att
 import AutoResizeTextarea from '../AutoResizeTextarea';
 import { RECORD_TYPES, EXTENDED_RECORD_TYPES, getShortRecordType, getWardLabel } from '../../constants';
 import { getDepartmentForRecord } from '../../utils/appHelpers';
-import { processAndSaveSingleAttachment, previewAttachment, downloadAttachment, isAllowedDocFile } from '../../services/attachmentStorage';
-import { Save, User as UserIcon, Calendar, MapPin, FileCheck, Loader2, Printer, RotateCcw, XCircle, CheckCircle, AlertCircle, X, Phone, FileText, BookOpen, Clock, Hash, Map, ChevronDown, ChevronUp, Plus, Paperclip, Eye, Download, CheckCircle2 } from 'lucide-react';
+import { preparePendingSingleAttachment, uploadPendingAttachmentsToDrive, enqueueRecordForBackgroundDriveSync, processAndSaveSingleAttachment, previewAttachment, downloadAttachment, isAllowedDocFile, isPreviewableFile } from '../../services/attachmentStorage';
+import { Save, User as UserIcon, Calendar, MapPin, FileCheck, Loader2, Printer, RotateCcw, XCircle, CheckCircle, AlertCircle, X, Phone, FileText, BookOpen, Clock, Hash, ChevronDown, ChevronUp, Plus, Paperclip, Eye, Download, CheckCircle2 } from 'lucide-react';
 
 const parseAttachedDocs = (otherDocsStr: string | null | undefined): AttachedDocItem[] => {
     if (!otherDocsStr) return [];
@@ -225,7 +225,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
       try {
           const doc = attachedDocs[idx];
           const docName = doc?.name?.trim() || 'Giấy tờ kèm theo';
-          const meta = await processAndSaveSingleAttachment(
+          const meta = await preparePendingSingleAttachment(
               file,
               formData.code || 'HS',
               docName,
@@ -238,7 +238,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
           setFormData(prev => ({ ...prev, otherDocs: JSON.stringify(updatedDocs) }));
       } catch (err: any) {
           console.error('Lỗi đính kèm tệp:', err);
-          alert(err.message || 'Lỗi khi tải tệp lên');
+          alert(err.message || 'Lỗi khi lưu tạm tệp đính kèm');
       } finally {
           setUploadingDocIdx(null);
       }
@@ -275,12 +275,24 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
         return; 
     }
     setLoading(true);
+
+    const finalCode = (formData.code || 'HS').trim();
+
+    const updatedFormData: Partial<RecordFile> = {
+      ...formData,
+      code: finalCode,
+      attachedFiles: formData.attachedFiles || [],
+      otherDocs: JSON.stringify(attachedDocs),
+      dossierComponents: formData.dossierComponents,
+    };
+
     const recordToSave: RecordFile = { 
-        ...formData, 
+        ...updatedFormData, 
         id: formData.id || Math.random().toString(36).substr(2, 9), 
         status: formData.status || RecordStatus.RECEIVED,
         receivedBy: formData.receivedBy || currentUser?.employeeId || currentUser?.name || currentUser?.username || '' 
     } as RecordFile;
+
     const savedRecord = await onSave(recordToSave);
     setLoading(false);
     if (savedRecord) {
@@ -289,6 +301,9 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
             onPrint(savedRecord);
         }
         if (initialData && onCancelEdit) onCancelEdit(); else handleReset(true);
+
+        // Kích hoạt đồng bộ ngầm Google Drive trong nền (0ms delay cho thao tác giao diện)
+        enqueueRecordForBackgroundDriveSync(savedRecord);
     } else {
         setNotification({ type: 'error', message: "Lỗi khi lưu hồ sơ." });
     }
@@ -557,20 +572,22 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
                                                     <div className="inline-flex items-center justify-center gap-1 px-1.5 py-0.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800">
                                                         <button
                                                             type="button"
-                                                            onClick={() => previewAttachment(doc.attachedFile!)}
-                                                            title={`Xem tệp: ${doc.attachedFile.fileName}`}
+                                                            onClick={() => isPreviewableFile(doc.attachedFile) ? previewAttachment(doc.attachedFile!) : downloadAttachment(doc.attachedFile!)}
+                                                            title={isPreviewableFile(doc.attachedFile) ? `Xem tệp: ${doc.attachedFile.fileName}` : `Tải tệp: ${doc.attachedFile.fileName}`}
                                                             className="p-0.5 rounded hover:bg-emerald-100 text-emerald-700 cursor-pointer"
                                                         >
                                                             <CheckCircle2 size={13} />
                                                         </button>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => previewAttachment(doc.attachedFile!)}
-                                                            title={`Xem trước (${doc.attachedFile.fileName})`}
-                                                            className="p-0.5 rounded hover:bg-emerald-100 text-blue-600 cursor-pointer"
-                                                        >
-                                                            <Eye size={12} />
-                                                        </button>
+                                                        {isPreviewableFile(doc.attachedFile) && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => previewAttachment(doc.attachedFile!)}
+                                                                title={`Xem trước (${doc.attachedFile.fileName})`}
+                                                                className="p-0.5 rounded hover:bg-emerald-100 text-blue-600 cursor-pointer"
+                                                            >
+                                                                <Eye size={12} />
+                                                            </button>
+                                                        )}
                                                         <button
                                                             type="button"
                                                             onClick={() => downloadAttachment(doc.attachedFile!)}

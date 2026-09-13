@@ -16,6 +16,7 @@ import TemplateConfigModal from './TemplateConfigModal';
 import DocxPreviewModal from './DocxPreviewModal';
 import ExcelPreviewModal from './ExcelPreviewModal';
 import SystemReceiptTemplate from './receive-record/SystemReceiptTemplate';
+import DeleteConfirmModal from './DeleteConfirmModal';
 
 interface ReceiveRecordProps {
   onSave: (record: RecordFile) => Promise<RecordFile | null>;
@@ -97,6 +98,7 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, onDelet
   
   // State chỉnh sửa
   const [editingRecord, setEditingRecord] = useState<RecordFile | null>(null);
+  const [deletingRecord, setDeletingRecord] = useState<RecordFile | null>(null);
 
   // Modal States
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
@@ -348,10 +350,8 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, onDelet
       setViewMode('create');
   };
 
-  const handleDeleteFromList = async (record: RecordFile) => {
-      if (await confirmAction(`Bạn có chắc muốn xóa hồ sơ ${record.code}?`)) {
-          await onDelete(record.id);
-      }
+  const handleDeleteFromList = (record: RecordFile) => {
+      setDeletingRecord(record);
   };
 
   return (
@@ -477,6 +477,20 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, onDelet
               onCreateContract={onCreateContract}
           />
       )}
+
+      <DeleteConfirmModal
+          isOpen={!!deletingRecord}
+          onClose={() => setDeletingRecord(null)}
+          onConfirm={async () => {
+              if (deletingRecord) {
+                  await onDelete(deletingRecord.id);
+                  setDeletingRecord(null);
+              }
+          }}
+          title="Xác nhận xóa hồ sơ"
+          message={deletingRecord?.code ? `Bạn có đồng ý xóa mã hồ sơ số ${deletingRecord.code} không?` : undefined}
+          record={deletingRecord}
+      />
     </div>
   );
 };

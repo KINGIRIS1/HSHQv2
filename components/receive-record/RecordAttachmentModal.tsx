@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { X, Folder, Paperclip, ExternalLink, Download, FileText } from 'lucide-react';
+import { X, Folder, Paperclip, ExternalLink, Download, FileText, CheckCircle2, Loader2, Save } from 'lucide-react';
 import { RecordFile, AttachedFileMeta } from '../../types';
 import { getDepartmentForRecord } from '../../utils/appHelpers';
 import { RecordAttachmentManager } from './RecordAttachmentManager';
-import { getGoogleDriveIncomingUrl, downloadAttachment } from '../../services/attachmentStorage';
+import { getGoogleDriveIncomingUrl, downloadAttachment, enqueueRecordForBackgroundDriveSync } from '../../services/attachmentStorage';
 
 interface RecordAttachmentModalProps {
   record: RecordFile | null;
@@ -20,30 +20,57 @@ export const RecordAttachmentModal: React.FC<RecordAttachmentModalProps> = ({
   onUpdateRecordFiles,
   readOnly = false,
 }) => {
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [currentFiles, setCurrentFiles] = useState<AttachedFileMeta[]>([]);
+
+  React.useEffect(() => {
+    if (record) {
+      setCurrentFiles(record.attachedFiles || []);
+    }
+  }, [record]);
+
   if (!isOpen || !record) return null;
 
   const department = getDepartmentForRecord(record);
   const driveUrl = getGoogleDriveIncomingUrl();
-  const files = record.attachedFiles || [];
+  const hasPendingFiles = currentFiles.some(f => !f.driveUrl && !f.driveFileId);
 
   const handleFilesChange = (newFiles: AttachedFileMeta[]) => {
-    if (onUpdateRecordFiles && record.id) {
-      onUpdateRecordFiles(record.id, newFiles);
+    setCurrentFiles(newFiles);
+  };
+
+  const handleSaveAndSync = async () => {
+    if (!record.id) return;
+    try {
+      // 1. Cập nhật ngay tệp trong giao diện và đóng hộp thoại tức thì 0ms
+      if (onUpdateRecordFiles) {
+        onUpdateRecordFiles(record.id, currentFiles);
+      }
+      onClose();
+
+      // 2. Kích hoạt đồng bộ ngầm tệp lên Google Drive trong nền (Background Sync)
+      const updatedRecord: RecordFile = {
+        ...record,
+        attachedFiles: currentFiles,
+      };
+      enqueueRecordForBackgroundDriveSync(updatedRecord);
+    } catch (err: any) {
+      console.error('Lỗi khi lưu tệp đính kèm:', err);
     }
   };
 
   // Tải về từng tệp riêng rẽ của mã hồ sơ (không đóng gói zip theo yêu cầu)
   const handleDownloadAllSeparate = async () => {
-    if (files.length === 0) {
+    if (currentFiles.length === 0) {
       alert('Hồ sơ này hiện chưa có tệp đính kèm nào.');
       return;
     }
 
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
+    for (let i = 0; i < currentFiles.length; i++) {
+      const file = currentFiles[i];
       await downloadAttachment(file);
       // Giãn cách một chút để trình duyệt không chặn nhiều lượt tải
-      if (i < files.length - 1) {
+      if (i < currentFiles.length - 1) {
         await new Promise(r => setTimeout(r, 400));
       }
     }
@@ -92,7 +119,7 @@ export const RecordAttachmentModal: React.FC<RecordAttachmentModalProps> = ({
               </p>
             </div>
 
-            {files.length > 0 && (
+            {currentFiles.length > 0 && (
               <button
                 type="button"
                 onClick={handleDownloadAllSeparate}
@@ -100,7 +127,7 @@ export const RecordAttachmentModal: React.FC<RecordAttachmentModalProps> = ({
                 title="Tải về lần lượt từng tệp đã đổi tên riêng rẽ của mã hồ sơ này"
               >
                 <Download size={14} />
-                Tải từng tệp của mã hồ sơ ({files.length})
+                Tải từng tệp của mã hồ sơ ({currentFiles.length})
               </button>
             )}
           </div>
@@ -109,7 +136,7 @@ export const RecordAttachmentModal: React.FC<RecordAttachmentModalProps> = ({
           <RecordAttachmentManager
             recordCode={record.code}
             department={department}
-            attachedFiles={files}
+            attachedFiles={currentFiles}
             onChange={handleFilesChange}
             readOnly={readOnly}
           />
@@ -133,13 +160,26 @@ export const RecordAttachmentModal: React.FC<RecordAttachmentModalProps> = ({
             )}
           </div>
 
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-xs font-bold transition-colors cursor-pointer"
-          >
-            Đóng
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-xs font-bold transition-colors cursor-pointer"
+              disabled={isSyncing}
+            >
+              Hủy / Đóng
+            </button>
+            {!readOnly && (
+              <button
+                type="button"
+                onClick={handleSaveAndSync}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer"
+              >
+                <Save size={14} />
+                Lưu tệp & Đóng
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>

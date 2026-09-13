@@ -156,6 +156,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
 
     const [dailyStatsRecords, setDailyStatsRecords] = useState<RecordFile[]>([]);
     const [revenueStatsRecords, setRevenueStatsRecords] = useState<RecordFile[]>([]);
+    const [overdueStatsRecords, setOverdueStatsRecords] = useState<RecordFile[]>([]);
 
     // Tải trước kho lưu trữ tức thì từ RAM / IndexedDB khi vào màn hình Báo cáo (0ms)
     useEffect(() => {
@@ -493,6 +494,9 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
         if (activeTab === 'revenue') {
             return revenueStatsRecords.length || filteredData.length;
         }
+        if (activeTab === 'overdue') {
+            return overdueStatsRecords.length;
+        }
         if (activeTab === 'employee' && selectedEmpId) {
             return filteredData.filter(r => r.assignedTo === selectedEmpId).length;
         }
@@ -500,7 +504,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
             return finalFilteredData.length;
         }
         return filteredData.length;
-    }, [activeTab, dailyStatsRecords, revenueStatsRecords, filteredData, finalFilteredData, selectedEmpId]);
+    }, [activeTab, dailyStatsRecords, revenueStatsRecords, overdueStatsRecords, filteredData, finalFilteredData, selectedEmpId]);
 
     const handleExportExcelClick = () => {
         if (!fromDate || !toDate) { alert("Vui lòng chọn đầy đủ thời gian."); return; }
@@ -538,10 +542,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
         } else if (activeTab === 'employee') {
             dataToExport = selectedEmpId ? filteredData.filter(r => r.assignedTo === selectedEmpId) : filteredData;
         } else if (activeTab === 'overdue') {
-            dataToExport = filteredData.filter(r => {
-                if (r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED || r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED || r.status === RecordStatus.SIGNED || r.exportBatch) return false;
-                return isRecordOverdue(r);
-            });
+            dataToExport = overdueStatsRecords;
         }
 
         onExportExcel(fromDate, toDate, selectedWard, title, dataToExport);
@@ -1100,6 +1101,7 @@ const ReportSection: React.FC<ReportSectionProps> = ({ reportContent, isGenerati
                     <OverdueStatsView 
                         records={filteredData}
                         employees={activeEmployees}
+                        onFilteredRecordsChange={setOverdueStatsRecords}
                     />
                 )}
 
