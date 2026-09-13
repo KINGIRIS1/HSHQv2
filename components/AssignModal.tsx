@@ -215,19 +215,20 @@ const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, e
           }
       }
 
-      // 3. Nếu có hồ sơ chọn, kiểm tra theo loại hồ sơ
+      // 3. Nếu có hồ sơ chọn, kiểm tra theo mã thủ tục (1.x -> Lưu trữ, 2.x -> Đo đạc, 3.x -> Cấp giấy)
       if (records && records.length > 0) {
           const record = records[0];
-          const type = (record.recordType || '').toLowerCase();
+          const type = (record.recordType || '').trim();
+          const code = (record.code || '').trim();
           
-          if (type.includes('1.1') || type.includes('1.2') || type.includes('công văn') || type.includes('lưu trữ')) {
+          if (type.startsWith('1.') || code.startsWith('1.')) {
               return 'Tổ Lưu trữ';
           }
-          if (type.includes('2.1') || type.includes('2.2') || type.includes('trích lục')) {
-              return 'Tổ Cấp giấy';
-          }
-          if (type.includes('2.3') || type.includes('2.4') || type.includes('2.5') || type.includes('2.6') || type.includes('số thửa') || type.includes('trích đo') || type.includes('đo đạc')) {
+          if (type.startsWith('2.') || code.startsWith('2.')) {
               return 'Tổ Đo đạc';
+          }
+          if (type.startsWith('3.') || code.startsWith('3.')) {
+              return 'Tổ Cấp giấy';
           }
       }
 
@@ -534,7 +535,7 @@ const AssignModal: React.FC<AssignModalProps> = ({ isOpen, onClose, onConfirm, e
                     disabled={!selectedEmpId}
                     className="px-6 py-2.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-black tracking-wider shadow-lg shadow-indigo-200 transition-all active:scale-95 flex items-center gap-2"
                 >
-                    <Check size={18} className="stroke-[2.5]" /> Xác nhận giao việc
+                    <Check size={18} className="stroke-[2.5]" /> Xác nhận
                 </button>
             </div>
         </div>

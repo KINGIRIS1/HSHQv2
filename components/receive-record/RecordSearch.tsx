@@ -33,6 +33,7 @@ import {
 import { DetailModal } from '../DetailModal';
 import { ExtendDeadlineModal } from '../ExtendDeadlineModal';
 import { isRecordOverdue, isRecordApproaching, toTitleCase, getBatchDisplayParts } from '../../utils/appHelpers';
+import { hasRecordActionPermission } from '../../utils/permissionUtils';
 
 interface RecordSearchProps {
     records: RecordFile[];
@@ -1080,7 +1081,7 @@ export const RecordSearch: React.FC<RecordSearchProps> = ({
                                                             >
                                                                 <FileCheck size={15} />
                                                             </button>
-                                                        ) : (
+                                                        ) : hasRecordActionPermission('extend', r, currentUser, employees) ? (
                                                             <button
                                                                 onClick={() => setSelectedExtendRecord(r)}
                                                                 className="p-1 text-indigo-700 hover:bg-indigo-100 rounded transition-colors border border-indigo-200 bg-indigo-50 cursor-pointer shadow-xs"
@@ -1088,7 +1089,7 @@ export const RecordSearch: React.FC<RecordSearchProps> = ({
                                                             >
                                                                 <CalendarClock size={15} />
                                                             </button>
-                                                        )}
+                                                        ) : null}
                                                     </div>
 
                                                     {/* Hàng dưới: Chỉnh sửa & Xóa */}

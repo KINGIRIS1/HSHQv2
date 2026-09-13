@@ -518,25 +518,35 @@ export function processAssignmentTimelineCheck(
 
 // --- HÀM XỬ LÝ VÀ ĐỊNH DẠNG ĐỢT GIAO 1 CỬA ---
 
-export function getDepartmentForRecord(r: RecordFile): string {
+export function getDepartmentForRecord(r: Partial<RecordFile>): string {
     if (r.returnHandoverDept) {
         const d = r.returnHandoverDept.toLowerCase();
         if (d.includes('lưu trữ') || d.includes('thông tin')) return 'Tổ Lưu trữ';
         if (d.includes('đo đạc') || d.includes('đo dạc')) return 'Tổ Đo đạc';
         if (d.includes('cấp giấy') || d.includes('đăng ký')) return 'Tổ Cấp giấy';
     }
-    const type = (r.recordType || '').toLowerCase();
-    const code = (r.code || '').toLowerCase();
+    const type = (r.recordType || '').trim();
+    const code = (r.code || '').trim();
 
-    if (type.includes('1.1') || type.includes('1.2') || type.includes('công văn') || type.includes('sao lục') || code.startsWith('1.')) {
+    // 1. Phân loại theo tiền tố mã thủ tục nghiêm ngặt (không dựa vào từ khóa)
+    // Tổ Lưu trữ: 1.x (1.1, 1.2, ...)
+    if (type.startsWith('1.') || code.startsWith('1.')) {
         return 'Tổ Lưu trữ';
     }
-    if (type.includes('2.3') || type.includes('2.4') || type.includes('2.5') || type.includes('2.6') || type.includes('số thửa') || type.includes('trích đo') || type.includes('đo đạc') || code.startsWith('2.')) {
+    // Tổ Đo đạc: 2.x (2.1, 2.2, 2.3, 2.4, 2.5, ...)
+    if (type.startsWith('2.') || code.startsWith('2.')) {
         return 'Tổ Đo đạc';
     }
-    if (type.includes('2.1') || type.includes('2.2') || type.includes('trích lục')) {
+    // Tổ Cấp giấy: 3.x (3.1, 3.2, ...)
+    if (type.startsWith('3.') || code.startsWith('3.')) {
         return 'Tổ Cấp giấy';
     }
+
+    // Nếu có sourceTable đã định sẵn
+    if (r.sourceTable === 'luutru_records') return 'Tổ Lưu trữ';
+    if (r.sourceTable === 'dangky_records') return 'Tổ Cấp giấy';
+    if (r.sourceTable === 'land_records') return 'Tổ Đo đạc';
+
     return 'Tổ Đo đạc';
 }
 

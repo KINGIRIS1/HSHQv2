@@ -20,7 +20,8 @@ const RECORD_DB_COLUMNS = [
     'price', 'advancePayment', 'isHandedOver',
     'statusLogs', 'archiveHandoverDate', 'archiveHandoverBatch',
     'surveyorId', 'surveyAssignedDate', 'fieldAssignedDate', 'fieldCompletedDate',
-    'drafterId', 'officeAssignedDate', 'officeCompletedDate'
+    'drafterId', 'officeAssignedDate', 'officeCompletedDate',
+    'attachedFiles', 'dossierComponents'
 ];
 
 /**
@@ -31,49 +32,40 @@ const RECORD_DB_COLUMNS = [
  */
 export const getTargetTable = (record: Partial<RecordFile>): 'dangky_records' | 'land_records' | 'luutru_records' => {
     const rawType = String(record.recordType || record.content || '').trim();
+    const code = String(record.code || '').trim();
     const shortType = getShortRecordType(rawType);
-    const typeLower = rawType.toLowerCase();
 
-    // 1. Nhóm 1.x -> luutru_records
+    // 1. Phân loại theo tiền tố mã thủ tục nghiêm ngặt (không dùng từ khóa)
+    // Nhóm 1.x -> Tổ Lưu trữ (luutru_records)
     if (
         shortType.startsWith('1.') ||
         rawType.startsWith('1.') ||
+        code.startsWith('1.') ||
         isArchiveRecordType(record.recordType) ||
-        isArchiveRecordType(record.content) ||
-        typeLower.includes('sao lục') ||
-        typeLower.includes('công văn') ||
-        typeLower.includes('cung cấp dữ liệu') ||
-        typeLower.includes('cung cấp tài liệu')
+        isArchiveRecordType(record.content)
     ) {
         return 'luutru_records';
     }
 
-    // 2. Nhóm 3.x -> dangky_records
-    if (
-        shortType.startsWith('3.') ||
-        rawType.startsWith('3.') ||
-        typeLower.includes('đăng ký') ||
-        typeLower.includes('biến động') ||
-        typeLower.includes('cấp giấy')
-    ) {
-        return 'dangky_records';
-    }
-
-    // 3. Nhóm 2.x -> land_records
+    // Nhóm 2.x -> Tổ Đo đạc (land_records)
     if (
         shortType.startsWith('2.') ||
         rawType.startsWith('2.') ||
-        typeLower.includes('trích lục') ||
-        typeLower.includes('trích đo') ||
-        typeLower.includes('duyệt đơn') ||
-        typeLower.includes('cắm mốc') ||
-        typeLower.includes('tách') ||
-        typeLower.includes('hợp thửa')
+        code.startsWith('2.')
     ) {
         return 'land_records';
     }
 
-    // Nếu có sourceTable
+    // Nhóm 3.x -> Tổ Cấp giấy / Đăng ký (dangky_records)
+    if (
+        shortType.startsWith('3.') ||
+        rawType.startsWith('3.') ||
+        code.startsWith('3.')
+    ) {
+        return 'dangky_records';
+    }
+
+    // Nếu có sourceTable đã được xác định trước đó
     if (record.sourceTable === 'luutru_records' || record.sourceTable === 'archive_records') return 'luutru_records';
     if (record.sourceTable === 'dangky_records') return 'dangky_records';
     if (record.sourceTable === 'land_records') return 'land_records';
@@ -293,6 +285,32 @@ export const fetchRecords = async (onProgress?: TierProgressCallback): Promise<R
         fetchTableRecords('land_records'),
         fetchTableRecords('luutru_records')
     ]);
+
+    // Tự động phát hiện và di chuyển các hồ sơ bị phân nhầm vào dangky_records (ví dụ hồ sơ Đo đạc 2.x)
+    const misplacedInDangky = dangky
+        .map(mapRecordFromDb)
+        .filter((r): r is RecordFile => !!r && getTargetTable(r) !== 'dangky_records');
+
+    if (misplacedInDangky.length > 0) {
+        console.log(`[Auto-Fix] Phát hiện ${misplacedInDangky.length} hồ sơ nằm sai trong dangky_records. Đang tự động chuyển dời...`);
+        setTimeout(async () => {
+            try {
+                const landFixes = misplacedInDangky.filter(r => getTargetTable(r) === 'land_records');
+                const luutruFixes = misplacedInDangky.filter(r => getTargetTable(r) === 'luutru_records');
+
+                if (landFixes.length > 0) {
+                    await supabase.from('land_records').upsert(landFixes.map(r => sanitizeData(r, RECORD_DB_COLUMNS)));
+                    await purgeBatchFromOtherTables(landFixes.map(r => r.id), landFixes.map(r => r.code), 'land_records');
+                }
+                if (luutruFixes.length > 0) {
+                    await supabase.from('luutru_records').upsert(luutruFixes.map(r => sanitizeData(r, RECORD_DB_COLUMNS)));
+                    await purgeBatchFromOtherTables(luutruFixes.map(r => r.id), luutruFixes.map(r => r.code), 'luutru_records');
+                }
+            } catch (err) {
+                console.error("[Auto-Fix Misplaced Records] Lỗi khi chuyển dời:", err);
+            }
+        }, 300);
+    }
     
     const rawList = [...dangky, ...land, ...luutru];
     rawList.forEach(item => {
@@ -678,6 +696,8 @@ export const updateRecordApi = async (record: RecordFile): Promise<RecordFile | 
         return { ...record, _isOfflineSaved: true };
     }
 };
+
+export const saveRecord = updateRecordApi;
 
 export const updateRecordFieldsApi = async (id: string, fields: Partial<RecordFile>): Promise<RecordFile | null> => {
     if (!isConfigured) {

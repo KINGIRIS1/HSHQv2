@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { RecordFile, Employee, User, UserRole, SplitItem, RecordStatus } from '../../types';
+import { RecordFile, Employee, User, UserRole, SplitItem, RecordStatus, RolePermissions, DepartmentPermissions, DossierComponentItem, AttachedFileMeta } from '../../types';
 import AutoResizeTextarea from '../AutoResizeTextarea';
 import { getNormalizedWard, getShortRecordType, isArchiveRecordType } from '../../constants';
 import StatusBadge from '../StatusBadge';
@@ -8,14 +8,17 @@ import {
   CheckCircle2, Circle, Send, FileSignature, CheckSquare, 
   CalendarClock, FileCheck, Calculator, Loader2, StickyNote, 
   Save, Bell, Printer, Pencil, Trash2, Info, ChevronLeft,
-  Phone, Calendar, Hash, FileDown, Clock, ShieldAlert
+  Phone, Calendar, Hash, FileDown, Clock, ShieldAlert,
+  Paperclip, Eye, Download
 } from 'lucide-react';
 import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../../services/docxService';
 import DocxPreviewModal from '../DocxPreviewModal';
 import { updateRecordApi, fetchContracts } from '../../services/api';
+import { previewAttachment, downloadAttachment } from '../../services/attachmentStorage';
 import SystemReceiptTemplate from '../receive-record/SystemReceiptTemplate';
 import SystemAnnexTemplate from '../receive-record/SystemAnnexTemplate';
 import { cleanSyncNotes, getPureBatchNumber, isFieldWorkProcedure, isOfficeOnlySurveyProcedure, getReceiptReceiverName } from '../../utils/appHelpers';
+import { checkUserPermission, hasRecordActionPermission } from '../../utils/permissionUtils';
 
 interface MobileDetailModalProps {
   isOpen: boolean;
@@ -24,6 +27,8 @@ interface MobileDetailModalProps {
   employees: Employee[];
   users: User[];
   currentUser: User | null;
+  rolePermissions?: RolePermissions;
+  departmentPermissions?: DepartmentPermissions;
   onEdit?: (record: RecordFile) => void;
   onDelete?: (record: RecordFile) => void;
   onCreateLiquidation?: (record: RecordFile) => void; 
@@ -33,11 +38,13 @@ interface MobileDetailModalProps {
 }
 
 interface ParsedDocItem {
+  id?: string;
   name: string;
   type: string;
   original: number;
   copy: number;
   note?: string;
+  attachedFile?: AttachedFileMeta;
 }
 
 const parseOtherDocsForMobile = (raw: string | null | undefined): ParsedDocItem[] => {
@@ -64,8 +71,9 @@ const parseOtherDocsForMobile = (raw: string | null | undefined): ParsedDocItem[
         const original = typeof item.original === 'number' ? item.original : (item.soBanChinh ? Number(item.soBanChinh) : (type === 'Bản chính' ? 1 : 0));
         const copy = typeof item.copy === 'number' ? item.copy : (item.soBanSao ? Number(item.soBanSao) : (type === 'Bản sao' ? 1 : 0));
         const note = item.note || item.ghiChu || '';
+        const attachedFile = item.attachedFile || undefined;
 
-        result.push({ name, type, original, copy, note });
+        result.push({ name, type, original, copy, note, attachedFile });
       }
       if (result.length > 0) return result;
     } catch {
@@ -83,7 +91,7 @@ const parseOtherDocsForMobile = (raw: string | null | undefined): ParsedDocItem[
 };
 
 export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({ 
-  isOpen, onClose, record, employees, users, currentUser, onEdit, onDelete, onCreateLiquidation, onCreateContract, onRefreshData, onOpenExtendModal
+  isOpen, onClose, record, employees, users, currentUser, rolePermissions, departmentPermissions, onEdit, onDelete, onCreateLiquidation, onCreateContract, onRefreshData, onOpenExtendModal
 }) => {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [previewBlob, setPreviewBlob] = useState<Blob | null>(null);
@@ -206,10 +214,7 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
           }
         } else {
           setMatchedContract(null);
-          const type = (record.recordType || '').toLowerCase();
-          if (type.includes('trích lục')) setContractPrice(53163);
-          else if (type.includes('sao lục') || type.includes('sao luc')) setContractPrice(310000);
-          else setContractPrice(null);
+          setContractPrice(null);
           setContractSplitItems(null);
           setLiquidationInfo(null);
         }
@@ -224,7 +229,9 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
   const isSubadmin = currentUser?.role === UserRole.SUBADMIN;
   const isOneDoor = currentUser?.role === UserRole.ONEDOOR;
   const canPerformAction = isAdmin || isSubadmin || isOneDoor;
-  const canPrintReceipt = isAdmin || isOneDoor;
+  const canPrintReceipt = isAdmin || isSubadmin || isOneDoor || 
+    checkUserPermission('PRINT_RECEIPT', currentUser, employees, rolePermissions, departmentPermissions) ||
+    hasRecordActionPermission('print', record, currentUser, employees, rolePermissions, departmentPermissions);
 
   const formatDate = (dateStr?: string | null) => {
     if (!dateStr) return '---';
@@ -501,7 +508,7 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                 {isProcessing ? <Loader2 size={17} className="animate-spin" /> : <Printer size={17} />}
               </button>
             )}
-            {record && (
+            {onOpenExtendModal && record && (
               <button 
                 onClick={() => { 
                   onClose(); 
@@ -658,40 +665,52 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
             </div>
 
             {/* Financial Info Card */}
-            <div className="bg-white p-3 rounded-xl border border-slate-200/80 shadow-xs space-y-2">
-              <div className="flex items-center gap-1.5 text-amber-700 font-bold text-xs uppercase">
-                <DollarSign size={14} />
-                <span>Tài chính & Biên lai</span>
-              </div>
-              <div className="space-y-2 text-xs">
-                <div className="flex justify-between items-center p-2 bg-blue-50/60 rounded-lg border border-blue-100">
-                  <span className="font-bold text-blue-800 text-[11px]">
-                    {record.receiptType === 'Biên Lai' ? 'SỐ BIÊN LAI' : record.receiptType === 'Hóa Đơn' ? 'SỐ HÓA ĐƠN' : 'BIÊN LAI / HÓA ĐƠN'}
-                  </span>
-                  <span className="font-bold font-mono text-blue-900">{record.receiptNumber || 'Chưa lập'}</span>
-                </div>
-                <div className="flex justify-between items-center p-2 bg-emerald-50/60 rounded-lg border border-emerald-100">
-                  <span className="font-bold text-emerald-800 text-[11px]">Số tiền phí</span>
-                  <span className="font-bold font-mono text-emerald-900">
-                    {record.returnedPrice !== undefined && record.returnedPrice !== null
-                      ? record.returnedPrice.toLocaleString('vi-VN') + ' đ'
-                      : '---'}
-                  </span>
-                </div>
-              </div>
+            {(() => {
+              const hasReceiptNumber = Boolean(record.receiptNumber && record.receiptNumber.trim());
+              const isContract = record.recordType && (getShortRecordType(record.recordType).startsWith('2.2') || getShortRecordType(record.recordType).startsWith('2.4'));
+              const hasFinancialInfo = hasReceiptNumber || isContract;
 
-              {/* Hợp đồng liên kết */}
-              {record.recordType && (getShortRecordType(record.recordType).startsWith('2.2') || getShortRecordType(record.recordType).startsWith('2.4')) && (
-                <div className="pt-2 border-t border-slate-100">
-                  <div className="bg-indigo-50/70 border border-indigo-100 rounded-lg p-2.5 flex items-center justify-between gap-2">
-                    <div className="min-w-0">
-                      <span className="text-[10px] text-indigo-500 font-bold uppercase block">Hợp đồng số:</span>
-                      <span className="text-[11px] font-bold text-indigo-900 truncate block">{matchedContract ? matchedContract.code : 'Chưa có HĐ'}</span>
-                    </div>
+              if (!hasFinancialInfo) return null;
+
+              return (
+                <div className="bg-white p-3 rounded-xl border border-slate-200/80 shadow-xs space-y-2">
+                  <div className="flex items-center gap-1.5 text-amber-700 font-bold text-xs uppercase">
+                    <DollarSign size={14} />
+                    <span>Tài chính & Biên lai</span>
                   </div>
+                  {hasReceiptNumber && (
+                    <div className="space-y-2 text-xs">
+                      <div className="flex justify-between items-center p-2 bg-blue-50/60 rounded-lg border border-blue-100">
+                        <span className="font-bold text-blue-800 text-[11px]">
+                          {record.receiptType === 'Biên Lai' ? 'SỐ BIÊN LAI' : record.receiptType === 'Hóa Đơn' ? 'SỐ HÓA ĐƠN' : 'BIÊN LAI / HÓA ĐƠN'}
+                        </span>
+                        <span className="font-bold font-mono text-blue-900">{record.receiptNumber || '---'}</span>
+                      </div>
+                      <div className="flex justify-between items-center p-2 bg-emerald-50/60 rounded-lg border border-emerald-100">
+                        <span className="font-bold text-emerald-800 text-[11px]">Số tiền thu</span>
+                        <span className="font-bold font-mono text-emerald-900">
+                          {record.returnedPrice !== undefined && record.returnedPrice !== null
+                            ? record.returnedPrice.toLocaleString('vi-VN') + ' đ'
+                            : (record.price ? record.price.toLocaleString('vi-VN') + ' đ' : '0 đ')}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Hợp đồng liên kết */}
+                  {isContract && (
+                    <div className="pt-2 border-t border-slate-100">
+                      <div className="bg-indigo-50/70 border border-indigo-100 rounded-lg p-2.5 flex items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <span className="text-[10px] text-indigo-500 font-bold uppercase block">Hợp đồng số:</span>
+                          <span className="text-[11px] font-bold text-indigo-900 truncate block">{matchedContract ? matchedContract.code : 'Chưa có HĐ'}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
+              );
+            })()}
           </div>
         )}
 
@@ -840,15 +859,17 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
         {activeTab === 'notes' && (
           <div className="space-y-2.5">
             {/* Nội dung chi tiết / Trích yếu */}
-            <div className="bg-white p-3 rounded-xl border border-slate-200/80 shadow-xs space-y-1.5">
-              <span className="text-[10px] font-bold text-purple-700 uppercase flex items-center gap-1.5">
-                <FileText size={13} />
-                <span>Nội dung chi tiết (Trích yếu)</span>
-              </span>
-              <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100 text-slate-800 text-xs font-medium leading-relaxed whitespace-pre-line">
-                {cleanSyncNotes(record.content) || 'Không có nội dung chi tiết.'}
+            {Boolean(cleanSyncNotes(record.content)?.trim()) && (
+              <div className="bg-white p-3 rounded-xl border border-slate-200/80 shadow-xs space-y-1.5">
+                <span className="text-[10px] font-bold text-purple-700 uppercase flex items-center gap-1.5">
+                  <FileText size={13} />
+                  <span>Nội dung chi tiết (Trích yếu)</span>
+                </span>
+                <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100 text-slate-800 text-xs font-medium leading-relaxed whitespace-pre-line">
+                  {cleanSyncNotes(record.content)}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Ghi chú hồ sơ */}
             {cleanSyncNotes(record.notes) && (
@@ -874,23 +895,138 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                     <span>Giấy tờ kèm theo ({docList.length})</span>
                   </span>
                   <div className="space-y-1.5">
-                    {docList.map((doc, idx) => (
-                      <div key={idx} className="bg-emerald-50/40 p-2 rounded-lg border border-emerald-100/70 text-slate-800 text-xs space-y-1">
+                    {docList.map((doc, idx) => {
+                      const badges: string[] = [];
+                      if (doc.original !== undefined && Number(doc.original) > 0) {
+                        badges.push('Bản chính');
+                      }
+                      if (doc.copy !== undefined && Number(doc.copy) > 0) {
+                        badges.push('Bản sao');
+                      }
+                      if (badges.length === 0) {
+                        badges.push(doc.type || 'Bản chính');
+                      }
+
+                      return (
+                        <div key={idx} className="bg-emerald-50/40 p-2 rounded-lg border border-emerald-100/70 text-slate-800 text-xs space-y-1">
+                          <div className="flex items-start justify-between gap-1.5">
+                            <span className="font-semibold text-slate-900 leading-snug flex-1">
+                              {idx + 1}. {doc.name}
+                            </span>
+                            <div className="flex items-center gap-1 shrink-0 flex-wrap justify-end">
+                              {badges.map((b, bIdx) => (
+                                <span key={bIdx} className="px-1.5 py-0.5 rounded-full font-bold text-[9px] bg-emerald-100 text-emerald-800 border border-emerald-200 shrink-0">
+                                  {b}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                          {doc.note && (
+                            <div className="flex flex-wrap items-center gap-2 text-[10px] text-slate-600 pt-1 border-t border-emerald-100/60">
+                              <span className="italic text-slate-500">Ghi chú: {doc.note}</span>
+                            </div>
+                          )}
+                          {doc.attachedFile && (
+                            <div className="flex items-center justify-between w-full gap-2 bg-white px-2 py-1 rounded border border-emerald-200 text-emerald-900 mt-1">
+                              <span className="font-semibold truncate max-w-[160px] flex items-center gap-1 text-[10px]">
+                                <Paperclip size={11} className="text-emerald-600 shrink-0" />
+                                {doc.attachedFile.fileName}
+                              </span>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => previewAttachment(doc.attachedFile!)}
+                                  className="text-blue-600 hover:text-blue-800 p-0.5 rounded cursor-pointer"
+                                  title="Xem trước"
+                                >
+                                  <Eye size={12} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => downloadAttachment(doc.attachedFile!)}
+                                  className="text-emerald-700 hover:text-emerald-900 p-0.5 rounded cursor-pointer"
+                                  title="Tải về"
+                                >
+                                  <Download size={12} />
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Thành phần hồ sơ & Tệp đính kèm */}
+            {(() => {
+              const comps: DossierComponentItem[] = (() => {
+                if (!record.dossierComponents) return [];
+                if (Array.isArray(record.dossierComponents)) return record.dossierComponents;
+                if (typeof record.dossierComponents === 'string') {
+                  try {
+                    const parsed = JSON.parse(record.dossierComponents);
+                    return Array.isArray(parsed) ? parsed : [];
+                  } catch {
+                    return [];
+                  }
+                }
+                return [];
+              })();
+
+              if (comps.length === 0) return null;
+
+              return (
+                <div className="bg-white p-3 rounded-xl border border-slate-200/80 shadow-xs space-y-2">
+                  <span className="text-[10px] font-bold text-blue-700 uppercase flex items-center gap-1.5">
+                    <FileText size={13} />
+                    <span>Thành phần hồ sơ ({comps.length})</span>
+                  </span>
+                  <div className="space-y-1.5">
+                    {comps.map((comp, idx) => (
+                      <div key={comp.id || idx} className="bg-slate-50/70 p-2.5 rounded-lg border border-slate-200 text-slate-800 text-xs space-y-1.5">
                         <div className="flex items-start justify-between gap-1.5">
                           <span className="font-semibold text-slate-900 leading-snug flex-1">
-                            {idx + 1}. {doc.name}
+                            {idx + 1}. {comp.name || 'Tài liệu không tên'}
                           </span>
-                          <span className="px-1.5 py-0.5 rounded-full font-bold text-[9px] bg-emerald-100 text-emerald-800 border border-emerald-200 shrink-0">
-                            {doc.type}
-                          </span>
+                          {comp.stage && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-100 text-blue-800 shrink-0">
+                              {comp.stage}
+                            </span>
+                          )}
                         </div>
-                        {(doc.original > 0 || doc.copy > 0 || doc.note) && (
-                          <div className="flex flex-wrap items-center gap-2 text-[10px] text-slate-600 pt-1 border-t border-emerald-100/60">
-                            {doc.original > 0 && <span>Bản chính: <strong>{doc.original}</strong></span>}
-                            {doc.copy > 0 && <span>Bản sao: <strong>{doc.copy}</strong></span>}
-                            {doc.note && <span className="italic text-slate-500">Ghi chú: {doc.note}</span>}
-                          </div>
-                        )}
+                        <div className="flex items-center justify-between gap-2 text-[10px] text-slate-500 pt-1 border-t border-slate-100">
+                          {comp.attachedFile ? (
+                            <div className="flex items-center justify-between w-full gap-2 bg-white px-2 py-1 rounded border border-blue-200 text-blue-900">
+                              <span className="font-semibold truncate max-w-[160px] flex items-center gap-1 text-[10px]">
+                                <Paperclip size={11} className="text-blue-600 shrink-0" />
+                                {comp.attachedFile.fileName}
+                              </span>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => previewAttachment(comp.attachedFile!)}
+                                  className="text-blue-600 hover:text-blue-800 p-0.5 rounded cursor-pointer"
+                                  title="Xem trước"
+                                >
+                                  <Eye size={12} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => downloadAttachment(comp.attachedFile!)}
+                                  className="text-emerald-700 hover:text-emerald-900 p-0.5 rounded cursor-pointer"
+                                  title="Tải về"
+                                >
+                                  <Download size={12} />
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="text-slate-400 italic">Chưa đính kèm tệp</span>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>

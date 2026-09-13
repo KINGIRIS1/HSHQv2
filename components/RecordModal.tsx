@@ -1,17 +1,13 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { RecordFile, RecordStatus, Employee, User, UserRole } from '../types';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { RecordFile, RecordStatus, Employee, User, UserRole, AttachedDocItem, DossierComponentItem, AttachedFileMeta } from '../types';
 import AutoResizeTextarea from './AutoResizeTextarea';
 import { GROUPS, EXTENDED_RECORD_TYPES, STATUS_LABELS, SELECTABLE_STATUSES, ARCHIVE_SELECTABLE_STATUSES, SURVEY_SELECTABLE_STATUSES, getShortRecordType, getWardLabel, getNormalizedWard, isArchiveRecordType } from '../constants';
-import { X, Save, Lock, User as UserIcon, MapPin, FileText, Calendar, FileCheck, ChevronDown, ChevronUp } from 'lucide-react';
+import { X, Save, Lock, User as UserIcon, MapPin, FileText, Calendar, FileCheck, ChevronDown, ChevronUp, Paperclip, Upload, Eye, Download, ExternalLink, Loader2, CheckCircle2, Plus } from 'lucide-react';
 import { calculateDeadlineHelper, getDepartmentForRecord, isProcedure2_3, syncRecordStatusTransition, getPureBatchNumber, groupEmployeesByDepartment, isFieldWorkProcedure, isOfficeOnlySurveyProcedure, deriveActualSurveyStatus, getDerivedStatusFromDates, cleanFutureMilestoneDates } from '../utils/appHelpers';
 import { fetchContracts } from '../services/api';
-
-interface AttachedDocItem {
-  id: string;
-  name: string;
-  type: 'Bản chính' | 'Bản sao';
-}
+import { processAndSaveSingleAttachment, previewAttachment, downloadAttachment, getGoogleDriveIncomingUrl, isAllowedDocFile } from '../services/attachmentStorage';
+import DossierComponentSection from './receive-record/DossierComponentSection';
 
 const parseAttachedDocs = (otherDocsStr: string | null | undefined): AttachedDocItem[] => {
     if (!otherDocsStr) return [];
@@ -21,7 +17,10 @@ const parseAttachedDocs = (otherDocsStr: string | null | undefined): AttachedDoc
             return parsed.map((item: any, idx: number) => ({
                 id: item.id || String(idx + 1),
                 name: item.name || '',
-                type: item.type === 'Bản sao' ? 'Bản sao' : 'Bản chính'
+                type: item.type === 'Bản sao' ? 'Bản sao' : 'Bản chính',
+                original: typeof item.original === 'number' ? item.original : (item.type === 'Bản sao' ? 0 : 1),
+                copy: typeof item.copy === 'number' ? item.copy : (item.type === 'Bản sao' ? 1 : 0),
+                attachedFile: item.attachedFile || undefined
             }));
         }
     } catch (e) {
@@ -30,7 +29,9 @@ const parseAttachedDocs = (otherDocsStr: string | null | undefined): AttachedDoc
             return [{
                 id: '1',
                 name: parts[0],
-                type: parts[1] === 'Bản sao' ? 'Bản sao' : 'Bản chính'
+                type: parts[1] === 'Bản sao' ? 'Bản sao' : 'Bản chính',
+                original: parts[1] === 'Bản sao' ? 0 : 1,
+                copy: parts[1] === 'Bản sao' ? 1 : 0
             }];
         }
     }
@@ -117,6 +118,9 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
 
   const [formData, setFormData] = useState<Partial<RecordFile>>(defaultState);
   const [attachedDocs, setAttachedDocs] = useState<AttachedDocItem[]>([]);
+  const [dossierComponents, setDossierComponents] = useState<DossierComponentItem[]>([]);
+  const [uploadingDocIdx, setUploadingDocIdx] = useState<number | null>(null);
+  const docFileInputRefs = useRef<{ [key: number]: HTMLInputElement | null }>({});
   const [authCccd, setAuthCccd] = useState('');
   const [authAddress, setAuthAddress] = useState('');
   const [isAuthOpen, setIsAuthOpen] = useState(false);
@@ -164,6 +168,20 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
             }
             setFormData(dataToSet);
             setAttachedDocs(parseAttachedDocs(initialData.otherDocs));
+            const initialComps: DossierComponentItem[] = (() => {
+                if (!initialData.dossierComponents) return [];
+                if (Array.isArray(initialData.dossierComponents)) return initialData.dossierComponents;
+                if (typeof initialData.dossierComponents === 'string') {
+                    try {
+                        const parsed = JSON.parse(initialData.dossierComponents);
+                        return Array.isArray(parsed) ? parsed : [];
+                    } catch {
+                        return [];
+                    }
+                }
+                return [];
+            })();
+            setDossierComponents(initialComps);
             const parsed = parseAuthDocType(initialData.authDocType);
             setAuthCccd(parsed.cccd);
             setAuthAddress(parsed.address);
@@ -218,17 +236,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                     console.error("Error loading contract price in RecordModal:", err);
                 }
 
-                // 4. Trích lục bản đồ địa chính
-                if (rLower.includes('trích lục')) {
-                    setFormData(prev => ({ ...prev, returnedPrice: 53163 }));
-                    return;
-                }
-
-                // 5. Sao lục hồ sơ địa chính
-                if (rLower.includes('sao lục') || rLower.includes('sao luc')) {
-                    setFormData(prev => ({ ...prev, returnedPrice: 310000 }));
-                    return;
-                }
+                // 4. Nếu không có hợp đồng khớp, để undefined cho người dùng tự điền
             };
             determinePrice();
         } else {
@@ -255,7 +263,9 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
       const newDoc: AttachedDocItem = {
           id: String(nextNum),
           name: '',
-          type: 'Bản chính'
+          type: 'Bản chính',
+          original: 1,
+          copy: 0
       };
       const updatedDocs = [...attachedDocs, newDoc];
       setAttachedDocs(updatedDocs);
@@ -283,6 +293,56 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
       setFormData(prev => ({ ...prev, otherDocs: JSON.stringify(updatedDocs) }));
   };
 
+  const handleAttachFileToDoc = async (index: number, file: File) => {
+      if (!isAllowedDocFile(file)) {
+          alert('Hệ thống đã bỏ hỗ trợ định dạng ảnh. Vui lòng tải lên tệp văn bản (PDF, Word, Excel, CAD...)');
+          return;
+      }
+      try {
+          setUploadingDocIdx(index);
+          const targetDoc = attachedDocs[index];
+          const docName = targetDoc?.name?.trim() || 'Giấy tờ kèm theo';
+          const savedMeta = await processAndSaveSingleAttachment(
+              file,
+              formData.code || 'HS',
+              docName,
+              index + 1,
+              'Bộ phận tiếp nhận',
+              'Cập nhật hồ sơ'
+          );
+          const updatedDocs = attachedDocs.map((d, idx) => {
+              if (idx === index) {
+                  return { ...d, attachedFile: savedMeta };
+              }
+              return d;
+          });
+          setAttachedDocs(updatedDocs);
+          setFormData(prev => ({
+              ...prev,
+              otherDocs: JSON.stringify(updatedDocs),
+              attachedFiles: [...(prev.attachedFiles || []).filter(f => f.id !== savedMeta.id), savedMeta]
+          }));
+      } catch (err: any) {
+          alert(err.message || 'Lỗi khi tải tệp đính kèm');
+      } finally {
+          setUploadingDocIdx(null);
+      }
+  };
+
+  const handleRemoveDocFile = (index: number) => {
+      const updatedDocs = attachedDocs.map((d, idx) => {
+          if (idx === index) {
+              return { ...d, attachedFile: undefined };
+          }
+          return d;
+      });
+      setAttachedDocs(updatedDocs);
+      setFormData(prev => ({
+          ...prev,
+          otherDocs: JSON.stringify(updatedDocs)
+      }));
+  };
+
   if (!isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -292,6 +352,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
       return;
     }
     let finalData: any = { ...formData };
+    finalData.dossierComponents = dossierComponents;
     if (!finalData.receivedBy && currentUser) {
         finalData.receivedBy = currentUser.employeeId || currentUser.name || currentUser.username || '';
     }
@@ -387,7 +448,18 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
         }
     }
 
+    // Nếu không có số biên lai / số hóa đơn, loại bỏ hoàn toàn số tiền thu
+    const hasReceiptNumber = Boolean(finalData.receiptNumber && String(finalData.receiptNumber).trim() !== '');
+    if (!hasReceiptNumber) {
+        finalData.returnedPrice = undefined;
+        finalData.receiptType = undefined;
+    }
+
     const cleanData = JSON.parse(JSON.stringify(mergedData));
+    if (!hasReceiptNumber) {
+        cleanData.returnedPrice = undefined;
+        cleanData.receiptType = undefined;
+    }
 
     onSubmit(cleanData as any);
     onClose();
@@ -901,24 +973,26 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                                     <button
                                         type="button"
                                         onClick={handleAddDoc}
-                                        className="text-[11px] bg-blue-50 text-blue-600 px-2.5 py-1 rounded border border-blue-200 hover:bg-blue-100 font-bold transition-all"
+                                        className="text-xs bg-blue-50 text-blue-600 px-2.5 py-1 rounded-md border border-blue-200 hover:bg-blue-100 font-bold flex items-center gap-1 transition-all active:scale-95 cursor-pointer"
                                     >
-                                        + THÊM GIẤY TỜ
+                                        <Plus size={13} />
+                                        Thêm mới
                                     </button>
                                 </div>
                                 
                                 {attachedDocs.length === 0 ? (
                                     <div className="text-center py-5 text-xs text-slate-400 italic bg-slate-50 rounded-lg border border-dashed border-slate-200">
-                                        Không có giấy tờ kèm theo. Bấm nút Thêm giấy tờ để thêm.
+                                        Không có giấy tờ kèm theo. Bấm nút Thêm mới để thêm.
                                     </div>
                                 ) : (
-                                    <div className="overflow-x-auto border border-slate-200 rounded-lg max-h-48 overflow-y-auto">
+                                    <div className="overflow-x-auto border border-slate-200 rounded-lg max-h-56 overflow-y-auto">
                                         <table className="w-full text-left border-collapse bg-white">
                                             <thead>
                                                 <tr className="bg-slate-50 border-b border-slate-200 text-[9px] font-bold text-slate-500 uppercase tracking-wider">
                                                     <th className="py-2 px-2 text-center w-8">#</th>
                                                     <th className="py-2 px-2">Tên giấy tờ</th>
-                                                    <th className="py-2 px-2 w-32 text-center">Hình thức</th>
+                                                    <th className="py-2 px-2 w-28 text-center">Hình thức</th>
+                                                    <th className="py-2 px-2 w-28 text-center">Tệp đính kèm</th>
                                                     <th className="py-2 px-2 w-8 text-center">Xóa</th>
                                                 </tr>
                                             </thead>
@@ -961,6 +1035,69 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                                                             </div>
                                                         </td>
                                                         <td className="py-1 px-2 text-center">
+                                                            <input
+                                                                type="file"
+                                                                className="hidden"
+                                                                accept=".pdf,.doc,.docx,.xls,.xlsx,.dwg,.dgn,.txt,.zip,.rar,.7z"
+                                                                ref={(el) => (docFileInputRefs.current[idx] = el)}
+                                                                onChange={(e) => {
+                                                                    const file = e.target.files?.[0];
+                                                                    if (file) handleAttachFileToDoc(idx, file);
+                                                                    e.target.value = '';
+                                                                }}
+                                                            />
+                                                            {doc.attachedFile ? (
+                                                                <div className="inline-flex items-center justify-center gap-1 px-1.5 py-0.5 rounded bg-emerald-50 border border-emerald-200 text-emerald-900 text-[11px]">
+                                                                    <button
+                                                                        type="button"
+                                                                        title={`Xem tệp: ${doc.attachedFile.fileName}`}
+                                                                        onClick={() => previewAttachment(doc.attachedFile!)}
+                                                                        className="p-0.5 text-emerald-700 hover:text-emerald-900 rounded cursor-pointer"
+                                                                    >
+                                                                        <CheckCircle2 size={12} />
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        title={`Xem trước (${doc.attachedFile.fileName})`}
+                                                                        onClick={() => previewAttachment(doc.attachedFile!)}
+                                                                        className="p-0.5 text-slate-500 hover:text-blue-600 rounded cursor-pointer"
+                                                                    >
+                                                                        <Eye size={12} />
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        title="Tải về"
+                                                                        onClick={() => downloadAttachment(doc.attachedFile!)}
+                                                                        className="p-0.5 text-slate-500 hover:text-emerald-700 rounded cursor-pointer"
+                                                                    >
+                                                                        <Download size={12} />
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        title="Gỡ tệp"
+                                                                        onClick={() => handleRemoveDocFile(idx)}
+                                                                        className="p-0.5 text-slate-400 hover:text-red-500 rounded cursor-pointer"
+                                                                    >
+                                                                        <X size={12} />
+                                                                    </button>
+                                                                </div>
+                                                            ) : (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => docFileInputRefs.current[idx]?.click()}
+                                                                    disabled={uploadingDocIdx === idx}
+                                                                    title="Đính kèm tệp"
+                                                                    className="p-1 rounded bg-slate-100 hover:bg-blue-50 text-slate-500 hover:text-blue-600 border border-slate-200 transition-all cursor-pointer inline-flex items-center justify-center disabled:opacity-50"
+                                                                >
+                                                                    {uploadingDocIdx === idx ? (
+                                                                        <Loader2 size={12} className="animate-spin text-blue-600" />
+                                                                    ) : (
+                                                                        <Paperclip size={12} />
+                                                                    )}
+                                                                </button>
+                                                            )}
+                                                        </td>
+                                                        <td className="py-1 px-2 text-center">
                                                             <button
                                                                 type="button"
                                                                 onClick={() => handleDeleteDoc(idx)}
@@ -976,6 +1113,39 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                                     </div>
                                 )}
                             </div>
+
+                            {/* THÀNH PHẦN HỒ SƠ */}
+                            <div className="mt-3">
+                                <DossierComponentSection
+                                    recordCode={formData.code || 'HS'}
+                                    department={getDepartmentForRecord(formData) || 'Bộ phận tiếp nhận'}
+                                    stage="Cập nhật hồ sơ"
+                                    components={dossierComponents}
+                                    onChange={(newComps) => {
+                                        setDossierComponents(newComps);
+                                        setFormData(prev => ({ ...prev, dossierComponents: newComps }));
+                                    }}
+                                    title="Thành phần hồ sơ"
+                                />
+                            </div>
+
+                            {/* ĐƯỜNG DẪN GOOGLE DRIVE LƯU DỮ LIỆU */}
+                            {getGoogleDriveIncomingUrl() && (
+                                <div className="flex items-center justify-between p-2.5 bg-blue-50/70 border border-blue-200 rounded-lg text-xs mt-2">
+                                    <div className="flex items-center gap-2 text-blue-800">
+                                        <ExternalLink size={14} className="text-blue-600 shrink-0" />
+                                        <span>Đường dẫn lưu dữ liệu tiếp nhận (Google Drive):</span>
+                                    </div>
+                                    <a 
+                                        href={getGoogleDriveIncomingUrl()} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-1 font-semibold text-blue-700 hover:text-blue-900 hover:underline"
+                                    >
+                                        Mở Google Drive →
+                                    </a>
+                                </div>
+                            )}
 
                             {/* THÔNG TIN NGƯỜI ĐƯỢC ỦY QUYỀN (NẾU CÓ) */}
                             <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">

@@ -84,6 +84,7 @@ export function checkUserPermission(
             else if (permissionId === 'DELETE_RECORDS') checkIds.push('dodac_DELETE_RECORDS');
             else if (permissionId === 'VIEW_DETAILS') checkIds.push('dodac_VIEW_DETAILS');
             else if (permissionId === 'ADD_RECORDS') checkIds.push('dodac_ADD_RECORDS');
+            else if (permissionId === 'PRINT_RECEIPT') checkIds.push('dodac_PRINT_RECEIPT');
         } else if (isArchiveDept) {
             if (permissionId === 'BTN_ADVANCE_STATUS') checkIds.push('luutru_BTN_ADVANCE_STATUS');
             else if (permissionId === 'BTN_ASSIGN_STAFF' || permissionId === 'ASSIGN_RECORDS') checkIds.push('luutru_BTN_ASSIGN_STAFF');
@@ -98,6 +99,7 @@ export function checkUserPermission(
             else if (permissionId === 'DELETE_RECORDS') checkIds.push('luutru_DELETE_RECORDS');
             else if (permissionId === 'VIEW_DETAILS') checkIds.push('luutru_VIEW_DETAILS');
             else if (permissionId === 'ADD_RECORDS') checkIds.push('luutru_ADD_RECORDS');
+            else if (permissionId === 'PRINT_RECEIPT') checkIds.push('luutru_PRINT_RECEIPT');
         } else {
             // General roles (e.g. ONEDOOR, ADMIN, etc.)
             if (permissionId === 'BTN_ASSIGN_STAFF' || permissionId === 'ASSIGN_RECORDS') {
@@ -126,6 +128,8 @@ export function checkUserPermission(
                 checkIds.push('dodac_ADD_RECORDS', 'luutru_ADD_RECORDS');
             } else if (permissionId === 'BTN_ADVANCE_STATUS') {
                 checkIds.push('dodac_BTN_ADVANCE_STATUS', 'luutru_BTN_ADVANCE_STATUS');
+            } else if (permissionId === 'PRINT_RECEIPT') {
+                checkIds.push('dodac_PRINT_RECEIPT', 'luutru_PRINT_RECEIPT');
             }
         }
     }
@@ -198,7 +202,7 @@ export function checkUserPermission(
  * whether the record belongs to Đo đạc or Lưu trữ.
  */
 export function hasRecordActionPermission(
-    action: 'view' | 'advance' | 'return' | 'edit' | 'delete' | 'extend' | 'reject',
+    action: 'view' | 'advance' | 'return' | 'edit' | 'delete' | 'extend' | 'reject' | 'print',
     record: { recordType?: string | null; sourceTable?: string | null },
     currentUser: User | null | undefined,
     employees?: Employee[],
@@ -219,6 +223,8 @@ export function hasRecordActionPermission(
         switch (action) {
             case 'view':
                 return checkUserPermission('VIEW_DETAILS', currentUser, employees, rolePermissions, departmentPermissions);
+            case 'print':
+                return checkUserPermission('PRINT_RECEIPT', currentUser, employees, rolePermissions, departmentPermissions);
             case 'return':
                 return checkUserPermission('BTN_RETURN_RESULT', currentUser, employees, rolePermissions, departmentPermissions) || 
                        checkUserPermission('HANDOVER_RECORDS', currentUser, employees, rolePermissions, departmentPermissions);
@@ -248,6 +254,14 @@ export function hasRecordActionPermission(
                 rolePermissions,
                 departmentPermissions
             );
+        case 'print':
+            return checkUserPermission(
+                isArchive ? 'luutru_PRINT_RECEIPT' : 'dodac_PRINT_RECEIPT',
+                currentUser,
+                employees,
+                rolePermissions,
+                departmentPermissions
+            ) || checkUserPermission('PRINT_RECEIPT', currentUser, employees, rolePermissions, departmentPermissions);
         case 'advance':
             return checkUserPermission(
                 isArchive ? 'luutru_BTN_ADVANCE_STATUS' : 'dodac_BTN_ADVANCE_STATUS',

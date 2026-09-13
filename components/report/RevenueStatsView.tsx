@@ -68,23 +68,18 @@ const RevenueStatsView: React.FC<RevenueStatsViewProps> = ({
             .map(r => {
                 const contractP = (r as any).contractPrice;
                 const price = Number(r.price) || Number(contractP) || 0;
+                const hasReceiptNumber = Boolean(r.receiptNumber && String(r.receiptNumber).trim() !== '');
                 let returned = 0;
-                if (r.returnedPrice !== undefined && r.returnedPrice !== null && String(r.returnedPrice).trim() !== '' && !isNaN(Number(r.returnedPrice))) {
-                    returned = Number(r.returnedPrice);
-                } else if (contractP !== undefined && contractP !== null && !isNaN(Number(contractP)) && Number(contractP) > 0) {
-                    returned = Number(contractP);
-                } else if (r.price !== undefined && r.price !== null && !isNaN(Number(r.price)) && Number(r.price) > 0) {
-                    returned = Number(r.price);
-                } else if (r.status === RecordStatus.RETURNED || r.status === RecordStatus.HANDOVER) {
-                    returned = price;
+                if (hasReceiptNumber) {
+                    if (r.returnedPrice !== undefined && r.returnedPrice !== null && String(r.returnedPrice).trim() !== '' && !isNaN(Number(r.returnedPrice))) {
+                        returned = Number(r.returnedPrice);
+                    } else if (contractP !== undefined && contractP !== null && !isNaN(Number(contractP)) && Number(contractP) > 0) {
+                        returned = Number(contractP);
+                    } else if (r.price !== undefined && r.price !== null && !isNaN(Number(r.price)) && Number(r.price) > 0) {
+                        returned = Number(r.price);
+                    }
                 }
 
-                if (returned === 0) {
-                    const rType = (r.recordType || '').toLowerCase();
-                    if (rType.includes('trích lục')) returned = 53163;
-                    else if (rType.includes('sao lục') || rType.includes('sao luc')) returned = 310000;
-                }
-                
                 const receiptType = getRecordReceiptType(r);
 
                 // Determine staff who confirmed result handover (Nhân viên TKQ)

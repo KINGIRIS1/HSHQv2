@@ -1,14 +1,15 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { X, Search, Layers, UserCheck, CheckCircle2 } from 'lucide-react';
-import { RecordFile, Employee } from '../../types';
+import { RecordFile, Employee, DossierComponentItem } from '../../types';
 import { removeVietnameseTones } from '../../utils/appHelpers';
+import DossierComponentSection from './DossierComponentSection';
 
 interface HandoverOfficeModalProps {
   isOpen: boolean;
   onClose: () => void;
   records: RecordFile[];
   employees: Employee[];
-  onConfirm: (drafterId: string) => Promise<void> | void;
+  onConfirm: (drafterId: string, components?: DossierComponentItem[]) => Promise<void> | void;
 }
 
 const HandoverOfficeModal: React.FC<HandoverOfficeModalProps> = ({
@@ -21,6 +22,27 @@ const HandoverOfficeModal: React.FC<HandoverOfficeModalProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDrafterId, setSelectedDrafterId] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const initialRecord = records[0] || null;
+  const initialComponents: DossierComponentItem[] = useMemo(() => {
+    if (!initialRecord?.dossierComponents) return [];
+    if (Array.isArray(initialRecord.dossierComponents)) return initialRecord.dossierComponents;
+    if (typeof initialRecord.dossierComponents === 'string') {
+      try {
+        const parsed = JSON.parse(initialRecord.dossierComponents);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  }, [initialRecord]);
+
+  const [components, setComponents] = useState<DossierComponentItem[]>(initialComponents);
+
+  useEffect(() => {
+    setComponents(initialComponents);
+  }, [initialComponents]);
 
   // Lọc chỉ nhân sự thuộc Tổ Đo đạc
   const candidateEmployees = useMemo(() => {
@@ -54,7 +76,7 @@ const HandoverOfficeModal: React.FC<HandoverOfficeModalProps> = ({
     }
     setIsSubmitting(true);
     try {
-      await onConfirm(selectedDrafterId);
+      await onConfirm(selectedDrafterId, components);
       onClose();
     } catch (err) {
       console.error('Error during handover:', err);
@@ -66,7 +88,7 @@ const HandoverOfficeModal: React.FC<HandoverOfficeModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fade-in">
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-md w-full overflow-hidden flex flex-col max-h-[90vh] animate-fade-in-up">
+      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-2xl w-full overflow-hidden flex flex-col max-h-[90vh] animate-fade-in-up">
         {/* Header */}
         <div className="p-4 bg-gradient-to-r from-sky-600 to-blue-700 text-white flex justify-between items-center shrink-0">
           <div className="flex items-center gap-2.5">
@@ -157,6 +179,16 @@ const HandoverOfficeModal: React.FC<HandoverOfficeModalProps> = ({
               })}
             </div>
           </div>
+
+          {/* Thành phần hồ sơ & Tệp đính kèm (Biên tập bản đồ) */}
+          <DossierComponentSection
+            recordCode={initialRecord?.code || 'HS'}
+            department="Tổ Đo đạc"
+            stage="Biên tập bản đồ"
+            components={components}
+            onChange={setComponents}
+            title="Thành phần hồ sơ & Tệp đính kèm"
+          />
         </div>
 
         {/* Footer */}
@@ -175,7 +207,7 @@ const HandoverOfficeModal: React.FC<HandoverOfficeModalProps> = ({
             disabled={isSubmitting || !selectedDrafterId}
             className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl font-bold text-xs cursor-pointer transition-all shadow-xs flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isSubmitting ? 'Đang xử lý...' : 'Xác nhận giao'}
+            {isSubmitting ? 'Đang xử lý...' : 'Xác nhận'}
           </button>
         </div>
       </div>

@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { RecordFile, Employee, User, RecordStatus } from '../types';
 import { X, AlertTriangle, CheckCircle, FileSpreadsheet, RefreshCw, Wrench, ChevronDown, ChevronUp, Search, Info, Check, Filter, Edit3, Save, Trash2, Loader2 } from 'lucide-react';
 import * as XLSX from 'xlsx-js-style';
+import { confirmAction } from '../utils/appHelpers';
 
 export interface RecordError {
   code: string;
@@ -88,7 +89,7 @@ export const BatchErrorDiagnosticModal: React.FC<BatchErrorDiagnosticModalProps>
       return;
     }
     const total = unupdatedRecords.length;
-    if (!window.confirm(`XÁC NHẬN XÓA NGẦM LẦN LƯỢT:\n\nBạn có chắc chắn muốn xóa ngầm lần lượt toàn bộ ${total} hồ sơ "Chưa Cập Nhật"?\n\nHệ thống sẽ tự động chia nhỏ công việc thành từng nhóm (50 hồ sơ/đợt) và xử lý ngầm để ứng dụng luôn mượt mà, không gián đoạn thao tác của bạn.`)) {
+    if (!(await confirmAction(`Bạn có chắc chắn muốn xóa ngầm lần lượt toàn bộ ${total} hồ sơ "Chưa Cập Nhật"?\n\nHệ thống sẽ tự động chia nhỏ công việc thành từng nhóm (50 hồ sơ/đợt) và xử lý ngầm để ứng dụng luôn mượt mà.`, 'Xác nhận xóa ngầm lần lượt'))) {
       return;
     }
 
@@ -534,7 +535,7 @@ export const BatchErrorDiagnosticModal: React.FC<BatchErrorDiagnosticModalProps>
       return;
     }
 
-    if (!window.confirm(`Xác nhận tự động sửa lỗi cho ${updates.length} hồ sơ?`)) {
+    if (!(await confirmAction(`Xác nhận tự động sửa lỗi cho ${updates.length} hồ sơ?`, 'Tự động sửa lỗi'))) {
       return;
     }
 

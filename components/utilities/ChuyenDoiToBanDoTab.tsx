@@ -3,6 +3,7 @@ import { Upload, Trash2, FileSpreadsheet, Loader2, Search, Download, MapPin, Gri
 import * as XLSX from 'xlsx-js-style';
 import { NotifyFunction } from '../../types';
 import { fetchMapSheetConversions, saveMapSheetConversions, deleteAllMapSheetConversions, MapSheetConversion } from '../../services/apiUtilities';
+import { confirmAction } from '../../utils/appHelpers';
 
 interface Props {
     notify: NotifyFunction;
@@ -137,7 +138,7 @@ const ChuyenDoiToBanDoTab: React.FC<Props> = ({ notify }) => {
     };
 
     const handleDeleteAll = async () => {
-        if (!window.confirm('Bạn có chắc chắn muốn xóa TOÀN BỘ dữ liệu chuyển đổi? Hành động này không thể hoàn tác.')) return;
+        if (!(await confirmAction('Bạn có chắc chắn muốn xóa TOÀN BỘ dữ liệu chuyển đổi? Hành động này không thể hoàn tác.', 'Xác nhận xóa toàn bộ'))) return;
         
         setSaving(true);
         try {

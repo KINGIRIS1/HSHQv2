@@ -27,7 +27,9 @@ import MobileRoutes from './components/mobile/MobileRoutes';
 import UpdateRequiredModal from './components/UpdateRequiredModal';
 import SubmitModal from './components/receive-record/SubmitModal';
 import HandoverOfficeModal from './components/receive-record/HandoverOfficeModal';
+import SignApprovalModal from './components/receive-record/SignApprovalModal';
 import BulkSignConfirmModal from './components/BulkSignConfirmModal';
+import { DossierComponentItem } from './types';
 import GlobalConfirmModal from './components/GlobalConfirmModal';
 import GlobalAlertModal from './components/GlobalAlertModal';
 import { checkAndTriggerWeeklyBackup, downloadBackupAsFile } from './services/backupService';
@@ -201,6 +203,8 @@ function App() {
   const [extendTargetRecords, setExtendTargetRecords] = useState<RecordFile[]>([]);
   const [isBulkSignModalOpen, setIsBulkSignModalOpen] = useState(false);
   const [bulkSignPendingRecords, setBulkSignPendingRecords] = useState<RecordFile[]>([]);
+  const [isSignApprovalModalOpen, setIsSignApprovalModalOpen] = useState(false);
+  const [signApprovalTargetRecords, setSignApprovalTargetRecords] = useState<RecordFile[]>([]);
 
   // Report States
   const [globalReportContent, setGlobalReportContent] = useState('');
@@ -938,7 +942,7 @@ function App() {
       }
   }, []);
 
-  const handleConfirmHandoverOffice = useCallback(async (drafterId: string) => {
+  const handleConfirmHandoverOffice = useCallback(async (drafterId: string, components?: DossierComponentItem[]) => {
     if (handoverOfficeTargetRecords.length === 0) return;
     const handoverIso = new Date().toISOString();
 
@@ -964,6 +968,7 @@ function App() {
             assignedTo: drafterId,
             officeAssignedDate: handoverIso,
             fieldCompletedDate: handoverIso,
+            ...(components ? { dossierComponents: components } : {}),
           };
           setRecords(prev => prev.map(r => r.id === record.id ? updatedRecord : r));
           return updateRecordApi(updatedRecord);
@@ -1004,6 +1009,12 @@ function App() {
           // Đi thẳng sang trình ký (bỏ qua bước trung gian là đã kiểm tra)
           setSubmitTargetRecords([record]);
           setIsSubmitModalOpen(true);
+          return;
+      }
+      if (record.status === RecordStatus.PENDING_SIGN) {
+          // Ký duyệt: Mở modal Ký duyệt bổ sung bảng Thành phần hồ sơ thay vì chuyển thẳng!
+          setSignApprovalTargetRecords([record]);
+          setIsSignApprovalModalOpen(true);
           return;
       }
       const flow = [RecordStatus.RECEIVED, RecordStatus.ASSIGNED, RecordStatus.IN_PROGRESS, RecordStatus.COMPLETED_WORK, RecordStatus.PENDING_CHECK, RecordStatus.PENDING_SIGN, RecordStatus.SIGNED, RecordStatus.HANDOVER];
@@ -1093,8 +1104,35 @@ function App() {
       const pendingSign = recordFilterProps.filteredRecords.filter(r => r.status === RecordStatus.PENDING_SIGN && selectedRecordIds.has(r.id));
       if (pendingSign.length === 0) { alert("Các hồ sơ được chọn không ở trạng thái chờ ký."); return; }
       
-      setBulkSignPendingRecords(pendingSign);
-      setIsBulkSignModalOpen(true);
+      setSignApprovalTargetRecords(pendingSign);
+      setIsSignApprovalModalOpen(true);
+  };
+
+  const handleExecuteSignApproval = async (targetRecords: RecordFile[], newComponents: DossierComponentItem[]) => {
+      const nowStr = new Date().toISOString();
+      const updatedTargets = targetRecords.map(r => ({
+          ...r,
+          status: RecordStatus.SIGNED,
+          approvalDate: nowStr,
+          completedDate: null,
+          dossierComponents: newComponents,
+          statusLogs: createStatusLog(r, RecordStatus.SIGNED, 'Ký duyệt')
+      }));
+
+      // Cập nhật giao diện tức thì 0 giây với O(1) Map
+      const updateMap = new Map<string, RecordFile>();
+      updatedTargets.forEach(u => updateMap.set(u.id, u));
+      setRecords(prev => prev.map(r => updateMap.get(r.id) || r));
+
+      setSelectedRecordIds(new Set());
+      setToast({ type: 'success', message: `Đã ký duyệt ${targetRecords.length} hồ sơ thành công!` });
+      setIsSignApprovalModalOpen(false);
+      setSignApprovalTargetRecords([]);
+
+      // Đẩy ngầm lên Supabase, không block UI
+      updateRecordsBatchById(updatedTargets).catch(err => {
+          console.error("Batch sign background error:", err);
+      });
   };
 
   const handleExecuteSignBatch = async () => {
@@ -1706,13 +1744,24 @@ function App() {
             count={bulkSignPendingRecords.length}
         />
 
+        {/* Modal Ký duyệt có bảng Thành phần hồ sơ & Tệp đính kèm */}
+        <SignApprovalModal 
+            isOpen={isSignApprovalModalOpen}
+            onClose={() => {
+                setIsSignApprovalModalOpen(false);
+                setSignApprovalTargetRecords([]);
+            }}
+            records={signApprovalTargetRecords}
+            onConfirm={handleExecuteSignApproval}
+        />
+
          <SubmitModal 
             isOpen={isSubmitModalOpen}
             onClose={() => setIsSubmitModalOpen(false)}
             records={submitTargetRecords}
             users={users}
             employees={employees}
-            onConfirm={async (directorId) => {
+            onConfirm={async (directorId, components) => {
                 const nowIso = new Date().toISOString();
                 const updates = submitTargetRecords.map(r => ({
                     ...r,
@@ -1720,7 +1769,8 @@ function App() {
                     completedWorkDate: r.completedWorkDate || nowIso,
                     checkedDate: r.checkedDate || nowIso,
                     submissionDate: nowIso,
-                    submittedTo: directorId
+                    submittedTo: directorId,
+                    ...(components ? { dossierComponents: components } : {})
                 }));
 
                 // Cập nhật giao diện tức thì 0 giây với O(1) Map
@@ -1755,14 +1805,15 @@ function App() {
             users={users}
             employees={employees}
             isCheckMode={true}
-            onConfirm={async (checkerId) => {
+            onConfirm={async (checkerId, components) => {
                 const nowIso = new Date().toISOString();
                 const updates = submitTargetRecords.map(r => ({
                     ...r,
                     status: RecordStatus.PENDING_CHECK,
                     completedWorkDate: r.completedWorkDate || nowIso,
                     pendingCheckDate: nowIso,
-                    checkedBy: checkerId
+                    checkedBy: checkerId,
+                    ...(components ? { dossierComponents: components } : {})
                 }));
 
                 // Cập nhật giao diện tức thì 0 giây với O(1) Map

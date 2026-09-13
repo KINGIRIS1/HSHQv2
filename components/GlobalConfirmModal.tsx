@@ -72,7 +72,7 @@ const GlobalConfirmModal = () => {
                         onClick={() => handleClose(false)}
                         className="flex-1 py-3 bg-white border border-slate-200 hover:bg-slate-100 active:scale-[0.98] transition-all text-slate-700 font-bold text-sm rounded-xl cursor-pointer"
                     >
-                        Quay lại
+                        Hủy
                     </button>
                     <button 
                         type="button"
@@ -85,7 +85,7 @@ const GlobalConfirmModal = () => {
                                     : 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/10'
                         }`}
                     >
-                        {isDelete ? 'Xác nhận xóa' : isSign ? 'Đồng ý ký duyệt' : 'Xác nhận'}
+                        Xác nhận
                     </button>
                 </div>
             </div>

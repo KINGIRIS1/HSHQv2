@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { ShieldAlert, CheckCircle2, Wrench, Download, Upload, RefreshCw, AlertTriangle, Database, Users, Calendar, FileText, Check, ArrowRight, Sparkles, Filter } from 'lucide-react';
 import { RecordFile, Employee, NotifyFunction, RecordStatus } from '../../types';
-import { deriveActualSurveyStatus } from '../../utils/appHelpers';
+import { deriveActualSurveyStatus, confirmAction } from '../../utils/appHelpers';
 import { STATUS_LABELS, isArchiveRecordType } from '../../constants';
 
 interface MeasurementAndArchiveSyncTabProps {
@@ -140,7 +140,7 @@ export const MeasurementAndArchiveSyncTab: React.FC<MeasurementAndArchiveSyncTab
             return;
         }
 
-        if (!window.confirm(`Xác nhận chuẩn hóa tự động trạng thái cho ${targets.length} hồ sơ theo các mốc ngày tiến độ thực tế?`)) {
+        if (!(await confirmAction(`Xác nhận chuẩn hóa tự động trạng thái cho ${targets.length} hồ sơ theo các mốc ngày tiến độ thực tế?`, 'Chuẩn hóa trạng thái'))) {
             return;
         }
 
@@ -215,7 +215,7 @@ export const MeasurementAndArchiveSyncTab: React.FC<MeasurementAndArchiveSyncTab
             return;
         }
 
-        if (!window.confirm(`Xác nhận bổ sung thông tin kiểm tra cho ${targets.length} hồ sơ đo đạc?`)) {
+        if (!(await confirmAction(`Xác nhận bổ sung thông tin kiểm tra cho ${targets.length} hồ sơ đo đạc?`, 'Vá lỗi thông tin kiểm tra'))) {
             return;
         }
 
@@ -289,7 +289,7 @@ export const MeasurementAndArchiveSyncTab: React.FC<MeasurementAndArchiveSyncTab
             return;
         }
 
-        if (!window.confirm(`Xác nhận đồng bộ ${importedArchiveData.length} hồ sơ vào hệ thống Lưu trữ?`)) {
+        if (!(await confirmAction(`Xác nhận đồng bộ ${importedArchiveData.length} hồ sơ vào hệ thống Lưu trữ?`, 'Đồng bộ hồ sơ lưu trữ'))) {
             return;
         }
 

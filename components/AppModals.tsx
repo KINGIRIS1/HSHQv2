@@ -125,6 +125,10 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
         ? hasRecordActionPermission('delete', props.viewingRecord, props.currentUser, props.employees, props.rolePermissions, props.departmentPermissions)
         : false;
 
+    const canExtendViewingRecord = props.viewingRecord
+        ? hasRecordActionPermission('extend', props.viewingRecord, props.currentUser, props.employees, props.rolePermissions, props.departmentPermissions)
+        : false;
+
     return (
         <>
             <RecordModal 
@@ -182,12 +186,14 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
                     employees={props.employees} 
                     users={props.users}
                     currentUser={props.currentUser} 
+                    rolePermissions={props.rolePermissions}
+                    departmentPermissions={props.departmentPermissions}
                     onEdit={canEditViewingRecord ? (r) => { props.setEditingRecord(r); props.setIsModalOpen(true); } : undefined}
                     onDelete={canDeleteViewingRecord ? props.confirmDelete : undefined}
                     onCreateLiquidation={props.onCreateLiquidation}
                     onCreateContract={props.onCreateContract}
                     onRefreshData={props.onRefreshData}
-                    onOpenExtendModal={props.onOpenExtendModal}
+                    onOpenExtendModal={canExtendViewingRecord ? props.onOpenExtendModal : undefined}
                 />
             ) : (
                 <DetailModal 
@@ -197,13 +203,15 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
                     employees={props.employees} 
                     users={props.users}
                     currentUser={props.currentUser} 
+                    rolePermissions={props.rolePermissions}
+                    departmentPermissions={props.departmentPermissions}
                     onEdit={canEditViewingRecord ? (r) => { props.setEditingRecord(r); props.setIsModalOpen(true); } : undefined}
                     onDelete={canDeleteViewingRecord ? props.confirmDelete : undefined}
                     onCreateLiquidation={props.onCreateLiquidation}
                     onCreateContract={props.onCreateContract}
                     onRefreshData={props.onRefreshData}
                     onOpenRejectReturnModal={props.onOpenRejectReturnModal}
-                    onOpenExtendModal={props.onOpenExtendModal}
+                    onOpenExtendModal={canExtendViewingRecord ? props.onOpenExtendModal : undefined}
                 />
             )}
             

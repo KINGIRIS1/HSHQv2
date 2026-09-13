@@ -74,21 +74,10 @@ const ReturnResultModal: React.FC<ReturnResultModalProps> = ({
                     return;
                 }
 
-                // 4. Nếu là Trích lục bản đồ địa chính
-                if (type.includes('trích lục')) {
-                    setReturnedPrice('53163');
-                    return;
-                }
-
-                // 5. Nếu là Sao lục hồ sơ địa chính
-                if (type.includes('sao lục') || type.includes('sao luc')) {
-                    setReturnedPrice('310000');
-                    return;
-                }
-
+                // 4. Nếu không có giá sẵn, để trống (0) cho người trả kết quả tự nhập
                 setReturnedPrice('0');
             } catch (err) {
-                console.error("Error loading default price:", err);
+                console.error("Error loading price:", err);
                 setReturnedPrice('0');
             } finally {
                 setIsLoadingPrice(false);
@@ -256,7 +245,7 @@ const ReturnResultModal: React.FC<ReturnResultModalProps> = ({
                     type="submit"
                     className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm shadow-sm transition-all active:scale-95 cursor-pointer"
                 >
-                    <CheckCircle2 size={18} /> Xác nhận trả kết quả
+                    <CheckCircle2 size={18} /> Xác nhận
                 </button>
             </div>
         </form>

@@ -1,24 +1,28 @@
 
 import React, { useState, useEffect } from 'react';
-import { RecordFile, Employee, User, UserRole, SplitItem, RecordStatus } from '../types';
+import { RecordFile, Employee, User, UserRole, SplitItem, RecordStatus, DossierComponentItem, AttachedFileMeta, RolePermissions, DepartmentPermissions } from '../types';
 import AutoResizeTextarea from './AutoResizeTextarea';
 import { getNormalizedWard, getShortRecordType, isArchiveRecordType } from '../constants';
 import StatusBadge from './StatusBadge';
-import { X, MapPin, FileText, User as UserIcon, Receipt, DollarSign, CheckCircle2, Circle, Send, FileSignature, CheckSquare, CalendarClock, FileCheck, Calculator, Loader2, StickyNote, Save, Bell, Printer, Pencil, Trash2, Info, FileDown, Undo2 } from 'lucide-react';
+import { X, MapPin, FileText, User as UserIcon, Receipt, DollarSign, CheckCircle2, Circle, Send, FileSignature, CheckSquare, CalendarClock, FileCheck, Calculator, Loader2, StickyNote, Save, Bell, Printer, Pencil, Trash2, Info, FileDown, Undo2, Paperclip, Eye, Download, ExternalLink, FolderOpen } from 'lucide-react';
 import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../services/docxService';
 import DocxPreviewModal from './DocxPreviewModal';
 import { updateRecordApi, fetchContracts } from '../services/api';
 import SystemReceiptTemplate from './receive-record/SystemReceiptTemplate';
 import SystemAnnexTemplate from './receive-record/SystemAnnexTemplate';
 import { getEmployeeName as getEmpNameHelper, getPureBatchNumber, isFieldWorkProcedure, isOfficeOnlySurveyProcedure, getReceiptReceiverName } from '../utils/appHelpers';
+import { previewAttachment, downloadAttachment, getGoogleDriveIncomingUrl } from '../services/attachmentStorage';
+import { checkUserPermission, hasRecordActionPermission } from '../utils/permissionUtils';
 
 
 interface ParsedDocItem {
+  id?: string;
   name: string;
   type: string;
   original: number;
   copy: number;
   note?: string;
+  attachedFile?: AttachedFileMeta;
 }
 
 const parseOtherDocsForDetail = (raw: string | null | undefined): ParsedDocItem[] => {
@@ -45,8 +49,9 @@ const parseOtherDocsForDetail = (raw: string | null | undefined): ParsedDocItem[
         const original = typeof item.original === 'number' ? item.original : (item.soBanChinh ? Number(item.soBanChinh) : (type === 'Bản chính' ? 1 : 0));
         const copy = typeof item.copy === 'number' ? item.copy : (item.soBanSao ? Number(item.soBanSao) : (type === 'Bản sao' ? 1 : 0));
         const note = item.note || item.ghiChu || '';
+        const attachedFile = item.attachedFile || undefined;
 
-        result.push({ name, type, original, copy, note });
+        result.push({ name, type, original, copy, note, attachedFile });
       }
       if (result.length > 0) return result;
     } catch {
@@ -70,6 +75,8 @@ interface DetailModalProps {
   employees: Employee[];
   users: User[];
   currentUser: User | null;
+  rolePermissions?: RolePermissions;
+  departmentPermissions?: DepartmentPermissions;
   onEdit?: (record: RecordFile) => void;
   onDelete?: (record: RecordFile) => void;
   onCreateLiquidation?: (record: RecordFile) => void; 
@@ -79,7 +86,7 @@ interface DetailModalProps {
   onOpenExtendModal?: (record: RecordFile) => void;
 }
 
-export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, employees, users, currentUser, onEdit, onDelete, onCreateLiquidation, onCreateContract, onRefreshData, onOpenRejectReturnModal, onOpenExtendModal }) => {
+export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, record, employees, users, currentUser, rolePermissions, departmentPermissions, onEdit, onDelete, onCreateLiquidation, onCreateContract, onRefreshData, onOpenRejectReturnModal, onOpenExtendModal }) => {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [previewBlob, setPreviewBlob] = useState<Blob | null>(null);
   const [previewFileName, setPreviewFileName] = useState('');
@@ -184,15 +191,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
 
               } else {
                   setMatchedContract(null);
-                  // Fallback: Nếu không có hợp đồng nhưng là hồ sơ Trích lục -> Hiển thị 53.163, Sao lục -> 310.000
-                  const type = (record.recordType || '').toLowerCase();
-                  if (type.includes('trích lục')) {
-                      setContractPrice(53163);
-                  } else if (type.includes('sao lục') || type.includes('sao luc')) {
-                      setContractPrice(310000);
-                  } else {
-                      setContractPrice(null);
-                  }
+                  setContractPrice(null);
                   setContractSplitItems(null);
                   setLiquidationInfo(null);
               }
@@ -225,8 +224,10 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
 
   const canPerformAction = isAdmin || isSubadmin || isOneDoor || currentUser?.role === UserRole.TEAM_LEADER || currentUser?.role === UserRole.EMPLOYEE; // Điều kiện để Sửa, Xóa
   
-  // Điều kiện để In biên nhận: Chỉ Admin hoặc Một cửa mới được thấy nút này
-  const canPrintReceipt = isAdmin || isOneDoor;
+  // Điều kiện để In biên nhận: Kiểm tra quyền phân bổ theo vai trò hoặc theo tổ/phòng ban tại tab Phân quyền
+  const canPrintReceipt = isAdmin || isSubadmin || isOneDoor || 
+    checkUserPermission('PRINT_RECEIPT', currentUser, employees, rolePermissions, departmentPermissions) ||
+    hasRecordActionPermission('print', record, currentUser, employees, rolePermissions, departmentPermissions);
 
   const formatDate = (dateStr?: string | null) => {
     if (!dateStr) return '---';
@@ -610,7 +611,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                     </button>
                 )}
 
-                {record && record.recordType && (getShortRecordType(record.recordType).startsWith('2.2') || getShortRecordType(record.recordType).startsWith('2.4')) && (
+                {onOpenExtendModal && record && record.recordType && (getShortRecordType(record.recordType).startsWith('2.2') || getShortRecordType(record.recordType).startsWith('2.4')) && (
                     <button
                         onClick={() => {
                             const hasAnnexTemplate = hasTemplate(STORAGE_KEYS.CONTRACT_TEMPLATE_ANNEX);
@@ -768,14 +769,17 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                     {(() => {
                         const isArchive = isArchiveRecordType(record?.recordType || '');
                         const isContractProcedure = !!(record?.recordType && (getShortRecordType(record.recordType).startsWith('2.2') || getShortRecordType(record.recordType).startsWith('2.4')));
-                        const hasExcerptOrMeasurement = !isArchive && !!(recordTypeLower.includes('trích đo') || recordTypeLower.includes('trích lục') || record?.measurementNumber || record?.excerptNumber);
+                        const excerptNum = recordTypeLower.includes('trích lục')
+                            ? (record.excerptNumber?.trim() || '')
+                            : (record.measurementNumber?.trim() || record.excerptNumber?.trim() || '');
+                        const hasExcerptOrMeasurement = !isArchive && !!excerptNum;
 
                         if (!isContractProcedure && !hasExcerptOrMeasurement && !matchedContract) return null;
 
                         return (
                             <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
                                 <h3 className="text-xs font-bold text-indigo-600 uppercase mb-3 flex items-center gap-2 border-l-4 border-indigo-600 pl-2">
-                                    <FileText size={16}/> Hợp đồng & Trích đo / Trích lục
+                                    <FileText size={16}/> {hasExcerptOrMeasurement && (isContractProcedure || matchedContract) ? 'Hợp đồng & Trích đo / Trích lục' : hasExcerptOrMeasurement ? (recordTypeLower.includes('trích lục') ? 'Số trích lục' : 'Số trích đo') : 'Hợp đồng liên kết'}
                                 </h3>
                                 <div className={`grid grid-cols-1 ${(isContractProcedure || matchedContract) && hasExcerptOrMeasurement ? 'sm:grid-cols-2' : ''} gap-3`}>
                                     {/* HỢP ĐỒNG LIÊN KẾT */}
@@ -806,9 +810,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                                                     {recordTypeLower.includes('trích lục') ? 'Số trích lục' : 'Số trích đo'}
                                                 </span>
                                                 <p className="text-xs font-bold text-purple-950 truncate">
-                                                    {recordTypeLower.includes('trích lục') 
-                                                        ? (record.excerptNumber || '---') 
-                                                        : (record.measurementNumber || record.excerptNumber || '---')}
+                                                    {excerptNum}
                                                 </p>
                                             </div>
                                         </div>
@@ -818,36 +820,43 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                         );
                     })()}
 
-                    {/* DƯỚI CÙNG LÀ TÀI CHÍNH & BIÊN LAI */}
-                    <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
-                        <h3 className="text-xs font-bold text-emerald-700 uppercase mb-4 flex items-center gap-2 border-l-4 border-emerald-600 pl-2">
-                            <Receipt size={16}/> Tài chính & Biên lai
-                        </h3>
-                        
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            {/* Thẻ Số BL/HĐ */}
-                            <div className="bg-blue-50/80 p-3 rounded-xl border border-blue-200/80 flex flex-col justify-center min-w-0">
-                                <label className="text-[10px] text-blue-700 uppercase font-bold block whitespace-nowrap truncate">
-                                    {record.receiptType === 'Biên Lai' ? 'SỐ BIÊN LAI' : record.receiptType === 'Hóa Đơn' ? 'SỐ HÓA ĐƠN' : 'SỐ BIÊN LAI / HÓA ĐƠN'}
-                                </label>
-                                <p className="text-xs font-black text-blue-900 font-mono whitespace-nowrap truncate mt-0.5">
-                                    {record.receiptNumber || '---'}
-                                </p>
-                            </div>
+                    {/* DƯỚI CÙNG LÀ TÀI CHÍNH & BIÊN LAI - Chỉ hiển thị khi có Số Biên lai / Hóa đơn */}
+                    {(() => {
+                        const hasReceiptNumber = Boolean(record.receiptNumber && record.receiptNumber.trim());
+                        if (!hasReceiptNumber) return null;
 
-                            {/* Thẻ Số tiền */}
-                            <div className="bg-emerald-50/80 p-3 rounded-xl border border-emerald-200/80 flex flex-col justify-center min-w-0">
-                                <label className="text-[10px] text-emerald-700 uppercase font-bold block whitespace-nowrap truncate">
-                                    Số tiền thu
-                                </label>
-                                <p className="text-sm font-black text-emerald-800 whitespace-nowrap truncate mt-0.5">
-                                    {record.returnedPrice !== undefined && record.returnedPrice !== null
-                                        ? record.returnedPrice.toLocaleString('vi-VN') + ' đ'
-                                        : (record.price ? record.price.toLocaleString('vi-VN') + ' đ' : '---')}
-                                </p>
+                        return (
+                            <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+                                <h3 className="text-xs font-bold text-emerald-700 uppercase mb-4 flex items-center gap-2 border-l-4 border-emerald-600 pl-2">
+                                    <Receipt size={16}/> Tài chính & Biên lai
+                                </h3>
+                                
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    {/* Thẻ Số BL/HĐ */}
+                                    <div className="bg-blue-50/80 p-3 rounded-xl border border-blue-200/80 flex flex-col justify-center min-w-0">
+                                        <label className="text-[10px] text-blue-700 uppercase font-bold block whitespace-nowrap truncate">
+                                            {record.receiptType === 'Biên Lai' ? 'SỐ BIÊN LAI' : record.receiptType === 'Hóa Đơn' ? 'SỐ HÓA ĐƠN' : 'SỐ BIÊN LAI / HÓA ĐƠN'}
+                                        </label>
+                                        <p className="text-xs font-black text-blue-900 font-mono whitespace-nowrap truncate mt-0.5">
+                                            {record.receiptNumber || '---'}
+                                        </p>
+                                    </div>
+
+                                    {/* Thẻ Số tiền */}
+                                    <div className="bg-emerald-50/80 p-3 rounded-xl border border-emerald-200/80 flex flex-col justify-center min-w-0">
+                                        <label className="text-[10px] text-emerald-700 uppercase font-bold block whitespace-nowrap truncate">
+                                            Số tiền thu
+                                        </label>
+                                        <p className="text-sm font-black text-emerald-800 whitespace-nowrap truncate mt-0.5">
+                                            {record.returnedPrice !== undefined && record.returnedPrice !== null
+                                                ? record.returnedPrice.toLocaleString('vi-VN') + ' đ'
+                                                : (record.price ? record.price.toLocaleString('vi-VN') + ' đ' : '0 đ')}
+                                        </p>
+                                    </div>
+                                </div>
                             </div>
-                        </div>
-                    </div>
+                        );
+                    })()}
                 </div>
 
                 {/* COLUMN 2: TIẾN ĐỘ & THỜI GIAN */}
@@ -1005,25 +1014,29 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
 
                 {/* COLUMN 3: NỘI DUNG CHI TIẾT (TRÍCH YẾU), GIẤY TỜ KÈM THEO, HẸN GIỜ LÀM VIỆC, GHI CHÚ CÁ NHÂN */}
                 <div className="space-y-6 order-3">
-                    {/* NỘI DUNG CHI TIẾT (TRÍCH YẾU) */}
-                    <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col">
-                        <h3 className="text-xs font-bold text-purple-600 uppercase mb-3 flex items-center gap-2 border-l-4 border-purple-600 pl-2">
-                            <FileText size={16}/> Nội dung chi tiết (Trích yếu)
-                        </h3>
-                        
-                        <div className="bg-gray-50 p-4 rounded-lg border border-gray-100 text-gray-800 text-sm font-medium mb-3 min-h-0 whitespace-pre-wrap">
-                            {record.content || 'Không có nội dung chi tiết.'}
-                        </div>
-
-                        {record.explanationPlan && (
-                            <div>
-                                <label className="text-[10px] text-purple-500 uppercase font-bold block mb-1">Phương án giải trình</label>
-                                <div className="bg-purple-50 p-3 rounded-lg border border-purple-100 text-purple-900 text-sm font-medium">
-                                    {record.explanationPlan}
+                    {/* NỘI DUNG CHI TIẾT (TRÍCH YẾU) - Chỉ hiện nếu có nội dung hoặc phương án giải trình */}
+                    {(Boolean(record.content?.trim()) || Boolean(record.explanationPlan?.trim())) && (
+                        <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col">
+                            <h3 className="text-xs font-bold text-purple-600 uppercase mb-3 flex items-center gap-2 border-l-4 border-purple-600 pl-2">
+                                <FileText size={16}/> Nội dung chi tiết (Trích yếu)
+                            </h3>
+                            
+                            {Boolean(record.content?.trim()) && (
+                                <div className="bg-gray-50 p-4 rounded-lg border border-gray-100 text-gray-800 text-sm font-medium mb-3 min-h-0 whitespace-pre-wrap">
+                                    {record.content}
                                 </div>
-                            </div>
-                        )}
-                    </div>
+                            )}
+
+                            {Boolean(record.explanationPlan?.trim()) && (
+                                <div>
+                                    <label className="text-[10px] text-purple-500 uppercase font-bold block mb-1">Phương án giải trình</label>
+                                    <div className="bg-purple-50 p-3 rounded-lg border border-purple-100 text-purple-900 text-sm font-medium">
+                                        {record.explanationPlan}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     {/* GIẤY TỜ KÈM THEO */}
                     {(() => {
@@ -1038,24 +1051,165 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                                 </div>
                                 {docList.length > 0 ? (
                                     <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
-                                        {docList.map((doc, idx) => (
-                                            <div key={idx} className="bg-emerald-50/50 p-2.5 rounded-lg border border-emerald-100 text-slate-800 text-xs space-y-1">
-                                                <div className="flex items-start justify-between gap-2">
-                                                    <span className="font-semibold text-slate-900 leading-snug">{doc.name}</span>
-                                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 shrink-0">
-                                                        {doc.type}
-                                                    </span>
+                                        {docList.map((doc, idx) => {
+                                            const badges: string[] = [];
+                                            if (doc.original !== undefined && Number(doc.original) > 0) {
+                                                badges.push('Bản chính');
+                                            }
+                                            if (doc.copy !== undefined && Number(doc.copy) > 0) {
+                                                badges.push('Bản sao');
+                                            }
+                                            if (badges.length === 0) {
+                                                badges.push(doc.type || 'Bản chính');
+                                            }
+
+                                            return (
+                                                <div key={idx} className="bg-emerald-50/50 p-2.5 rounded-lg border border-emerald-100 text-slate-800 text-xs space-y-1.5">
+                                                    <div className="flex items-start justify-between gap-2">
+                                                        <span className="font-semibold text-slate-900 leading-snug">{doc.name}</span>
+                                                        <div className="flex items-center gap-1 shrink-0 flex-wrap justify-end">
+                                                            {badges.map((b, bIdx) => (
+                                                                <span key={bIdx} className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 shrink-0">
+                                                                    {b}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                    {(doc.note || doc.attachedFile) && (
+                                                        <div className="flex items-center justify-between gap-2 text-[11px] text-slate-500 flex-wrap">
+                                                            <div>
+                                                                {doc.note && <span className="italic text-slate-400">({doc.note})</span>}
+                                                            </div>
+
+                                                            {/* File đính kèm của giấy tờ */}
+                                                            {doc.attachedFile && (
+                                                                <div className="flex items-center gap-1.5 bg-white px-2 py-0.5 rounded border border-emerald-200 text-emerald-800 font-mono text-[10px]">
+                                                                    <Paperclip size={11} className="text-emerald-600" />
+                                                                    <span className="font-semibold truncate max-w-[140px] sm:max-w-[200px]" title={doc.attachedFile.fileName}>
+                                                                        {doc.attachedFile.fileName}
+                                                                    </span>
+                                                                    <button
+                                                                        type="button"
+                                                                        title="Xem nhanh tệp"
+                                                                        onClick={() => previewAttachment(doc.attachedFile!)}
+                                                                        className="text-blue-600 hover:text-blue-800 p-0.5 rounded hover:bg-blue-50 cursor-pointer"
+                                                                    >
+                                                                        <Eye size={12} />
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        title="Tải tệp về máy"
+                                                                        onClick={() => downloadAttachment(doc.attachedFile!)}
+                                                                        className="text-emerald-700 hover:text-emerald-900 p-0.5 rounded hover:bg-emerald-50 cursor-pointer"
+                                                                    >
+                                                                        <Download size={12} />
+                                                                    </button>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
                                                 </div>
-                                                <div className="flex items-center gap-3 text-[11px] text-slate-500">
-                                                    <span>Bản chính: <strong className="text-slate-700">{doc.original}</strong></span>
-                                                    <span>Bản sao: <strong className="text-slate-700">{doc.copy}</strong></span>
-                                                    {doc.note && <span className="italic text-slate-400">({doc.note})</span>}
+                                            );
+                                        })}
+                                    </div>
+                                ) : (
+                                    <p className="text-xs text-gray-400 italic">Không có giấy tờ kèm theo.</p>
+                                )}
+                            </div>
+                        );
+                    })()}
+
+                    {/* THÀNH PHẦN HỒ SƠ (CÁC TỔ CHUYÊN MÔN / CÔNG ĐOẠN) */}
+                    {(() => {
+                        const comps: DossierComponentItem[] = (() => {
+                            if (!record.dossierComponents) return [];
+                            if (Array.isArray(record.dossierComponents)) return record.dossierComponents;
+                            if (typeof record.dossierComponents === 'string') {
+                                try {
+                                    const parsed = JSON.parse(record.dossierComponents);
+                                    return Array.isArray(parsed) ? parsed : [];
+                                } catch {
+                                    return [];
+                                }
+                            }
+                            return [];
+                        })();
+
+                        if (comps.length === 0) return null;
+
+                        const driveUrl = getGoogleDriveIncomingUrl();
+
+                        return (
+                            <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <h3 className="text-xs font-bold text-blue-700 uppercase flex items-center gap-2 border-l-4 border-blue-600 pl-2">
+                                        <FileText size={16} />
+                                        <span>Thành phần hồ sơ {comps.length > 0 ? `(${comps.length})` : ''}</span>
+                                    </h3>
+                                    {driveUrl && (
+                                        <a
+                                            href={driveUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 hover:text-blue-800 hover:underline bg-blue-50 px-2 py-0.5 rounded border border-blue-200"
+                                        >
+                                            <ExternalLink size={12} />
+                                            <span>Google Drive</span>
+                                        </a>
+                                    )}
+                                </div>
+
+                                {comps.length > 0 ? (
+                                    <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                                        {comps.map((comp, idx) => (
+                                            <div key={comp.id || idx} className="bg-slate-50/70 p-2.5 rounded-lg border border-slate-200 text-slate-800 text-xs space-y-1.5 hover:bg-slate-50 transition-colors">
+                                                <div className="flex items-start justify-between gap-2">
+                                                    <span className="font-semibold text-slate-900 leading-snug">{comp.name || 'Tài liệu không tên'}</span>
+                                                    {comp.stage && (
+                                                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800 shrink-0">
+                                                            {comp.stage}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div className="flex items-center justify-between gap-2 text-[11px] text-slate-500 flex-wrap">
+                                                    <span className="text-[10px] text-slate-400">
+                                                        STT: #{idx + 1}
+                                                    </span>
+
+                                                    {comp.attachedFile ? (
+                                                        <div className="flex items-center gap-1.5 bg-white px-2 py-0.5 rounded border border-blue-200 text-blue-900 font-mono text-[10px]">
+                                                            <Paperclip size={11} className="text-blue-600 shrink-0" />
+                                                            <span className="font-semibold truncate max-w-[140px] sm:max-w-[200px]" title={comp.attachedFile.fileName}>
+                                                                {comp.attachedFile.fileName}
+                                                            </span>
+                                                            <button
+                                                                type="button"
+                                                                title="Xem nhanh tệp"
+                                                                onClick={() => previewAttachment(comp.attachedFile!)}
+                                                                className="text-blue-600 hover:text-blue-800 p-0.5 rounded hover:bg-blue-50 cursor-pointer"
+                                                            >
+                                                                <Eye size={12} />
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                title="Tải tệp về máy"
+                                                                onClick={() => downloadAttachment(comp.attachedFile!)}
+                                                                className="text-emerald-700 hover:text-emerald-900 p-0.5 rounded hover:bg-emerald-50 cursor-pointer"
+                                                            >
+                                                                <Download size={12} />
+                                                            </button>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-[10px] text-slate-400 italic">Chưa đính kèm tệp</span>
+                                                    )}
                                                 </div>
                                             </div>
                                         ))}
                                     </div>
                                 ) : (
-                                    <p className="text-xs text-gray-400 italic">Không có giấy tờ kèm theo.</p>
+                                    <div className="text-xs text-gray-400 italic py-2">
+                                        Chưa có thành phần hồ sơ nào được đính kèm.
+                                    </div>
                                 )}
                             </div>
                         );

@@ -11,7 +11,6 @@ import ChinhLyBienDongTab from './utilities/ChinhLyBienDongTab';
 import HoSoTachThuaTab from './utilities/HoSoTachThuaTab';
 import ChuyenDoiToBanDoTab from './utilities/ChuyenDoiToBanDoTab';
 import ExcerptManagement from './ExcerptManagement';
-import { KiemTraDoDacTab } from './utilities/KiemTraDoDacTab';
 
 interface UtilitiesViewProps {
     currentUser: UserType;
@@ -47,7 +46,7 @@ const UtilitiesView: React.FC<UtilitiesViewProps> = ({
     onDeleteBatchRecords,
     onRefreshData,
 }) => {
-  const [activeTab, setActiveTab] = useState<'bienban' | 'thongtin' | 'vphc' | 'saiso' | 'chinhly' | 'tachthua' | 'chuyendoi' | 'sotltd' | 'vaoloi' | 'kiemtra'>('bienban');
+  const [activeTab, setActiveTab] = useState<'bienban' | 'thongtin' | 'vphc' | 'saiso' | 'chinhly' | 'tachthua' | 'chuyendoi' | 'sotltd' | 'vaoloi'>('bienban');
   const [defaultExportPath, setDefaultExportPath] = useState('');
   
   // State cho thông báo Custom (Toast)
@@ -180,15 +179,9 @@ const UtilitiesView: React.FC<UtilitiesViewProps> = ({
                       <BookOpen size={16} /> Số TL/TĐ
                   </button>
               )}
-              <button 
-                  onClick={() => setActiveTab('kiemtra')}
-                  className={`px-4 py-2 text-sm font-bold rounded-md transition-all whitespace-nowrap flex items-center gap-2 ${activeTab === 'kiemtra' ? 'bg-white text-emerald-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-              >
-                  <CheckCircle size={16} /> Kiểm tra Đo đạc
-              </button>
           </div>
           
-          {activeTab !== 'saiso' && activeTab !== 'chinhly' && activeTab !== 'tachthua' && activeTab !== 'chuyendoi' && activeTab !== 'sotltd' && activeTab !== 'kiemtra' && (
+          {activeTab !== 'saiso' && activeTab !== 'chinhly' && activeTab !== 'tachthua' && activeTab !== 'chuyendoi' && activeTab !== 'sotltd' && (
             <div className="flex-1 flex justify-end items-center gap-3 pr-4">
                 <button 
                     onClick={handleConfigurePath}
@@ -260,24 +253,6 @@ const UtilitiesView: React.FC<UtilitiesViewProps> = ({
                   <div className="p-8 text-center text-gray-500 bg-white rounded-xl shadow-sm border border-slate-200 m-4 flex flex-col items-center justify-center">
                       <Loader2 className="animate-spin text-blue-600 mb-4" size={32} />
                       <p className="text-slate-600 font-medium">Đang tải cấu hình Số TL/TĐ...</p>
-                  </div>
-              )}
-          </div>
-
-          {/* TAB 9: KIỂM TRA ĐO ĐẠC */}
-          <div className={`w-full h-full flex flex-col bg-[#f8fafc] ${activeTab === 'kiemtra' ? 'block' : 'hidden'}`}>
-              {records && onSaveRecord ? (
-                  <KiemTraDoDacTab
-                      records={records}
-                      employees={employees}
-                      onSaveRecord={onSaveRecord}
-                      onRefreshData={onRefreshData}
-                      notify={notify}
-                  />
-              ) : (
-                  <div className="p-8 text-center text-gray-500 bg-white rounded-xl shadow-sm border border-slate-200 m-4 flex flex-col items-center justify-center">
-                      <Loader2 className="animate-spin text-blue-600 mb-4" size={32} />
-                      <p className="text-slate-600 font-medium">Đang tải cấu hình dữ liệu đo đạc...</p>
                   </div>
               )}
           </div>

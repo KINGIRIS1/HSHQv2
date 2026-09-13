@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Database, AlertTriangle, Cloud, Loader2, CheckCircle, Save, Globe, Calendar, Plus, Trash2, ShieldAlert, Key, FolderArchive, Upload, Download, RefreshCw, FolderOpen, LayoutDashboard, SlidersHorizontal, Eye, EyeOff, ArrowLeft, ArrowRight, ChevronUp, ChevronDown, Search, RotateCcw, FileSpreadsheet, Clock, CheckCircle2 } from 'lucide-react';
+import { Database, AlertTriangle, Cloud, Loader2, CheckCircle, Save, Globe, Calendar, Plus, Trash2, ShieldAlert, Key, FolderArchive, Upload, Download, RefreshCw, FolderOpen, LayoutDashboard, SlidersHorizontal, Eye, EyeOff, ArrowLeft, ArrowRight, ChevronUp, ChevronDown, Search, RotateCcw, FileSpreadsheet, Clock, CheckCircle2, ExternalLink } from 'lucide-react';
 import { Holiday, UserRole, RolePermissions, DepartmentPermissions, DEFAULT_ROLE_PERMISSIONS, AVAILABLE_PERMISSIONS, Employee, RecordStatus, User, RecordFile } from '../types';
 import { fetchHolidays, saveHolidays, testDatabaseConnection, saveUpdateInfo, fetchUpdateInfo, getSystemSetting, saveSystemSetting, fetchSystemEvents } from '../services/api';
 import { fetchRecords } from '../services/apiRecords';
@@ -16,7 +16,7 @@ import {
   EXCEL_BACKUP_PERIOD_DAYS 
 } from '../services/excelBackupService';
 import { isConfigured } from '../services/supabaseClient';
-import FixAssignedDatesTool from './FixAssignedDatesTool';
+import { getGoogleDriveIncomingUrl, setGoogleDriveIncomingUrl } from '../services/attachmentStorage';
 
 const PERMISSION_DEPARTMENTS = [
   { id: 'Ban Giám đốc', name: 'Ban Giám đốc', label: 'Ban Giám đốc', desc: 'Ban lãnh đạo đơn vị, ký duyệt và chỉ đạo chung' },
@@ -64,6 +64,7 @@ const PERMISSION_GROUPS = [
     items: [
       { id: 'ADD_RECORDS', label: 'Thêm / Nhập mới hồ sơ' },
       { id: 'EXPORT_RECORDS', label: 'Xuất danh sách hồ sơ (Excel)' },
+      { id: 'PRINT_RECEIPT', label: 'In biên nhận hồ sơ' },
       { id: 'ADD_CONTRACTS', label: 'Thêm mới hợp đồng' },
       { id: 'EDIT_CONTRACTS', label: 'Sửa thông tin hợp đồng' },
       { id: 'LIQUIDATE_CONTRACTS', label: 'Thanh lý / Quyết toán hợp đồng' },
@@ -88,6 +89,7 @@ const PERMISSION_GROUPS = [
       { id: 'dodac_EDIT_RECORDS', label: 'Sửa hồ sơ (Đo đạc)' },
       { id: 'dodac_DELETE_RECORDS', label: 'Xóa hồ sơ (Đo đạc)' },
       { id: 'dodac_VIEW_DETAILS', label: 'Xem chi tiết hồ sơ (Đo đạc)' },
+      { id: 'dodac_PRINT_RECEIPT', label: 'In biên nhận hồ sơ (Đo đạc)' },
       { id: 'dodac_VIEW_EXCERPTS', label: 'Xem trích lục bản đồ' },
       { id: 'dodac_MANAGE_EXCERPTS', label: 'Cấp số trích lục bản đồ' },
       { id: 'dodac_BTN_ADVANCE_STATUS', label: 'Chuyển bước hồ sơ (Đo đạc)' },
@@ -110,6 +112,7 @@ const PERMISSION_GROUPS = [
       { id: 'luutru_EDIT_RECORDS', label: 'Sửa hồ sơ (Lưu trữ)' },
       { id: 'luutru_DELETE_RECORDS', label: 'Xóa hồ sơ (Lưu trữ)' },
       { id: 'luutru_VIEW_DETAILS', label: 'Xem chi tiết hồ sơ (Lưu trữ)' },
+      { id: 'luutru_PRINT_RECEIPT', label: 'In biên nhận hồ sơ (Lưu trữ)' },
       { id: 'VIEW_ARCHIVE', label: 'Tra cứu thông tin lưu trữ' },
       { id: 'MANAGE_ARCHIVE', label: 'Quản lý kho lưu trữ (Mượn/trả)' },
       { id: 'luutru_BTN_ADVANCE_STATUS', label: 'Chuyển bước hồ sơ (Lưu trữ)' },
@@ -168,6 +171,16 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
   const [manualVersion, setManualVersion] = useState('');
   const [manualUrl, setManualUrl] = useState('');
   const [isSavingUpdate, setIsSavingUpdate] = useState(false);
+
+  // Google Drive URL Cấu hình lưu trữ hồ sơ tiếp nhận
+  const [driveUrl, setDriveUrl] = useState<string>(getGoogleDriveIncomingUrl());
+  const [isDriveSaved, setIsDriveSaved] = useState<boolean>(false);
+
+  const handleSaveDriveUrl = () => {
+    setGoogleDriveIncomingUrl(driveUrl);
+    setIsDriveSaved(true);
+    setTimeout(() => setIsDriveSaved(false), 3000);
+  };
 
   // Excel Periodic Auto-Backup
   const [isExecutingExcelBackup, setIsExecutingExcelBackup] = useState(false);
@@ -630,7 +643,7 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
               'reports', 'VIEW_REPORTS', 'work_schedule', 'VIEW_SCHEDULE', 'utilities', 'SYSTEM_SETTINGS', 'VIEW_CHAT', 'VIEW_PERSONAL_PROFILE',
               'dodac_BTN_APPROVE_SIGN', 'dodac_VIEW_DETAILS', 'dodac_VIEW_EXCERPTS',
               'luutru_BTN_APPROVE_SIGN', 'luutru_VIEW_DETAILS', 'luutru_VIEW_ARCHIVE',
-              'VIEW_DETAILS'
+              'VIEW_DETAILS', 'PRINT_RECEIPT', 'dodac_PRINT_RECEIPT', 'luutru_PRINT_RECEIPT'
           ];
       } else if (matchDepartmentKey('đo đạc', deptName)) {
           const ARCHIVE_PERMS = [
@@ -648,7 +661,7 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
       } else if (matchDepartmentKey('cấp giấy', deptName) || matchDepartmentKey('đăng ký', deptName)) {
           return [
               'registration_records', 'reports', 'VIEW_REPORTS', 'work_schedule', 'VIEW_SCHEDULE',
-              'utilities', 'VIEW_CHAT', 'VIEW_PERSONAL_PROFILE'
+              'utilities', 'VIEW_CHAT', 'VIEW_PERSONAL_PROFILE', 'PRINT_RECEIPT', 'VIEW_DETAILS'
           ];
       } else if (matchDepartmentKey('hành chính', deptName) || matchDepartmentKey('một cửa', deptName)) {
           return DEFAULT_ROLE_PERMISSIONS[UserRole.ONEDOOR] || [];
@@ -1434,11 +1447,101 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
 
             {activeTab === 'data' && (
                 <div className="max-w-5xl mx-auto space-y-8">
-                    {/* Công cụ Sửa lỗi ngày giao Đo đạc thực địa và ngày Biên tập bản đồ (09/09/2026) */}
-                    <FixAssignedDatesTool 
-                        records={records} 
-                        onRecordsUpdated={onRecordsUpdated || onHolidaysChanged} 
-                    />
+                    {/* Hộp cấu hình Google Drive Lưu trữ dữ liệu tiếp nhận */}
+                    <div className="border border-blue-100 rounded-[2rem] overflow-hidden bg-white shadow-xl shadow-blue-50/50">
+                        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-5 border-b border-blue-100 flex items-center justify-between">
+                            <h3 className="text-blue-800 font-black flex items-center gap-2 uppercase tracking-widest text-xs">
+                                <Globe size={18} className="text-blue-600" />
+                                Đường dẫn Google Drive lưu trữ hồ sơ tiếp nhận đầu vào
+                            </h3>
+                            <span className="text-[10px] font-bold px-2.5 py-1 bg-blue-100 text-blue-800 rounded-full">
+                                Cấu hình chung
+                            </span>
+                        </div>
+                        <div className="p-6 md:p-8 space-y-6">
+                            <div>
+                                <p className="text-xs text-slate-600 font-medium leading-relaxed mb-4">
+                                    Thiết lập đường dẫn (URL) thư mục Google Drive dùng chung của đơn vị để lưu trữ và liên kết các tài liệu scan / tệp đính kèm khi tiếp nhận hồ sơ đầu vào theo từng tổ chuyên môn.
+                                </p>
+
+                                <div className="space-y-2">
+                                    <label className="block text-xs font-black uppercase tracking-wider text-slate-700">
+                                        Đường dẫn liên kết thư mục Google Drive:
+                                    </label>
+                                    <div className="flex flex-col sm:flex-row gap-3">
+                                        <input
+                                            type="url"
+                                            value={driveUrl}
+                                            onChange={(e) => setDriveUrl(e.target.value)}
+                                            placeholder="Ví dụ: https://drive.google.com/drive/folders/1a2b3c4d5e..."
+                                            className="flex-1 px-4 py-3 text-sm font-medium border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-slate-50 focus:bg-white transition-all shadow-inner"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={handleSaveDriveUrl}
+                                            className="px-6 py-3 bg-blue-600 text-white font-black text-xs uppercase tracking-widest rounded-xl hover:bg-blue-700 transition-all shadow-md shadow-blue-100 flex items-center justify-center gap-2 shrink-0 active:scale-95 cursor-pointer"
+                                        >
+                                            <Save size={16} />
+                                            Lưu cấu hình
+                                        </button>
+                                        {driveUrl && (
+                                            <a
+                                                href={driveUrl}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="px-5 py-3 bg-emerald-600 text-white font-black text-xs uppercase tracking-widest rounded-xl hover:bg-emerald-700 transition-all shadow-md shadow-emerald-100 flex items-center justify-center gap-2 shrink-0 active:scale-95 cursor-pointer"
+                                            >
+                                                <ExternalLink size={16} />
+                                                Mở Google Drive
+                                            </a>
+                                        )}
+                                    </div>
+                                    {isDriveSaved && (
+                                        <div className="flex items-center gap-2 text-xs font-bold text-emerald-600 mt-2">
+                                            <CheckCircle size={15} />
+                                            Đã lưu đường dẫn Google Drive thành công! Toàn bộ giao diện tiếp nhận và chuyên môn đã được cập nhật.
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Bảng hướng dẫn phân loại theo tổ chuyên môn */}
+                            <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-4">
+                                <h5 className="text-xs font-black text-slate-700 uppercase tracking-wider mb-2">
+                                    Quy định phân loại hồ sơ & tệp theo Tổ chuyên môn (Theo tiền tố Mã thủ tục):
+                                </h5>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                                    <div className="bg-white p-3 rounded-lg border border-purple-100 shadow-sm">
+                                        <div className="font-bold text-purple-700 mb-1 flex items-center gap-1.5">
+                                            <span className="w-2 h-2 rounded-full bg-purple-500"></span>
+                                            Tổ Lưu trữ (Mã 1.x)
+                                        </div>
+                                        <p className="text-slate-500 text-[11px]">
+                                            Thủ tục: <strong>1.1</strong> Sao lục, <strong>1.2</strong> Công văn, Cung cấp dữ liệu.
+                                        </p>
+                                    </div>
+                                    <div className="bg-white p-3 rounded-lg border border-blue-100 shadow-sm">
+                                        <div className="font-bold text-blue-700 mb-1 flex items-center gap-1.5">
+                                            <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                                            Tổ Đo đạc (Mã 2.x)
+                                        </div>
+                                        <p className="text-slate-500 text-[11px]">
+                                            Thủ tục: <strong>2.1</strong> Trích lục, <strong>2.2</strong> Trích đo, <strong>2.3</strong> Duyệt đơn, <strong>2.4</strong> Cắm mốc, <strong>2.5</strong> Tách-Hợp thửa.
+                                        </p>
+                                    </div>
+                                    <div className="bg-white p-3 rounded-lg border border-emerald-100 shadow-sm">
+                                        <div className="font-bold text-emerald-700 mb-1 flex items-center gap-1.5">
+                                            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                                            Tổ Cấp giấy (Mã 3.x)
+                                        </div>
+                                        <p className="text-slate-500 text-[11px]">
+                                            Thủ tục: <strong>3.1</strong> Đăng ký biến động, <strong>3.2</strong> Cấp đổi / cấp lại GCN.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
                     {/* Hộp vùng nguy hiểm */}
                     <div className="border border-red-100 rounded-[2rem] overflow-hidden bg-white shadow-xl shadow-red-50/50">

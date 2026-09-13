@@ -1,13 +1,17 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import * as XLSX from 'xlsx-js-style';
-import { RecordFile, Contract } from '../../types';
+import { RecordFile, Contract, AttachedFileMeta } from '../../types';
 import { getNormalizedWard, getShortRecordType, RECORD_TYPES } from '../../constants';
+import { getDepartmentForRecord } from '../../utils/appHelpers';
 import { 
     Search, Eye, FileSpreadsheet, Pencil, Printer, Trash2, 
     FileSignature, FileEdit, RefreshCw, Filter, ChevronDown, ChevronUp, 
-    X, RotateCcw, Calendar, UserCheck, Layers, Building2, ChevronLeft, ChevronRight
+    X, RotateCcw, Calendar, UserCheck, Layers, Building2, ChevronLeft, ChevronRight,
+    Paperclip
 } from 'lucide-react';
 import { fetchContracts } from '../../services/api';
+import { saveRecord } from '../../services/apiRecords';
+import RecordAttachmentModal from './RecordAttachmentModal';
 
 interface DailyListProps {
   records: RecordFile[];
@@ -54,6 +58,21 @@ const DailyList: React.FC<DailyListProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [isFilterPopoverOpen, setIsFilterPopoverOpen] = useState(false);
   const [contracts, setContracts] = useState<Contract[]>([]);
+  const [attachmentRecord, setAttachmentRecord] = useState<RecordFile | null>(null);
+
+  const handleUpdateRecordFiles = async (recordId: string, files: AttachedFileMeta[]) => {
+      if (!attachmentRecord) return;
+      const updated = { ...attachmentRecord, attachedFiles: files };
+      setAttachmentRecord(updated);
+      try {
+          await saveRecord(updated);
+          if (onSyncPending) {
+              await onSyncPending();
+          }
+      } catch (e) {
+          console.error('Lỗi khi lưu tệp đính kèm vào hồ sơ:', e);
+      }
+  };
 
   // Pagination State (20 records / page)
   const [currentPage, setCurrentPage] = useState(1);
@@ -207,36 +226,15 @@ const DailyList: React.FC<DailyListProps> = ({
               }
           }
 
-          // 4. Lọc theo tổ chuyên môn
+          // 4. Lọc theo tổ chuyên môn theo tiền tố mã thủ tục (1.x -> Lưu trữ, 2.x -> Đo đạc, 3.x -> Cấp giấy)
           if (selectedDept !== 'ALL' && selectedDept !== 'Tất cả') {
-              const codeClean = (r.code || '').trim().toLowerCase();
-              const typeLower = (r.recordType || '').toLowerCase();
-              const deptLower = ((r as any).department || r.returnHandoverDept || '').toLowerCase();
-
-              const is2x = codeClean.startsWith('2.') || /^2[.\d]/.test(codeClean) || typeLower.startsWith('2.') || typeLower.includes('2.');
-              const is1x = codeClean.startsWith('1.') || /^1[.\d]/.test(codeClean) || typeLower.startsWith('1.') || typeLower.includes('1.') || typeLower.includes('sao lục');
-
-              if (selectedDept === 'Tổ Đo đạc') {
-                  const isDoDac = is2x || 
-                                  deptLower.includes('đo đạc') || 
-                                  deptLower.includes('đo dạc') || 
-                                  typeLower.includes('trích đo') || 
-                                  typeLower.includes('trích lục') || 
-                                  typeLower.includes('đo đạc') || 
-                                  typeLower.includes('cắm mốc') || 
-                                  typeLower.includes('tách') || 
-                                  typeLower.includes('hợp') || 
-                                  typeLower.includes('số thửa') || 
-                                  typeLower.includes('cập nhật') || 
-                                  typeLower.includes('cập nhập');
-                  if (!isDoDac) return false;
-              } else if (selectedDept === 'Tổ Lưu trữ' || selectedDept === 'Tổ Thông tin lưu trữ') {
-                  const isLuuTru = is1x || 
-                                   deptLower.includes('lưu trữ') || 
-                                   typeLower.includes('cung cấp') || 
-                                   typeLower.includes('lưu trữ') ||
-                                   typeLower.includes('sao lục');
-                  if (!isLuuTru) return false;
+              const recordDept = getDepartmentForRecord(r);
+              if (selectedDept === 'Tổ Đo đạc' && recordDept !== 'Tổ Đo đạc') {
+                  return false;
+              } else if ((selectedDept === 'Tổ Lưu trữ' || selectedDept === 'Tổ Thông tin lưu trữ') && recordDept !== 'Tổ Lưu trữ') {
+                  return false;
+              } else if (selectedDept === 'Tổ Cấp giấy' && recordDept !== 'Tổ Cấp giấy') {
+                  return false;
               }
           }
 
@@ -613,8 +611,9 @@ const DailyList: React.FC<DailyListProps> = ({
                                             className="w-full text-xs md:text-sm border border-gray-200 rounded-lg p-2 font-medium bg-gray-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
                                         >
                                             <option value="ALL">Tất cả tổ chuyên môn</option>
-                                            <option value="Tổ Đo đạc">Tổ Đo đạc</option>
-                                            <option value="Tổ Lưu trữ">Tổ Lưu trữ</option>
+                                            <option value="Tổ Lưu trữ">Tổ Lưu trữ (1.x)</option>
+                                            <option value="Tổ Đo đạc">Tổ Đo đạc (2.x)</option>
+                                            <option value="Tổ Cấp giấy">Tổ Cấp giấy (3.x)</option>
                                         </select>
                                     </div>
                                 </div>
@@ -745,8 +744,24 @@ const DailyList: React.FC<DailyListProps> = ({
                                                     )}
                                                 </div>
 
-                                                {/* Hàng 2: In biên nhận & Xóa */}
+                                                {/* Hàng 2: Đính kèm tệp, In biên nhận & Xóa */}
                                                 <div className="flex items-center justify-center gap-1">
+                                                    <button 
+                                                        onClick={() => setAttachmentRecord(r)} 
+                                                        className={`p-1.5 rounded border transition-all cursor-pointer shadow-2xs relative ${
+                                                            r.attachedFiles && r.attachedFiles.length > 0 
+                                                                ? 'text-indigo-700 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 border-indigo-200/80 font-bold' 
+                                                                : 'text-slate-500 hover:text-slate-800 bg-slate-50 hover:bg-slate-100 border-slate-200/80'
+                                                        }`}
+                                                        title={r.attachedFiles && r.attachedFiles.length > 0 ? `Xem/Tải ${r.attachedFiles.length} tệp đính kèm` : 'Đính kèm tệp hồ sơ'}
+                                                    >
+                                                        <Paperclip size={13} />
+                                                        {r.attachedFiles && r.attachedFiles.length > 0 && (
+                                                            <span className="absolute -top-1 -right-1 bg-indigo-600 text-white text-[9px] w-3.5 h-3.5 rounded-full flex items-center justify-center font-bold">
+                                                                {r.attachedFiles.length}
+                                                            </span>
+                                                        )}
+                                                    </button>
                                                     <button 
                                                         onClick={() => onPrint(r)} 
                                                         className="p-1.5 text-purple-600 hover:text-purple-800 bg-purple-50 hover:bg-purple-100 rounded border border-purple-200/80 transition-all cursor-pointer shadow-2xs" 
@@ -813,6 +828,14 @@ const DailyList: React.FC<DailyListProps> = ({
                 </div>
             )}
         </div>
+
+        {/* Modal quản lý tệp đính kèm theo từng mã hồ sơ riêng */}
+        <RecordAttachmentModal
+            record={attachmentRecord}
+            isOpen={!!attachmentRecord}
+            onClose={() => setAttachmentRecord(null)}
+            onUpdateRecordFiles={handleUpdateRecordFiles}
+        />
     </div>
   );
 };

@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
-import { RecordFile, RecordStatus, User, Employee, Contract, UserRole } from "../types";
+import { RecordFile, RecordStatus, User, Employee, Contract, UserRole, DossierComponentItem } from "../types";
 import StatusBadge from "./StatusBadge";
 import {
   Briefcase,
@@ -46,6 +46,7 @@ import {
 } from "../services/apiArchive";
 import SubmitModal from "./receive-record/SubmitModal";
 import HandoverOfficeModal from "./receive-record/HandoverOfficeModal";
+import SignApprovalModal from "./receive-record/SignApprovalModal";
 import SystemAnnexTemplate from "./receive-record/SystemAnnexTemplate";
 import {
   generateDocxBlobAsync,
@@ -161,6 +162,8 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
   const [isSubmitCheckModalOpen, setIsSubmitCheckModalOpen] = useState(false);
   const [isHandoverOfficeModalOpen, setIsHandoverOfficeModalOpen] = useState(false);
+  const [isSignApprovalModalOpen, setIsSignApprovalModalOpen] = useState(false);
+  const [signTargetRecord, setSignTargetRecord] = useState<RecordFile | null>(null);
   const [submitTargetRecords, setSubmitTargetRecords] = useState<RecordFile[]>(
     [],
   );
@@ -996,7 +999,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
     setIsHandoverOfficeModalOpen(true);
   };
 
-  const handleConfirmHandoverOffice = async (drafterId: string) => {
+  const handleConfirmHandoverOffice = async (drafterId: string, components?: DossierComponentItem[]) => {
     const targets = [...handoverOfficeTargetRecords];
     if (targets.length === 0) return;
 
@@ -1025,6 +1028,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
             assignedTo: drafterId, // Chuyển việc sang Chuyên viên Nội nghiệp
             officeAssignedDate: handoverIso,
             fieldCompletedDate: handoverIso,
+            ...(components ? { dossierComponents: components } : {}),
           };
 
           if (onUpdateRecord) {
@@ -1039,64 +1043,73 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
     }
   };
 
-  const handleSignRecord = async (record: RecordFile) => {
-    if (
-      await confirmAction(
-        `Xác nhận ký duyệt hồ sơ ${record.code}?\nHồ sơ sẽ chuyển sang trạng thái "Chờ bàn giao" (Đã ký).`
-      )
-    ) {
-      const nowIso = new Date().toISOString();
-      if (
-        record.recordType === "Sao lục" ||
-        record.recordType === "Công văn" ||
-        isArchiveRecordType(record.recordType)
-      ) {
-        const historyEntry = {
-          action: "Ký duyệt",
-          status: "signed",
-          timestamp: nowIso,
-          user: user.name,
-        };
-        const currentArchive = archiveRecords.find((r) => r.id === record.id);
-        if (currentArchive) {
-          const oldHistory = Array.isArray(currentArchive.data?.history)
-            ? currentArchive.data.history
-            : [];
-          const newHistory = [...oldHistory, historyEntry];
-          await saveArchiveRecord({
-            ...currentArchive,
-            id: record.id,
-            status: "signed",
-            so_hieu: currentArchive.so_hieu || record.code || '',
-            noi_nhan_gui: currentArchive.noi_nhan_gui || record.customerName || '',
-            trich_yeu: currentArchive.trich_yeu || record.content || '',
-            data: {
-              ...currentArchive.data,
-              history: newHistory,
-              approvalDate: nowIso,
-            },
-          });
-          const saoluc = await fetchArchiveRecords("saoluc");
-          const congvan = await fetchArchiveRecords("congvan");
-          setArchiveRecords([...saoluc, ...congvan]);
-        }
-      } else {
-        const updatedRecord: RecordFile = {
-          ...record,
-          status: RecordStatus.SIGNED,
-          approvalDate: nowIso,
-        };
-        if (onUpdateRecord) {
-          await onUpdateRecord(updatedRecord);
-        } else {
-          await updateRecordApi(updatedRecord);
-          onUpdateStatus(record, RecordStatus.SIGNED);
-        }
-      }
-    }
+  const handleOpenSignModal = (record: RecordFile) => {
+    setSignTargetRecord(record);
+    setIsSignApprovalModalOpen(true);
   };
 
-  const handleConfirmSubmit = async (directorId: string) => {
+  const handleConfirmSignFromModal = async (
+    targetRecords: RecordFile[],
+    newComponents: DossierComponentItem[]
+  ) => {
+    const targetRecord = targetRecords[0];
+    if (!targetRecord) return;
+    const nowIso = new Date().toISOString();
+
+    if (
+      targetRecord.recordType === "Sao lục" ||
+      targetRecord.recordType === "Công văn" ||
+      isArchiveRecordType(targetRecord.recordType)
+    ) {
+      const historyEntry = {
+        action: "Ký duyệt",
+        status: "signed",
+        timestamp: nowIso,
+        user: user.name,
+      };
+      const currentArchive = archiveRecords.find((r) => r.id === targetRecord.id);
+      if (currentArchive) {
+        const oldHistory = Array.isArray(currentArchive.data?.history)
+          ? currentArchive.data.history
+          : [];
+        const newHistory = [...oldHistory, historyEntry];
+        await saveArchiveRecord({
+          ...currentArchive,
+          id: targetRecord.id,
+          status: "signed",
+          so_hieu: currentArchive.so_hieu || targetRecord.code || '',
+          noi_nhan_gui: currentArchive.noi_nhan_gui || targetRecord.customerName || '',
+          trich_yeu: currentArchive.trich_yeu || targetRecord.content || '',
+          data: {
+            ...currentArchive.data,
+            history: newHistory,
+            approvalDate: nowIso,
+            dossierComponents: newComponents,
+          },
+        });
+        const saoluc = await fetchArchiveRecords("saoluc");
+        const congvan = await fetchArchiveRecords("congvan");
+        setArchiveRecords([...saoluc, ...congvan]);
+      }
+    } else {
+      const updatedRecord: RecordFile = {
+        ...targetRecord,
+        status: RecordStatus.SIGNED,
+        approvalDate: nowIso,
+        dossierComponents: newComponents,
+      };
+      if (onUpdateRecord) {
+        await onUpdateRecord(updatedRecord);
+      } else {
+        await updateRecordApi(updatedRecord);
+        onUpdateStatus(targetRecord, RecordStatus.SIGNED);
+      }
+    }
+    setIsSignApprovalModalOpen(false);
+    setSignTargetRecord(null);
+  };
+
+  const handleConfirmSubmit = async (directorId: string, components?: DossierComponentItem[]) => {
     const targets = [...submitTargetRecords];
     if (targets.length === 0) return;
 
@@ -1148,6 +1161,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                   submitted_to: directorId,
                   submittedTo: directorId,
                   submissionDate: nowIso,
+                  ...(components ? { dossierComponents: components } : {}),
                 },
               });
             }
@@ -1160,6 +1174,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
               checkedDate: record.checkedDate || nowIso,
               submittedTo: directorId,
               submissionDate: nowIso,
+              ...(components ? { dossierComponents: components } : {}),
             };
 
             if (onUpdateRecord) {
@@ -1880,7 +1895,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
 
                               {isDirectorUser && r.status === RecordStatus.PENDING_SIGN && (
                                 <button
-                                  onClick={() => handleSignRecord(r)}
+                                  onClick={() => handleOpenSignModal(r)}
                                   title="Ký duyệt hồ sơ"
                                   className="px-3 py-1.5 bg-purple-600 text-white rounded-md hover:bg-purple-700 text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all"
                                 >
@@ -2036,7 +2051,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
 
                           {isDirectorUser && r.status === RecordStatus.PENDING_SIGN && (
                             <button
-                              onClick={() => handleSignRecord(r)}
+                              onClick={() => handleOpenSignModal(r)}
                               className="px-2.5 py-1.5 bg-purple-600 text-white rounded-lg text-xs font-bold flex items-center gap-1"
                               title="Ký duyệt hồ sơ"
                             >
@@ -2127,7 +2142,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
         users={users}
         employees={employees}
         isCheckMode={true}
-        onConfirm={async (checkerId) => {
+        onConfirm={async (checkerId, components) => {
           const targets = [...submitTargetRecords];
           if (targets.length === 0) return;
 
@@ -2172,6 +2187,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                         history: newHistory,
                         checked_by: checkerId,
                         checkedBy: checkerId,
+                        ...(components ? { dossierComponents: components } : {}),
                       },
                     });
                   }
@@ -2183,6 +2199,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                     completedWorkDate: record.completedWorkDate || nowIso,
                     pendingCheckDate: nowIso,
                     checkedBy: checkerId,
+                    ...(components ? { dossierComponents: components } : {}),
                   };
 
                   if (onUpdateRecord) {
@@ -2219,6 +2236,17 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
         records={handoverOfficeTargetRecords}
         employees={employees}
         onConfirm={handleConfirmHandoverOffice}
+      />
+
+      {/* Modal Ký duyệt có bảng Thành phần hồ sơ */}
+      <SignApprovalModal
+        isOpen={isSignApprovalModalOpen}
+        onClose={() => {
+          setIsSignApprovalModalOpen(false);
+          setSignTargetRecord(null);
+        }}
+        record={signTargetRecord}
+        onConfirm={handleConfirmSignFromModal}
       />
 
       {isAnnexModalOpen && annexTargetRecord && (

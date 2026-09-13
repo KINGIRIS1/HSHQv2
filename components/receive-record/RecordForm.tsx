@@ -1,15 +1,11 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { RecordFile, Holiday, RecordStatus, User, Employee } from '../../types';
+import { RecordFile, Holiday, RecordStatus, User, Employee, AttachedDocItem, AttachedFileMeta } from '../../types';
 import AutoResizeTextarea from '../AutoResizeTextarea';
 import { RECORD_TYPES, EXTENDED_RECORD_TYPES, getShortRecordType, getWardLabel } from '../../constants';
-import { Save, User as UserIcon, Calendar, MapPin, FileCheck, Loader2, Printer, RotateCcw, XCircle, CheckCircle, AlertCircle, X, Phone, FileText, BookOpen, Clock, Hash, Map, ChevronDown, ChevronUp } from 'lucide-react';
-
-interface AttachedDocItem {
-  id: string;
-  name: string;
-  type: 'Bản chính' | 'Bản sao';
-}
+import { getDepartmentForRecord } from '../../utils/appHelpers';
+import { processAndSaveSingleAttachment, previewAttachment, downloadAttachment, isAllowedDocFile } from '../../services/attachmentStorage';
+import { Save, User as UserIcon, Calendar, MapPin, FileCheck, Loader2, Printer, RotateCcw, XCircle, CheckCircle, AlertCircle, X, Phone, FileText, BookOpen, Clock, Hash, Map, ChevronDown, ChevronUp, Plus, Paperclip, Eye, Download, CheckCircle2 } from 'lucide-react';
 
 const parseAttachedDocs = (otherDocsStr: string | null | undefined): AttachedDocItem[] => {
     if (!otherDocsStr) return [];
@@ -19,7 +15,10 @@ const parseAttachedDocs = (otherDocsStr: string | null | undefined): AttachedDoc
             return parsed.map((item: any, idx: number) => ({
                 id: item.id || String(idx + 1),
                 name: item.name || '',
-                type: item.type === 'Bản sao' ? 'Bản sao' : 'Bản chính'
+                type: item.type === 'Bản sao' ? 'Bản sao' : 'Bản chính',
+                original: typeof item.original === 'number' ? item.original : (item.type === 'Bản sao' ? 0 : 1),
+                copy: typeof item.copy === 'number' ? item.copy : (item.type === 'Bản sao' ? 1 : 0),
+                attachedFile: item.attachedFile || undefined
             }));
         }
     } catch (e) {
@@ -29,7 +28,9 @@ const parseAttachedDocs = (otherDocsStr: string | null | undefined): AttachedDoc
             return [{
                 id: '1',
                 name: parts[0],
-                type: parts[1] === 'Bản sao' ? 'Bản sao' : 'Bản chính'
+                type: parts[1] === 'Bản sao' ? 'Bản sao' : 'Bản chính',
+                original: parts[1] === 'Bản sao' ? 0 : 1,
+                copy: parts[1] === 'Bản sao' ? 1 : 0
             }];
         }
     }
@@ -95,6 +96,8 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
   });
 
   const [attachedDocs, setAttachedDocs] = useState<AttachedDocItem[]>([]);
+  const [uploadingDocIdx, setUploadingDocIdx] = useState<number | null>(null);
+  const docFileInputRefs = useRef<{ [key: number]: HTMLInputElement | null }>({});
   const [authCccd, setAuthCccd] = useState('');
   const [authAddress, setAuthAddress] = useState('');
   const [isAuthOpen, setIsAuthOpen] = useState(false);
@@ -183,20 +186,66 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
       const newDoc: AttachedDocItem = {
           id: String(nextNum),
           name: '',
-          type: 'Bản chính'
+          type: 'Bản chính',
+          original: 1,
+          copy: 0
       };
       const updatedDocs = [...attachedDocs, newDoc];
       setAttachedDocs(updatedDocs);
       setFormData(prev => ({ ...prev, otherDocs: JSON.stringify(updatedDocs) }));
   };
 
-  const handleUpdateDoc = (index: number, field: keyof AttachedDocItem, value: string) => {
+  const handleUpdateDoc = (index: number, field: keyof AttachedDocItem, value: any) => {
       const updatedDocs = attachedDocs.map((doc, idx) => {
           if (idx === index) {
-              return { ...doc, [field]: value };
+              const next = { ...doc, [field]: value };
+              if (field === 'type') {
+                  if (value === 'Bản chính') {
+                      next.original = 1;
+                      next.copy = 0;
+                  } else {
+                      next.original = 0;
+                      next.copy = 1;
+                  }
+              }
+              return next;
           }
           return doc;
       });
+      setAttachedDocs(updatedDocs);
+      setFormData(prev => ({ ...prev, otherDocs: JSON.stringify(updatedDocs) }));
+  };
+
+  const handleAttachFileToDoc = async (idx: number, file: File) => {
+      if (!isAllowedDocFile(file)) {
+          alert('Hệ thống đã bỏ hỗ trợ định dạng ảnh. Vui lòng chọn tệp văn bản/tài liệu (PDF, Word, Excel, CAD...)');
+          return;
+      }
+      setUploadingDocIdx(idx);
+      try {
+          const doc = attachedDocs[idx];
+          const docName = doc?.name?.trim() || 'Giấy tờ kèm theo';
+          const meta = await processAndSaveSingleAttachment(
+              file,
+              formData.code || 'HS',
+              docName,
+              idx + 1,
+              'Bộ phận tiếp nhận',
+              'Tiếp nhận'
+          );
+          const updatedDocs = attachedDocs.map((d, i) => (i === idx ? { ...d, attachedFile: meta } : d));
+          setAttachedDocs(updatedDocs);
+          setFormData(prev => ({ ...prev, otherDocs: JSON.stringify(updatedDocs) }));
+      } catch (err: any) {
+          console.error('Lỗi đính kèm tệp:', err);
+          alert(err.message || 'Lỗi khi tải tệp lên');
+      } finally {
+          setUploadingDocIdx(null);
+      }
+  };
+
+  const handleRemoveDocFile = (idx: number) => {
+      const updatedDocs = attachedDocs.map((d, i) => (i === idx ? { ...d, attachedFile: undefined } : d));
       setAttachedDocs(updatedDocs);
       setFormData(prev => ({ ...prev, otherDocs: JSON.stringify(updatedDocs) }));
   };
@@ -431,9 +480,10 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
                         <button
                             type="button"
                             onClick={handleAddDoc}
-                            className="text-xs bg-blue-50 text-blue-600 px-2.5 py-1 rounded-md border border-blue-200 hover:bg-blue-100 font-bold flex items-center gap-1 transition-all active:scale-95"
+                            className="text-xs bg-blue-50 text-blue-600 px-2.5 py-1 rounded-md border border-blue-200 hover:bg-blue-100 font-bold flex items-center gap-1 transition-all active:scale-95 cursor-pointer"
                         >
-                            + THÊM
+                            <Plus size={13} />
+                            Thêm mới
                         </button>
                     </div>
                     
@@ -448,7 +498,8 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
                                     <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                                         <th className="py-1.5 px-2 text-center w-8">#</th>
                                         <th className="py-1.5 px-2">Tên giấy tờ</th>
-                                        <th className="py-1.5 px-2 w-28 text-center">Loại</th>
+                                        <th className="py-1.5 px-2 w-28 text-center">Hình thức</th>
+                                        <th className="py-1.5 px-2 w-28 text-center">Tệp đính kèm</th>
                                         <th className="py-1.5 px-2 w-8 text-center">Xóa</th>
                                     </tr>
                                 </thead>
@@ -489,6 +540,69 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
                                                          Sao
                                                      </label>
                                                 </div>
+                                            </td>
+                                            <td className="py-1 px-2 text-center">
+                                                <input
+                                                    type="file"
+                                                    ref={(el) => (docFileInputRefs.current[idx] = el)}
+                                                    onChange={(e) => {
+                                                        const file = e.target.files?.[0];
+                                                        if (file) handleAttachFileToDoc(idx, file);
+                                                        e.target.value = '';
+                                                    }}
+                                                    accept=".pdf,.docx,.doc,.xlsx,.xls,.dwg,.dgn,.txt,.rtf,.zip,.rar,.7z"
+                                                    className="hidden"
+                                                />
+                                                {doc.attachedFile ? (
+                                                    <div className="inline-flex items-center justify-center gap-1 px-1.5 py-0.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => previewAttachment(doc.attachedFile!)}
+                                                            title={`Xem tệp: ${doc.attachedFile.fileName}`}
+                                                            className="p-0.5 rounded hover:bg-emerald-100 text-emerald-700 cursor-pointer"
+                                                        >
+                                                            <CheckCircle2 size={13} />
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => previewAttachment(doc.attachedFile!)}
+                                                            title={`Xem trước (${doc.attachedFile.fileName})`}
+                                                            className="p-0.5 rounded hover:bg-emerald-100 text-blue-600 cursor-pointer"
+                                                        >
+                                                            <Eye size={12} />
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => downloadAttachment(doc.attachedFile!)}
+                                                            title="Tải về"
+                                                            className="p-0.5 rounded hover:bg-emerald-100 text-emerald-700 cursor-pointer"
+                                                        >
+                                                            <Download size={12} />
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleRemoveDocFile(idx)}
+                                                            title="Gỡ tệp đính kèm"
+                                                            className="p-0.5 rounded hover:bg-red-50 text-slate-400 hover:text-red-600 cursor-pointer"
+                                                        >
+                                                            <X size={12} />
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <button
+                                                        type="button"
+                                                        disabled={uploadingDocIdx === idx}
+                                                        onClick={() => docFileInputRefs.current[idx]?.click()}
+                                                        title="Đính kèm tệp văn bản/tài liệu"
+                                                        className="p-1.5 rounded-lg bg-slate-50 hover:bg-blue-50 text-slate-500 hover:text-blue-600 border border-slate-200 transition-all cursor-pointer inline-flex items-center justify-center disabled:opacity-50"
+                                                    >
+                                                        {uploadingDocIdx === idx ? (
+                                                            <Loader2 size={13} className="animate-spin text-blue-600" />
+                                                        ) : (
+                                                            <Paperclip size={13} />
+                                                        )}
+                                                    </button>
+                                                )}
                                             </td>
                                             <td className="py-1 px-2 text-center">
                                                 <button

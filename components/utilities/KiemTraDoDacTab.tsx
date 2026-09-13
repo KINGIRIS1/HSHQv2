@@ -22,7 +22,7 @@ import {
     Trash2
 } from 'lucide-react';
 import { RecordFile, Employee, NotifyFunction, RecordStatus } from '../../types';
-import { getDepartmentForRecord, formatDateDDMMYYYY, parseSafeDate } from '../../utils/appHelpers';
+import { getDepartmentForRecord, formatDateDDMMYYYY, parseSafeDate, confirmAction } from '../../utils/appHelpers';
 import { getShortRecordType } from '../../constants';
 import * as XLSX from 'xlsx-js-style';
 
@@ -500,7 +500,7 @@ export const KiemTraDoDacTab: React.FC<KiemTraDoDacTabProps> = ({
         }
 
         const confirmMsg = `Xác nhận cập nhật đồng loạt ${Object.keys(updateFields).length} trường thông tin cho ${selectedIds.size} hồ sơ đang chọn?`;
-        if (!window.confirm(confirmMsg)) return;
+        if (!(await confirmAction(confirmMsg, 'Xác nhận cập nhật đồng loạt'))) return;
 
         setIsSaving(true);
         setImportTotal(selectedIds.size);

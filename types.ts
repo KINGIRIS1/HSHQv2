@@ -40,10 +40,10 @@ export const DEFAULT_ROLE_PERMISSIONS: RolePermissions = {
     'reports', 'VIEW_REPORTS',
     'work_schedule', 'VIEW_SCHEDULE', 'MANAGE_SCHEDULE',
     'utilities', 'VIEW_CHAT', 'VIEW_PERSONAL_PROFILE',
-    'ADD_RECORDS', 'EDIT_RECORDS', 'DELETE_RECORDS', 'EXPORT_RECORDS', 'VIEW_DETAILS',
+    'ADD_RECORDS', 'EDIT_RECORDS', 'DELETE_RECORDS', 'EXPORT_RECORDS', 'VIEW_DETAILS', 'PRINT_RECEIPT',
     'BTN_ASSIGN_STAFF', 'BTN_SUBMIT_SIGN', 'BTN_APPROVE_SIGN', 'BTN_SUBMIT_CHECK', 'BTN_REJECT_RECORD', 'HANDOVER_RECORDS', 'BTN_RETURN_RESULT', 'BTN_EXTEND_DEADLINE', 'BTN_ADVANCE_STATUS',
-    'dodac_ADD_RECORDS', 'dodac_BTN_ASSIGN_STAFF', 'dodac_BTN_SUBMIT_CHECK', 'dodac_BTN_SUBMIT_SIGN', 'dodac_BTN_APPROVE_SIGN', 'dodac_BTN_REJECT_RECORD', 'dodac_HANDOVER_RECORDS', 'dodac_BTN_RETURN_RESULT', 'dodac_VIEW_EXCERPTS', 'dodac_MANAGE_EXCERPTS', 'dodac_BTN_EXTEND_DEADLINE', 'dodac_EDIT_RECORDS', 'dodac_DELETE_RECORDS', 'dodac_VIEW_DETAILS', 'dodac_BTN_ADVANCE_STATUS',
-    'luutru_ADD_RECORDS', 'luutru_BTN_ASSIGN_STAFF', 'luutru_BTN_SUBMIT_CHECK', 'luutru_BTN_SUBMIT_SIGN', 'luutru_BTN_APPROVE_SIGN', 'luutru_BTN_REJECT_RECORD', 'luutru_HANDOVER_RECORDS', 'luutru_BTN_RETURN_RESULT', 'luutru_VIEW_ARCHIVE', 'luutru_MANAGE_ARCHIVE', 'luutru_BTN_EXTEND_DEADLINE', 'luutru_EDIT_RECORDS', 'luutru_DELETE_RECORDS', 'luutru_VIEW_DETAILS', 'luutru_BTN_ADVANCE_STATUS',
+    'dodac_ADD_RECORDS', 'dodac_BTN_ASSIGN_STAFF', 'dodac_BTN_SUBMIT_CHECK', 'dodac_BTN_SUBMIT_SIGN', 'dodac_BTN_APPROVE_SIGN', 'dodac_BTN_REJECT_RECORD', 'dodac_HANDOVER_RECORDS', 'dodac_BTN_RETURN_RESULT', 'dodac_VIEW_EXCERPTS', 'dodac_MANAGE_EXCERPTS', 'dodac_BTN_EXTEND_DEADLINE', 'dodac_EDIT_RECORDS', 'dodac_DELETE_RECORDS', 'dodac_VIEW_DETAILS', 'dodac_PRINT_RECEIPT', 'dodac_BTN_ADVANCE_STATUS',
+    'luutru_ADD_RECORDS', 'luutru_BTN_ASSIGN_STAFF', 'luutru_BTN_SUBMIT_CHECK', 'luutru_BTN_SUBMIT_SIGN', 'luutru_BTN_APPROVE_SIGN', 'luutru_BTN_REJECT_RECORD', 'luutru_HANDOVER_RECORDS', 'luutru_BTN_RETURN_RESULT', 'luutru_VIEW_ARCHIVE', 'luutru_MANAGE_ARCHIVE', 'luutru_BTN_EXTEND_DEADLINE', 'luutru_EDIT_RECORDS', 'luutru_DELETE_RECORDS', 'luutru_VIEW_DETAILS', 'luutru_PRINT_RECEIPT', 'luutru_BTN_ADVANCE_STATUS',
     'VIEW_ARCHIVE', 'MANAGE_ARCHIVE'
   ],
   [UserRole.TEAM_LEADER]: [
@@ -56,9 +56,9 @@ export const DEFAULT_ROLE_PERMISSIONS: RolePermissions = {
     'reports', 'VIEW_REPORTS',
     'work_schedule', 'VIEW_SCHEDULE',
     'utilities',
-    'BTN_ASSIGN_STAFF', 'BTN_SUBMIT_SIGN', 'BTN_APPROVE_SIGN', 'BTN_SUBMIT_CHECK', 'BTN_REJECT_RECORD', 'HANDOVER_RECORDS', 'BTN_RETURN_RESULT', 'BTN_EXTEND_DEADLINE', 'EDIT_RECORDS', 'DELETE_RECORDS', 'VIEW_DETAILS', 'BTN_ADVANCE_STATUS',
-    'dodac_ADD_RECORDS', 'dodac_BTN_ASSIGN_STAFF', 'dodac_BTN_SUBMIT_CHECK', 'dodac_BTN_SUBMIT_SIGN', 'dodac_BTN_APPROVE_SIGN', 'dodac_BTN_REJECT_RECORD', 'dodac_HANDOVER_RECORDS', 'dodac_BTN_RETURN_RESULT', 'dodac_VIEW_EXCERPTS', 'dodac_MANAGE_EXCERPTS', 'dodac_BTN_EXTEND_DEADLINE', 'dodac_EDIT_RECORDS', 'dodac_DELETE_RECORDS', 'dodac_VIEW_DETAILS', 'dodac_BTN_ADVANCE_STATUS',
-    'luutru_ADD_RECORDS', 'luutru_BTN_ASSIGN_STAFF', 'luutru_BTN_SUBMIT_CHECK', 'luutru_BTN_SUBMIT_SIGN', 'luutru_BTN_APPROVE_SIGN', 'luutru_BTN_REJECT_RECORD', 'luutru_HANDOVER_RECORDS', 'luutru_BTN_RETURN_RESULT', 'luutru_VIEW_ARCHIVE', 'luutru_MANAGE_ARCHIVE', 'luutru_BTN_EXTEND_DEADLINE', 'luutru_EDIT_RECORDS', 'luutru_DELETE_RECORDS', 'luutru_VIEW_DETAILS', 'luutru_BTN_ADVANCE_STATUS'
+    'BTN_ASSIGN_STAFF', 'BTN_SUBMIT_SIGN', 'BTN_APPROVE_SIGN', 'BTN_SUBMIT_CHECK', 'BTN_REJECT_RECORD', 'HANDOVER_RECORDS', 'BTN_RETURN_RESULT', 'BTN_EXTEND_DEADLINE', 'EDIT_RECORDS', 'DELETE_RECORDS', 'VIEW_DETAILS', 'PRINT_RECEIPT', 'BTN_ADVANCE_STATUS',
+    'dodac_ADD_RECORDS', 'dodac_BTN_ASSIGN_STAFF', 'dodac_BTN_SUBMIT_CHECK', 'dodac_BTN_SUBMIT_SIGN', 'dodac_BTN_APPROVE_SIGN', 'dodac_BTN_REJECT_RECORD', 'dodac_HANDOVER_RECORDS', 'dodac_BTN_RETURN_RESULT', 'dodac_VIEW_EXCERPTS', 'dodac_MANAGE_EXCERPTS', 'dodac_BTN_EXTEND_DEADLINE', 'dodac_EDIT_RECORDS', 'dodac_DELETE_RECORDS', 'dodac_VIEW_DETAILS', 'dodac_PRINT_RECEIPT', 'dodac_BTN_ADVANCE_STATUS',
+    'luutru_ADD_RECORDS', 'luutru_BTN_ASSIGN_STAFF', 'luutru_BTN_SUBMIT_CHECK', 'luutru_BTN_SUBMIT_SIGN', 'luutru_BTN_APPROVE_SIGN', 'luutru_BTN_REJECT_RECORD', 'luutru_HANDOVER_RECORDS', 'luutru_BTN_RETURN_RESULT', 'luutru_VIEW_ARCHIVE', 'luutru_MANAGE_ARCHIVE', 'luutru_BTN_EXTEND_DEADLINE', 'luutru_EDIT_RECORDS', 'luutru_DELETE_RECORDS', 'luutru_VIEW_DETAILS', 'luutru_PRINT_RECEIPT', 'luutru_BTN_ADVANCE_STATUS'
   ],
   [UserRole.ONEDOOR]: [
     'receive_record', 'receive_sub_create', 'receive_sub_bulk', 'receive_sub_list', 'receive_search', 'receive_record_search', 'ADD_RECORDS',
@@ -67,7 +67,7 @@ export const DEFAULT_ROLE_PERMISSIONS: RolePermissions = {
     'reports', 'VIEW_REPORTS',
     'work_schedule', 'VIEW_SCHEDULE',
     'utilities', 'VIEW_CHAT', 'VIEW_PERSONAL_PROFILE',
-    'BTN_RETURN_RESULT', 'HANDOVER_RECORDS', 'EDIT_RECORDS', 'DELETE_RECORDS', 'VIEW_DETAILS'
+    'BTN_RETURN_RESULT', 'HANDOVER_RECORDS', 'EDIT_RECORDS', 'DELETE_RECORDS', 'VIEW_DETAILS', 'PRINT_RECEIPT'
   ],
   [UserRole.EMPLOYEE]: [
     'reports', 'VIEW_REPORTS',
@@ -82,6 +82,7 @@ export const DEFAULT_ROLE_PERMISSIONS: RolePermissions = {
 export const AVAILABLE_PERMISSIONS = [
   { id: 'VIEW_RECORDS', label: 'Xem hồ sơ' },
   { id: 'VIEW_DETAILS', label: 'Xem chi tiết hồ sơ' },
+  { id: 'PRINT_RECEIPT', label: 'In biên nhận hồ sơ' },
   { id: 'ADD_RECORDS', label: 'Thêm hồ sơ' },
   { id: 'EDIT_RECORDS', label: 'Sửa hồ sơ' },
   { id: 'DELETE_RECORDS', label: 'Xóa hồ sơ' },
@@ -241,6 +242,48 @@ export interface RecordFile {
   // Phân loại bảng Cloud Database
   sourceTable?: 'dangky_records' | 'land_records' | 'archive_records' | 'luutru_records';
   _isOfflineSaved?: boolean;
+
+  // Tệp tài liệu đính kèm tiếp nhận đầu vào
+  attachedFiles?: AttachedFileMeta[];
+  dossierComponents?: DossierComponentItem[] | string | null;
+}
+
+export type AttachmentDocType = 'GCN' | 'DON' | 'VBUQ' | 'BANVE' | 'BIENBAN' | 'TAICHINH' | 'PHIEU_KT' | 'TO_TRINH' | 'TLKHAC';
+
+export interface DossierComponentItem {
+  id: string;
+  name: string; // Tên giấy tờ / thành phần
+  original?: number;
+  copy?: number;
+  note?: string;
+  stage?: string; // Công đoạn tải lên
+  attachedFile?: AttachedFileMeta;
+}
+
+export interface AttachedDocItem {
+  id: string;
+  name: string;
+  original?: number;
+  copy?: number;
+  type: string;
+  note?: string;
+  attachedFile?: AttachedFileMeta;
+}
+
+export interface AttachedFileMeta {
+  id: string;
+  recordCode: string;
+  originalName: string;
+  fileName: string; // Tên chuẩn hóa: [Tên_Viết_Tắt] [STT]_[Mã_HS].[ext]
+  docType: AttachmentDocType | string;
+  docTypeLabel: string;
+  fileSize: number;
+  fileType: string;
+  uploadedAt: string;
+  department: string; // 'Tổ Lưu trữ' | 'Tổ Đo đạc' | 'Tổ Cấp giấy'
+  stage?: string; // 'Tiếp nhận' | 'Biên tập bản đồ' | 'Trình kiểm tra' | 'Trình ký' | 'Ký duyệt'
+  storageId?: string; // Khóa trong IndexedDB
+  base64Data?: string; // Dữ liệu base64 dự phòng cho tệp nhỏ (<1MB)
 }
 
 export interface RecordStatusLog {
