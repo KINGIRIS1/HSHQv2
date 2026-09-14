@@ -171,27 +171,53 @@ export const keepOnlyDate = (val: any): string | null => {
     if (typeof val === 'string') {
         const cleanStr = val.trim();
         if (cleanStr === '') return null;
-        // Trích xuất YYYY-MM-DD từ chuỗi ISO (vd: 2026-07-24T12:34:56.000Z)
-        const match = cleanStr.match(/^(\d{4}-\d{2}-\d{2})/);
-        if (match) return match[1];
+
+        // Trích xuất YYYY-MM-DD từ chuỗi ISO (vd: 2026-07-24T12:34:56.000Z hoặc 2026-07-24)
+        const matchYmd = cleanStr.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+        if (matchYmd) {
+            const year = parseInt(matchYmd[1], 10);
+            const month = parseInt(matchYmd[2], 10);
+            const day = parseInt(matchYmd[3], 10);
+            if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+            const d = new Date(year, month - 1, day);
+            if (isNaN(d.getTime()) || d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) {
+                return null; // Ngày ảo / không tồn tại trên lịch (vd: 30/02)
+            }
+            return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        }
         
         // Xử lý định dạng DD/MM/YYYY hoặc DD-MM-YYYY
-        const parts = cleanStr.split(/[\sT]/)[0].split(/[-/]/);
-        if (parts.length === 3) {
-            if (parts[0].length === 4) { // YYYY-MM-DD
-                return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
-            } else if (parts[2].length === 4) { // DD/MM/YYYY
-                return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+        const matchDmy = cleanStr.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+        if (matchDmy) {
+            const day = parseInt(matchDmy[1], 10);
+            const month = parseInt(matchDmy[2], 10);
+            const year = parseInt(matchDmy[3], 10);
+            if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+            const d = new Date(year, month - 1, day);
+            if (isNaN(d.getTime()) || d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) {
+                return null; // Ngày ảo / không tồn tại trên lịch (vd: 30/02)
             }
+            return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
         }
-        return cleanStr;
+
+        // Thử parse Date thông thường nếu có thể
+        const parsed = new Date(cleanStr);
+        if (!isNaN(parsed.getTime())) {
+            const y = parsed.getFullYear();
+            const m = String(parsed.getMonth() + 1).padStart(2, '0');
+            const d = String(parsed.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+        }
+
+        return null;
     } else if (val instanceof Date) {
+        if (isNaN(val.getTime())) return null;
         const y = val.getFullYear();
         const m = String(val.getMonth() + 1).padStart(2, '0');
         const d = String(val.getDate()).padStart(2, '0');
         return `${y}-${m}-${d}`;
     }
-    return val;
+    return null;
 };
 
 export const sanitizeData = (data: any, allowedColumns: string[]) => {

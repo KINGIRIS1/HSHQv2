@@ -74,19 +74,29 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
           const dmyRegex = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/;
           const match = cleanStr.match(dmyRegex);
           if (match) {
-              const day = match[1].padStart(2, '0');
-              const month = match[2].padStart(2, '0');
-              const year = match[3];
-              return `${year}-${month}-${day}`;
+              const day = parseInt(match[1], 10);
+              const month = parseInt(match[2], 10);
+              const year = parseInt(match[3], 10);
+              if (month < 1 || month > 12 || day < 1 || day > 31) return undefined;
+              const chk = new Date(year, month - 1, day);
+              if (isNaN(chk.getTime()) || chk.getFullYear() !== year || chk.getMonth() !== month - 1 || chk.getDate() !== day) {
+                  return undefined;
+              }
+              return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
           }
 
           const ymdRegex = /^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/;
           const matchYmd = cleanStr.match(ymdRegex);
           if (matchYmd) {
-              const year = matchYmd[1];
-              const month = matchYmd[2].padStart(2, '0');
-              const day = matchYmd[3].padStart(2, '0');
-              return `${year}-${month}-${day}`;
+              const year = parseInt(matchYmd[1], 10);
+              const month = parseInt(matchYmd[2], 10);
+              const day = parseInt(matchYmd[3], 10);
+              if (month < 1 || month > 12 || day < 1 || day > 31) return undefined;
+              const chk = new Date(year, month - 1, day);
+              if (isNaN(chk.getTime()) || chk.getFullYear() !== year || chk.getMonth() !== month - 1 || chk.getDate() !== day) {
+                  return undefined;
+              }
+              return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
           }
 
           const date = new Date(cleanStr);
