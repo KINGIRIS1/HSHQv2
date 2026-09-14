@@ -63,6 +63,113 @@ const parseAuthDocType = (str: string | null | undefined) => {
     }
 };
 
+const extractAllRecordDossierComponents = (rec: RecordFile): DossierComponentItem[] => {
+    let baseComps: DossierComponentItem[] = [];
+    if (rec.dossierComponents) {
+        if (Array.isArray(rec.dossierComponents)) {
+            baseComps = [...rec.dossierComponents];
+        } else if (typeof rec.dossierComponents === 'string') {
+            try {
+                const parsed = JSON.parse(rec.dossierComponents);
+                if (Array.isArray(parsed)) baseComps = [...parsed];
+            } catch {
+                // Ignore parse error
+            }
+        }
+    }
+
+    const isFileAlreadyInComps = (file?: AttachedFileMeta): boolean => {
+        if (!file) return false;
+        return baseComps.some(c => {
+            if (!c.attachedFile) return false;
+            if (file.id && c.attachedFile.id === file.id) return true;
+            if (file.driveFileId && c.attachedFile.driveFileId && c.attachedFile.driveFileId === file.driveFileId) return true;
+            if (file.fileName && c.attachedFile.fileName === file.fileName) return true;
+            return false;
+        });
+    };
+
+    // 1. Chuyển tệp từ otherDocs nếu chưa có trong dossierComponents
+    const docs = parseAttachedDocs(rec.otherDocs);
+    docs.forEach((d, idx) => {
+        if (d.attachedFile && !isFileAlreadyInComps(d.attachedFile)) {
+            baseComps.push({
+                id: `comp_doc_${d.id || idx}_${Math.random().toString(36).substring(2, 6)}`,
+                name: d.name || 'Giấy tờ kèm theo',
+                original: d.original ?? (d.type === 'Bản sao' ? 0 : 1),
+                copy: d.copy ?? (d.type === 'Bản sao' ? 1 : 0),
+                stage: 'Tiếp nhận',
+                attachedFile: d.attachedFile
+            });
+        }
+    });
+
+    // 2. Chuyển tệp từ attachedFiles nếu chưa có trong dossierComponents
+    if (Array.isArray(rec.attachedFiles)) {
+        rec.attachedFiles.forEach((file, idx) => {
+            if (file && !isFileAlreadyInComps(file)) {
+                baseComps.push({
+                    id: `comp_att_${file.id || idx}_${Math.random().toString(36).substring(2, 6)}`,
+                    name: file.docTypeLabel || file.originalName || file.fileName || 'Tài liệu đính kèm',
+                    original: 1,
+                    copy: 0,
+                    stage: file.stage || file.department || 'Tệp đính kèm',
+                    attachedFile: file
+                });
+            }
+        });
+    }
+
+    // 3. Chuyển tệp từ rec.data (thực địa, bản vẽ, nội nghiệp, kiểm tra, v.v.)
+    if (rec.data && typeof rec.data === 'object') {
+        const stepFileKeys = [
+            'fieldResultFiles', 'drawingFiles', 'surveyDocs', 'technicalDocs', 
+            'stepFiles', 'taxFiles', 'scanFiles', 'resultFiles', 'files'
+        ];
+        stepFileKeys.forEach(key => {
+            const arr = rec.data?.[key];
+            if (Array.isArray(arr)) {
+                arr.forEach((item: any, idx: number) => {
+                    const fileObj: AttachedFileMeta | undefined = item.attachedFile || (item.fileName ? item : undefined);
+                    if (fileObj && !isFileAlreadyInComps(fileObj)) {
+                        baseComps.push({
+                            id: `comp_data_${key}_${idx}_${Math.random().toString(36).substring(2, 6)}`,
+                            name: item.name || fileObj.docTypeLabel || fileObj.originalName || fileObj.fileName || `Tài liệu công đoạn (${key})`,
+                            original: 1,
+                            copy: 0,
+                            stage: fileObj.stage || (key.includes('field') ? 'Ngoại nghiệp' : key.includes('drawing') ? 'Nội nghiệp bản đồ' : key.includes('technical') ? 'Kiểm tra kỹ thuật' : 'Công đoạn nghiệp vụ'),
+                            attachedFile: fileObj
+                        });
+                    }
+                });
+            }
+        });
+    }
+
+    // 4. Chuyển tệp từ nhật ký trạng thái statusLogs
+    if (Array.isArray(rec.statusLogs)) {
+        rec.statusLogs.forEach((log: any, logIdx: number) => {
+            const logFiles: AttachedFileMeta[] = Array.isArray(log.attachedFiles) 
+                ? log.attachedFiles 
+                : (log.attachedFile ? [log.attachedFile] : []);
+            logFiles.forEach((file: AttachedFileMeta, fIdx: number) => {
+                if (file && !isFileAlreadyInComps(file)) {
+                    baseComps.push({
+                        id: `comp_log_${logIdx}_${fIdx}_${Math.random().toString(36).substring(2, 6)}`,
+                        name: file.docTypeLabel || file.originalName || file.fileName || 'Tài liệu mốc xử lý',
+                        original: 1,
+                        copy: 0,
+                        stage: file.stage || log.newStatus || 'Lịch sử xử lý',
+                        attachedFile: file
+                    });
+                }
+            });
+        });
+    }
+
+    return baseComps;
+};
+
 interface RecordModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -168,19 +275,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
             }
             setFormData(dataToSet);
             setAttachedDocs(parseAttachedDocs(initialData.otherDocs));
-            const initialComps: DossierComponentItem[] = (() => {
-                if (!initialData.dossierComponents) return [];
-                if (Array.isArray(initialData.dossierComponents)) return initialData.dossierComponents;
-                if (typeof initialData.dossierComponents === 'string') {
-                    try {
-                        const parsed = JSON.parse(initialData.dossierComponents);
-                        return Array.isArray(parsed) ? parsed : [];
-                    } catch {
-                        return [];
-                    }
-                }
-                return [];
-            })();
+            const initialComps: DossierComponentItem[] = extractAllRecordDossierComponents(initialData);
             setDossierComponents(initialComps);
             const parsed = parseAuthDocType(initialData.authDocType);
             setAuthCccd(parsed.cccd);
@@ -354,9 +449,23 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
 
     const finalCode = (formData.code || 'HS').trim();
 
-    const cleanAttachedFiles: AttachedFileMeta[] = formData.attachedFiles || [];
     const cleanAttachedDocs: AttachedDocItem[] = [...attachedDocs];
     const cleanDossierComponents: DossierComponentItem[] = [...dossierComponents];
+
+    // Tự động gom toàn bộ file đính kèm từ dossierComponents vào attachedFiles để đồng bộ
+    const filesFromComps = cleanDossierComponents
+        .map(c => c.attachedFile)
+        .filter((f): f is AttachedFileMeta => Boolean(f && (f.fileName || f.id)));
+
+    const fileMap = new Map<string, AttachedFileMeta>();
+    (formData.attachedFiles || []).forEach(f => {
+        if (f && (f.id || f.fileName)) fileMap.set(f.id || f.fileName, f);
+    });
+    filesFromComps.forEach(f => {
+        if (f && (f.id || f.fileName)) fileMap.set(f.id || f.fileName, f);
+    });
+
+    const cleanAttachedFiles: AttachedFileMeta[] = Array.from(fileMap.values());
 
     let finalData: any = { 
       ...formData,

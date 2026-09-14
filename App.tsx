@@ -11,7 +11,7 @@ import { DEFAULT_VISIBLE_COLUMNS, confirmAction, COLUMN_DEFS, processAssignmentT
 import { exportReportToExcel, exportReturnedListToExcel } from './utils/excelExport';
 import { generateReport } from './services/geminiService';
 import { syncTemplatesFromCloud } from './services/docxService'; 
-import { updateRecordApi, saveEmployeeApi, saveUserApi, forceUpdateRecordsBatchApi, updateRecordsBatchById, logSystemEvent } from './services/api';
+import { updateRecordApi, updateRecordFieldsApi, saveEmployeeApi, saveUserApi, forceUpdateRecordsBatchApi, updateRecordsBatchById, logSystemEvent } from './services/api';
 import { migrateArchiveRecordsFromLandRecords } from './services/apiArchive';
 import { ReturnOptionType } from './components/RejectReturnStepModal';
 import * as XLSX from 'xlsx-js-style';
@@ -307,6 +307,27 @@ function App() {
       setRecords(prev => prev.map(r => r.id === id ? { ...r, ...fields } : r));
   }, [setRecords]);
   const { activeRemindersCount } = useReminderSystem(records, handleUpdateRecordState, currentUser);
+
+  const handleClearReminder = useCallback(async (recordId: string) => {
+      setRecords(prev => prev.map(r => r.id === recordId ? { ...r, reminderDate: null } : r));
+      try {
+          await updateRecordFieldsApi(recordId, { reminderDate: null });
+      } catch (err) {
+          console.error("Lỗi khi xóa nhắc nhở:", err);
+      }
+  }, [setRecords]);
+
+  const handleClearAllReminders = useCallback(async () => {
+      const reminderIds = records.filter(r => r.reminderDate).map(r => r.id);
+      setRecords(prev => prev.map(r => r.reminderDate ? { ...r, reminderDate: null } : r));
+      for (const id of reminderIds) {
+          try {
+              await updateRecordFieldsApi(id, { reminderDate: null });
+          } catch (err) {
+              console.error("Lỗi khi xóa tất cả nhắc nhở:", err);
+          }
+      }
+  }, [records, setRecords]);
 
   // Filtering Logic
   const recordFilterProps = useRecordFilter(records, currentUser, currentView, employees);
@@ -1583,6 +1604,10 @@ function App() {
         unreadMessages={unreadMessages}
         warningCount={recordFilterProps.warningCount}
         activeRemindersCount={activeRemindersCount}
+        records={records}
+        onViewRecord={(r) => setViewingRecord(r)}
+        onClearReminder={handleClearReminder}
+        onClearAllReminders={handleClearAllReminders}
         connectionStatus={connectionStatus}
         rolePermissions={rolePermissions}
         departmentPermissions={departmentPermissions}

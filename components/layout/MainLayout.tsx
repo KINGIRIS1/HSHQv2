@@ -2,11 +2,12 @@
 import React, { useState } from 'react';
 import TopNavigation from '../TopNavigation';
 import { Menu, ShieldCheck, UserCircle, LogOut, UserCog, ChevronDown, Settings, HelpCircle, Shield, Headphones, X, UserCheck, Phone, Mail, Clock, CheckCircle2 } from 'lucide-react';
-import { User, UserRole, RolePermissions, DepartmentPermissions, Employee } from '../../types';
+import { User, UserRole, RolePermissions, DepartmentPermissions, Employee, RecordFile } from '../../types';
 import { isViewAllowedForUser } from '../../config/roleConfig';
 import UpdateRequiredModal from '../UpdateRequiredModal';
 import AdminBackupWarningBanner from '../AdminBackupWarningBanner';
 import { NetworkPingIndicator } from '../NetworkPingIndicator';
+import { NotificationBell } from '../NotificationBell';
 
 interface MainLayoutProps {
     children: React.ReactNode;
@@ -25,6 +26,10 @@ interface MainLayoutProps {
     unreadMessages: number;
     warningCount: { overdue: number; approaching: number };
     activeRemindersCount: number;
+    records?: RecordFile[];
+    onViewRecord?: (record: RecordFile) => void;
+    onClearReminder?: (recordId: string) => void;
+    onClearAllReminders?: () => void;
     rolePermissions: RolePermissions;
     departmentPermissions: DepartmentPermissions;
     employees: Employee[];
@@ -58,6 +63,10 @@ const MainLayout: React.FC<MainLayoutProps> = ({
     unreadMessages,
     warningCount,
     activeRemindersCount,
+    records = [],
+    onViewRecord = () => {},
+    onClearReminder = () => {},
+    onClearAllReminders,
     rolePermissions,
     departmentPermissions,
     employees,
@@ -109,9 +118,17 @@ const MainLayout: React.FC<MainLayoutProps> = ({
                     </div>
                 </div>
 
-                {/* RIGHT: USER INFO & NETWORK PING */}
+                {/* RIGHT: USER INFO, NETWORK PING & NOTIFICATION BELL */}
                 <div className="relative flex items-center gap-2 sm:gap-3">
                     <NetworkPingIndicator />
+
+                    <NotificationBell 
+                        records={records}
+                        currentUser={currentUser}
+                        onViewRecord={onViewRecord}
+                        onClearReminder={onClearReminder}
+                        onClearAllReminders={onClearAllReminders}
+                    />
 
                     <button 
                         onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}

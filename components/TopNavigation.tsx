@@ -57,7 +57,7 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
 
   // Define menu structure
   const menuItems = [
-    { id: 'dashboard', label: 'Tổng quan', icon: LayoutDashboard, visible: true, badge: reminderCount, badgeColor: 'bg-pink-500' },
+    { id: 'dashboard', label: 'Tổng quan', icon: LayoutDashboard, visible: true },
     
     // "Tiếp nhận" tab group
     {
