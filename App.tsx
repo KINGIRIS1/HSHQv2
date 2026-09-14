@@ -691,7 +691,6 @@ function App() {
                   recordUpdates.completedWorkDate = targetDateStr;
               } else if (value === RecordStatus.PENDING_CHECK) {
                   recordUpdates.pendingCheckDate = targetDateStr;
-                  recordUpdates.checkedDate = targetDateStr;
               } else if (value === RecordStatus.PENDING_SIGN) {
                   recordUpdates.submissionDate = targetDateStr;
               } else if (value === RecordStatus.SIGNED) {

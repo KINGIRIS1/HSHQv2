@@ -1218,16 +1218,16 @@ export function cleanFutureMilestoneDates(
         cleaned.approvalDate = null as any;
     }
 
-    // Nếu rank < 4 (không phải PENDING_SIGN trở lên): Dọn dẹp mốc trình ký
+    // Nếu rank < 4 (không phải PENDING_SIGN trở lên): Dọn dẹp mốc trình ký & ngày kiểm tra xong
     if (rank < 4) {
         cleaned.submissionDate = null as any;
         cleaned.submittedTo = null as any;
+        cleaned.checkedDate = null as any;
     }
 
     // Nếu rank < 3 (không phải PENDING_CHECK trở lên): Dọn dẹp mốc kiểm tra
     if (rank < 3) {
         cleaned.pendingCheckDate = null as any;
-        cleaned.checkedDate = null as any;
         cleaned.checkedBy = null as any;
     }
 
@@ -1286,15 +1286,13 @@ export function syncRecordStatusTransition(
         updates.resultReturnedDate = undefined;
         updates.receiverName = undefined;
     } else {
-        // DỌN DẸP NẾU QUAY LÙI BƯỚC (Xóa ngày và người được giao/thực hiện của các bước đã chuyển lùi)
-        if (isRollback) {
-            const cleaned = cleanFutureMilestoneDates(currentRecord, newStatus);
-            Object.keys(cleaned).forEach(key => {
-                if ((cleaned as any)[key] === null || (cleaned as any)[key] === false) {
-                    (updates as any)[key] = (cleaned as any)[key];
-                }
-            });
-        }
+        // DỌN DẸP TOÀN BỘ CÁC MỐC NGÀY VÀ THÔNG TIN PHÍA SAU TRẠNG THÁI MỚI (Triệt tiêu mốc cũ khi lùi bước)
+        const cleaned = cleanFutureMilestoneDates(currentRecord, newStatus);
+        Object.keys(cleaned).forEach(key => {
+            if ((cleaned as any)[key] === null || (cleaned as any)[key] === false) {
+                (updates as any)[key] = (cleaned as any)[key];
+            }
+        });
 
         // BẢO TOÀN NGÀY THÁNG: Chỉ gán ngày mới khi thực sự chuyển sang trạng thái mới và ngày đó chưa có. Nếu chỉ lưu/cập nhật thông tin hồ sơ, tuyệt đối giữ nguyên ngày cũ.
         const effectiveTargetDate = isActuallyChangingStatus ? targetDate : undefined;
