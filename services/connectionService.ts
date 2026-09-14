@@ -130,15 +130,15 @@ class ConnectionManager {
                     throw new Error("Trình duyệt đang ở chế độ Offline");
                 }
 
-                // Tầng 2 & 3: Ping kiểm chứng máy chủ với timeout 25s (chống timeout oan khi mạng trễ)
+                // Tầng 2 & 3: Ping kiểm chứng máy chủ với timeout an toàn 7s (rút ngắn để người dùng không phải chờ lâu)
                 const timeoutPromise = new Promise<never>((_, reject) => 
-                    setTimeout(() => reject(new Error("Timeout phản hồi kết nối")), 25000)
+                    setTimeout(() => reject(new Error("Timeout phản hồi kết nối")), 7000)
                 );
 
                 const pingPromise = (async () => {
                     let internetOk = false;
                     try {
-                        // Thử ping nhẹ vào static asset nội bộ của ứng dụng trước
+                        // Thử ping nhẹ vào static asset hoặc endpoint nội bộ của ứng dụng
                         const staticResp = await fetch(`${window.location.origin}/favicon.ico?_ping=${Date.now()}`, { 
                             method: 'HEAD', 
                             cache: 'no-store' 

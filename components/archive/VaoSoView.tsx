@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { ArchiveRecord, fetchArchiveRecords, saveArchiveRecord, deleteArchiveRecord, importArchiveRecords, updateArchiveRecordsBatch } from '../../services/apiArchive';
 import { useArchiveRealtime } from '../../hooks/useArchiveRealtime';
 import { User } from '../../types';
-import { Loader2, Plus, Search, Trash2, Upload, FileSpreadsheet, Send, CheckCircle2, X, History, Calendar, FileOutput, Settings, Hash, Edit, FileText, Filter, Users, MapPin } from 'lucide-react';
+import { Loader2, Plus, Search, Trash2, Upload, FileSpreadsheet, Send, CheckCircle2, X, History, Calendar, FileOutput, Settings, Hash, Edit, FileText, Filter, Users, MapPin, Landmark, CheckSquare, BookOpen, ClipboardList, PenTool, Printer, UserPlus, SlidersHorizontal, ChevronDown, Clock, AlertTriangle, Eye } from 'lucide-react';
 import * as XLSX from 'xlsx-js-style';
 import { confirmAction, matchDepartmentKey } from '../../utils/appHelpers';
 import { saveAs } from 'file-saver';
@@ -39,6 +39,11 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'scanned'>('all');
+    const [mainTab, setMainTab] = useState<'all' | 'chua_giao' | 'tham_dinh' | 'thue' | 'in_gcn' | 'kiem_tra' | 'trinh_ky' | 'vao_so' | 'giao_1_cua'>('all');
+    const [thueSubTab, setThueSubTab] = useState<'phieu_chuyen' | 'khu_vuc_7' | 'thong_bao'>('phieu_chuyen');
+    const [giao1CuaSubTab, setGiao1CuaSubTab] = useState<'cho_ban_giao' | 'cho_tra_kq' | 'da_tra_kq'>('cho_ban_giao');
+    const [showFilterPopover, setShowFilterPopover] = useState(false);
+    const [showColumnSelector, setShowColumnSelector] = useState(false);
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [savingId, setSavingId] = useState<string | null>(null);
     const [editingId, setEditingId] = useState<string | null>(null);
@@ -119,7 +124,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
     useEffect(() => {
         setSelectedIds(new Set());
         setCurrentPage(1);
-    }, [activeTab, searchTerm, fromDate, toDate, filterRecordType, filterWard, filterEmployee, filterStatus]);
+    }, [activeTab, mainTab, thueSubTab, giao1CuaSubTab, searchTerm, fromDate, toDate, filterRecordType, filterWard, filterEmployee, filterStatus]);
 
 
 
@@ -176,20 +181,66 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
     const filteredRecords = useMemo(() => {
         let filtered = records;
 
-        // Filter by Tab (Status)
-        // If user selects status from dropdown, it overrides the tab logic or syncs with it.
-        // Let's make the dropdown control the activeTab state for consistency.
-        // But here we use activeTab directly.
-        
-        if (activeTab === 'all') {
-            // Danh sách tổng: Hiển thị tối đa 1000 dòng mới nhất
-            filtered = records.slice(0, 1000);
-        } else if (activeTab === 'pending') {
-            // Chờ chuyển Scan: Đã được đánh dấu chuyển scan NHƯNG chưa có đợt scan (chưa scan xong)
-            filtered = records.filter(r => r.data?.is_pending_scan && !r.data?.is_scanned);
-        } else if (activeTab === 'scanned') {
-            // Đã chuyển Scan: Đã có đợt scan
-            filtered = records.filter(r => r.data?.is_scanned);
+        // Filter by mainTab & subTab
+        if (mainTab === 'chua_giao') {
+            const list = filtered.filter(r => 
+                !r.data?.assigned_employee || 
+                r.data?.assigned_employee === '' || 
+                r.data?.stage === 'chua_giao' ||
+                r.data?.status === 'Chưa giao'
+            );
+            filtered = list.length > 0 ? list : filtered;
+        } else if (mainTab === 'in_gcn') {
+            const list = filtered.filter(r => 
+                r.data?.stage === 'in_gcn' || 
+                (r.data?.loai_ho_so || '').toLowerCase().includes('in gcn') || 
+                (r.trich_yeu || '').toLowerCase().includes('in gcn') ||
+                (r.data?.status || '').toLowerCase().includes('in')
+            );
+            filtered = list.length > 0 ? list : filtered;
+        } else if (mainTab === 'tham_dinh') {
+            const thamDinhList = filtered.filter(r => 
+                r.data?.stage === 'tham_dinh' || 
+                (r.data?.loai_ho_so || '').toLowerCase().includes('thẩm định') || 
+                (r.trich_yeu || '').toLowerCase().includes('thẩm định')
+            );
+            filtered = thamDinhList.length > 0 ? thamDinhList : filtered;
+        } else if (mainTab === 'thue') {
+            if (thueSubTab === 'phieu_chuyen') {
+                const sub = filtered.filter(r => r.data?.tax_stage === 'phieu_chuyen');
+                if (sub.length > 0) filtered = sub;
+            } else if (thueSubTab === 'khu_vuc_7') {
+                const sub = filtered.filter(r => r.data?.tax_stage === 'khu_vuc_7' || r.data?.area_zone === '7');
+                if (sub.length > 0) filtered = sub;
+            } else if (thueSubTab === 'thong_bao') {
+                const sub = filtered.filter(r => r.data?.tax_stage === 'thong_bao');
+                if (sub.length > 0) filtered = sub;
+            }
+        } else if (mainTab === 'kiem_tra') {
+            const kiemTraList = filtered.filter(r => r.data?.stage === 'kiem_tra');
+            if (kiemTraList.length > 0) filtered = kiemTraList;
+        } else if (mainTab === 'trinh_ky') {
+            const trinhKyList = filtered.filter(r => r.data?.stage === 'trinh_ky');
+            if (trinhKyList.length > 0) filtered = trinhKyList;
+        } else if (mainTab === 'giao_1_cua') {
+            if (giao1CuaSubTab === 'cho_ban_giao') {
+                const sub = filtered.filter(r => r.data?.one_door_stage === 'cho_ban_giao');
+                if (sub.length > 0) filtered = sub;
+            } else if (giao1CuaSubTab === 'cho_tra_kq') {
+                const sub = filtered.filter(r => r.data?.one_door_stage === 'cho_tra_kq');
+                if (sub.length > 0) filtered = sub;
+            } else if (giao1CuaSubTab === 'da_tra_kq') {
+                const sub = filtered.filter(r => r.data?.one_door_stage === 'da_tra_kq');
+                if (sub.length > 0) filtered = sub;
+            }
+        } else if (mainTab === 'vao_so' || mainTab === 'all') {
+            if (activeTab === 'all') {
+                filtered = records.slice(0, 1000);
+            } else if (activeTab === 'pending') {
+                filtered = records.filter(r => r.data?.is_pending_scan && !r.data?.is_scanned);
+            } else if (activeTab === 'scanned') {
+                filtered = records.filter(r => r.data?.is_scanned);
+            }
         }
 
         // Filter by Date (Ngày nhận)
@@ -216,7 +267,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
         }
 
         return filtered;
-    }, [records, searchTerm, activeTab, fromDate, toDate, filterWard]);
+    }, [records, searchTerm, activeTab, mainTab, thueSubTab, giao1CuaSubTab, fromDate, toDate, filterWard, filterEmployee, filterRecordType]);
 
     // Pagination
     const totalPages = Math.ceil(filteredRecords.length / itemsPerPage);
@@ -864,150 +915,425 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
 
     return (
         <div className="flex flex-col h-full bg-white">
-            {/* Header */}
-            <div className="p-4 border-b border-gray-100 flex flex-col gap-4">
-                <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-                    <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-                        Vào số GCN
-                    </h2>
-                    <div className="relative flex-1 sm:w-64 max-w-md">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                        <input 
-                            className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" 
-                            placeholder="Tìm kiếm..." 
-                            value={searchTerm} 
-                            onChange={e => setSearchTerm(e.target.value)} 
+            {/* HÀNG 1: TABS QUY TRÌNH CHÍNH (NẰM Ở TRÊN CÙNG) */}
+            <div className="flex border-b border-gray-200 bg-slate-50 px-4 pt-2 overflow-x-auto gap-1">
+                <button
+                    onClick={() => setMainTab('all')}
+                    className={`px-4 py-2.5 text-xs sm:text-sm font-bold flex items-center gap-2 border-b-2 transition-all whitespace-nowrap cursor-pointer ${
+                        mainTab === 'all'
+                            ? 'border-blue-600 text-blue-700 bg-white shadow-2xs rounded-t-lg'
+                            : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100/60 rounded-t-lg'
+                    }`}
+                >
+                    <FileText size={16} /> Tất cả hồ sơ
+                </button>
+
+                <button
+                    onClick={() => setMainTab('chua_giao')}
+                    className={`px-4 py-2.5 text-xs sm:text-sm font-bold flex items-center gap-2 border-b-2 transition-all whitespace-nowrap cursor-pointer ${
+                        mainTab === 'chua_giao'
+                            ? 'border-blue-600 text-blue-700 bg-white shadow-2xs rounded-t-lg'
+                            : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100/60 rounded-t-lg'
+                    }`}
+                >
+                    <UserPlus size={16} /> Chưa giao
+                </button>
+
+                <button
+                    onClick={() => setMainTab('tham_dinh')}
+                    className={`px-4 py-2.5 text-xs sm:text-sm font-bold flex items-center gap-2 border-b-2 transition-all whitespace-nowrap cursor-pointer ${
+                        mainTab === 'tham_dinh'
+                            ? 'border-blue-600 text-blue-700 bg-white shadow-2xs rounded-t-lg'
+                            : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100/60 rounded-t-lg'
+                    }`}
+                >
+                    <CheckSquare size={16} /> Thẩm định
+                </button>
+
+                <button
+                    onClick={() => setMainTab('thue')}
+                    className={`px-4 py-2.5 text-xs sm:text-sm font-bold flex items-center gap-2 border-b-2 transition-all whitespace-nowrap cursor-pointer ${
+                        mainTab === 'thue'
+                            ? 'border-amber-600 text-amber-700 bg-white shadow-2xs rounded-t-lg'
+                            : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100/60 rounded-t-lg'
+                    }`}
+                >
+                    <Landmark size={16} /> Thuế
+                </button>
+
+                <button
+                    onClick={() => setMainTab('in_gcn')}
+                    className={`px-4 py-2.5 text-xs sm:text-sm font-bold flex items-center gap-2 border-b-2 transition-all whitespace-nowrap cursor-pointer ${
+                        mainTab === 'in_gcn'
+                            ? 'border-teal-600 text-teal-700 bg-white shadow-2xs rounded-t-lg'
+                            : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100/60 rounded-t-lg'
+                    }`}
+                >
+                    <Printer size={16} /> In GCN
+                </button>
+
+                <button
+                    onClick={() => setMainTab('kiem_tra')}
+                    className={`px-4 py-2.5 text-xs sm:text-sm font-bold flex items-center gap-2 border-b-2 transition-all whitespace-nowrap cursor-pointer ${
+                        mainTab === 'kiem_tra'
+                            ? 'border-purple-600 text-purple-700 bg-white shadow-2xs rounded-t-lg'
+                            : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100/60 rounded-t-lg'
+                    }`}
+                >
+                    <ClipboardList size={16} /> Kiểm tra
+                </button>
+
+                <button
+                    onClick={() => setMainTab('trinh_ky')}
+                    className={`px-4 py-2.5 text-xs sm:text-sm font-bold flex items-center gap-2 border-b-2 transition-all whitespace-nowrap cursor-pointer ${
+                        mainTab === 'trinh_ky'
+                            ? 'border-indigo-600 text-indigo-700 bg-white shadow-2xs rounded-t-lg'
+                            : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100/60 rounded-t-lg'
+                    }`}
+                >
+                    <PenTool size={16} /> Trình ký
+                </button>
+
+                <button
+                    onClick={() => setMainTab('vao_so')}
+                    className={`px-4 py-2.5 text-xs sm:text-sm font-bold flex items-center gap-2 border-b-2 transition-all whitespace-nowrap cursor-pointer ${
+                        mainTab === 'vao_so'
+                            ? 'border-teal-600 text-teal-700 bg-white shadow-2xs rounded-t-lg'
+                            : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100/60 rounded-t-lg'
+                    }`}
+                >
+                    <BookOpen size={16} /> Vào số GCN
+                </button>
+
+                <button
+                    onClick={() => setMainTab('giao_1_cua')}
+                    className={`px-4 py-2.5 text-xs sm:text-sm font-bold flex items-center gap-2 border-b-2 transition-all whitespace-nowrap cursor-pointer ${
+                        mainTab === 'giao_1_cua'
+                            ? 'border-emerald-600 text-emerald-700 bg-white shadow-2xs rounded-t-lg'
+                            : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100/60 rounded-t-lg'
+                    }`}
+                >
+                    <Send size={16} /> Giao 1 cửa
+                </button>
+            </div>
+
+            {/* HÀNG 2: THANH TÌM KIẾM, BỘ LỌC VÀ NÚT XUẤT EXCEL (CỐ ĐỊNH CHUẨN MỰC) */}
+            <div className="px-4 py-3 border-b border-gray-200 bg-white flex flex-wrap items-center justify-between gap-3">
+                {/* Bên trái: Ô tìm kiếm và các Bộ lọc */}
+                <div className="flex flex-wrap items-center gap-2.5 flex-1 min-w-0">
+                    {/* 1. Ô Tìm kiếm */}
+                    <div className="relative flex-1 min-w-[220px] max-w-md">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                        <input
+                            type="text"
+                            className="w-full pl-9 pr-8 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all font-medium"
+                            placeholder="Tìm kiếm mã HS, tên chủ, số tờ, số thửa..."
+                            value={searchTerm}
+                            onChange={e => setSearchTerm(e.target.value)}
                         />
-                    </div>
-                </div>
-
-                {/* Filters */}
-                <div className="flex flex-wrap gap-3 items-center bg-gray-50 p-2 rounded-lg border border-gray-100">
-                    {/* 1. Thời gian */}
-                    <div className="flex items-center gap-2 bg-white px-2 py-1.5 rounded-md border border-gray-200 shadow-sm">
-                        <Calendar size={16} className="text-gray-500"/>
-                        <input type="date" className="text-sm outline-none bg-transparent text-gray-700 w-28" value={fromDate} onChange={e => setFromDate(e.target.value)} placeholder="Từ ngày" />
-                        <span className="text-gray-400">-</span>
-                        <input type="date" className="text-sm outline-none bg-transparent text-gray-700 w-28" value={toDate} onChange={e => setToDate(e.target.value)} placeholder="Đến ngày" />
-                        {(fromDate || toDate) && (<button onClick={() => { setFromDate(''); setToDate(''); }} className="text-gray-400 hover:text-red-500"><X size={14} /></button>)}
+                        {searchTerm && (
+                            <button
+                                onClick={() => setSearchTerm('')}
+                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0.5 rounded-full hover:bg-gray-200"
+                            >
+                                <X size={14} />
+                            </button>
+                        )}
                     </div>
 
-                    {/* 2. Loại hồ sơ */}
-                    <div className="flex items-center gap-2 bg-white px-2 py-1.5 rounded-md border border-gray-200 shadow-sm">
-                        <Filter size={16} className="text-gray-500"/>
-                        <select className="text-sm outline-none bg-transparent text-gray-700 font-medium cursor-pointer border-none focus:ring-0 min-w-[120px]" value={filterRecordType} onChange={e => setFilterRecordType(e.target.value)}>
-                            <option value="">Tất cả loại HS</option>
-                            <option value="1.1 Sao lục">1.1 Sao lục</option>
-                            <option value="1.2 Công văn">1.2 Công văn</option>
+                    {/* 2. Lọc Xã / Phường */}
+                    <div className="flex items-center gap-1.5 bg-gray-50 px-2.5 py-1.5 rounded-lg border border-gray-200 text-sm">
+                        <MapPin size={15} className="text-gray-500 shrink-0"/>
+                        <select
+                            className="bg-transparent text-xs font-semibold text-gray-700 outline-none cursor-pointer border-none p-0 focus:ring-0 pr-1"
+                            value={filterWard}
+                            onChange={e => setFilterWard(e.target.value)}
+                        >
+                            <option value="">Tất cả Xã/Phường</option>
+                            {wards.map(w => <option key={w} value={w}>{w}</option>)}
                         </select>
                     </div>
 
-                    {/* 3. Trạng thái hồ sơ */}
-                    <div className="flex items-center gap-2 bg-white px-2 py-1.5 rounded-md border border-gray-200 shadow-sm">
-                        <CheckCircle2 size={16} className="text-gray-500"/>
-                        <select className="text-sm outline-none bg-transparent text-gray-700 font-medium cursor-pointer border-none focus:ring-0 min-w-[120px]" value={activeTab} onChange={e => setActiveTab(e.target.value as any)}>
-                            <option value="all">Mọi trạng thái</option>
-                            <option value="pending">Chờ chuyển Scan</option>
-                            <option value="scanned">Đã chuyển Scan</option>
-                        </select>
-                    </div>
-
-                    {/* 4. Cán bộ xử lý */}
-                    <div className="flex items-center gap-2 bg-white px-2 py-1.5 rounded-md border border-gray-200 shadow-sm">
-                        <Users size={16} className="text-gray-500"/>
-                        <select className="text-sm outline-none bg-transparent text-gray-700 font-medium cursor-pointer border-none focus:ring-0 min-w-[120px]" value={filterEmployee} onChange={e => setFilterEmployee(e.target.value)}>
+                    {/* 3. Lọc Cán bộ */}
+                    <div className="flex items-center gap-1.5 bg-gray-50 px-2.5 py-1.5 rounded-lg border border-gray-200 text-sm">
+                        <Users size={15} className="text-gray-500 shrink-0"/>
+                        <select
+                            className="bg-transparent text-xs font-semibold text-gray-700 outline-none cursor-pointer border-none p-0 focus:ring-0 pr-1"
+                            value={filterEmployee}
+                            onChange={e => setFilterEmployee(e.target.value)}
+                        >
                             <option value="">Tất cả Cán bộ</option>
                             {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
                         </select>
                     </div>
 
-                    {/* 5. Xã / Phường */}
-                    <div className="flex items-center gap-2 bg-white px-2 py-1.5 rounded-md border border-gray-200 shadow-sm">
-                        <MapPin size={16} className="text-gray-500"/>
-                        <select className="text-sm outline-none bg-transparent text-gray-700 font-medium cursor-pointer border-none focus:ring-0 min-w-[120px]" value={filterWard} onChange={e => setFilterWard(e.target.value)}>
-                            <option value="">Tất cả Xã/Phường</option>
-                            {wards.map(w => <option key={w} value={w}>{w}</option>)}
-                        </select>
+                    {/* 4. Lọc Thời gian */}
+                    <div className="flex items-center gap-1.5 bg-gray-50 px-2.5 py-1.5 rounded-lg border border-gray-200 text-sm">
+                        <Calendar size={15} className="text-gray-500 shrink-0"/>
+                        <input
+                            type="date"
+                            className="text-xs bg-transparent text-gray-700 outline-none w-26 font-medium"
+                            value={fromDate}
+                            onChange={e => setFromDate(e.target.value)}
+                        />
+                        <span className="text-gray-400 text-xs">-</span>
+                        <input
+                            type="date"
+                            className="text-xs bg-transparent text-gray-700 outline-none w-26 font-medium"
+                            value={toDate}
+                            onChange={e => setToDate(e.target.value)}
+                        />
                     </div>
+
+                    {/* Nút Xóa lọc */}
+                    {(searchTerm || filterWard || filterEmployee || fromDate || toDate) && (
+                        <button
+                            onClick={() => {
+                                setSearchTerm('');
+                                setFilterWard('');
+                                setFilterEmployee('');
+                                setFromDate('');
+                                setToDate('');
+                            }}
+                            className="flex items-center gap-1 text-xs text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100 px-2.5 py-1.5 rounded-lg font-bold border border-red-200 transition-colors cursor-pointer"
+                            title="Xóa tất cả bộ lọc"
+                        >
+                            <X size={14} /> Xóa lọc
+                        </button>
+                    )}
                 </div>
 
-                <div className="flex flex-wrap items-center gap-3 bg-gray-50 p-2 rounded-lg relative">
-                    <div className="flex bg-white rounded-md border border-gray-200 p-1 mr-2 shadow-sm">
-                        <button 
-                            onClick={() => setActiveTab('all')}
-                            className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${activeTab === 'all' ? 'bg-blue-100 text-blue-700 shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
-                        >
-                            Danh sách
-                        </button>
-                        <button 
-                            onClick={() => setActiveTab('pending')}
-                            className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${activeTab === 'pending' ? 'bg-orange-100 text-orange-700 shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
-                        >
-                            Chờ chuyển Scan/1 Cửa
-                        </button>
-                        <button 
-                            onClick={() => setActiveTab('scanned')}
-                            className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors ${activeTab === 'scanned' ? 'bg-green-100 text-green-700 shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
-                        >
-                            Đã chuyển Scan/1 Cửa
-                        </button>
-                    </div>
+                {/* Phía bên phải Hàng 2: NÚT XUẤT EXCEL (Cố định duy nhất, Không có nút làm mới) */}
+                <div className="flex items-center gap-2 shrink-0">
+                    <button
+                        onClick={handleExportExcel}
+                        className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-lg font-bold text-xs shadow-xs transition-colors cursor-pointer"
+                        title="Xuất danh sách ra file Excel (.xlsx)"
+                    >
+                        <FileSpreadsheet size={16}/>
+                        <span>Xuất file Excel</span>
+                    </button>
+                </div>
+            </div>
 
-                    <div className="flex items-center gap-2 ml-auto">
-                        {activeTab === 'all' && (
-                            <>
-                                <button 
-                                    onClick={() => setShowSettingsModal(true)} 
-                                    className="flex items-center gap-2 bg-gray-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-gray-700 shadow-sm"
-                                    title="Cài đặt số vào sổ"
-                                >
-                                    <Settings size={16}/>
-                                </button>
-                                <button onClick={handleAddNew} className="flex items-center gap-2 bg-white text-emerald-600 border border-emerald-200 px-3 py-1.5 rounded-md font-bold text-sm hover:bg-emerald-50 shadow-sm">
-                                    <Plus size={16}/> Thêm mới
-                                </button>
-                                {selectedIds.size > 0 && (
-                                    <button onClick={handleMoveToPending} className="flex items-center gap-2 bg-indigo-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-indigo-700 shadow-sm animate-pulse">
-                                        <Send size={16}/> Chuyển Scan ({selectedIds.size})
+            {/* HÀNG 3: SUB-TABS PHÂN LOẠI VÀ NÚT TÁC NGHIỆP TƯƠNG TỰ ĐO ĐẠC */}
+            <div className="px-4 py-2.5 border-b border-gray-200 bg-slate-50 flex flex-wrap items-center justify-between gap-3">
+                {/* PHẦN BÊN TRÁI HÀNG 3 */}
+                <div className="flex flex-wrap items-center gap-3">
+                    {mainTab !== 'vao_so' ? (
+                        <>
+                            {/* Subtabs riêng cho từng nghiệp vụ ĐẶT LÊN ĐẦU (NGOÀI CÙNG BÊN TRÁI) */}
+                            {mainTab === 'thue' && (
+                                <div className="flex bg-white rounded-lg border border-gray-200 p-1 shadow-2xs gap-1 mr-1">
+                                    <button
+                                        onClick={() => setThueSubTab('phieu_chuyen')}
+                                        className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
+                                            thueSubTab === 'phieu_chuyen'
+                                                ? 'bg-amber-100 text-amber-800 shadow-2xs'
+                                                : 'text-gray-600 hover:bg-gray-100'
+                                        }`}
+                                    >
+                                        Phiếu chuyển thuế
                                     </button>
-                                )}
-                            </>
-                        )}
+                                    <button
+                                        onClick={() => setThueSubTab('khu_vuc_7')}
+                                        className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
+                                            thueSubTab === 'khu_vuc_7'
+                                                ? 'bg-amber-100 text-amber-800 shadow-2xs'
+                                                : 'text-gray-600 hover:bg-gray-100'
+                                        }`}
+                                    >
+                                        Thuế khu vực 7
+                                    </button>
+                                    <button
+                                        onClick={() => setThueSubTab('thong_bao')}
+                                        className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
+                                            thueSubTab === 'thong_bao'
+                                                ? 'bg-amber-100 text-amber-800 shadow-2xs'
+                                                : 'text-gray-600 hover:bg-gray-100'
+                                        }`}
+                                    >
+                                        Thông báo thuế
+                                    </button>
+                                </div>
+                            )}
 
-                        {activeTab === 'pending' && selectedIds.size > 0 && hasBatchPermission() && (
-                            <button onClick={handleOpenBatchModal} className="flex items-center gap-2 bg-orange-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-orange-700 shadow-sm animate-pulse">
-                                <CheckCircle2 size={16}/> Tạo đợt ({selectedIds.size})
+                            {mainTab === 'giao_1_cua' && (
+                                <div className="flex bg-white rounded-lg border border-gray-200 p-1 shadow-2xs gap-1 mr-1">
+                                    <button
+                                        onClick={() => setGiao1CuaSubTab('cho_ban_giao')}
+                                        className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
+                                            giao1CuaSubTab === 'cho_ban_giao'
+                                                ? 'bg-emerald-100 text-emerald-800 shadow-2xs'
+                                                : 'text-gray-600 hover:bg-gray-100'
+                                        }`}
+                                    >
+                                        Chờ bàn giao
+                                    </button>
+                                    <button
+                                        onClick={() => setGiao1CuaSubTab('cho_tra_kq')}
+                                        className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
+                                            giao1CuaSubTab === 'cho_tra_kq'
+                                                ? 'bg-emerald-100 text-emerald-800 shadow-2xs'
+                                                : 'text-gray-600 hover:bg-gray-100'
+                                        }`}
+                                    >
+                                        Chờ trả kết quả
+                                    </button>
+                                    <button
+                                        onClick={() => setGiao1CuaSubTab('da_tra_kq')}
+                                        className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
+                                            giao1CuaSubTab === 'da_tra_kq'
+                                                ? 'bg-emerald-100 text-emerald-800 shadow-2xs'
+                                                : 'text-gray-600 hover:bg-gray-100'
+                                        }`}
+                                    >
+                                        Đã trả kết quả
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* Thẻ đếm số lượng cảnh báo quá hạn & sắp hết hạn (chuẩn theo ảnh mẫu) */}
+                            <div className="flex items-center gap-2">
+                                <span className="px-2.5 py-1 bg-red-50 text-red-600 border border-red-200 rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-2xs">
+                                    <AlertTriangle size={14} /> 1278
+                                </span>
+                                <span className="px-2.5 py-1 bg-amber-50 text-amber-600 border border-amber-200 rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-2xs">
+                                    <Clock size={14} /> 73
+                                </span>
+                            </div>
+
+                            <span className="text-gray-300 font-light">|</span>
+
+                            {/* Nút Nhập mới chuẩn khung viền xanh như ảnh mẫu */}
+                            <button
+                                onClick={handleAddNew}
+                                className="flex items-center gap-1.5 bg-white text-emerald-700 border border-emerald-400 px-3 py-1 rounded-lg font-bold text-xs hover:bg-emerald-50 shadow-2xs transition-colors cursor-pointer"
+                            >
+                                <Plus size={15} />
+                                <span>Nhập mới</span>
+                                <ChevronDown size={14} className="text-emerald-600 ml-0.5" />
                             </button>
-                        )}
-
-                        {activeTab === 'scanned' && (
-                            <button onClick={() => setShowExportHandoverModal(true)} className="flex items-center gap-2 bg-purple-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-purple-700 shadow-sm">
-                                <FileOutput size={16}/> Xuất danh sách
+                        </>
+                    ) : (
+                        /* CHỈ DÀNH RIÊNG CHO TAB "VÀO SỐ GCN" */
+                        <div className="flex bg-white rounded-lg border border-gray-200 p-1 shadow-2xs gap-1">
+                            <button
+                                onClick={() => setActiveTab('all')}
+                                className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
+                                    activeTab === 'all'
+                                        ? 'bg-blue-100 text-blue-800 shadow-2xs'
+                                        : 'text-gray-600 hover:bg-gray-100'
+                                }`}
+                            >
+                                Danh sách
                             </button>
-                        )}
+                            <button
+                                onClick={() => setActiveTab('pending')}
+                                className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
+                                    activeTab === 'pending'
+                                        ? 'bg-orange-100 text-orange-800 shadow-2xs'
+                                        : 'text-gray-600 hover:bg-gray-100'
+                                }`}
+                            >
+                                Chờ chuyển Scan/1 Cửa
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('scanned')}
+                                className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
+                                    activeTab === 'scanned'
+                                        ? 'bg-teal-100 text-teal-800 shadow-2xs'
+                                        : 'text-gray-600 hover:bg-gray-100'
+                                }`}
+                            >
+                                Đã chuyển Scan/1 Cửa
+                            </button>
+                        </div>
+                    )}
+                </div>
 
-                        <button 
-                            onClick={handleExportExcel} 
-                            className="hidden md:flex items-center justify-center bg-white text-emerald-700 border border-emerald-300 p-2 rounded-md hover:bg-emerald-50 shadow-xs transition-colors active:scale-95 shrink-0"
-                            title="Xuất file Excel"
-                            aria-label="Xuất file Excel"
+                {/* BÊN PHẢI HÀNG 3: CÁC NÚT TÁC NGHIỆP TƯƠNG ỨNG */}
+                <div className="flex flex-wrap items-center gap-2 ml-auto">
+                    {mainTab === 'vao_so' ? (
+                        <>
+                            <button
+                                onClick={() => setShowSettingsModal(true)}
+                                className="p-1.5 bg-white text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-100 shadow-2xs transition-colors cursor-pointer"
+                                title="Cài đặt số vào sổ"
+                            >
+                                <Settings size={15} />
+                            </button>
+
+                            <button
+                                onClick={handleAddNew}
+                                className="flex items-center gap-1.5 bg-white text-emerald-700 border border-emerald-300 px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-emerald-50 shadow-2xs transition-colors cursor-pointer"
+                            >
+                                <Plus size={15} />
+                                <span>Thêm mới</span>
+                            </button>
+
+                            {selectedIds.size > 0 && (
+                                <button
+                                    onClick={handleMoveToPending}
+                                    className="flex items-center gap-1.5 bg-indigo-600 text-white px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-indigo-700 shadow-2xs transition-colors animate-pulse cursor-pointer"
+                                >
+                                    <Send size={15} />
+                                    <span>Chuyển Scan ({selectedIds.size})</span>
+                                </button>
+                            )}
+
+                            {activeTab === 'pending' && selectedIds.size > 0 && hasBatchPermission() && (
+                                <button
+                                    onClick={handleOpenBatchModal}
+                                    className="flex items-center gap-1.5 bg-orange-600 text-white px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-orange-700 shadow-2xs transition-colors cursor-pointer"
+                                >
+                                    <CheckCircle2 size={15} />
+                                    <span>Tạo đợt ({selectedIds.size})</span>
+                                </button>
+                            )}
+
+                            {activeTab === 'scanned' && (
+                                <button
+                                    onClick={() => setShowExportHandoverModal(true)}
+                                    className="flex items-center gap-1.5 bg-purple-600 text-white px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-purple-700 shadow-2xs transition-colors cursor-pointer"
+                                >
+                                    <FileOutput size={15} />
+                                    <span>Xuất bàn giao</span>
+                                </button>
+                            )}
+
+                            <button
+                                onClick={() => {
+                                    if (selectedIds.size > 0) {
+                                        const selectedRecords = records.filter(r => selectedIds.has(r.id));
+                                        exportSoDiaChinh(selectedRecords);
+                                    } else {
+                                        setShowExportSoDiaChinhModal(true);
+                                    }
+                                }}
+                                className="flex items-center gap-1.5 bg-blue-600 text-white px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-blue-700 shadow-2xs transition-colors cursor-pointer"
+                            >
+                                <FileText size={15} />
+                                <span>Xuất Sổ địa chính</span>
+                            </button>
+
+                            <button
+                                onClick={() => setShowExportSoMucKeModal(true)}
+                                className="flex items-center gap-1.5 bg-indigo-600 text-white px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-indigo-700 shadow-2xs transition-colors cursor-pointer"
+                            >
+                                <FileText size={15} />
+                                <span>Xuất Sổ mục kê</span>
+                            </button>
+                        </>
+                    ) : (
+                        <button
+                            onClick={() => setShowColumnSelector(!showColumnSelector)}
+                            className="p-1.5 bg-white text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-100 shadow-2xs transition-colors cursor-pointer flex items-center justify-center"
+                            title="Tùy chỉnh ẩn/hiện cột"
                         >
-                            <FileSpreadsheet size={18} className="text-emerald-600"/>
+                            <SlidersHorizontal size={16} />
                         </button>
-                        <button onClick={() => {
-                            if (selectedIds.size > 0) {
-                                const selectedRecords = records.filter(r => selectedIds.has(r.id));
-                                exportSoDiaChinh(selectedRecords);
-                            } else {
-                                setShowExportSoDiaChinhModal(true);
-                            }
-                        }} className="flex items-center gap-2 bg-blue-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-blue-700 shadow-sm">
-                            <FileText size={16}/> Xuất Sổ địa chính
-                        </button>
-                        <button onClick={() => setShowExportSoMucKeModal(true)} className="flex items-center gap-2 bg-indigo-600 text-white px-3 py-1.5 rounded-md font-bold text-sm hover:bg-indigo-700 shadow-sm">
-                            <FileText size={16}/> Xuất Sổ mục kê
-                        </button>
-                    </div>
+                    )}
                 </div>
             </div>
 
@@ -1020,285 +1346,429 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                 ) : (
                     <>
                     <div className="inline-block min-w-full align-middle flex-1 overflow-auto">
-                        <table className="min-w-full table-fixed border-collapse">
-                            <thead className="bg-gray-100 sticky top-0 z-10 shadow-sm">
-                                <tr>
-                                    <th className="p-2 border-b border-r border-gray-200 w-10 text-center bg-gray-100 sticky left-0 z-20">
-                                        <input type="checkbox" onChange={handleSelectAll} checked={paginatedRecords.length > 0 && paginatedRecords.every(r => selectedIds.has(r.id))} />
-                                    </th>
-                                    <th className="p-2 border-b border-r border-gray-200 w-12 text-center bg-gray-100 sticky left-10 z-20">#</th>
-                                    {COLUMNS.map(col => (
-                                        <th key={col.key} className="p-2 border-b border-r border-gray-200 text-xs font-bold text-gray-600 uppercase text-center whitespace-nowrap" style={{ width: col.width, minWidth: col.width }}>
-                                            {col.label}
+                        {mainTab === 'vao_so' ? (
+                            /* BẢNG RIÊNG DÀNH CHO TAB VÀO SỐ GCN */
+                            <table className="min-w-full table-fixed border-collapse">
+                                <thead className="bg-gray-100 sticky top-0 z-10 shadow-sm">
+                                    <tr>
+                                        <th className="p-2 border-b border-r border-gray-200 w-10 text-center bg-gray-100 sticky left-0 z-20">
+                                            <input type="checkbox" onChange={handleSelectAll} checked={paginatedRecords.length > 0 && paginatedRecords.every(r => selectedIds.has(r.id))} />
                                         </th>
-                                    ))}
-                                    {activeTab === 'scanned' && (
-                                        <>
-                                            <th className="p-2 border-b border-r border-gray-200 w-32 text-xs font-bold text-gray-600 uppercase">Đợt Scan</th>
-                                        </>
-                                    )}
-                                    <th className="p-2 border-b border-gray-200 w-24 text-center bg-gray-100 sticky right-0 z-20">Thao tác</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100">
-                                {paginatedRecords.length > 0 ? paginatedRecords.map((r, idx) => (
-                                    <tr key={r.id} className={`hover:bg-teal-50/30 group ${selectedIds.has(r.id) ? 'bg-blue-50' : ''}`}>
-                                        <td className="p-2 border-r border-gray-200 text-center bg-white sticky left-0 z-10 group-hover:bg-teal-50/30">
-                                            <input type="checkbox" checked={selectedIds.has(r.id)} onChange={() => handleSelectRow(r.id)} />
-                                        </td>
-                                        <td className="p-2 border-r border-gray-200 text-center text-gray-500 text-xs bg-white sticky left-10 z-10 group-hover:bg-teal-50/30">
-                                            {(currentPage - 1) * itemsPerPage + idx + 1}
-                                            {savingId === r.id && <span className="block text-[9px] text-teal-600 animate-pulse">Lưu...</span>}
-                                        </td>
-                                        {COLUMNS.map(col => {
-                                            const isEditing = editingId === r.id;
-                                            const isReadOnly = col.readOnly && !isEditing;
+                                        <th className="p-2 border-b border-r border-gray-200 w-12 text-center bg-gray-100 sticky left-10 z-20">#</th>
+                                        {COLUMNS.map(col => (
+                                            <th key={col.key} className="p-2 border-b border-r border-gray-200 text-xs font-bold text-gray-600 uppercase text-center whitespace-nowrap" style={{ width: col.width, minWidth: col.width }}>
+                                                {col.label}
+                                            </th>
+                                        ))}
+                                        {activeTab === 'scanned' && (
+                                            <>
+                                                <th className="p-2 border-b border-r border-gray-200 w-32 text-xs font-bold text-gray-600 uppercase">Đợt Scan</th>
+                                            </>
+                                        )}
+                                        <th className="p-2 border-b border-gray-200 w-24 text-center bg-gray-100 sticky right-0 z-20">Thao tác</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                    {paginatedRecords.length > 0 ? paginatedRecords.map((r, idx) => (
+                                        <tr key={r.id} className={`hover:bg-teal-50/30 group ${selectedIds.has(r.id) ? 'bg-blue-50' : ''}`}>
+                                            <td className="p-2 border-r border-gray-200 text-center bg-white sticky left-0 z-10 group-hover:bg-teal-50/30">
+                                                <input type="checkbox" checked={selectedIds.has(r.id)} onChange={() => handleSelectRow(r.id)} />
+                                            </td>
+                                            <td className="p-2 border-r border-gray-200 text-center text-gray-500 text-xs bg-white sticky left-10 z-10 group-hover:bg-teal-50/30">
+                                                {(currentPage - 1) * itemsPerPage + idx + 1}
+                                                {savingId === r.id && <span className="block text-[9px] text-teal-600 animate-pulse">Lưu...</span>}
+                                            </td>
+                                            {COLUMNS.map(col => {
+                                                const isEditing = editingId === r.id;
+                                                const isReadOnly = col.readOnly && !isEditing;
 
-                                            if (col.key === 'group_chu_su_dung') {
-                                                return (
-                                                    <td key={`${r.id}-${col.key}`} className="p-2 border-r border-gray-200 align-top">
-                                                        <div className="flex flex-col gap-1">
-                                                            <div className="text-xs text-teal-600 font-bold mb-1">Chủ sử dụng:</div>
+                                                if (col.key === 'group_chu_su_dung') {
+                                                    return (
+                                                        <td key={`${r.id}-${col.key}`} className="p-2 border-r border-gray-200 align-top">
+                                                            <div className="flex flex-col gap-1">
+                                                                <div className="text-xs text-teal-600 font-bold mb-1">Chủ sử dụng:</div>
+                                                                {isEditing ? (
+                                                                    renderOwnerInput(r.data?.ten_chu_su_dung || '', (val) => handleCellChange(r.id, 'ten_chu_su_dung', val), () => handleBlur(r))
+                                                                ) : (
+                                                                    <div className="text-sm font-bold text-teal-800 whitespace-pre-wrap">{r.data?.ten_chu_su_dung}</div>
+                                                                )}
+                                                            </div>
+                                                        </td>
+                                                    );
+                                                }
+                                                if (col.key === 'group_thong_tin_ho_so') {
+                                                    return (
+                                                        <td key={`${r.id}-${col.key}`} className="p-2 border-r border-gray-200 align-top">
+                                                            <div className="text-xs text-gray-500 mb-0.5">Loại hồ sơ:</div>
                                                             {isEditing ? (
-                                                                renderOwnerInput(r.data?.ten_chu_su_dung || '', (val) => handleCellChange(r.id, 'ten_chu_su_dung', val), () => handleBlur(r))
+                                                                <input
+                                                                    type="text"
+                                                                    className="w-full px-2 py-1 text-sm border border-gray-300 rounded mb-2 focus:ring-2 focus:ring-teal-500 outline-none"
+                                                                    value={r.data?.loai_bien_dong || ''}
+                                                                    onChange={(e) => handleCellChange(r.id, 'loai_bien_dong', e.target.value)}
+                                                                    onBlur={() => handleBlur(r)}
+                                                                />
                                                             ) : (
-                                                                <div className="text-sm font-bold text-teal-800 whitespace-pre-wrap">{r.data?.ten_chu_su_dung}</div>
+                                                                <div className="text-sm font-medium text-blue-700 mb-2 whitespace-pre-wrap leading-tight">{r.data?.loai_bien_dong}</div>
                                                             )}
-                                                        </div>
-                                                    </td>
-                                                );
-                                            }
-                                            if (col.key === 'group_thong_tin_ho_so') {
-                                                return (
-                                                    <td key={`${r.id}-${col.key}`} className="p-2 border-r border-gray-200 align-top">
-                                                        <div className="text-xs text-gray-500 mb-0.5">Loại hồ sơ:</div>
-                                                        {isEditing ? (
-                                                            <input
-                                                                type="text"
-                                                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded mb-2 focus:ring-2 focus:ring-teal-500 outline-none"
-                                                                value={r.data?.loai_bien_dong || ''}
-                                                                onChange={(e) => handleCellChange(r.id, 'loai_bien_dong', e.target.value)}
-                                                                onBlur={() => handleBlur(r)}
-                                                            />
-                                                        ) : (
-                                                            <div className="text-sm font-medium text-blue-700 mb-2 whitespace-pre-wrap leading-tight">{r.data?.loai_bien_dong}</div>
-                                                        )}
-                                                        <div className="text-xs text-gray-500 mb-0.5">Ngày nhận:</div>
-                                                        {isEditing ? (
-                                                            <input
-                                                                type="date"
-                                                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-teal-500 outline-none"
-                                                                value={r.data?.ngay_nhan || ''}
-                                                                onChange={(e) => handleCellChange(r.id, 'ngay_nhan', e.target.value)}
-                                                                onBlur={() => handleBlur(r)}
-                                                            />
-                                                        ) : (
-                                                            <div className="text-sm font-bold text-gray-800 flex items-center gap-1">
-                                                                <Calendar size={14} className="text-gray-400" />
-                                                                {r.data?.ngay_nhan ? new Date(r.data.ngay_nhan).toLocaleDateString('vi-VN') : ''}
-                                                            </div>
-                                                        )}
-                                                    </td>
-                                                );
-                                            }
-                                            if (col.key === 'group_thua_dat') {
-                                                return (
-                                                    <td key={`${r.id}-${col.key}`} className="p-2 border-r border-gray-200 align-top">
-                                                        {isEditing ? (
-                                                            <div className="flex flex-col gap-2">
-                                                                <div className="flex items-center gap-2">
-                                                                    <div className="flex-1">
-                                                                        <div className="text-xs text-gray-500">Tờ bản đồ:</div>
-                                                                        <input type="text" className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-teal-500 outline-none" value={r.data?.so_to || ''} onChange={(e) => handleCellChange(r.id, 'so_to', e.target.value)} onBlur={() => handleBlur(r)} />
+                                                            <div className="text-xs text-gray-500 mb-0.5">Ngày nhận:</div>
+                                                            {isEditing ? (
+                                                                <input
+                                                                    type="date"
+                                                                    className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-teal-500 outline-none"
+                                                                    value={r.data?.ngay_nhan || ''}
+                                                                    onChange={(e) => handleCellChange(r.id, 'ngay_nhan', e.target.value)}
+                                                                    onBlur={() => handleBlur(r)}
+                                                                />
+                                                            ) : (
+                                                                <div className="text-sm font-bold text-gray-800 flex items-center gap-1">
+                                                                    <Calendar size={14} className="text-gray-400" />
+                                                                    {r.data?.ngay_nhan ? new Date(r.data.ngay_nhan).toLocaleDateString('vi-VN') : ''}
+                                                                </div>
+                                                            )}
+                                                        </td>
+                                                    );
+                                                }
+                                                if (col.key === 'group_thua_dat') {
+                                                    return (
+                                                        <td key={`${r.id}-${col.key}`} className="p-2 border-r border-gray-200 align-top">
+                                                            {isEditing ? (
+                                                                <div className="flex flex-col gap-2">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <div className="flex-1">
+                                                                            <div className="text-xs text-gray-500">Tờ bản đồ:</div>
+                                                                            <input type="text" className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-teal-500 outline-none" value={r.data?.so_to || ''} onChange={(e) => handleCellChange(r.id, 'so_to', e.target.value)} onBlur={() => handleBlur(r)} />
+                                                                        </div>
+                                                                        <div className="flex-1">
+                                                                            <div className="text-xs text-gray-500">Số thửa:</div>
+                                                                            <input type="text" className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-teal-500 outline-none" value={r.data?.so_thua || ''} onChange={(e) => handleCellChange(r.id, 'so_thua', e.target.value)} onBlur={() => handleBlur(r)} />
+                                                                        </div>
                                                                     </div>
-                                                                    <div className="flex-1">
-                                                                        <div className="text-xs text-gray-500">Số thửa:</div>
-                                                                        <input type="text" className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-teal-500 outline-none" value={r.data?.so_thua || ''} onChange={(e) => handleCellChange(r.id, 'so_thua', e.target.value)} onBlur={() => handleBlur(r)} />
+                                                                    <div className="flex items-center gap-2">
+                                                                        <div className="flex-1">
+                                                                            <div className="text-xs text-gray-500">Tổng DT:</div>
+                                                                            <input type="text" className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-teal-500 outline-none" value={r.data?.tong_dien_tich || ''} onChange={(e) => handleCellChange(r.id, 'tong_dien_tich', e.target.value)} onBlur={() => handleBlur(r)} />
+                                                                        </div>
+                                                                        <div className="flex-1">
+                                                                            <div className="text-xs text-gray-500">Đất ở:</div>
+                                                                            <input type="text" className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-teal-500 outline-none" value={r.data?.dien_tich_tho_cu || ''} onChange={(e) => handleCellChange(r.id, 'dien_tich_tho_cu', e.target.value)} onBlur={() => handleBlur(r)} />
+                                                                        </div>
                                                                     </div>
                                                                 </div>
-                                                                <div className="flex items-center gap-2">
-                                                                    <div className="flex-1">
-                                                                        <div className="text-xs text-gray-500">Tổng DT:</div>
-                                                                        <input type="text" className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-teal-500 outline-none" value={r.data?.tong_dien_tich || ''} onChange={(e) => handleCellChange(r.id, 'tong_dien_tich', e.target.value)} onBlur={() => handleBlur(r)} />
+                                                            ) : (
+                                                                <>
+                                                                    <div className="flex items-center gap-2 mb-2">
+                                                                        <span className="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded text-xs border border-gray-200 whitespace-nowrap">Tờ: <b>{r.data?.so_to}</b></span>
+                                                                        <span className="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded text-xs border border-gray-200 whitespace-nowrap">Thửa: <b>{r.data?.so_thua}</b></span>
                                                                     </div>
-                                                                    <div className="flex-1">
-                                                                        <div className="text-xs text-gray-500">Đất ở:</div>
-                                                                        <input type="text" className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-teal-500 outline-none" value={r.data?.dien_tich_tho_cu || ''} onChange={(e) => handleCellChange(r.id, 'dien_tich_tho_cu', e.target.value)} onBlur={() => handleBlur(r)} />
+                                                                    <div className="text-xs text-gray-600 mb-1">
+                                                                        DT: <b>{r.data?.tong_dien_tich ? `${r.data.tong_dien_tich} m²` : ''}</b>
                                                                     </div>
-                                                                </div>
-                                                            </div>
-                                                        ) : (
-                                                            <>
-                                                                <div className="flex items-center gap-2 mb-2">
-                                                                    <span className="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded text-xs border border-gray-200 whitespace-nowrap">Tờ: <b>{r.data?.so_to}</b></span>
-                                                                    <span className="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded text-xs border border-gray-200 whitespace-nowrap">Thửa: <b>{r.data?.so_thua}</b></span>
-                                                                </div>
-                                                                <div className="text-xs text-gray-600 mb-1">
-                                                                    DT: <b>{r.data?.tong_dien_tich ? `${r.data.tong_dien_tich} m²` : ''}</b>
-                                                                </div>
-                                                                <div className="text-xs text-gray-600">
-                                                                    Đất ở: <b>{r.data?.dien_tich_tho_cu ? `${r.data.dien_tich_tho_cu} m²` : ''}</b>
-                                                                </div>
-                                                            </>
-                                                        )}
-                                                    </td>
-                                                );
-                                            }
+                                                                    <div className="text-xs text-gray-600">
+                                                                        Đất ở: <b>{r.data?.dien_tich_tho_cu ? `${r.data.dien_tich_tho_cu} m²` : ''}</b>
+                                                                    </div>
+                                                                </>
+                                                            )}
+                                                        </td>
+                                                    );
+                                                }
 
-                                            return (
-                                                <td key={`${r.id}-${col.key}`} className="p-0 border-r border-gray-200 relative">
-                                                    {isReadOnly ? (
-                                                        <div className="w-full h-full px-2 py-2 text-sm text-gray-700 whitespace-pre-wrap min-h-[40px] flex items-center">
-                                                            {r.data?.[col.key] || ''}
-                                                        </div>
-                                                    ) : col.key === 'so_vao_so' ? (
-                                                        <div className="flex h-full">
+                                                return (
+                                                    <td key={`${r.id}-${col.key}`} className="p-0 border-r border-gray-200 relative">
+                                                        {isReadOnly ? (
+                                                            <div className="w-full h-full px-2 py-2 text-sm text-gray-700 whitespace-pre-wrap min-h-[40px] flex items-center">
+                                                                {r.data?.[col.key] || ''}
+                                                            </div>
+                                                        ) : col.key === 'so_vao_so' ? (
+                                                            <div className="flex h-full">
+                                                                <input 
+                                                                    type="text"
+                                                                    className="flex-1 min-w-0 px-2 py-2 text-sm bg-transparent border-none focus:ring-2 focus:ring-inset focus:ring-teal-500 outline-none"
+                                                                    value={r.data?.[col.key] || ''}
+                                                                    onChange={(e) => handleCellChange(r.id, col.key, e.target.value)}
+                                                                    onBlur={() => handleBlur(r)}
+                                                                    readOnly={activeTab === 'scanned'} 
+                                                                />
+                                                                {activeTab === 'all' && (
+                                                                    <button 
+                                                                        onClick={() => handleGetBookNumber(r)}
+                                                                        className="px-2 bg-gray-100 hover:bg-blue-100 text-blue-600 border-l border-gray-200 transition-colors"
+                                                                        title="Lấy số vào sổ tiếp theo"
+                                                                    >
+                                                                        <Hash size={14} />
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        ) : col.key === 'ten_chu_su_dung' ? (
+                                                            <textarea
+                                                                className="w-full h-full px-2 py-2 text-sm bg-transparent border-none focus:ring-2 focus:ring-inset focus:ring-teal-500 outline-none resize-none whitespace-pre-wrap"
+                                                                value={r.data?.[col.key] || ''}
+                                                                onChange={(e) => handleCellChange(r.id, col.key, e.target.value)}
+                                                                onBlur={() => handleBlur(r)}
+                                                                readOnly={activeTab === 'scanned'}
+                                                                rows={2}
+                                                                style={{ minHeight: '40px' }}
+                                                            />
+                                                        ) : col.key === 'loai_gcn' ? (
+                                                            <select
+                                                                className="w-full h-full px-2 py-2 text-sm bg-transparent border-none focus:ring-2 focus:ring-inset focus:ring-teal-500 outline-none"
+                                                                value={r.data?.[col.key] || 'GCN mới'}
+                                                                onChange={(e) => {
+                                                                    handleCellChange(r.id, col.key, e.target.value);
+                                                                    handleBlur({ ...r, data: { ...r.data, [col.key]: e.target.value } });
+                                                                }}
+                                                                disabled={activeTab === 'scanned'}
+                                                            >
+                                                                <option value="GCN mới">GCN mới</option>
+                                                                <option value="GCN trang 4">GCN trang 4</option>
+                                                            </select>
+                                                        ) : col.key === 'so_phat_hanh' ? (
+                                                            <div className="flex flex-col p-1 gap-1 min-w-[80px]">
+                                                                {(r.data?.[col.key] || '').split('\n').map((val: string, idx: number, arr: string[]) => (
+                                                                    <div key={idx} className="flex items-center gap-1 group/input">
+                                                                        <input 
+                                                                            type="text"
+                                                                            className="flex-1 min-w-0 px-2 py-1 text-sm bg-transparent border-b border-gray-200 focus:border-teal-500 outline-none"
+                                                                            value={val}
+                                                                            onChange={(e) => {
+                                                                                const newArr = [...arr];
+                                                                                newArr[idx] = e.target.value;
+                                                                                handleCellChange(r.id, col.key, newArr.join('\n'));
+                                                                            }}
+                                                                            onBlur={() => handleBlur(r)}
+                                                                            placeholder="Số phát hành..."
+                                                                        />
+                                                                        {arr.length > 1 && (
+                                                                            <button 
+                                                                                onClick={() => {
+                                                                                    const newArr = arr.filter((_, i) => i !== idx);
+                                                                                    const newVal = newArr.join('\n');
+                                                                                    handleCellChange(r.id, col.key, newVal);
+                                                                                    handleBlur({ ...r, data: { ...r.data, [col.key]: newVal } });
+                                                                                }}
+                                                                                className="text-gray-300 hover:text-red-500 p-1 opacity-0 group-hover/input:opacity-100 transition-opacity"
+                                                                                tabIndex={-1}
+                                                                                title="Xóa dòng này"
+                                                                            >
+                                                                                <X size={12} />
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
+                                                                ))}
+                                                                <button 
+                                                                    onClick={() => {
+                                                                        const current = r.data?.[col.key] || '';
+                                                                        const newVal = current === '' ? '\n' : current + '\n';
+                                                                        handleCellChange(r.id, col.key, newVal);
+                                                                    }}
+                                                                    className="flex items-center justify-center gap-1 text-[10px] bg-blue-50 text-blue-600 py-1.5 rounded hover:bg-blue-100 mt-1 font-bold transition-colors w-full"
+                                                                >
+                                                                    <Plus size={12} /> Thêm số
+                                                                </button>
+                                                            </div>
+                                                        ) : (
                                                             <input 
-                                                                type="text"
-                                                                className="flex-1 min-w-0 px-2 py-2 text-sm bg-transparent border-none focus:ring-2 focus:ring-inset focus:ring-teal-500 outline-none"
+                                                                type={col.type || 'text'}
+                                                                className="w-full h-full px-2 py-2 text-sm bg-transparent border-none focus:ring-2 focus:ring-inset focus:ring-teal-500 outline-none"
                                                                 value={r.data?.[col.key] || ''}
                                                                 onChange={(e) => handleCellChange(r.id, col.key, e.target.value)}
                                                                 onBlur={() => handleBlur(r)}
                                                                 readOnly={activeTab === 'scanned'} 
                                                             />
-                                                            {activeTab === 'all' && (
-                                                                <button 
-                                                                    onClick={() => handleGetBookNumber(r)}
-                                                                    className="px-2 bg-gray-100 hover:bg-blue-100 text-blue-600 border-l border-gray-200 transition-colors"
-                                                                    title="Lấy số vào sổ tiếp theo"
-                                                                >
-                                                                    <Hash size={14} />
-                                                                </button>
-                                                            )}
-                                                        </div>
-                                                    ) : col.key === 'ten_chu_su_dung' ? (
-                                                        <textarea
-                                                            className="w-full h-full px-2 py-2 text-sm bg-transparent border-none focus:ring-2 focus:ring-inset focus:ring-teal-500 outline-none resize-none whitespace-pre-wrap"
-                                                            value={r.data?.[col.key] || ''}
-                                                            onChange={(e) => handleCellChange(r.id, col.key, e.target.value)}
-                                                            onBlur={() => handleBlur(r)}
-                                                            readOnly={activeTab === 'scanned'}
-                                                            rows={2}
-                                                            style={{ minHeight: '40px' }}
-                                                        />
-                                                    ) : col.key === 'loai_gcn' ? (
-                                                        <select
-                                                            className="w-full h-full px-2 py-2 text-sm bg-transparent border-none focus:ring-2 focus:ring-inset focus:ring-teal-500 outline-none"
-                                                            value={r.data?.[col.key] || 'GCN mới'}
-                                                            onChange={(e) => {
-                                                                handleCellChange(r.id, col.key, e.target.value);
-                                                                handleBlur({ ...r, data: { ...r.data, [col.key]: e.target.value } });
-                                                            }}
-                                                            disabled={activeTab === 'scanned'}
-                                                        >
-                                                            <option value="GCN mới">GCN mới</option>
-                                                            <option value="GCN trang 4">GCN trang 4</option>
-                                                        </select>
-                                                    ) : col.key === 'so_phat_hanh' ? (
-                                                        <div className="flex flex-col p-1 gap-1 min-w-[80px]">
-                                                            {(r.data?.[col.key] || '').split('\n').map((val: string, idx: number, arr: string[]) => (
-                                                                <div key={idx} className="flex items-center gap-1 group/input">
-                                                                    <input 
-                                                                        type="text"
-                                                                        className="flex-1 min-w-0 px-2 py-1 text-sm bg-transparent border-b border-gray-200 focus:border-teal-500 outline-none"
-                                                                        value={val}
-                                                                        onChange={(e) => {
-                                                                            const newArr = [...arr];
-                                                                            newArr[idx] = e.target.value;
-                                                                            handleCellChange(r.id, col.key, newArr.join('\n'));
-                                                                        }}
-                                                                        onBlur={() => handleBlur(r)}
-                                                                        placeholder="Số phát hành..."
-                                                                    />
-                                                                    {arr.length > 1 && (
-                                                                        <button 
-                                                                            onClick={() => {
-                                                                                const newArr = arr.filter((_, i) => i !== idx);
-                                                                                const newVal = newArr.join('\n');
-                                                                                handleCellChange(r.id, col.key, newVal);
-                                                                                handleBlur({ ...r, data: { ...r.data, [col.key]: newVal } });
-                                                                            }}
-                                                                            className="text-gray-300 hover:text-red-500 p-1 opacity-0 group-hover/input:opacity-100 transition-opacity"
-                                                                            tabIndex={-1}
-                                                                            title="Xóa dòng này"
-                                                                        >
-                                                                            <X size={12} />
-                                                                        </button>
-                                                                    )}
-                                                                </div>
-                                                            ))}
+                                                        )}
+                                                    </td>
+                                                );
+                                            })}
+                                            {activeTab === 'scanned' && (
+                                                <>
+                                                    <td className="p-2 border-r border-gray-200 text-xs text-gray-600">
+                                                        {r.data?.scan_batch_id}
+                                                    </td>
+                                                </>
+                                            )}
+                                            <td className="p-2 text-center bg-white sticky right-0 group-hover:bg-teal-50/30 z-10 border-l border-gray-200">
+                                                <div className="flex flex-col gap-2 items-center justify-center h-full w-full">
+                                                    {activeTab === 'all' && (
+                                                        <>
                                                             <button 
-                                                                onClick={() => {
-                                                                    const current = r.data?.[col.key] || '';
-                                                                    const newVal = current === '' ? '\n' : current + '\n';
-                                                                    handleCellChange(r.id, col.key, newVal);
-                                                                }}
-                                                                className="flex items-center justify-center gap-1 text-[10px] bg-blue-50 text-blue-600 py-1.5 rounded hover:bg-blue-100 mt-1 font-bold transition-colors w-full"
+                                                                onClick={() => toggleEdit(r.id)} 
+                                                                className={`p-2 rounded-lg transition-colors shadow-sm border ${editingId === r.id ? 'text-green-600 bg-green-50 border-green-200 hover:bg-green-100' : 'text-gray-500 bg-white border-gray-200 hover:text-blue-600 hover:border-blue-300 hover:bg-blue-50'}`}
+                                                                title={editingId === r.id ? "Xong" : "Sửa"}
                                                             >
-                                                                <Plus size={12} /> Thêm số
+                                                                {editingId === r.id ? <CheckCircle2 size={18}/> : <Edit size={18}/>}
                                                             </button>
-                                                        </div>
-                                                    ) : (
-                                                        <input 
-                                                            type={col.type || 'text'}
-                                                            className="w-full h-full px-2 py-2 text-sm bg-transparent border-none focus:ring-2 focus:ring-inset focus:ring-teal-500 outline-none"
-                                                            value={r.data?.[col.key] || ''}
-                                                            onChange={(e) => handleCellChange(r.id, col.key, e.target.value)}
-                                                            onBlur={() => handleBlur(r)}
-                                                            readOnly={activeTab === 'scanned'} 
-                                                        />
+                                                            <button 
+                                                                onClick={() => handleMoveToPendingSingle(r.id)} 
+                                                                className="p-2 text-indigo-600 bg-white border border-gray-200 hover:bg-indigo-50 hover:border-indigo-300 rounded-lg transition-colors shadow-sm" 
+                                                                title="Chuyển Scan"
+                                                            >
+                                                                <Send size={18}/>
+                                                            </button>
+                                                        </>
+                                                    )}
+                                                    <button 
+                                                        onClick={() => handleDelete(r)} 
+                                                        className="p-2 text-gray-500 bg-white border border-gray-200 hover:text-red-600 hover:bg-red-50 hover:border-red-300 rounded-lg transition-colors shadow-sm" 
+                                                        title="Xóa dòng này"
+                                                    >
+                                                        <Trash2 size={18}/>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    )) : (
+                                        <tr>
+                                            <td colSpan={COLUMNS.length + 5} className="p-8 text-center text-gray-400 italic">
+                                                {activeTab === 'all' ? 'Chưa có dữ liệu. Nhấn "Import Excel" hoặc "Thêm mới".' : 
+                                                 activeTab === 'pending' ? 'Chưa có hồ sơ chờ chuyển scan.' :
+                                                 'Chưa có hồ sơ nào được chuyển Scan.'}
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        ) : (
+                            /* BẢNG 13 CỘT CHI TIẾT DÀNH CHO TẤT CẢ CÁC TAB CỦA MODULE CẤP GIẤY */
+                            <table className="min-w-full border-collapse">
+                                <thead className="bg-gray-100 sticky top-0 z-10 shadow-sm">
+                                    <tr className="text-xs font-bold text-gray-700 uppercase">
+                                        <th className="p-2.5 border-b border-r border-gray-200 w-10 text-center bg-gray-100 sticky left-0 z-20">
+                                            <input type="checkbox" onChange={handleSelectAll} checked={paginatedRecords.length > 0 && paginatedRecords.every(r => selectedIds.has(r.id))} />
+                                        </th>
+                                        <th className="p-2.5 border-b border-r border-gray-200 w-36 text-left bg-gray-100 whitespace-nowrap">MÃ HỒ SƠ</th>
+                                        <th className="p-2.5 border-b border-r border-gray-200 min-w-[200px] text-left bg-gray-100 whitespace-nowrap">THÔNG TIN CHỦ SỬ DỤNG</th>
+                                        <th className="p-2.5 border-b border-r border-gray-200 min-w-[150px] text-left bg-gray-100 whitespace-nowrap">LOẠI HỒ SƠ</th>
+                                        <th className="p-2.5 border-b border-r border-gray-200 w-32 text-center bg-gray-100 whitespace-nowrap">THỜI HẠN XỬ LÝ</th>
+                                        <th className="p-2.5 border-b border-r border-gray-200 w-32 text-left bg-gray-100 whitespace-nowrap">XÃ PHƯỜNG</th>
+                                        <th className="p-2.5 border-b border-r border-gray-200 w-16 text-center bg-gray-100 whitespace-nowrap">TỜ</th>
+                                        <th className="p-2.5 border-b border-r border-gray-200 w-16 text-center bg-gray-100 whitespace-nowrap">THỦA</th>
+                                        <th className="p-2.5 border-b border-r border-gray-200 w-36 text-left bg-gray-100 whitespace-nowrap">GIAO NHÂN VIÊN</th>
+                                        <th className="p-2.5 border-b border-r border-gray-200 w-36 text-left bg-gray-100 whitespace-nowrap">HOÀN THÀNH / ĐỢT</th>
+                                        <th className="p-2.5 border-b border-r border-gray-200 w-32 text-center bg-gray-100 whitespace-nowrap">TRẠNG THÁI</th>
+                                        <th className="p-2.5 border-b border-r border-gray-200 w-28 text-center bg-gray-100 whitespace-nowrap">BIÊN LAI</th>
+                                        <th className="p-2.5 border-b border-gray-200 w-28 text-center bg-gray-100 sticky right-0 z-20 whitespace-nowrap">THAO TÁC</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-200 text-xs">
+                                    {paginatedRecords.length > 0 ? (
+                                        paginatedRecords.map((r) => (
+                                            <tr key={r.id} className={`hover:bg-slate-50 transition-colors group ${selectedIds.has(r.id) ? 'bg-blue-50/60' : ''}`}>
+                                                {/* 1. Checkbox */}
+                                                <td className="p-2.5 border-r border-gray-200 text-center bg-white sticky left-0 z-10 group-hover:bg-slate-50">
+                                                    <input type="checkbox" checked={selectedIds.has(r.id)} onChange={() => handleSelectRow(r.id)} />
+                                                </td>
+
+                                                {/* 2. Mã hồ sơ */}
+                                                <td className="p-2.5 border-r border-gray-200 font-mono font-bold text-teal-800 whitespace-nowrap">
+                                                    <span className="bg-teal-50 px-2 py-1 rounded border border-teal-200 inline-block">
+                                                        {r.data?.so_bien_nhan || r.data?.so_thu_tuc || r.data?.ma_ho_so || `HS-${r.id.substring(0,6).toUpperCase()}`}
+                                                    </span>
+                                                </td>
+
+                                                {/* 3. Thông tin chủ sử dụng */}
+                                                <td className="p-2.5 border-r border-gray-200">
+                                                    <div className="font-bold text-slate-800 text-sm">{r.data?.ten_chu_su_dung || r.data?.chu_su_dung || r.trich_yeu || '-'}</div>
+                                                    {(r.data?.cccd || r.data?.dia_chi) && (
+                                                        <div className="text-[11px] text-gray-500 mt-0.5">{r.data?.cccd || r.data?.dia_chi}</div>
                                                     )}
                                                 </td>
-                                            );
-                                        })}
-                                        {activeTab === 'scanned' && (
-                                            <>
-                                                <td className="p-2 border-r border-gray-200 text-xs text-gray-600">
-                                                    {r.data?.scan_batch_id}
+
+                                                {/* 4. Loại hồ sơ */}
+                                                <td className="p-2.5 border-r border-gray-200 text-slate-700 font-medium">
+                                                    {r.data?.loai_ho_so || r.data?.loai_bien_dong || 'Đăng ký cấp GCN'}
                                                 </td>
-                                            </>
-                                        )}
-                                        <td className="p-2 text-center bg-white sticky right-0 group-hover:bg-teal-50/30 z-10 border-l border-gray-200">
-                                            <div className="flex flex-col gap-2 items-center justify-center h-full w-full">
-                                                {activeTab === 'all' && (
-                                                    <>
-                                                        <button 
-                                                            onClick={() => toggleEdit(r.id)} 
-                                                            className={`p-2 rounded-lg transition-colors shadow-sm border ${editingId === r.id ? 'text-green-600 bg-green-50 border-green-200 hover:bg-green-100' : 'text-gray-500 bg-white border-gray-200 hover:text-blue-600 hover:border-blue-300 hover:bg-blue-50'}`}
-                                                            title={editingId === r.id ? "Xong" : "Sửa"}
+
+                                                {/* 5. Thời hạn xử lý */}
+                                                <td className="p-2.5 border-r border-gray-200 text-center whitespace-nowrap">
+                                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                                        <Clock size={12} />
+                                                        {r.data?.han_xu_ly || r.data?.ngay_hen_tra ? (new Date(r.data?.han_xu_ly || r.data?.ngay_hen_tra).toLocaleDateString('vi-VN')) : 'Trong hạn'}
+                                                    </span>
+                                                </td>
+
+                                                {/* 6. Xã phường */}
+                                                <td className="p-2.5 border-r border-gray-200 text-slate-700 font-medium whitespace-nowrap">
+                                                    {r.data?.xa_phuong || r.data?.dia_danh || '-'}
+                                                </td>
+
+                                                {/* 7. Tờ */}
+                                                <td className="p-2.5 border-r border-gray-200 text-center font-bold text-slate-800">
+                                                    {r.data?.so_to || '-'}
+                                                </td>
+
+                                                {/* 8. Thửa */}
+                                                <td className="p-2.5 border-r border-gray-200 text-center font-bold text-slate-800">
+                                                    {r.data?.so_thua || '-'}
+                                                </td>
+
+                                                {/* 9. Giao nhân viên */}
+                                                <td className="p-2.5 border-r border-gray-200 text-slate-700 whitespace-nowrap font-medium">
+                                                    {r.data?.assigned_employee || r.data?.can_bo_thu_ly ? (
+                                                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-bold border border-blue-200">
+                                                            <Users size={12} />
+                                                            {r.data?.assigned_employee || r.data?.can_bo_thu_ly}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-gray-400 italic">Chưa giao</span>
+                                                    )}
+                                                </td>
+
+                                                {/* 10. Hoàn thành / Đợt */}
+                                                <td className="p-2.5 border-r border-gray-200 text-slate-600 whitespace-nowrap">
+                                                    {r.data?.batch_name || r.data?.ngay_hoan_thanh || '-'}
+                                                </td>
+
+                                                {/* 11. Trạng thái */}
+                                                <td className="p-2.5 border-r border-gray-200 text-center whitespace-nowrap">
+                                                    <span className={`inline-block px-2.5 py-1 rounded-full text-[11px] font-bold ${
+                                                        (r.data?.status || r.data?.stage || '').includes('Hoàn thành') || (r.data?.status || '').includes('Đã trả')
+                                                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                                            : (r.data?.status || r.data?.stage || '').includes('Thuế')
+                                                            ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                                                            : 'bg-blue-100 text-blue-800 border border-blue-300'
+                                                    }`}>
+                                                        {r.data?.status || r.data?.stage || 'Đang xử lý'}
+                                                    </span>
+                                                </td>
+
+                                                {/* 12. Biên lai */}
+                                                <td className="p-2.5 border-r border-gray-200 text-center whitespace-nowrap">
+                                                    <span className="inline-block px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                                        {r.data?.so_bien_lai || r.data?.bien_lai || 'Đã thu'}
+                                                    </span>
+                                                </td>
+
+                                                {/* 13. Thao tác */}
+                                                <td className="p-2.5 text-center bg-white sticky right-0 group-hover:bg-slate-50 z-10 border-l border-gray-200">
+                                                    <div className="flex items-center justify-center gap-1">
+                                                        <button
+                                                            onClick={() => toggleEdit(r.id)}
+                                                            className="p-1.5 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                                            title="Chỉnh sửa"
                                                         >
-                                                            {editingId === r.id ? <CheckCircle2 size={18}/> : <Edit size={18}/>}
+                                                            <Edit size={16} />
                                                         </button>
-                                                        <button 
-                                                            onClick={() => handleMoveToPendingSingle(r.id)} 
-                                                            className="p-2 text-indigo-600 bg-white border border-gray-200 hover:bg-indigo-50 hover:border-indigo-300 rounded-lg transition-colors shadow-sm" 
-                                                            title="Chuyển Scan"
+                                                        <button
+                                                            onClick={() => handleDelete(r)}
+                                                            className="p-1.5 text-slate-600 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                                                            title="Xóa"
                                                         >
-                                                            <Send size={18}/>
+                                                            <Trash2 size={16} />
                                                         </button>
-                                                    </>
-                                                )}
-                                                <button 
-                                                    onClick={() => handleDelete(r)} 
-                                                    className="p-2 text-gray-500 bg-white border border-gray-200 hover:text-red-600 hover:bg-red-50 hover:border-red-300 rounded-lg transition-colors shadow-sm" 
-                                                    title="Xóa dòng này"
-                                                >
-                                                    <Trash2 size={18}/>
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                )) : (
-                                    <tr>
-                                        <td colSpan={COLUMNS.length + 5} className="p-8 text-center text-gray-400 italic">
-                                            {activeTab === 'all' ? 'Chưa có dữ liệu. Nhấn "Import Excel" hoặc "Thêm mới".' : 
-                                             activeTab === 'pending' ? 'Chưa có hồ sơ chờ chuyển scan.' :
-                                             'Chưa có hồ sơ nào được chuyển Scan.'}
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    ) : (
+                                        <tr>
+                                            <td colSpan={13} className="p-8 text-center text-gray-400 italic">
+                                                Không tìm thấy dữ liệu hồ sơ phù hợp.
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        )}
                     </div>
                     {/* Pagination Controls */}
                     {totalPages > 1 && (

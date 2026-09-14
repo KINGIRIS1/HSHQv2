@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Database, AlertTriangle, Cloud, Loader2, CheckCircle, Save, Globe, Calendar, Plus, Trash2, ShieldAlert, Key, FolderArchive, Upload, Download, RefreshCw, FolderOpen, LayoutDashboard, SlidersHorizontal, Eye, EyeOff, ArrowLeft, ArrowRight, ChevronUp, ChevronDown, Search, RotateCcw, FileSpreadsheet, Clock, CheckCircle2, ExternalLink, Copy, Code, HelpCircle, Check } from 'lucide-react';
+import { Database, AlertTriangle, Cloud, Loader2, CheckCircle, Save, Globe, Calendar, Plus, Trash2, ShieldAlert, Key, FolderArchive, Upload, Download, RefreshCw, FolderOpen, LayoutDashboard, SlidersHorizontal, Eye, EyeOff, ArrowLeft, ArrowRight, ChevronUp, ChevronDown, Search, RotateCcw, FileSpreadsheet, Clock, CheckCircle2, ExternalLink, Copy, Code, HelpCircle, Check, Lock, Unlock, Edit3, X } from 'lucide-react';
 import { Holiday, UserRole, RolePermissions, DepartmentPermissions, DEFAULT_ROLE_PERMISSIONS, AVAILABLE_PERMISSIONS, Employee, RecordStatus, User, RecordFile } from '../types';
 import { fetchHolidays, saveHolidays, testDatabaseConnection, saveUpdateInfo, fetchUpdateInfo, getSystemSetting, saveSystemSetting, fetchSystemEvents } from '../services/api';
 import { fetchRecords } from '../services/apiRecords';
@@ -50,7 +50,7 @@ const PERMISSION_GROUPS = [
       { id: 'receive_contract', label: 'Tab Quản lý Hợp đồng dịch vụ' },
       { id: 'all_records', label: 'Tab Hồ sơ Đo đạc' },
       { id: 'archive_records', label: 'Tab Hồ sơ Lưu trữ' },
-      { id: 'registration_records', label: 'Tab Đăng ký cấp giấy' },
+      { id: 'registration_records', label: 'Tab Hồ sơ Cấp giấy' },
       { id: 'excerpt_management', label: 'Tab Sổ trích lục / Trích đo' },
       { id: 'work_schedule', label: 'Tab Lịch công tác' },
       { id: 'reports', label: 'Tab Báo cáo & Thống kê' },
@@ -175,6 +175,11 @@ const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
   // Google Drive URL Cấu hình lưu trữ hồ sơ tiếp nhận
   const [driveUrl, setDriveUrl] = useState<string>(getGoogleDriveIncomingUrl());
   const [driveScriptUrl, setDriveScriptUrl] = useState<string>(getGoogleDriveScriptUrl());
+  const [isEditingDriveUrls, setIsEditingDriveUrls] = useState<boolean>(() => {
+    // Nếu chưa có link nào thì mở sẵn chế độ nhập, nếu đã có link thì khóa an toàn
+    const hasInitial = !!(getGoogleDriveIncomingUrl() || getGoogleDriveScriptUrl());
+    return !hasInitial;
+  });
   const [isDriveSaved, setIsDriveSaved] = useState<boolean>(false);
   const [isTestingDrive, setIsTestingDrive] = useState<boolean>(false);
   const [driveTestFeedback, setDriveTestFeedback] = useState<{ success: boolean; message: string; driveUrl?: string } | null>(null);
@@ -496,10 +501,17 @@ function cleanString(str) {
       cleanScriptUrl = cleanScriptUrl.replace(/\/dev$/, '/exec');
       setDriveScriptUrl(cleanScriptUrl);
     }
-    setGoogleDriveIncomingUrl(driveUrl);
+    setGoogleDriveIncomingUrl(driveUrl.trim());
     setGoogleDriveScriptUrl(cleanScriptUrl);
+    setIsEditingDriveUrls(false);
     setIsDriveSaved(true);
     setTimeout(() => setIsDriveSaved(false), 3000);
+  };
+
+  const handleCancelEditDriveUrl = () => {
+    setDriveUrl(getGoogleDriveIncomingUrl());
+    setDriveScriptUrl(getGoogleDriveScriptUrl());
+    setIsEditingDriveUrls(false);
   };
 
   const handleTestDriveConnection = async () => {
@@ -1369,16 +1381,51 @@ function cleanString(str) {
                                     Cấu hình đường dẫn thư mục Google Drive dùng để mở trực tiếp thư mục lưu trữ tệp đính kèm hồ sơ tiếp nhận từ biên nhận.
                                 </p>
                             </div>
+                            <div className="flex items-center gap-2">
+                                {!isEditingDriveUrls && (driveUrl || driveScriptUrl) ? (
+                                    <div className="flex items-center gap-2">
+                                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold">
+                                            <Lock size={13} className="text-emerald-600" />
+                                            Đã lưu & Đang bảo vệ link
+                                        </span>
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsEditingDriveUrls(true)}
+                                            className="px-3.5 py-1.5 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-900 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
+                                        >
+                                            <Edit3 size={13} className="text-amber-700" />
+                                            <span>Sửa / Thay đổi link</span>
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-800 text-xs font-bold">
+                                        <Unlock size={13} className="text-blue-600" />
+                                        Chế độ chỉnh sửa link
+                                    </span>
+                                )}
+                            </div>
                         </div>
 
                         <div className="space-y-4">
                             <div>
-                                <label className="block text-xs font-bold text-slate-600 mb-1.5">1. Link thư mục Google Drive (URL Thư mục dùng chung)</label>
+                                <label className="block text-xs font-bold text-slate-600 mb-1.5 flex items-center justify-between">
+                                    <span>1. Link thư mục Google Drive (URL Thư mục dùng chung)</span>
+                                    {!isEditingDriveUrls && driveUrl && (
+                                        <span className="text-[11px] font-bold text-slate-400 flex items-center gap-1">
+                                            <Lock size={11} /> Đang khóa chống sửa nhầm
+                                        </span>
+                                    )}
+                                </label>
                                 <div className="relative w-full">
-                                    <Globe size={16} className="absolute left-4 top-3.5 text-gray-400" />
+                                    <Globe size={16} className={`absolute left-4 top-3.5 ${!isEditingDriveUrls ? 'text-slate-400' : 'text-blue-500'}`} />
                                     <input 
                                         type="text" 
-                                        className="w-full border border-gray-200 rounded-xl px-4 py-2.5 pl-11 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none transition-all" 
+                                        disabled={!isEditingDriveUrls}
+                                        className={`w-full border rounded-xl px-4 py-2.5 pl-11 text-sm font-bold transition-all ${
+                                            !isEditingDriveUrls 
+                                                ? 'bg-slate-50 border-slate-200 text-slate-600 cursor-not-allowed select-all' 
+                                                : 'bg-white border-gray-200 text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none'
+                                        }`}
                                         placeholder="https://drive.google.com/drive/folders/..." 
                                         value={driveUrl || ''} 
                                         onChange={(e) => setDriveUrl(e.target.value)} 
@@ -1394,12 +1441,22 @@ function cleanString(str) {
                                             ⚠️ Phát hiện link /dev (Sẽ tự chuyển thành /exec khi lưu)
                                         </span>
                                     )}
+                                    {!isEditingDriveUrls && driveScriptUrl && (
+                                        <span className="text-[11px] font-bold text-slate-400 flex items-center gap-1">
+                                            <Lock size={11} /> Đang khóa chống sửa nhầm
+                                        </span>
+                                    )}
                                 </label>
                                 <div className="relative w-full">
-                                    <Cloud size={16} className="absolute left-4 top-3.5 text-gray-400" />
+                                    <Cloud size={16} className={`absolute left-4 top-3.5 ${!isEditingDriveUrls ? 'text-slate-400' : 'text-blue-500'}`} />
                                     <input 
                                         type="text" 
-                                        className="w-full border border-gray-200 rounded-xl px-4 py-2.5 pl-11 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none transition-all" 
+                                        disabled={!isEditingDriveUrls}
+                                        className={`w-full border rounded-xl px-4 py-2.5 pl-11 text-sm font-bold transition-all ${
+                                            !isEditingDriveUrls 
+                                                ? 'bg-slate-50 border-slate-200 text-slate-600 cursor-not-allowed select-all' 
+                                                : 'bg-white border-gray-200 text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none'
+                                        }`}
                                         placeholder="https://script.google.com/macros/s/.../exec" 
                                         value={driveScriptUrl || ''} 
                                         onChange={(e) => setDriveScriptUrl(e.target.value)} 
@@ -1411,15 +1468,39 @@ function cleanString(str) {
                             </div>
 
                             <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
-                                <div className="flex items-center gap-2 w-full sm:w-auto">
-                                    <button
-                                        type="button"
-                                        onClick={handleSaveDriveUrl}
-                                        className="flex-1 sm:flex-none px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95 cursor-pointer shrink-0"
-                                    >
-                                        <Save size={14} />
-                                        <span>Lưu thiết lập</span>
-                                    </button>
+                                <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
+                                    {isEditingDriveUrls ? (
+                                        <>
+                                            <button
+                                                type="button"
+                                                onClick={handleSaveDriveUrl}
+                                                className="flex-1 sm:flex-none px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95 cursor-pointer shrink-0"
+                                            >
+                                                <Save size={14} />
+                                                <span>Lưu & Khóa link</span>
+                                            </button>
+
+                                            {(getGoogleDriveIncomingUrl() || getGoogleDriveScriptUrl()) && (
+                                                <button
+                                                    type="button"
+                                                    onClick={handleCancelEditDriveUrl}
+                                                    className="flex-1 sm:flex-none px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-slate-700 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
+                                                >
+                                                    <X size={14} />
+                                                    <span>Hủy</span>
+                                                </button>
+                                            )}
+                                        </>
+                                    ) : (
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsEditingDriveUrls(true)}
+                                            className="flex-1 sm:flex-none px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95 cursor-pointer shrink-0"
+                                        >
+                                            <Edit3 size={14} />
+                                            <span>Mở sửa / Thay link</span>
+                                        </button>
+                                    )}
 
                                     <button
                                         type="button"
@@ -1485,7 +1566,7 @@ function cleanString(str) {
                             {isDriveSaved && (
                                 <div className="p-2.5 rounded-xl text-xs font-bold bg-emerald-50 border border-emerald-200 text-emerald-800 flex items-center gap-2">
                                     <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
-                                    <span>Đã lưu thành công cấu hình Google Drive!</span>
+                                    <span>Đã lưu và khóa an toàn cấu hình Google Drive!</span>
                                 </div>
                             )}
 

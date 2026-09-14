@@ -1685,7 +1685,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
         />
       );
     case "registration_records":
-      return <RegistrationRecords currentUser={currentUser} wards={wards} />;
+      return <RegistrationRecords currentUser={currentUser} wards={wards} employees={employees} />;
     case "congvan_records":
       return <CongVanView currentUser={currentUser} />;
     case "barcode_generator":
