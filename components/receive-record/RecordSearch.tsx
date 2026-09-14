@@ -736,11 +736,20 @@ export const RecordSearch: React.FC<RecordSearchProps> = ({
                         {/* Excel Export */}
                         <button
                             onClick={handleExportExcel}
-                            className="inline-flex items-center justify-center p-2 bg-white text-emerald-700 border border-emerald-300 hover:bg-emerald-50 rounded-lg shadow-xs transition-all active:scale-95 cursor-pointer select-none shrink-0"
+                            className={`relative inline-flex items-center justify-center p-2 rounded-lg shadow-xs transition-all active:scale-95 cursor-pointer select-none shrink-0 border ${
+                                selectedIds.size > 0 
+                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-400 hover:bg-emerald-100' 
+                                    : 'bg-white text-emerald-700 border-emerald-300 hover:bg-emerald-50'
+                            }`}
                             title={selectedIds.size > 0 ? `Xuất Excel ${selectedIds.size} hồ sơ đã chọn` : `Xuất Excel toàn bộ ${sortedRecords.length} hồ sơ`}
                             aria-label="Xuất file Excel"
                         >
                             <FileSpreadsheet size={18} className="text-emerald-600 shrink-0" />
+                            {selectedIds.size > 0 && (
+                                <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 bg-[#802a0a] text-white text-[10px] font-black rounded-full flex items-center justify-center shadow-xs border border-white leading-none">
+                                    {selectedIds.size}
+                                </span>
+                            )}
                         </button>
 
                         {/* Column visibility and ordering selector matched perfectly to "Tất cả hồ sơ" */}
@@ -809,29 +818,6 @@ export const RecordSearch: React.FC<RecordSearchProps> = ({
                     </div>
                 </div>
             </div>
-
-            {/* Selected Records Banner */}
-            {selectedIds.size > 0 && (
-                <div className="mx-3 md:mx-4 mt-2.5 mb-1 flex items-center gap-2 bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-200 shrink-0">
-                    <span className="text-slate-600 text-xs font-semibold">
-                        Đã chọn <strong className="text-blue-700 font-bold">{selectedIds.size}</strong> hồ sơ
-                    </span>
-                    <button
-                        onClick={() => setSelectedIds(new Set(sortedRecords.map(r => r.id)))}
-                        className="text-xs text-blue-600 hover:text-blue-800 font-bold hover:underline cursor-pointer"
-                        title="Chọn toàn bộ hồ sơ trong kết quả tìm kiếm"
-                    >
-                        Chọn tất cả ({sortedRecords.length})
-                    </button>
-                    <span className="text-gray-300">|</span>
-                    <button
-                        onClick={() => setSelectedIds(new Set())}
-                        className="text-xs text-gray-500 hover:text-gray-700 font-semibold hover:underline cursor-pointer"
-                    >
-                        Bỏ chọn
-                    </button>
-                </div>
-            )}
 
             {/* Records Table and Content */}
             <div className="flex-1 overflow-auto min-h-0">

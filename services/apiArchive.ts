@@ -40,7 +40,15 @@ const ARCHIVE_DB_COLUMNS = [
     'receiptNumber', 'resultReturnedDate', 'receiverName',
     'needsMapCorrection', 'explanationPlan',
     'issueNumber', 'entryNumber', 'issueDate', 'residentialArea',
-    'isHandedOver', 'statusLogs', 'archiveHandoverDate', 'archiveHandoverBatch'
+    'isHandedOver', 'statusLogs', 'archiveHandoverDate', 'archiveHandoverBatch',
+    'attachedFiles', 'dossierComponents'
+];
+
+export const OPTIONAL_ARCHIVE_COLUMNS = [
+    'dossierComponents', 'attachedFiles', 'statusLogs', 'isHandedOver',
+    'archiveHandoverDate', 'archiveHandoverBatch', 'exportBatch', 'exportDate',
+    'handoverWard', 'checkedBy', 'pendingCheckDate', 'checkedDate', 'submittedTo', 'approvalDate',
+    'reminderDate', 'lastRemindedAt'
 ];
 
 // --- CONVERSION HELPERS ---
@@ -551,6 +559,14 @@ export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise
         if (record.id) {
             let { data, error } = await supabase.from('luutru_records').update(payload).eq('id', record.id).select();
             
+            if (error && (error.code === '42703' || String(error.message || '').includes('column') || error.code === 'PGRST204')) {
+                const fallbackPayload = { ...payload };
+                OPTIONAL_ARCHIVE_COLUMNS.forEach(col => delete fallbackPayload[col]);
+                const res = await supabase.from('luutru_records').update(fallbackPayload).eq('id', record.id).select();
+                data = res.data;
+                error = res.error;
+            }
+
             if (error && (error.code === '22P02' || String(error.message || '').includes('22P02'))) {
                 const cleanPayload = sanitizePayloadFor22P02(payload);
                 const res = await supabase.from('luutru_records').update(cleanPayload).eq('id', record.id).select();
@@ -563,6 +579,14 @@ export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise
         } else {
             let { data, error } = await supabase.from('luutru_records').insert([payload]).select();
             
+            if (error && (error.code === '42703' || String(error.message || '').includes('column') || error.code === 'PGRST204')) {
+                const fallbackPayload = { ...payload };
+                OPTIONAL_ARCHIVE_COLUMNS.forEach(col => delete fallbackPayload[col]);
+                const res = await supabase.from('luutru_records').insert([fallbackPayload]).select();
+                data = res.data;
+                error = res.error;
+            }
+
             if (error && (error.code === '22P02' || String(error.message || '').includes('22P02'))) {
                 const cleanPayload = sanitizePayloadFor22P02(payload);
                 const res = await supabase.from('luutru_records').insert([cleanPayload]).select();
@@ -666,6 +690,16 @@ export const updateArchiveRecordsBatch = async (ids: string[], updates: Partial<
         });
 
         let { error: upsertError } = await supabase.from('luutru_records').upsert(updatedPayloads);
+        if (upsertError && (upsertError.code === '42703' || String(upsertError.message || '').includes('column') || upsertError.code === 'PGRST204')) {
+            const fallbackPayloads = updatedPayloads.map(p => {
+                const fp = { ...p };
+                OPTIONAL_ARCHIVE_COLUMNS.forEach(col => delete fp[col]);
+                return fp;
+            });
+            const res = await supabase.from('luutru_records').upsert(fallbackPayloads);
+            upsertError = res.error;
+        }
+
         if (upsertError && (upsertError.code === '22P02' || String(upsertError.message || '').includes('22P02'))) {
             const cleanPayload = sanitizePayloadFor22P02(updatedPayloads);
             const res = await supabase.from('luutru_records').upsert(cleanPayload);

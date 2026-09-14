@@ -157,7 +157,8 @@ const OPTIONAL_NEW_COLUMNS = [
     'price', 'advancePayment', 'isHandedOver',
     'statusLogs', 'archiveHandoverDate', 'archiveHandoverBatch',
     'surveyorId', 'surveyAssignedDate', 'fieldAssignedDate', 'fieldCompletedDate',
-    'drafterId', 'officeAssignedDate', 'officeCompletedDate'
+    'drafterId', 'officeAssignedDate', 'officeCompletedDate',
+    'exportBatch', 'exportDate', 'handoverWard', 'attachedFiles', 'dossierComponents'
 ];
 
 const fetchTableRecords = async (

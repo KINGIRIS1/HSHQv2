@@ -769,7 +769,11 @@ export const KiemTraDoDacTab: React.FC<KiemTraDoDacTabProps> = ({
     };
 
     const handleExportExcel = () => {
-        if (searchedRecords.length === 0) {
+        const recordsToExport = selectedIds.size > 0
+            ? eligibleRecords.filter(r => selectedIds.has(r.id))
+            : searchedRecords;
+
+        if (recordsToExport.length === 0) {
             notify("Danh sách trống, không có hồ sơ để xuất.", 'error');
             return;
         }
@@ -777,7 +781,9 @@ export const KiemTraDoDacTab: React.FC<KiemTraDoDacTabProps> = ({
         const wb = XLSX.utils.book_new();
         const ws = XLSX.utils.aoa_to_sheet([]);
 
-        const title1 = "DANH SÁCH HỒ SƠ THIẾU THÔNG TIN KIỂM TRA ĐO ĐẠC";
+        const title1 = selectedIds.size > 0 
+            ? `DANH SÁCH ${recordsToExport.length} HỒ SƠ ĐƯỢC CHỌN - KIỂM TRA ĐO ĐẠC`
+            : "DANH SÁCH HỒ SƠ THIẾU THÔNG TIN KIỂM TRA ĐO ĐẠC";
         const title2 = "CHI NHÁNH HỚN QUẢN";
 
         const headers = [
@@ -818,7 +824,7 @@ export const KiemTraDoDacTab: React.FC<KiemTraDoDacTabProps> = ({
         };
 
         const dataRows: any[] = [];
-        searchedRecords.forEach((r, idx) => {
+        recordsToExport.forEach((r, idx) => {
             const hasReachedPendingSign = [
                 RecordStatus.PENDING_SIGN,
                 RecordStatus.SIGNED,
@@ -982,11 +988,20 @@ export const KiemTraDoDacTab: React.FC<KiemTraDoDacTabProps> = ({
                 <div className="flex items-center gap-3 text-xs self-start xl:self-auto">
                     <button
                         onClick={handleExportExcel}
-                        className="bg-white hover:bg-emerald-50 text-emerald-700 border border-emerald-300 p-2 rounded-lg flex items-center justify-center font-bold shadow-xs transition-all cursor-pointer active:scale-95"
-                        title="Xuất danh sách hồ sơ đang hiển thị ra tệp Excel"
+                        className={`relative p-2 rounded-lg flex items-center justify-center font-bold shadow-xs transition-all cursor-pointer active:scale-95 border ${
+                            selectedIds.size > 0 
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-400 hover:bg-emerald-100' 
+                                : 'bg-white hover:bg-emerald-50 text-emerald-700 border-emerald-300'
+                        }`}
+                        title={selectedIds.size > 0 ? `Xuất Excel ${selectedIds.size} hồ sơ đã chọn` : `Xuất file Excel (${eligibleRecords.length} hồ sơ)`}
                         aria-label="Xuất file Excel"
                     >
                         <FileSpreadsheet size={18} className="text-emerald-600 shrink-0" />
+                        {(selectedIds.size > 0 ? selectedIds.size : eligibleRecords.length) > 0 && (
+                            <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 bg-[#802a0a] text-white text-[10px] font-black rounded-full flex items-center justify-center shadow-xs border border-white leading-none">
+                                {selectedIds.size > 0 ? selectedIds.size : eligibleRecords.length}
+                            </span>
+                        )}
                     </button>
                     <div className="bg-amber-50 border border-amber-200 text-amber-800 px-3 py-1.5 rounded-lg flex items-center gap-1.5 font-semibold">
                         <AlertCircle size={14} className="text-amber-600" />

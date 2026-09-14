@@ -317,21 +317,20 @@ export const RegistrationModuleView: React.FC<RegistrationModuleViewProps> = ({
             <button
               type="button"
               onClick={() => setShowFilterPopover(!showFilterPopover)}
-              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all border shadow-2xs cursor-pointer ${
+              className={`flex items-center justify-center p-2 rounded-xl text-xs font-bold transition-all border shadow-2xs cursor-pointer relative ${
                 activeFilterCount > 0
                   ? 'border-blue-300 text-blue-700 bg-blue-50'
                   : 'border-slate-200 text-slate-700 bg-white hover:bg-slate-50'
               }`}
-              title="Mở bộ lọc tìm kiếm"
+              title="Bộ lọc hồ sơ cấp giấy"
+              aria-label="Bộ lọc hồ sơ cấp giấy"
             >
-              <Filter size={15} />
-              <span>Bộ lọc</span>
+              <Filter size={18} />
               {activeFilterCount > 0 && (
-                <span className="bg-red-500 text-white text-[10px] px-1.5 py-0.2 rounded-full font-extrabold">
+                <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full font-extrabold flex items-center justify-center shadow-xs">
                   {activeFilterCount}
                 </span>
               )}
-              {showFilterPopover ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
             </button>
 
             {/* Thẻ Popover thả xuống */}

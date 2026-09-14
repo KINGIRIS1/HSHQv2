@@ -216,11 +216,16 @@ const ScheduleList: React.FC<ScheduleListProps> = ({ schedules, onEdit, onDelete
 
                         <button 
                             onClick={handleExport} 
-                            className="flex items-center justify-center bg-white text-emerald-700 border border-emerald-300 p-2 rounded-lg hover:bg-emerald-50 shadow-xs shrink-0 transition-all active:scale-95 cursor-pointer"
-                            title="Xuất lịch công tác ra file Excel"
+                            className="relative flex items-center justify-center bg-white text-emerald-700 border border-emerald-300 p-2 rounded-lg hover:bg-emerald-50 shadow-xs shrink-0 transition-all active:scale-95 cursor-pointer"
+                            title={`Xuất lịch công tác ra file Excel (${filteredList.length} lịch)`}
                             aria-label="Xuất file Excel"
                         >
                             <FileSpreadsheet size={16} className="text-emerald-600" />
+                            {filteredList.length > 0 && (
+                                <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 bg-[#802a0a] text-white text-[10px] font-black rounded-full flex items-center justify-center shadow-xs border border-white leading-none">
+                                    {filteredList.length}
+                                </span>
+                            )}
                         </button>
                     </div>
                 </div>

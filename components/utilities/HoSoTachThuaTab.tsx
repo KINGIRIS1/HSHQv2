@@ -448,12 +448,18 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
     }
 
     const handleExportExcel = () => {
-        if (groupedList.length === 0) { notify("Danh sách trống.", 'error'); return; }
+        const sourceList = selectedGroups.size > 0
+            ? groupedList.filter(item => item.data.SO_HD && selectedGroups.has(item.data.SO_HD))
+            : groupedList;
+
+        if (sourceList.length === 0) { notify("Danh sách trống.", 'error'); return; }
 
         const wb = XLSX.utils.book_new();
         const ws = XLSX.utils.aoa_to_sheet([]);
 
-        const title1 = "DANH SÁCH CUNG CẤP SỐ THỬA CHÍNH THỨC";
+        const title1 = selectedGroups.size > 0 
+            ? `DANH SÁCH CUNG CẤP SỐ THỬA CHÍNH THỨC (${selectedGroups.size} HỒ SƠ ĐÃ CHỌN)`
+            : "DANH SÁCH CUNG CẤP SỐ THỬA CHÍNH THỨC";
         const title2 = "CHI NHÁNH HỚN QUẢN";
         
         // Cập nhật Header cho Excel (Bỏ cột Ghi chú, đổi tên cột Số HĐ)
@@ -493,16 +499,43 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
         merges.push({ s: { r: 3, c: 6 }, e: { r: 3, c: 10 } }); // Sau BĐ
         merges.push({ s: { r: 3, c: 13 }, e: { r: 3, c: 14 } }); // Mục đích SD
 
+        const getSourceRowSpan = (index: number) => {
+            const current = sourceList[index];
+            const prev = sourceList[index - 1];
+            if (!current.data.SO_HD) return 1;
+            if (prev && prev.data.SO_HD === current.data.SO_HD) return 0; 
+            let count = 1;
+            for (let i = index + 1; i < sourceList.length; i++) {
+                if (sourceList[i].data.SO_HD === current.data.SO_HD) count++; else break;
+            }
+            return count;
+        };
+
+        const getSourceGroupSTT = (index: number) => {
+            const current = sourceList[index];
+            if (!current.data.SO_HD) return index + 1;
+            let firstIdx = index;
+            while(firstIdx > 0 && sourceList[firstIdx - 1].data.SO_HD === current.data.SO_HD) firstIdx--;
+            let groupCount = 0;
+            let i = 0;
+            while (i < firstIdx) {
+                groupCount++;
+                const hd = sourceList[i].data.SO_HD;
+                if (hd) { while (i < firstIdx && sourceList[i].data.SO_HD === hd) i++; } else i++;
+            }
+            return groupCount + 1;
+        };
+
         // Data starts at A6 -> Index 5
         let currentRow = 5;
 
-        for (let i = 0; i < groupedList.length; i++) {
-            const item = groupedList[i];
+        for (let i = 0; i < sourceList.length; i++) {
+            const item = sourceList[i];
             const d = item.data;
-            const span = getRowSpan(i, 'SO_HD');
+            const span = getSourceRowSpan(i);
             
             dataRows.push([
-                span > 0 ? getGroupSTT(i) : '', 
+                span > 0 ? getSourceGroupSTT(i) : '', 
                 span > 0 ? d.XA : '',           
                 d.TO_CU, d.THUA_CU, d.DT_CU, d.LOAI_DAT_CU,
                 d.TO_MOI, d.THUA_TAM, d.THUA_CHINH_THUC, d.DT_MOI, d.LOAI_DAT_MOI,
@@ -854,11 +887,20 @@ const HoSoTachThuaTab: React.FC<HoSoTachThuaTabProps> = ({ currentUser, notify }
 
                                 <button 
                                     onClick={handleExportExcel} 
-                                    className="flex items-center justify-center p-2 bg-white text-emerald-700 border border-emerald-300 rounded-lg hover:bg-emerald-50 shadow-xs transition-all active:scale-95 shrink-0"
-                                    title="Xuất file Excel"
+                                    className={`relative flex items-center justify-center p-2 rounded-lg shadow-xs transition-all active:scale-95 shrink-0 border ${
+                                        selectedGroups.size > 0 
+                                            ? 'bg-emerald-50 text-emerald-700 border-emerald-400 hover:bg-emerald-100' 
+                                            : 'bg-white text-emerald-700 border-emerald-300 hover:bg-emerald-50'
+                                    }`}
+                                    title={selectedGroups.size > 0 ? `Xuất Excel ${selectedGroups.size} hồ sơ đã chọn` : "Xuất file Excel"}
                                     aria-label="Xuất file Excel"
                                 >
                                     <FileSpreadsheet size={18} className="text-emerald-600" />
+                                    {selectedGroups.size > 0 && (
+                                        <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 bg-[#802a0a] text-white text-[10px] font-black rounded-full flex items-center justify-center shadow-xs border border-white leading-none">
+                                            {selectedGroups.size}
+                                        </span>
+                                    )}
                                 </button>
                             </div>
                         </div>

@@ -105,6 +105,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
 
   // State cho Nhắc nhở
   const [reminderDate, setReminderDate] = useState('');
+  const [reminderTime, setReminderTime] = useState('');
   const [isSavingReminder, setIsSavingReminder] = useState(false);
 
   // State cho giá hợp đồng
@@ -122,11 +123,24 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
   useEffect(() => {
       if (record) {
           setPersonalNote(record.personalNotes || '');
-          // Set reminder date (yyyy-MM-dd)
+          // Set reminder date (yyyy-MM-dd) & reminder time (HH:mm)
           if (record.reminderDate) {
-              setReminderDate(record.reminderDate.split('T')[0]);
+              const d = new Date(record.reminderDate);
+              if (!isNaN(d.getTime())) {
+                  const y = d.getFullYear();
+                  const m = String(d.getMonth() + 1).padStart(2, '0');
+                  const day = String(d.getDate()).padStart(2, '0');
+                  const hh = String(d.getHours()).padStart(2, '0');
+                  const mm = String(d.getMinutes()).padStart(2, '0');
+                  setReminderDate(`${y}-${m}-${day}`);
+                  setReminderTime(`${hh}:${mm}`);
+              } else {
+                  setReminderDate(record.reminderDate.split('T')[0] || '');
+                  setReminderTime('');
+              }
           } else {
               setReminderDate('');
+              setReminderTime('');
           }
 
           // Fetch Contract Price & Details
@@ -267,9 +281,15 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
       // Nếu user xóa trắng input -> xóa nhắc nhở
       let newReminderDate: string | null = null;
       if (reminderDate) {
-          const remD = new Date(reminderDate);
+          const timePart = reminderTime ? `${reminderTime}:00` : '08:00:00';
+          const remD = new Date(`${reminderDate}T${timePart}`);
           if (!isNaN(remD.getTime())) {
               newReminderDate = remD.toISOString();
+          } else {
+              const fallbackD = new Date(reminderDate);
+              if (!isNaN(fallbackD.getTime())) {
+                  newReminderDate = fallbackD.toISOString();
+              }
           }
       }
       
@@ -284,7 +304,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
       setIsSavingReminder(false);
       
       if (result) {
-          alert('Đã lưu lịch nhắc nhở!');
+          alert('Đã lưu lịch hẹn giờ làm việc!');
           // Cập nhật lại record local nếu cần thiết (thường App sẽ auto refresh)
       } else {
           alert('Lỗi khi lưu nhắc nhở.');
@@ -1227,12 +1247,26 @@ export const DetailModal: React.FC<DetailModalProps> = ({ isOpen, onClose, recor
                                 {isSavingReminder ? <Loader2 size={10} className="animate-spin" /> : <Save size={10} />} Lưu
                             </button>
                         </div>
-                        <input 
-                            type="date" 
-                            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all"
-                            value={reminderDate}
-                            onChange={(e) => setReminderDate(e.target.value)}
-                        />
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <div>
+                                <label className="text-[11px] font-medium text-gray-500 mb-1 block">Ngày nhắc</label>
+                                <input 
+                                    type="date" 
+                                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all"
+                                    value={reminderDate}
+                                    onChange={(e) => setReminderDate(e.target.value)}
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[11px] font-medium text-gray-500 mb-1 block">Giờ nhắc</label>
+                                <input 
+                                    type="time" 
+                                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all"
+                                    value={reminderTime}
+                                    onChange={(e) => setReminderTime(e.target.value)}
+                                />
+                            </div>
+                        </div>
                     </div>
 
                     {/* GHI CHÚ CÁ NHÂN */}

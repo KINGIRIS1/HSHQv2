@@ -108,6 +108,7 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
   const [personalNote, setPersonalNote] = useState('');
   const [isSavingNote, setIsSavingNote] = useState(false);
   const [reminderDate, setReminderDate] = useState('');
+  const [reminderTime, setReminderTime] = useState('');
   const [isSavingReminder, setIsSavingReminder] = useState(false);
   const [contractPrice, setContractPrice] = useState<number | null>(null);
   const [contractSplitItems, setContractSplitItems] = useState<SplitItem[] | null>(null);
@@ -162,10 +163,21 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
       setPersonalNote(record.personalNotes || '');
       if (record.reminderDate) {
         const d = new Date(record.reminderDate);
-        const localIso = new Date(d.getTime() - (d.getTimezoneOffset() * 60000)).toISOString().slice(0, 10);
-        setReminderDate(localIso);
+        if (!isNaN(d.getTime())) {
+          const y = d.getFullYear();
+          const m = String(d.getMonth() + 1).padStart(2, '0');
+          const day = String(d.getDate()).padStart(2, '0');
+          const hh = String(d.getHours()).padStart(2, '0');
+          const mm = String(d.getMinutes()).padStart(2, '0');
+          setReminderDate(`${y}-${m}-${day}`);
+          setReminderTime(`${hh}:${mm}`);
+        } else {
+          setReminderDate(record.reminderDate.split('T')[0] || '');
+          setReminderTime('');
+        }
       } else {
         setReminderDate('');
+        setReminderTime('');
       }
 
       // Fetch Contract Price & Details
@@ -251,10 +263,22 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
 
   const handleSaveReminder = async () => {
     setIsSavingReminder(true);
-    const newReminderDate = reminderDate ? new Date(reminderDate).toISOString() : null;
+    let newReminderDate: string | null = null;
+    if (reminderDate) {
+      const timePart = reminderTime ? `${reminderTime}:00` : '08:00:00';
+      const remD = new Date(`${reminderDate}T${timePart}`);
+      if (!isNaN(remD.getTime())) {
+        newReminderDate = remD.toISOString();
+      } else {
+        const fallbackD = new Date(reminderDate);
+        if (!isNaN(fallbackD.getTime())) {
+          newReminderDate = fallbackD.toISOString();
+        }
+      }
+    }
     const result = await updateRecordApi({ ...record, reminderDate: newReminderDate as string, lastRemindedAt: null as any });
     setIsSavingReminder(false);
-    alert(result ? 'Đã lưu nhắc nhở!' : 'Lỗi khi lưu.');
+    alert(result ? 'Đã lưu lịch hẹn giờ làm việc!' : 'Lỗi khi lưu.');
   };
 
   const handleSaveExtension = async () => {
@@ -1066,12 +1090,26 @@ export const MobileDetailModal: React.FC<MobileDetailModalProps> = ({
                   {isSavingReminder ? <Loader2 size={11} className="animate-spin" /> : 'Lưu'}
                 </button>
               </div>
-              <input 
-                type="date" 
-                className="w-full border border-slate-200 rounded-lg px-2.5 py-2 text-xs bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-100"
-                value={reminderDate}
-                onChange={(e) => setReminderDate(e.target.value)}
-              />
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] text-slate-500 mb-1 block">Ngày</label>
+                  <input 
+                    type="date" 
+                    className="w-full border border-slate-200 rounded-lg px-2.5 py-2 text-xs bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                    value={reminderDate}
+                    onChange={(e) => setReminderDate(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-slate-500 mb-1 block">Giờ</label>
+                  <input 
+                    type="time" 
+                    className="w-full border border-slate-200 rounded-lg px-2.5 py-2 text-xs bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                    value={reminderTime}
+                    onChange={(e) => setReminderTime(e.target.value)}
+                  />
+                </div>
+              </div>
             </div>
 
             {/* Ghi chú cá nhân */}

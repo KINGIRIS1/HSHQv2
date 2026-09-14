@@ -1211,6 +1211,7 @@ export function cleanFutureMilestoneDates(
         cleaned.exportBatch = null as any;
         cleaned.is_handover = false;
         cleaned.handover_date = null as any;
+        cleaned.handoverWard = null as any;
     }
 
     // Nếu rank < 5 (không phải SIGNED trở lên): Dọn dẹp mốc ký duyệt

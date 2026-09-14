@@ -7,7 +7,7 @@ import {
     Search, Eye, FileSpreadsheet, Pencil, Printer, Trash2, 
     FileSignature, FileEdit, RefreshCw, Filter, ChevronDown, ChevronUp, 
     X, RotateCcw, Calendar, UserCheck, Layers, Building2, ChevronLeft, ChevronRight,
-    Paperclip
+    Paperclip, CheckSquare, Square
 } from 'lucide-react';
 import { fetchContracts } from '../../services/api';
 import { saveRecord } from '../../services/apiRecords';
@@ -59,6 +59,7 @@ const DailyList: React.FC<DailyListProps> = ({
   const [isFilterPopoverOpen, setIsFilterPopoverOpen] = useState(false);
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [attachmentRecord, setAttachmentRecord] = useState<RecordFile | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const handleUpdateRecordFiles = async (recordId: string, files: AttachedFileMeta[]) => {
       if (!attachmentRecord) return;
@@ -258,10 +259,39 @@ const DailyList: React.FC<DailyListProps> = ({
       });
   }, [records, filterFromDate, filterToDate, selectedReceiver, selectedRecordType, selectedDept, searchTerm, currentUser, employees]);
 
-  // Reset to page 1 whenever filters change
+  // Reset to page 1 whenever filters change, and clear non-existent selections
   useEffect(() => {
       setCurrentPage(1);
   }, [filterFromDate, filterToDate, selectedReceiver, selectedRecordType, selectedDept, searchTerm]);
+
+  // Handle select/deselect all for current filtered list
+  const isAllSelected = filteredDailyRecords.length > 0 && filteredDailyRecords.every(r => selectedIds.has(r.id));
+  const isSomeSelected = filteredDailyRecords.some(r => selectedIds.has(r.id));
+
+  const handleSelectAllToggle = () => {
+      if (isAllSelected) {
+          // Unselect all in current filtered list
+          const next = new Set(selectedIds);
+          filteredDailyRecords.forEach(r => next.delete(r.id));
+          setSelectedIds(next);
+      } else {
+          // Select all in current filtered list
+          const next = new Set(selectedIds);
+          filteredDailyRecords.forEach(r => next.add(r.id));
+          setSelectedIds(next);
+      }
+  };
+
+  const handleRowSelectToggle = (id: string, e?: React.MouseEvent) => {
+      if (e) e.stopPropagation();
+      const next = new Set(selectedIds);
+      if (next.has(id)) {
+          next.delete(id);
+      } else {
+          next.add(id);
+      }
+      setSelectedIds(next);
+  };
 
   // Paginated records
   const totalPages = Math.ceil(filteredDailyRecords.length / recordsPerPage) || 1;
@@ -299,8 +329,23 @@ const DailyList: React.FC<DailyListProps> = ({
   };
 
 
+  // Priority list for export/preview:
+  // 1. If items are selected -> only selected items
+  // 2. If filtered -> filtered records
+  // 3. Fallback -> all records
+  const getRecordsToExport = () => {
+      if (selectedIds.size > 0) {
+          return records.filter(r => selectedIds.has(r.id));
+      }
+      if (filteredDailyRecords.length > 0) {
+          return filteredDailyRecords;
+      }
+      return records;
+  };
+
   const createDailyListWorkbook = () => {
-      if (filteredDailyRecords.length === 0) return null;
+      const recordsToExport = getRecordsToExport();
+      if (recordsToExport.length === 0) return null;
       
       let mainTitle = "DANH SÁCH TIẾP NHẬN HỒ SƠ";
       let wardTitle = "DANH SÁCH TỔNG HỢP";
@@ -320,7 +365,7 @@ const DailyList: React.FC<DailyListProps> = ({
       
       const formatDateStr = (d: any) => d ? new Date(d).toLocaleDateString('vi-VN') : '';
 
-      const dataRows = filteredDailyRecords.map((r, i) => [
+      const dataRows = recordsToExport.map((r, i) => [
           i + 1, 
           r.code, 
           r.customerName, 
@@ -416,6 +461,8 @@ const DailyList: React.FC<DailyListProps> = ({
   };
 
   const handleExport = () => {
+      const recordsToExport = getRecordsToExport();
+      if (recordsToExport.length === 0) { alert("Không có hồ sơ."); return; }
       const wb = createDailyListWorkbook();
       if (!wb) { alert("Không có hồ sơ."); return; }
       const suffix = selectedDept === 'ALL' || selectedDept === 'Tất cả' ? 'Tiep_Nhan' : selectedDept === 'Tổ Đo đạc' ? 'Ban_Giao_Do_Dac' : 'Ban_Giao_Luu_Tru';
@@ -423,7 +470,7 @@ const DailyList: React.FC<DailyListProps> = ({
       XLSX.writeFile(wb, `DS_${suffix}_${dateFileSuffix}.xlsx`);
       
       if (onHandOverRecords) {
-          const ids = filteredDailyRecords.map(r => r.id);
+          const ids = recordsToExport.map(r => r.id);
           setTimeout(() => {
               onHandOverRecords(ids);
           }, 1000);
@@ -651,10 +698,20 @@ const DailyList: React.FC<DailyListProps> = ({
                     </button>
                     <button 
                         onClick={handleExport} 
-                        className="p-2 bg-white text-emerald-700 border border-emerald-300 rounded-lg hover:bg-emerald-50 text-xs font-semibold shadow-xs transition-all active:scale-95 cursor-pointer"
-                        title="Xuất file Excel và Bàn giao"
+                        className="relative p-2 bg-white text-emerald-700 border border-emerald-300 rounded-lg hover:bg-emerald-50 text-xs font-semibold shadow-xs transition-all active:scale-95 cursor-pointer flex items-center justify-center"
+                        title={
+                            selectedIds.size > 0
+                                ? `Xuất file Excel cho ${selectedIds.size} hồ sơ đã chọn`
+                                : `Xuất file Excel và Bàn giao (${filteredDailyRecords.length} hồ sơ)`
+                        }
+                        aria-label="Xuất file Excel và Bàn giao"
                     > 
                         <FileSpreadsheet size={16} className="text-emerald-600" />
+                        {selectedIds.size > 0 && (
+                            <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 bg-[#802a0a] text-white text-[10px] font-black rounded-full flex items-center justify-center shadow-xs border border-white leading-none">
+                                {selectedIds.size}
+                            </span>
+                        )}
                     </button>
                 </div>
             </div>
@@ -666,6 +723,19 @@ const DailyList: React.FC<DailyListProps> = ({
                 <table className="w-full text-left table-fixed min-w-[1150px]">
                     <thead className="bg-gray-50 text-xs text-gray-600 uppercase font-bold sticky top-0 shadow-sm z-10">
                         <tr> 
+                            <th className="p-3 w-10 text-center">
+                                <button
+                                    onClick={handleSelectAllToggle}
+                                    className="text-gray-400 hover:text-blue-600 transition-colors cursor-pointer flex items-center justify-center mx-auto"
+                                    title={isAllSelected ? "Bỏ chọn tất cả" : "Chọn tất cả"}
+                                >
+                                    {isAllSelected ? (
+                                        <CheckSquare size={16} className="text-blue-600" />
+                                    ) : (
+                                        <Square size={16} />
+                                    )}
+                                </button>
+                            </th>
                             <th className="p-3 w-12 text-center">STT</th> 
                             <th className="p-3 w-[140px]">Mã Hồ Sơ</th> 
                             <th className="p-3 w-[190px]">Chủ Sử Dụng</th> 
@@ -684,9 +754,26 @@ const DailyList: React.FC<DailyListProps> = ({
                                 const existingContract = getContractForRecord(r);
                                 const is2xRecord = r.recordType && (getShortRecordType(r.recordType).startsWith('2.2') || getShortRecordType(r.recordType).startsWith('2.4') || (r.code || '').startsWith('2.'));
                                 const actualIndex = (currentPage - 1) * recordsPerPage + index + 1;
+                                const isSelected = selectedIds.has(r.id);
 
                                 return (
-                                    <tr key={r.id} className="hover:bg-blue-50/50 group">
+                                    <tr 
+                                        key={r.id} 
+                                        onClick={() => handleRowSelectToggle(r.id)}
+                                        className={`hover:bg-blue-50/50 group cursor-pointer ${isSelected ? 'bg-blue-50/70 font-medium' : ''}`}
+                                    >
+                                        <td className="p-3 text-center align-middle" onClick={(e) => handleRowSelectToggle(r.id, e)}>
+                                            <button
+                                                type="button"
+                                                className="text-gray-400 hover:text-blue-600 transition-colors flex items-center justify-center mx-auto cursor-pointer"
+                                            >
+                                                {isSelected ? (
+                                                    <CheckSquare size={16} className="text-blue-600" />
+                                                ) : (
+                                                    <Square size={16} />
+                                                )}
+                                            </button>
+                                        </td>
                                         <td className="p-3 text-center text-gray-400 font-mono align-middle">{actualIndex}</td> 
                                         <td className="p-3 font-mono font-bold text-blue-600 truncate align-middle" title={r.code}>
                                             <span>{r.code}</span>
@@ -711,7 +798,7 @@ const DailyList: React.FC<DailyListProps> = ({
                                             </div>
                                         </td>
                                         <td className="p-3 text-gray-500 italic truncate align-middle" title={r.content || ''}>{r.content}</td>
-                                        <td className="p-2 align-middle text-center sticky right-0 bg-white group-hover:bg-blue-50/50 shadow-l">
+                                        <td className="p-2 align-middle text-center sticky right-0 bg-white group-hover:bg-blue-50/50 shadow-l" onClick={(e) => e.stopPropagation()}>
                                             <div className="flex flex-col items-center justify-center gap-1">
                                                 {/* Hàng 1: Sửa hồ sơ & Hợp đồng */}
                                                 <div className="flex items-center justify-center gap-1">
@@ -784,7 +871,7 @@ const DailyList: React.FC<DailyListProps> = ({
                             })
                         ) : ( 
                             <tr>
-                                <td colSpan={10} className="p-12 text-center text-gray-400 italic">
+                                <td colSpan={11} className="p-12 text-center text-gray-400 italic">
                                     Không có hồ sơ tiếp nhận nào phù hợp với bộ lọc đang chọn.
                                 </td>
                             </tr> 

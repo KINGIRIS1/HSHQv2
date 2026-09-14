@@ -442,7 +442,11 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
       const prefix = `${isSurvey ? "Do_Dac" : "Luu_Tru"}_${slug}`;
       const fileName = `${prefix}_${datePart}_${timePart}.xlsx`;
 
-      await exportCustomRecordsToExcel(props.filteredRecords, employees, titleText, fileName);
+      const recordsToExport = (props.selectedRecordIds && props.selectedRecordIds.size > 0)
+        ? props.filteredRecords.filter(r => props.selectedRecordIds.has(r.id))
+        : props.filteredRecords;
+
+      await exportCustomRecordsToExcel(recordsToExport, employees, titleText, fileName);
     } catch (error: any) {
       console.error("Lỗi xuất excel:", error);
       alert(error?.message || "Đã xảy ra lỗi khi xuất file Excel.");
@@ -1000,11 +1004,22 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                 id="btn-export-filtered-records-excel"
                 onClick={handleExportFilteredExcel}
                 disabled={isExportingExcel || props.filteredRecords.length === 0}
-                className="flex items-center justify-center p-2 bg-white text-emerald-700 border border-emerald-300 hover:bg-emerald-50 rounded-lg shadow-xs transition-all cursor-pointer shrink-0 active:scale-95 disabled:bg-gray-100 disabled:text-gray-400 disabled:border-gray-200 disabled:cursor-not-allowed"
-                title={`Xuất file Excel theo kết quả lọc (${props.filteredRecords.length} hồ sơ)`}
+                className={`relative flex items-center justify-center p-2 rounded-lg shadow-xs transition-all cursor-pointer shrink-0 active:scale-95 border ${
+                  props.selectedRecordIds && props.selectedRecordIds.size > 0
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-400 hover:bg-emerald-100'
+                    : 'bg-white text-emerald-700 border-emerald-300 hover:bg-emerald-50'
+                } disabled:bg-gray-100 disabled:text-gray-400 disabled:border-gray-200 disabled:cursor-not-allowed`}
+                title={props.selectedRecordIds && props.selectedRecordIds.size > 0 
+                  ? `Xuất Excel ${props.selectedRecordIds.size} hồ sơ đã chọn` 
+                  : `Xuất file Excel theo kết quả lọc (${props.filteredRecords.length} hồ sơ)`}
                 aria-label="Xuất file Excel"
               >
                 <FileSpreadsheet size={18} className="text-emerald-600 shrink-0" />
+                {props.selectedRecordIds && props.selectedRecordIds.size > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 bg-[#802a0a] text-white text-[10px] font-black rounded-full flex items-center justify-center shadow-xs border border-white leading-none">
+                    {props.selectedRecordIds.size}
+                  </span>
+                )}
               </button>
             </div>
           </div>

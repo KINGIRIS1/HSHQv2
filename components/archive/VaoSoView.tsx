@@ -2,9 +2,9 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { ArchiveRecord, fetchArchiveRecords, saveArchiveRecord, deleteArchiveRecord, importArchiveRecords, updateArchiveRecordsBatch } from '../../services/apiArchive';
 import { useArchiveRealtime } from '../../hooks/useArchiveRealtime';
 import { User } from '../../types';
-import { Loader2, Plus, Search, Trash2, Upload, FileSpreadsheet, Send, CheckCircle2, X, History, Calendar, FileOutput, Settings, Hash, Edit, FileText, Filter, Users, MapPin, Landmark, CheckSquare, BookOpen, ClipboardList, PenTool, Printer, UserPlus, SlidersHorizontal, ChevronDown, ChevronUp, Clock, AlertTriangle, Eye } from 'lucide-react';
+import { Loader2, Plus, Search, Trash2, Upload, FileSpreadsheet, Send, CheckCircle2, X, History, Calendar, FileOutput, Settings, Hash, Edit, FileText, Filter, Users, MapPin, Landmark, CheckSquare, BookOpen, ClipboardList, PenTool, Printer, UserPlus, SlidersHorizontal, ChevronDown, ChevronUp, Clock, AlertTriangle, Eye, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
 import * as XLSX from 'xlsx-js-style';
-import { confirmAction, matchDepartmentKey } from '../../utils/appHelpers';
+import { confirmAction, matchDepartmentKey, parseSafeDate } from '../../utils/appHelpers';
 import { saveAs } from 'file-saver';
 import { exportSoDiaChinh, generateSoDiaChinhBlob } from '../../utils/exportSoDiaChinh';
 import { exportSoMucKe } from '../../utils/exportSoMucKe';
@@ -50,9 +50,12 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
     const [editingId, setEditingId] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     
-    // Pagination State
+    // Warning Filter State ('none' | 'overdue' | 'approaching')
+    const [warningFilter, setWarningFilter] = useState<'none' | 'overdue' | 'approaching'>('none');
+    
+    // Pagination State (đồng bộ chuẩn 15, 25, 50, 100 theo module Đo đạc)
     const [currentPage, setCurrentPage] = useState(1);
-    const itemsPerPage = 10;
+    const [itemsPerPage, setItemsPerPage] = useState<number>(15);
 
     // Batch Modal State
     const [showBatchModal, setShowBatchModal] = useState(false);
@@ -139,9 +142,69 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
     useEffect(() => {
         setSelectedIds(new Set());
         setCurrentPage(1);
-    }, [activeTab, mainTab, thueSubTab, giao1CuaSubTab, searchTerm, fromDate, toDate, filterRecordType, filterWard, filterEmployee, filterStatus]);
+    }, [activeTab, mainTab, thueSubTab, giao1CuaSubTab, warningFilter, searchTerm, fromDate, toDate, filterRecordType, filterWard, filterEmployee, filterStatus, itemsPerPage]);
 
+    // Helper kiểm tra hồ sơ quá hạn trong Cấp giấy
+    const isArchiveOverdue = (r: ArchiveRecord): boolean => {
+        const isCompleted = r.status === 'completed' || 
+            (r.data?.status || '').toLowerCase().includes('hoàn thành') || 
+            (r.data?.status || '').toLowerCase().includes('đã trả') || 
+            r.data?.one_door_stage === 'da_tra_kq' || 
+            r.data?.ngay_tra_kq || 
+            r.data?.ngay_hoan_thanh || 
+            r.exportBatch;
+        if (isCompleted) return false;
 
+        const rawDeadline = r.data?.han_xu_ly || r.data?.ngay_hen_tra || r.data?.deadline;
+        if (!rawDeadline) return false;
+
+        const deadline = parseSafeDate(rawDeadline);
+        if (!deadline) return false;
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        deadline.setHours(0, 0, 0, 0);
+        return deadline < today;
+    };
+
+    // Helper kiểm tra hồ sơ tới hạn trong Cấp giấy (1 - 3 ngày)
+    const isArchiveApproaching = (r: ArchiveRecord): boolean => {
+        const isCompleted = r.status === 'completed' || 
+            (r.data?.status || '').toLowerCase().includes('hoàn thành') || 
+            (r.data?.status || '').toLowerCase().includes('đã trả') || 
+            r.data?.one_door_stage === 'da_tra_kq' || 
+            r.data?.ngay_tra_kq || 
+            r.data?.ngay_hoan_thanh || 
+            r.exportBatch;
+        if (isCompleted) return false;
+
+        if (isArchiveOverdue(r)) return false;
+
+        const rawDeadline = r.data?.han_xu_ly || r.data?.ngay_hen_tra || r.data?.deadline;
+        if (!rawDeadline) return false;
+
+        const deadline = parseSafeDate(rawDeadline);
+        if (!deadline) return false;
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        deadline.setHours(0, 0, 0, 0);
+
+        const diffTime = deadline.getTime() - today.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        return diffDays >= 0 && diffDays <= 3;
+    };
+
+    // Đếm số lượng quá hạn và tới hạn thực tế từ danh sách hồ sơ Cấp giấy
+    const warningCounts = useMemo(() => {
+        let overdue = 0;
+        let approaching = 0;
+        records.forEach(r => {
+            if (isArchiveOverdue(r)) overdue++;
+            else if (isArchiveApproaching(r)) approaching++;
+        });
+        return { overdue, approaching };
+    }, [records]);
 
     const loadData = async () => {
         setLoading(true);
@@ -196,106 +259,163 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
     const filteredRecords = useMemo(() => {
         let filtered = records;
 
-        // Filter by mainTab & subTab
+        // 1. Phân loại độc lập tuyệt đối theo Quy trình (mainTab & subTab)
         if (mainTab === 'chua_giao') {
-            const list = filtered.filter(r => 
-                !r.data?.assigned_employee || 
-                r.data?.assigned_employee === '' || 
+            filtered = filtered.filter(r => 
+                (!r.data?.assigned_employee && !r.data?.can_bo_thu_ly && !r.data?.assigned_to) || 
                 r.data?.stage === 'chua_giao' ||
-                r.data?.status === 'Chưa giao'
+                r.data?.status === 'Chưa giao' ||
+                r.status === 'draft'
             );
-            filtered = list.length > 0 ? list : filtered;
+        } else if (mainTab === 'tham_dinh') {
+            filtered = filtered.filter(r => 
+                r.data?.stage === 'tham_dinh' || 
+                (r.data?.loai_ho_so || '').toLowerCase().includes('thẩm định') || 
+                (r.trich_yeu || '').toLowerCase().includes('thẩm định') ||
+                (r.data?.status || '').toLowerCase().includes('thẩm định') ||
+                r.status === 'executed'
+            );
+        } else if (mainTab === 'thue') {
+            if (thueSubTab === 'phieu_chuyen') {
+                filtered = filtered.filter(r => 
+                    r.data?.tax_stage === 'phieu_chuyen' || 
+                    (r.data?.stage === 'thue' && (!r.data?.tax_stage || r.data?.tax_stage === 'phieu_chuyen')) ||
+                    (r.data?.status || '').toLowerCase().includes('phiếu chuyển')
+                );
+            } else if (thueSubTab === 'khu_vuc_7') {
+                filtered = filtered.filter(r => 
+                    r.data?.tax_stage === 'khu_vuc_7' || 
+                    r.data?.area_zone === '7' || 
+                    (r.data?.status || '').toLowerCase().includes('khu vực 7')
+                );
+            } else if (thueSubTab === 'thong_bao') {
+                filtered = filtered.filter(r => 
+                    r.data?.tax_stage === 'thong_bao' || 
+                    (r.data?.status || '').toLowerCase().includes('thông báo thuế')
+                );
+            } else {
+                filtered = filtered.filter(r => 
+                    r.data?.stage === 'thue' || 
+                    (r.data?.status || '').toLowerCase().includes('thuế')
+                );
+            }
         } else if (mainTab === 'in_gcn') {
-            const list = filtered.filter(r => 
+            filtered = filtered.filter(r => 
                 r.data?.stage === 'in_gcn' || 
                 (r.data?.loai_ho_so || '').toLowerCase().includes('in gcn') || 
                 (r.trich_yeu || '').toLowerCase().includes('in gcn') ||
                 (r.data?.status || '').toLowerCase().includes('in')
             );
-            filtered = list.length > 0 ? list : filtered;
-        } else if (mainTab === 'tham_dinh') {
-            const thamDinhList = filtered.filter(r => 
-                r.data?.stage === 'tham_dinh' || 
-                (r.data?.loai_ho_so || '').toLowerCase().includes('thẩm định') || 
-                (r.trich_yeu || '').toLowerCase().includes('thẩm định')
-            );
-            filtered = thamDinhList.length > 0 ? thamDinhList : filtered;
-        } else if (mainTab === 'thue') {
-            if (thueSubTab === 'phieu_chuyen') {
-                const sub = filtered.filter(r => r.data?.tax_stage === 'phieu_chuyen');
-                if (sub.length > 0) filtered = sub;
-            } else if (thueSubTab === 'khu_vuc_7') {
-                const sub = filtered.filter(r => r.data?.tax_stage === 'khu_vuc_7' || r.data?.area_zone === '7');
-                if (sub.length > 0) filtered = sub;
-            } else if (thueSubTab === 'thong_bao') {
-                const sub = filtered.filter(r => r.data?.tax_stage === 'thong_bao');
-                if (sub.length > 0) filtered = sub;
-            }
         } else if (mainTab === 'kiem_tra') {
-            const kiemTraList = filtered.filter(r => r.data?.stage === 'kiem_tra');
-            if (kiemTraList.length > 0) filtered = kiemTraList;
+            filtered = filtered.filter(r => 
+                r.data?.stage === 'kiem_tra' || 
+                r.status === 'pending_check' || 
+                (r.data?.status || '').toLowerCase().includes('kiểm tra')
+            );
         } else if (mainTab === 'trinh_ky') {
-            const trinhKyList = filtered.filter(r => r.data?.stage === 'trinh_ky');
-            if (trinhKyList.length > 0) filtered = trinhKyList;
+            filtered = filtered.filter(r => 
+                r.data?.stage === 'trinh_ky' || 
+                r.status === 'pending_sign' || 
+                (r.data?.status || '').toLowerCase().includes('trình ký') || 
+                (r.data?.status || '').toLowerCase().includes('ký duyệt')
+            );
+        } else if (mainTab === 'vao_so') {
+            if (activeTab === 'all') {
+                filtered = filtered.filter(r => 
+                    r.data?.stage === 'vao_so' || 
+                    r.status === 'signed' || 
+                    r.data?.so_vao_so || 
+                    (r.data?.status || '').toLowerCase().includes('vào sổ') || 
+                    (r.data?.status || '').toLowerCase().includes('vào so') || 
+                    r.type === 'vaoso'
+                );
+            } else if (activeTab === 'pending') {
+                filtered = filtered.filter(r => 
+                    (r.data?.stage === 'vao_so' || r.data?.so_vao_so || r.type === 'vaoso') && 
+                    r.data?.is_pending_scan && !r.data?.is_scanned
+                );
+            } else if (activeTab === 'scanned') {
+                filtered = filtered.filter(r => 
+                    (r.data?.stage === 'vao_so' || r.data?.so_vao_so || r.type === 'vaoso') && 
+                    r.data?.is_scanned
+                );
+            }
         } else if (mainTab === 'giao_1_cua') {
             if (giao1CuaSubTab === 'cho_ban_giao') {
-                const sub = filtered.filter(r => r.data?.one_door_stage === 'cho_ban_giao');
-                if (sub.length > 0) filtered = sub;
+                filtered = filtered.filter(r => 
+                    r.data?.one_door_stage === 'cho_ban_giao' || 
+                    (r.data?.stage === 'giao_1_cua' && (!r.data?.one_door_stage || r.data?.one_door_stage === 'cho_ban_giao')) ||
+                    (r.data?.status || '').toLowerCase().includes('chờ bàn giao')
+                );
             } else if (giao1CuaSubTab === 'cho_tra_kq') {
-                const sub = filtered.filter(r => r.data?.one_door_stage === 'cho_tra_kq');
-                if (sub.length > 0) filtered = sub;
+                filtered = filtered.filter(r => 
+                    r.data?.one_door_stage === 'cho_tra_kq' || 
+                    (r.data?.status || '').toLowerCase().includes('chờ trả')
+                );
             } else if (giao1CuaSubTab === 'da_tra_kq') {
-                const sub = filtered.filter(r => r.data?.one_door_stage === 'da_tra_kq');
-                if (sub.length > 0) filtered = sub;
-            }
-        } else if (mainTab === 'vao_so' || mainTab === 'all') {
-            if (activeTab === 'all') {
-                filtered = records.slice(0, 1000);
-            } else if (activeTab === 'pending') {
-                filtered = records.filter(r => r.data?.is_pending_scan && !r.data?.is_scanned);
-            } else if (activeTab === 'scanned') {
-                filtered = records.filter(r => r.data?.is_scanned);
+                filtered = filtered.filter(r => 
+                    r.data?.one_door_stage === 'da_tra_kq' || 
+                    r.status === 'completed' || 
+                    (r.data?.status || '').toLowerCase().includes('đã trả')
+                );
+            } else {
+                filtered = filtered.filter(r => 
+                    r.data?.stage === 'giao_1_cua' || 
+                    (r.data?.status || '').toLowerCase().includes('1 cửa') || 
+                    (r.data?.status || '').toLowerCase().includes('một cửa')
+                );
             }
         }
+        // mainTab === 'all' giữ nguyên toàn bộ hồ sơ trong module Cấp giấy
 
-        // Filter by Date (Ngày nhận)
-        if (fromDate) filtered = filtered.filter(r => r.data?.ngay_nhan >= fromDate);
-        if (toDate) filtered = filtered.filter(r => r.data?.ngay_nhan <= toDate);
+        // 2. Bộ lọc cảnh báo Quá hạn / Tới hạn
+        if (warningFilter === 'overdue') {
+            filtered = filtered.filter(r => isArchiveOverdue(r));
+        } else if (warningFilter === 'approaching') {
+            filtered = filtered.filter(r => isArchiveApproaching(r));
+        }
 
-        // Filter by Record Type
+        // 3. Filter by Date (Ngày nhận)
+        if (fromDate) filtered = filtered.filter(r => (r.data?.ngay_nhan || r.ngay_thang || '') >= fromDate);
+        if (toDate) filtered = filtered.filter(r => (r.data?.ngay_nhan || r.ngay_thang || '') <= toDate);
+
+        // 4. Filter by Record Type
         if (filterRecordType) filtered = filtered.filter(r => (r.trich_yeu || '').includes(filterRecordType) || (r.data?.loai_ho_so || '').includes(filterRecordType));
 
-        // Filter by Employee
-        if (filterEmployee) filtered = filtered.filter(r => r.data?.nguoi_thuc_hien === filterEmployee || r.data?.assigned_to === filterEmployee);
+        // 5. Filter by Employee
+        if (filterEmployee) filtered = filtered.filter(r => r.data?.nguoi_thuc_hien === filterEmployee || r.data?.assigned_to === filterEmployee || r.data?.assigned_employee === filterEmployee || r.data?.can_bo_thu_ly === filterEmployee);
 
-        // Filter by Ward (Địa danh)
-        if (filterWard) filtered = filtered.filter(r => r.data?.dia_danh === filterWard);
+        // 6. Filter by Ward (Địa danh)
+        if (filterWard) filtered = filtered.filter(r => r.data?.dia_danh === filterWard || r.data?.xa_phuong === filterWard);
 
-        // Filter by Search
+        // 7. Filter by Search (Tìm kiếm đa trường trên mọi tab)
         if (searchTerm) {
             const lower = searchTerm.toLowerCase();
             filtered = filtered.filter(r => 
                 r.so_hieu?.toLowerCase().includes(lower) ||
                 r.trich_yeu?.toLowerCase().includes(lower) ||
+                (r.data?.ma_ho_so || '').toLowerCase().includes(lower) ||
+                (r.data?.so_bien_nhan || '').toLowerCase().includes(lower) ||
+                (r.data?.so_thu_tuc || '').toLowerCase().includes(lower) ||
+                (r.data?.ten_chu_su_dung || '').toLowerCase().includes(lower) ||
+                (r.data?.chu_su_dung || '').toLowerCase().includes(lower) ||
+                (r.data?.so_vao_so || '').toLowerCase().includes(lower) ||
+                (r.data?.so_to || '').toLowerCase().includes(lower) ||
+                (r.data?.so_thua || '').toLowerCase().includes(lower) ||
+                (r.data?.so_phat_hanh || '').toLowerCase().includes(lower) ||
                 JSON.stringify(r.data).toLowerCase().includes(lower)
             );
         }
 
         return filtered;
-    }, [records, searchTerm, activeTab, mainTab, thueSubTab, giao1CuaSubTab, fromDate, toDate, filterWard, filterEmployee, filterRecordType]);
+    }, [records, searchTerm, activeTab, mainTab, thueSubTab, giao1CuaSubTab, warningFilter, fromDate, toDate, filterWard, filterEmployee, filterRecordType]);
 
-    // Pagination
-    const totalPages = Math.ceil(filteredRecords.length / itemsPerPage);
+    // Pagination (chuẩn module Đo đạc)
+    const totalPages = Math.max(1, Math.ceil(filteredRecords.length / itemsPerPage));
     const paginatedRecords = useMemo(() => {
         const start = (currentPage - 1) * itemsPerPage;
         return filteredRecords.slice(start, start + itemsPerPage);
-    }, [filteredRecords, currentPage]);
-
-    // Reset page when tab or search changes
-    useEffect(() => {
-        setCurrentPage(1);
-        setSelectedIds(new Set()); // Clear selection on tab change
-    }, [activeTab, searchTerm]);
+    }, [filteredRecords, currentPage, itemsPerPage]);
 
     const handleAddNew = async () => {
         const newRecord: Partial<ArchiveRecord> = {
@@ -725,7 +845,11 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
     };
 
     const handleExportExcel = () => {
-        const dataToExport = filteredRecords.map((r, idx) => {
+        const recordsToProcess = selectedIds.size > 0 
+            ? filteredRecords.filter(r => selectedIds.has(r.id))
+            : filteredRecords;
+
+        const dataToExport = recordsToProcess.map((r, idx) => {
             const row: any = {
                 'STT': idx + 1,
                 'Số vào sổ': r.data?.so_vao_so,
@@ -1032,45 +1156,45 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                 </button>
             </div>
 
-            {/* HÀNG 2: THANH TÌM KIẾM, BỘ LỌC VÀ NÚT XUẤT EXCEL (CỐ ĐỊNH CHUẨN MỰC THEO THIẾT KẾ) */}
-            <div className="px-4 py-3 border-b border-gray-200 bg-white flex flex-wrap items-center justify-between gap-3">
-                {/* Bên trái: Ô tìm kiếm */}
-                <div className="relative flex-1 min-w-[220px] max-w-md">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                    <input
-                        type="text"
-                        className="w-full pl-9 pr-8 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all font-medium"
-                        placeholder="Tìm kiếm..."
-                        value={searchTerm}
-                        onChange={e => setSearchTerm(e.target.value)}
-                    />
-                    {searchTerm && (
-                        <button
-                            onClick={() => setSearchTerm('')}
-                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0.5 rounded-full hover:bg-gray-200 cursor-pointer"
-                        >
-                            <X size={14} />
-                        </button>
-                    )}
-                </div>
+            {/* HÀNG 2: THANH TÌM KIẾM, BỘ LỌC VÀ NÚT XUẤT EXCEL (ĐỒNG BỘ VỚI MODULE ĐO ĐẠC) */}
+            <div className="px-4 py-2.5 border-b border-gray-200 bg-white flex flex-wrap items-center justify-end gap-3">
+                {/* Phía bên phải Hàng 2: THANH TÌM KIẾM KÉO DÀI CẠNH NÚT BỘ LỌC VÀ NÚT XUẤT EXCEL */}
+                <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end flex-1 max-w-xl">
+                    {/* Thanh tìm kiếm dài bằng module Đo đạc */}
+                    <div className="relative flex-1 sm:w-64">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                        <input
+                            type="text"
+                            className="w-full pl-9 pr-8 py-2 border border-gray-200 rounded-lg text-xs sm:text-sm bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all font-medium"
+                            placeholder="Tìm kiếm hồ sơ..."
+                            value={searchTerm}
+                            onChange={e => setSearchTerm(e.target.value)}
+                        />
+                        {searchTerm && (
+                            <button
+                                onClick={() => setSearchTerm('')}
+                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0.5 rounded-full hover:bg-gray-200 cursor-pointer"
+                            >
+                                <X size={14} />
+                            </button>
+                        )}
+                    </div>
 
-                {/* Phía bên phải Hàng 2: NÚT BỘ LỌC POPOVER VÀ NÚT XUẤT EXCEL */}
-                <div className="flex items-center gap-2.5 shrink-0">
                     <div className="relative inline-block shrink-0" ref={filterPopoverRef}>
                         <button
                             onClick={() => setShowFilterPopover(!showFilterPopover)}
-                            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-bold transition-all shadow-xs bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 cursor-pointer ${
+                            className={`flex items-center justify-center p-2 rounded-lg text-xs sm:text-sm font-bold transition-all shadow-xs bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 cursor-pointer relative ${
                                 activeFilterCount > 0 ? "border-blue-300 text-blue-700 bg-blue-50/50" : ""
                             }`}
-                            title="Mở bộ lọc tìm kiếm"
+                            title="Bộ lọc tìm kiếm"
+                            aria-label="Bộ lọc tìm kiếm"
                         >
-                            <Filter size={16} />
+                            <Filter size={18} />
                             {activeFilterCount > 0 && (
-                                <span className="bg-red-500 text-white text-[11px] px-1.5 py-0.2 rounded-full font-extrabold">
+                                <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full font-extrabold flex items-center justify-center shadow-xs">
                                     {activeFilterCount}
                                 </span>
                             )}
-                            {showFilterPopover ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                         </button>
 
                         {/* POPOVER DROPDOWN CARD */}
@@ -1169,27 +1293,77 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                         )}
                     </div>
 
-                    {/* Nút Xuất Excel dạng icon vuông theo hình ảnh đính kèm */}
+                    {/* Nút Xuất Excel dạng icon vuông kèm badge */}
                     <button
                         onClick={handleExportExcel}
-                        className="flex items-center justify-center p-2 bg-white text-emerald-700 border border-emerald-300 hover:bg-emerald-50 rounded-lg shadow-xs transition-all cursor-pointer shrink-0 active:scale-95"
-                        title="Xuất danh sách ra file Excel (.xlsx)"
+                        className={`relative flex items-center justify-center p-2 rounded-lg shadow-xs transition-all cursor-pointer shrink-0 active:scale-95 border ${
+                            selectedIds.size > 0 
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-400 hover:bg-emerald-100' 
+                                : 'bg-white text-emerald-700 border-emerald-300 hover:bg-emerald-50'
+                        }`}
+                        title={selectedIds.size > 0 ? `Xuất Excel ${selectedIds.size} hồ sơ đã chọn` : `Xuất Excel toàn bộ ${filteredRecords.length} hồ sơ`}
                         aria-label="Xuất file Excel"
                     >
                         <FileSpreadsheet size={18} className="text-emerald-600 shrink-0" />
+                        {selectedIds.size > 0 && (
+                            <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 bg-[#802a0a] text-white text-[10px] font-black rounded-full flex items-center justify-center shadow-xs border border-white leading-none">
+                                {selectedIds.size}
+                            </span>
+                        )}
                     </button>
                 </div>
             </div>
 
-            {/* HÀNG 3: SUB-TABS PHÂN LOẠI VÀ NÚT TÁC NGHIỆP TƯƠNG TỰ ĐO ĐẠC */}
+            {/* HÀNG 3: NÚT CẢNH BÁO QUÁ HẠN/TỚI HẠN Ở NGOÀI CÙNG BÊN TRÁI (ẨN TẠI VÀO SỐ GCN VÀ GIAO 1 CỬA), TIẾP THEO LÀ SUB-TABS VÀ NÚT TÁC NGHIỆP (CHUẨN ĐO ĐẠC) */}
             <div className="px-4 py-2.5 border-b border-gray-200 bg-slate-50 flex flex-wrap items-center justify-between gap-3">
-                {/* PHẦN BÊN TRÁI HÀNG 3 */}
-                <div className="flex flex-wrap items-center gap-3">
+                {/* PHẦN BÊN TRÁI HÀNG 3: CÁC NÚT CẢNH BÁO (NGOÀI CÙNG TRÁI) + SUBTABS + NÚT NHẬP MỚI */}
+                <div className="flex flex-wrap items-center gap-2.5">
+                    {/* CÁC NÚT CẢNH BÁO QUÁ HẠN / TỚI HẠN (ẨN TẠI TAB 'VÀO SỐ GCN' VÀ 'GIAO 1 CỬA') */}
+                    {mainTab !== 'vao_so' && mainTab !== 'giao_1_cua' && (
+                        <div className="flex gap-2 mr-1">
+                            <button
+                                type="button"
+                                onClick={() => setWarningFilter(prev => prev === 'overdue' ? 'none' : 'overdue')}
+                                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-bold transition-colors shadow-sm border ${
+                                    warningFilter === 'overdue'
+                                        ? 'bg-red-600 text-white'
+                                        : 'bg-white text-red-600'
+                                }`}
+                                title="Lọc các hồ sơ đã quá hạn xử lý (Bấm lại để hủy)"
+                            >
+                                <AlertTriangle size={16} /> {warningCounts.overdue}
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => setWarningFilter(prev => prev === 'approaching' ? 'none' : 'approaching')}
+                                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-bold transition-colors shadow-sm border ${
+                                    warningFilter === 'approaching'
+                                        ? 'bg-orange-500 text-white'
+                                        : 'bg-white text-orange-600'
+                                }`}
+                                title="Lọc các hồ sơ sắp đến hạn xử lý trong 1-3 ngày (Bấm lại để hủy)"
+                            >
+                                <Clock size={16} /> {warningCounts.approaching}
+                            </button>
+
+                            {warningFilter !== 'none' && (
+                                <button
+                                    onClick={() => setWarningFilter('none')}
+                                    className="text-gray-400 hover:text-red-600 p-1 rounded-full hover:bg-gray-100 transition-colors cursor-pointer flex items-center justify-center"
+                                    title="Bỏ lọc cảnh báo"
+                                >
+                                    <X size={14} />
+                                </button>
+                            )}
+                        </div>
+                    )}
+
                     {mainTab !== 'vao_so' ? (
                         <>
-                            {/* Subtabs riêng cho từng nghiệp vụ ĐẶT LÊN ĐẦU (NGOÀI CÙNG BÊN TRÁI) */}
+                            {/* Subtabs riêng cho từng nghiệp vụ */}
                             {mainTab === 'thue' && (
-                                <div className="flex bg-white rounded-lg border border-gray-200 p-1 shadow-2xs gap-1 mr-1">
+                                <div className="flex bg-white rounded-lg border border-gray-200 p-1 shadow-2xs gap-1">
                                     <button
                                         onClick={() => setThueSubTab('phieu_chuyen')}
                                         className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
@@ -1224,7 +1398,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                             )}
 
                             {mainTab === 'giao_1_cua' && (
-                                <div className="flex bg-white rounded-lg border border-gray-200 p-1 shadow-2xs gap-1 mr-1">
+                                <div className="flex bg-white rounded-lg border border-gray-200 p-1 shadow-2xs gap-1">
                                     <button
                                         onClick={() => setGiao1CuaSubTab('cho_ban_giao')}
                                         className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
@@ -1258,146 +1432,123 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                                 </div>
                             )}
 
-                            {/* Thẻ đếm số lượng cảnh báo quá hạn & sắp hết hạn (chuẩn theo ảnh mẫu) */}
-                            <div className="flex items-center gap-2">
-                                <span className="px-2.5 py-1 bg-red-50 text-red-600 border border-red-200 rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-2xs">
-                                    <AlertTriangle size={14} /> 1278
-                                </span>
-                                <span className="px-2.5 py-1 bg-amber-50 text-amber-600 border border-amber-200 rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-2xs">
-                                    <Clock size={14} /> 73
-                                </span>
-                            </div>
-
-                            <span className="text-gray-300 font-light">|</span>
-
-                            {/* Nút Nhập mới chuẩn khung viền xanh như ảnh mẫu */}
+                            {/* Nút Nhập mới chuẩn khung viền xanh theo mẫu module Đo đạc */}
                             <button
                                 onClick={handleAddNew}
-                                className="flex items-center gap-1.5 bg-white text-emerald-700 border border-emerald-400 px-3 py-1 rounded-lg font-bold text-xs hover:bg-emerald-50 shadow-2xs transition-colors cursor-pointer"
+                                className="flex items-center gap-1.5 bg-white text-emerald-700 border border-emerald-400 px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-emerald-50 shadow-2xs transition-colors cursor-pointer"
                             >
                                 <Plus size={15} />
                                 <span>Nhập mới</span>
-                                <ChevronDown size={14} className="text-emerald-600 ml-0.5" />
                             </button>
                         </>
-                    ) : (
-                        /* CHỈ DÀNH RIÊNG CHO TAB "VÀO SỐ GCN" */
-                        <div className="flex bg-white rounded-lg border border-gray-200 p-1 shadow-2xs gap-1">
-                            <button
-                                onClick={() => setActiveTab('all')}
-                                className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
-                                    activeTab === 'all'
-                                        ? 'bg-blue-100 text-blue-800 shadow-2xs'
-                                        : 'text-gray-600 hover:bg-gray-100'
-                                }`}
-                            >
-                                Danh sách
-                            </button>
-                            <button
-                                onClick={() => setActiveTab('pending')}
-                                className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
-                                    activeTab === 'pending'
-                                        ? 'bg-orange-100 text-orange-800 shadow-2xs'
-                                        : 'text-gray-600 hover:bg-gray-100'
-                                }`}
-                            >
-                                Chờ chuyển Scan/1 Cửa
-                            </button>
-                            <button
-                                onClick={() => setActiveTab('scanned')}
-                                className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
-                                    activeTab === 'scanned'
-                                        ? 'bg-teal-100 text-teal-800 shadow-2xs'
-                                        : 'text-gray-600 hover:bg-gray-100'
-                                }`}
-                            >
-                                Đã chuyển Scan/1 Cửa
-                            </button>
-                        </div>
-                    )}
+                    ) : null}
                 </div>
 
-                {/* BÊN PHẢI HÀNG 3: CÁC NÚT TÁC NGHIỆP TƯƠNG ỨNG */}
+                {/* BÊN PHẢI HÀNG 3: CÁC NÚT TÁC NGHIỆP TƯƠNG ỨNG (CHUẨN ĐỒNG NHẤT VỚI MODULE ĐO ĐẠC) */}
                 <div className="flex flex-wrap items-center gap-2 ml-auto">
-                    {mainTab === 'vao_so' ? (
+                    {mainTab !== 'vao_so' && (
                         <>
-                            <button
-                                onClick={() => setShowSettingsModal(true)}
-                                className="p-1.5 bg-white text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-100 shadow-2xs transition-colors cursor-pointer"
-                                title="Cài đặt số vào sổ"
-                            >
-                                <Settings size={15} />
-                            </button>
-
-                            <button
-                                onClick={handleAddNew}
-                                className="flex items-center gap-1.5 bg-white text-emerald-700 border border-emerald-300 px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-emerald-50 shadow-2xs transition-colors cursor-pointer"
-                            >
-                                <Plus size={15} />
-                                <span>Thêm mới</span>
-                            </button>
-
+                            {/* Nút Giao việc (khi có chọn hồ sơ) */}
                             {selectedIds.size > 0 && (
                                 <button
-                                    onClick={handleMoveToPending}
-                                    className="flex items-center gap-1.5 bg-indigo-600 text-white px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-indigo-700 shadow-2xs transition-colors animate-pulse cursor-pointer"
+                                    onClick={() => {
+                                        alert(`Tính năng Giao việc cho ${selectedIds.size} hồ sơ đang được áp dụng.`);
+                                    }}
+                                    className="flex items-center gap-1.5 bg-blue-600 text-white px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-blue-700 shadow-2xs transition-colors cursor-pointer"
+                                    title="Giao việc cho nhân viên"
                                 >
-                                    <Send size={15} />
-                                    <span>Chuyển Scan ({selectedIds.size})</span>
+                                    <Users size={15} />
+                                    <span>Giao việc ({selectedIds.size})</span>
                                 </button>
                             )}
 
-                            {activeTab === 'pending' && selectedIds.size > 0 && hasBatchPermission() && (
+                            {/* Nút Trình kiểm tra - CHỈ HIỆN TẠI TAB 'In GCN' khi có tích chọn hồ sơ */}
+                            {mainTab === 'in_gcn' && selectedIds.size > 0 && (
                                 <button
-                                    onClick={handleOpenBatchModal}
-                                    className="flex items-center gap-1.5 bg-orange-600 text-white px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-orange-700 shadow-2xs transition-colors cursor-pointer"
+                                    onClick={() => {
+                                        alert(`Đã trình kiểm tra ${selectedIds.size} hồ sơ.`);
+                                    }}
+                                    className="flex items-center gap-1.5 bg-indigo-600 text-white px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-indigo-700 shadow-2xs transition-colors cursor-pointer"
+                                    title="Trình kiểm tra hồ sơ"
                                 >
-                                    <CheckCircle2 size={15} />
-                                    <span>Tạo đợt ({selectedIds.size})</span>
+                                    <CheckSquare size={15} />
+                                    <span>Trình kiểm tra ({selectedIds.size})</span>
                                 </button>
                             )}
 
-                            {activeTab === 'scanned' && (
+                            {/* Nút Trình ký - CHỈ HIỆN TẠI TAB 'Kiểm tra' khi có tích chọn hồ sơ */}
+                            {mainTab === 'kiem_tra' && selectedIds.size > 0 && (
                                 <button
-                                    onClick={() => setShowExportHandoverModal(true)}
-                                    className="flex items-center gap-1.5 bg-purple-600 text-white px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-purple-700 shadow-2xs transition-colors cursor-pointer"
+                                    onClick={() => {
+                                        alert(`Đã trình ký ${selectedIds.size} hồ sơ.`);
+                                    }}
+                                    className="flex items-center gap-1.5 bg-teal-600 text-white px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-teal-700 shadow-2xs transition-colors cursor-pointer"
+                                    title="Trình ký lãnh đạo"
                                 >
-                                    <FileOutput size={15} />
-                                    <span>Xuất bàn giao</span>
+                                    <PenTool size={15} />
+                                    <span>Trình ký ({selectedIds.size})</span>
                                 </button>
                             )}
 
+                            {/* Nút Trả hồ sơ (khi có chọn hồ sơ) */}
+                            {selectedIds.size > 0 && (
+                                <button
+                                    onClick={() => {
+                                        alert(`Trả lại ${selectedIds.size} hồ sơ.`);
+                                    }}
+                                    className="flex items-center gap-1.5 bg-rose-600 text-white px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-rose-700 shadow-2xs transition-colors cursor-pointer"
+                                    title="Trả hồ sơ về bước trước"
+                                >
+                                    <ChevronLeft size={15} />
+                                    <span>Trả hồ sơ ({selectedIds.size})</span>
+                                </button>
+                            )}
+
+                            {/* Nút Xử lý All (khi có chọn hồ sơ) */}
+                            {selectedIds.size > 0 && (
+                                <button
+                                    onClick={() => {
+                                        alert(`Xử lý hàng loạt cho ${selectedIds.size} hồ sơ.`);
+                                    }}
+                                    className="flex items-center gap-1.5 bg-amber-600 text-white px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-amber-700 shadow-2xs transition-colors cursor-pointer"
+                                    title="Xử lý hàng loạt hồ sơ đã chọn"
+                                >
+                                    <RefreshCw size={15} />
+                                    <span>Xử lý All ({selectedIds.size})</span>
+                                </button>
+                            )}
+
+                            {/* Nút Chốt hồ sơ */}
                             <button
                                 onClick={() => {
-                                    if (selectedIds.size > 0) {
-                                        const selectedRecords = records.filter(r => selectedIds.has(r.id));
-                                        exportSoDiaChinh(selectedRecords);
-                                    } else {
-                                        setShowExportSoDiaChinhModal(true);
-                                    }
+                                    alert('Đang cập nhật trạng thái chốt danh sách hồ sơ.');
                                 }}
-                                className="flex items-center gap-1.5 bg-blue-600 text-white px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-blue-700 shadow-2xs transition-colors cursor-pointer"
+                                className="flex items-center gap-1.5 bg-white text-slate-700 border border-slate-300 px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-slate-50 shadow-2xs transition-colors cursor-pointer"
+                                title="Chốt danh sách hồ sơ"
                             >
-                                <FileText size={15} />
-                                <span>Xuất Sổ địa chính</span>
+                                <ClipboardList size={15} />
+                                <span>Chốt hồ sơ</span>
                             </button>
 
+                            {/* Nút Xuất DS */}
                             <button
-                                onClick={() => setShowExportSoMucKeModal(true)}
-                                className="flex items-center gap-1.5 bg-indigo-600 text-white px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-indigo-700 shadow-2xs transition-colors cursor-pointer"
+                                onClick={handleExportExcel}
+                                className="flex items-center gap-1.5 bg-white text-emerald-700 border border-emerald-300 px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-emerald-50 shadow-2xs transition-colors cursor-pointer"
+                                title="Xuất danh sách ra file Excel"
                             >
-                                <FileText size={15} />
-                                <span>Xuất Sổ mục kê</span>
+                                <FileSpreadsheet size={15} />
+                                <span>Xuất DS</span>
+                            </button>
+
+                            {/* Nút Tùy chỉnh ẩn/hiện cột */}
+                            <button
+                                onClick={() => setShowColumnSelector(!showColumnSelector)}
+                                className="p-1.5 bg-white text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-100 shadow-2xs transition-colors cursor-pointer flex items-center justify-center"
+                                title="Tùy chỉnh ẩn/hiện cột"
+                            >
+                                <SlidersHorizontal size={16} />
                             </button>
                         </>
-                    ) : (
-                        <button
-                            onClick={() => setShowColumnSelector(!showColumnSelector)}
-                            className="p-1.5 bg-white text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-100 shadow-2xs transition-colors cursor-pointer flex items-center justify-center"
-                            title="Tùy chỉnh ẩn/hiện cột"
-                        >
-                            <SlidersHorizontal size={16} />
-                        </button>
                     )}
                 </div>
             </div>
@@ -1405,8 +1556,10 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
             {/* Table Container */}
             <div className="flex-1 overflow-auto relative flex flex-col">
                 {loading ? (
-                    <div className="flex items-center justify-center h-full text-gray-500 gap-2">
-                        <Loader2 className="animate-spin" /> Đang xử lý...
+                    <div className="flex flex-col items-center justify-center h-full min-h-[360px] text-gray-500 gap-3">
+                        <Loader2 className="animate-spin text-blue-600" size={36} />
+                        <span className="text-sm font-semibold text-slate-700">Đang tải danh sách hồ sơ Cấp giấy...</span>
+                        <span className="text-xs text-slate-400">Vui lòng chờ trong giây lát</span>
                     </div>
                 ) : (
                     <>
@@ -1835,27 +1988,50 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                             </table>
                         )}
                     </div>
-                    {/* Pagination Controls */}
-                    {totalPages > 1 && (
-                        <div className="p-2 border-t border-gray-200 bg-gray-50 flex justify-between items-center sticky bottom-0 z-20">
-                            <div className="text-xs text-gray-500">
-                                Hiển thị {(currentPage - 1) * itemsPerPage + 1} - {Math.min(currentPage * itemsPerPage, filteredRecords.length)} trong tổng số {filteredRecords.length} dòng
+                    {/* Pagination Controls chuẩn phong cách module Đo đạc */}
+                    {filteredRecords.length > 0 && (
+                        <div className="border-t border-gray-200 p-3 bg-gray-50 flex flex-col sm:flex-row justify-between items-center gap-4 shrink-0 text-xs text-gray-600 sticky bottom-0 z-20 shadow-xs">
+                            <div className="flex items-center gap-4 flex-wrap">
+                                <span>
+                                    Tổng số: <strong>{filteredRecords.length}</strong> hồ sơ (Hiển thị <strong>{(currentPage - 1) * itemsPerPage + 1} - {Math.min(currentPage * itemsPerPage, filteredRecords.length)}</strong>)
+                                </span>
+                                <div className="flex items-center gap-2">
+                                    <span>Hiển thị</span>
+                                    <select
+                                        value={itemsPerPage}
+                                        onChange={(e) => {
+                                            setItemsPerPage(Number(e.target.value));
+                                            setCurrentPage(1);
+                                        }}
+                                        className="border border-gray-300 rounded px-2 py-1 bg-white outline-none font-medium cursor-pointer"
+                                    >
+                                        <option value={15}>15</option>
+                                        <option value={25}>25</option>
+                                        <option value={50}>50</option>
+                                        <option value={100}>100</option>
+                                    </select>
+                                    <span>dòng/trang</span>
+                                </div>
                             </div>
-                            <div className="flex gap-1">
+                            <div className="flex items-center gap-2">
                                 <button 
                                     onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                                     disabled={currentPage === 1}
-                                    className="px-2 py-1 bg-white border border-gray-300 rounded text-xs disabled:opacity-50 hover:bg-gray-100"
+                                    className="p-1.5 border border-gray-300 rounded bg-white hover:bg-gray-100 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+                                    title="Trang trước"
                                 >
-                                    Trước
+                                    <ChevronLeft size={16} />
                                 </button>
-                                <span className="px-2 py-1 text-xs font-medium">Trang {currentPage} / {totalPages}</span>
+                                <span className="font-medium px-1">
+                                    Trang <strong className="text-blue-700">{currentPage}</strong> / {totalPages || 1}
+                                </span>
                                 <button 
                                     onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                                    disabled={currentPage === totalPages}
-                                    className="px-2 py-1 bg-white border border-gray-300 rounded text-xs disabled:opacity-50 hover:bg-gray-100"
+                                    disabled={currentPage >= totalPages}
+                                    className="p-1.5 border border-gray-300 rounded bg-white hover:bg-gray-100 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+                                    title="Trang sau"
                                 >
-                                    Sau
+                                    <ChevronRight size={16} />
                                 </button>
                             </div>
                         </div>

@@ -21,6 +21,7 @@ import {
   FileCheck,
   Map as MapIcon,
   CheckSquare,
+  Square,
   ClipboardList,
   FileDown,
   FileSpreadsheet,
@@ -116,6 +117,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
   const [filterToDate, setFilterToDate] = useState("");
   const [filterRecordType, setFilterRecordType] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const [isFilterPopoverOpen, setIsFilterPopoverOpen] = useState(false);
   const filterPopoverRef = useRef<HTMLDivElement>(null);
@@ -637,14 +639,56 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
     setSortConfig({ key, direction });
   };
 
+  // Selection handlers
+  const isAllSelected = displayRecords.length > 0 && displayRecords.every((r) => selectedIds.has(r.id));
+  const isSomeSelected = displayRecords.some((r) => selectedIds.has(r.id));
+
+  const handleSelectAllToggle = () => {
+    if (isAllSelected) {
+      const next = new Set(selectedIds);
+      displayRecords.forEach((r) => next.delete(r.id));
+      setSelectedIds(next);
+    } else {
+      const next = new Set(selectedIds);
+      displayRecords.forEach((r) => next.add(r.id));
+      setSelectedIds(next);
+    }
+  };
+
+  const handleRowSelectToggle = (id: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const next = new Set(selectedIds);
+    if (next.has(id)) {
+      next.delete(id);
+    } else {
+      next.add(id);
+    }
+    setSelectedIds(next);
+  };
+
+  // Priority list for export:
+  // 1. If items are selected -> only selected items
+  // 2. If filtered -> filtered records (displayRecords)
+  // 3. Fallback -> all records
+  const getRecordsToExport = () => {
+    if (selectedIds.size > 0) {
+      return records.filter((r) => selectedIds.has(r.id));
+    }
+    if (displayRecords.length > 0) {
+      return displayRecords;
+    }
+    return records;
+  };
+
   const handleExportExcel = () => {
-    if (displayRecords.length === 0) {
-      alert("Không có hồ sơ nào theo kết quả lọc để xuất Excel.");
+    const recordsToExport = getRecordsToExport();
+    if (recordsToExport.length === 0) {
+      alert("Không có hồ sơ nào để xuất Excel.");
       return;
     }
 
     const title = "DANH SÁCH HỒ SƠ CÁ NHÂN";
-    const subTitle = `TỔNG SỐ HỒ SƠ: ${displayRecords.length} ${filterFromDate || filterToDate ? `(Từ ${filterFromDate || 'đầu'} đến ${filterToDate || 'nay'})` : ''}`;
+    const subTitle = `TỔNG SỐ HỒ SƠ: ${recordsToExport.length} ${filterFromDate || filterToDate ? `(Từ ${filterFromDate || 'đầu'} đến ${filterToDate || 'nay'})` : ''}`;
     const displayDate = `Ngày ${new Date().getDate()} tháng ${new Date().getMonth() + 1} năm ${new Date().getFullYear()}`;
 
     const headers = [
@@ -653,7 +697,7 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
       "Số Tờ", "Số Thửa", "Diện Tích", "Địa Chỉ", "Nội Dung", "Ghi Chú"
     ];
 
-    const dataRows = displayRecords.map((r, idx) => [
+    const dataRows = recordsToExport.map((r, idx) => [
       idx + 1,
       r.code || "",
       r.customerName || "",
@@ -1691,11 +1735,20 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
             {/* XUẤT EXCEL BUTTON */}
             <button
               onClick={handleExportExcel}
-              className="flex items-center justify-center p-2 bg-white text-emerald-700 border border-emerald-300 hover:bg-emerald-50 rounded-lg transition-all shadow-xs cursor-pointer shrink-0 active:scale-95"
-              title={`Xuất danh sách ${displayRecords.length} hồ sơ ra file Excel`}
+              className="relative flex items-center justify-center p-2 bg-white text-emerald-700 border border-emerald-300 hover:bg-emerald-50 rounded-lg transition-all shadow-xs cursor-pointer shrink-0 active:scale-95"
+              title={
+                selectedIds.size > 0
+                  ? `Xuất file Excel cho ${selectedIds.size} hồ sơ đã chọn`
+                  : `Xuất danh sách ${displayRecords.length} hồ sơ ra file Excel`
+              }
               aria-label="Xuất file Excel"
             >
               <FileSpreadsheet size={18} className="text-emerald-600" />
+              {selectedIds.size > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 bg-[#802a0a] text-white text-[10px] font-black rounded-full flex items-center justify-center shadow-xs border border-white leading-none">
+                  {selectedIds.size}
+                </span>
+              )}
             </button>
           </div>
         </div>
@@ -1708,6 +1761,19 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                 <table className="w-full text-left table-fixed min-w-[1160px]">
                   <thead className="bg-white border-b border-gray-200 text-xs text-gray-500 uppercase sticky top-0 shadow-sm z-10">
                     <tr>
+                      <th className="p-3 w-10 text-center">
+                        <button
+                          onClick={handleSelectAllToggle}
+                          className="text-gray-400 hover:text-blue-600 transition-colors cursor-pointer flex items-center justify-center mx-auto"
+                          title={isAllSelected ? "Bỏ chọn tất cả" : "Chọn tất cả"}
+                        >
+                          {isAllSelected ? (
+                            <CheckSquare size={16} className="text-blue-600" />
+                          ) : (
+                            <Square size={16} />
+                          )}
+                        </button>
+                      </th>
                       <th className="p-3 w-10 text-center">#</th>
                       <th className="p-3 w-[120px]">
                         {renderSortHeader("Mã HS", "code")}
@@ -1747,13 +1813,34 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                   <tbody className="divide-y divide-gray-100 text-sm">
                     {paginatedDisplayRecords.map((r, index) => {
                       const deadlineStatus = getDeadlineStatus(r);
+                      const isSelected = selectedIds.has(r.id);
                       const rowClass =
                         activeTab === "reminder"
-                          ? "hover:bg-pink-50/50 bg-pink-50/10"
-                          : "hover:bg-blue-50/50";
+                          ? isSelected
+                            ? "bg-pink-100/70 hover:bg-pink-100"
+                            : "hover:bg-pink-50/50 bg-pink-50/10"
+                          : isSelected
+                            ? "bg-blue-50/70 hover:bg-blue-100/70"
+                            : "hover:bg-blue-50/50";
 
                       return (
-                        <tr key={r.id} className={`${rowClass} transition-colors`}>
+                        <tr 
+                          key={r.id} 
+                          onClick={() => handleRowSelectToggle(r.id)}
+                          className={`${rowClass} transition-colors cursor-pointer`}
+                        >
+                          <td className="p-3 text-center align-middle" onClick={(e) => handleRowSelectToggle(r.id, e)}>
+                            <button
+                              type="button"
+                              className="text-gray-400 hover:text-blue-600 transition-colors flex items-center justify-center mx-auto cursor-pointer"
+                            >
+                              {isSelected ? (
+                                <CheckSquare size={16} className="text-blue-600" />
+                              ) : (
+                                <Square size={16} />
+                              )}
+                            </button>
+                          </td>
                           <td className="p-3 text-center text-gray-400 text-xs align-middle">
                             {(currentPage - 1) * itemsPerPage + index + 1}
                           </td>
@@ -1931,13 +2018,33 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
                   const deadlineStatus = getDeadlineStatus(r);
                   const isArchiveType = isArchiveRecordType(r.recordType);
                   const checkerEmp = r.checkedBy ? employees.find((e) => e.id === r.checkedBy) : null;
+                  const isSelected = selectedIds.has(r.id);
 
                   return (
-                    <div key={r.id} className="p-4 bg-white rounded-xl border border-gray-100 shadow-sm space-y-3 hover:border-blue-200 transition-all">
-                      {/* Top row with code and status */}
+                    <div 
+                      key={r.id} 
+                      onClick={() => handleRowSelectToggle(r.id)}
+                      className={`p-4 bg-white rounded-xl border shadow-sm space-y-3 transition-all cursor-pointer ${
+                        isSelected ? "border-blue-300 bg-blue-50/40" : "border-gray-100 hover:border-blue-200"
+                      }`}
+                    >
+                      {/* Top row with checkbox, code and status */}
                       <div className="flex justify-between items-center">
-                        <span className="font-bold text-blue-600 text-sm font-mono">{r.code}</span>
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={(e) => handleRowSelectToggle(r.id, e)}
+                            className="text-gray-400 hover:text-blue-600 transition-colors cursor-pointer"
+                          >
+                            {isSelected ? (
+                              <CheckSquare size={16} className="text-blue-600" />
+                            ) : (
+                              <Square size={16} />
+                            )}
+                          </button>
+                          <span className="font-bold text-blue-600 text-sm font-mono">{r.code}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
                           {r.needsMapCorrection && (
                             <span className="p-1 bg-orange-100 text-orange-600 rounded" title="Cần chỉnh lý bản đồ">
                               <MapIcon size={12} className="fill-orange-100" />

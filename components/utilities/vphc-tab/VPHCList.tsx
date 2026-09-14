@@ -118,11 +118,16 @@ const VPHCList: React.FC<VPHCListProps> = ({ data, onEdit, onDelete, onRefresh, 
                 
                 <button 
                     onClick={handleExportExcel}
-                    className="flex items-center justify-center p-2 bg-white text-emerald-700 border border-emerald-300 rounded-lg hover:bg-emerald-50 shadow-xs transition-colors active:scale-95 shrink-0"
-                    title="Xuất file Excel"
+                    className="relative flex items-center justify-center p-2 bg-white text-emerald-700 border border-emerald-300 rounded-lg hover:bg-emerald-50 shadow-xs transition-colors active:scale-95 shrink-0"
+                    title={`Xuất file Excel (${filteredData.length} biên bản)`}
                     aria-label="Xuất file Excel"
                 >
                     <FileSpreadsheet size={18} className="text-emerald-600" />
+                    {filteredData.length > 0 && (
+                        <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 bg-[#802a0a] text-white text-[10px] font-black rounded-full flex items-center justify-center shadow-xs border border-white leading-none">
+                            {filteredData.length}
+                        </span>
+                    )}
                 </button>
 
                 <button onClick={onRefresh} className="p-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 text-gray-600" title="Tải lại dữ liệu">
