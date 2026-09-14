@@ -109,7 +109,9 @@ export const useRecordFilter = (
         // Filter for TEAM_LEADER by managed wards in professional/measurement tab
         const isMeasurementViewTab = [
             'all_records', 'assign_tasks', 'completed_list', 'measurement_field', 'measurement_office',
-            'pending_supplement_list', 'pending_check_list', 'check_list', 'handover_list', 'director_completed'
+            'pending_supplement_list', 'pending_check_list', 'check_list', 'handover_list', 'director_completed',
+            'test_records', 'test_assign_tasks', 'test_completed_list', 'test_measurement_field', 'test_measurement_office',
+            'test_pending_supplement_list', 'test_pending_check_list', 'test_check_list', 'test_handover_list', 'test_director_completed'
         ].includes(currentView);
 
         if (currentUser && currentUser.role === UserRole.TEAM_LEADER && isMeasurementViewTab) {
@@ -124,7 +126,7 @@ export const useRecordFilter = (
         }
 
         // View-based filtering
-        if (currentView === 'check_list' || currentView === 'archive_check_list') {
+        if (currentView === 'check_list' || currentView === 'archive_check_list' || currentView === 'test_check_list') {
             const isPendingSign = (r: RecordFile) => {
                 if (r.status === RecordStatus.PENDING_SIGN) return true;
                 if ((r.submissionDate || r.submittedTo) && !(r.approvalDate || r.exportBatch || r.completedDate || r.resultReturnedDate)) {
@@ -138,7 +140,7 @@ export const useRecordFilter = (
             } else {
                 result = result.filter(r => isPendingSign(r));
             }
-        } else if (currentView === 'pending_check_list' || currentView === 'archive_pending_check_list') {
+        } else if (currentView === 'pending_check_list' || currentView === 'archive_pending_check_list' || currentView === 'test_pending_check_list') {
             // Tab Kiểm tra: Hiển thị hồ sơ Chờ kiểm tra
             result = result.filter(r => {
                 if (r.status === RecordStatus.PENDING_CHECK) return true;
@@ -147,7 +149,7 @@ export const useRecordFilter = (
                 }
                 return false;
             });
-        } else if (currentView === 'measurement_field') {
+        } else if (currentView === 'measurement_field' || currentView === 'test_measurement_field') {
             result = result.filter(r => {
                 // Thủ tục 2.1, 2.3 (Nội nghiệp trực tiếp / Trích lục / Duyệt đơn) KHÔNG thuộc Đo đạc thực địa
                 if (isOfficeOnlySurveyProcedure(r.recordType)) return false;
@@ -167,7 +169,7 @@ export const useRecordFilter = (
                 if (r.status === RecordStatus.OFFICE_WORK) return false;
                 return true;
             });
-        } else if (currentView === 'measurement_office') {
+        } else if (currentView === 'measurement_office' || currentView === 'test_measurement_office') {
             result = result.filter(r => {
                 // Hồ sơ thuộc bước Biên tập bản đồ
                 if (r.completedDate || r.exportBatch || r.exportDate || r.resultReturnedDate || r.approvalDate) return false;
@@ -184,7 +186,7 @@ export const useRecordFilter = (
 
                 return false;
             });
-        } else if (currentView === 'completed_list' || currentView === 'archive_completed_list') {
+        } else if (currentView === 'completed_list' || currentView === 'archive_completed_list' || currentView === 'test_completed_list') {
             result = result.filter(r => {
                 // Hồ sơ đang thực hiện là hồ sơ ĐÃ ĐƯỢC GIAO (có assignedTo hoặc status thuộc nhóm đang thực hiện)
                 const isAssigned = Boolean(r.assignedTo && r.assignedTo.trim() !== '');
@@ -201,9 +203,9 @@ export const useRecordFilter = (
                 if (r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED || r.status === RecordStatus.RETURNED || r.status === RecordStatus.HANDOVER || r.status === RecordStatus.SIGNED || r.status === RecordStatus.PENDING_SIGN || r.status === RecordStatus.PENDING_CHECK) return false;
                 return true;
             });
-        } else if (currentView === 'director_completed' || currentView === 'archive_director_completed') {
+        } else if (currentView === 'director_completed' || currentView === 'archive_director_completed' || currentView === 'test_director_completed') {
             result = result.filter(r => r.submittedTo === currentUser?.employeeId && r.status !== RecordStatus.PENDING_SIGN && r.status !== RecordStatus.RECEIVED && r.status !== RecordStatus.ASSIGNED && r.status !== RecordStatus.IN_PROGRESS && r.status !== RecordStatus.FIELD_WORK && r.status !== RecordStatus.OFFICE_WORK && r.status !== RecordStatus.COMPLETED_WORK);
-        } else if (currentView === 'handover_list' || currentView === 'archive_handover_list') {
+        } else if (currentView === 'handover_list' || currentView === 'archive_handover_list' || currentView === 'test_handover_list') {
             if (handoverTab === 'today') {
                 // Tab chờ giao: Bao gồm Đã ký HOẶC (Đã rút VÀ chưa có đợt xuất) HOẶC Hồ sơ trả (REJECTED)
                 result = result.filter(r => 
@@ -238,7 +240,7 @@ export const useRecordFilter = (
                     });
                 }
             }
-        } else if (currentView === 'assign_tasks' || currentView === 'archive_assign_tasks') {
+        } else if (currentView === 'assign_tasks' || currentView === 'archive_assign_tasks' || currentView === 'test_assign_tasks') {
             result = result.filter(r => {
                 // Đã bàn giao 1 cửa, đã trả kết quả, đã rút, đã trả thì không ở Chưa giao
                 if (r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED || r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED || r.status === RecordStatus.SIGNED) return false;
@@ -249,13 +251,22 @@ export const useRecordFilter = (
                 // Còn lại là hồ sơ chưa giao / tiếp nhận mới
                 return true;
             });
-        } else if (currentView === 'pending_supplement_list') {
+        } else if (currentView === 'pending_supplement_list' || currentView === 'test_pending_supplement_list') {
             result = result.filter(r => r.status === RecordStatus.PENDING_SUPPLEMENT);
+        } else if (currentView === 'test_print_cert') {
+            result = result.filter(r => {
+                if (r.completedDate || r.exportBatch || r.exportDate || r.resultReturnedDate || r.approvalDate) return false;
+                if (r.submissionDate || r.submittedTo) return false;
+                if (r.pendingCheckDate || r.checkedDate || r.checkedBy) return false;
+                if (r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED || r.status === RecordStatus.RETURNED || r.status === RecordStatus.HANDOVER || r.status === RecordStatus.SIGNED || r.status === RecordStatus.PENDING_SIGN || r.status === RecordStatus.PENDING_CHECK) return false;
+                return true;
+            });
         }
 
         // Filter by recordType based on view group
         const isArchiveMeasurementView = ['archive_records', 'archive_assign_tasks', 'archive_completed_list', 'archive_pending_check_list', 'archive_check_list', 'archive_handover_list', 'archive_director_completed'].includes(currentView);
         const isMeasurementView = ['all_records', 'assign_tasks', 'completed_list', 'measurement_field', 'measurement_office', 'pending_supplement_list', 'pending_check_list', 'check_list', 'handover_list', 'director_completed'].includes(currentView);
+        const isTestMeasurementView = ['test_records', 'test_assign_tasks', 'test_completed_list', 'test_measurement_field', 'test_measurement_office', 'test_print_cert', 'test_pending_supplement_list', 'test_pending_check_list', 'test_check_list', 'test_handover_list', 'test_director_completed'].includes(currentView);
         
         // Loại bỏ hoàn toàn các hồ sơ thuộc thủ tục CMD, Tòa án, Thi hành án
         result = result.filter(r => {
@@ -269,8 +280,14 @@ export const useRecordFilter = (
                 result = result.filter(r => getShortRecordType(r.recordType) === filterRecordType || r.recordType === filterRecordType);
             }
         } else if (isMeasurementView) {
-            // Loại bỏ hoàn toàn hồ sơ lưu trữ khỏi toàn bộ module Đo đạc (Hồ sơ lưu trữ có phân hệ & Giao 1 cửa riêng)
-            result = result.filter(r => !isArchiveRecord(r));
+            // Module Đo đạc chính: Lấy các hồ sơ thuộc land_records (không phải luutru_records và không phải dangky_records)
+            result = result.filter(r => !isArchiveRecord(r) && r.sourceTable !== 'dangky_records');
+            if (filterRecordType !== 'all') {
+                result = result.filter(r => getShortRecordType(r.recordType) === filterRecordType || r.recordType === filterRecordType);
+            }
+        } else if (isTestMeasurementView) {
+            // Module Đo đạc (test): Sử dụng CSDL Lưu Trữ Biệt Lập (dangky_records)
+            result = result.filter(r => r.sourceTable === 'dangky_records' || r.group === '3. Đăng ký đất đai, cấp GCN');
             if (filterRecordType !== 'all') {
                 result = result.filter(r => getShortRecordType(r.recordType) === filterRecordType || r.recordType === filterRecordType);
             }
@@ -297,11 +314,15 @@ export const useRecordFilter = (
             });
         }
         const isStatusFilterHidden = [
-            'assign_tasks', 'archive_assign_tasks',
-            'completed_list', 'archive_completed_list',
-            'pending_check_list', 'archive_pending_check_list', 'check_list', 'archive_check_list',
-            'director_completed', 'archive_director_completed',
-            'handover_list', 'archive_handover_list'
+            'assign_tasks', 'archive_assign_tasks', 'test_assign_tasks',
+            'completed_list', 'archive_completed_list', 'test_completed_list',
+            'measurement_field', 'test_measurement_field',
+            'measurement_office', 'test_measurement_office',
+            'test_print_cert',
+            'pending_check_list', 'archive_pending_check_list', 'test_pending_check_list',
+            'check_list', 'archive_check_list', 'test_check_list',
+            'director_completed', 'archive_director_completed', 'test_director_completed',
+            'handover_list', 'archive_handover_list', 'test_handover_list'
         ].includes(currentView || '');
 
         if (!isStatusFilterHidden && filterStatus !== 'all') {
@@ -374,25 +395,110 @@ export const useRecordFilter = (
         let approaching = 0;
         if (records.length > 0 && currentUser) {
             const isArchiveMeasurementView = ['archive_records', 'archive_assign_tasks', 'archive_completed_list', 'archive_pending_check_list', 'archive_check_list', 'archive_handover_list', 'archive_director_completed'].includes(currentView);
-            const isMeasurementView = ['all_records', 'assign_tasks', 'completed_list', 'measurement_field', 'measurement_office', 'pending_check_list', 'check_list', 'handover_list', 'director_completed'].includes(currentView);
+            const isMeasurementView = ['all_records', 'assign_tasks', 'completed_list', 'measurement_field', 'measurement_office', 'pending_supplement_list', 'pending_check_list', 'check_list', 'handover_list', 'director_completed'].includes(currentView);
+            const isTestMeasurementView = ['test_records', 'test_assign_tasks', 'test_completed_list', 'test_measurement_field', 'test_measurement_office', 'test_print_cert', 'test_pending_supplement_list', 'test_pending_check_list', 'test_check_list', 'test_handover_list', 'test_director_completed'].includes(currentView);
 
-            records.forEach(r => {
-                if (r.status === RecordStatus.HANDOVER || r.status === RecordStatus.WITHDRAWN) return; 
-                if (!checkWarningPermission(r)) return; 
+            let candidates = records.filter(r => {
+                if (r.status === RecordStatus.HANDOVER || r.status === RecordStatus.WITHDRAWN) return false; 
+                if (!checkWarningPermission(r)) return false; 
                 
                 const shortType = getShortRecordType(r.recordType);
-                if (['CMD', 'Tòa án', 'Thi hành án'].includes(shortType)) return;
+                if (['CMD', 'Tòa án', 'Thi hành án'].includes(shortType)) return false;
 
                 // Filter by recordType based on view group
-                if (isArchiveMeasurementView && !isArchiveRecord(r)) return;
-                if (isMeasurementView && isArchiveRecord(r)) return;
+                if (isArchiveMeasurementView && !isArchiveRecord(r)) return false;
+                if (isMeasurementView && (isArchiveRecord(r) || r.sourceTable === 'dangky_records')) return false;
+                if (isTestMeasurementView && (r.sourceTable !== 'dangky_records' && r.group !== '3. Đăng ký đất đai, cấp GCN')) return false;
 
+                return true;
+            });
+
+            // If in specific sub-tab view, filter candidates by that sub-tab's conditions
+            if (!['all_records', 'archive_records', 'test_records'].includes(currentView)) {
+                if (currentView === 'check_list' || currentView === 'archive_check_list' || currentView === 'test_check_list') {
+                    const isPendingSign = (r: RecordFile) => {
+                        if (r.status === RecordStatus.PENDING_SIGN) return true;
+                        if ((r.submissionDate || r.submittedTo) && !(r.approvalDate || r.exportBatch || r.completedDate || r.resultReturnedDate)) return true;
+                        return false;
+                    };
+                    if (isDirector) {
+                        candidates = candidates.filter(r => isPendingSign(r) && r.submittedTo === currentUser?.employeeId);
+                    } else {
+                        candidates = candidates.filter(r => isPendingSign(r));
+                    }
+                } else if (currentView === 'pending_check_list' || currentView === 'archive_pending_check_list' || currentView === 'test_pending_check_list') {
+                    candidates = candidates.filter(r => {
+                        if (r.status === RecordStatus.PENDING_CHECK) return true;
+                        if ((r.pendingCheckDate || r.checkedBy || r.checkedDate) && !(r.submissionDate || r.submittedTo || r.approvalDate || r.exportBatch || r.completedDate || r.resultReturnedDate)) return true;
+                        return false;
+                    });
+                } else if (currentView === 'measurement_field' || currentView === 'test_measurement_field') {
+                    candidates = candidates.filter(r => {
+                        if (isOfficeOnlySurveyProcedure(r.recordType)) return false;
+                        const isAssigned = Boolean(r.assignedTo && r.assignedTo.trim() !== '');
+                        const isExecutingStatus = r.status === RecordStatus.ASSIGNED || r.status === RecordStatus.IN_PROGRESS || r.status === RecordStatus.FIELD_WORK;
+                        if (!isAssigned && (!r.status || r.status === RecordStatus.RECEIVED)) return false;
+                        if (!isAssigned && !isExecutingStatus && r.status !== RecordStatus.FIELD_WORK) return false;
+                        if (r.completedDate || r.exportBatch || r.exportDate || r.resultReturnedDate || r.approvalDate) return false;
+                        if (r.submissionDate || r.submittedTo) return false;
+                        if (r.pendingCheckDate || r.checkedDate || r.checkedBy) return false;
+                        if (r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED || r.status === RecordStatus.RETURNED || r.status === RecordStatus.HANDOVER || r.status === RecordStatus.SIGNED || r.status === RecordStatus.PENDING_SIGN || r.status === RecordStatus.PENDING_CHECK) return false;
+                        if (r.status === RecordStatus.OFFICE_WORK) return false;
+                        return true;
+                    });
+                } else if (currentView === 'measurement_office' || currentView === 'test_measurement_office') {
+                    candidates = candidates.filter(r => {
+                        if (r.completedDate || r.exportBatch || r.exportDate || r.resultReturnedDate || r.approvalDate) return false;
+                        if (r.submissionDate || r.submittedTo) return false;
+                        if (r.pendingCheckDate || r.checkedDate || r.checkedBy) return false;
+                        if (r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED || r.status === RecordStatus.RETURNED || r.status === RecordStatus.HANDOVER || r.status === RecordStatus.SIGNED || r.status === RecordStatus.PENDING_SIGN || r.status === RecordStatus.PENDING_CHECK) return false;
+                        const isAssigned = Boolean(r.assignedTo && r.assignedTo.trim() !== '');
+                        const isOfficeProcedure = isOfficeOnlySurveyProcedure(r.recordType);
+                        if (r.status === RecordStatus.OFFICE_WORK) return true;
+                        if (isOfficeProcedure && isAssigned) return true;
+                        return false;
+                    });
+                } else if (currentView === 'test_print_cert') {
+                    candidates = candidates.filter(r => {
+                        if (r.completedDate || r.exportBatch || r.exportDate || r.resultReturnedDate || r.approvalDate) return false;
+                        if (r.submissionDate || r.submittedTo) return false;
+                        if (r.pendingCheckDate || r.checkedDate || r.checkedBy) return false;
+                        if (r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED || r.status === RecordStatus.RETURNED || r.status === RecordStatus.HANDOVER || r.status === RecordStatus.SIGNED || r.status === RecordStatus.PENDING_SIGN || r.status === RecordStatus.PENDING_CHECK) return false;
+                        return true;
+                    });
+                } else if (currentView === 'completed_list' || currentView === 'archive_completed_list' || currentView === 'test_completed_list') {
+                    candidates = candidates.filter(r => {
+                        const isAssigned = Boolean(r.assignedTo && r.assignedTo.trim() !== '');
+                        const isExecutingStatus = r.status === RecordStatus.ASSIGNED || r.status === RecordStatus.IN_PROGRESS || r.status === RecordStatus.FIELD_WORK || r.status === RecordStatus.OFFICE_WORK || r.status === RecordStatus.COMPLETED_WORK;
+                        if (!isAssigned && (!r.status || r.status === RecordStatus.RECEIVED)) return false;
+                        if (!isAssigned && !isExecutingStatus) return false;
+                        if (r.completedDate || r.exportBatch || r.exportDate || r.resultReturnedDate || r.approvalDate) return false;
+                        if (r.submissionDate || r.submittedTo) return false;
+                        if (r.pendingCheckDate || r.checkedDate || r.checkedBy) return false;
+                        if (r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED || r.status === RecordStatus.RETURNED || r.status === RecordStatus.HANDOVER || r.status === RecordStatus.SIGNED || r.status === RecordStatus.PENDING_SIGN || r.status === RecordStatus.PENDING_CHECK) return false;
+                        return true;
+                    });
+                } else if (currentView === 'director_completed' || currentView === 'archive_director_completed' || currentView === 'test_director_completed') {
+                    candidates = candidates.filter(r => r.submittedTo === currentUser?.employeeId && r.status !== RecordStatus.PENDING_SIGN && r.status !== RecordStatus.RECEIVED && r.status !== RecordStatus.ASSIGNED && r.status !== RecordStatus.IN_PROGRESS && r.status !== RecordStatus.FIELD_WORK && r.status !== RecordStatus.OFFICE_WORK && r.status !== RecordStatus.COMPLETED_WORK);
+                } else if (currentView === 'assign_tasks' || currentView === 'archive_assign_tasks' || currentView === 'test_assign_tasks') {
+                    candidates = candidates.filter(r => {
+                        if (r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED || r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED || r.status === RecordStatus.SIGNED) return false;
+                        if (r.submissionDate || r.submittedTo || r.approvalDate || r.exportBatch || r.exportDate || r.resultReturnedDate || r.pendingCheckDate || r.checkedDate || r.checkedBy) return false;
+                        if (r.assignedTo && r.assignedTo.trim() !== '') return false;
+                        return true;
+                    });
+                } else if (currentView === 'pending_supplement_list' || currentView === 'test_pending_supplement_list') {
+                    candidates = candidates.filter(r => r.status === RecordStatus.PENDING_SUPPLEMENT);
+                }
+            }
+
+            candidates.forEach(r => {
                 if (isRecordOverdue(r)) overdue++;
                 else if (isRecordApproaching(r)) approaching++;
             });
         }
         return { overdue, approaching };
-    }, [records, currentUser, employees, currentView]);
+    }, [records, currentUser, employees, currentView, isDirector]);
 
     return {
         filteredRecords, paginatedRecords, totalPages, warningCount,

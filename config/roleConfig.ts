@@ -23,7 +23,7 @@ export const ROLE_VIEWS_CONFIG: Record<UserRole, RoleConfig> = {
     role: UserRole.ONEDOOR,
     allowedViews: [
       'dashboard', 'receive_record', 'receive_search', 'receive_record_search', 'receive_contract', 
-      'registration_records', 'personal_profile', 
+      'personal_profile', 
       'account_settings', 'utilities', 'work_schedule', 
       'receive_group', 'management_group',
       'reports', 'tools_group', 'barcode_generator'
@@ -48,10 +48,6 @@ export const ROLE_VIEWS_CONFIG: Record<UserRole, RoleConfig> = {
       {
         keyword: 'đo đạc',
         views: ['all_records', 'assign_tasks', 'completed_list', 'pending_supplement_list', 'pending_check_list', 'check_list', 'handover_list', 'director_completed']
-      },
-      {
-        keyword: 'đăng ký',
-        views: ['registration_records']
       },
       {
         keyword: 'lưu trữ',
@@ -192,7 +188,7 @@ export function isViewAllowedForUser(
       case 'receive_group':
         return activePerms.includes('receive_record') || activePerms.includes('receive_contract') || activePerms.includes('ADD_RECORDS') || activePerms.includes('VIEW_CONTRACTS') || hasAnyPerm(ONEDOOR_CHILD_PERMS) || hasAnyPerm(CONTRACT_CHILD_PERMS);
       case 'records_group':
-        return activePerms.includes('all_records') || activePerms.includes('archive_records') || activePerms.includes('registration_records');
+        return activePerms.includes('all_records') || activePerms.includes('archive_records') || activePerms.includes('test_records') || activePerms.includes('registration_records');
       case 'tools_group':
         return activePerms.includes('reports') || activePerms.includes('VIEW_REPORTS') || activePerms.includes('excerpt_management') || activePerms.includes('MANAGE_EXCERPTS') || activePerms.includes('VIEW_EXCERPTS') || activePerms.includes('dodac_VIEW_EXCERPTS') || activePerms.includes('dodac_MANAGE_EXCERPTS') || activePerms.includes('utilities') || activePerms.includes('SYSTEM_SETTINGS') || activePerms.includes('VIEW_CHAT');
       case 'management_group':
@@ -207,11 +203,10 @@ export function isViewAllowedForUser(
         return activePerms.includes('all_records');
       case 'archive_records':
         return activePerms.includes('archive_records');
+      case 'test_records':
+        return activePerms.includes('test_records') || activePerms.includes('all_records');
       case 'receive_contract':
         return activePerms.includes('receive_contract') || activePerms.includes('VIEW_CONTRACTS') || activePerms.includes('ADD_CONTRACTS');
-
-      case 'registration_records':
-        return activePerms.includes('registration_records');
 
       // Child Tabs - Receive Group
       case 'receive_sub_create':
@@ -256,6 +251,26 @@ export function isViewAllowedForUser(
         return activePerms.includes('archive_records') || activePerms.includes('archive_handover_list') || activePerms.includes('luutru_HANDOVER_RECORDS');
       case 'archive_director_completed':
         return activePerms.includes('archive_records') || activePerms.includes('archive_director_completed') || activePerms.includes('luutru_BTN_APPROVE_SIGN');
+
+      // Child Tabs - Test Group (Module Test)
+      case 'test_sub_all':
+        return activePerms.includes('test_records') || activePerms.includes('all_records') || activePerms.includes('test_sub_all');
+      case 'test_assign_tasks':
+        return activePerms.includes('test_records') || activePerms.includes('all_records') || activePerms.includes('test_assign_tasks');
+      case 'test_completed_list':
+      case 'test_measurement_field':
+      case 'test_measurement_office':
+      case 'test_print_cert':
+      case 'test_pending_supplement_list':
+        return activePerms.includes('test_records') || activePerms.includes('all_records') || activePerms.includes('test_completed_list');
+      case 'test_pending_check_list':
+        return activePerms.includes('test_records') || activePerms.includes('all_records') || activePerms.includes('test_pending_check_list');
+      case 'test_check_list':
+        return activePerms.includes('test_records') || activePerms.includes('all_records') || activePerms.includes('test_check_list');
+      case 'test_director_completed':
+        return activePerms.includes('test_records') || activePerms.includes('all_records') || activePerms.includes('test_director_completed');
+      case 'test_handover_list':
+        return activePerms.includes('test_records') || activePerms.includes('all_records') || activePerms.includes('test_handover_list');
 
       // Other Standalone Views
       case 'excerpt_management':

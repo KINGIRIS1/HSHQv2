@@ -31,6 +31,11 @@ const RECORD_DB_COLUMNS = [
  * - Nhóm 3.x (Đăng ký đất đai, Cấp giấy, Đăng ký biến động) -> dangky_records
  */
 export const getTargetTable = (record: Partial<RecordFile>): 'dangky_records' | 'land_records' | 'luutru_records' => {
+    // 0. Ưu tiên tuyệt đối nếu sourceTable đã được chỉ định (như Module Đo đạc - Test chỉ định dangky_records)
+    if (record.sourceTable === 'dangky_records') return 'dangky_records';
+    if (record.sourceTable === 'luutru_records' || record.sourceTable === 'archive_records') return 'luutru_records';
+    if (record.sourceTable === 'land_records') return 'land_records';
+
     const rawType = String(record.recordType || record.content || '').trim();
     const code = String(record.code || '').trim();
     const shortType = getShortRecordType(rawType);
@@ -47,15 +52,6 @@ export const getTargetTable = (record: Partial<RecordFile>): 'dangky_records' | 
         return 'luutru_records';
     }
 
-    // Nhóm 2.x -> Tổ Đo đạc (land_records)
-    if (
-        shortType.startsWith('2.') ||
-        rawType.startsWith('2.') ||
-        code.startsWith('2.')
-    ) {
-        return 'land_records';
-    }
-
     // Nhóm 3.x -> Tổ Cấp giấy / Đăng ký (dangky_records)
     if (
         shortType.startsWith('3.') ||
@@ -65,10 +61,14 @@ export const getTargetTable = (record: Partial<RecordFile>): 'dangky_records' | 
         return 'dangky_records';
     }
 
-    // Nếu có sourceTable đã được xác định trước đó
-    if (record.sourceTable === 'luutru_records' || record.sourceTable === 'archive_records') return 'luutru_records';
-    if (record.sourceTable === 'dangky_records') return 'dangky_records';
-    if (record.sourceTable === 'land_records') return 'land_records';
+    // Nhóm 2.x -> Tổ Đo đạc (land_records)
+    if (
+        shortType.startsWith('2.') ||
+        rawType.startsWith('2.') ||
+        code.startsWith('2.')
+    ) {
+        return 'land_records';
+    }
 
     // Tra cứu nhanh từ Cache nếu không có recordType
     if (record.id || record.code) {

@@ -35,7 +35,7 @@ export const DEFAULT_ROLE_PERMISSIONS: RolePermissions = {
     'receive_contract', 'VIEW_CONTRACTS', 'ADD_CONTRACTS', 'EDIT_CONTRACTS', 'LIQUIDATE_CONTRACTS', 'EXPORT_CONTRACTS',
     'all_records', 'all_sub_all', 'assign_tasks', 'completed_list', 'pending_check_list', 'check_list', 'handover_list', 'director_completed',
     'archive_records', 'archive_sub_all', 'archive_assign_tasks', 'archive_completed_list', 'archive_pending_check_list', 'archive_check_list', 'archive_handover_list', 'archive_director_completed',
-    'registration_records',
+    'test_records', 'test_sub_all', 'test_assign_tasks', 'test_completed_list', 'test_measurement_field', 'test_measurement_office', 'test_print_cert', 'test_pending_check_list', 'test_check_list', 'test_handover_list', 'test_director_completed',
     'excerpt_management', 'MANAGE_EXCERPTS', 'VIEW_EXCERPTS',
     'reports', 'VIEW_REPORTS',
     'work_schedule', 'VIEW_SCHEDULE', 'MANAGE_SCHEDULE',
@@ -44,6 +44,7 @@ export const DEFAULT_ROLE_PERMISSIONS: RolePermissions = {
     'BTN_ASSIGN_STAFF', 'BTN_SUBMIT_SIGN', 'BTN_APPROVE_SIGN', 'BTN_SUBMIT_CHECK', 'BTN_REJECT_RECORD', 'HANDOVER_RECORDS', 'BTN_RETURN_RESULT', 'BTN_EXTEND_DEADLINE', 'BTN_ADVANCE_STATUS',
     'dodac_ADD_RECORDS', 'dodac_BTN_ASSIGN_STAFF', 'dodac_BTN_SUBMIT_CHECK', 'dodac_BTN_SUBMIT_SIGN', 'dodac_BTN_APPROVE_SIGN', 'dodac_BTN_REJECT_RECORD', 'dodac_HANDOVER_RECORDS', 'dodac_BTN_RETURN_RESULT', 'dodac_VIEW_EXCERPTS', 'dodac_MANAGE_EXCERPTS', 'dodac_BTN_EXTEND_DEADLINE', 'dodac_EDIT_RECORDS', 'dodac_DELETE_RECORDS', 'dodac_VIEW_DETAILS', 'dodac_PRINT_RECEIPT', 'dodac_BTN_ADVANCE_STATUS',
     'luutru_ADD_RECORDS', 'luutru_BTN_ASSIGN_STAFF', 'luutru_BTN_SUBMIT_CHECK', 'luutru_BTN_SUBMIT_SIGN', 'luutru_BTN_APPROVE_SIGN', 'luutru_BTN_REJECT_RECORD', 'luutru_HANDOVER_RECORDS', 'luutru_BTN_RETURN_RESULT', 'luutru_VIEW_ARCHIVE', 'luutru_MANAGE_ARCHIVE', 'luutru_BTN_EXTEND_DEADLINE', 'luutru_EDIT_RECORDS', 'luutru_DELETE_RECORDS', 'luutru_VIEW_DETAILS', 'luutru_PRINT_RECEIPT', 'luutru_BTN_ADVANCE_STATUS',
+    'test_ADD_RECORDS', 'test_BTN_ASSIGN_STAFF', 'test_BTN_SUBMIT_CHECK', 'test_BTN_SUBMIT_SIGN', 'test_BTN_APPROVE_SIGN', 'test_BTN_REJECT_RECORD', 'test_HANDOVER_RECORDS', 'test_BTN_RETURN_RESULT', 'test_BTN_EXTEND_DEADLINE', 'test_EDIT_RECORDS', 'test_DELETE_RECORDS', 'test_VIEW_DETAILS', 'test_PRINT_RECEIPT', 'test_BTN_ADVANCE_STATUS',
     'VIEW_ARCHIVE', 'MANAGE_ARCHIVE'
   ],
   [UserRole.TEAM_LEADER]: [
@@ -51,14 +52,15 @@ export const DEFAULT_ROLE_PERMISSIONS: RolePermissions = {
     'receive_contract', 'VIEW_CONTRACTS', 'ADD_CONTRACTS', 'EDIT_CONTRACTS', 'LIQUIDATE_CONTRACTS', 'EXPORT_CONTRACTS',
     'all_records', 'all_sub_all', 'assign_tasks', 'completed_list', 'pending_check_list', 'check_list', 'handover_list', 'director_completed',
     'archive_records', 'archive_sub_all', 'archive_assign_tasks', 'archive_completed_list', 'archive_pending_check_list', 'archive_check_list', 'archive_handover_list', 'archive_director_completed',
-    'registration_records',
+    'test_records', 'test_sub_all', 'test_assign_tasks', 'test_completed_list', 'test_measurement_field', 'test_measurement_office', 'test_print_cert', 'test_pending_check_list', 'test_check_list', 'test_handover_list', 'test_director_completed',
     'excerpt_management', 'MANAGE_EXCERPTS', 'VIEW_EXCERPTS',
     'reports', 'VIEW_REPORTS',
     'work_schedule', 'VIEW_SCHEDULE',
     'utilities',
     'BTN_ASSIGN_STAFF', 'BTN_SUBMIT_SIGN', 'BTN_APPROVE_SIGN', 'BTN_SUBMIT_CHECK', 'BTN_REJECT_RECORD', 'HANDOVER_RECORDS', 'BTN_RETURN_RESULT', 'BTN_EXTEND_DEADLINE', 'EDIT_RECORDS', 'DELETE_RECORDS', 'VIEW_DETAILS', 'PRINT_RECEIPT', 'BTN_ADVANCE_STATUS',
     'dodac_ADD_RECORDS', 'dodac_BTN_ASSIGN_STAFF', 'dodac_BTN_SUBMIT_CHECK', 'dodac_BTN_SUBMIT_SIGN', 'dodac_BTN_APPROVE_SIGN', 'dodac_BTN_REJECT_RECORD', 'dodac_HANDOVER_RECORDS', 'dodac_BTN_RETURN_RESULT', 'dodac_VIEW_EXCERPTS', 'dodac_MANAGE_EXCERPTS', 'dodac_BTN_EXTEND_DEADLINE', 'dodac_EDIT_RECORDS', 'dodac_DELETE_RECORDS', 'dodac_VIEW_DETAILS', 'dodac_PRINT_RECEIPT', 'dodac_BTN_ADVANCE_STATUS',
-    'luutru_ADD_RECORDS', 'luutru_BTN_ASSIGN_STAFF', 'luutru_BTN_SUBMIT_CHECK', 'luutru_BTN_SUBMIT_SIGN', 'luutru_BTN_APPROVE_SIGN', 'luutru_BTN_REJECT_RECORD', 'luutru_HANDOVER_RECORDS', 'luutru_BTN_RETURN_RESULT', 'luutru_VIEW_ARCHIVE', 'luutru_MANAGE_ARCHIVE', 'luutru_BTN_EXTEND_DEADLINE', 'luutru_EDIT_RECORDS', 'luutru_DELETE_RECORDS', 'luutru_VIEW_DETAILS', 'luutru_PRINT_RECEIPT', 'luutru_BTN_ADVANCE_STATUS'
+    'luutru_ADD_RECORDS', 'luutru_BTN_ASSIGN_STAFF', 'luutru_BTN_SUBMIT_CHECK', 'luutru_BTN_SUBMIT_SIGN', 'luutru_BTN_APPROVE_SIGN', 'luutru_BTN_REJECT_RECORD', 'luutru_HANDOVER_RECORDS', 'luutru_BTN_RETURN_RESULT', 'luutru_VIEW_ARCHIVE', 'luutru_MANAGE_ARCHIVE', 'luutru_BTN_EXTEND_DEADLINE', 'luutru_EDIT_RECORDS', 'luutru_DELETE_RECORDS', 'luutru_VIEW_DETAILS', 'luutru_PRINT_RECEIPT', 'luutru_BTN_ADVANCE_STATUS',
+    'test_ADD_RECORDS', 'test_BTN_ASSIGN_STAFF', 'test_BTN_SUBMIT_CHECK', 'test_BTN_SUBMIT_SIGN', 'test_BTN_APPROVE_SIGN', 'test_BTN_REJECT_RECORD', 'test_HANDOVER_RECORDS', 'test_BTN_RETURN_RESULT', 'test_BTN_EXTEND_DEADLINE', 'test_EDIT_RECORDS', 'test_DELETE_RECORDS', 'test_VIEW_DETAILS', 'test_PRINT_RECEIPT', 'test_BTN_ADVANCE_STATUS'
   ],
   [UserRole.ONEDOOR]: [
     'receive_record', 'receive_sub_create', 'receive_sub_bulk', 'receive_sub_list', 'receive_search', 'receive_record_search', 'ADD_RECORDS',
@@ -118,7 +120,22 @@ export const AVAILABLE_PERMISSIONS = [
   { id: 'BTN_SUBMIT_CHECK', label: 'Trình kiểm tra' },
   { id: 'BTN_CLOSE_BATCH', label: 'Tạo đợt / Chốt đợt' },
   { id: 'BTN_EXTEND_DEADLINE', label: 'Gia hạn' },
-  { id: 'BTN_ADVANCE_STATUS', label: 'Chuyển bước hồ sơ' }
+  { id: 'BTN_ADVANCE_STATUS', label: 'Chuyển bước hồ sơ' },
+  { id: 'test_records', label: 'Tab Hồ sơ Cấp giấy' },
+  { id: 'test_ADD_RECORDS', label: 'Thêm mới hồ sơ (Cấp giấy)' },
+  { id: 'test_BTN_ASSIGN_STAFF', label: 'Giao việc (Cấp giấy)' },
+  { id: 'test_BTN_SUBMIT_CHECK', label: 'Trình kiểm tra (Cấp giấy)' },
+  { id: 'test_BTN_SUBMIT_SIGN', label: 'Trình ký (Cấp giấy)' },
+  { id: 'test_BTN_APPROVE_SIGN', label: 'Ký duyệt (Cấp giấy)' },
+  { id: 'test_BTN_REJECT_RECORD', label: 'Trả hồ sơ / Từ chối (Cấp giấy)' },
+  { id: 'test_HANDOVER_RECORDS', label: 'Bàn giao 1 cửa (Cấp giấy)' },
+  { id: 'test_BTN_RETURN_RESULT', label: 'Trả kết quả (Cấp giấy)' },
+  { id: 'test_BTN_EXTEND_DEADLINE', label: 'Gia hạn thời gian (Cấp giấy)' },
+  { id: 'test_EDIT_RECORDS', label: 'Sửa hồ sơ (Cấp giấy)' },
+  { id: 'test_DELETE_RECORDS', label: 'Xóa hồ sơ (Cấp giấy)' },
+  { id: 'test_VIEW_DETAILS', label: 'Xem chi tiết hồ sơ (Cấp giấy)' },
+  { id: 'test_PRINT_RECEIPT', label: 'In biên nhận hồ sơ (Cấp giấy)' },
+  { id: 'test_BTN_ADVANCE_STATUS', label: 'Chuyển bước hồ sơ (Cấp giấy)' }
 ];
 
 export interface User {
