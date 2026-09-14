@@ -113,6 +113,40 @@ interface AppModalsProps {
 }
 
 const AppModals: React.FC<AppModalsProps> = (props) => {
+    // Lắng nghe phím Esc toàn cục cho tất cả Modal
+    React.useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                if (props.isDiagnosticModalOpen) props.setIsDiagnosticModalOpen?.(false);
+                else if (props.isRejectReturnStepModalOpen) props.setIsRejectReturnStepModalOpen?.(false);
+                else if (props.isExtendModalOpen) props.setIsExtendModalOpen?.(false);
+                else if (props.isBulkUpdateModalOpen) props.setIsBulkUpdateModalOpen(false);
+                else if (props.isReturnModalOpen) props.setIsReturnModalOpen(false);
+                else if (props.isReturnHandoverModalOpen) props.setIsReturnHandoverModalOpen?.(false);
+                else if (props.isAddToBatchModalOpen) props.setIsAddToBatchModalOpen(false);
+                else if (props.isExcelPreviewOpen) props.setIsExcelPreviewOpen(false);
+                else if (props.isExportModalOpen) props.setIsExportModalOpen(false);
+                else if (props.isDeleteModalOpen) props.setIsDeleteModalOpen(false);
+                else if (props.isAssignModalOpen) props.setIsAssignModalOpen(false);
+                else if (props.isImportModalOpen) props.setIsImportModalOpen(false);
+                else if (props.isModalOpen) props.setIsModalOpen(false);
+                else if (props.viewingRecord) props.setViewingRecord(null);
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [
+        props.isDiagnosticModalOpen, props.isRejectReturnStepModalOpen, props.isExtendModalOpen,
+        props.isBulkUpdateModalOpen, props.isReturnModalOpen, props.isReturnHandoverModalOpen,
+        props.isAddToBatchModalOpen, props.isExcelPreviewOpen, props.isExportModalOpen,
+        props.isDeleteModalOpen, props.isAssignModalOpen, props.isImportModalOpen,
+        props.isModalOpen, props.viewingRecord, props.setIsDiagnosticModalOpen,
+        props.setIsRejectReturnStepModalOpen, props.setIsExtendModalOpen, props.setIsBulkUpdateModalOpen,
+        props.setIsReturnModalOpen, props.setIsReturnHandoverModalOpen, props.setIsAddToBatchModalOpen,
+        props.setIsExcelPreviewOpen, props.setIsExportModalOpen, props.setIsDeleteModalOpen,
+        props.setIsAssignModalOpen, props.setIsImportModalOpen, props.setIsModalOpen, props.setViewingRecord
+    ]);
+
     // Xác định danh sách hồ sơ cần chốt để truyền vào modal (cho tính năng cảnh báo)
     const targetRecordsForBatch = props.selectedRecordsForBulk.length > 0 ? props.selectedRecordsForBulk : props.filteredRecords;
     const isMobile = useIsMobile();

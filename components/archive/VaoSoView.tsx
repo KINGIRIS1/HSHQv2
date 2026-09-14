@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { ArchiveRecord, fetchArchiveRecords, saveArchiveRecord, deleteArchiveRecord, importArchiveRecords, updateArchiveRecordsBatch } from '../../services/apiArchive';
 import { useArchiveRealtime } from '../../hooks/useArchiveRealtime';
 import { User } from '../../types';
-import { Loader2, Plus, Search, Trash2, Upload, FileSpreadsheet, Send, CheckCircle2, X, History, Calendar, FileOutput, Settings, Hash, Edit, FileText, Filter, Users, MapPin, Landmark, CheckSquare, BookOpen, ClipboardList, PenTool, Printer, UserPlus, SlidersHorizontal, ChevronDown, Clock, AlertTriangle, Eye } from 'lucide-react';
+import { Loader2, Plus, Search, Trash2, Upload, FileSpreadsheet, Send, CheckCircle2, X, History, Calendar, FileOutput, Settings, Hash, Edit, FileText, Filter, Users, MapPin, Landmark, CheckSquare, BookOpen, ClipboardList, PenTool, Printer, UserPlus, SlidersHorizontal, ChevronDown, ChevronUp, Clock, AlertTriangle, Eye } from 'lucide-react';
 import * as XLSX from 'xlsx-js-style';
 import { confirmAction, matchDepartmentKey } from '../../utils/appHelpers';
 import { saveAs } from 'file-saver';
@@ -43,6 +43,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
     const [thueSubTab, setThueSubTab] = useState<'phieu_chuyen' | 'khu_vuc_7' | 'thong_bao'>('phieu_chuyen');
     const [giao1CuaSubTab, setGiao1CuaSubTab] = useState<'cho_ban_giao' | 'cho_tra_kq' | 'da_tra_kq'>('cho_ban_giao');
     const [showFilterPopover, setShowFilterPopover] = useState(false);
+    const filterPopoverRef = useRef<HTMLDivElement>(null);
     const [showColumnSelector, setShowColumnSelector] = useState(false);
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [savingId, setSavingId] = useState<string | null>(null);
@@ -113,6 +114,20 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
     const [filterWard, setFilterWard] = useState('');
     const [filterEmployee, setFilterEmployee] = useState('');
     const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'scanned'>('all');
+
+    const activeFilterCount = useMemo(() => {
+        return [filterWard, filterEmployee, fromDate, toDate].filter(Boolean).length;
+    }, [filterWard, filterEmployee, fromDate, toDate]);
+
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (filterPopoverRef.current && !filterPopoverRef.current.contains(e.target as Node)) {
+                setShowFilterPopover(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     useArchiveRealtime('vaoso', setRecords);
 
@@ -1017,101 +1032,151 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                 </button>
             </div>
 
-            {/* HÀNG 2: THANH TÌM KIẾM, BỘ LỌC VÀ NÚT XUẤT EXCEL (CỐ ĐỊNH CHUẨN MỰC) */}
+            {/* HÀNG 2: THANH TÌM KIẾM, BỘ LỌC VÀ NÚT XUẤT EXCEL (CỐ ĐỊNH CHUẨN MỰC THEO THIẾT KẾ) */}
             <div className="px-4 py-3 border-b border-gray-200 bg-white flex flex-wrap items-center justify-between gap-3">
-                {/* Bên trái: Ô tìm kiếm và các Bộ lọc */}
-                <div className="flex flex-wrap items-center gap-2.5 flex-1 min-w-0">
-                    {/* 1. Ô Tìm kiếm */}
-                    <div className="relative flex-1 min-w-[220px] max-w-md">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                        <input
-                            type="text"
-                            className="w-full pl-9 pr-8 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all font-medium"
-                            placeholder="Tìm kiếm mã HS, tên chủ, số tờ, số thửa..."
-                            value={searchTerm}
-                            onChange={e => setSearchTerm(e.target.value)}
-                        />
-                        {searchTerm && (
-                            <button
-                                onClick={() => setSearchTerm('')}
-                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0.5 rounded-full hover:bg-gray-200"
-                            >
-                                <X size={14} />
-                            </button>
-                        )}
-                    </div>
-
-                    {/* 2. Lọc Xã / Phường */}
-                    <div className="flex items-center gap-1.5 bg-gray-50 px-2.5 py-1.5 rounded-lg border border-gray-200 text-sm">
-                        <MapPin size={15} className="text-gray-500 shrink-0"/>
-                        <select
-                            className="bg-transparent text-xs font-semibold text-gray-700 outline-none cursor-pointer border-none p-0 focus:ring-0 pr-1"
-                            value={filterWard}
-                            onChange={e => setFilterWard(e.target.value)}
-                        >
-                            <option value="">Tất cả Xã/Phường</option>
-                            {wards.map(w => <option key={w} value={w}>{w}</option>)}
-                        </select>
-                    </div>
-
-                    {/* 3. Lọc Cán bộ */}
-                    <div className="flex items-center gap-1.5 bg-gray-50 px-2.5 py-1.5 rounded-lg border border-gray-200 text-sm">
-                        <Users size={15} className="text-gray-500 shrink-0"/>
-                        <select
-                            className="bg-transparent text-xs font-semibold text-gray-700 outline-none cursor-pointer border-none p-0 focus:ring-0 pr-1"
-                            value={filterEmployee}
-                            onChange={e => setFilterEmployee(e.target.value)}
-                        >
-                            <option value="">Tất cả Cán bộ</option>
-                            {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
-                        </select>
-                    </div>
-
-                    {/* 4. Lọc Thời gian */}
-                    <div className="flex items-center gap-1.5 bg-gray-50 px-2.5 py-1.5 rounded-lg border border-gray-200 text-sm">
-                        <Calendar size={15} className="text-gray-500 shrink-0"/>
-                        <input
-                            type="date"
-                            className="text-xs bg-transparent text-gray-700 outline-none w-26 font-medium"
-                            value={fromDate}
-                            onChange={e => setFromDate(e.target.value)}
-                        />
-                        <span className="text-gray-400 text-xs">-</span>
-                        <input
-                            type="date"
-                            className="text-xs bg-transparent text-gray-700 outline-none w-26 font-medium"
-                            value={toDate}
-                            onChange={e => setToDate(e.target.value)}
-                        />
-                    </div>
-
-                    {/* Nút Xóa lọc */}
-                    {(searchTerm || filterWard || filterEmployee || fromDate || toDate) && (
+                {/* Bên trái: Ô tìm kiếm */}
+                <div className="relative flex-1 min-w-[220px] max-w-md">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                    <input
+                        type="text"
+                        className="w-full pl-9 pr-8 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all font-medium"
+                        placeholder="Tìm kiếm..."
+                        value={searchTerm}
+                        onChange={e => setSearchTerm(e.target.value)}
+                    />
+                    {searchTerm && (
                         <button
-                            onClick={() => {
-                                setSearchTerm('');
-                                setFilterWard('');
-                                setFilterEmployee('');
-                                setFromDate('');
-                                setToDate('');
-                            }}
-                            className="flex items-center gap-1 text-xs text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100 px-2.5 py-1.5 rounded-lg font-bold border border-red-200 transition-colors cursor-pointer"
-                            title="Xóa tất cả bộ lọc"
+                            onClick={() => setSearchTerm('')}
+                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0.5 rounded-full hover:bg-gray-200 cursor-pointer"
                         >
-                            <X size={14} /> Xóa lọc
+                            <X size={14} />
                         </button>
                     )}
                 </div>
 
-                {/* Phía bên phải Hàng 2: NÚT XUẤT EXCEL (Cố định duy nhất, Không có nút làm mới) */}
-                <div className="flex items-center gap-2 shrink-0">
+                {/* Phía bên phải Hàng 2: NÚT BỘ LỌC POPOVER VÀ NÚT XUẤT EXCEL */}
+                <div className="flex items-center gap-2.5 shrink-0">
+                    <div className="relative inline-block shrink-0" ref={filterPopoverRef}>
+                        <button
+                            onClick={() => setShowFilterPopover(!showFilterPopover)}
+                            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-bold transition-all shadow-xs bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 cursor-pointer ${
+                                activeFilterCount > 0 ? "border-blue-300 text-blue-700 bg-blue-50/50" : ""
+                            }`}
+                            title="Mở bộ lọc tìm kiếm"
+                        >
+                            <Filter size={16} />
+                            {activeFilterCount > 0 && (
+                                <span className="bg-red-500 text-white text-[11px] px-1.5 py-0.2 rounded-full font-extrabold">
+                                    {activeFilterCount}
+                                </span>
+                            )}
+                            {showFilterPopover ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                        </button>
+
+                        {/* POPOVER DROPDOWN CARD */}
+                        {showFilterPopover && (
+                            <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 p-4 z-50 text-gray-800 animate-fade-in">
+                                <div className="flex items-center justify-between pb-3 border-b border-gray-100 mb-3">
+                                    <div className="flex items-center gap-2 font-bold text-blue-700 text-base">
+                                        <Filter size={18} />
+                                        <span>Bộ lọc tìm kiếm</span>
+                                    </div>
+                                    <button
+                                        onClick={() => setShowFilterPopover(false)}
+                                        className="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100 transition-colors"
+                                    >
+                                        <X size={18} />
+                                    </button>
+                                </div>
+
+                                <div className="space-y-3.5 max-h-[75vh] overflow-y-auto pr-1">
+                                    {/* 1. Xã/Phường */}
+                                    <div>
+                                        <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 mb-1">
+                                            <MapPin size={14} className="text-gray-500" />
+                                            <span>Xã/Phường:</span>
+                                        </label>
+                                        <select
+                                            value={filterWard}
+                                            onChange={e => setFilterWard(e.target.value)}
+                                            className="w-full text-sm border border-gray-200 rounded-lg p-2 font-medium bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                                        >
+                                            <option value="">Tất cả Xã/Phường</option>
+                                            {wards.map(w => <option key={w} value={w}>{w}</option>)}
+                                        </select>
+                                    </div>
+
+                                    {/* 2. Cán bộ */}
+                                    <div>
+                                        <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 mb-1">
+                                            <Users size={14} className="text-gray-500" />
+                                            <span>Cán bộ xử lý:</span>
+                                        </label>
+                                        <select
+                                            value={filterEmployee}
+                                            onChange={e => setFilterEmployee(e.target.value)}
+                                            className="w-full text-sm border border-gray-200 rounded-lg p-2 font-medium bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                                        >
+                                            <option value="">Tất cả Cán bộ</option>
+                                            {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+                                        </select>
+                                    </div>
+
+                                    {/* 3. Thời gian */}
+                                    <div>
+                                        <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 mb-1">
+                                            <Calendar size={14} className="text-gray-500" />
+                                            <span>Thời gian:</span>
+                                        </label>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <div>
+                                                <span className="text-[11px] text-gray-500 font-medium block mb-0.5">Từ ngày</span>
+                                                <input
+                                                    type="date"
+                                                    value={fromDate}
+                                                    onChange={e => setFromDate(e.target.value)}
+                                                    className="w-full text-xs border border-gray-200 rounded-lg p-2 font-medium bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                />
+                                            </div>
+                                            <div>
+                                                <span className="text-[11px] text-gray-500 font-medium block mb-0.5">Đến ngày</span>
+                                                <input
+                                                    type="date"
+                                                    value={toDate}
+                                                    onChange={e => setToDate(e.target.value)}
+                                                    className="w-full text-xs border border-gray-200 rounded-lg p-2 font-medium bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Reset Filter Button */}
+                                    <div className="pt-2">
+                                        <button
+                                            onClick={() => {
+                                                setFilterWard('');
+                                                setFilterEmployee('');
+                                                setFromDate('');
+                                                setToDate('');
+                                            }}
+                                            className="w-full py-2 border border-red-200 text-red-600 rounded-xl hover:bg-red-50 text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer"
+                                        >
+                                            <X size={14} /> Xóa tất cả bộ lọc
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Nút Xuất Excel dạng icon vuông theo hình ảnh đính kèm */}
                     <button
                         onClick={handleExportExcel}
-                        className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-lg font-bold text-xs shadow-xs transition-colors cursor-pointer"
+                        className="flex items-center justify-center p-2 bg-white text-emerald-700 border border-emerald-300 hover:bg-emerald-50 rounded-lg shadow-xs transition-all cursor-pointer shrink-0 active:scale-95"
                         title="Xuất danh sách ra file Excel (.xlsx)"
+                        aria-label="Xuất file Excel"
                     >
-                        <FileSpreadsheet size={16}/>
-                        <span>Xuất file Excel</span>
+                        <FileSpreadsheet size={18} className="text-emerald-600 shrink-0" />
                     </button>
                 </div>
             </div>

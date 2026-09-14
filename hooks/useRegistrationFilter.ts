@@ -185,11 +185,20 @@ export const useRegistrationFilter = ({ records }: UseRegistrationFilterProps) =
 
   return {
     searchTerm,
-    setSearchTerm,
+    setSearchTerm: (term: string) => {
+      setSearchTerm(term);
+      setCurrentPage(1);
+    },
     selectedWard,
-    setSelectedWard,
+    setSelectedWard: (ward: string) => {
+      setSelectedWard(ward);
+      setCurrentPage(1);
+    },
     selectedStatus,
-    setSelectedStatus,
+    setSelectedStatus: (status: string) => {
+      setSelectedStatus(status);
+      setCurrentPage(1);
+    },
     selectedAssignedTo,
     setSelectedAssignedTo,
     selectedGroup,
@@ -203,6 +212,7 @@ export const useRegistrationFilter = ({ records }: UseRegistrationFilterProps) =
     activeSubTab,
     setActiveSubTab: (tab: string) => {
       setActiveSubTab(tab);
+      setSelectedStatus('all');
       setCurrentPage(1);
     },
     currentPage,

@@ -298,6 +298,21 @@ function App() {
       };
   }, []);
 
+  // Lắng hệ thống phím phím Escape đóng các Modal cấp root
+  useEffect(() => {
+      const handleKeyDown = (e: KeyboardEvent) => {
+          if (e.key === 'Escape') {
+              if (isBulkSignModalOpen) setIsBulkSignModalOpen(false);
+              else if (isSignApprovalModalOpen) setIsSignApprovalModalOpen(false);
+              else if (isSubmitModalOpen) setIsSubmitModalOpen(false);
+              else if (isSubmitCheckModalOpen) setIsSubmitCheckModalOpen(false);
+              else if (isHandoverOfficeModalOpen) setIsHandoverOfficeModalOpen(false);
+          }
+      };
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isBulkSignModalOpen, isSignApprovalModalOpen, isSubmitModalOpen, isSubmitCheckModalOpen, isHandoverOfficeModalOpen]);
+
   const records = useMemo(() => {
       return rawRecords;
   }, [rawRecords]);

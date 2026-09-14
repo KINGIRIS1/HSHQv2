@@ -8,6 +8,11 @@ import {
   ChevronRight,
   X,
   Trash2,
+  Filter,
+  ChevronUp,
+  ChevronDown,
+  MapPin,
+  Users,
 } from 'lucide-react';
 import { RecordFile, Employee, User, RecordStatus } from '../../types';
 import { useRegistrationFilter } from '../../hooks/useRegistrationFilter';
@@ -44,6 +49,25 @@ export const RegistrationModuleView: React.FC<RegistrationModuleViewProps> = ({
   );
 
   const filterHook = useRegistrationFilter({ records });
+
+  const [showFilterPopover, setShowFilterPopover] = useState<boolean>(false);
+  const filterPopoverRef = React.useRef<HTMLDivElement>(null);
+
+  const activeFilterCount = [
+    filterHook.selectedWard !== 'all',
+    filterHook.selectedStatus !== 'all',
+    filterHook.selectedAssignedTo !== 'all',
+  ].filter(Boolean).length;
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (filterPopoverRef.current && !filterPopoverRef.current.contains(e.target as Node)) {
+        setShowFilterPopover(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Tải dữ liệu từ bảng dangky_records
   const loadData = async () => {
@@ -144,6 +168,23 @@ export const RegistrationModuleView: React.FC<RegistrationModuleViewProps> = ({
     setSelectedIds(new Set());
     showFeedback('success', `Đã phân công ${recordIds.length} hồ sơ cho cán bộ ${assignedTo}`);
   };
+
+  // Lắng nghe phím Esc để thoát các modal / popover
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (isDetailOpen) {
+          setIsDetailOpen(false);
+        } else if (isAssignOpen) {
+          setIsAssignOpen(false);
+        } else if (filterHook.searchTerm) {
+          filterHook.setSearchTerm('');
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isDetailOpen, isAssignOpen, filterHook]);
 
   // Danh sách hồ sơ đang được chọn
   const selectedRecordsList = records.filter((r) => selectedIds.has(r.id));
@@ -247,80 +288,166 @@ export const RegistrationModuleView: React.FC<RegistrationModuleViewProps> = ({
         ))}
       </div>
 
-      {/* Bộ lọc Tìm kiếm & Phân loại */}
-      <div className="p-6 space-y-4">
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-3">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-            {/* Search Input */}
-            <div className="relative md:col-span-2">
-              <Search size={16} className="absolute left-3.5 top-3 text-slate-400" />
-              <input
-                type="text"
-                value={filterHook.searchTerm}
-                onChange={(e) => filterHook.setSearchTerm(e.target.value)}
-                placeholder="Tìm mã hồ sơ, chủ sử dụng, số thửa, tờ bản đồ, SĐT..."
-                className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-              />
-              {filterHook.searchTerm && (
-                <button
-                  type="button"
-                  onClick={() => filterHook.setSearchTerm('')}
-                  className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 cursor-pointer"
-                >
-                  <X size={14} />
-                </button>
-              )}
-            </div>
-
-            {/* Xã / Phường */}
-            <div>
-              <select
-                value={filterHook.selectedWard}
-                onChange={(e) => filterHook.setSelectedWard(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all cursor-pointer"
+      {/* Thanh Tìm kiếm & Bộ lọc Popover (Nằm cạnh nhau) */}
+      <div className="p-4 px-6 bg-white border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5 flex-1 min-w-[280px] max-w-xl">
+          {/* Ô Tìm kiếm */}
+          <div className="relative flex-1">
+            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              value={filterHook.searchTerm}
+              onChange={(e) => filterHook.setSearchTerm(e.target.value)}
+              placeholder="Tìm kiếm mã hồ sơ, tên chủ, số tờ, số thửa, SĐT..."
+              className="w-full pl-10 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+            />
+            {filterHook.searchTerm && (
+              <button
+                type="button"
+                onClick={() => filterHook.setSearchTerm('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded-full hover:bg-slate-200 cursor-pointer"
               >
-                <option value="all">-- Tất cả Xã / Phường --</option>
-                {filterHook.availableWards.map((w) => (
-                  <option key={w} value={w}>
-                    {w}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Trạng thái */}
-            <div>
-              <select
-                value={filterHook.selectedStatus}
-                onChange={(e) => filterHook.setSelectedStatus(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all cursor-pointer"
-              >
-                <option value="all">-- Tất cả Trạng thái --</option>
-                <option value={RecordStatus.RECEIVED}>Tiếp nhận / Chờ phân công</option>
-                <option value={RecordStatus.IN_PROGRESS}>Đang thực hiện</option>
-                <option value={RecordStatus.PENDING_CHECK}>Chờ kiểm tra</option>
-                <option value={RecordStatus.PENDING_SIGN}>Chờ ký duyệt</option>
-                <option value={RecordStatus.SIGNED}>Đã ký duyệt / Chờ bàn giao</option>
-                <option value={RecordStatus.HANDOVER}>Đã giao 1 cửa</option>
-                <option value={RecordStatus.RETURNED}>Đã trả kết quả</option>
-              </select>
-            </div>
+                <X size={14} />
+              </button>
+            )}
           </div>
 
-          <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs text-slate-500">
-            <span>
-              Tìm thấy <strong className="text-blue-700">{filterHook.filteredRecords.length}</strong> / {records.length} hồ sơ
-            </span>
+          {/* Nút Lọc Popover đặt ngay cạnh ô tìm kiếm */}
+          <div className="relative inline-block shrink-0" ref={filterPopoverRef}>
             <button
               type="button"
-              onClick={filterHook.resetFilters}
-              className="text-slate-500 hover:text-blue-700 font-semibold cursor-pointer"
+              onClick={() => setShowFilterPopover(!showFilterPopover)}
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all border shadow-2xs cursor-pointer ${
+                activeFilterCount > 0
+                  ? 'border-blue-300 text-blue-700 bg-blue-50'
+                  : 'border-slate-200 text-slate-700 bg-white hover:bg-slate-50'
+              }`}
+              title="Mở bộ lọc tìm kiếm"
             >
-              Đặt lại bộ lọc
+              <Filter size={15} />
+              <span>Bộ lọc</span>
+              {activeFilterCount > 0 && (
+                <span className="bg-red-500 text-white text-[10px] px-1.5 py-0.2 rounded-full font-extrabold">
+                  {activeFilterCount}
+                </span>
+              )}
+              {showFilterPopover ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
             </button>
+
+            {/* Thẻ Popover thả xuống */}
+            {showFilterPopover && (
+              <div className="absolute left-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-xl border border-slate-200 p-4 z-50 text-slate-800 animate-fade-in">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
+                  <div className="flex items-center gap-2 font-bold text-blue-700 text-sm">
+                    <Filter size={16} />
+                    <span>Bộ lọc hồ sơ cấp giấy</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowFilterPopover(false)}
+                    className="text-slate-400 hover:text-slate-600 p-1 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+
+                <div className="space-y-3 max-h-[70vh] overflow-y-auto pr-1 text-xs">
+                  {/* 1. Xã / Phường */}
+                  <div>
+                    <label className="flex items-center gap-1.5 font-bold text-slate-700 mb-1">
+                      <MapPin size={14} className="text-slate-400" />
+                      <span>Xã / Phường:</span>
+                    </label>
+                    <select
+                      value={filterHook.selectedWard}
+                      onChange={(e) => filterHook.setSelectedWard(e.target.value)}
+                      className="w-full text-xs border border-slate-200 rounded-xl p-2 font-medium bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                    >
+                      <option value="all">-- Tất cả Xã / Phường --</option>
+                      {filterHook.availableWards.map((w) => (
+                        <option key={w} value={w}>
+                          {w}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* 2. Cán bộ thụ lý */}
+                  <div>
+                    <label className="flex items-center gap-1.5 font-bold text-slate-700 mb-1">
+                      <Users size={14} className="text-slate-400" />
+                      <span>Cán bộ thụ lý:</span>
+                    </label>
+                    <select
+                      value={filterHook.selectedAssignedTo}
+                      onChange={(e) => filterHook.setSelectedAssignedTo(e.target.value)}
+                      className="w-full text-xs border border-slate-200 rounded-xl p-2 font-medium bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                    >
+                      <option value="all">-- Tất cả Cán bộ --</option>
+                      {employees.map((emp) => (
+                        <option key={emp.id} value={emp.name}>
+                          {emp.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* 3. Trạng thái */}
+                  <div>
+                    <label className="flex items-center gap-1.5 font-bold text-slate-700 mb-1">
+                      <FileText size={14} className="text-slate-400" />
+                      <span>Trạng thái hồ sơ:</span>
+                    </label>
+                    <select
+                      value={filterHook.selectedStatus}
+                      onChange={(e) => filterHook.setSelectedStatus(e.target.value)}
+                      className="w-full text-xs border border-slate-200 rounded-xl p-2 font-medium bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                    >
+                      <option value="all">-- Tất cả Trạng thái --</option>
+                      <option value={RecordStatus.RECEIVED}>Tiếp nhận / Chờ phân công</option>
+                      <option value={RecordStatus.IN_PROGRESS}>Đang thực hiện</option>
+                      <option value={RecordStatus.PENDING_CHECK}>Chờ kiểm tra</option>
+                      <option value={RecordStatus.PENDING_SIGN}>Chờ ký duyệt</option>
+                      <option value={RecordStatus.SIGNED}>Đã ký duyệt / Chờ bàn giao</option>
+                      <option value={RecordStatus.HANDOVER}>Đã giao 1 cửa</option>
+                      <option value={RecordStatus.RETURNED}>Đã trả kết quả</option>
+                    </select>
+                  </div>
+
+                  {/* Nút Reset */}
+                  <div className="pt-2 border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => filterHook.resetFilters()}
+                      className="w-full py-2 border border-red-200 text-red-600 rounded-xl hover:bg-red-50 text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                    >
+                      <X size={14} /> Đặt lại tất cả bộ lọc
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
+        {/* Báo số lượng kết quả */}
+        <div className="flex items-center gap-3 text-xs text-slate-500">
+          <span>
+            Tìm thấy <strong className="text-blue-700 font-extrabold">{filterHook.filteredRecords.length}</strong> / {records.length} hồ sơ
+          </span>
+          {activeFilterCount > 0 && (
+            <button
+              type="button"
+              onClick={filterHook.resetFilters}
+              className="text-xs text-red-600 hover:text-red-800 font-bold hover:underline cursor-pointer"
+            >
+              Xóa lọc
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="p-6 space-y-4">
         {/* Thanh tác vụ hàng loạt khi có chọn */}
         {selectedIds.size > 0 && (
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 px-4 flex items-center justify-between">
@@ -350,11 +477,11 @@ export const RegistrationModuleView: React.FC<RegistrationModuleViewProps> = ({
 
         {/* Bảng dữ liệu hồ sơ Đăng ký */}
         <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-320px)] min-h-[350px]">
             <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 text-[11px] font-black uppercase tracking-wider">
-                  <th className="py-3 px-3 text-center w-10">
+              <thead className="sticky top-0 z-10 bg-slate-100 shadow-2xs">
+                <tr className="border-b border-slate-200 text-slate-600 text-[11px] font-black uppercase tracking-wider">
+                  <th className="py-3 px-3 text-center w-10 bg-slate-100">
                     <input
                       type="checkbox"
                       checked={
@@ -365,16 +492,16 @@ export const RegistrationModuleView: React.FC<RegistrationModuleViewProps> = ({
                       className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-gray-300 cursor-pointer"
                     />
                   </th>
-                  <th className="py-3 px-2 text-center w-12">STT</th>
-                  <th className="py-3 px-3">Mã hồ sơ</th>
-                  <th className="py-3 px-3">Chủ sử dụng</th>
-                  <th className="py-3 px-3">Xã / Phường</th>
-                  <th className="py-3 px-3 text-center">Thửa / Tờ</th>
-                  <th className="py-3 px-3">Nội dung</th>
-                  <th className="py-3 px-3">Cán bộ thụ lý</th>
-                  <th className="py-3 px-3">Ngày nhận / Hạn</th>
-                  <th className="py-3 px-3 text-center">Trạng thái</th>
-                  <th className="py-3 px-3 text-right w-24">Thao tác</th>
+                  <th className="py-3 px-2 text-center w-12 bg-slate-100">STT</th>
+                  <th className="py-3 px-3 bg-slate-100">Mã hồ sơ</th>
+                  <th className="py-3 px-3 bg-slate-100">Chủ sử dụng</th>
+                  <th className="py-3 px-3 bg-slate-100">Xã / Phường</th>
+                  <th className="py-3 px-3 text-center bg-slate-100">Thửa / Tờ</th>
+                  <th className="py-3 px-3 bg-slate-100">Nội dung</th>
+                  <th className="py-3 px-3 bg-slate-100">Cán bộ thụ lý</th>
+                  <th className="py-3 px-3 bg-slate-100">Ngày nhận / Hạn</th>
+                  <th className="py-3 px-3 text-center bg-slate-100">Trạng thái</th>
+                  <th className="py-3 px-3 text-right w-24 bg-slate-100">Thao tác</th>
                 </tr>
               </thead>
               <tbody>
@@ -415,28 +542,71 @@ export const RegistrationModuleView: React.FC<RegistrationModuleViewProps> = ({
             </table>
           </div>
 
-          {/* Phân trang */}
-          <div className="p-4 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600">
-            <span>
-              Trang <strong>{filterHook.currentPage}</strong> / {filterHook.totalPages} (Tổng cộng{' '}
-              {filterHook.filteredRecords.length} hồ sơ)
-            </span>
-            <div className="flex items-center gap-2">
+          {/* Phân trang tiêu chuẩn như module đo đạc */}
+          <div className="px-4 py-3 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-medium text-slate-600">
+            <div className="flex flex-wrap items-center gap-3">
+              <span>
+                Hiển thị từ{' '}
+                <span className="font-bold text-slate-900">
+                  {filterHook.filteredRecords.length > 0
+                    ? (filterHook.currentPage - 1) * filterHook.itemsPerPage + 1
+                    : 0}
+                </span>{' '}
+                đến{' '}
+                <span className="font-bold text-slate-900">
+                  {Math.min(
+                    filterHook.currentPage * filterHook.itemsPerPage,
+                    filterHook.filteredRecords.length
+                  )}
+                </span>{' '}
+                trên tổng số{' '}
+                <span className="font-bold text-blue-600">
+                  {filterHook.filteredRecords.length}
+                </span>{' '}
+                hồ sơ
+              </span>
+
+              <div className="flex items-center gap-1.5 ml-2">
+                <span className="text-[11px] text-slate-500 font-medium">Số dòng/trang:</span>
+                <select
+                  value={filterHook.itemsPerPage}
+                  onChange={(e) => {
+                    filterHook.setItemsPerPage(Number(e.target.value));
+                    filterHook.setCurrentPage(1);
+                  }}
+                  className="bg-white border border-slate-200 text-slate-700 text-xs font-bold rounded-lg px-2 py-1 outline-none cursor-pointer focus:ring-2 focus:ring-blue-500 shadow-2xs"
+                >
+                  <option value={15}>15</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5">
               <button
                 type="button"
-                disabled={filterHook.currentPage <= 1}
-                onClick={() => filterHook.setCurrentPage((p) => Math.max(1, p - 1))}
-                className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
+                onClick={() => filterHook.setCurrentPage(Math.max(filterHook.currentPage - 1, 1))}
+                disabled={filterHook.currentPage === 1}
+                className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-medium flex items-center gap-1 shadow-2xs cursor-pointer"
               >
-                <ChevronLeft size={16} />
+                <ChevronLeft size={14} />
+                <span>Trang trước</span>
               </button>
+
+              <span className="px-3 py-1.5 font-bold text-slate-800 bg-white border border-slate-200 rounded-lg shadow-2xs">
+                Trang {filterHook.currentPage} / {filterHook.totalPages}
+              </span>
+
               <button
                 type="button"
+                onClick={() => filterHook.setCurrentPage(Math.min(filterHook.currentPage + 1, filterHook.totalPages))}
                 disabled={filterHook.currentPage >= filterHook.totalPages}
-                onClick={() => filterHook.setCurrentPage((p) => Math.min(filterHook.totalPages, p + 1))}
-                className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
+                className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-medium flex items-center gap-1 shadow-2xs cursor-pointer"
               >
-                <ChevronRight size={16} />
+                <span>Trang sau</span>
+                <ChevronRight size={14} />
               </button>
             </div>
           </div>

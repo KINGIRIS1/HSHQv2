@@ -6,7 +6,6 @@ import { User, UserRole, RolePermissions, DepartmentPermissions, Employee, Recor
 import { isViewAllowedForUser } from '../../config/roleConfig';
 import UpdateRequiredModal from '../UpdateRequiredModal';
 import AdminBackupWarningBanner from '../AdminBackupWarningBanner';
-import { NetworkPingIndicator } from '../NetworkPingIndicator';
 import { NotificationBell } from '../NotificationBell';
 
 interface MainLayoutProps {
@@ -118,10 +117,8 @@ const MainLayout: React.FC<MainLayoutProps> = ({
                     </div>
                 </div>
 
-                {/* RIGHT: USER INFO, NETWORK PING & NOTIFICATION BELL */}
+                {/* RIGHT: USER INFO & NOTIFICATION BELL */}
                 <div className="relative flex items-center gap-2 sm:gap-3">
-                    <NetworkPingIndicator />
-
                     <NotificationBell 
                         records={records}
                         currentUser={currentUser}
