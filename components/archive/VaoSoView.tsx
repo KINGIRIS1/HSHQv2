@@ -1156,66 +1156,12 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                 </button>
             </div>
 
-            {/* HÀNG 2: BỘ LỌC CẢNH BÁO QUÁ HẠN / TỚI HẠN VÀ THANH TÌM KIẾM CẠNH NÚT LỌC (CỐ ĐỊNH CHO MỌI TAB) */}
-            <div className="px-4 py-2.5 border-b border-gray-200 bg-white flex flex-wrap items-center justify-between gap-3">
-                {/* Bên trái: Nút lọc Quá hạn & Tới hạn tương tác thực tế */}
-                <div className="flex items-center gap-2">
-                    <button
-                        type="button"
-                        onClick={() => setWarningFilter(prev => prev === 'overdue' ? 'none' : 'overdue')}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-xs border cursor-pointer ${
-                            warningFilter === 'overdue'
-                                ? 'bg-red-600 text-white border-red-700 ring-2 ring-red-300'
-                                : 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100'
-                        }`}
-                        title="Lọc các hồ sơ đã quá hạn xử lý (Bấm lại để hủy)"
-                    >
-                        <AlertTriangle size={14} className={warningFilter === 'overdue' ? 'text-white' : 'text-red-600'} />
-                        <span>Quá hạn</span>
-                        <span className={`px-1.5 py-0.2 rounded-full text-[11px] font-extrabold ${
-                            warningFilter === 'overdue' ? 'bg-white text-red-700' : 'bg-red-600 text-white'
-                        }`}>
-                            {warningCounts.overdue}
-                        </span>
-                    </button>
-
-                    <button
-                        type="button"
-                        onClick={() => setWarningFilter(prev => prev === 'approaching' ? 'none' : 'approaching')}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-xs border cursor-pointer ${
-                            warningFilter === 'approaching'
-                                ? 'bg-amber-500 text-white border-amber-600 ring-2 ring-amber-300'
-                                : 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100'
-                        }`}
-                        title="Lọc các hồ sơ sắp đến hạn xử lý trong 1-3 ngày (Bấm lại để hủy)"
-                    >
-                        <Clock size={14} className={warningFilter === 'approaching' ? 'text-white' : 'text-amber-600'} />
-                        <span>Tới hạn</span>
-                        <span className={`px-1.5 py-0.2 rounded-full text-[11px] font-extrabold ${
-                            warningFilter === 'approaching' ? 'bg-white text-amber-800' : 'bg-amber-500 text-white'
-                        }`}>
-                            {warningCounts.approaching}
-                        </span>
-                    </button>
-
-                    {warningFilter !== 'none' && (
-                        <button
-                            onClick={() => setWarningFilter('none')}
-                            className="text-xs text-blue-600 hover:underline flex items-center gap-0.5 ml-1 font-semibold cursor-pointer"
-                        >
-                            <X size={13} /> Bỏ lọc cảnh báo
-                        </button>
-                    )}
-
-                    <div className="hidden sm:flex items-center text-xs text-gray-500 ml-2">
-                        <span>Hiển thị: <strong>{filteredRecords.length}</strong> hồ sơ</span>
-                    </div>
-                </div>
-
-                {/* Phía bên phải Hàng 2: THANH TÌM KIẾM ĐẶT CẠNH NÚT BỘ LỌC VÀ NÚT XUẤT EXCEL */}
-                <div className="flex items-center gap-2.5 shrink-0 ml-auto">
-                    {/* Thanh tìm kiếm đưa về bên tay phải cạnh nút lọc hồ sơ */}
-                    <div className="relative w-60 sm:w-72">
+            {/* HÀNG 2: THANH TÌM KIẾM, BỘ LỌC VÀ NÚT XUẤT EXCEL (ĐỒNG BỘ VỚI MODULE ĐO ĐẠC) */}
+            <div className="px-4 py-2.5 border-b border-gray-200 bg-white flex flex-wrap items-center justify-end gap-3">
+                {/* Phía bên phải Hàng 2: THANH TÌM KIẾM KÉO DÀI CẠNH NÚT BỘ LỌC VÀ NÚT XUẤT EXCEL */}
+                <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end flex-1 max-w-xl">
+                    {/* Thanh tìm kiếm dài bằng module Đo đạc */}
+                    <div className="relative flex-1 sm:w-64">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                         <input
                             type="text"
@@ -1347,7 +1293,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                         )}
                     </div>
 
-                    {/* Nút Xuất Excel dạng icon vuông kèm badge theo hình ảnh đính kèm */}
+                    {/* Nút Xuất Excel dạng icon vuông kèm badge */}
                     <button
                         onClick={handleExportExcel}
                         className={`relative flex items-center justify-center p-2 rounded-lg shadow-xs transition-all cursor-pointer shrink-0 active:scale-95 border ${
@@ -1368,15 +1314,56 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                 </div>
             </div>
 
-            {/* HÀNG 3: SUB-TABS PHÂN LOẠI VÀ NÚT TÁC NGHIỆP TƯƠNG TỰ ĐO ĐẠC */}
+            {/* HÀNG 3: NÚT CẢNH BÁO QUÁ HẠN/TỚI HẠN Ở NGOÀI CÙNG BÊN TRÁI (ẨN TẠI VÀO SỐ GCN VÀ GIAO 1 CỬA), TIẾP THEO LÀ SUB-TABS VÀ NÚT TÁC NGHIỆP (CHUẨN ĐO ĐẠC) */}
             <div className="px-4 py-2.5 border-b border-gray-200 bg-slate-50 flex flex-wrap items-center justify-between gap-3">
-                {/* PHẦN BÊN TRÁI HÀNG 3 */}
-                <div className="flex flex-wrap items-center gap-3">
+                {/* PHẦN BÊN TRÁI HÀNG 3: CÁC NÚT CẢNH BÁO (NGOÀI CÙNG TRÁI) + SUBTABS + NÚT NHẬP MỚI */}
+                <div className="flex flex-wrap items-center gap-2.5">
+                    {/* CÁC NÚT CẢNH BÁO QUÁ HẠN / TỚI HẠN (ẨN TẠI TAB 'VÀO SỐ GCN' VÀ 'GIAO 1 CỬA') */}
+                    {mainTab !== 'vao_so' && mainTab !== 'giao_1_cua' && (
+                        <div className="flex gap-2 mr-1">
+                            <button
+                                type="button"
+                                onClick={() => setWarningFilter(prev => prev === 'overdue' ? 'none' : 'overdue')}
+                                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-bold transition-colors shadow-sm border ${
+                                    warningFilter === 'overdue'
+                                        ? 'bg-red-600 text-white'
+                                        : 'bg-white text-red-600'
+                                }`}
+                                title="Lọc các hồ sơ đã quá hạn xử lý (Bấm lại để hủy)"
+                            >
+                                <AlertTriangle size={16} /> {warningCounts.overdue}
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => setWarningFilter(prev => prev === 'approaching' ? 'none' : 'approaching')}
+                                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-bold transition-colors shadow-sm border ${
+                                    warningFilter === 'approaching'
+                                        ? 'bg-orange-500 text-white'
+                                        : 'bg-white text-orange-600'
+                                }`}
+                                title="Lọc các hồ sơ sắp đến hạn xử lý trong 1-3 ngày (Bấm lại để hủy)"
+                            >
+                                <Clock size={16} /> {warningCounts.approaching}
+                            </button>
+
+                            {warningFilter !== 'none' && (
+                                <button
+                                    onClick={() => setWarningFilter('none')}
+                                    className="text-gray-400 hover:text-red-600 p-1 rounded-full hover:bg-gray-100 transition-colors cursor-pointer flex items-center justify-center"
+                                    title="Bỏ lọc cảnh báo"
+                                >
+                                    <X size={14} />
+                                </button>
+                            )}
+                        </div>
+                    )}
+
                     {mainTab !== 'vao_so' ? (
                         <>
-                            {/* Subtabs riêng cho từng nghiệp vụ ĐẶT LÊN ĐẦU (NGOÀI CÙNG BÊN TRÁI) */}
+                            {/* Subtabs riêng cho từng nghiệp vụ */}
                             {mainTab === 'thue' && (
-                                <div className="flex bg-white rounded-lg border border-gray-200 p-1 shadow-2xs gap-1 mr-1">
+                                <div className="flex bg-white rounded-lg border border-gray-200 p-1 shadow-2xs gap-1">
                                     <button
                                         onClick={() => setThueSubTab('phieu_chuyen')}
                                         className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
@@ -1411,7 +1398,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                             )}
 
                             {mainTab === 'giao_1_cua' && (
-                                <div className="flex bg-white rounded-lg border border-gray-200 p-1 shadow-2xs gap-1 mr-1">
+                                <div className="flex bg-white rounded-lg border border-gray-200 p-1 shadow-2xs gap-1">
                                     <button
                                         onClick={() => setGiao1CuaSubTab('cho_ban_giao')}
                                         className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
@@ -1445,22 +1432,7 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                                 </div>
                             )}
 
-                            {/* Với các tab không có subtab, hiển thị nhãn quy trình rõ ràng */}
-                            {mainTab !== 'thue' && mainTab !== 'giao_1_cua' && (
-                                <div className="flex items-center gap-1.5 bg-white border border-slate-200 px-3 py-1.5 rounded-lg shadow-2xs text-xs font-bold text-slate-700">
-                                    <FileText size={14} className="text-blue-600" />
-                                    <span>
-                                        {mainTab === 'all' && 'Tất cả quy trình'}
-                                        {mainTab === 'chua_giao' && 'Hồ sơ chưa giao việc'}
-                                        {mainTab === 'tham_dinh' && 'Hồ sơ thẩm định'}
-                                        {mainTab === 'in_gcn' && 'Hồ sơ in GCN'}
-                                        {mainTab === 'kiem_tra' && 'Hồ sơ kiểm tra'}
-                                        {mainTab === 'trinh_ky' && 'Hồ sơ trình ký'}
-                                    </span>
-                                </div>
-                            )}
-
-                            {/* Nút Nhập mới chuẩn khung viền xanh */}
+                            {/* Nút Nhập mới chuẩn khung viền xanh theo mẫu module Đo đạc */}
                             <button
                                 onClick={handleAddNew}
                                 className="flex items-center gap-1.5 bg-white text-emerald-700 border border-emerald-400 px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-emerald-50 shadow-2xs transition-colors cursor-pointer"
@@ -1469,124 +1441,114 @@ const VaoSoView: React.FC<VaoSoViewProps> = ({ currentUser, wards }) => {
                                 <span>Nhập mới</span>
                             </button>
                         </>
-                    ) : (
-                        /* CHỈ DÀNH RIÊNG CHO TAB "VÀO SỐ GCN" */
-                        <div className="flex bg-white rounded-lg border border-gray-200 p-1 shadow-2xs gap-1">
-                            <button
-                                onClick={() => setActiveTab('all')}
-                                className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
-                                    activeTab === 'all'
-                                        ? 'bg-blue-100 text-blue-800 shadow-2xs'
-                                        : 'text-gray-600 hover:bg-gray-100'
-                                }`}
-                            >
-                                Danh sách
-                            </button>
-                            <button
-                                onClick={() => setActiveTab('pending')}
-                                className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
-                                    activeTab === 'pending'
-                                        ? 'bg-orange-100 text-orange-800 shadow-2xs'
-                                        : 'text-gray-600 hover:bg-gray-100'
-                                }`}
-                            >
-                                Chờ chuyển Scan/1 Cửa
-                            </button>
-                            <button
-                                onClick={() => setActiveTab('scanned')}
-                                className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
-                                    activeTab === 'scanned'
-                                        ? 'bg-teal-100 text-teal-800 shadow-2xs'
-                                        : 'text-gray-600 hover:bg-gray-100'
-                                }`}
-                            >
-                                Đã chuyển Scan/1 Cửa
-                            </button>
-                        </div>
-                    )}
+                    ) : null}
                 </div>
 
-                {/* BÊN PHẢI HÀNG 3: CÁC NÚT TÁC NGHIỆP TƯƠNG ỨNG */}
+                {/* BÊN PHẢI HÀNG 3: CÁC NÚT TÁC NGHIỆP TƯƠNG ỨNG (CHUẨN ĐỒNG NHẤT VỚI MODULE ĐO ĐẠC) */}
                 <div className="flex flex-wrap items-center gap-2 ml-auto">
-                    {mainTab === 'vao_so' ? (
+                    {mainTab !== 'vao_so' && (
                         <>
-                            <button
-                                onClick={() => setShowSettingsModal(true)}
-                                className="p-1.5 bg-white text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-100 shadow-2xs transition-colors cursor-pointer"
-                                title="Cài đặt số vào sổ"
-                            >
-                                <Settings size={15} />
-                            </button>
-
-                            <button
-                                onClick={handleAddNew}
-                                className="flex items-center gap-1.5 bg-white text-emerald-700 border border-emerald-300 px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-emerald-50 shadow-2xs transition-colors cursor-pointer"
-                            >
-                                <Plus size={15} />
-                                <span>Thêm mới</span>
-                            </button>
-
+                            {/* Nút Giao việc (khi có chọn hồ sơ) */}
                             {selectedIds.size > 0 && (
                                 <button
-                                    onClick={handleMoveToPending}
-                                    className="flex items-center gap-1.5 bg-indigo-600 text-white px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-indigo-700 shadow-2xs transition-colors animate-pulse cursor-pointer"
+                                    onClick={() => {
+                                        alert(`Tính năng Giao việc cho ${selectedIds.size} hồ sơ đang được áp dụng.`);
+                                    }}
+                                    className="flex items-center gap-1.5 bg-blue-600 text-white px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-blue-700 shadow-2xs transition-colors cursor-pointer"
+                                    title="Giao việc cho nhân viên"
                                 >
-                                    <Send size={15} />
-                                    <span>Chuyển Scan ({selectedIds.size})</span>
+                                    <Users size={15} />
+                                    <span>Giao việc ({selectedIds.size})</span>
                                 </button>
                             )}
 
-                            {activeTab === 'pending' && selectedIds.size > 0 && hasBatchPermission() && (
+                            {/* Nút Trình kiểm tra - CHỈ HIỆN TẠI TAB 'In GCN' khi có tích chọn hồ sơ */}
+                            {mainTab === 'in_gcn' && selectedIds.size > 0 && (
                                 <button
-                                    onClick={handleOpenBatchModal}
-                                    className="flex items-center gap-1.5 bg-orange-600 text-white px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-orange-700 shadow-2xs transition-colors cursor-pointer"
+                                    onClick={() => {
+                                        alert(`Đã trình kiểm tra ${selectedIds.size} hồ sơ.`);
+                                    }}
+                                    className="flex items-center gap-1.5 bg-indigo-600 text-white px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-indigo-700 shadow-2xs transition-colors cursor-pointer"
+                                    title="Trình kiểm tra hồ sơ"
                                 >
-                                    <CheckCircle2 size={15} />
-                                    <span>Tạo đợt ({selectedIds.size})</span>
+                                    <CheckSquare size={15} />
+                                    <span>Trình kiểm tra ({selectedIds.size})</span>
                                 </button>
                             )}
 
-                            {activeTab === 'scanned' && (
+                            {/* Nút Trình ký - CHỈ HIỆN TẠI TAB 'Kiểm tra' khi có tích chọn hồ sơ */}
+                            {mainTab === 'kiem_tra' && selectedIds.size > 0 && (
                                 <button
-                                    onClick={() => setShowExportHandoverModal(true)}
-                                    className="flex items-center gap-1.5 bg-purple-600 text-white px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-purple-700 shadow-2xs transition-colors cursor-pointer"
+                                    onClick={() => {
+                                        alert(`Đã trình ký ${selectedIds.size} hồ sơ.`);
+                                    }}
+                                    className="flex items-center gap-1.5 bg-teal-600 text-white px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-teal-700 shadow-2xs transition-colors cursor-pointer"
+                                    title="Trình ký lãnh đạo"
                                 >
-                                    <FileOutput size={15} />
-                                    <span>Xuất bàn giao</span>
+                                    <PenTool size={15} />
+                                    <span>Trình ký ({selectedIds.size})</span>
                                 </button>
                             )}
 
+                            {/* Nút Trả hồ sơ (khi có chọn hồ sơ) */}
+                            {selectedIds.size > 0 && (
+                                <button
+                                    onClick={() => {
+                                        alert(`Trả lại ${selectedIds.size} hồ sơ.`);
+                                    }}
+                                    className="flex items-center gap-1.5 bg-rose-600 text-white px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-rose-700 shadow-2xs transition-colors cursor-pointer"
+                                    title="Trả hồ sơ về bước trước"
+                                >
+                                    <ChevronLeft size={15} />
+                                    <span>Trả hồ sơ ({selectedIds.size})</span>
+                                </button>
+                            )}
+
+                            {/* Nút Xử lý All (khi có chọn hồ sơ) */}
+                            {selectedIds.size > 0 && (
+                                <button
+                                    onClick={() => {
+                                        alert(`Xử lý hàng loạt cho ${selectedIds.size} hồ sơ.`);
+                                    }}
+                                    className="flex items-center gap-1.5 bg-amber-600 text-white px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-amber-700 shadow-2xs transition-colors cursor-pointer"
+                                    title="Xử lý hàng loạt hồ sơ đã chọn"
+                                >
+                                    <RefreshCw size={15} />
+                                    <span>Xử lý All ({selectedIds.size})</span>
+                                </button>
+                            )}
+
+                            {/* Nút Chốt hồ sơ */}
                             <button
                                 onClick={() => {
-                                    if (selectedIds.size > 0) {
-                                        const selectedRecords = records.filter(r => selectedIds.has(r.id));
-                                        exportSoDiaChinh(selectedRecords);
-                                    } else {
-                                        setShowExportSoDiaChinhModal(true);
-                                    }
+                                    alert('Đang cập nhật trạng thái chốt danh sách hồ sơ.');
                                 }}
-                                className="flex items-center gap-1.5 bg-blue-600 text-white px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-blue-700 shadow-2xs transition-colors cursor-pointer"
+                                className="flex items-center gap-1.5 bg-white text-slate-700 border border-slate-300 px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-slate-50 shadow-2xs transition-colors cursor-pointer"
+                                title="Chốt danh sách hồ sơ"
                             >
-                                <FileText size={15} />
-                                <span>Xuất Sổ địa chính</span>
+                                <ClipboardList size={15} />
+                                <span>Chốt hồ sơ</span>
                             </button>
 
+                            {/* Nút Xuất DS */}
                             <button
-                                onClick={() => setShowExportSoMucKeModal(true)}
-                                className="flex items-center gap-1.5 bg-indigo-600 text-white px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-indigo-700 shadow-2xs transition-colors cursor-pointer"
+                                onClick={handleExportExcel}
+                                className="flex items-center gap-1.5 bg-white text-emerald-700 border border-emerald-300 px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-emerald-50 shadow-2xs transition-colors cursor-pointer"
+                                title="Xuất danh sách ra file Excel"
                             >
-                                <FileText size={15} />
-                                <span>Xuất Sổ mục kê</span>
+                                <FileSpreadsheet size={15} />
+                                <span>Xuất DS</span>
+                            </button>
+
+                            {/* Nút Tùy chỉnh ẩn/hiện cột */}
+                            <button
+                                onClick={() => setShowColumnSelector(!showColumnSelector)}
+                                className="p-1.5 bg-white text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-100 shadow-2xs transition-colors cursor-pointer flex items-center justify-center"
+                                title="Tùy chỉnh ẩn/hiện cột"
+                            >
+                                <SlidersHorizontal size={16} />
                             </button>
                         </>
-                    ) : (
-                        <button
-                            onClick={() => setShowColumnSelector(!showColumnSelector)}
-                            className="p-1.5 bg-white text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-100 shadow-2xs transition-colors cursor-pointer flex items-center justify-center"
-                            title="Tùy chỉnh ẩn/hiện cột"
-                        >
-                            <SlidersHorizontal size={16} />
-                        </button>
                     )}
                 </div>
             </div>

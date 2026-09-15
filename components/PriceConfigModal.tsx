@@ -57,24 +57,40 @@ const PriceConfigModal: React.FC<PriceConfigModalProps> = ({ isOpen, onClose, cu
         // Headers: LOAIHS, KhuVuc, TenSanPham, DTMin, DTMax, Donvi, GiaSanPham, VAT, VAT_IS_PERCENT
         rows.forEach((row: any) => {
            const normalizedRow: Record<string, any> = {};
-           Object.keys(row).forEach(k => normalizedRow[k.trim().toUpperCase()] = row[k]);
+           Object.keys(row).forEach(k => {
+               const cleanKey = k.trim().toUpperCase()
+                   .replace(/À|Á|Ạ|Ả|Ã|Â|Ầ|Ấ|Ậ|Ẩ|Ẫ|Ă|Ằ|Ắ|Ặ|Ẳ|Ẵ/g, "A")
+                   .replace(/È|É|Ẹ|Ẻ|Ẽ|Ê|Ề|Ế|Ệ|Ể|Ễ/g, "E")
+                   .replace(/Ì|Í|Ị|Ỉ|Ĩ/g, "I")
+                   .replace(/Ò|Ó|Ọ|Ỏ|Õ|Ô|Ồ|Ố|Ộ|Ổ|Ỗ|Ơ|Ờ|Ớ|Ợ|Ở|Ỡ/g, "O")
+                   .replace(/Ù|Ú|Ụ|Ủ|Ũ|Ư|Ừ|Ứ|Ự|Ử|Ữ/g, "U")
+                   .replace(/Ỳ|Ý|Ỵ|Ỷ|Ỹ/g, "Y")
+                   .replace(/Đ/g, "D")
+                   .replace(/\s+/g, "");
+               normalizedRow[cleanKey] = row[k];
+           });
            
-           const name = String(normalizedRow['TENSANPHAM'] || normalizedRow['TÊN SẢN PHẨM'] || '');
+           const name = String(
+               normalizedRow['TENSANPHAM'] || normalizedRow['TENSANPHAM'] || normalizedRow['TENSP'] || normalizedRow['DICHVU'] || normalizedRow['TENDICHVU'] || ''
+           ).trim();
            
            if (name) {
-               const vatPercentRaw = String(normalizedRow['VAT_IS_PERCENT'] || 'TRUE').toUpperCase();
+               const vatPercentRaw = String(normalizedRow['VATISPERCENT'] || normalizedRow['VATPERCENT'] || 'TRUE').toUpperCase();
                const vatIsPercent = vatPercentRaw === 'TRUE' || vatPercentRaw === '1' || vatPercentRaw === 'YES';
+
+               const rawPrice = normalizedRow['GIASANPHAM'] ?? normalizedRow['GIASP'] ?? normalizedRow['DONGIA'] ?? normalizedRow['GIA'] ?? 0;
+               const cleanPrice = typeof rawPrice === 'string' ? Number(rawPrice.replace(/[^0-9]/g, '')) : Number(rawPrice || 0);
 
                newItems.push({
                    id: Math.random().toString(36).substr(2, 9),
-                   serviceGroup: String(normalizedRow['LOAIHS'] || ''),
-                   areaType: String(normalizedRow['KHUVUC'] || ''),
+                   serviceGroup: String(normalizedRow['LOAIHS'] || normalizedRow['LOAIHOSOVUPHA'] || normalizedRow['NHOMDICHVU'] || ''),
+                   areaType: String(normalizedRow['KHUVUC'] || normalizedRow['KHUVUCDAT'] || ''),
                    serviceName: name,
-                   minArea: Number(normalizedRow['DTMIN'] || 0),
-                   maxArea: Number(normalizedRow['DTMAX'] || 99999999),
-                   unit: String(normalizedRow['DONVI'] || 'Thửa'),
-                   price: Number(normalizedRow['GIASANPHAM'] || 0),
-                   vatRate: Number(normalizedRow['VAT'] || 8),
+                   minArea: Number(normalizedRow['DTMIN'] || normalizedRow['DIENTICHMIN'] || 0),
+                   maxArea: Number(normalizedRow['DTMAX'] || normalizedRow['DIENTICHMAX'] || 99999999),
+                   unit: String(normalizedRow['DONVI'] || normalizedRow['DONVITINH'] || 'Thửa'),
+                   price: isNaN(cleanPrice) ? 0 : cleanPrice,
+                   vatRate: Number(normalizedRow['VAT'] || normalizedRow['THUEVAT'] || 8),
                    vatIsPercent: vatIsPercent
                });
            }

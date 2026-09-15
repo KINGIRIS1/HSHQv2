@@ -35,7 +35,6 @@ import RecordRow from "./RecordRow";
 import WorkScheduleView from "./WorkScheduleView";
 import SaoLucView from "./archive/SaoLucView";
 import CongVanView from "./archive/CongVanView";
-import RegistrationRecords from "./RegistrationRecords";
 import SystemView from "./SystemView";
 import BarcodeGeneratorView from "./BarcodeGeneratorView";
 
@@ -90,6 +89,7 @@ import {
   CalendarClock,
   Compass,
   PenTool,
+  Printer,
 } from "lucide-react";
 
 interface AppRoutesProps {
@@ -507,6 +507,8 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
     props.setColumnOrder(newOrder);
   };
 
+  const [taxSubTab, setTaxSubTab] = React.useState<'transfer' | 'area7' | 'notice'>('transfer');
+
   // --- RENDER RECORD LIST (Extracted to be used in switch) ---
   const renderRecordList = () => {
     // Kiểm tra xem có đang ở chế độ xem Hồ sơ đo đạc (bao gồm tất cả các tab con)
@@ -531,11 +533,24 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
       "archive_handover_list",
       "archive_director_completed",
     ].includes(currentView);
+    const isTestMeasurementView = [
+      "test_records",
+      "test_assign_tasks",
+      "test_completed_list",
+      "test_measurement_field",
+      "test_measurement_office",
+      "test_print_cert",
+      "test_pending_supplement_list",
+      "test_pending_check_list",
+      "test_check_list",
+      "test_handover_list",
+      "test_director_completed",
+    ].includes(currentView);
 
-    const isSpecializedTab = !["all_records", "archive_records"].includes(currentView);
-    const isAllRecordsTab = currentView === "all_records" || currentView === "archive_records";
+    const isSpecializedTab = !["all_records", "archive_records", "test_records"].includes(currentView);
+    const isAllRecordsTab = currentView === "all_records" || currentView === "archive_records" || currentView === "test_records";
 
-    const statusFilterOptions = isMeasurementView
+    const statusFilterOptions = (isMeasurementView || isTestMeasurementView)
       ? SURVEY_SELECTABLE_STATUSES.filter(item => item.key !== RecordStatus.IN_PROGRESS)
       : isArchiveMeasurementView
       ? ARCHIVE_SELECTABLE_STATUSES
@@ -547,35 +562,51 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
       currentView === "archive_check_list"
     )
       title = isDirector ? "Danh sách Chờ ký" : "Danh sách Trình Ký";
+    else if (currentView === "test_check_list")
+      title = isDirector ? "Danh sách Chờ ký (Cấp giấy)" : "Danh sách Trình Ký (Cấp giấy)";
     else if (
       currentView === "director_completed" ||
       currentView === "archive_director_completed"
     )
       title = "Danh sách Hoàn thành";
+    else if (currentView === "test_director_completed")
+      title = "Danh sách Hoàn thành (Cấp giấy)";
     else if (currentView === "handover_list")
       title = "Danh sách Giao 1 cửa (Hồ sơ đo đạc)";
     else if (currentView === "archive_handover_list")
       title = "Danh sách Giao 1 cửa (Hồ sơ lưu trữ)";
+    else if (currentView === "test_handover_list")
+      title = "Danh sách Giao 1 cửa (Hồ sơ cấp giấy)";
     else if (
       currentView === "assign_tasks" ||
       currentView === "archive_assign_tasks"
     )
       title = "Hồ sơ chưa giao";
+    else if (currentView === "test_assign_tasks")
+      title = "Hồ sơ Cấp giấy chưa giao";
     else if (currentView === "measurement_field") title = "Hồ sơ Đo đạc (Thực địa)";
+    else if (currentView === "test_measurement_field") title = "Hồ sơ Cấp giấy (Thẩm định)";
     else if (currentView === "measurement_office") title = "Hồ sơ Biên tập bản đồ";
+    else if (currentView === "test_measurement_office") title = "Hồ sơ Cấp giấy (Thuế)";
+    else if (currentView === "test_print_cert") title = "Hồ sơ Cấp giấy (In GCN)";
     else if (
       currentView === "completed_list" ||
       currentView === "archive_completed_list"
     )
       title = "Hồ sơ đang thực hiện";
-    else if (currentView === "pending_supplement_list")
+    else if (currentView === "test_completed_list")
+      title = "Hồ sơ Cấp giấy đang thực hiện";
+    else if (currentView === "pending_supplement_list" || currentView === "test_pending_supplement_list")
       title = "Hồ sơ chờ bổ sung";
     else if (
       currentView === "pending_check_list" ||
       currentView === "archive_pending_check_list"
     )
       title = "Hồ sơ chờ kiểm tra";
+    else if (currentView === "test_pending_check_list")
+      title = "Hồ sơ Cấp giấy chờ kiểm tra";
     else if (currentView === "all_records") title = "Hồ sơ đo đạc";
+    else if (currentView === "test_records") title = "Hồ sơ Cấp giấy đất đai";
     else if (currentView === "archive_records")
       title = "Lưu trữ (Cung cấp TLĐĐ)";
     else if (currentView === "archive_completed_list") title = "Đang thực hiện";
@@ -754,6 +785,101 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
           </div>
         )}
 
+        {/* SUB-HEADER TABS FOR TEST MEASUREMENT RECORDS */}
+        {isTestMeasurementView && (
+          <div className="flex border-b border-gray-200 bg-gray-50 px-4 overflow-x-auto">
+            {!isDirector && (
+              <>
+                {isViewAllowedForUser(currentUser, employees, "test_records", rolePermissions, departmentPermissions) && (
+                  <button
+                    id="tab-test-records-all"
+                    onClick={() => props.setCurrentView("test_records")}
+                    className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "test_records" ? "border-blue-600 text-blue-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
+                  >
+                    <FileText size={16} /> Tất cả
+                  </button>
+                )}
+
+                {isViewAllowedForUser(currentUser, employees, "test_assign_tasks", rolePermissions, departmentPermissions) && (
+                  <button
+                    id="tab-test-records-assign-tasks"
+                    onClick={() => props.setCurrentView("test_assign_tasks")}
+                    className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "test_assign_tasks" ? "border-blue-600 text-blue-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
+                  >
+                    <UserPlusIcon size={16} /> Chưa giao
+                  </button>
+                )}
+
+                {isViewAllowedForUser(currentUser, employees, "test_completed_list", rolePermissions, departmentPermissions) && (
+                  <>
+                    <button
+                      id="tab-test-records-measurement-field"
+                      onClick={() => props.setCurrentView("test_measurement_field")}
+                      className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "test_measurement_field" ? "border-blue-600 text-blue-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
+                    >
+                      <Compass size={16} /> Thẩm định
+                    </button>
+                    <button
+                      id="tab-test-records-measurement-office"
+                      onClick={() => props.setCurrentView("test_measurement_office")}
+                      className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "test_measurement_office" ? "border-indigo-600 text-indigo-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
+                    >
+                      <PenTool size={16} /> Thuế
+                    </button>
+                    <button
+                      id="tab-test-records-print-cert"
+                      onClick={() => props.setCurrentView("test_print_cert")}
+                      className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "test_print_cert" ? "border-teal-600 text-teal-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
+                    >
+                      <Printer size={16} /> In GCN
+                    </button>
+                  </>
+                )}
+
+                {isViewAllowedForUser(currentUser, employees, "test_pending_check_list", rolePermissions, departmentPermissions) && (
+                  <button
+                    id="tab-test-records-pending-check-list"
+                    onClick={() => props.setCurrentView("test_pending_check_list")}
+                    className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "test_pending_check_list" ? "border-orange-600 text-orange-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
+                  >
+                    <ClipboardList size={16} /> Kiểm tra
+                  </button>
+                )}
+              </>
+            )}
+
+            {isViewAllowedForUser(currentUser, employees, "test_check_list", rolePermissions, departmentPermissions) && (
+              <button
+                id="tab-test-records-check-list"
+                onClick={() => props.setCurrentView("test_check_list")}
+                className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "test_check_list" ? "border-purple-600 text-purple-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
+              >
+                <ClipboardList size={16} /> {isDirector ? "Chờ ký" : "Trình ký"}
+              </button>
+            )}
+
+            {isDirector && isViewAllowedForUser(currentUser, employees, "test_director_completed", rolePermissions, departmentPermissions) && (
+              <button
+                id="tab-test-records-director-completed"
+                onClick={() => props.setCurrentView("test_director_completed")}
+                className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "test_director_completed" ? "border-green-600 text-green-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
+              >
+                <CheckSquare size={16} /> Hoàn thành
+              </button>
+            )}
+
+            {!isDirector && isViewAllowedForUser(currentUser, employees, "test_handover_list", rolePermissions, departmentPermissions) && (
+              <button
+                id="tab-test-records-handover-list"
+                onClick={() => props.setCurrentView("test_handover_list")}
+                className={`px-4 py-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${currentView === "test_handover_list" ? "border-green-600 text-green-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700"}`}
+              >
+                <Send size={16} /> Giao 1 cửa
+              </button>
+            )}
+          </div>
+        )}
+
         <div className="p-4 border-b border-gray-100 flex flex-col gap-4">
           <div className="flex flex-col sm:flex-row justify-between items-center gap-3">
             <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2 shrink-0">
@@ -846,7 +972,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                       </div>
 
                       {/* 2. Loại hồ sơ */}
-                      {isMeasurementView && (
+                      {(isMeasurementView || isTestMeasurementView) && (
                         <div>
                           <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 mb-1">
                             <Filter size={14} className="text-gray-500" />
@@ -885,7 +1011,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                         </div>
                       )}
 
-                      {!isMeasurementView && !isArchiveMeasurementView && (
+                      {!isMeasurementView && !isArchiveMeasurementView && !isTestMeasurementView && (
                         <div>
                           <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 mb-1">
                             <Filter size={14} className="text-gray-500" />
@@ -1026,7 +1152,8 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
 
           <div className="flex flex-wrap items-center gap-3 bg-gray-50 p-2 rounded-lg relative">
             {(currentView === "handover_list" ||
-              currentView === "archive_handover_list") && (
+              currentView === "archive_handover_list" ||
+              currentView === "test_handover_list") && (
               <div className="flex items-center gap-2 flex-wrap">
                 <div className="flex bg-white rounded-md border border-gray-200 p-1 shadow-sm">
                   <button
@@ -1071,13 +1198,34 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                     <CheckCircle size={16} /> Chốt DS ({props.selectedRecordIds.size})
                   </button>
                 )}
-
-                {/* Đã loại bỏ nút Chốt HS lưu theo yêu cầu */}
               </div>
             )}
 
-            {(currentView === "all_records" ||
-              currentView === "archive_records") && (
+            {/* 3 Sub-tabs cho Tab Thuế (đặt ngoài cùng bên trái trong Tab Thuế) */}
+            {currentView === "test_measurement_office" && (
+              <div className="flex bg-white rounded-md border border-indigo-200 p-1 shadow-sm">
+                <button
+                  onClick={() => setTaxSubTab("transfer")}
+                  className={`px-3 py-1.5 rounded text-xs font-bold transition-colors ${taxSubTab === "transfer" ? "bg-indigo-600 text-white shadow-sm" : "text-gray-600 hover:bg-gray-100"}`}
+                >
+                  Phiếu chuyển thuế
+                </button>
+                <button
+                  onClick={() => setTaxSubTab("area7")}
+                  className={`px-3 py-1.5 rounded text-xs font-bold transition-colors ${taxSubTab === "area7" ? "bg-indigo-600 text-white shadow-sm" : "text-gray-600 hover:bg-gray-100"}`}
+                >
+                  Thuế khu vực 7
+                </button>
+                <button
+                  onClick={() => setTaxSubTab("notice")}
+                  className={`px-3 py-1.5 rounded text-xs font-bold transition-colors ${taxSubTab === "notice" ? "bg-indigo-600 text-white shadow-sm" : "text-gray-600 hover:bg-gray-100"}`}
+                >
+                  Thông báo thuế
+                </button>
+              </div>
+            )}
+
+            {currentView !== "test_measurement_office" && !["handover_list", "archive_handover_list", "test_handover_list"].includes(currentView) && (
                 <div className="flex gap-2">
                   <button
                     onClick={() =>
@@ -1105,7 +1253,7 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
             {(() => {
               const isArchiveView = (currentView || '').startsWith('archive_');
               const canAdd = isArchiveView ? hasPermission('luutru_ADD_RECORDS') : hasPermission('dodac_ADD_RECORDS');
-              return canAdd && !["handover_list", "archive_handover_list"].includes(currentView);
+              return canAdd && !["handover_list", "archive_handover_list", "test_handover_list"].includes(currentView);
             })() && (
               <div className="flex items-center gap-2 flex-wrap">
                 <div className="h-6 w-px bg-gray-300 mx-1"></div>
@@ -1159,13 +1307,40 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                   )}
                 </div>
 
+                {/* Nút lọc trễ / sắp tới hạn riêng cho Tab Thuế (đặt ngay bên phải Nhập mới) */}
+                {currentView === "test_measurement_office" && (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() =>
+                        props.setWarningFilter((prev: any) =>
+                          prev === "overdue" ? "none" : "overdue",
+                        )
+                      }
+                      className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-bold transition-colors shadow-sm border ${props.warningFilter === "overdue" ? "bg-red-600 text-white" : "bg-white text-red-600"}`}
+                    >
+                      <AlertTriangle size={16} /> {props.warningCount.overdue}
+                    </button>
+                    <button
+                      onClick={() =>
+                        props.setWarningFilter((prev: any) =>
+                          prev === "approaching" ? "none" : "approaching",
+                        )
+                      }
+                      className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-bold transition-colors shadow-sm border ${props.warningFilter === "approaching" ? "bg-orange-500 text-white" : "bg-white text-orange-600"}`}
+                    >
+                      <Clock size={16} /> {props.warningCount.approaching}
+                    </button>
+                  </div>
+                )}
+
                 {/* Các nút thao tác theo lô chính đặt cạnh Nhập mới */}
                 {props.selectedRecordIds.size > 0 && (
                   <>
                     {/* Bulk Assign (Giao việc) */}
                     {(currentView === "assign_tasks" ||
-                      currentView === "archive_assign_tasks") &&
-                      (currentView.startsWith("archive_") ? hasPermission('luutru_BTN_ASSIGN_STAFF') : hasPermission('dodac_BTN_ASSIGN_STAFF')) && (
+                      currentView === "archive_assign_tasks" ||
+                      currentView === "test_assign_tasks") &&
+                      (currentView.startsWith("archive_") ? hasPermission('luutru_BTN_ASSIGN_STAFF') : currentView.startsWith("test_") ? hasPermission('test_BTN_ASSIGN_STAFF') : hasPermission('dodac_BTN_ASSIGN_STAFF')) && (
                         <button
                           onClick={() => {
                             const targets = records.filter((r) =>
@@ -1182,13 +1357,14 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
 
                     {/* Bulk Approve / Sign (Ký Duyệt) */}
                     {(currentView === "check_list" ||
-                      currentView === "archive_check_list") &&
-                      (currentView.startsWith("archive_") ? hasPermission('luutru_BTN_APPROVE_SIGN') : hasPermission('dodac_BTN_APPROVE_SIGN')) && (
+                      currentView === "archive_check_list" ||
+                      currentView === "test_check_list") &&
+                      (currentView.startsWith("archive_") ? hasPermission('luutru_BTN_APPROVE_SIGN') : currentView.startsWith("test_") ? hasPermission('test_BTN_APPROVE_SIGN') : hasPermission('dodac_BTN_APPROVE_SIGN')) && (
                         <button
                           onClick={props.handleConfirmSignBatch}
                           className="flex items-center gap-1.5 bg-purple-600 text-white px-3.5 py-1.5 rounded-lg hover:bg-purple-700 text-sm font-bold shadow-sm transition-all animate-pulse cursor-pointer whitespace-nowrap"
                         >
-                          <FileSignature size={16} /> Ký Duyệt ({props.selectedRecordIds.size})
+                          <FileSignature size={16} /> Ký duyệt ({props.selectedRecordIds.size})
                         </button>
                       )}
 
@@ -1210,9 +1386,9 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                       </button>
                     )}
 
-                    {/* Bulk Submit Check (Trình Kiểm Tra - Dành cho tab Biên tập hoặc Đã thực hiện) */}
-                    {hasPermission('dodac_BTN_SUBMIT_CHECK') &&
-                      (currentView === "completed_list" || currentView === "measurement_office") && (
+                    {/* Bulk Submit Check (Trình Kiểm Tra - Dành cho tab In GCN, Biên tập hoặc Đã thực hiện) */}
+                    {(currentView.startsWith("test_") ? hasPermission('test_BTN_SUBMIT_CHECK') : hasPermission('dodac_BTN_SUBMIT_CHECK')) &&
+                      (currentView === "completed_list" || currentView === "measurement_office" || currentView === "test_print_cert") && (
                         <button
                           onClick={() => {
                             const targets = records.filter((r) =>
@@ -1223,15 +1399,16 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                           }}
                           className="flex items-center gap-1.5 bg-orange-600 text-white px-3.5 py-1.5 rounded-lg hover:bg-orange-700 text-sm font-bold shadow-sm transition-all animate-pulse cursor-pointer whitespace-nowrap"
                         >
-                          <ClipboardList size={16} /> Trình Kiểm Tra ({props.selectedRecordIds.size})
+                          <ClipboardList size={16} /> Trình kiểm tra ({props.selectedRecordIds.size})
                         </button>
                       )}
 
                     {/* Bulk Submit Sign (Trình Ký) */}
-                    {(currentView.startsWith("archive_") ? hasPermission('luutru_BTN_SUBMIT_SIGN') : hasPermission('dodac_BTN_SUBMIT_SIGN')) &&
+                    {(currentView.startsWith("archive_") ? hasPermission('luutru_BTN_SUBMIT_SIGN') : currentView.startsWith("test_") ? hasPermission('test_BTN_SUBMIT_SIGN') : hasPermission('dodac_BTN_SUBMIT_SIGN')) &&
                       (currentView === "archive_completed_list" ||
                        currentView === "pending_check_list" ||
-                       currentView === "archive_pending_check_list") && (
+                       currentView === "archive_pending_check_list" ||
+                       currentView === "test_pending_check_list") && (
                         <button
                           onClick={() => {
                             const targets = records.filter((r) =>
@@ -1242,14 +1419,15 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
                           }}
                           className="flex items-center gap-1.5 bg-indigo-600 text-white px-3.5 py-1.5 rounded-lg hover:bg-indigo-700 text-sm font-bold shadow-sm transition-all animate-pulse cursor-pointer whitespace-nowrap"
                         >
-                          <FileSignature size={16} /> Trình Ký ({props.selectedRecordIds.size})
+                          <FileSignature size={16} /> Trình ký ({props.selectedRecordIds.size})
                         </button>
                       )}
 
                     {/* Bulk Handover (Bàn giao 1 cửa) */}
                     {(currentView === "director_completed" ||
-                      currentView === "archive_director_completed") &&
-                      (currentView.startsWith("archive_") ? hasPermission('luutru_HANDOVER_RECORDS') : hasPermission('dodac_HANDOVER_RECORDS')) && (
+                      currentView === "archive_director_completed" ||
+                      currentView === "test_director_completed") &&
+                      (currentView.startsWith("archive_") ? hasPermission('luutru_HANDOVER_RECORDS') : currentView.startsWith("test_") ? hasPermission('test_HANDOVER_RECORDS') : hasPermission('dodac_HANDOVER_RECORDS')) && (
                         <button
                           onClick={() => {
                             props.setExportModalType("handover");
@@ -1271,8 +1449,8 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
               {props.selectedRecordIds.size > 0 && (
                 <>
                   {/* Bulk Reject (Trả hồ sơ) - Bỏ ở các tab bàn giao/trả kết quả */}
-                  {!["handover_list", "archive_handover_list"].includes(currentView) &&
-                    (currentView.startsWith("archive_") ? hasPermission('luutru_BTN_REJECT_RECORD') : hasPermission('dodac_BTN_REJECT_RECORD')) && (
+                  {!["handover_list", "archive_handover_list", "test_handover_list"].includes(currentView) &&
+                    (currentView.startsWith("archive_") ? hasPermission('luutru_BTN_REJECT_RECORD') : currentView.startsWith("test_") ? hasPermission('test_BTN_REJECT_RECORD') : hasPermission('dodac_BTN_REJECT_RECORD')) && (
                     <button
                       onClick={() => {
                         const targets = records.filter((r) =>
@@ -1313,8 +1491,10 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
               {/* Các tab "Chờ bàn giao" & "Chờ trả kết quả": Nút Xuất DS */}
               {(currentView === "director_completed" ||
                 currentView === "archive_director_completed" ||
+                currentView === "test_director_completed" ||
                 ((currentView === "handover_list" ||
-                  currentView === "archive_handover_list") &&
+                  currentView === "archive_handover_list" ||
+                  currentView === "test_handover_list") &&
                  props.handoverTab !== "returned")) && (
                 <button
                   onClick={() => {
@@ -1331,7 +1511,8 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
 
               {/* Nút Cài đặt cột tiêu đề bảng */}
               {(currentView === "all_records" ||
-                currentView === "archive_records") && (
+                currentView === "archive_records" ||
+                currentView === "test_records") && (
                 <div className="relative">
                   <button
                     onClick={() => setShowColumnSelector(!showColumnSelector)}
@@ -1699,8 +1880,6 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
           onRefreshData={props.onRefreshData}
         />
       );
-    case "registration_records":
-      return <RegistrationRecords currentUser={currentUser} wards={wards} employees={employees} />;
     case "congvan_records":
       return <CongVanView currentUser={currentUser} />;
     case "barcode_generator":

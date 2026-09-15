@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { RecordFile, Employee, RecordStatus } from '../types';
 import { STATUS_LABELS, SURVEY_SELECTABLE_STATUSES, ARCHIVE_SELECTABLE_STATUSES, isArchiveRecordType, isArchiveRecord } from '../constants';
 import { X, CheckCircle2, Layers, ArrowRight, UserCheck, Calendar, History, User, Building2, Clock, Info } from 'lucide-react';
-import { getDepartmentForRecord, getPureBatchNumber, groupEmployeesByDepartment } from '../utils/appHelpers';
+import { getDepartmentForRecord, getPureBatchNumber, groupEmployeesByDepartment, confirmAction } from '../utils/appHelpers';
 
 interface BulkUpdateModalProps {
   isOpen: boolean;
@@ -249,11 +249,13 @@ const BulkUpdateModal: React.FC<BulkUpdateModalProps> = ({
     }
 
     const count = activeRecordsToUpdate.length;
+    const confirmTitle = targetField === 'historyStatus' ? 'Cập nhật lịch sử tiến độ' : 'Xác nhận xử lý hàng loạt';
     const confirmMessage = targetField === 'historyStatus'
       ? `Bạn có chắc chắn muốn cập nhật lịch sử tiến độ cho ${count} hồ sơ đang chọn không?`
       : `Bạn có chắc chắn muốn cập nhật ${count} hồ sơ đang chọn không?`;
 
-    if (confirm(confirmMessage)) {
+    const isConfirmed = await confirmAction(confirmMessage, confirmTitle);
+    if (isConfirmed) {
         setIsProcessing(true);
         let isoDate: string | undefined = undefined;
         if (customDate) {

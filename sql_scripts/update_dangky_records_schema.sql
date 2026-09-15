@@ -1,5 +1,6 @@
 -- =========================================================================
 -- SQL BỔ SUNG CÁC CỘT THIẾT YẾU CHO BẢNG dangky_records (TỔ ĐĂNG KÝ / CẤP GIẤY)
+-- Chạy script này trên Supabase SQL Editor nếu bảng dangky_records đã tồn tại
 -- =========================================================================
 
 -- 1. Thời gian tiếp nhận & Hạn giải quyết
@@ -25,8 +26,11 @@ ALTER TABLE dangky_records ADD COLUMN IF NOT EXISTS "submittedTo" TEXT;
 
 -- 5. Mốc tiến độ kiểm tra & hoàn thành chuyên môn
 ALTER TABLE dangky_records ADD COLUMN IF NOT EXISTS "pendingCheckDate" DATE;
+ALTER TABLE dangky_records ADD COLUMN IF NOT EXISTS "checkedBy" TEXT;
 ALTER TABLE dangky_records ADD COLUMN IF NOT EXISTS "checkedDate" DATE;
 ALTER TABLE dangky_records ADD COLUMN IF NOT EXISTS "completedWorkDate" DATE;
+ALTER TABLE dangky_records ADD COLUMN IF NOT EXISTS "submissionDate" DATE;
+ALTER TABLE dangky_records ADD COLUMN IF NOT EXISTS "approvalDate" DATE;
 
 -- 6. Trả kết quả cho công dân & Biên lai / Hóa đơn
 ALTER TABLE dangky_records ADD COLUMN IF NOT EXISTS "receiptNumber" TEXT;
@@ -44,8 +48,10 @@ ALTER TABLE dangky_records ADD COLUMN IF NOT EXISTS "returnBatch" NUMERIC;
 ALTER TABLE dangky_records ADD COLUMN IF NOT EXISTS "returnBatchDate" DATE;
 ALTER TABLE dangky_records ADD COLUMN IF NOT EXISTS "returnHandoverDept" TEXT;
 
--- 8. Nhắc nhở tiến độ & Hạn xử lý
-ALTER TABLE dangky_records ADD COLUMN IF NOT EXISTS "reminderDate" DATE;
+-- 8. Chỉnh lý & Nhắc nhở tiến độ
+ALTER TABLE dangky_records ADD COLUMN IF NOT EXISTS "needsMapCorrection" BOOLEAN DEFAULT FALSE;
+ALTER TABLE dangky_records ADD COLUMN IF NOT EXISTS "explanationPlan" TEXT;
+ALTER TABLE dangky_records ADD COLUMN IF NOT EXISTS "reminderDate" TIMESTAMPTZ;
 ALTER TABLE dangky_records ADD COLUMN IF NOT EXISTS "lastRemindedAt" TIMESTAMPTZ;
 ALTER TABLE dangky_records ADD COLUMN IF NOT EXISTS "deadlineReminded" BOOLEAN DEFAULT FALSE;
 
@@ -55,3 +61,4 @@ CREATE INDEX IF NOT EXISTS idx_dangky_status ON dangky_records(status);
 CREATE INDEX IF NOT EXISTS idx_dangky_ward ON dangky_records(ward);
 CREATE INDEX IF NOT EXISTS idx_dangky_assigned ON dangky_records("assignedTo");
 CREATE INDEX IF NOT EXISTS idx_dangky_created_at ON dangky_records("createdAt" DESC);
+
