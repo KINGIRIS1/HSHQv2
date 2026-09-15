@@ -101,8 +101,21 @@ const MobileLayout: React.FC<MobileLayoutProps> = ({
                   <div className="absolute right-0 mt-2 w-60 bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden z-50 animate-in fade-in zoom-in-95 duration-200 origin-top-right text-slate-800">
                     <div className="p-3.5 border-b border-slate-100 bg-slate-50/50">
                       <p className="text-xs font-bold text-slate-800 truncate">{currentUser.name}</p>
-                      <div className="mt-1 text-[9px] font-bold uppercase tracking-wider text-blue-600 bg-blue-50 px-2 py-0.5 rounded inline-block border border-blue-100">
-                        {currentUser.role === UserRole.ADMIN ? 'Admin' : currentUser.role === UserRole.SUBADMIN ? 'Phó quản trị' : currentUser.role === UserRole.TEAM_LEADER ? 'Nhóm trưởng' : currentUser.role === UserRole.ONEDOOR ? 'Một cửa' : 'Nhân viên'}
+                      <p className="text-[10px] text-slate-500 truncate">@{currentUser.username}</p>
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        <span className="text-[9px] font-bold uppercase tracking-wider text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
+                          {currentUser.role === UserRole.ADMIN ? 'Admin' : currentUser.role === UserRole.SUBADMIN ? 'Phó quản trị' : currentUser.role === UserRole.TEAM_LEADER ? 'Nhóm trưởng' : currentUser.role === UserRole.ONEDOOR ? 'Một cửa' : 'Nhân viên'}
+                        </span>
+                        {currentUser.position && (
+                          <span className="text-[9px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
+                            {currentUser.position}
+                          </span>
+                        )}
+                        {currentUser.department && (
+                          <span className="text-[9px] font-semibold text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-100">
+                            {currentUser.department}
+                          </span>
+                        )}
                       </div>
                     </div>
                     <div className="p-1.5 space-y-1">

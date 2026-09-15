@@ -146,6 +146,9 @@ export interface User {
   role: UserRole;
   employeeId?: string;
   active?: boolean;
+  department?: string;      // Tổ / Phong ban
+  position?: string;        // Chuc vu
+  managedWards?: string[];  // Dia ban duoc phan cong
 }
 
 export interface Employee {

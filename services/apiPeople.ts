@@ -230,6 +230,18 @@ export const deleteEmployeeApi = async (id: string): Promise<boolean> => {
 export const enrichUserWithEmployees = async (user: User, existingEmployees?: Employee[]): Promise<User> => {
     if (!user) return user;
 
+    console.group(`[AUTH HYDRATION] Hydrating profile for user: "${user.username}" (${user.name})`);
+    console.log(`Step 1: Raw User Record from DB/Session:`, {
+        id: user.id,
+        username: user.username,
+        name: user.name,
+        role: user.role,
+        employeeId: user.employeeId,
+        department: user.department,
+        position: user.position,
+        managedWards: user.managedWards
+    });
+
     let employeesList = existingEmployees;
     if (!employeesList || employeesList.length === 0) {
         try {
@@ -254,42 +266,78 @@ export const enrichUserWithEmployees = async (user: User, existingEmployees?: Em
         matchedEmp = employeesList.find(e => (e.id || '').trim().toLowerCase() === cleanUsername);
     }
 
-    // 3. Nếu vẫn chưa thấy trong danh sách bộ nhớ (máy mới / trình duyệt mới), truy vấn TRỰC TIẾP từ Supabase Cloud
+    // 3. Tìm theo tên
+    if (!matchedEmp && user.name) {
+        const cleanName = user.name.trim().toLowerCase();
+        matchedEmp = employeesList.find(e => (e.name || '').trim().toLowerCase() === cleanName);
+    }
+
+    // 4. Nếu vẫn chưa thấy trong danh sách bộ nhớ (máy mới / trình duyệt mới), truy vấn TRỰC TIẾP từ Supabase Cloud
     if (!matchedEmp && isConfigured && supabase) {
-        const targetKey = (user.employeeId || user.username || '').trim();
-        if (targetKey) {
+        const targetKeys = [user.employeeId, user.username, user.name].filter(Boolean).map(k => String(k).trim());
+        for (const key of targetKeys) {
+            if (!key) continue;
             try {
                 const { data, error } = await supabase
                     .from('employees')
                     .select('*')
-                    .or(`id.ilike.${targetKey},ma_nv.ilike.${targetKey},employee_id.ilike.${targetKey},code.ilike.${targetKey}`);
+                    .or(`id.ilike.${key},ma_nv.ilike.${key},employee_id.ilike.${key},code.ilike.${key},ho_ten.ilike.${key},name.ilike.${key}`);
                 if (!error && Array.isArray(data) && data.length > 0) {
                     matchedEmp = mapEmployeeFromDb(data[0]);
+                    console.log(`Step 2: Queried Employee directly from Supabase Cloud:`, matchedEmp);
+                    break;
                 }
             } catch (e) {
                 console.warn("Lỗi truy vấn nhân viên trực tiếp từ CSDL Cloud:", e);
             }
         }
+    } else if (matchedEmp) {
+        console.log(`Step 2: Matched Employee from memory/cache:`, matchedEmp);
+    } else {
+        console.warn(`Step 2: No linked Employee record found for user "${user.username}". Using fallback profile info if present.`);
     }
 
-    if (matchedEmp && matchedEmp.name) {
-        const officialEmpName = matchedEmp.name.trim();
-        const currentUserName = (user.name || '').trim();
+    // Step 3: Resolve Position, Department, Managed Wards
+    let resolvedPosition = user.position || '';
+    let resolvedDepartment = user.department || '';
+    let resolvedWards: string[] = Array.isArray(user.managedWards) ? user.managedWards : [];
 
-        const isNameEmptyOrCode = !currentUserName || 
-            currentUserName.toLowerCase() === cleanEmpId || 
-            currentUserName.toLowerCase() === cleanUsername;
-
-        if (isNameEmptyOrCode || currentUserName !== officialEmpName) {
-            return {
-                ...user,
-                employeeId: matchedEmp.id || user.employeeId,
-                name: officialEmpName
-            };
+    if (matchedEmp) {
+        if (matchedEmp.position) resolvedPosition = normalizePosition(matchedEmp.position);
+        if (matchedEmp.department) resolvedDepartment = normalizeDepartment(matchedEmp.department);
+        if (Array.isArray(matchedEmp.managedWards) && matchedEmp.managedWards.length > 0) {
+            resolvedWards = matchedEmp.managedWards;
         }
     }
 
-    return user;
+    // Resolve official name
+    const officialEmpName = matchedEmp?.name ? matchedEmp.name.trim() : '';
+    const currentUserName = (user.name || '').trim();
+
+    const isNameEmptyOrCode = !currentUserName || 
+        currentUserName.toLowerCase() === cleanEmpId || 
+        currentUserName.toLowerCase() === cleanUsername;
+
+    const resolvedName = (isNameEmptyOrCode || currentUserName !== officialEmpName) && officialEmpName
+        ? officialEmpName
+        : (currentUserName || officialEmpName || user.username);
+
+    const finalUser: User = {
+        ...user,
+        employeeId: matchedEmp?.id || user.employeeId || '',
+        name: resolvedName,
+        department: resolvedDepartment ? normalizeDepartment(resolvedDepartment) : undefined,
+        position: resolvedPosition ? normalizePosition(resolvedPosition) : undefined,
+        managedWards: resolvedWards
+    };
+
+    console.log(`Step 3: Position resolved: "${finalUser.position || 'N/A'}"`);
+    console.log(`Step 4: Department resolved: "${finalUser.department || 'N/A'}"`);
+    console.log(`Step 5: Managed Wards / Assigned Areas resolved:`, finalUser.managedWards || []);
+    console.log(`Step 6: Final Complete User Object constructed:`, finalUser);
+    console.groupEnd();
+
+    return finalUser;
 };
 
 export const enrichUsersList = async (usersList: User[], existingEmployees?: Employee[]): Promise<User[]> => {
@@ -310,34 +358,47 @@ export const enrichUsersList = async (usersList: User[], existingEmployees?: Emp
     const empMap = new Map<string, Employee>();
     employeesList.forEach(e => {
         if (e.id) empMap.set(e.id.trim().toLowerCase(), e);
+        if (e.name) empMap.set(e.name.trim().toLowerCase(), e);
     });
 
     return usersList.map(u => {
         const cleanEmpId = (u.employeeId || '').trim().toLowerCase();
         const cleanUsername = (u.username || '').trim().toLowerCase();
+        const cleanName = (u.name || '').trim().toLowerCase();
 
         let matchedEmp = empMap.get(cleanEmpId);
         if (!matchedEmp && cleanUsername) {
             matchedEmp = empMap.get(cleanUsername);
         }
-
-        if (matchedEmp && matchedEmp.name) {
-            const officialName = matchedEmp.name.trim();
-            const currentUserName = (u.name || '').trim();
-
-            const isNameEmptyOrCode = !currentUserName || 
-                currentUserName.toLowerCase() === cleanEmpId || 
-                currentUserName.toLowerCase() === cleanUsername;
-
-            if (isNameEmptyOrCode || currentUserName !== officialName) {
-                return {
-                    ...u,
-                    employeeId: matchedEmp.id,
-                    name: officialName
-                };
-            }
+        if (!matchedEmp && cleanName) {
+            matchedEmp = empMap.get(cleanName);
         }
-        return u;
+
+        const resolvedDept = matchedEmp?.department || u.department || '';
+        const resolvedPos = matchedEmp?.position || u.position || '';
+        const resolvedWards = (Array.isArray(matchedEmp?.managedWards) && matchedEmp!.managedWards.length > 0)
+            ? matchedEmp!.managedWards
+            : (u.managedWards || []);
+
+        const officialName = matchedEmp?.name ? matchedEmp.name.trim() : '';
+        const currentUserName = (u.name || '').trim();
+
+        const isNameEmptyOrCode = !currentUserName || 
+            currentUserName.toLowerCase() === cleanEmpId || 
+            currentUserName.toLowerCase() === cleanUsername;
+
+        const finalName = (isNameEmptyOrCode || currentUserName !== officialName) && officialName
+            ? officialName
+            : (currentUserName || u.username);
+
+        return {
+            ...u,
+            employeeId: matchedEmp?.id || u.employeeId,
+            name: finalName,
+            department: resolvedDept ? normalizeDepartment(resolvedDept) : undefined,
+            position: resolvedPos ? normalizePosition(resolvedPos) : undefined,
+            managedWards: resolvedWards
+        };
     });
 };
 

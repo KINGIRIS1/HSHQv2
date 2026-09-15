@@ -281,13 +281,16 @@ function App() {
             return;
           }
           const fullyEnriched = await enrichUserWithEmployees(dbUser, employees);
-          if (
-            fullyEnriched.role !== currentUser.role ||
-            fullyEnriched.name !== currentUser.name ||
-            fullyEnriched.employeeId !== currentUser.employeeId ||
-            fullyEnriched.password !== currentUser.password ||
-            fullyEnriched.active !== currentUser.active
-          ) {
+          const isRoleChanged = fullyEnriched.role !== currentUser.role;
+          const isNameChanged = fullyEnriched.name !== currentUser.name;
+          const isEmpChanged = fullyEnriched.employeeId !== currentUser.employeeId;
+          const isPassChanged = fullyEnriched.password !== currentUser.password;
+          const isActiveChanged = fullyEnriched.active !== currentUser.active;
+          const isDeptChanged = fullyEnriched.department !== currentUser.department;
+          const isPosChanged = fullyEnriched.position !== currentUser.position;
+          const isWardsChanged = JSON.stringify(fullyEnriched.managedWards) !== JSON.stringify(currentUser.managedWards);
+
+          if (isRoleChanged || isNameChanged || isEmpChanged || isPassChanged || isActiveChanged || isDeptChanged || isPosChanged || isWardsChanged) {
             console.log(`🔒 Nạp lại phiên làm việc đầy đủ từ Supabase Cloud: [${fullyEnriched.username}] (${fullyEnriched.name})`);
             setCurrentUser(fullyEnriched);
             sessionStorage.setItem('current_user_session', JSON.stringify(fullyEnriched));
@@ -297,21 +300,24 @@ function App() {
     }
   }, []);
 
-  // --- TỰ ĐỘNG ĐỒNG BỘ THÔNG TIN HỌ TÊN NHÂN VIÊN VÀ MAPPING KHÔNG PHỤ THUỘC CACHE TRÌNH DUYỆT ---
+  // --- TỰ ĐỘNG ĐỒNG BỘ THÔNG TIN HỌ TÊN, CHỨC VỤ, TỔ, ĐỊA BÀN VÀ MAPPING KHÔNG PHỤ THUỘC CACHE TRÌNH DUYỆT ---
   useEffect(() => {
     if (currentUser && Array.isArray(employees) && employees.length > 0) {
       enrichUserWithEmployees(currentUser, employees).then(enriched => {
-        if (
-          enriched.name !== currentUser.name ||
-          enriched.employeeId !== currentUser.employeeId
-        ) {
-          console.log(`✨ [Đồng bộ Họ tên Nhân viên] Cập nhật currentUser: "${currentUser.name}" -> "${enriched.name}"`);
+        const isNameChanged = enriched.name !== currentUser.name;
+        const isEmpChanged = enriched.employeeId !== currentUser.employeeId;
+        const isDeptChanged = enriched.department !== currentUser.department;
+        const isPosChanged = enriched.position !== currentUser.position;
+        const isWardsChanged = JSON.stringify(enriched.managedWards) !== JSON.stringify(currentUser.managedWards);
+
+        if (isNameChanged || isEmpChanged || isDeptChanged || isPosChanged || isWardsChanged) {
+          console.log(`✨ [Đồng bộ Hồ sơ Người dùng] Cập nhật profile đầy đủ cho currentUser: "${currentUser.name}"`);
           setCurrentUser(enriched);
           sessionStorage.setItem('current_user_session', JSON.stringify(enriched));
         }
       });
     }
-  }, [employees, currentUser?.username, currentUser?.employeeId, currentUser?.name]);
+  }, [employees, currentUser?.username, currentUser?.employeeId, currentUser?.name, currentUser?.department, currentUser?.position, JSON.stringify(currentUser?.managedWards)]);
 
   // --- TỰ ĐỘNG ĐỒNG BỘ THÔNG TIN & QUYỀN HẠN TÀI KHOẢN THEO DATABASE REALTIME ---
   useEffect(() => {
@@ -336,9 +342,12 @@ function App() {
           const isEmpChanged = fullyEnriched.employeeId !== currentUser.employeeId;
           const isPassChanged = fullyEnriched.password !== currentUser.password;
           const isActiveChanged = fullyEnriched.active !== currentUser.active;
+          const isDeptChanged = fullyEnriched.department !== currentUser.department;
+          const isPosChanged = fullyEnriched.position !== currentUser.position;
+          const isWardsChanged = JSON.stringify(fullyEnriched.managedWards) !== JSON.stringify(currentUser.managedWards);
 
-          if (isRoleChanged || isNameChanged || isEmpChanged || isPassChanged || isActiveChanged) {
-            console.log(`🔒 Thắt chặt phân quyền & Họ tên: Đã đồng bộ [${fullyEnriched.username}]: ${currentUser.name} -> ${fullyEnriched.name}`);
+          if (isRoleChanged || isNameChanged || isEmpChanged || isPassChanged || isActiveChanged || isDeptChanged || isPosChanged || isWardsChanged) {
+            console.log(`🔒 Thắt chặt phân quyền & Hồ sơ: Đã đồng bộ [${fullyEnriched.username}]: ${currentUser.name} -> ${fullyEnriched.name}`);
             setCurrentUser(fullyEnriched);
             sessionStorage.setItem('current_user_session', JSON.stringify(fullyEnriched));
 

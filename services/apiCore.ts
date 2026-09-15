@@ -755,7 +755,7 @@ export const mapEmployeeFromDb = (e: any): Employee => {
     if (!e) return { id: '', name: '', department: 'Tổ Đo đạc', position: 'Nhân viên', managedWards: [] };
 
     let parsedWards: string[] = [];
-    const rawWards = e.managedWards || e.managed_wards || e.managedwards || e.phuong_xa;
+    const rawWards = e.managedWards || e.managed_wards || e.managedwards || e.phuong_xa || e.assignedAreas || e.assigned_areas || e.dia_ban;
     if (typeof rawWards === 'string') {
         try {
             parsedWards = JSON.parse(rawWards);
@@ -768,8 +768,8 @@ export const mapEmployeeFromDb = (e: any): Employee => {
     
     const rawId = e.id || e.employee_id || e.employeeId || e.ma_nv || e.manv || e.code || '';
     const rawName = e.name || e.ho_ten || e.hoten || e.full_name || e.fullname || e.display_name || e.ten_nhan_vien || e.tennhanvien || e.id || '';
-    const rawDept = e.department || e.phong_ban || e.phongban || e.bo_phan || e.bophan || '';
-    const rawPos = e.position || e.chuc_vu || e.chucvu || '';
+    const rawDept = e.department || e.phong_ban || e.phongban || e.bo_phan || e.bophan || e.team || e.to_chuyen_mon || '';
+    const rawPos = e.position || e.chuc_vu || e.chucvu || e.chuc_danh || e.job_title || '';
 
     const cleanDept = normalizeDepartment(rawDept);
     const cleanPos = normalizePosition(rawPos);
@@ -808,6 +808,16 @@ export const mapUserFromDb = (u: any): User => {
                       (u.is_active !== undefined ? Boolean(u.is_active) :
                       (u.trang_thai !== undefined ? (String(u.trang_thai) === 'true' || String(u.trang_thai) === '1' || u.trang_thai === true) : true));
 
+    const rawDept = u.department || u.phong_ban || u.phongban || u.team || u.to_chuyen_mon || '';
+    const rawPos = u.position || u.chuc_vu || u.chucvu || u.chuc_danh || '';
+    let parsedWards: string[] = [];
+    const rawWards = u.managedWards || u.managed_wards || u.assignedAreas || u.assigned_areas || u.phuong_xa || u.dia_ban;
+    if (typeof rawWards === 'string') {
+        try { parsedWards = JSON.parse(rawWards); } catch { parsedWards = rawWards.split(',').map((w: string) => w.trim()).filter(Boolean); }
+    } else if (Array.isArray(rawWards)) {
+        parsedWards = rawWards.map(w => String(w).trim()).filter(Boolean);
+    }
+
     return {
         id: u.id ? String(u.id) : undefined,
         username: String(rawUsername).normalize('NFC').trim(),
@@ -815,7 +825,10 @@ export const mapUserFromDb = (u: any): User => {
         name: String(rawName).normalize('NFC').trim(),
         role: String(rawRole).trim().toUpperCase() as any,
         employeeId: String(rawEmpId).trim(),
-        active: rawActive
+        active: rawActive,
+        department: rawDept ? normalizeDepartment(rawDept) : undefined,
+        position: rawPos ? normalizePosition(rawPos) : undefined,
+        managedWards: parsedWards.length > 0 ? parsedWards : undefined
     };
 };
 
