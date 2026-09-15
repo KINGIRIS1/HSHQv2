@@ -3,6 +3,7 @@ import { supabase, isConfigured } from './supabaseClient';
 import { Contract, PriceItem } from '../types';
 import { logError, mapContractFromDb, mapContractToDb, mapPriceFromDb, mapPriceToDb, mapPriceToDbSnake, getFromCache, saveToCache, CACHE_KEYS } from './apiCore';
 import { getIndexedDBItem, setIndexedDBItem } from './storageService';
+import { getSystemSetting, saveSystemSetting } from './apiSystem';
 
 const LOCAL_CONTRACTS_KEY = 'app_contracts_data_v2';
 let memoryContractsCache: Contract[] | null = null;
@@ -290,61 +291,95 @@ export const deleteContractApi = async (id: string): Promise<boolean> => {
 
 // --- PRICE LIST ---
 export const fetchPriceList = async (): Promise<PriceItem[]> => {
+    // Tier 1: Local cache
     const local = getFromCache<PriceItem[]>(CACHE_KEYS.PRICE_LIST, []);
-    if (!isConfigured) return local;
-    try {
-        const { data, error } = await supabase.from('price_list').select('*');
-        if (error) throw error;
-        const list = (data || []).map(mapPriceFromDb);
-        if (list.length > 0) {
-            saveToCache(CACHE_KEYS.PRICE_LIST, list);
-            return list;
+    
+    // Tier 2: Try fetching from Supabase price_list table
+    if (isConfigured) {
+        try {
+            const { data, error } = await supabase.from('price_list').select('*');
+            if (!error && data && data.length > 0) {
+                const list = data.map(mapPriceFromDb);
+                saveToCache(CACHE_KEYS.PRICE_LIST, list);
+                setIndexedDBItem('app_price_list_v1', list).catch(() => {});
+                return list;
+            }
+        } catch (err) {
+            console.warn("⚠️ Không thể đọc price_list từ Supabase table, chuyển sang system_settings:", err);
         }
-        return local;
-    } catch (error) {
-        logError("fetchPriceList", error, true);
-        return local;
+
+        // Tier 3: Try fetching from system_settings table (key: price_list_config)
+        try {
+            const sysVal = await getSystemSetting('price_list_config');
+            if (sysVal) {
+                const parsed = JSON.parse(sysVal);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    saveToCache(CACHE_KEYS.PRICE_LIST, parsed);
+                    setIndexedDBItem('app_price_list_v1', parsed).catch(() => {});
+                    return parsed;
+                }
+            }
+        } catch (sysErr) {
+            console.warn("⚠️ Cảnh báo đọc price_list_config từ system_settings:", sysErr);
+        }
     }
+
+    if (local && local.length > 0) return local;
+
+    // Tier 4: IndexedDB fallback
+    try {
+        const idbList = await getIndexedDBItem<PriceItem[]>('app_price_list_v1');
+        if (idbList && idbList.length > 0) {
+            saveToCache(CACHE_KEYS.PRICE_LIST, idbList);
+            return idbList;
+        }
+    } catch {}
+
+    return [];
 };
 
 export const savePriceListBatch = async (items: PriceItem[]): Promise<boolean> => {
     try {
-        // 1. Luôn lưu vào LocalStorage Cache để hệ thống hoạt động ngay cả khi offline / không có Supabase
+        // 1. Luôn lưu vào LocalStorage Cache & IndexedDB để ứng dụng sử dụng ngay lập tức
         saveToCache(CACHE_KEYS.PRICE_LIST, items);
+        setIndexedDBItem('app_price_list_v1', items).catch(() => {});
+
+        // 2. Lưu cấu hình bảng giá vào system_settings (key: price_list_config) - siêu bền bỉ trên Cloud & Local
+        try {
+            await saveSystemSetting('price_list_config', JSON.stringify(items));
+        } catch (sErr) {
+            console.warn("⚠️ Cảnh báo saveSystemSetting price_list_config:", sErr);
+        }
 
         if (!isConfigured) return true;
 
-        // 2. Xóa các bản ghi cũ trên Supabase bằng query an toàn .not('id', 'is', null)
-        // Tránh lỗi 22P02 (invalid input syntax for type uuid: "0") khi cột id trên Supabase là kiểu UUID
+        // 3. Xóa các bản ghi cũ trên bảng price_list (query an toàn không bị dính lỗi kiểu dữ liệu ID)
         try {
             await supabase.from('price_list').delete().not('id', 'is', null);
         } catch (delErr) {
-            console.warn("⚠️ Cảnh báo khi xóa bảng giá cũ:", delErr);
+            console.warn("⚠️ Cảnh báo khi xóa bảng price_list cũ:", delErr);
         }
 
         if (items.length === 0) return true;
 
-        // 3. Thử insert dữ liệu với cột camelCase
+        // 4. Insert dữ liệu mới lên bảng price_list
         const dbItems = items.map(mapPriceToDb);
         let { error } = await supabase.from('price_list').insert(dbItems);
 
         if (error) {
-            // Thử lại với cột snake_case nếu Supabase dùng định dạng snake_case (service_group, area_type...)
-            if (error.code === 'PGRST204' || String(error.code) === '42703' || (error.message && String(error.message).includes('does not exist'))) {
-                console.warn("⚠️ Bảng price_list thiếu cột camelCase. Đang thử lại insert với snake_case...");
-                const snakeItems = items.map(mapPriceToDbSnake);
-                const { error: err2 } = await supabase.from('price_list').insert(snakeItems);
-                if (err2) {
-                    logError("savePriceListBatch snake_case", err2, true);
-                }
-            } else {
-                logError("savePriceListBatch camelCase", error, true);
+            // Trường hợp Supabase dùng tên cột dạng snake_case
+            console.warn("⚠️ Insert camelCase gặp cảnh báo:", error.message || error);
+            const snakeItems = items.map(mapPriceToDbSnake);
+            const { error: err2 } = await supabase.from('price_list').insert(snakeItems);
+            if (err2) {
+                console.warn("⚠️ Insert snake_case gặp cảnh báo:", err2.message || err2);
             }
         }
+
         return true;
     } catch (error) {
         logError("savePriceListBatch", error, true);
-        return true;
+        return true; // Vẫn trả về true vì đã bảo vệ dữ liệu ở Local Cache & system_settings
     }
 };
 
