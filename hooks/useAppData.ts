@@ -487,11 +487,11 @@ export const useAppData = (currentUser: User | null) => {
             };
         }
 
-        // Tự động kiểm tra cập nhật tài khoản và phân quyền mỗi 15 giây
+        // Tự động kiểm tra cập nhật tài khoản và phân quyền mỗi 5 giây
         const userSyncInterval = setInterval(() => {
             refreshUsers();
             refreshPermissions();
-        }, 15000);
+        }, 5000);
 
         return () => {
             window.removeEventListener('users_updated', handleUserEvent);

@@ -17,7 +17,12 @@ export const ROLE_VIEWS_CONFIG: Record<UserRole, RoleConfig> = {
   },
   [UserRole.SUBADMIN]: {
     role: UserRole.SUBADMIN,
-    allowedViews: ['*'] // Cho phép toàn bộ
+    allowedViews: [
+      'dashboard', 'receive_record', 'receive_search', 'receive_record_search', 'receive_contract', 
+      'all_records', 'archive_records', 'test_records', 'excerpt_management',
+      'personal_profile', 'account_settings', 'utilities', 'work_schedule', 
+      'receive_group', 'records_group', 'management_group', 'reports', 'tools_group', 'barcode_generator'
+    ]
   },
   [UserRole.ONEDOOR]: {
     role: UserRole.ONEDOOR,
