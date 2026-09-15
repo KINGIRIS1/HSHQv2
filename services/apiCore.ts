@@ -740,14 +740,9 @@ export const mapEmployeeToDb = (e: Employee) => {
     return {
         id: e.id,
         name: e.name,
-        ho_ten: e.name,
         department: cleanDept,
-        phong_ban: cleanDept,
         position: cleanPos,
-        chuc_vu: cleanPos,
-        managedWards: wardsStr,
-        managed_wards: wardsStr,
-        phuong_xa: wardsStr
+        managed_wards: wardsStr
     };
 };
 

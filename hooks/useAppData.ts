@@ -4,7 +4,7 @@ import { RecordFile, Employee, User, UserRole, RecordStatus, Holiday, RolePermis
 import { fetchRecords, fetchEmployees, fetchUsers, fetchUpdateInfo, fetchHolidays,
     createRecordApi, updateRecordApi, deleteRecordApi, deleteRecordsBatchApi, createRecordsBatchApi,
     saveEmployeeApi, deleteEmployeeApi, saveUserApi, deleteUserApi, deleteAllDataApi, getSystemSetting,
-    enrichUsersList
+    enrichUsersList, enrichUserWithEmployees
 } from '../services/api';
 import { supabase } from '../services/supabaseClient';
 import { mapRecordFromDb, getFromCache, CACHE_KEYS } from '../services/apiCore';
@@ -678,22 +678,36 @@ export const useAppData = (currentUser: User | null) => {
         const exists = employees.find(e => e.id === emp.id);
         const savedEmp = await saveEmployeeApi(emp, !!exists);
         if (savedEmp) {
-            if (exists) setEmployees(prev => prev.map(e => e.id === savedEmp.id ? savedEmp : e));
-            else setEmployees(prev => [...prev, savedEmp]);
+            const nextEmps = exists
+                ? employees.map(e => e.id === savedEmp.id ? savedEmp : e)
+                : [...employees, savedEmp];
+            setEmployees(nextEmps);
+
+            // Tự động re-enrich danh sách users dựa trên danh sách nhân viên mới
+            enrichUsersList(users, nextEmps).then(enrichedUsers => {
+                setUsers(enrichedUsers);
+            });
         }
     };
 
     const handleDeleteEmployee = async (id: string) => {
         const success = await deleteEmployeeApi(id);
-        if (success) setEmployees(prev => prev.filter(e => e.id !== id));
+        if (success) {
+            const nextEmps = employees.filter(e => e.id !== id);
+            setEmployees(nextEmps);
+            enrichUsersList(users, nextEmps).then(enrichedUsers => {
+                setUsers(enrichedUsers);
+            });
+        }
     };
 
     // --- User Handlers ---
     const handleUpdateUser = async (u: User, isUpdate: boolean) => {
         const res = await saveUserApi(u, isUpdate);
         if (res) {
-            if (isUpdate) setUsers(prev => prev.map(x => x.username === u.username ? res : x));
-            else setUsers(prev => [...prev, res]);
+            const enrichedRes = await enrichUserWithEmployees(res, employees);
+            if (isUpdate) setUsers(prev => prev.map(x => x.username === u.username ? enrichedRes : x));
+            else setUsers(prev => [...prev, enrichedRes]);
         }
         return res;
     };

@@ -151,26 +151,12 @@ export const saveEmployeeApi = async (employee: Employee, isUpdate: boolean): Pr
             if (isUpdate) {
                 const { error } = await supabase.from('employees').update(payload).eq('id', cleanEmp.id);
                 if (error) {
-                    const fallbackPayload = {
-                        id: cleanEmp.id,
-                        name: cleanEmp.name,
-                        department: cleanEmp.department,
-                        position: cleanEmp.position,
-                        managedWards: JSON.stringify(cleanEmp.managedWards)
-                    };
-                    await supabase.from('employees').update(fallbackPayload).eq('id', cleanEmp.id);
+                    console.warn("Lỗi update bảng employees:", error);
                 }
             } else {
                 const { error } = await supabase.from('employees').insert([payload]);
                 if (error) {
-                    const fallbackPayload = {
-                        id: cleanEmp.id,
-                        name: cleanEmp.name,
-                        department: cleanEmp.department,
-                        position: cleanEmp.position,
-                        managedWards: JSON.stringify(cleanEmp.managedWards)
-                    };
-                    await supabase.from('employees').insert([fallbackPayload]);
+                    console.warn("Lỗi insert bảng employees:", error);
                 }
             }
         } catch (dbErr) {
@@ -281,7 +267,7 @@ export const enrichUserWithEmployees = async (user: User, existingEmployees?: Em
                 const { data, error } = await supabase
                     .from('employees')
                     .select('*')
-                    .or(`id.ilike.${key},ma_nv.ilike.${key},employee_id.ilike.${key},code.ilike.${key},ho_ten.ilike.${key},name.ilike.${key}`);
+                    .or(`id.ilike.${key},name.ilike.${key}`);
                 if (!error && Array.isArray(data) && data.length > 0) {
                     matchedEmp = mapEmployeeFromDb(data[0]);
                     console.log(`Step 2: Queried Employee directly from Supabase Cloud:`, matchedEmp);
@@ -531,72 +517,36 @@ export const saveUserApi = async (user: User, isUpdate: boolean): Promise<User |
 
     if (isConfigured && supabase) {
         try {
-            const payloadsToTry = [
-                {
-                    username: user.username,
-                    password: user.password,
-                    name: user.name,
-                    role: user.role,
-                    employee_id: user.employeeId || null,
-                    active: user.active !== undefined ? user.active : true
-                },
-                {
-                    username: user.username,
-                    password: user.password,
-                    name: user.name,
-                    role: user.role,
-                    employeeId: user.employeeId || null,
-                    active: user.active !== undefined ? user.active : true
-                },
-                {
-                    username: user.username,
-                    password: user.password,
-                    name: user.name,
-                    role: user.role,
-                    active: user.active !== undefined ? user.active : true
-                },
-                {
-                    username: user.username,
-                    password: user.password,
-                    name: user.name,
-                    role: user.role
-                }
-            ];
-
+            const payload = mapUserToDb(user);
             let dbSuccess = false;
-            for (const payload of payloadsToTry) {
-                if (dbSuccess) break;
-                try {
-                    if (isUpdate) {
-                        let query = supabase.from('users').update(payload);
-                        if (user.id) {
-                            query = query.eq('id', user.id);
-                        } else {
-                            query = query.ilike('username', user.username);
-                        }
-                        const { data, error } = await query.select();
-                        if (!error) {
-                            if (Array.isArray(data) && data.length > 0) {
-                                savedUser = mapUserFromDb(data[0]);
-                                dbSuccess = true;
-                            } else {
-                                const insertRes = await supabase.from('users').insert([payload]).select();
-                                if (!insertRes.error && Array.isArray(insertRes.data) && insertRes.data.length > 0) {
-                                    savedUser = mapUserFromDb(insertRes.data[0]);
-                                    dbSuccess = true;
-                                }
-                            }
-                        }
+            try {
+                if (isUpdate) {
+                    let query = supabase.from('users').update(payload);
+                    if (user.id) {
+                        query = query.eq('id', user.id);
                     } else {
-                        const { data, error } = await supabase.from('users').insert([payload]).select();
-                        if (!error && Array.isArray(data) && data.length > 0) {
-                            savedUser = mapUserFromDb(data[0]);
+                        query = query.ilike('username', user.username);
+                    }
+                    const { data, error } = await query.select();
+                    if (!error && Array.isArray(data) && data.length > 0) {
+                        savedUser = mapUserFromDb(data[0]);
+                        dbSuccess = true;
+                    } else {
+                        const insertRes = await supabase.from('users').insert([payload]).select();
+                        if (!insertRes.error && Array.isArray(insertRes.data) && insertRes.data.length > 0) {
+                            savedUser = mapUserFromDb(insertRes.data[0]);
                             dbSuccess = true;
                         }
                     }
-                } catch (e) {
-                    console.warn("Thử payload lưu bảng users không thành công, đang thử phương án tiếp theo:", e);
+                } else {
+                    const { data, error } = await supabase.from('users').insert([payload]).select();
+                    if (!error && Array.isArray(data) && data.length > 0) {
+                        savedUser = mapUserFromDb(data[0]);
+                        dbSuccess = true;
+                    }
                 }
+            } catch (e) {
+                console.warn("Lưu bảng users gặp lỗi:", e);
             }
         } catch (error) {
             logError("saveUserApi table users", error, true);
