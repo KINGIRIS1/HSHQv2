@@ -93,6 +93,24 @@ export const enrichUserWithEmployees = async (user: User, existingEmployees?: Em
         matchedEmp = employeesList.find(e => (e.id || '').trim().toLowerCase() === cleanUsername);
     }
 
+    // 3. Nếu vẫn chưa thấy trong danh sách bộ nhớ (máy mới / trình duyệt mới), truy vấn TRỰC TIẾP từ Supabase Cloud
+    if (!matchedEmp && isConfigured && supabase) {
+        const targetKey = (user.employeeId || user.username || '').trim();
+        if (targetKey) {
+            try {
+                const { data, error } = await supabase
+                    .from('employees')
+                    .select('*')
+                    .or(`id.ilike.${targetKey},ma_nv.ilike.${targetKey},employee_id.ilike.${targetKey},code.ilike.${targetKey}`);
+                if (!error && Array.isArray(data) && data.length > 0) {
+                    matchedEmp = mapEmployeeFromDb(data[0]);
+                }
+            } catch (e) {
+                console.warn("Lỗi truy vấn nhân viên trực tiếp từ CSDL Cloud:", e);
+            }
+        }
+    }
+
     if (matchedEmp && matchedEmp.name) {
         const officialEmpName = matchedEmp.name.trim();
         const currentUserName = (user.name || '').trim();
@@ -104,7 +122,7 @@ export const enrichUserWithEmployees = async (user: User, existingEmployees?: Em
         if (isNameEmptyOrCode || currentUserName !== officialEmpName) {
             return {
                 ...user,
-                employeeId: matchedEmp.id,
+                employeeId: matchedEmp.id || user.employeeId,
                 name: officialEmpName
             };
         }

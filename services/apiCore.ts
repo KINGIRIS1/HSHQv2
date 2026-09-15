@@ -691,30 +691,30 @@ export const mapEmployeeToDb = (e: Employee) => ({
 });
 
 export const mapEmployeeFromDb = (e: any): Employee => {
+    if (!e) return { id: '', name: '', department: '', position: '', managedWards: [] };
+
     let parsedWards = [];
-    if (typeof e.managedWards === 'string') {
+    const rawWards = e.managedWards || e.managed_wards || e.managedwards || e.phuong_xa;
+    if (typeof rawWards === 'string') {
         try {
-            parsedWards = JSON.parse(e.managedWards);
+            parsedWards = JSON.parse(rawWards);
         } catch (err) {
-            parsedWards = e.managedWards.split(',').map((w: string) => w.trim()).filter(Boolean);
+            parsedWards = rawWards.split(',').map((w: string) => w.trim()).filter(Boolean);
         }
-    } else if (typeof e.managed_wards === 'string') {
-        try {
-            parsedWards = JSON.parse(e.managed_wards);
-        } catch (err) {
-            parsedWards = e.managed_wards.split(',').map((w: string) => w.trim()).filter(Boolean);
-        }
-    } else if (Array.isArray(e.managedWards)) {
-        parsedWards = e.managedWards;
-    } else if (Array.isArray(e.managed_wards)) {
-        parsedWards = e.managed_wards;
+    } else if (Array.isArray(rawWards)) {
+        parsedWards = rawWards;
     }
     
+    const rawId = e.id || e.employee_id || e.employeeId || e.ma_nv || e.manv || e.code || '';
+    const rawName = e.name || e.ho_ten || e.hoten || e.full_name || e.fullname || e.display_name || e.ten_nhan_vien || e.tennhanvien || e.id || '';
+    const rawDept = e.department || e.phong_ban || e.phongban || e.bo_phan || e.bophan || '';
+    const rawPos = e.position || e.chuc_vu || e.chucvu || '';
+
     return {
-        id: e.id,
-        name: e.name,
-        department: e.department,
-        position: e.position,
+        id: String(rawId).normalize('NFC').trim(),
+        name: String(rawName).normalize('NFC').trim(),
+        department: String(rawDept).normalize('NFC').trim(),
+        position: String(rawPos).normalize('NFC').trim(),
         managedWards: parsedWards
     };
 };
