@@ -22,7 +22,7 @@ const PERMISSION_DEPARTMENTS = [
   { id: 'Ban Giám đốc', name: 'Ban Giám đốc', label: 'Ban Giám đốc', desc: 'Ban lãnh đạo đơn vị, ký duyệt và chỉ đạo chung' },
   { id: 'Tổ Lưu trữ', name: 'Tổ Lưu trữ', label: 'Tổ Lưu trữ', desc: 'Bộ phận phụ trách lưu trữ, khai thác thông tin đất đai và hồ sơ lưu trữ' },
   { id: 'Tổ Đo đạc', name: 'Tổ Đo đạc', label: 'Tổ Đo đạc', desc: 'Bộ phận phụ trách đo đạc, chỉnh lý bản đồ và trích đo địa chính' },
-  { id: 'Tổ Cấp giấy', name: 'Tổ Cấp giấy', label: 'Tổ Cấp giấy', desc: 'Bộ phận phụ trách đăng ký đất đai, thẩm định, cấp GCN và hồ sơ cấp giấy' },
+  { id: 'Tổ Cấp giấy', name: 'Tổ Cấp giấy', label: 'Tổ Cấp giấy', desc: 'Bộ phận phụ trách đăng ký, cấp giấy chứng nhận quyền sử dụng đất' },
   { id: 'Tổ Hành chính', name: 'Tổ Hành chính', label: 'Tổ Hành chính', desc: 'Bộ phận hành chính, văn phòng, tiếp nhận một cửa' }
 ];
 
@@ -50,7 +50,7 @@ const PERMISSION_GROUPS = [
       { id: 'receive_contract', label: 'Tab Quản lý Hợp đồng dịch vụ' },
       { id: 'all_records', label: 'Tab Hồ sơ Đo đạc' },
       { id: 'archive_records', label: 'Tab Hồ sơ Lưu trữ' },
-      { id: 'test_records', label: 'Tab Hồ sơ Cấp giấy' },
+      { id: 'registration_records', label: 'Tab Hồ sơ Cấp giấy' },
       { id: 'excerpt_management', label: 'Tab Sổ trích lục / Trích đo' },
       { id: 'work_schedule', label: 'Tab Lịch công tác' },
       { id: 'reports', label: 'Tab Báo cáo & Thống kê' },
@@ -119,29 +119,8 @@ const PERMISSION_GROUPS = [
     ]
   },
   {
-    id: 'group_actions_capgiay',
-    title: '5. Quyền Thao tác - Tổ Cấp giấy',
-    desc: 'Các nút bấm và hành động xử lý chuyên môn tại Tổ Cấp giấy (Đăng ký đất đai, cấp GCN)',
-    items: [
-      { id: 'test_ADD_RECORDS', label: 'Thêm mới hồ sơ (Cấp giấy)' },
-      { id: 'test_BTN_ASSIGN_STAFF', label: 'Giao việc (Cấp giấy)' },
-      { id: 'test_BTN_SUBMIT_CHECK', label: 'Trình kiểm tra (Cấp giấy)' },
-      { id: 'test_BTN_SUBMIT_SIGN', label: 'Trình ký (Cấp giấy)' },
-      { id: 'test_BTN_APPROVE_SIGN', label: 'Ký duyệt (Cấp giấy)' },
-      { id: 'test_BTN_REJECT_RECORD', label: 'Trả hồ sơ / Từ chối (Cấp giấy)' },
-      { id: 'test_HANDOVER_RECORDS', label: 'Bàn giao 1 cửa (Cấp giấy)' },
-      { id: 'test_BTN_RETURN_RESULT', label: 'Trả kết quả (Cấp giấy)' },
-      { id: 'test_BTN_EXTEND_DEADLINE', label: 'Gia hạn thời gian (Cấp giấy)' },
-      { id: 'test_EDIT_RECORDS', label: 'Sửa hồ sơ (Cấp giấy)' },
-      { id: 'test_DELETE_RECORDS', label: 'Xóa hồ sơ (Cấp giấy)' },
-      { id: 'test_VIEW_DETAILS', label: 'Xem chi tiết hồ sơ (Cấp giấy)' },
-      { id: 'test_PRINT_RECEIPT', label: 'In biên nhận hồ sơ (Cấp giấy)' },
-      { id: 'test_BTN_ADVANCE_STATUS', label: 'Chuyển bước hồ sơ (Cấp giấy)' },
-    ]
-  },
-  {
     id: 'group_system_management',
-    title: '6. Quyền Quản trị & Tiện ích chung',
+    title: '5. Quyền Quản trị & Tiện ích chung',
     desc: 'Quản lý lịch tuần, chat, nhân sự, tài khoản và cài đặt hệ thống',
     items: [
       { id: 'VIEW_SCHEDULE', label: 'Xem lịch công tác' },

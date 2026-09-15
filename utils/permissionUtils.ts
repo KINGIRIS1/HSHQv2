@@ -55,18 +55,18 @@ export function checkUserPermission(
     }
     const isSurveyDept = userDept.includes('đo đạc') || userDept.includes('do dac');
     const isArchiveDept = userDept.includes('lưu trữ') || userDept.includes('luu tru');
-    const isCapGiayDept = userDept.includes('cấp giấy') || userDept.includes('cap giay') || userDept.includes('đăng ký') || userDept.includes('dang ky');
 
     // Determine the exact list of IDs that satisfy this permission check
     const checkIds: string[] = [permissionId];
 
     if (permissionId.startsWith('dodac_')) {
         // Specifically asking for Dodac permission.
-        // It must NEVER match luutru_ / test_ or fallback to generic!
+        // It must NEVER match luutru_ or fallback to generic!
+        // Keep ONLY [permissionId]
     } else if (permissionId.startsWith('luutru_')) {
         // Specifically asking for Luutru permission.
-    } else if (permissionId.startsWith('test_')) {
-        // Specifically asking for CapGiay (test_) permission.
+        // It must NEVER match dodac_ or fallback to generic!
+        // Keep ONLY [permissionId]
     } else {
         // Generic permission requested (e.g., 'BTN_ADVANCE_STATUS', 'BTN_ASSIGN_STAFF', 'EDIT_RECORDS')
         // Resolve accurately based on the user's department context
@@ -100,51 +100,36 @@ export function checkUserPermission(
             else if (permissionId === 'VIEW_DETAILS') checkIds.push('luutru_VIEW_DETAILS');
             else if (permissionId === 'ADD_RECORDS') checkIds.push('luutru_ADD_RECORDS');
             else if (permissionId === 'PRINT_RECEIPT') checkIds.push('luutru_PRINT_RECEIPT');
-        } else if (isCapGiayDept) {
-            if (permissionId === 'BTN_ADVANCE_STATUS') checkIds.push('test_BTN_ADVANCE_STATUS');
-            else if (permissionId === 'BTN_ASSIGN_STAFF' || permissionId === 'ASSIGN_RECORDS') checkIds.push('test_BTN_ASSIGN_STAFF');
-            else if (permissionId === 'BTN_SUBMIT_CHECK' || permissionId === 'CHECK_RECORDS') checkIds.push('test_BTN_SUBMIT_CHECK');
-            else if (permissionId === 'BTN_SUBMIT_SIGN' || permissionId === 'SIGN_RECORDS') checkIds.push('test_BTN_SUBMIT_SIGN');
-            else if (permissionId === 'BTN_APPROVE_SIGN') checkIds.push('test_BTN_APPROVE_SIGN');
-            else if (permissionId === 'BTN_REJECT_RECORD' || permissionId === 'REJECT_RECORDS') checkIds.push('test_BTN_REJECT_RECORD');
-            else if (permissionId === 'HANDOVER_RECORDS') checkIds.push('test_HANDOVER_RECORDS');
-            else if (permissionId === 'BTN_RETURN_RESULT' || permissionId === 'RETURN_RECORDS') checkIds.push('test_BTN_RETURN_RESULT');
-            else if (permissionId === 'BTN_EXTEND_DEADLINE') checkIds.push('test_BTN_EXTEND_DEADLINE');
-            else if (permissionId === 'EDIT_RECORDS') checkIds.push('test_EDIT_RECORDS');
-            else if (permissionId === 'DELETE_RECORDS') checkIds.push('test_DELETE_RECORDS');
-            else if (permissionId === 'VIEW_DETAILS') checkIds.push('test_VIEW_DETAILS');
-            else if (permissionId === 'ADD_RECORDS') checkIds.push('test_ADD_RECORDS');
-            else if (permissionId === 'PRINT_RECEIPT') checkIds.push('test_PRINT_RECEIPT');
         } else {
             // General roles (e.g. ONEDOOR, ADMIN, etc.)
             if (permissionId === 'BTN_ASSIGN_STAFF' || permissionId === 'ASSIGN_RECORDS') {
-                checkIds.push('dodac_BTN_ASSIGN_STAFF', 'luutru_BTN_ASSIGN_STAFF', 'test_BTN_ASSIGN_STAFF');
+                checkIds.push('dodac_BTN_ASSIGN_STAFF', 'luutru_BTN_ASSIGN_STAFF');
             } else if (permissionId === 'BTN_SUBMIT_CHECK' || permissionId === 'CHECK_RECORDS') {
-                checkIds.push('dodac_BTN_SUBMIT_CHECK', 'luutru_BTN_SUBMIT_CHECK', 'test_BTN_SUBMIT_CHECK');
+                checkIds.push('dodac_BTN_SUBMIT_CHECK', 'luutru_BTN_SUBMIT_CHECK');
             } else if (permissionId === 'BTN_SUBMIT_SIGN' || permissionId === 'SIGN_RECORDS') {
-                checkIds.push('dodac_BTN_SUBMIT_SIGN', 'luutru_BTN_SUBMIT_SIGN', 'test_BTN_SUBMIT_SIGN');
+                checkIds.push('dodac_BTN_SUBMIT_SIGN', 'luutru_BTN_SUBMIT_SIGN');
             } else if (permissionId === 'BTN_APPROVE_SIGN') {
-                checkIds.push('dodac_BTN_APPROVE_SIGN', 'luutru_BTN_APPROVE_SIGN', 'test_BTN_APPROVE_SIGN');
+                checkIds.push('dodac_BTN_APPROVE_SIGN', 'luutru_BTN_APPROVE_SIGN');
             } else if (permissionId === 'BTN_REJECT_RECORD' || permissionId === 'REJECT_RECORDS') {
-                checkIds.push('dodac_BTN_REJECT_RECORD', 'luutru_BTN_REJECT_RECORD', 'test_BTN_REJECT_RECORD');
+                checkIds.push('dodac_BTN_REJECT_RECORD', 'luutru_BTN_REJECT_RECORD');
             } else if (permissionId === 'HANDOVER_RECORDS') {
-                checkIds.push('dodac_HANDOVER_RECORDS', 'luutru_HANDOVER_RECORDS', 'test_HANDOVER_RECORDS');
+                checkIds.push('dodac_HANDOVER_RECORDS', 'luutru_HANDOVER_RECORDS');
             } else if (permissionId === 'BTN_RETURN_RESULT' || permissionId === 'RETURN_RECORDS') {
-                checkIds.push('dodac_BTN_RETURN_RESULT', 'luutru_BTN_RETURN_RESULT', 'test_BTN_RETURN_RESULT');
+                checkIds.push('dodac_BTN_RETURN_RESULT', 'luutru_BTN_RETURN_RESULT');
             } else if (permissionId === 'BTN_EXTEND_DEADLINE') {
-                checkIds.push('dodac_BTN_EXTEND_DEADLINE', 'luutru_BTN_EXTEND_DEADLINE', 'test_BTN_EXTEND_DEADLINE');
+                checkIds.push('dodac_BTN_EXTEND_DEADLINE', 'luutru_BTN_EXTEND_DEADLINE');
             } else if (permissionId === 'EDIT_RECORDS') {
-                checkIds.push('dodac_EDIT_RECORDS', 'luutru_EDIT_RECORDS', 'test_EDIT_RECORDS');
+                checkIds.push('dodac_EDIT_RECORDS', 'luutru_EDIT_RECORDS');
             } else if (permissionId === 'DELETE_RECORDS') {
-                checkIds.push('dodac_DELETE_RECORDS', 'luutru_DELETE_RECORDS', 'test_DELETE_RECORDS');
+                checkIds.push('dodac_DELETE_RECORDS', 'luutru_DELETE_RECORDS');
             } else if (permissionId === 'VIEW_DETAILS') {
-                checkIds.push('dodac_VIEW_DETAILS', 'luutru_VIEW_DETAILS', 'test_VIEW_DETAILS');
+                checkIds.push('dodac_VIEW_DETAILS', 'luutru_VIEW_DETAILS');
             } else if (permissionId === 'ADD_RECORDS') {
-                checkIds.push('dodac_ADD_RECORDS', 'luutru_ADD_RECORDS', 'test_ADD_RECORDS');
+                checkIds.push('dodac_ADD_RECORDS', 'luutru_ADD_RECORDS');
             } else if (permissionId === 'BTN_ADVANCE_STATUS') {
-                checkIds.push('dodac_BTN_ADVANCE_STATUS', 'luutru_BTN_ADVANCE_STATUS', 'test_BTN_ADVANCE_STATUS');
+                checkIds.push('dodac_BTN_ADVANCE_STATUS', 'luutru_BTN_ADVANCE_STATUS');
             } else if (permissionId === 'PRINT_RECEIPT') {
-                checkIds.push('dodac_PRINT_RECEIPT', 'luutru_PRINT_RECEIPT', 'test_PRINT_RECEIPT');
+                checkIds.push('dodac_PRINT_RECEIPT', 'luutru_PRINT_RECEIPT');
             }
         }
     }
@@ -218,7 +203,7 @@ export function checkUserPermission(
  */
 export function hasRecordActionPermission(
     action: 'view' | 'advance' | 'return' | 'edit' | 'delete' | 'extend' | 'reject' | 'print',
-    record: { recordType?: string | null; sourceTable?: string | null; group?: string | null },
+    record: { recordType?: string | null; sourceTable?: string | null },
     currentUser: User | null | undefined,
     employees?: Employee[],
     rolePermissions?: RolePermissions | null,
@@ -259,12 +244,11 @@ export function hasRecordActionPermission(
     }
 
     const isArchive = isArchiveRecordType(record.recordType || '') || record.sourceTable === 'luutru_records';
-    const isCapGiay = record.sourceTable === 'dangky_records' || record.group === '3. Đăng ký đất đai, cấp GCN';
 
     switch (action) {
         case 'view':
             return checkUserPermission(
-                isArchive ? 'luutru_VIEW_DETAILS' : isCapGiay ? 'test_VIEW_DETAILS' : 'dodac_VIEW_DETAILS',
+                isArchive ? 'luutru_VIEW_DETAILS' : 'dodac_VIEW_DETAILS',
                 currentUser,
                 employees,
                 rolePermissions,
@@ -272,7 +256,7 @@ export function hasRecordActionPermission(
             );
         case 'print':
             return checkUserPermission(
-                isArchive ? 'luutru_PRINT_RECEIPT' : isCapGiay ? 'test_PRINT_RECEIPT' : 'dodac_PRINT_RECEIPT',
+                isArchive ? 'luutru_PRINT_RECEIPT' : 'dodac_PRINT_RECEIPT',
                 currentUser,
                 employees,
                 rolePermissions,
@@ -280,7 +264,7 @@ export function hasRecordActionPermission(
             ) || checkUserPermission('PRINT_RECEIPT', currentUser, employees, rolePermissions, departmentPermissions);
         case 'advance':
             return checkUserPermission(
-                isArchive ? 'luutru_BTN_ADVANCE_STATUS' : isCapGiay ? 'test_BTN_ADVANCE_STATUS' : 'dodac_BTN_ADVANCE_STATUS',
+                isArchive ? 'luutru_BTN_ADVANCE_STATUS' : 'dodac_BTN_ADVANCE_STATUS',
                 currentUser,
                 employees,
                 rolePermissions,
@@ -288,7 +272,7 @@ export function hasRecordActionPermission(
             );
         case 'return':
             return checkUserPermission(
-                isArchive ? 'luutru_BTN_RETURN_RESULT' : isCapGiay ? 'test_BTN_RETURN_RESULT' : 'dodac_BTN_RETURN_RESULT',
+                isArchive ? 'luutru_BTN_RETURN_RESULT' : 'dodac_BTN_RETURN_RESULT',
                 currentUser,
                 employees,
                 rolePermissions,
@@ -296,7 +280,7 @@ export function hasRecordActionPermission(
             );
         case 'edit':
             return checkUserPermission(
-                isArchive ? 'luutru_EDIT_RECORDS' : isCapGiay ? 'test_EDIT_RECORDS' : 'dodac_EDIT_RECORDS',
+                isArchive ? 'luutru_EDIT_RECORDS' : 'dodac_EDIT_RECORDS',
                 currentUser,
                 employees,
                 rolePermissions,
@@ -304,7 +288,7 @@ export function hasRecordActionPermission(
             );
         case 'delete':
             return checkUserPermission(
-                isArchive ? 'luutru_DELETE_RECORDS' : isCapGiay ? 'test_DELETE_RECORDS' : 'dodac_DELETE_RECORDS',
+                isArchive ? 'luutru_DELETE_RECORDS' : 'dodac_DELETE_RECORDS',
                 currentUser,
                 employees,
                 rolePermissions,
@@ -312,7 +296,7 @@ export function hasRecordActionPermission(
             );
         case 'extend':
             return checkUserPermission(
-                isArchive ? 'luutru_BTN_EXTEND_DEADLINE' : isCapGiay ? 'test_BTN_EXTEND_DEADLINE' : 'dodac_BTN_EXTEND_DEADLINE',
+                isArchive ? 'luutru_BTN_EXTEND_DEADLINE' : 'dodac_BTN_EXTEND_DEADLINE',
                 currentUser,
                 employees,
                 rolePermissions,
@@ -320,7 +304,7 @@ export function hasRecordActionPermission(
             );
         case 'reject':
             return checkUserPermission(
-                isArchive ? 'luutru_BTN_REJECT_RECORD' : isCapGiay ? 'test_BTN_REJECT_RECORD' : 'dodac_BTN_REJECT_RECORD',
+                isArchive ? 'luutru_BTN_REJECT_RECORD' : 'dodac_BTN_REJECT_RECORD',
                 currentUser,
                 employees,
                 rolePermissions,

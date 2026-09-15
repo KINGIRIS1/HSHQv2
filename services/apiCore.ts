@@ -136,7 +136,8 @@ export const logError = (context: string, error: any, silent: boolean = false) =
     } else if (code === '406') {
          console.warn(`⚠️ [Info] ${context}: Không tìm thấy dữ liệu (406).`);
     } else if (code === '22007' || code === '22008') {
-         console.warn(`⚠️ [Cảnh báo ngày tháng] ${context}: Dữ liệu ngày tháng không hợp lệ hoặc sai định dạng (Lỗi ${code}). Hệ thống đã tự động lọc và chuyển về ngày hợp lệ.`);
+         console.error(`❌ Lỗi tại ${context}: Dữ liệu ngày tháng không hợp lệ (Lỗi ${code}).`);
+         alert(`LỖI DỮ LIỆU: Dữ liệu chứa ngày tháng không hợp lệ hoặc sai định dạng (Ví dụ: 30/02).\nHệ thống đã cố gắng xử lý nhưng Server từ chối.`);
     } else if (code === '21000') {
          console.error(`❌ Lỗi tại ${context}: Dữ liệu trùng lặp trong cùng một yêu cầu (Lỗi ${code}).`);
          alert(`LỖI TRÙNG LẶP: File Excel có chứa nhiều dòng cùng Mã Hồ Sơ. Hệ thống đã cố gắng xử lý nhưng Server từ chối.\nVui lòng kiểm tra file Excel và xóa các dòng trùng lặp mã.`);
@@ -166,127 +167,31 @@ export function sanitizeFileName(fileName: string): string {
 }
 
 export const keepOnlyDate = (val: any): string | null => {
-    if (val === undefined || val === null || val === '') return null;
-    
-    // 1. Xử lý số serial của Excel (vd: 45500)
-    if (typeof val === 'number') {
-        if (isNaN(val)) return null;
-        if (val > 20000 && val < 70000) {
-            const utcMs = Math.round((val - 25569) * 86400 * 1000);
-            const date = new Date(utcMs);
-            if (!isNaN(date.getTime())) {
-                const y = date.getUTCFullYear();
-                const m = String(date.getUTCMonth() + 1).padStart(2, '0');
-                const d = String(date.getUTCDate()).padStart(2, '0');
-                return `${y}-${m}-${d}`;
+    if (!val) return null;
+    if (typeof val === 'string') {
+        const cleanStr = val.trim();
+        if (cleanStr === '') return null;
+        // Trích xuất YYYY-MM-DD từ chuỗi ISO (vd: 2026-07-24T12:34:56.000Z)
+        const match = cleanStr.match(/^(\d{4}-\d{2}-\d{2})/);
+        if (match) return match[1];
+        
+        // Xử lý định dạng DD/MM/YYYY hoặc DD-MM-YYYY
+        const parts = cleanStr.split(/[\sT]/)[0].split(/[-/]/);
+        if (parts.length === 3) {
+            if (parts[0].length === 4) { // YYYY-MM-DD
+                return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+            } else if (parts[2].length === 4) { // DD/MM/YYYY
+                return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
             }
         }
-        return null;
-    }
-
-    // 2. Xử lý Date object
-    if (val instanceof Date) {
-        if (isNaN(val.getTime())) return null;
+        return cleanStr;
+    } else if (val instanceof Date) {
         const y = val.getFullYear();
-        if (y < 1900 || y > 2100) return null;
         const m = String(val.getMonth() + 1).padStart(2, '0');
         const d = String(val.getDate()).padStart(2, '0');
         return `${y}-${m}-${d}`;
     }
-
-    // 3. Xử lý chuỗi
-    if (typeof val === 'string') {
-        let cleanStr = val.trim();
-        if (cleanStr === '' || cleanStr === 'null' || cleanStr === 'undefined' || cleanStr === '-' || cleanStr === 'N/A') return null;
-
-        // Trích xuất YYYY-MM-DD từ chuỗi ISO hoặc có giờ (vd: 2026-07-24T12:34:56.000Z hoặc 2026-07-24 10:30:00)
-        const matchYmd = cleanStr.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
-        if (matchYmd) {
-            const year = parseInt(matchYmd[1], 10);
-            const month = parseInt(matchYmd[2], 10);
-            const day = parseInt(matchYmd[3], 10);
-            if (month < 1 || month > 12 || day < 1 || day > 31 || year < 1900 || year > 2100) return null;
-            const d = new Date(year, month - 1, day);
-            if (isNaN(d.getTime()) || d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) {
-                return null; // Ngày không hợp lệ (vd: 30/02)
-            }
-            return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-        }
-        
-        // Xử lý định dạng DD/MM/YYYY hoặc DD-MM-YYYY hoặc DD.MM.YYYY
-        const matchDmy = cleanStr.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})/);
-        if (matchDmy) {
-            const day = parseInt(matchDmy[1], 10);
-            const month = parseInt(matchDmy[2], 10);
-            const year = parseInt(matchDmy[3], 10);
-            if (month < 1 || month > 12 || day < 1 || day > 31 || year < 1900 || year > 2100) return null;
-            const d = new Date(year, month - 1, day);
-            if (isNaN(d.getTime()) || d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) {
-                return null; // Ngày không hợp lệ (vd: 30/02)
-            }
-            return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-        }
-
-        // Thử parse Date thông thường
-        const parsed = new Date(cleanStr);
-        if (!isNaN(parsed.getTime())) {
-            const y = parsed.getFullYear();
-            if (y < 1900 || y > 2100) return null;
-            const m = String(parsed.getMonth() + 1).padStart(2, '0');
-            const d = String(parsed.getDate()).padStart(2, '0');
-            return `${y}-${m}-${d}`;
-        }
-
-        return null;
-    }
-    return null;
-};
-
-export const keepOnlyDateTime = (val: any): string | null => {
-    if (val === undefined || val === null || val === '') return null;
-    if (val instanceof Date) {
-        return isNaN(val.getTime()) ? null : val.toISOString();
-    }
-    if (typeof val === 'number') {
-        if (isNaN(val)) return null;
-        if (val > 20000 && val < 70000) {
-            const utcMs = Math.round((val - 25569) * 86400 * 1000);
-            const d = new Date(utcMs);
-            return isNaN(d.getTime()) ? null : d.toISOString();
-        }
-        const d = new Date(val);
-        return isNaN(d.getTime()) ? null : d.toISOString();
-    }
-    if (typeof val === 'string') {
-        const cleanStr = val.trim();
-        if (!cleanStr || cleanStr === 'null' || cleanStr === 'undefined' || cleanStr === '-' || cleanStr === 'N/A') return null;
-        
-        // Kiểm tra dạng DD/MM/YYYY hoặc DD/MM/YYYY HH:mm(:ss)
-        const dmyMatch = cleanStr.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?/);
-        if (dmyMatch) {
-            const day = parseInt(dmyMatch[1], 10);
-            const month = parseInt(dmyMatch[2], 10);
-            const year = parseInt(dmyMatch[3], 10);
-            const hours = dmyMatch[4] ? parseInt(dmyMatch[4], 10) : 0;
-            const mins = dmyMatch[5] ? parseInt(dmyMatch[5], 10) : 0;
-            const secs = dmyMatch[6] ? parseInt(dmyMatch[6], 10) : 0;
-            if (month < 1 || month > 12 || day < 1 || day > 31 || year < 1900 || year > 2100) return null;
-            const d = new Date(year, month - 1, day, hours, mins, secs);
-            if (isNaN(d.getTime()) || d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) {
-                return null;
-            }
-            return d.toISOString();
-        }
-        
-        const d = new Date(cleanStr);
-        if (!isNaN(d.getTime())) {
-            const y = d.getFullYear();
-            if (y < 1900 || y > 2100) return null;
-            return d.toISOString();
-        }
-        return null;
-    }
-    return null;
+    return val;
 };
 
 export const sanitizeData = (data: any, allowedColumns: string[]) => {
@@ -295,7 +200,7 @@ export const sanitizeData = (data: any, allowedColumns: string[]) => {
         'area', 'unitPrice', 'vatRate', 'vatAmount', 'totalAmount', 
         'deposit', 'quantity', 'plotCount', 'markerCount', 
         'minArea', 'maxArea', 'price',
-        'liquidationArea', 'liquidationAmount', 'residentialArea', 'advancePayment'
+        'liquidationArea', 'liquidationAmount', 'residentialArea'
     ];
     numberFields.forEach(field => {
         if (clean[field] !== undefined) {
@@ -305,33 +210,40 @@ export const sanitizeData = (data: any, allowedColumns: string[]) => {
         }
     });
     
-    // DateTime fields: Lưu chuẩn ISO timestamp hoặc null
+    // DateTime fields: Giữ nguyên ngày và giờ (những trường thực sự cần lưu đầy đủ timestamp)
     const dateTimeFields = [
-        'lastRemindedAt', 'reminderDate', 'created_at', 'updated_at', 'createdAt', 'updatedAt'
+        'lastRemindedAt', 'createdDate'
     ];
 
-    // Date-only fields: Đảm bảo CHỈ lưu YYYY-MM-DD hợp lệ, loại bỏ hoàn toàn các chuỗi ngày lỗi
+    // Date-only fields: Chỉ lấy phần ngày YYYY-MM-DD, loại bỏ hoàn toàn phần giờ
     const dateOnlyFields = [
         'receivedDate', 'resultReturnedDate',
         'deadline', 'assignedDate', 
         'submissionDate', 'approvalDate', 'completedDate', 
         'exportDate', 'issueDate',
-        'pendingCheckDate', 'checkedDate', 'completedWorkDate',
+        'pendingCheckDate', 'checkedDate', 'completedWorkDate', 'reminderDate',
         'surveyAssignedDate', 'fieldAssignedDate', 'fieldCompletedDate',
-        'officeAssignedDate', 'officeCompletedDate',
-        'archiveHandoverDate', 'returnBatchDate', 'returnBatchDate',
-        'ngay_thang', 'date', 'createdDate'
+        'officeAssignedDate', 'officeCompletedDate'
     ];
 
     dateTimeFields.forEach(field => {
         if (clean[field] !== undefined) {
-            clean[field] = keepOnlyDateTime(clean[field]);
+            if (clean[field] === '' || clean[field] === null) {
+                clean[field] = null;
+            } else if (typeof clean[field] === 'string') {
+                const trimmed = clean[field].trim();
+                clean[field] = trimmed === '' ? null : trimmed;
+            }
         }
     });
 
     dateOnlyFields.forEach(field => {
         if (clean[field] !== undefined) {
-            clean[field] = keepOnlyDate(clean[field]);
+            if (clean[field] === '' || clean[field] === null) {
+                clean[field] = null;
+            } else {
+                clean[field] = keepOnlyDate(clean[field]);
+            }
         }
     });
     
@@ -342,38 +254,6 @@ export const sanitizeData = (data: any, allowedColumns: string[]) => {
         }
     });
     return sanitized;
-};
-
-/**
- * Tự động làm sạch & chuẩn hóa toàn bộ các trường ngày tháng khi gặp lỗi 22007/22008 (Invalid Date / Out of Range)
- */
-export const sanitizePayloadForDateErrors = (payload: any): any => {
-    if (!payload) return payload;
-    if (Array.isArray(payload)) {
-        return payload.map(item => sanitizePayloadForDateErrors(item));
-    }
-    const clean = { ...payload };
-    const dateFields = [
-        'receivedDate', 'resultReturnedDate', 'deadline', 'assignedDate', 
-        'submissionDate', 'approvalDate', 'completedDate', 'exportDate', 'issueDate',
-        'pendingCheckDate', 'checkedDate', 'completedWorkDate',
-        'surveyAssignedDate', 'fieldAssignedDate', 'fieldCompletedDate',
-        'officeAssignedDate', 'officeCompletedDate',
-        'archiveHandoverDate', 'returnBatchDate', 'ngay_thang', 'date', 'createdDate'
-    ];
-    dateFields.forEach(f => {
-        if (clean[f] !== undefined) {
-            clean[f] = keepOnlyDate(clean[f]);
-        }
-    });
-
-    const dateTimeFields = ['lastRemindedAt', 'reminderDate', 'created_at', 'updated_at', 'createdAt', 'updatedAt'];
-    dateTimeFields.forEach(f => {
-        if (clean[f] !== undefined) {
-            clean[f] = keepOnlyDateTime(clean[f]);
-        }
-    });
-    return clean;
 };
 
 /**

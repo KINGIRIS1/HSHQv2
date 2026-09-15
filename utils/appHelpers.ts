@@ -343,7 +343,7 @@ export function parseSafeDate(dateStr: any): Date | null {
     if (!s) return null;
 
     // Check if it's YYYY-MM-DD or ISO format with optional time
-    const ymdMatch = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:$|[T\s](\d{2}):(\d{2})(?::(\d{2}))?)/);
+    const ymdMatch = s.match(/^(\d{4})-(\d{2})-(\d{2})(?:$|[T\s](\d{2}):(\d{2})(?::(\d{2}))?)/);
     if (ymdMatch) {
         const year = parseInt(ymdMatch[1], 10);
         const month = parseInt(ymdMatch[2], 10) - 1;
@@ -352,12 +352,7 @@ export function parseSafeDate(dateStr: any): Date | null {
         const minute = ymdMatch[5] ? parseInt(ymdMatch[5], 10) : 0;
         const second = ymdMatch[6] ? parseInt(ymdMatch[6], 10) : 0;
         const d = new Date(year, month, day, hour, minute, second);
-        if (isNaN(d.getTime())) return null;
-        // Kiểm tra tính hợp lệ lịch thực tế (tránh ngày ảo như 30/02 hoặc 31/04)
-        if (d.getFullYear() !== year || d.getMonth() !== month || d.getDate() !== day) {
-            return null;
-        }
-        return d;
+        return isNaN(d.getTime()) ? null : d;
     }
 
     // Check if it's DD/MM/YYYY or DD-MM-YYYY or similar with optional time
@@ -371,17 +366,11 @@ export function parseSafeDate(dateStr: any): Date | null {
         const minute = match[5] ? parseInt(match[5], 10) : 0;
         const second = match[6] ? parseInt(match[6], 10) : 0;
         const d = new Date(year, month, day, hour, minute, second);
-        if (isNaN(d.getTime())) return null;
-        // Kiểm tra tính hợp lệ lịch thực tế (tránh ngày ảo như 30/02 hoặc 31/04)
-        if (d.getFullYear() !== year || d.getMonth() !== month || d.getDate() !== day) {
-            return null;
-        }
-        return d;
+        return isNaN(d.getTime()) ? null : d;
     }
 
     const d = new Date(s);
-    if (isNaN(d.getTime())) return null;
-    return d;
+    return isNaN(d.getTime()) ? null : d;
 }
 
 export function processAssignmentTimelineCheck(
@@ -1222,7 +1211,6 @@ export function cleanFutureMilestoneDates(
         cleaned.exportBatch = null as any;
         cleaned.is_handover = false;
         cleaned.handover_date = null as any;
-        cleaned.handoverWard = null as any;
     }
 
     // Nếu rank < 5 (không phải SIGNED trở lên): Dọn dẹp mốc ký duyệt

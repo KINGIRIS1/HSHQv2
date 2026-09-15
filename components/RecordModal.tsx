@@ -267,20 +267,6 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
     "director_completed",
   ].includes(currentView || "");
 
-  const isTestMeasurementView = [
-    "test_records",
-    "test_assign_tasks",
-    "test_completed_list",
-    "test_measurement_field",
-    "test_measurement_office",
-    "test_print_cert",
-    "test_pending_supplement_list",
-    "test_pending_check_list",
-    "test_check_list",
-    "test_handover_list",
-    "test_director_completed",
-  ].includes(currentView || "");
-
   // Tất cả các thủ tục / loại hồ sơ khi nhập mới hoặc cập nhật
   let allowedRecordTypes: string[] = EXTENDED_RECORD_TYPES;
 
@@ -604,14 +590,6 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
     if (!hasReceiptNumber) {
         cleanData.returnedPrice = undefined;
         cleanData.receiptType = undefined;
-    }
-
-    if (isTestMeasurementView || initialData?.sourceTable === 'dangky_records') {
-        cleanData.sourceTable = 'dangky_records';
-    } else if (isArchiveView || initialData?.sourceTable === 'luutru_records') {
-        cleanData.sourceTable = 'luutru_records';
-    } else if (isMeasurementView || initialData?.sourceTable === 'land_records') {
-        cleanData.sourceTable = 'land_records';
     }
 
     onSubmit(cleanData as any);
