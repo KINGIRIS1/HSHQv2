@@ -708,7 +708,7 @@ export const normalizeDepartment = (rawDept: any): string => {
     const matched = standardDepts.find(d => d.toLowerCase() === lower);
     if (matched) return matched;
 
-    return str;
+    return 'Tổ Đo đạc';
 };
 
 export const normalizePosition = (rawPos: any): string => {
@@ -728,7 +728,7 @@ export const normalizePosition = (rawPos: any): string => {
     const matched = standardPositions.find(p => p.toLowerCase() === lower);
     if (matched) return matched;
 
-    return str;
+    return 'Nhân viên';
 };
 
 export const mapEmployeeToDb = (e: Employee) => ({

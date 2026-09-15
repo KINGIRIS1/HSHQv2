@@ -1,7 +1,7 @@
 
 import { supabase, isConfigured } from './supabaseClient';
 import { Employee, User } from '../types';
-import { MOCK_EMPLOYEES, MOCK_USERS } from '../constants';
+import { MOCK_EMPLOYEES, MOCK_USERS, DEPARTMENTS, POSITIONS } from '../constants';
 import { logError, getFromCache, saveToCache, CACHE_KEYS, mapEmployeeFromDb, mapEmployeeToDb, mapUserFromDb, mapUserToDb, normalizeDepartment, normalizePosition } from './apiCore';
 import { getSystemSetting, saveSystemSetting } from './apiSystem';
 
@@ -9,23 +9,28 @@ import { getSystemSetting, saveSystemSetting } from './apiSystem';
 
 /**
  * Tải trực tiếp danh sách nhân viên thô từ CSDL (bảng employees & system_settings)
- * KHÔNG gọi các hàm liên quan tới Users để tránh đệ quy chéo (circular promise hang)
+ * Hợp nhất thông minh giữa CSDL Cloud và Cấu hình Nhân sự nâng cao
  */
 export const fetchRawEmployeesOnly = async (): Promise<Employee[]> => {
-    let cloudEmps: Employee[] = [];
+    const empMap = new Map<string, Employee>();
 
     if (isConfigured && supabase) {
         // 1. Tải từ bảng employees trên Supabase Cloud
         try {
             const { data, error } = await supabase.from('employees').select('*');
             if (!error && Array.isArray(data) && data.length > 0) {
-                cloudEmps = data.map(mapEmployeeFromDb);
+                data.forEach(item => {
+                    const emp = mapEmployeeFromDb(item);
+                    if (emp.id) {
+                        empMap.set(emp.id.trim().toLowerCase(), emp);
+                    }
+                });
             }
         } catch (e) {
             console.warn("Lỗi fetch bảng employees:", e);
         }
 
-        // 2. Tải từ system_settings (key: employees_config)
+        // 2. Tải từ system_settings (key: employees_config) để hợp nhất thông tin phong phú hơn
         try {
             const configVal = await getSystemSetting('employees_config');
             if (configVal) {
@@ -33,8 +38,25 @@ export const fetchRawEmployeesOnly = async (): Promise<Employee[]> => {
                 if (Array.isArray(parsed) && parsed.length > 0) {
                     parsed.forEach(e => {
                         const mapped = mapEmployeeFromDb(e);
-                        if (mapped.id && !cloudEmps.some(existing => (existing.id || '').toLowerCase() === (mapped.id || '').toLowerCase())) {
-                            cloudEmps.push(mapped);
+                        if (mapped.id) {
+                            const key = mapped.id.trim().toLowerCase();
+                            const existing = empMap.get(key);
+                            if (!existing) {
+                                empMap.set(key, mapped);
+                            } else {
+                                // Ưu tiên giữ thông tin đã được cấu hình chi tiết (Tổ, Chức vụ, Xã phụ trách)
+                                const hasDeptConfig = mapped.department && DEPARTMENTS.includes(mapped.department as any);
+                                const hasPosConfig = mapped.position && POSITIONS.includes(mapped.position as any);
+                                const hasWardsConfig = Array.isArray(mapped.managedWards) && mapped.managedWards.length > 0;
+
+                                empMap.set(key, {
+                                    id: existing.id,
+                                    name: (existing.name && existing.name !== existing.id) ? existing.name : (mapped.name || existing.name),
+                                    department: hasDeptConfig ? mapped.department : existing.department,
+                                    position: hasPosConfig ? mapped.position : existing.position,
+                                    managedWards: hasWardsConfig ? mapped.managedWards : existing.managedWards
+                                });
+                            }
                         }
                     });
                 }
@@ -44,7 +66,7 @@ export const fetchRawEmployeesOnly = async (): Promise<Employee[]> => {
         }
     }
 
-    return cloudEmps;
+    return Array.from(empMap.values());
 };
 
 export const fetchEmployees = async (): Promise<Employee[]> => {
@@ -96,19 +118,43 @@ export const fetchEmployees = async (): Promise<Employee[]> => {
     return cached && cached.length > 0 ? cached : MOCK_EMPLOYEES;
 };
 
+export const syncEmployeesToCloudConfig = async (employeesList: Employee[]) => {
+    try {
+        await saveSystemSetting('employees_config', JSON.stringify(employeesList));
+    } catch (e) {
+        console.warn("Lỗi đồng bộ employees_config lên system_settings:", e);
+    }
+};
+
 export const saveEmployeeApi = async (employee: Employee, isUpdate: boolean): Promise<Employee | null> => {
     if (!isConfigured) return employee;
     try {
         const payload = mapEmployeeToDb(employee);
+        let resultEmp = employee;
         if (isUpdate) {
             const { data, error } = await supabase.from('employees').update(payload).eq('id', employee.id).select();
-            if (error) throw error;
-            return data?.[0] ? mapEmployeeFromDb(data[0]) : employee;
+            if (!error && data?.[0]) resultEmp = mapEmployeeFromDb(data[0]);
         } else {
             const { data, error } = await supabase.from('employees').insert([payload]).select();
-            if (error) throw error;
-            return data?.[0] ? mapEmployeeFromDb(data[0]) : employee;
+            if (!error && data?.[0]) resultEmp = mapEmployeeFromDb(data[0]);
         }
+
+        // Luôn đồng bộ cập nhật vào system_settings 'employees_config' để đồng bộ 100% trên thiết bị/trình duyệt mới
+        try {
+            const currentCloudList = await fetchRawEmployeesOnly();
+            const existingIdx = currentCloudList.findIndex(e => (e.id || '').toLowerCase() === (employee.id || '').toLowerCase());
+            if (existingIdx >= 0) {
+                currentCloudList[existingIdx] = resultEmp;
+            } else {
+                currentCloudList.push(resultEmp);
+            }
+            await syncEmployeesToCloudConfig(currentCloudList);
+            saveToCache(CACHE_KEYS.EMPLOYEES, currentCloudList);
+        } catch (syncErr) {
+            console.warn("Lỗi đồng bộ kép employees_config:", syncErr);
+        }
+
+        return resultEmp;
     } catch (error) {
         logError("saveEmployeeApi", error, true);
         return employee;
@@ -118,8 +164,11 @@ export const saveEmployeeApi = async (employee: Employee, isUpdate: boolean): Pr
 export const deleteEmployeeApi = async (id: string): Promise<boolean> => {
     if (!isConfigured) return true;
     try {
-        const { error } = await supabase.from('employees').delete().eq('id', id);
-        if (error) throw error;
+        await supabase.from('employees').delete().eq('id', id);
+        const currentCloudList = await fetchRawEmployeesOnly();
+        const filtered = currentCloudList.filter(e => (e.id || '').toLowerCase() !== id.toLowerCase());
+        await syncEmployeesToCloudConfig(filtered);
+        saveToCache(CACHE_KEYS.EMPLOYEES, filtered);
         return true;
     } catch (error) {
         logError("deleteEmployeeApi", error, true);
