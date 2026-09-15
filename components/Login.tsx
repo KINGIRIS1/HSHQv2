@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { User } from '../types';
 import { LogIn, Eye, EyeOff, Check } from 'lucide-react';
-import { APP_VERSION, MOCK_USERS } from '../constants';
-import { fetchUsers, fetchUsersDirectFromDb, findUserInDbDirectly } from '../services/apiPeople';
-import { mapUserFromDb } from '../services/apiCore';
+import { APP_VERSION } from '../constants';
+import { authenticateUserCloud } from '../services/apiPeople';
 
 interface LoginProps {
   onLogin: (user: User) => void;
@@ -31,92 +30,24 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
     setError('');
     setIsLoading(true);
 
-    // Chuẩn hóa Unicode NFC & xoá khoảng trắng thừa
-    const submittedUsername = username.normalize('NFC').trim().toLowerCase();
-    const submittedPassword = password.normalize('NFC').trim();
-
-    if (!submittedUsername || !submittedPassword) {
-      setError('Vui lòng nhập đầy đủ tên đăng nhập và mật khẩu.');
-      setIsLoading(false);
-      return;
-    }
-
-    const checkMatch = (u: any): boolean => {
-      if (!u) return false;
-      const mapped = mapUserFromDb(u);
-      const dbU = (mapped.username || '').normalize('NFC').trim().toLowerCase();
-      const dbP = (mapped.password || '').normalize('NFC').trim();
-      return dbU === submittedUsername && dbP === submittedPassword;
-    };
-
     try {
-      let matchedUser: User | null = null;
+      const result = await authenticateUserCloud(username, password);
 
-      // 1. Đối chiếu trong danh sách `users` truyền từ App
-      if (Array.isArray(users) && users.length > 0) {
-        const found = users.find(checkMatch);
-        if (found) matchedUser = mapUserFromDb(found);
-      }
-
-      // 2. TRÌNH DUYỆT ẨN DANH / BỘ NHỚ ĐỆM TRỐNG: Truy vấn toàn bộ danh sách người dùng TRỰC TIẾP từ Supabase (bỏ qua cache)
-      if (!matchedUser) {
-        try {
-          const freshDbUsers = await fetchUsersDirectFromDb();
-          if (Array.isArray(freshDbUsers) && freshDbUsers.length > 0) {
-            const found = freshDbUsers.find(checkMatch);
-            if (found) matchedUser = mapUserFromDb(found);
-          }
-        } catch (dbErr) {
-          console.warn("Lỗi tải danh sách người dùng trực tiếp từ CSDL:", dbErr);
-        }
-      }
-
-      // 3. Tìm kiếm ĐÍCH DANH theo tên đăng nhập trên Supabase (phòng trường hợp CSDL trả về danh sách lớn)
-      if (!matchedUser) {
-        try {
-          const targetedUser = await findUserInDbDirectly(submittedUsername);
-          if (targetedUser && checkMatch(targetedUser)) {
-            matchedUser = targetedUser;
-          }
-        } catch (targetErr) {
-          console.warn("Lỗi tìm kiếm tài khoản đích danh:", targetErr);
-        }
-      }
-
-      // 4. Dự phòng: Kiểm tra trong bộ nhớ đệm cache local (nếu có từ phiên cũ)
-      if (!matchedUser && typeof window !== 'undefined') {
-        try {
-          const cachedRaw = localStorage.getItem('app_users_v1') || localStorage.getItem('app_users_cache_v1');
-          if (cachedRaw) {
-            const cachedArr = JSON.parse(cachedRaw);
-            if (Array.isArray(cachedArr) && cachedArr.length > 0) {
-              const found = cachedArr.find(checkMatch);
-              if (found) matchedUser = mapUserFromDb(found);
-            }
-          }
-        } catch (cacheErr) {
-          console.warn("Lỗi đọc cache local:", cacheErr);
-        }
-      }
-
-      // 5. Dự phòng cấp cuối: Kiểm tra trong danh sách mặc định MOCK_USERS
-      if (!matchedUser) {
-        const found = MOCK_USERS.find(checkMatch);
-        if (found) matchedUser = mapUserFromDb(found);
-      }
-
-      if (matchedUser) {
+      if (result.status === 'SUCCESS' && result.user) {
         if (rememberMe) {
           localStorage.setItem('saved_username', username.trim());
         } else {
           localStorage.removeItem('saved_username');
         }
-        onLogin(matchedUser);
+        onLogin(result.user);
       } else {
-        setError('Tên đăng nhập hoặc mật khẩu không chính xác.');
+        if (result.errorDetails) {
+          console.error("🔍 [Chi tiết lỗi xác thực Supabase]:", result.errorDetails);
+        }
+        setError(result.message || 'Đã xảy ra lỗi không xác định.');
       }
-    } catch (err) {
-      console.error("Lỗi khi xử lý đăng nhập:", err);
+    } catch (err: any) {
+      console.error("Lỗi hệ thống khi xác thực tài khoản:", err);
       setError('Đã xảy ra lỗi khi xác thực tài khoản. Vui lòng thử lại.');
     } finally {
       setIsLoading(false);

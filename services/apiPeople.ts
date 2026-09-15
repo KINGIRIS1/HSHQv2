@@ -291,6 +291,152 @@ export const saveUserApi = async (user: User, isUpdate: boolean): Promise<User |
     return savedUser;
 };
 
+export interface CloudAuthResult {
+    status: 'SUCCESS' | 'INVALID_CREDENTIALS' | 'ACCOUNT_DISABLED' | 'NETWORK_ERROR' | 'DB_ERROR';
+    user?: User;
+    message?: string;
+    errorDetails?: any;
+}
+
+/**
+ * Hàm xác thực tài khoản trực tiếp với Supabase Cloud dành cho máy mới / trình duyệt mới.
+ * Tuân thủ nghiêm ngặt 3 trường hợp phản hồi theo yêu cầu hệ thống.
+ */
+export const authenticateUserCloud = async (usernameInput: string, passwordInput: string): Promise<CloudAuthResult> => {
+    // 1. Kiểm tra cấu hình môi trường kết nối Supabase
+    if (!isConfigured || !supabase) {
+        return {
+            status: 'NETWORK_ERROR',
+            message: 'Không thể kết nối máy chủ. Vui lòng kiểm tra kết nối mạng và thử lại.'
+        };
+    }
+
+    const cleanU = usernameInput.normalize('NFC').trim().toLowerCase();
+    const cleanP = passwordInput.normalize('NFC').trim();
+
+    if (!cleanU || !cleanP) {
+        return {
+            status: 'INVALID_CREDENTIALS',
+            message: 'Vui lòng nhập đầy đủ tên đăng nhập và mật khẩu.'
+        };
+    }
+
+    let cloudUsers: User[] = [];
+    let querySuccessCount = 0;
+    let lastNetworkError: any = null;
+    let lastDbError: any = null;
+
+    // 2. Truy vấn trực tiếp từ bảng users trên Supabase Cloud
+    try {
+        const { data, error } = await supabase.from('users').select('*');
+        if (error) {
+            console.error("🔒 [Supabase Auth Debug] Lỗi truy vấn bảng `users`:", error);
+            lastDbError = error;
+        } else if (Array.isArray(data)) {
+            querySuccessCount++;
+            data.forEach(item => {
+                const mapped = mapUserFromDb(item);
+                if (mapped.username) cloudUsers.push(mapped);
+            });
+        }
+    } catch (e: any) {
+        console.error("🌐 [Supabase Auth Debug] Lỗi mạng khi đọc bảng `users`:", e);
+        lastNetworkError = e;
+    }
+
+    // 3. Truy vấn trực tiếp từ system_settings (users_config) để đảm bảo đồng bộ kép
+    try {
+        const configVal = await getSystemSetting('users_config');
+        if (configVal) {
+            querySuccessCount++;
+            try {
+                const parsed = JSON.parse(configVal);
+                if (Array.isArray(parsed)) {
+                    parsed.forEach(item => {
+                        const mapped = mapUserFromDb(item);
+                        if (mapped.username) cloudUsers.push(mapped);
+                    });
+                }
+            } catch (pErr) {
+                console.warn("Parse users_config JSON warning:", pErr);
+            }
+        } else if (!lastDbError && !lastNetworkError) {
+            querySuccessCount++;
+        }
+    } catch (e: any) {
+        console.error("🌐 [Supabase Auth Debug] Lỗi mạng khi đọc `system_settings`:", e);
+        if (!lastNetworkError) lastNetworkError = e;
+    }
+
+    // 4. Phân loại 3 trường hợp lỗi kết nối / RLS theo đúng yêu cầu:
+    if (querySuccessCount === 0) {
+        // Trường hợp 2: Lỗi mạng / Không kết nối được Supabase
+        if (lastNetworkError || (!window.navigator.onLine)) {
+            return {
+                status: 'NETWORK_ERROR',
+                message: 'Không thể kết nối máy chủ. Vui lòng kiểm tra kết nối mạng và thử lại.',
+                errorDetails: lastNetworkError
+            };
+        }
+        // Trường hợp 3: Lỗi RLS / Database / Query Supabase
+        if (lastDbError) {
+            return {
+                status: 'DB_ERROR',
+                message: 'Không thể xác thực tài khoản từ máy chủ. Vui lòng liên hệ quản trị hệ thống.',
+                errorDetails: lastDbError
+            };
+        }
+        return {
+            status: 'NETWORK_ERROR',
+            message: 'Không thể kết nối máy chủ. Vui lòng kiểm tra kết nối mạng và thử lại.'
+        };
+    }
+
+    // Trường hợp 1: Supabase hoạt động bình thường -> Xác thực tài khoản Cloud
+    const userMap = new Map<string, User>();
+    cloudUsers.forEach(u => {
+        const key = (u.username || '').normalize('NFC').trim().toLowerCase();
+        if (key) {
+            const existing = userMap.get(key);
+            if (!existing || (!existing.password && u.password)) {
+                userMap.set(key, u);
+            }
+        }
+    });
+
+    const targetUser = userMap.get(cleanU);
+
+    // Không tìm thấy tài khoản
+    if (!targetUser) {
+        return {
+            status: 'INVALID_CREDENTIALS',
+            message: 'Tên đăng nhập hoặc mật khẩu không chính xác.'
+        };
+    }
+
+    // Mật khẩu không đúng
+    const dbPassword = (targetUser.password || '').normalize('NFC').trim();
+    if (dbPassword !== cleanP) {
+        return {
+            status: 'INVALID_CREDENTIALS',
+            message: 'Tên đăng nhập hoặc mật khẩu không chính xác.'
+        };
+    }
+
+    // Tài khoản bị vô hiệu hóa / active = false
+    if (targetUser.active === false) {
+        return {
+            status: 'ACCOUNT_DISABLED',
+            message: 'Tài khoản đã bị vô hiệu hóa hoặc bị khóa. Vui lòng liên hệ quản trị viên.'
+        };
+    }
+
+    return {
+        status: 'SUCCESS',
+        user: targetUser
+    };
+};
+
 export const deleteUserApi = async (username: string): Promise<boolean> => {
     let success = true;
     const cleanU = username.normalize('NFC').trim().toLowerCase();

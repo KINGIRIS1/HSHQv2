@@ -145,6 +145,7 @@ export interface User {
   name: string;
   role: UserRole;
   employeeId?: string;
+  active?: boolean;
 }
 
 export interface Employee {

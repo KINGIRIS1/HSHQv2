@@ -725,11 +725,13 @@ export const mapUserToDb = (u: User) => ({
     name: u.name,
     role: u.role,
     employeeId: u.employeeId || null,
-    employee_id: u.employeeId || null
+    employee_id: u.employeeId || null,
+    active: u.active !== undefined ? u.active : true,
+    is_active: u.active !== undefined ? u.active : true
 });
 
 export const mapUserFromDb = (u: any): User => {
-    if (!u) return { username: '', password: '', name: '', role: 'USER' as any };
+    if (!u) return { username: '', password: '', name: '', role: 'USER' as any, active: true };
     
     const rawUsername = u.username || u.user_name || u.userName || u.user || u.account || u.ten_dang_nhap || u.tendangnhap || '';
     const rawPassword = u.password !== undefined && u.password !== null ? u.password : 
@@ -740,13 +742,18 @@ export const mapUserFromDb = (u: any): User => {
     const rawName = u.name || u.display_name || u.displayName || u.ho_ten || u.hoten || u.full_name || u.fullname || rawUsername || '';
     const rawRole = u.role || u.user_role || u.userRole || u.vai_tro || u.vaitro || 'USER';
     const rawEmpId = u.employeeId || u.employeeid || u.employee_id || u.ma_nv || u.manv || '';
+    const rawActive = u.active !== undefined ? Boolean(u.active) :
+                      (u.is_active !== undefined ? Boolean(u.is_active) :
+                      (u.trang_thai !== undefined ? (String(u.trang_thai) === 'true' || String(u.trang_thai) === '1' || u.trang_thai === true) : true));
 
     return {
+        id: u.id ? String(u.id) : undefined,
         username: String(rawUsername).normalize('NFC').trim(),
         password: String(rawPassword).normalize('NFC').trim(),
         name: String(rawName).normalize('NFC').trim(),
         role: String(rawRole).trim().toUpperCase() as any,
-        employeeId: String(rawEmpId).trim()
+        employeeId: String(rawEmpId).trim(),
+        active: rawActive
     };
 };
 
