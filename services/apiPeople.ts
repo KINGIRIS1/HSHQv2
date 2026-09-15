@@ -6,7 +6,12 @@ import { logError, getFromCache, saveToCache, CACHE_KEYS, mapEmployeeFromDb, map
 import { getSystemSetting, saveSystemSetting } from './apiSystem';
 
 // --- EMPLOYEES ---
-export const fetchEmployees = async (): Promise<Employee[]> => {
+
+/**
+ * Tải trực tiếp danh sách nhân viên thô từ CSDL (bảng employees & system_settings)
+ * KHÔNG gọi các hàm liên quan tới Users để tránh đệ quy chéo (circular promise hang)
+ */
+export const fetchRawEmployeesOnly = async (): Promise<Employee[]> => {
     let cloudEmps: Employee[] = [];
 
     if (isConfigured && supabase) {
@@ -37,15 +42,23 @@ export const fetchEmployees = async (): Promise<Employee[]> => {
         } catch (e) {
             console.warn("Lỗi fetch system_settings employees_config:", e);
         }
+    }
 
-        // 3. TỰ ĐỘNG BỔ SUNG TỪ TÀI KHOẢN NGƯỜI DÙNG (USERS / USERS_CONFIG)
-        // Mỗi tài khoản User trong hệ thống (NV15, NV497...) chính là một Cán bộ / Nhân viên!
+    return cloudEmps;
+};
+
+export const fetchEmployees = async (): Promise<Employee[]> => {
+    let cloudEmps = await fetchRawEmployeesOnly();
+
+    if (isConfigured && supabase) {
+        // Tự động bổ sung từ bảng users trên DB trực tiếp (TRUY VẤN TRỰC TIẾP bảng users, KHÔNG gọi fetchUsersDirectFromDb để tránh đệ quy)
         try {
-            const usersList = await fetchUsersDirectFromDb();
-            if (Array.isArray(usersList) && usersList.length > 0) {
-                usersList.forEach(u => {
-                    const empId = (u.employeeId || u.username || '').trim();
-                    const empName = (u.name || u.username || '').trim();
+            const { data, error } = await supabase.from('users').select('*');
+            if (!error && Array.isArray(data) && data.length > 0) {
+                data.forEach(u => {
+                    const mappedUser = mapUserFromDb(u);
+                    const empId = (mappedUser.employeeId || mappedUser.username || '').trim();
+                    const empName = (mappedUser.name || mappedUser.username || '').trim();
                     if (empId && empName && empName.toLowerCase() !== empId.toLowerCase()) {
                         const exists = cloudEmps.some(e => 
                             (e.id || '').trim().toLowerCase() === empId.toLowerCase() || 
@@ -55,7 +68,7 @@ export const fetchEmployees = async (): Promise<Employee[]> => {
                             cloudEmps.push({
                                 id: empId,
                                 name: empName,
-                                department: String(u.role) === 'SURVEYOR' ? 'Tổ Đo đạc' : 'Phòng Chuyên môn',
+                                department: String(mappedUser.role) === 'SURVEYOR' ? 'Tổ Đo đạc' : 'Phòng Chuyên môn',
                                 position: 'Chuyên viên',
                                 managedWards: []
                             });
@@ -127,9 +140,12 @@ export const enrichUserWithEmployees = async (user: User, existingEmployees?: Em
     let employeesList = existingEmployees;
     if (!employeesList || employeesList.length === 0) {
         try {
-            employeesList = await fetchEmployees();
+            employeesList = await fetchRawEmployeesOnly();
+            if (!employeesList || employeesList.length === 0) {
+                employeesList = getFromCache<Employee[]>(CACHE_KEYS.EMPLOYEES, MOCK_EMPLOYEES);
+            }
         } catch (e) {
-            console.warn("Lỗi fetchEmployees khi enrich user:", e);
+            console.warn("Lỗi fetchRawEmployeesOnly khi enrich user:", e);
             employeesList = [];
         }
     }
@@ -189,7 +205,10 @@ export const enrichUsersList = async (usersList: User[], existingEmployees?: Emp
     let employeesList = existingEmployees;
     if (!employeesList || employeesList.length === 0) {
         try {
-            employeesList = await fetchEmployees();
+            employeesList = await fetchRawEmployeesOnly();
+            if (!employeesList || employeesList.length === 0) {
+                employeesList = getFromCache<Employee[]>(CACHE_KEYS.EMPLOYEES, MOCK_EMPLOYEES);
+            }
         } catch (e) {
             employeesList = [];
         }
