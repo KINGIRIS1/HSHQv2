@@ -1494,6 +1494,7 @@ export function getReceiptReceiverName(
         if (!identifier) return '';
         const trimmed = String(identifier).trim();
         if (!trimmed) return '';
+        const lowerTrimmed = trimmed.toLowerCase();
 
         // Loại trừ tuyệt đối nếu trùng với tên chủ hồ sơ hoặc người nộp ủy quyền
         if (isCustomerOrCitizen(trimmed)) {
@@ -1503,9 +1504,9 @@ export function getReceiptReceiverName(
         // Kiểm tra trong danh sách nhân viên (theo id hoặc name)
         if (employees && employees.length > 0) {
             const emp = employees.find(e => 
-                e.id === trimmed || 
-                e.name?.toLowerCase() === trimmed.toLowerCase() ||
-                (trimmed.length > 4 && e.name && trimmed.toLowerCase().includes(e.name.toLowerCase()))
+                (e.id || '').trim().toLowerCase() === lowerTrimmed || 
+                (e.name || '').trim().toLowerCase() === lowerTrimmed ||
+                (trimmed.length > 4 && e.name && lowerTrimmed.includes(e.name.toLowerCase()))
             );
             if (emp && emp.name) return emp.name;
         }
@@ -1513,11 +1514,11 @@ export function getReceiptReceiverName(
         // Kiểm tra trong danh sách tài khoản (theo id, employeeId, username, name)
         if (users && users.length > 0) {
             const usr = users.find(u => 
-                u.id === trimmed || 
-                u.employeeId === trimmed || 
-                u.username?.toLowerCase() === trimmed.toLowerCase() || 
-                u.name?.toLowerCase() === trimmed.toLowerCase() ||
-                (trimmed.length > 4 && u.name && trimmed.toLowerCase().includes(u.name.toLowerCase()))
+                (u.id || '').trim().toLowerCase() === lowerTrimmed || 
+                (u.employeeId || '').trim().toLowerCase() === lowerTrimmed || 
+                (u.username || '').trim().toLowerCase() === lowerTrimmed || 
+                (u.name || '').trim().toLowerCase() === lowerTrimmed ||
+                (trimmed.length > 4 && u.name && lowerTrimmed.includes(u.name.toLowerCase()))
             );
             if (usr && (usr.name || usr.username)) return usr.name || usr.username;
         }

@@ -35,6 +35,7 @@ export const RegistrationRecordRow: React.FC<RegistrationRecordRowProps> = ({
   onEdit,
   onDelete,
   onAssign,
+  employees = [],
 }) => {
   const isOverdue = React.useMemo(() => {
     if (
@@ -125,10 +126,20 @@ export const RegistrationRecordRow: React.FC<RegistrationRecordRowProps> = ({
       {/* Cán bộ thụ lý */}
       <td className="py-2.5 px-3">
         {record.assignedTo ? (
-          <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-800 font-medium">
-            <User size={11} className="text-slate-500" />
-            <span>{record.assignedTo}</span>
-          </div>
+          (() => {
+            const cleanKey = (record.assignedTo || '').trim().toLowerCase();
+            const emp = (employees || []).find(e => 
+              (e.id || '').trim().toLowerCase() === cleanKey || 
+              (e.name || '').trim().toLowerCase() === cleanKey
+            );
+            const displayName = emp && emp.name ? emp.name : record.assignedTo;
+            return (
+              <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-800 font-medium">
+                <User size={11} className="text-slate-500" />
+                <span title={displayName}>{displayName}</span>
+              </div>
+            );
+          })()
         ) : (
           <button
             type="button"

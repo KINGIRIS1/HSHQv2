@@ -7,22 +7,74 @@ import { getSystemSetting, saveSystemSetting } from './apiSystem';
 
 // --- EMPLOYEES ---
 export const fetchEmployees = async (): Promise<Employee[]> => {
-    if (!isConfigured) return getFromCache(CACHE_KEYS.EMPLOYEES, MOCK_EMPLOYEES);
-    try {
-        const { data, error } = await supabase.from('employees').select('*');
-        if (error) throw error;
-        if (Array.isArray(data) && data.length > 0) {
-            const mapped = data.map(mapEmployeeFromDb);
-            saveToCache(CACHE_KEYS.EMPLOYEES, mapped);
-            return mapped;
+    let cloudEmps: Employee[] = [];
+
+    if (isConfigured && supabase) {
+        // 1. Tải từ bảng employees trên Supabase Cloud
+        try {
+            const { data, error } = await supabase.from('employees').select('*');
+            if (!error && Array.isArray(data) && data.length > 0) {
+                cloudEmps = data.map(mapEmployeeFromDb);
+            }
+        } catch (e) {
+            console.warn("Lỗi fetch bảng employees:", e);
         }
-        const cached = getFromCache<Employee[]>(CACHE_KEYS.EMPLOYEES, MOCK_EMPLOYEES);
-        return cached && cached.length > 0 ? cached : MOCK_EMPLOYEES;
-    } catch (error) {
-        logError("fetchEmployees", error, true);
-        const cached = getFromCache<Employee[]>(CACHE_KEYS.EMPLOYEES, MOCK_EMPLOYEES);
-        return cached && cached.length > 0 ? cached : MOCK_EMPLOYEES;
+
+        // 2. Tải từ system_settings (key: employees_config)
+        try {
+            const configVal = await getSystemSetting('employees_config');
+            if (configVal) {
+                const parsed = JSON.parse(configVal);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    parsed.forEach(e => {
+                        const mapped = mapEmployeeFromDb(e);
+                        if (mapped.id && !cloudEmps.some(existing => (existing.id || '').toLowerCase() === (mapped.id || '').toLowerCase())) {
+                            cloudEmps.push(mapped);
+                        }
+                    });
+                }
+            }
+        } catch (e) {
+            console.warn("Lỗi fetch system_settings employees_config:", e);
+        }
+
+        // 3. TỰ ĐỘNG BỔ SUNG TỪ TÀI KHOẢN NGƯỜI DÙNG (USERS / USERS_CONFIG)
+        // Mỗi tài khoản User trong hệ thống (NV15, NV497...) chính là một Cán bộ / Nhân viên!
+        try {
+            const usersList = await fetchUsersDirectFromDb();
+            if (Array.isArray(usersList) && usersList.length > 0) {
+                usersList.forEach(u => {
+                    const empId = (u.employeeId || u.username || '').trim();
+                    const empName = (u.name || u.username || '').trim();
+                    if (empId && empName && empName.toLowerCase() !== empId.toLowerCase()) {
+                        const exists = cloudEmps.some(e => 
+                            (e.id || '').trim().toLowerCase() === empId.toLowerCase() || 
+                            (e.name || '').trim().toLowerCase() === empName.toLowerCase()
+                        );
+                        if (!exists) {
+                            cloudEmps.push({
+                                id: empId,
+                                name: empName,
+                                department: String(u.role) === 'SURVEYOR' ? 'Tổ Đo đạc' : 'Phòng Chuyên môn',
+                                position: 'Chuyên viên',
+                                managedWards: []
+                            });
+                        }
+                    }
+                });
+            }
+        } catch (e) {
+            console.warn("Lỗi tự động tổng hợp danh sách nhân viên từ danh sách Users:", e);
+        }
     }
+
+    if (cloudEmps.length > 0) {
+        saveToCache(CACHE_KEYS.EMPLOYEES, cloudEmps);
+        return cloudEmps;
+    }
+
+    const cached = getFromCache<Employee[]>(CACHE_KEYS.EMPLOYEES, MOCK_EMPLOYEES);
+    return cached && cached.length > 0 ? cached : MOCK_EMPLOYEES;
 };
 
 export const saveEmployeeApi = async (employee: Employee, isUpdate: boolean): Promise<Employee | null> => {

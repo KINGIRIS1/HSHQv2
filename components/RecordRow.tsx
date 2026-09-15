@@ -208,9 +208,13 @@ const RecordRow: React.FC<RecordRowProps> = ({
                     break;
             }
 
-            const emp = employees.find(e => e.id === personId || e.name === personId);
+            const cleanPerson = (personId || '').trim().toLowerCase();
+            const emp = employees.find(e => 
+                (e.id || '').trim().toLowerCase() === cleanPerson || 
+                (e.name || '').trim().toLowerCase() === cleanPerson
+            );
             return {
-                name: emp ? emp.name : (personId || ''),
+                name: emp && emp.name ? emp.name : (personId || ''),
                 date: dateVal
             };
         })();
