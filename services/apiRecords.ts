@@ -1,7 +1,7 @@
 import { supabase, isConfigured } from './supabaseClient';
 import { RecordFile, RecordStatus } from '../types';
 import { MOCK_RECORDS, API_BASE_URL, isArchiveRecordType, getShortRecordType } from '../constants';
-import { logError, getFromCache, saveToCache, CACHE_KEYS, sanitizeData, sanitizePayloadFor22P02, normalizeCode, mapRecordFromDb, keepOnlyDate } from './apiCore';
+import { logError, getFromCache, saveToCache, CACHE_KEYS, sanitizeData, sanitizePayloadFor22P02, sanitizePayloadForDateErrors, normalizeCode, mapRecordFromDb, keepOnlyDate } from './apiCore';
 import { getIndexedDBItem } from './storageService';
 import { addPendingRecord, removePendingRecord, getPendingRecords, syncPendingRecordsToCloud, generateStandardUUID, isValidUUID } from './syncQueueService';
 
@@ -569,6 +569,15 @@ export const createRecordApi = async (record: RecordFile): Promise<RecordFile | 
             error = res.error;
         }
 
+        // 1.1. Thử lại nếu lỗi định dạng ngày tháng 22007/22008
+        if (error && (error.code === '22007' || error.code === '22008' || String(error.message || '').includes('date') || String(error.message || '').includes('timestamp') || String(error.message || '').includes('time'))) {
+            console.warn(`⚠️ [Date Fallback] Thử lại insert vào ${targetTable} với dữ liệu ngày tháng đã làm sạch...`);
+            const fallbackDatePayload = sanitizePayloadForDateErrors(payload);
+            const res = await supabase.from(targetTable).insert([fallbackDatePayload]).select();
+            data = res.data;
+            error = res.error;
+        }
+
         // 2. Thử lại nếu thiếu cột trên Supabase (PGRST204 / 42703)
         if (error && (error.code === 'PGRST204' || String(error.code) === '42703' || (error.message && String(error.message).includes('does not exist')))) {
             console.warn(`⚠️ [Fallback] Bảng ${targetTable} thiếu một số cột mới. Thử lại không kèm cột tùy chọn...`);
@@ -644,6 +653,14 @@ export const updateRecordApi = async (record: RecordFile): Promise<RecordFile | 
                     console.warn(`⚠️ [22P02 Fallback] Retrying update on ${tbl} with 22P02 sanitized payload...`);
                     const fallback22P02Payload = sanitizePayloadFor22P02(payload);
                     const res = await supabase.from(tbl).update(fallback22P02Payload).eq('id', record.id).select();
+                    data = res.data;
+                    error = res.error;
+                }
+
+                if (error && (error.code === '22007' || error.code === '22008' || String(error.message || '').includes('date') || String(error.message || '').includes('timestamp') || String(error.message || '').includes('time'))) {
+                    console.warn(`⚠️ [Date Fallback] Retrying update on ${tbl} with date sanitized payload...`);
+                    const fallbackDatePayload = sanitizePayloadForDateErrors(payload);
+                    const res = await supabase.from(tbl).update(fallbackDatePayload).eq('id', record.id).select();
                     data = res.data;
                     error = res.error;
                 }
@@ -735,6 +752,14 @@ export const updateRecordFieldsApi = async (id: string, fields: Partial<RecordFi
                     console.warn(`⚠️ [22P02 Fallback] Retrying updateRecordFieldsApi on ${tbl} with 22P02 sanitized payload...`);
                     const fallback22P02Payload = sanitizePayloadFor22P02(payload);
                     const res = await supabase.from(tbl).update(fallback22P02Payload).eq('id', id).select();
+                    data = res.data;
+                    error = res.error;
+                }
+
+                if (error && (error.code === '22007' || error.code === '22008' || String(error.message || '').includes('date') || String(error.message || '').includes('timestamp') || String(error.message || '').includes('time'))) {
+                    console.warn(`⚠️ [Date Fallback] Retrying updateRecordFieldsApi on ${tbl} with date sanitized payload...`);
+                    const fallbackDatePayload = sanitizePayloadForDateErrors(payload);
+                    const res = await supabase.from(tbl).update(fallbackDatePayload).eq('id', id).select();
                     data = res.data;
                     error = res.error;
                 }
@@ -859,6 +884,13 @@ export const createRecordsBatchApi = async (records: RecordFile[], onProgress?: 
                     console.warn(`⚠️ [22P02 Fallback] Retrying batch insert into ${table} chunk ${i} with 22P02 sanitized payload...`);
                     const fallback22P02 = sanitizePayloadFor22P02(chunk);
                     const res = await supabase.from(table).insert(fallback22P02);
+                    error = res.error;
+                }
+
+                if (error && (error.code === '22007' || error.code === '22008' || String(error.message || '').includes('date') || String(error.message || '').includes('timestamp') || String(error.message || '').includes('time'))) {
+                    console.warn(`⚠️ [Date Fallback] Retrying batch insert into ${table} chunk ${i} with date sanitized payload...`);
+                    const fallbackDate = sanitizePayloadForDateErrors(chunk);
+                    const res = await supabase.from(table).insert(fallbackDate);
                     error = res.error;
                 }
 
