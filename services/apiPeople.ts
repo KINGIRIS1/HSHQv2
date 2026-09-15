@@ -2,7 +2,7 @@
 import { supabase, isConfigured } from './supabaseClient';
 import { Employee, User } from '../types';
 import { MOCK_EMPLOYEES, MOCK_USERS } from '../constants';
-import { logError, getFromCache, saveToCache, CACHE_KEYS, mapEmployeeFromDb, mapEmployeeToDb, mapUserFromDb, mapUserToDb } from './apiCore';
+import { logError, getFromCache, saveToCache, CACHE_KEYS, mapEmployeeFromDb, mapEmployeeToDb, mapUserFromDb, mapUserToDb, normalizeDepartment, normalizePosition } from './apiCore';
 import { getSystemSetting, saveSystemSetting } from './apiSystem';
 
 // --- EMPLOYEES ---
@@ -65,11 +65,17 @@ export const fetchEmployees = async (): Promise<Employee[]> => {
                             (e.name || '').trim().toLowerCase() === empName.toLowerCase()
                         );
                         if (!exists) {
+                            const userRoleStr = String(mappedUser.role).toUpperCase();
+                            let defaultDept = 'Tổ Hành chính';
+                            if (userRoleStr === 'SURVEYOR' || userRoleStr === 'STAFF') defaultDept = 'Tổ Đo đạc';
+                            else if (userRoleStr === 'ARCHIVE_STAFF') defaultDept = 'Tổ Lưu trữ';
+                            else if (userRoleStr === 'SUBADMIN' || userRoleStr === 'ADMIN') defaultDept = 'Ban Giám đốc';
+
                             cloudEmps.push({
                                 id: empId,
                                 name: empName,
-                                department: String(mappedUser.role) === 'SURVEYOR' ? 'Tổ Đo đạc' : 'Phòng Chuyên môn',
-                                position: 'Chuyên viên',
+                                department: normalizeDepartment(defaultDept),
+                                position: normalizePosition(userRoleStr === 'SUBADMIN' || userRoleStr === 'ADMIN' ? 'Tổ Trưởng' : 'Nhân viên'),
                                 managedWards: []
                             });
                         }

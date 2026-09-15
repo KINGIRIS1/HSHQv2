@@ -682,6 +682,55 @@ export const mapContractFromDb = (c: any): Contract => ({
     liquidationAmount: c.liquidationAmount || c.liquidation_amount
 });
 
+export const normalizeDepartment = (rawDept: any): string => {
+    if (!rawDept) return 'Tổ Đo đạc';
+    const str = String(rawDept).normalize('NFC').trim();
+    if (!str) return 'Tổ Đo đạc';
+    const lower = str.toLowerCase();
+
+    if (lower.includes('giám đốc') || lower.includes('lãnh đạo') || lower.includes('subadmin') || lower.includes('admin')) {
+        return 'Ban Giám đốc';
+    }
+    if (lower.includes('lưu trữ') || lower.includes('thông tin') || lower.includes('archive')) {
+        return 'Tổ Lưu trữ';
+    }
+    if (lower.includes('cấp giấy') || lower.includes('đăng ký') || lower.includes('biến động') || lower.includes('đk&cg')) {
+        return 'Tổ Cấp giấy';
+    }
+    if (lower.includes('hành chính') || lower.includes('một cửa') || lower.includes('quản trị')) {
+        return 'Tổ Hành chính';
+    }
+    if (lower.includes('đo đạc') || lower.includes('đo dạc') || lower.includes('sơ đồ') || lower.includes('surveyor') || lower.includes('trích đo')) {
+        return 'Tổ Đo đạc';
+    }
+
+    const standardDepts = ['Ban Giám đốc', 'Tổ Lưu trữ', 'Tổ Đo đạc', 'Tổ Cấp giấy', 'Tổ Hành chính'];
+    const matched = standardDepts.find(d => d.toLowerCase() === lower);
+    if (matched) return matched;
+
+    return str;
+};
+
+export const normalizePosition = (rawPos: any): string => {
+    if (!rawPos) return 'Nhân viên';
+    const str = String(rawPos).normalize('NFC').trim();
+    if (!str) return 'Nhân viên';
+    const lower = str.toLowerCase();
+
+    if (lower.includes('phó giám đốc')) return 'Phó Giám Đốc';
+    if (lower.includes('giám đốc')) return 'Giám Đốc';
+    if (lower.includes('tổ trưởng') || lower.includes('trưởng tổ')) return 'Tổ Trưởng';
+    if (lower.includes('tổ phó') || lower.includes('phó tổ')) return 'Tổ Phó';
+    if (lower.includes('viên chức')) return 'Viên chức';
+    if (lower.includes('nhân viên') || lower.includes('chuyên viên')) return 'Nhân viên';
+
+    const standardPositions = ['Giám Đốc', 'Phó Giám Đốc', 'Tổ Trưởng', 'Tổ Phó', 'Viên chức', 'Nhân viên'];
+    const matched = standardPositions.find(p => p.toLowerCase() === lower);
+    if (matched) return matched;
+
+    return str;
+};
+
 export const mapEmployeeToDb = (e: Employee) => ({
     id: e.id,
     name: e.name,
@@ -691,9 +740,9 @@ export const mapEmployeeToDb = (e: Employee) => ({
 });
 
 export const mapEmployeeFromDb = (e: any): Employee => {
-    if (!e) return { id: '', name: '', department: '', position: '', managedWards: [] };
+    if (!e) return { id: '', name: '', department: 'Tổ Đo đạc', position: 'Nhân viên', managedWards: [] };
 
-    let parsedWards = [];
+    let parsedWards: string[] = [];
     const rawWards = e.managedWards || e.managed_wards || e.managedwards || e.phuong_xa;
     if (typeof rawWards === 'string') {
         try {
@@ -702,7 +751,7 @@ export const mapEmployeeFromDb = (e: any): Employee => {
             parsedWards = rawWards.split(',').map((w: string) => w.trim()).filter(Boolean);
         }
     } else if (Array.isArray(rawWards)) {
-        parsedWards = rawWards;
+        parsedWards = rawWards.map((w: any) => String(w).trim()).filter(Boolean);
     }
     
     const rawId = e.id || e.employee_id || e.employeeId || e.ma_nv || e.manv || e.code || '';
@@ -710,11 +759,14 @@ export const mapEmployeeFromDb = (e: any): Employee => {
     const rawDept = e.department || e.phong_ban || e.phongban || e.bo_phan || e.bophan || '';
     const rawPos = e.position || e.chuc_vu || e.chucvu || '';
 
+    const cleanDept = normalizeDepartment(rawDept);
+    const cleanPos = normalizePosition(rawPos);
+
     return {
         id: String(rawId).normalize('NFC').trim(),
         name: String(rawName).normalize('NFC').trim(),
-        department: String(rawDept).normalize('NFC').trim(),
-        position: String(rawPos).normalize('NFC').trim(),
+        department: cleanDept,
+        position: cleanPos,
         managedWards: parsedWards
     };
 };
