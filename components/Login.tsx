@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { User } from '../types';
 import { LogIn, Eye, EyeOff, Check } from 'lucide-react';
 import { APP_VERSION, MOCK_USERS } from '../constants';
-import { fetchUsers } from '../services/apiPeople';
+import { fetchUsers, fetchUsersDirectFromDb, findUserInDbDirectly } from '../services/apiPeople';
+import { mapUserFromDb } from '../services/apiCore';
 
 interface LoginProps {
   onLogin: (user: User) => void;
@@ -30,56 +31,78 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
     setError('');
     setIsLoading(true);
 
-    const submittedUsername = username.trim().toLowerCase();
-    const submittedPassword = password.trim();
+    // Chuẩn hóa Unicode NFC & xoá khoảng trắng thừa
+    const submittedUsername = username.normalize('NFC').trim().toLowerCase();
+    const submittedPassword = password.normalize('NFC').trim();
+
+    if (!submittedUsername || !submittedPassword) {
+      setError('Vui lòng nhập đầy đủ tên đăng nhập và mật khẩu.');
+      setIsLoading(false);
+      return;
+    }
+
+    const checkMatch = (u: any): boolean => {
+      if (!u) return false;
+      const mapped = mapUserFromDb(u);
+      const dbU = mapped.username.normalize('NFC').trim().toLowerCase();
+      const dbP = mapped.password.normalize('NFC').trim();
+      return dbU === submittedUsername && dbP === submittedPassword;
+    };
 
     try {
-      // 1. Kiểm tra trong danh sách users prop truyền vào từ App
-      let matchedUser = users && users.length > 0 ? users.find(u => {
-        const dbUsername = (u.username || '').trim().toLowerCase();
-        const dbPassword = (u.password || '').trim();
-        return dbUsername === submittedUsername && dbPassword === submittedPassword;
-      }) : null;
+      let matchedUser: User | null = null;
 
-      // 2. Dự phòng 1: Kiểm tra trong bộ nhớ đệm cache (phòng khi prop users chưa kịp nạp)
-      if (!matchedUser && typeof window !== 'undefined') {
-        try {
-          const cached = JSON.parse(localStorage.getItem('app_users_cache_v1') || '[]');
-          if (Array.isArray(cached) && cached.length > 0) {
-            matchedUser = cached.find((u: any) => {
-              const dbUsername = (u.username || u.user_name || '').trim().toLowerCase();
-              const dbPassword = (u.password !== undefined ? String(u.password) : (u.pass !== undefined ? String(u.pass) : '')).trim();
-              return dbUsername === submittedUsername && dbPassword === submittedPassword;
-            });
-          }
-        } catch (e) {
-          console.warn("Lỗi đọc user cache:", e);
-        }
+      // 1. Đối chiếu trong danh sách `users` truyền từ App
+      if (Array.isArray(users) && users.length > 0) {
+        const found = users.find(checkMatch);
+        if (found) matchedUser = mapUserFromDb(found);
       }
 
-      // 3. Dự phòng 2 CẤP THIẾT DÀNH CHO TRÌNH DUYỆT ẨN DANH: Truy vấn trực tiếp danh sách tài khoản từ Supabase CSDL
+      // 2. TRÌNH DUYỆT ẨN DANH / BỘ NHỚ ĐỆM TRỐNG: Truy vấn toàn bộ danh sách người dùng TRỰC TIẾP từ Supabase (bỏ qua cache)
       if (!matchedUser) {
         try {
-          const dbUsers = await fetchUsers();
-          if (Array.isArray(dbUsers) && dbUsers.length > 0) {
-            matchedUser = dbUsers.find(u => {
-              const dbUsername = (u.username || '').trim().toLowerCase();
-              const dbPassword = (u.password || '').trim();
-              return dbUsername === submittedUsername && dbPassword === submittedPassword;
-            });
+          const freshDbUsers = await fetchUsersDirectFromDb();
+          if (Array.isArray(freshDbUsers) && freshDbUsers.length > 0) {
+            const found = freshDbUsers.find(checkMatch);
+            if (found) matchedUser = mapUserFromDb(found);
           }
         } catch (dbErr) {
-          console.warn("Lỗi tải danh sách người dùng từ CSDL:", dbErr);
+          console.warn("Lỗi tải danh sách người dùng trực tiếp từ CSDL:", dbErr);
         }
       }
 
-      // 4. Dự phòng cấp cao nhất: Kiểm tra trong danh sách tài khoản mặc định MOCK_USERS
+      // 3. Tìm kiếm ĐÍCH DANH theo tên đăng nhập trên Supabase (phòng trường hợp CSDL trả về danh sách lớn)
       if (!matchedUser) {
-        matchedUser = MOCK_USERS.find(u => {
-          const dbUsername = (u.username || '').trim().toLowerCase();
-          const dbPassword = (u.password || '').trim();
-          return dbUsername === submittedUsername && dbPassword === submittedPassword;
-        });
+        try {
+          const targetedUser = await findUserInDbDirectly(submittedUsername);
+          if (targetedUser && checkMatch(targetedUser)) {
+            matchedUser = targetedUser;
+          }
+        } catch (targetErr) {
+          console.warn("Lỗi tìm kiếm tài khoản đích danh:", targetErr);
+        }
+      }
+
+      // 4. Dự phòng: Kiểm tra trong bộ nhớ đệm cache local (nếu có từ phiên cũ)
+      if (!matchedUser && typeof window !== 'undefined') {
+        try {
+          const cachedRaw = localStorage.getItem('app_users_v1') || localStorage.getItem('app_users_cache_v1');
+          if (cachedRaw) {
+            const cachedArr = JSON.parse(cachedRaw);
+            if (Array.isArray(cachedArr) && cachedArr.length > 0) {
+              const found = cachedArr.find(checkMatch);
+              if (found) matchedUser = mapUserFromDb(found);
+            }
+          }
+        } catch (cacheErr) {
+          console.warn("Lỗi đọc cache local:", cacheErr);
+        }
+      }
+
+      // 5. Dự phòng cấp cuối: Kiểm tra trong danh sách mặc định MOCK_USERS
+      if (!matchedUser) {
+        const found = MOCK_USERS.find(checkMatch);
+        if (found) matchedUser = mapUserFromDb(found);
       }
 
       if (matchedUser) {

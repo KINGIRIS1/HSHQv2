@@ -75,6 +75,51 @@ export const fetchUsers = async (): Promise<User[]> => {
     }
 };
 
+/**
+ * Truy vấn danh sách tài khoản TRỰC TIẾP từ Supabase (bỏ qua cache, phục vụ đăng nhập)
+ */
+export const fetchUsersDirectFromDb = async (): Promise<User[]> => {
+    if (!isConfigured || !supabase) return [];
+    try {
+        const { data, error } = await supabase.from('users').select('*');
+        if (error) {
+            console.warn("fetchUsersDirectFromDb error:", error);
+            return [];
+        }
+        if (Array.isArray(data) && data.length > 0) {
+            const mapped = data.map(mapUserFromDb);
+            saveToCache(CACHE_KEYS.USERS, mapped);
+            return mapped;
+        }
+        return [];
+    } catch (err) {
+        console.warn("fetchUsersDirectFromDb exception:", err);
+        return [];
+    }
+};
+
+/**
+ * Tìm kiếm tài khoản cụ thể trực tiếp trên Supabase (tránh bị lọc đè bởi cache cũ)
+ */
+export const findUserInDbDirectly = async (usernameInput: string): Promise<User | null> => {
+    if (!isConfigured || !supabase) return null;
+    const cleanU = usernameInput.normalize('NFC').trim();
+    if (!cleanU) return null;
+    try {
+        const { data, error } = await supabase
+            .from('users')
+            .select('*')
+            .or(`username.ilike.${cleanU},user_name.ilike.${cleanU},ten_dang_nhap.ilike.${cleanU}`);
+        
+        if (!error && Array.isArray(data) && data.length > 0) {
+            return mapUserFromDb(data[0]);
+        }
+    } catch (e) {
+        console.warn("findUserInDbDirectly error:", e);
+    }
+    return null;
+};
+
 export const saveUserApi = async (user: User, isUpdate: boolean): Promise<User | null> => {
     let savedUser = user;
     if (isConfigured) {

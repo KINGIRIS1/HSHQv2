@@ -727,13 +727,27 @@ export const mapUserToDb = (u: User) => ({
     "employeeId": u.employeeId
 });
 
-export const mapUserFromDb = (u: any): User => ({
-    username: (u.username || u.user_name || u.userName || '').trim(),
-    password: u.password !== undefined ? String(u.password).trim() : (u.pass !== undefined ? String(u.pass).trim() : ''),
-    name: u.name || u.display_name || u.displayName || u.username || '',
-    role: (u.role || 'USER').toUpperCase() as any,
-    employeeId: u.employeeId || u.employeeid || u.employee_id || ''
-});
+export const mapUserFromDb = (u: any): User => {
+    if (!u) return { username: '', password: '', name: '', role: 'USER' as any };
+    
+    const rawUsername = u.username || u.user_name || u.userName || u.user || u.account || u.ten_dang_nhap || u.tendangnhap || '';
+    const rawPassword = u.password !== undefined && u.password !== null ? u.password : 
+                        (u.pass !== undefined && u.pass !== null ? u.pass : 
+                        (u.pass_word !== undefined && u.pass_word !== null ? u.pass_word : 
+                        (u.mat_khau !== undefined && u.mat_khau !== null ? u.mat_khau : 
+                        (u.matkhau !== undefined && u.matkhau !== null ? u.matkhau : ''))));
+    const rawName = u.name || u.display_name || u.displayName || u.ho_ten || u.hoten || u.full_name || u.fullname || rawUsername || '';
+    const rawRole = u.role || u.user_role || u.userRole || u.vai_tro || u.vaitro || 'USER';
+    const rawEmpId = u.employeeId || u.employeeid || u.employee_id || u.ma_nv || u.manv || '';
+
+    return {
+        username: String(rawUsername).normalize('NFC').trim(),
+        password: String(rawPassword).normalize('NFC').trim(),
+        name: String(rawName).normalize('NFC').trim(),
+        role: String(rawRole).trim().toUpperCase() as any,
+        employeeId: String(rawEmpId).trim()
+    };
+};
 
 export const mapPriceFromDb = (item: any): PriceItem => ({
     id: item.id || Math.random().toString(36).substr(2, 9),
