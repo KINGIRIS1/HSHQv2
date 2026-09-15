@@ -189,7 +189,7 @@ export const fetchUsersDirectFromDb = async (): Promise<User[]> => {
     }
 
     try {
-        // 1. Đọc từ bảng users trên Supabase
+        // 1. Đọc từ bảng users trên Supabase (Thẩm quyền cao nhất)
         try {
             const { data, error } = await supabase.from('users').select('*');
             if (!error && Array.isArray(data) && data.length > 0) {
@@ -204,7 +204,7 @@ export const fetchUsersDirectFromDb = async (): Promise<User[]> => {
             console.warn("Direct fetch table users error:", e);
         }
 
-        // 2. Đọc từ system_settings ('users_config') để bổ sung tài khoản nếu bảng users chưa chứa
+        // 2. Đọc từ system_settings ('users_config') CHỈ để bổ sung tài khoản chưa có trong bảng users
         try {
             const configVal = await getSystemSetting('users_config');
             if (configVal) {
@@ -226,25 +226,18 @@ export const fetchUsersDirectFromDb = async (): Promise<User[]> => {
             console.warn("Direct fetch system_settings error:", e);
         }
 
-        const cloudUsers = Array.from(cloudMap.values());
-        if (cloudUsers.length > 0) {
-            // Nạp thêm MOCK_USERS mặc định nếu chưa có trong DB (đảm bảo admin luôn có sẵn)
-            MOCK_USERS.forEach(m => {
-                const key = m.username.normalize('NFC').trim().toLowerCase();
-                if (!cloudMap.has(key)) {
-                    cloudMap.set(key, mapUserFromDb(m));
-                }
-            });
+        // 3. Nạp thêm MOCK_USERS mặc định nếu chưa có trong DB (đảm bảo admin luôn có sẵn)
+        MOCK_USERS.forEach(m => {
+            const key = m.username.normalize('NFC').trim().toLowerCase();
+            if (!cloudMap.has(key)) {
+                cloudMap.set(key, mapUserFromDb(m));
+            }
+        });
 
-            const rawResult = Array.from(cloudMap.values());
-            const enrichedResult = await enrichUsersList(rawResult);
-            saveToCache(CACHE_KEYS.USERS, enrichedResult);
-            return enrichedResult;
-        }
-
-        const cached = getFromCache<User[]>(CACHE_KEYS.USERS, MOCK_USERS);
-        const fallbackUsers = cached && cached.length > 0 ? cached : MOCK_USERS;
-        return enrichUsersList(fallbackUsers);
+        const rawResult = Array.from(cloudMap.values());
+        const enrichedResult = await enrichUsersList(rawResult);
+        saveToCache(CACHE_KEYS.USERS, enrichedResult);
+        return enrichedResult;
     } catch (err) {
         console.warn("fetchUsersDirectFromDb exception:", err);
         const cached = getFromCache<User[]>(CACHE_KEYS.USERS, MOCK_USERS);
@@ -258,20 +251,13 @@ export const fetchUsers = async (): Promise<User[]> => {
 };
 
 /**
- * Tìm kiếm tài khoản cụ thể trực tiếp trên Supabase
+ * Tìm kiếm tài khoản cụ thể trực tiếp trên Supabase (Ưu tiên bảng users)
  */
 export const findUserInDbDirectly = async (usernameInput: string): Promise<User | null> => {
-    const cleanU = usernameInput.normalize('NFC').trim().toLowerCase();
+    const cleanU = (usernameInput || '').normalize('NFC').trim().toLowerCase();
     if (!cleanU) return null;
 
-    // 1. Tìm trong danh sách vừa nạp trực tiếp từ Cloud
-    const allUsers = await fetchUsersDirectFromDb();
-    const matched = allUsers.find(u => u.username.normalize('NFC').trim().toLowerCase() === cleanU);
-    if (matched) {
-        return enrichUserWithEmployees(matched);
-    }
-
-    // 2. Thử tìm qua query trực tiếp trên Supabase
+    // 1. Tìm trực tiếp trong bảng users trên Supabase
     if (isConfigured && supabase) {
         try {
             const { data, error } = await supabase
@@ -280,11 +266,18 @@ export const findUserInDbDirectly = async (usernameInput: string): Promise<User 
                 .ilike('username', cleanU);
             if (!error && Array.isArray(data) && data.length > 0) {
                 const mappedUser = mapUserFromDb(data[0]);
-                return enrichUserWithEmployees(mappedUser);
+                return await enrichUserWithEmployees(mappedUser);
             }
         } catch (e) {
-            console.warn("findUserInDbDirectly query error:", e);
+            console.warn("findUserInDbDirectly direct query error:", e);
         }
+    }
+
+    // 2. Tìm trong danh sách hợp nhất từ Cloud
+    const allUsers = await fetchUsersDirectFromDb();
+    const matched = allUsers.find(u => u.username.normalize('NFC').trim().toLowerCase() === cleanU);
+    if (matched) {
+        return await enrichUserWithEmployees(matched);
     }
 
     return null;
