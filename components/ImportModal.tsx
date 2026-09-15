@@ -3,7 +3,8 @@ import * as XLSX from 'xlsx-js-style';
 import { RecordFile, RecordStatus, Employee, Holiday } from '../types';
 import { RECORD_TYPES, STATUS_LABELS, STATUS_COLORS, getShortRecordType, isArchiveRecordType } from '../constants';
 import { fetchHolidays } from '../services/api';
-import { X, Upload, FileSpreadsheet, Save, Loader2, Check, RefreshCw, PlusCircle } from 'lucide-react';
+import { keepOnlyDate } from '../services/apiCore';
+import { X, Upload, FileSpreadsheet, Save, Loader2, Check, RefreshCw, PlusCircle, AlertTriangle } from 'lucide-react';
 import { calculateDeadlineHelper, migrateUnbatchedRecords, isOfficeOnlySurveyProcedure, isFieldWorkProcedure } from '../utils/appHelpers';
 
 interface ImportModalProps {
@@ -42,70 +43,18 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
     }
   }, [isOpen, initialMode]);
 
-  const parseExcelDate = (input: any): string | undefined => {
+  const parseExcelDate = (input: any, fieldLabel?: string, errorsList?: string[]): string | undefined => {
       if (input === undefined || input === null || input === '') return undefined;
-      
-      if (input instanceof Date) {
-          if (!isNaN(input.getTime())) {
-              const y = input.getUTCFullYear();
-              const m = String(input.getUTCMonth() + 1).padStart(2, '0');
-              const d = String(input.getUTCDate()).padStart(2, '0');
-              return `${y}-${m}-${d}`;
-          }
-          return undefined;
+      const strVal = String(input).trim();
+      if (strVal === '' || strVal === '-' || strVal === 'N/A' || strVal === 'null' || strVal === 'undefined') return undefined;
+
+      const dateIso = keepOnlyDate(input);
+      if (dateIso) {
+          return dateIso;
       }
 
-      const num = Number(input);
-      if (!isNaN(num) && num > 20000 && typeof input !== 'string') {
-          const utcMs = Math.round((num - 25569) * 86400 * 1000);
-          const date = new Date(utcMs);
-          if (!isNaN(date.getTime())) {
-              const y = date.getUTCFullYear();
-              const m = String(date.getUTCMonth() + 1).padStart(2, '0');
-              const d = String(date.getUTCDate()).padStart(2, '0');
-              return `${y}-${m}-${d}`;
-          }
-      }
-
-      if (typeof input === 'string') {
-          const cleanStr = input.trim();
-          if (cleanStr === '') return undefined;
-          
-          const dmyRegex = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/;
-          const match = cleanStr.match(dmyRegex);
-          if (match) {
-              const day = parseInt(match[1], 10);
-              const month = parseInt(match[2], 10);
-              const year = parseInt(match[3], 10);
-              if (month < 1 || month > 12 || day < 1 || day > 31) return undefined;
-              const chk = new Date(year, month - 1, day);
-              if (isNaN(chk.getTime()) || chk.getFullYear() !== year || chk.getMonth() !== month - 1 || chk.getDate() !== day) {
-                  return undefined;
-              }
-              return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-          }
-
-          const ymdRegex = /^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/;
-          const matchYmd = cleanStr.match(ymdRegex);
-          if (matchYmd) {
-              const year = parseInt(matchYmd[1], 10);
-              const month = parseInt(matchYmd[2], 10);
-              const day = parseInt(matchYmd[3], 10);
-              if (month < 1 || month > 12 || day < 1 || day > 31) return undefined;
-              const chk = new Date(year, month - 1, day);
-              if (isNaN(chk.getTime()) || chk.getFullYear() !== year || chk.getMonth() !== month - 1 || chk.getDate() !== day) {
-                  return undefined;
-              }
-              return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-          }
-
-          const date = new Date(cleanStr);
-          if (!isNaN(date.getTime())) {
-              const y = date.getUTCFullYear();
-              const m = String(date.getUTCMonth() + 1).padStart(2, '0');
-              const d = String(date.getUTCDate()).padStart(2, '0');
-              return `${y}-${m}-${d}`;
-          }
+      if (fieldLabel && errorsList) {
+          errorsList.push(`${fieldLabel} "${strVal}" không đúng định dạng ngày (vd: 24/07/2026) hoặc sai lịch (vd: 30/02)`);
       }
       return undefined;
   };
@@ -241,7 +190,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
             if (entryNumRaw !== undefined) record.entryNumber = String(entryNumRaw).trim();
 
             const issueDateRaw = getVal(['NGÀY CẤP', 'issuedate', 'issue_date', 'issueDate']);
-            if (issueDateRaw !== undefined) record.issueDate = parseExcelDate(issueDateRaw);
+            if (issueDateRaw !== undefined) record.issueDate = parseExcelDate(issueDateRaw, 'Ngày cấp', errors);
 
             const contentRaw = getVal(['NỘI DUNG', 'GHI CHÚ', 'content', 'notes']);
             if (contentRaw !== undefined) record.content = String(contentRaw).trim();
@@ -250,32 +199,35 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
             if (otherDocsRaw !== undefined) record.otherDocs = String(otherDocsRaw).trim();
 
             const receivedRaw = getVal(['NGÀY NHẬN', 'NGÀY NỘP', 'receiveddate', 'received_date', 'receivedDate']);
-            if (receivedRaw !== undefined) record.receivedDate = parseExcelDate(receivedRaw);
-            else if (mode === 'create') record.receivedDate = new Date().toISOString();
+            if (receivedRaw !== undefined) {
+                record.receivedDate = parseExcelDate(receivedRaw, 'Ngày nhận', errors);
+            } else if (mode === 'create') {
+                record.receivedDate = new Date().toISOString();
+            }
 
             const deadlineRaw = getVal(['HẸN TRẢ', 'DEADLINE', 'deadline']);
-            if (deadlineRaw !== undefined) record.deadline = parseExcelDate(deadlineRaw);
+            if (deadlineRaw !== undefined) record.deadline = parseExcelDate(deadlineRaw, 'Ngày hẹn trả', errors);
 
             const completedWorkDateRaw = getVal(['NGÀY THỰC HIỆN', 'NGÀY ĐÃ THỰC HIỆN', 'completedworkdate', 'completed_work_date', 'completedWorkDate']);
-            if (completedWorkDateRaw !== undefined) record.completedWorkDate = parseExcelDate(completedWorkDateRaw);
+            if (completedWorkDateRaw !== undefined) record.completedWorkDate = parseExcelDate(completedWorkDateRaw, 'Ngày thực hiện', errors);
 
             const pendingCheckDateRaw = getVal(['NGÀY TRÌNH KIỂM TRA', 'NGÀY CHỜ KIỂM TRA', 'pendingcheckdate', 'pending_check_date', 'pendingCheckDate']);
-            if (pendingCheckDateRaw !== undefined) record.pendingCheckDate = parseExcelDate(pendingCheckDateRaw);
+            if (pendingCheckDateRaw !== undefined) record.pendingCheckDate = parseExcelDate(pendingCheckDateRaw, 'Ngày trình KT', errors);
 
             const checkedDateRaw = getVal(['NGÀY ĐÃ KIỂM TRA', 'checkeddate', 'checked_date', 'checkedDate']);
-            if (checkedDateRaw !== undefined) record.checkedDate = parseExcelDate(checkedDateRaw);
+            if (checkedDateRaw !== undefined) record.checkedDate = parseExcelDate(checkedDateRaw, 'Ngày đã KT', errors);
 
             const submissionDateRaw = getVal(['NGÀY TRÌNH KÝ', 'submissiondate', 'submission_date', 'submissionDate']);
-            if (submissionDateRaw !== undefined) record.submissionDate = parseExcelDate(submissionDateRaw);
+            if (submissionDateRaw !== undefined) record.submissionDate = parseExcelDate(submissionDateRaw, 'Ngày trình ký', errors);
 
             const approvalDateRaw = getVal(['NGÀY KÝ DUYỆT', 'NGÀY KÝ', 'approvaldate', 'approval_date', 'approvalDate']);
-            if (approvalDateRaw !== undefined) record.approvalDate = parseExcelDate(approvalDateRaw);
+            if (approvalDateRaw !== undefined) record.approvalDate = parseExcelDate(approvalDateRaw, 'Ngày ký', errors);
 
             const completedDateRaw = getVal(['NGÀY HOÀN THÀNH', 'completeddate', 'completed_date', 'completedDate', 'NGÀY GIAO 1 CỬA']);
-            if (completedDateRaw !== undefined) record.completedDate = parseExcelDate(completedDateRaw);
+            if (completedDateRaw !== undefined) record.completedDate = parseExcelDate(completedDateRaw, 'Ngày hoàn thành', errors);
 
             const resultReturnedDateRaw = getVal(['NGÀY TRẢ DÂN', 'resultreturneddate', 'result_returned_date', 'resultReturnedDate']);
-            if (resultReturnedDateRaw !== undefined) record.resultReturnedDate = parseExcelDate(resultReturnedDateRaw);
+            if (resultReturnedDateRaw !== undefined) record.resultReturnedDate = parseExcelDate(resultReturnedDateRaw, 'Ngày trả dân', errors);
 
             const typeRaw = getVal(['LOẠI HỒ SƠ', 'LOAI HO SO', 'LOẠI', 'THỦ TỤC', 'recordtype', 'record_type']);
             if (typeRaw !== undefined) {
@@ -297,7 +249,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
 
             const exportDateRaw = getVal(['NGÀY XUẤT', 'EXPORT DATE', 'exportdate', 'export_date', 'exportDate']);
             if (exportDateRaw !== undefined) {
-                record.exportDate = parseExcelDate(exportDateRaw);
+                record.exportDate = parseExcelDate(exportDateRaw, 'Ngày xuất', errors);
             }
 
             const assigneeRaw = getVal(['NGƯỜI XỬ LÝ', 'NHÂN VIÊN', 'assignedto', 'assigned_to', 'assignedTo', 'NV XỬ LÝ']);
@@ -311,7 +263,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
 
             const assignedDateRaw = getVal(['NGÀY GIAO', 'NGÀY GIAO VIỆC', 'assigneddate', 'assigned_date', 'assignedDate']);
             if (assignedDateRaw !== undefined) {
-                record.assignedDate = parseExcelDate(assignedDateRaw);
+                record.assignedDate = parseExcelDate(assignedDateRaw, 'Ngày giao', errors);
             }
 
             let explicitStatus: RecordStatus | undefined = undefined;
