@@ -56,6 +56,14 @@ export const ROLE_VIEWS_CONFIG: Record<UserRole, RoleConfig> = {
       {
         keyword: 'thông tin',
         views: ['archive_records', 'archive_assign_tasks', 'archive_completed_list', 'archive_pending_check_list', 'archive_check_list', 'archive_handover_list', 'excerpt_management']
+      },
+      {
+        keyword: 'cấp giấy',
+        views: ['test_records', 'test_assign_tasks', 'test_completed_list', 'test_pending_supplement_list', 'test_pending_check_list', 'test_check_list', 'test_handover_list', 'test_director_completed']
+      },
+      {
+        keyword: 'đăng ký',
+        views: ['test_records', 'test_assign_tasks', 'test_completed_list', 'test_pending_supplement_list', 'test_pending_check_list', 'test_check_list', 'test_handover_list', 'test_director_completed']
       }
     ]
   }
@@ -204,7 +212,7 @@ export function isViewAllowedForUser(
       case 'archive_records':
         return activePerms.includes('archive_records');
       case 'test_records':
-        return activePerms.includes('test_records') || activePerms.includes('all_records');
+        return activePerms.includes('test_records');
       case 'receive_contract':
         return activePerms.includes('receive_contract') || activePerms.includes('VIEW_CONTRACTS') || activePerms.includes('ADD_CONTRACTS');
 
@@ -252,25 +260,25 @@ export function isViewAllowedForUser(
       case 'archive_director_completed':
         return activePerms.includes('archive_records') || activePerms.includes('archive_director_completed') || activePerms.includes('luutru_BTN_APPROVE_SIGN');
 
-      // Child Tabs - Test Group (Module Test)
+      // Child Tabs - Cấp giấy Group
       case 'test_sub_all':
-        return activePerms.includes('test_records') || activePerms.includes('all_records') || activePerms.includes('test_sub_all');
+        return activePerms.includes('test_records') || activePerms.includes('test_sub_all') || activePerms.includes('test_VIEW_DETAILS');
       case 'test_assign_tasks':
-        return activePerms.includes('test_records') || activePerms.includes('all_records') || activePerms.includes('test_assign_tasks');
+        return activePerms.includes('test_records') || activePerms.includes('test_assign_tasks') || activePerms.includes('test_BTN_ASSIGN_STAFF');
       case 'test_completed_list':
       case 'test_measurement_field':
       case 'test_measurement_office':
       case 'test_print_cert':
       case 'test_pending_supplement_list':
-        return activePerms.includes('test_records') || activePerms.includes('all_records') || activePerms.includes('test_completed_list');
+        return activePerms.includes('test_records') || activePerms.includes('test_completed_list') || activePerms.includes('test_VIEW_DETAILS');
       case 'test_pending_check_list':
-        return activePerms.includes('test_records') || activePerms.includes('all_records') || activePerms.includes('test_pending_check_list');
+        return activePerms.includes('test_records') || activePerms.includes('test_pending_check_list') || activePerms.includes('test_BTN_SUBMIT_CHECK');
       case 'test_check_list':
-        return activePerms.includes('test_records') || activePerms.includes('all_records') || activePerms.includes('test_check_list');
+        return activePerms.includes('test_records') || activePerms.includes('test_check_list') || activePerms.includes('test_BTN_SUBMIT_SIGN');
       case 'test_director_completed':
-        return activePerms.includes('test_records') || activePerms.includes('all_records') || activePerms.includes('test_director_completed');
+        return activePerms.includes('test_records') || activePerms.includes('test_director_completed') || activePerms.includes('test_BTN_APPROVE_SIGN');
       case 'test_handover_list':
-        return activePerms.includes('test_records') || activePerms.includes('all_records') || activePerms.includes('test_handover_list');
+        return activePerms.includes('test_records') || activePerms.includes('test_handover_list') || activePerms.includes('test_HANDOVER_RECORDS');
 
       // Other Standalone Views
       case 'excerpt_management':
