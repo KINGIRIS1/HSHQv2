@@ -365,11 +365,53 @@ export const useAppData = (currentUser: User | null) => {
             )
             .subscribe();
 
+        const settingsChannel = supabase.channel('system_settings_realtime_changes')
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'system_settings' },
+                (payload) => {
+                    const key = payload.new?.key || payload.old?.key;
+                    if (!key || key === 'role_permissions' || key === 'department_permissions') {
+                        getSystemSetting('role_permissions').then(permsData => {
+                            if (permsData) {
+                                try {
+                                    const parsed = JSON.parse(permsData);
+                                    Object.keys(DEFAULT_ROLE_PERMISSIONS).forEach(roleKey => {
+                                        if (!parsed[roleKey]) {
+                                            parsed[roleKey] = DEFAULT_ROLE_PERMISSIONS[roleKey as UserRole] || [];
+                                        }
+                                        if (roleKey === UserRole.SUBADMIN && Array.isArray(parsed[roleKey]) && parsed[roleKey].includes('*')) {
+                                            parsed[roleKey] = DEFAULT_ROLE_PERMISSIONS[UserRole.SUBADMIN] || [];
+                                        }
+                                    });
+                                    setRolePermissions(parsed);
+                                } catch (e) {}
+                            }
+                        });
+                        getSystemSetting('department_permissions').then(deptPermsData => {
+                            if (deptPermsData) {
+                                try {
+                                    const parsedDept = JSON.parse(deptPermsData);
+                                    Object.keys(parsedDept).forEach(k => {
+                                        if (Array.isArray(parsedDept[k]) && parsedDept[k].includes('*')) {
+                                            parsedDept[k] = parsedDept[k].filter((p: string) => p !== '*');
+                                        }
+                                    });
+                                    setDepartmentPermissions(parsedDept);
+                                } catch (e) {}
+                            }
+                        });
+                    }
+                }
+            )
+            .subscribe();
+
         return () => {
             supabase.removeChannel(landRecordsChannel);
             supabase.removeChannel(luutruRecordsChannel);
             supabase.removeChannel(dangkyRecordsChannel);
             supabase.removeChannel(usersChannel);
+            supabase.removeChannel(settingsChannel);
         };
     }, []);
 
@@ -389,12 +431,25 @@ export const useAppData = (currentUser: User | null) => {
                 if (permsData) {
                     try {
                         const parsed = JSON.parse(permsData);
+                        Object.keys(DEFAULT_ROLE_PERMISSIONS).forEach(roleKey => {
+                            if (!parsed[roleKey]) {
+                                parsed[roleKey] = DEFAULT_ROLE_PERMISSIONS[roleKey as UserRole] || [];
+                            }
+                            if (roleKey === UserRole.SUBADMIN && Array.isArray(parsed[roleKey]) && parsed[roleKey].includes('*')) {
+                                parsed[roleKey] = DEFAULT_ROLE_PERMISSIONS[UserRole.SUBADMIN] || [];
+                            }
+                        });
                         setRolePermissions(parsed);
                     } catch (e) {}
                 }
                 if (deptPermsData) {
                     try {
                         const parsedDept = JSON.parse(deptPermsData);
+                        Object.keys(parsedDept).forEach(k => {
+                            if (Array.isArray(parsedDept[k]) && parsedDept[k].includes('*')) {
+                                parsedDept[k] = parsedDept[k].filter((p: string) => p !== '*');
+                            }
+                        });
                         setDepartmentPermissions(parsedDept);
                     } catch (e) {}
                 }
@@ -416,11 +471,18 @@ export const useAppData = (currentUser: User | null) => {
         });
 
         let usersBc: BroadcastChannel | null = null;
+        let permsBc: BroadcastChannel | null = null;
         if (typeof BroadcastChannel !== 'undefined') {
             usersBc = new BroadcastChannel('app_users_channel');
             usersBc.onmessage = (evt) => {
                 if (evt.data?.type === 'USERS_UPDATED') {
                     refreshUsers();
+                }
+            };
+            permsBc = new BroadcastChannel('app_permissions_channel');
+            permsBc.onmessage = (evt) => {
+                if (evt.data?.type === 'PERMISSIONS_UPDATED') {
+                    refreshPermissions();
                 }
             };
         }
@@ -435,6 +497,7 @@ export const useAppData = (currentUser: User | null) => {
             window.removeEventListener('users_updated', handleUserEvent);
             window.removeEventListener('permissions_updated', handlePermEvent);
             if (usersBc) usersBc.close();
+            if (permsBc) permsBc.close();
             clearInterval(userSyncInterval);
         };
     }, []);

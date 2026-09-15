@@ -950,6 +950,11 @@ function cleanString(str) {
               window.dispatchEvent(new CustomEvent('permissions_updated', {
                   detail: { rolePermissions, departmentPermissions }
               }));
+              if (typeof BroadcastChannel !== 'undefined') {
+                  const bc = new BroadcastChannel('app_permissions_channel');
+                  bc.postMessage({ type: 'PERMISSIONS_UPDATED', rolePermissions, departmentPermissions });
+                  bc.close();
+              }
           } catch (_) {}
       }
 
