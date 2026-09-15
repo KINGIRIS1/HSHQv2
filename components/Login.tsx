@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { User } from '../types';
 import { LogIn, Eye, EyeOff, Check } from 'lucide-react';
 import { APP_VERSION, MOCK_USERS } from '../constants';
+import { fetchUsers } from '../services/apiPeople';
 
 interface LoginProps {
   onLogin: (user: User) => void;
@@ -24,7 +25,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
     }
   }, []);
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError('');
     setIsLoading(true);
@@ -32,7 +33,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
     const submittedUsername = username.trim().toLowerCase();
     const submittedPassword = password.trim();
 
-    setTimeout(() => {
+    try {
       // 1. Kiểm tra trong danh sách users prop truyền vào từ App
       let matchedUser = users && users.length > 0 ? users.find(u => {
         const dbUsername = (u.username || '').trim().toLowerCase();
@@ -40,7 +41,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
         return dbUsername === submittedUsername && dbPassword === submittedPassword;
       }) : null;
 
-      // 2. Dự phòng: Kiểm tra trong bộ nhớ đệm cache (phòng khi prop users chưa kịp nạp)
+      // 2. Dự phòng 1: Kiểm tra trong bộ nhớ đệm cache (phòng khi prop users chưa kịp nạp)
       if (!matchedUser && typeof window !== 'undefined') {
         try {
           const cached = JSON.parse(localStorage.getItem('app_users_cache_v1') || '[]');
@@ -56,7 +57,23 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
         }
       }
 
-      // 3. Dự phòng cấp cao nhất: Kiểm tra trong danh sách tài khoản mặc định MOCK_USERS
+      // 3. Dự phòng 2 CẤP THIẾT DÀNH CHO TRÌNH DUYỆT ẨN DANH: Truy vấn trực tiếp danh sách tài khoản từ Supabase CSDL
+      if (!matchedUser) {
+        try {
+          const dbUsers = await fetchUsers();
+          if (Array.isArray(dbUsers) && dbUsers.length > 0) {
+            matchedUser = dbUsers.find(u => {
+              const dbUsername = (u.username || '').trim().toLowerCase();
+              const dbPassword = (u.password || '').trim();
+              return dbUsername === submittedUsername && dbPassword === submittedPassword;
+            });
+          }
+        } catch (dbErr) {
+          console.warn("Lỗi tải danh sách người dùng từ CSDL:", dbErr);
+        }
+      }
+
+      // 4. Dự phòng cấp cao nhất: Kiểm tra trong danh sách tài khoản mặc định MOCK_USERS
       if (!matchedUser) {
         matchedUser = MOCK_USERS.find(u => {
           const dbUsername = (u.username || '').trim().toLowerCase();
@@ -74,9 +91,13 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
         onLogin(matchedUser);
       } else {
         setError('Tên đăng nhập hoặc mật khẩu không chính xác.');
-        setIsLoading(false);
       }
-    }, 250);
+    } catch (err) {
+      console.error("Lỗi khi xử lý đăng nhập:", err);
+      setError('Đã xảy ra lỗi khi xác thực tài khoản. Vui lòng thử lại.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
