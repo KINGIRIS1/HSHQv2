@@ -3,6 +3,7 @@ import { supabase, isConfigured } from './supabaseClient';
 import { Employee, User } from '../types';
 import { MOCK_EMPLOYEES, MOCK_USERS } from '../constants';
 import { logError, getFromCache, saveToCache, CACHE_KEYS, mapEmployeeFromDb, mapEmployeeToDb, mapUserFromDb, mapUserToDb } from './apiCore';
+import { getSystemSetting, saveSystemSetting } from './apiSystem';
 
 // --- EMPLOYEES ---
 export const fetchEmployees = async (): Promise<Employee[]> => {
@@ -56,87 +57,224 @@ export const deleteEmployeeApi = async (id: string): Promise<boolean> => {
 };
 
 // --- USERS ---
-export const fetchUsers = async (): Promise<User[]> => {
-    if (!isConfigured) return getFromCache(CACHE_KEYS.USERS, MOCK_USERS);
+
+/**
+ * Đồng bộ danh sách tài khoản kép vào system_settings ('users_config') để đảm bảo đồng bộ 100% trên mọi thiết bị và trình duyệt
+ */
+const syncUsersToCloudConfig = async (usersList: User[]) => {
     try {
-        const { data, error } = await supabase.from('users').select('*');
-        if (error) throw error;
-        if (Array.isArray(data) && data.length > 0) {
-            const mapped = data.map(mapUserFromDb);
-            saveToCache(CACHE_KEYS.USERS, mapped);
-            return mapped;
+        await saveSystemSetting('users_config', JSON.stringify(usersList));
+    } catch (e) {
+        console.warn("Lỗi đồng bộ users_config lên system_settings:", e);
+    }
+};
+
+/**
+ * Đọc và hợp nhất toàn bộ tài khoản từ:
+ * 1. Bảng system_settings (key: users_config)
+ * 2. Bảng users chuyên dụng trên Supabase
+ * 3. LocalStorage cache
+ * 4. MOCK_USERS mặc định
+ */
+export const fetchUsers = async (): Promise<User[]> => {
+    const cachedLocal = getFromCache<User[]>(CACHE_KEYS.USERS, MOCK_USERS);
+    let mergedUsersMap = new Map<string, User>();
+
+    // Nạp MOCK_USERS & LocalCache trước
+    MOCK_USERS.forEach(u => mergedUsersMap.set(u.username.toLowerCase(), mapUserFromDb(u)));
+    if (Array.isArray(cachedLocal)) {
+        cachedLocal.forEach(u => {
+            const mapped = mapUserFromDb(u);
+            if (mapped.username) mergedUsersMap.set(mapped.username.toLowerCase(), mapped);
+        });
+    }
+
+    if (!isConfigured) {
+        const result = Array.from(mergedUsersMap.values());
+        saveToCache(CACHE_KEYS.USERS, result);
+        return result;
+    }
+
+    try {
+        // 1. Đọc từ system_settings (users_config)
+        const configVal = await getSystemSetting('users_config');
+        if (configVal) {
+            try {
+                const parsed = JSON.parse(configVal);
+                if (Array.isArray(parsed)) {
+                    parsed.forEach(u => {
+                        const mapped = mapUserFromDb(u);
+                        if (mapped.username) mergedUsersMap.set(mapped.username.toLowerCase(), mapped);
+                    });
+                }
+            } catch (e) {
+                console.warn("Parse users_config error:", e);
+            }
         }
-        const cached = getFromCache<User[]>(CACHE_KEYS.USERS, MOCK_USERS);
-        return cached && cached.length > 0 ? cached : MOCK_USERS;
+
+        // 2. Đọc từ bảng users trên Supabase
+        try {
+            const { data, error } = await supabase.from('users').select('*');
+            if (!error && Array.isArray(data) && data.length > 0) {
+                data.forEach(u => {
+                    const mapped = mapUserFromDb(u);
+                    if (mapped.username) mergedUsersMap.set(mapped.username.toLowerCase(), mapped);
+                });
+            }
+        } catch (dbErr) {
+            console.warn("fetchUsers bảng users gặp thông báo (đã có users_config dự phòng):", dbErr);
+        }
+
+        const finalUsers = Array.from(mergedUsersMap.values());
+        saveToCache(CACHE_KEYS.USERS, finalUsers);
+        return finalUsers;
     } catch (error) {
         logError("fetchUsers", error, true);
-        const cached = getFromCache<User[]>(CACHE_KEYS.USERS, MOCK_USERS);
-        return cached && cached.length > 0 ? cached : MOCK_USERS;
+        const fallback = Array.from(mergedUsersMap.values());
+        return fallback.length > 0 ? fallback : MOCK_USERS;
     }
 };
 
 /**
- * Truy vấn danh sách tài khoản TRỰC TIẾP từ Supabase (bỏ qua cache, phục vụ đăng nhập)
+ * Truy vấn danh sách tài khoản TRỰC TIẾP từ Supabase Cloud (bỏ qua cache, phục vụ đăng nhập trên máy mới)
  */
 export const fetchUsersDirectFromDb = async (): Promise<User[]> => {
-    if (!isConfigured || !supabase) return [];
+    let usersMap = new Map<string, User>();
+
+    // Nạp MOCK_USERS làm mốc mặc định
+    MOCK_USERS.forEach(u => usersMap.set(u.username.toLowerCase(), mapUserFromDb(u)));
+
+    if (!isConfigured || !supabase) {
+        return Array.from(usersMap.values());
+    }
+
     try {
-        const { data, error } = await supabase.from('users').select('*');
-        if (error) {
-            console.warn("fetchUsersDirectFromDb error:", error);
-            return [];
+        // 1. Thử đọc từ system_settings ('users_config')
+        try {
+            const configVal = await getSystemSetting('users_config');
+            if (configVal) {
+                const parsed = JSON.parse(configVal);
+                if (Array.isArray(parsed)) {
+                    parsed.forEach(u => {
+                        const mapped = mapUserFromDb(u);
+                        if (mapped.username) usersMap.set(mapped.username.toLowerCase(), mapped);
+                    });
+                }
+            }
+        } catch (e) {
+            console.warn("Direct fetch system_settings error:", e);
         }
-        if (Array.isArray(data) && data.length > 0) {
-            const mapped = data.map(mapUserFromDb);
-            saveToCache(CACHE_KEYS.USERS, mapped);
-            return mapped;
+
+        // 2. Thử đọc từ bảng users
+        try {
+            const { data, error } = await supabase.from('users').select('*');
+            if (!error && Array.isArray(data) && data.length > 0) {
+                data.forEach(u => {
+                    const mapped = mapUserFromDb(u);
+                    if (mapped.username) usersMap.set(mapped.username.toLowerCase(), mapped);
+                });
+            }
+        } catch (e) {
+            console.warn("Direct fetch table users error:", e);
         }
-        return [];
+
+        const result = Array.from(usersMap.values());
+        if (result.length > 0) {
+            saveToCache(CACHE_KEYS.USERS, result);
+        }
+        return result;
     } catch (err) {
         console.warn("fetchUsersDirectFromDb exception:", err);
-        return [];
+        return Array.from(usersMap.values());
     }
 };
 
 /**
- * Tìm kiếm tài khoản cụ thể trực tiếp trên Supabase (tránh bị lọc đè bởi cache cũ)
+ * Tìm kiếm tài khoản cụ thể trực tiếp trên Supabase
  */
 export const findUserInDbDirectly = async (usernameInput: string): Promise<User | null> => {
-    if (!isConfigured || !supabase) return null;
-    const cleanU = usernameInput.normalize('NFC').trim();
+    const cleanU = usernameInput.normalize('NFC').trim().toLowerCase();
     if (!cleanU) return null;
-    try {
-        const { data, error } = await supabase
-            .from('users')
-            .select('*')
-            .or(`username.ilike.${cleanU},user_name.ilike.${cleanU},ten_dang_nhap.ilike.${cleanU}`);
-        
-        if (!error && Array.isArray(data) && data.length > 0) {
-            return mapUserFromDb(data[0]);
+
+    // 1. Tìm trong danh sách vừa nạp trực tiếp từ Cloud
+    const allUsers = await fetchUsersDirectFromDb();
+    const matched = allUsers.find(u => u.username.normalize('NFC').trim().toLowerCase() === cleanU);
+    if (matched) return matched;
+
+    // 2. Thử tìm qua query trực tiếp trên Supabase
+    if (isConfigured && supabase) {
+        try {
+            const { data, error } = await supabase
+                .from('users')
+                .select('*')
+                .eq('username', cleanU);
+            if (!error && Array.isArray(data) && data.length > 0) {
+                return mapUserFromDb(data[0]);
+            }
+        } catch (e) {
+            console.warn("findUserInDbDirectly query error:", e);
         }
-    } catch (e) {
-        console.warn("findUserInDbDirectly error:", e);
     }
+
     return null;
 };
 
 export const saveUserApi = async (user: User, isUpdate: boolean): Promise<User | null> => {
     let savedUser = user;
+
+    // 1. Thử lưu vào bảng users chuyên dụng (với fallback payload linh hoạt)
     if (isConfigured) {
         try {
-            const payload = mapUserToDb(user);
+            const fullPayload = mapUserToDb(user);
+            let payloadToUse: any = fullPayload;
+
             if (isUpdate) {
-                const { data, error } = await supabase.from('users').update(payload).eq('username', user.username).select();
-                if (error) throw error;
+                let { data, error } = await supabase.from('users').update(payloadToUse).eq('username', user.username).select();
+                if (error && error.code === '42703') {
+                    // Nếu dính lỗi cột không tồn tại, lược bỏ employee_id/employeeId
+                    delete payloadToUse.employee_id;
+                    delete payloadToUse.employeeId;
+                    const res = await supabase.from('users').update(payloadToUse).eq('username', user.username).select();
+                    data = res.data;
+                }
                 if (data?.[0]) savedUser = mapUserFromDb(data[0]);
             } else {
-                const { data, error } = await supabase.from('users').insert([payload]).select();
-                if (error) throw error;
+                let { data, error } = await supabase.from('users').insert([payloadToUse]).select();
+                if (error && error.code === '42703') {
+                    delete payloadToUse.employee_id;
+                    delete payloadToUse.employeeId;
+                    const res = await supabase.from('users').insert([payloadToUse]).select();
+                    data = res.data;
+                }
                 if (data?.[0]) savedUser = mapUserFromDb(data[0]);
             }
         } catch (error) {
-            logError("saveUserApi", error, true);
+            logError("saveUserApi table users", error, true);
         }
+    }
+
+    // 2. Luôn nạp toàn bộ danh sách hiện tại, cập nhật tài khoản mới/sửa và đồng bộ KÉP lên system_settings ('users_config')
+    try {
+        const currentList = await fetchUsers();
+        let updatedList: User[] = [];
+        const normalizedTarget = savedUser.username.normalize('NFC').trim().toLowerCase();
+
+        const exists = currentList.some(u => u.username.normalize('NFC').trim().toLowerCase() === normalizedTarget);
+
+        if (exists) {
+            updatedList = currentList.map(u => 
+                u.username.normalize('NFC').trim().toLowerCase() === normalizedTarget ? savedUser : u
+            );
+        } else {
+            updatedList = [...currentList, savedUser];
+        }
+
+        saveToCache(CACHE_KEYS.USERS, updatedList);
+        if (isConfigured) {
+            await syncUsersToCloudConfig(updatedList);
+        }
+    } catch (syncErr) {
+        console.warn("Lỗi lưu dự phòng users_config:", syncErr);
     }
 
     if (typeof window !== 'undefined') {
@@ -155,13 +293,26 @@ export const saveUserApi = async (user: User, isUpdate: boolean): Promise<User |
 
 export const deleteUserApi = async (username: string): Promise<boolean> => {
     let success = true;
+    const cleanU = username.normalize('NFC').trim().toLowerCase();
+
     if (isConfigured) {
         try {
             const { error } = await supabase.from('users').delete().eq('username', username);
-            if (error) throw error;
+            if (error) console.warn("deleteUserApi table users error:", error);
         } catch (error) {
             logError("deleteUserApi", error, true);
         }
+    }
+
+    try {
+        const currentList = await fetchUsers();
+        const updatedList = currentList.filter(u => u.username.normalize('NFC').trim().toLowerCase() !== cleanU);
+        saveToCache(CACHE_KEYS.USERS, updatedList);
+        if (isConfigured) {
+            await syncUsersToCloudConfig(updatedList);
+        }
+    } catch (syncErr) {
+        console.warn("Lỗi xóa dự phòng users_config:", syncErr);
     }
 
     if (typeof window !== 'undefined') {

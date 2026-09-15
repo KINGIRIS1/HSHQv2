@@ -370,7 +370,9 @@ export const useAppData = (currentUser: User | null) => {
                 'postgres_changes',
                 { event: '*', schema: 'public', table: 'system_settings' },
                 (payload) => {
-                    const key = payload.new?.key || payload.old?.key;
+                    const newObj = payload.new as any;
+                    const oldObj = payload.old as any;
+                    const key = newObj?.key || oldObj?.key;
                     if (!key || key === 'role_permissions' || key === 'department_permissions') {
                         getSystemSetting('role_permissions').then(permsData => {
                             if (permsData) {

@@ -44,8 +44,8 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
     const checkMatch = (u: any): boolean => {
       if (!u) return false;
       const mapped = mapUserFromDb(u);
-      const dbU = mapped.username.normalize('NFC').trim().toLowerCase();
-      const dbP = mapped.password.normalize('NFC').trim();
+      const dbU = (mapped.username || '').normalize('NFC').trim().toLowerCase();
+      const dbP = (mapped.password || '').normalize('NFC').trim();
       return dbU === submittedUsername && dbP === submittedPassword;
     };
 
