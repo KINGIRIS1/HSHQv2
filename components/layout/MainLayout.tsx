@@ -85,14 +85,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({
 
     if (!currentUser) return <>{children}</>;
 
-    const matchedEmployee = currentUser.employeeId ? employees.find(e => e.id === currentUser.employeeId) : null;
-    const linkedEmployee = matchedEmployee || {
-        id: currentUser.employeeId || '',
-        name: currentUser.name || '',
-        department: currentUser.department || '',
-        position: currentUser.position || '',
-        managedWards: currentUser.managedWards || []
-    };
+    const linkedEmployee = currentUser.employeeId ? employees.find(e => e.id === currentUser.employeeId) : null;
 
     return (
         <div className="flex flex-col h-screen bg-slate-50 overflow-hidden font-sans">
@@ -158,27 +151,9 @@ const MainLayout: React.FC<MainLayoutProps> = ({
                                 <div className="p-4 border-b border-gray-100 bg-gray-50/50">
                                     <p className="text-sm font-bold text-gray-800 truncate">{currentUser.name}</p>
                                     <p className="text-xs text-gray-500 truncate mt-0.5">@{currentUser.username}</p>
-                                    <div className="mt-2 flex flex-wrap gap-1">
-                                        <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
-                                            {currentUser.role === UserRole.ADMIN ? 'Administrator' : currentUser.role === UserRole.SUBADMIN ? 'Phó quản trị' : currentUser.role === UserRole.TEAM_LEADER ? 'Nhóm trưởng' : currentUser.role === UserRole.ONEDOOR ? 'Một cửa' : 'Nhân viên'}
-                                        </span>
-                                        {(linkedEmployee?.position || currentUser.position) && (
-                                            <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
-                                                {linkedEmployee?.position || currentUser.position}
-                                            </span>
-                                        )}
-                                        {(linkedEmployee?.department || currentUser.department) && (
-                                            <span className="text-[10px] font-semibold text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-100">
-                                                {linkedEmployee?.department || currentUser.department}
-                                            </span>
-                                        )}
+                                    <div className="mt-2 text-[10px] font-bold uppercase tracking-wider text-blue-600 bg-blue-50 px-2 py-1 rounded inline-block border border-blue-100">
+                                        {currentUser.role === UserRole.ADMIN ? 'Administrator' : currentUser.role === UserRole.SUBADMIN ? 'Phó quản trị' : currentUser.role === UserRole.TEAM_LEADER ? 'Nhóm trưởng' : currentUser.role === UserRole.ONEDOOR ? 'Một cửa' : 'Nhân viên'}
                                     </div>
-                                    {((linkedEmployee?.managedWards && linkedEmployee.managedWards.length > 0) || (currentUser.managedWards && currentUser.managedWards.length > 0)) && (
-                                        <div className="mt-2 text-[11px] text-gray-600 bg-gray-100/80 px-2 py-1 rounded">
-                                            <span className="font-semibold text-gray-700">Địa bàn: </span>
-                                            {(linkedEmployee?.managedWards || currentUser.managedWards || []).join(', ')}
-                                        </div>
-                                    )}
                                 </div>
                                 <div className="p-2 space-y-1">
                                     <button 
