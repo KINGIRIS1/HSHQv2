@@ -61,52 +61,15 @@ export const useAppData = (currentUser: User | null) => {
                 }
             };
 
-            const [recData, empData, userData, updateInfo, holidayData, permsData, deptPermsData] = await Promise.all([
-                // Tải danh sách hồ sơ: Không ép fallback về mảng rỗng làm đè mất dữ liệu đang tải
-                fetchRecords((tier, partialList, isComplete) => {
-                    // Cập nhật giao diện ngay khi từng Giai đoạn ưu tiên tải xong
-                    if (Array.isArray(partialList) && partialList.length > 0) {
-                        setRecords(prev => {
-                            if (!prev || prev.length === 0) {
-                                const { migratedRecords } = migrateUnbatchedRecords(deduplicateRecords(partialList));
-                                return migratedRecords;
-                            }
-                            const map = new Map<string, RecordFile>();
-                            prev.forEach(r => { if (r.id) map.set(r.id, r); });
-                            partialList.forEach(r => { if (r.id) map.set(r.id, r); });
-                            const merged = Array.from(map.values());
-                            const { migratedRecords } = migrateUnbatchedRecords(deduplicateRecords(merged));
-                            return migratedRecords;
-                        });
-                    }
-                }).catch(async (err) => {
-                    console.warn("fetchRecords gặp lỗi mạng, đang nạp từ IndexedDB:", err);
-                    const idb = await getIndexedDBItem<RecordFile[]>(CACHE_KEYS.RECORDS);
-                    return Array.isArray(idb) ? idb : [];
-                }),
-                safeFetch(fetchEmployees(), getFromCache(CACHE_KEYS.EMPLOYEES, MOCK_EMPLOYEES)),
-                safeFetch(fetchUsers(), getFromCache(CACHE_KEYS.USERS, MOCK_USERS)),
-                safeFetch(fetchUpdateInfo(), { version: null, url: null }, 6000),
-                safeFetch(fetchHolidays(), getFromCache(CACHE_KEYS.HOLIDAYS, []), 6000),
-                safeFetch(getSystemSetting('role_permissions'), null, 6000),
-                safeFetch(getSystemSetting('department_permissions'), null, 6000)
+            // GIAI ĐOẠN 1: Ưu tiên nạp Dữ liệu Hệ thống, Nhân sự, Người dùng & Phân quyền (Siêu nhanh ~100ms)
+            const [empData, userData, updateInfo, holidayData, permsData, deptPermsData] = await Promise.all([
+                safeFetch(fetchEmployees(), getFromCache(CACHE_KEYS.EMPLOYEES, MOCK_EMPLOYEES), 8000),
+                safeFetch(fetchUsers(), getFromCache(CACHE_KEYS.USERS, MOCK_USERS), 8000),
+                safeFetch(fetchUpdateInfo(), { version: null, url: null }, 5000),
+                safeFetch(fetchHolidays(), getFromCache(CACHE_KEYS.HOLIDAYS, []), 5000),
+                safeFetch(getSystemSetting('role_permissions'), null, 5000),
+                safeFetch(getSystemSetting('department_permissions'), null, 5000)
             ]);
-
-            if (Array.isArray(recData) && recData.length > 0) {
-                const { migratedRecords } = migrateUnbatchedRecords(deduplicateRecords(recData));
-                setRecords(prev => {
-                    // Chỉ cập nhật nếu danh sách mới nhiều hơn hoặc bằng danh sách hiện tại
-                    if (prev.length <= migratedRecords.length || prev.length === 0) {
-                        return migratedRecords;
-                    }
-                    const map = new Map<string, RecordFile>();
-                    prev.forEach(r => { if (r.id) map.set(r.id, r); });
-                    migratedRecords.forEach(r => { if (r.id) map.set(r.id, r); });
-                    const merged = Array.from(map.values());
-                    const { migratedRecords: mRecs } = migrateUnbatchedRecords(deduplicateRecords(merged));
-                    return mRecs;
-                });
-            }
 
             if (Array.isArray(empData) && empData.length > 0) {
                 setEmployees(empData);
@@ -151,6 +114,46 @@ export const useAppData = (currentUser: User | null) => {
                 setLatestVersion(updateInfo.version);
                 setUpdateUrl(updateInfo.url);
             }
+
+            // GIAI ĐOẠN 2: Nạp ngầm Hồ sơ công việc sau khi hệ thống & nhân sự đã sẵn sàng
+            fetchRecords((tier, partialList, isComplete) => {
+                if (Array.isArray(partialList) && partialList.length > 0) {
+                    setRecords(prev => {
+                        if (!prev || prev.length === 0) {
+                            const { migratedRecords } = migrateUnbatchedRecords(deduplicateRecords(partialList));
+                            return migratedRecords;
+                        }
+                        const map = new Map<string, RecordFile>();
+                        prev.forEach(r => { if (r.id) map.set(r.id, r); });
+                        partialList.forEach(r => { if (r.id) map.set(r.id, r); });
+                        const merged = Array.from(map.values());
+                        const { migratedRecords } = migrateUnbatchedRecords(deduplicateRecords(merged));
+                        return migratedRecords;
+                    });
+                }
+            }).then(recData => {
+                if (Array.isArray(recData) && recData.length > 0) {
+                    const { migratedRecords } = migrateUnbatchedRecords(deduplicateRecords(recData));
+                    setRecords(prev => {
+                        if (prev.length <= migratedRecords.length || prev.length === 0) {
+                            return migratedRecords;
+                        }
+                        const map = new Map<string, RecordFile>();
+                        prev.forEach(r => { if (r.id) map.set(r.id, r); });
+                        migratedRecords.forEach(r => { if (r.id) map.set(r.id, r); });
+                        const merged = Array.from(map.values());
+                        const { migratedRecords: mRecs } = migrateUnbatchedRecords(deduplicateRecords(merged));
+                        return mRecs;
+                    });
+                }
+            }).catch(async (err) => {
+                console.warn("fetchRecords gặp lỗi mạng, đang nạp từ IndexedDB:", err);
+                const idb = await getIndexedDBItem<RecordFile[]>(CACHE_KEYS.RECORDS);
+                if (Array.isArray(idb) && idb.length > 0) {
+                    const { migratedRecords } = migrateUnbatchedRecords(deduplicateRecords(idb));
+                    setRecords(prev => prev.length > 0 ? prev : migratedRecords);
+                }
+            });
 
             // Tải ngầm kho hồ sơ lưu trữ vào RAM & IndexedDB để vào Báo cáo Lưu trữ tức thì 0ms
             fetchAllArchiveRecordsAsRecordFiles().catch(() => {});

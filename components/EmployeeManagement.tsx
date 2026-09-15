@@ -118,7 +118,7 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (evt) => {
+    reader.onload = async (evt) => {
       try {
         const data = evt.target?.result;
         const wb = XLSX.read(data, { type: 'array' });
@@ -126,24 +126,31 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
         const ws = wb.Sheets[wsname];
         const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
 
-        let count = 0;
+        const importedEmps: Employee[] = [];
         rows.forEach((row: any) => {
            const normalizedRow: Record<string, any> = {};
            Object.keys(row).forEach(k => normalizedRow[k.trim().toUpperCase()] = row[k]);
            
-           const id = String(normalizedRow['MÃ NHÂN VIÊN'] || normalizedRow['MÃ NV'] || normalizedRow['ID'] || '');
-           const name = String(normalizedRow['HỌ TÊN'] || normalizedRow['TÊN'] || normalizedRow['NAME'] || '');
+           const id = String(normalizedRow['MÃ NHÂN VIÊN'] || normalizedRow['MÃ NV'] || normalizedRow['ID'] || '').trim();
+           const name = String(normalizedRow['HỌ TÊN'] || normalizedRow['TÊN'] || normalizedRow['NAME'] || '').trim();
            const department = String(normalizedRow['PHÒNG BAN'] || normalizedRow['DEPARTMENT'] || 'Tổ Đo đạc');
            const position = String(normalizedRow['CHỨC VỤ'] || normalizedRow['POSITION'] || 'Nhân viên');
            const wardsRaw = String(normalizedRow['PHỤ TRÁCH'] || normalizedRow['XÃ PHƯỜNG'] || normalizedRow['KHU VỰC'] || '');
 
            if (id && name) {
-               const managedWards = wardsRaw.split(',').map(w => w.trim()).filter(w => w);
-               onSaveEmployee({ id, name, department, position, managedWards });
-               count++;
+               const managedWards = wardsRaw.split(',').map(w => w.trim()).filter(Boolean);
+               importedEmps.push({ id, name, department, position, managedWards });
            }
         });
-        alert(`Đã nhập thành công ${count} nhân viên.`);
+
+        if (importedEmps.length > 0) {
+            for (const emp of importedEmps) {
+                await onSaveEmployee(emp);
+            }
+            alert(`Đã nhập thành công ${importedEmps.length} nhân viên.`);
+        } else {
+            alert('Không tìm thấy dữ liệu nhân viên hợp lệ trong tệp Excel.');
+        }
       } catch (error) {
         console.error(error);
         alert('Lỗi đọc file Excel. Vui lòng kiểm tra định dạng.');

@@ -731,13 +731,25 @@ export const normalizePosition = (rawPos: any): string => {
     return 'Nhân viên';
 };
 
-export const mapEmployeeToDb = (e: Employee) => ({
-    id: e.id,
-    name: e.name,
-    department: e.department,
-    position: e.position,
-    "managedWards": Array.isArray(e.managedWards) ? JSON.stringify(e.managedWards) : e.managedWards
-});
+export const mapEmployeeToDb = (e: Employee) => {
+    const cleanDept = normalizeDepartment(e.department);
+    const cleanPos = normalizePosition(e.position);
+    const wardsArr = Array.isArray(e.managedWards) ? e.managedWards : [];
+    const wardsStr = JSON.stringify(wardsArr);
+
+    return {
+        id: e.id,
+        name: e.name,
+        ho_ten: e.name,
+        department: cleanDept,
+        phong_ban: cleanDept,
+        position: cleanPos,
+        chuc_vu: cleanPos,
+        managedWards: wardsStr,
+        managed_wards: wardsStr,
+        phuong_xa: wardsStr
+    };
+};
 
 export const mapEmployeeFromDb = (e: any): Employee => {
     if (!e) return { id: '', name: '', department: 'Tổ Đo đạc', position: 'Nhân viên', managedWards: [] };
