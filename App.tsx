@@ -263,6 +263,39 @@ function App() {
       handleSaveEmployee, handleDeleteEmployee, handleDeleteAllData, handleUpdateUser, handleDeleteUser
   } = useAppData(currentUser);
 
+  // --- TỰ ĐỘNG ĐỒNG BỘ THÔNG TIN & QUYỀN HẠN TÀI KHOẢN THEO DATABASE REALTIME ---
+  useEffect(() => {
+    if (currentUser && Array.isArray(users) && users.length > 0) {
+      const dbUser = users.find(u => (u.username || '').trim().toLowerCase() === (currentUser.username || '').trim().toLowerCase());
+      if (dbUser) {
+        const isRoleChanged = dbUser.role !== currentUser.role;
+        const isNameChanged = dbUser.name !== currentUser.name;
+        const isEmpChanged = dbUser.employeeId !== currentUser.employeeId;
+        const isPassChanged = dbUser.password !== currentUser.password;
+
+        if (isRoleChanged || isNameChanged || isEmpChanged || isPassChanged) {
+          console.log(`🔒 Thắt chặt phân quyền: Đã đồng bộ quyền hạn [${dbUser.username}]: ${currentUser.role} -> ${dbUser.role}`);
+          setCurrentUser(dbUser);
+          sessionStorage.setItem('current_user_session', JSON.stringify(dbUser));
+
+          if (isRoleChanged) {
+            const roleNameMap: Record<string, string> = {
+              [UserRole.ADMIN]: 'Quản trị viên (Admin)',
+              [UserRole.SUBADMIN]: 'Phó quản trị (Sub-Admin)',
+              [UserRole.TEAM_LEADER]: 'Trưởng nhóm / Tổ trưởng',
+              [UserRole.ONEDOOR]: 'Cán bộ Một cửa',
+              [UserRole.EMPLOYEE]: 'Chuyên viên'
+            };
+            setToast({
+              type: 'info' as any,
+              message: `Quyền hạn tài khoản của bạn vừa được quản trị viên đồng bộ thành: ${roleNameMap[dbUser.role] || dbUser.role}`
+            });
+          }
+        }
+      }
+    }
+  }, [users, currentUser]);
+
   // Khi có phiên bản mới hoặc admin phát hành bản mới, tự động mở lại popup cập nhật ngay lập tức
   useEffect(() => {
       if (isUpdateAvailable) {

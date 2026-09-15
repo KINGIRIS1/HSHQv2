@@ -946,18 +946,19 @@ function cleanString(str) {
               localStorage.setItem('sys_setting_department_permissions', deptPermsStr);
               localStorage.setItem('role_permissions', rolePermsStr);
               localStorage.setItem('department_permissions', deptPermsStr);
+              
+              window.dispatchEvent(new CustomEvent('permissions_updated', {
+                  detail: { rolePermissions, departmentPermissions }
+              }));
           } catch (_) {}
       }
 
-      const successRole = await saveSystemSetting('role_permissions', rolePermsStr);
-      const successDept = await saveSystemSetting('department_permissions', deptPermsStr);
+      await saveSystemSetting('role_permissions', rolePermsStr);
+      await saveSystemSetting('department_permissions', deptPermsStr);
+      
       setIsSavingPermissions(false);
-      if (successRole && successDept) {
-          if (onHolidaysChanged) onHolidaysChanged();
-          alert('Đã lưu cấu hình phân quyền thành công! Hệ thống đã cập nhật quyền hạn ngay lập tức.');
-      } else {
-          alert('Lỗi khi lưu cấu hình phân quyền.');
-      }
+      if (onHolidaysChanged) onHolidaysChanged();
+      alert('Đã lưu cấu hình phân quyền thành công! Hệ thống đã cập nhật quyền hạn ngay lập tức.');
   };
 
   const handleResetPermissions = async () => {

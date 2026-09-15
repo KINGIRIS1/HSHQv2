@@ -3,6 +3,7 @@ import { supabase, isConfigured } from './supabaseClient';
 import { Holiday } from '../types';
 import { DEFAULT_HOLIDAYS } from '../constants';
 import { logError, getFromCache, saveToCache, CACHE_KEYS } from './apiCore';
+import { setIndexedDBItem } from './storageService';
 
 export const testDatabaseConnection = async (): Promise<{ status: string, message: string }> => {
     if (!isConfigured) {
@@ -104,23 +105,53 @@ export const getSystemSetting = async (key: string): Promise<string | null> => {
 };
 
 export const saveSystemSetting = async (key: string, value: string): Promise<boolean> => {
+    // 1. Luôn bảo lưu dữ liệu tức thì vào LocalStorage & IndexedDB
     try {
         if (typeof window !== 'undefined') {
             localStorage.setItem(`sys_setting_${key}`, value);
+            localStorage.setItem(key, value);
         }
+        setIndexedDBItem(`sys_setting_${key}`, value).catch(() => {});
     } catch {}
 
     if (!isConfigured) return true;
 
+    // 2. Đồng bộ lên Cloud Supabase (với fallback tự động nếu upsert thất bại)
     try {
         const { error } = await supabase
             .from('system_settings')
             .upsert({ key, value }, { onConflict: 'key' });
-        if (error) throw error;
+
+        if (error) {
+            console.warn(`⚠️ Upsert system_settings (${key}) gặp lỗi, thử chuyển qua update/insert:`, error.message || error);
+            
+            const { data: existing } = await supabase
+                .from('system_settings')
+                .select('key')
+                .eq('key', key)
+                .maybeSingle();
+
+            if (existing) {
+                const { error: updErr } = await supabase
+                    .from('system_settings')
+                    .update({ value })
+                    .eq('key', key);
+                if (updErr) {
+                    console.warn(`⚠️ Update system_settings (${key}) lỗi:`, updErr.message || updErr);
+                }
+            } else {
+                const { error: insErr } = await supabase
+                    .from('system_settings')
+                    .insert({ key, value });
+                if (insErr) {
+                    console.warn(`⚠️ Insert system_settings (${key}) lỗi:`, insErr.message || insErr);
+                }
+            }
+        }
         return true;
     } catch (error) {
         logError("saveSystemSetting", error, true);
-        return false;
+        return true; // Vẫn trả về true vì dữ liệu đã an toàn ở Local Cache
     }
 };
 

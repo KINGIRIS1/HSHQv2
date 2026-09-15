@@ -351,10 +351,91 @@ export const useAppData = (currentUser: User | null) => {
             )
             .subscribe();
 
+        const usersChannel = supabase.channel('users_realtime_changes')
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'users' },
+                () => {
+                    fetchUsers().then(uData => {
+                        if (Array.isArray(uData) && uData.length > 0) {
+                            setUsers(uData);
+                        }
+                    }).catch(() => {});
+                }
+            )
+            .subscribe();
+
         return () => {
             supabase.removeChannel(landRecordsChannel);
             supabase.removeChannel(luutruRecordsChannel);
             supabase.removeChannel(dangkyRecordsChannel);
+            supabase.removeChannel(usersChannel);
+        };
+    }, []);
+
+    // Lắng nghe sự kiện cập nhật danh sách người dùng và phân quyền hệ thống liên tab/liên window
+    useEffect(() => {
+        const refreshUsers = async () => {
+            try {
+                const fresh = await fetchUsers();
+                if (Array.isArray(fresh) && fresh.length > 0) setUsers(fresh);
+            } catch (e) {}
+        };
+
+        const refreshPermissions = async () => {
+            try {
+                const permsData = await getSystemSetting('role_permissions');
+                const deptPermsData = await getSystemSetting('department_permissions');
+                if (permsData) {
+                    try {
+                        const parsed = JSON.parse(permsData);
+                        setRolePermissions(parsed);
+                    } catch (e) {}
+                }
+                if (deptPermsData) {
+                    try {
+                        const parsedDept = JSON.parse(deptPermsData);
+                        setDepartmentPermissions(parsedDept);
+                    } catch (e) {}
+                }
+            } catch (e) {}
+        };
+
+        const handleUserEvent = () => refreshUsers();
+        const handlePermEvent = (e: any) => {
+            if (e?.detail?.rolePermissions) setRolePermissions(e.detail.rolePermissions);
+            if (e?.detail?.departmentPermissions) setDepartmentPermissions(e.detail.departmentPermissions);
+            refreshPermissions();
+        };
+
+        window.addEventListener('users_updated', handleUserEvent);
+        window.addEventListener('permissions_updated', handlePermEvent);
+        window.addEventListener('focus', () => {
+            refreshUsers();
+            refreshPermissions();
+        });
+
+        let usersBc: BroadcastChannel | null = null;
+        if (typeof BroadcastChannel !== 'undefined') {
+            usersBc = new BroadcastChannel('app_users_channel');
+            usersBc.onmessage = (evt) => {
+                if (evt.data?.type === 'USERS_UPDATED') {
+                    refreshUsers();
+                }
+            };
+        }
+
+        // Tự động kiểm tra cập nhật tài khoản và phân quyền mỗi 15 giây
+        const userSyncInterval = setInterval(() => {
+            refreshUsers();
+            refreshPermissions();
+        }, 15000);
+
+        return () => {
+            window.removeEventListener('users_updated', handleUserEvent);
+            window.removeEventListener('permissions_updated', handlePermEvent);
+            if (usersBc) usersBc.close();
+            clearInterval(userSyncInterval);
         };
     }, []);
 
