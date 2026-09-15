@@ -1099,66 +1099,69 @@ const PersonalProfile: React.FC<PersonalProfileProps> = ({
 
   const handleConfirmSignFromModal = async (
     targetRecords: RecordFile[],
-    newComponents: DossierComponentItem[]
+    newComponents?: DossierComponentItem[]
   ) => {
-    const targetRecord = targetRecords[0];
-    if (!targetRecord) return;
+    if (!targetRecords || targetRecords.length === 0) return;
     const nowIso = new Date().toISOString();
 
-    if (
-      targetRecord.recordType === "Sao lục" ||
-      targetRecord.recordType === "Công văn" ||
-      isArchiveRecordType(targetRecord.recordType)
-    ) {
-      const historyEntry = {
-        action: "Ký duyệt",
-        status: "signed",
-        timestamp: nowIso,
-        user: user.name,
-      };
-      const currentArchive = archiveRecords.find((r) => r.id === targetRecord.id);
-      if (currentArchive) {
-        const oldHistory = Array.isArray(currentArchive.data?.history)
-          ? currentArchive.data.history
-          : [];
-        const newHistory = [...oldHistory, historyEntry];
-        await saveArchiveRecord({
-          ...currentArchive,
-          id: targetRecord.id,
+    for (const targetRecord of targetRecords) {
+      if (
+        targetRecord.recordType === "Sao lục" ||
+        targetRecord.recordType === "Công văn" ||
+        isArchiveRecordType(targetRecord.recordType)
+      ) {
+        const historyEntry = {
+          action: "Ký duyệt",
           status: "signed",
-          so_hieu: currentArchive.so_hieu || targetRecord.code || '',
-          noi_nhan_gui: currentArchive.noi_nhan_gui || targetRecord.customerName || '',
-          trich_yeu: currentArchive.trich_yeu || targetRecord.content || '',
-          data: {
-            ...currentArchive.data,
-            history: newHistory,
-            approvalDate: nowIso,
-            dossierComponents: newComponents,
-          },
-        });
-        const saoluc = await fetchArchiveRecords("saoluc");
-        const congvan = await fetchArchiveRecords("congvan");
-        setArchiveRecords([...saoluc, ...congvan]);
-      }
-    } else {
-      const updatedRecord: RecordFile = {
-        ...targetRecord,
-        status: RecordStatus.SIGNED,
-        approvalDate: nowIso,
-        dossierComponents: newComponents,
-      };
-
-      if (hasPendingRecordAttachments(updatedRecord)) {
-        enqueueRecordForBackgroundDriveSync(updatedRecord);
-      }
-
-      if (onUpdateRecord) {
-        await onUpdateRecord(updatedRecord);
+          timestamp: nowIso,
+          user: user.name,
+        };
+        const currentArchive = archiveRecords.find((r) => r.id === targetRecord.id);
+        if (currentArchive) {
+          const oldHistory = Array.isArray(currentArchive.data?.history)
+            ? currentArchive.data.history
+            : [];
+          const newHistory = [...oldHistory, historyEntry];
+          await saveArchiveRecord({
+            ...currentArchive,
+            id: targetRecord.id,
+            status: "signed",
+            so_hieu: currentArchive.so_hieu || targetRecord.code || '',
+            noi_nhan_gui: currentArchive.noi_nhan_gui || targetRecord.customerName || '',
+            trich_yeu: currentArchive.trich_yeu || targetRecord.content || '',
+            data: {
+              ...currentArchive.data,
+              history: newHistory,
+              approvalDate: nowIso,
+              ...(newComponents ? { dossierComponents: newComponents } : {}),
+            },
+          });
+        }
       } else {
-        await updateRecordApi(updatedRecord);
-        onUpdateStatus(targetRecord, RecordStatus.SIGNED);
+        const updatedRecord: RecordFile = {
+          ...targetRecord,
+          status: RecordStatus.SIGNED,
+          approvalDate: nowIso,
+          ...(newComponents ? { dossierComponents: newComponents } : {}),
+        };
+
+        if (hasPendingRecordAttachments(updatedRecord)) {
+          enqueueRecordForBackgroundDriveSync(updatedRecord);
+        }
+
+        if (onUpdateRecord) {
+          await onUpdateRecord(updatedRecord);
+        } else {
+          await updateRecordApi(updatedRecord);
+          onUpdateStatus(targetRecord, RecordStatus.SIGNED);
+        }
       }
     }
+
+    const saoluc = await fetchArchiveRecords("saoluc");
+    const congvan = await fetchArchiveRecords("congvan");
+    setArchiveRecords([...saoluc, ...congvan]);
+
     setIsSignApprovalModalOpen(false);
     setSignTargetRecord(null);
   };

@@ -31,19 +31,8 @@ export function checkUserPermission(
         return true;
     }
 
-    // Fallback to localStorage if not passed
-    if (!departmentPermissions && typeof window !== 'undefined') {
-        try {
-            const stored = localStorage.getItem('sys_setting_department_permissions') || localStorage.getItem('department_permissions');
-            if (stored) departmentPermissions = JSON.parse(stored);
-        } catch (_) {}
-    }
-    if (!rolePermissions && typeof window !== 'undefined') {
-        try {
-            const stored = localStorage.getItem('sys_setting_role_permissions') || localStorage.getItem('role_permissions');
-            if (stored) rolePermissions = JSON.parse(stored);
-        } catch (_) {}
-    }
+    // Strictly rely on passed in rolePermissions and departmentPermissions from Supabase state.
+    // Do NOT fallback to reading old stale localStorage items.
 
     // Check if user belongs to a specific department
     let userDept = '';

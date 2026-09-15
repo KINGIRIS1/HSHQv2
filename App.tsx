@@ -7,6 +7,8 @@ import MainLayout from './components/layout/MainLayout';
 import AppRoutes from './components/AppRoutes';
 import AppModals from './components/AppModals';
 
+import { findUserInDbDirectly, enrichUserWithEmployees } from './services/apiPeople';
+
 import { DEFAULT_VISIBLE_COLUMNS, confirmAction, COLUMN_DEFS, processAssignmentTimelineCheck, syncRecordStatusTransition, getDepartmentForRecord, getPureBatchNumber, isFieldWorkProcedure, isOfficeOnlySurveyProcedure } from './utils/appHelpers';
 import { exportReportToExcel, exportReturnedListToExcel } from './utils/excelExport';
 import { generateReport } from './services/geminiService';
@@ -263,38 +265,101 @@ function App() {
       handleSaveEmployee, handleDeleteEmployee, handleDeleteAllData, handleUpdateUser, handleDeleteUser
   } = useAppData(currentUser);
 
+  // --- KIỂM TRA & ĐỒNG BỘ VỚI DB SUPABASE TỨC THÌ KHI MỞ ỨNG DỤNG ---
+  useEffect(() => {
+    if (currentUser?.username) {
+      findUserInDbDirectly(currentUser.username).then(async dbUser => {
+        if (dbUser) {
+          if (dbUser.active === false) {
+            console.warn(`🔒 Tài khoản [${dbUser.username}] đã bị vô hiệu hóa bởi Quản trị viên.`);
+            setCurrentUser(null);
+            sessionStorage.removeItem('current_user_session');
+            setToast({
+              type: 'error' as any,
+              message: 'Tài khoản của bạn đã bị vô hiệu hóa hoặc bị khóa bởi Quản trị viên.'
+            });
+            return;
+          }
+          const fullyEnriched = await enrichUserWithEmployees(dbUser, employees);
+          if (
+            fullyEnriched.role !== currentUser.role ||
+            fullyEnriched.name !== currentUser.name ||
+            fullyEnriched.employeeId !== currentUser.employeeId ||
+            fullyEnriched.password !== currentUser.password ||
+            fullyEnriched.active !== currentUser.active
+          ) {
+            console.log(`🔒 Nạp lại phiên làm việc đầy đủ từ Supabase Cloud: [${fullyEnriched.username}] (${fullyEnriched.name})`);
+            setCurrentUser(fullyEnriched);
+            sessionStorage.setItem('current_user_session', JSON.stringify(fullyEnriched));
+          }
+        }
+      }).catch(() => {});
+    }
+  }, []);
+
+  // --- TỰ ĐỘNG ĐỒNG BỘ THÔNG TIN HỌ TÊN NHÂN VIÊN VÀ MAPPING KHÔNG PHỤ THUỘC CACHE TRÌNH DUYỆT ---
+  useEffect(() => {
+    if (currentUser && Array.isArray(employees) && employees.length > 0) {
+      enrichUserWithEmployees(currentUser, employees).then(enriched => {
+        if (
+          enriched.name !== currentUser.name ||
+          enriched.employeeId !== currentUser.employeeId
+        ) {
+          console.log(`✨ [Đồng bộ Họ tên Nhân viên] Cập nhật currentUser: "${currentUser.name}" -> "${enriched.name}"`);
+          setCurrentUser(enriched);
+          sessionStorage.setItem('current_user_session', JSON.stringify(enriched));
+        }
+      });
+    }
+  }, [employees, currentUser?.username, currentUser?.employeeId, currentUser?.name]);
+
   // --- TỰ ĐỘNG ĐỒNG BỘ THÔNG TIN & QUYỀN HẠN TÀI KHOẢN THEO DATABASE REALTIME ---
   useEffect(() => {
     if (currentUser && Array.isArray(users) && users.length > 0) {
-      const dbUser = users.find(u => (u.username || '').trim().toLowerCase() === (currentUser.username || '').trim().toLowerCase());
+      const cleanU = (currentUser.username || '').trim().toLowerCase();
+      const dbUser = users.find(u => (u.username || '').trim().toLowerCase() === cleanU);
       if (dbUser) {
-        const isRoleChanged = dbUser.role !== currentUser.role;
-        const isNameChanged = dbUser.name !== currentUser.name;
-        const isEmpChanged = dbUser.employeeId !== currentUser.employeeId;
-        const isPassChanged = dbUser.password !== currentUser.password;
-
-        if (isRoleChanged || isNameChanged || isEmpChanged || isPassChanged) {
-          console.log(`🔒 Thắt chặt phân quyền: Đã đồng bộ quyền hạn [${dbUser.username}]: ${currentUser.role} -> ${dbUser.role}`);
-          setCurrentUser(dbUser);
-          sessionStorage.setItem('current_user_session', JSON.stringify(dbUser));
-
-          if (isRoleChanged) {
-            const roleNameMap: Record<string, string> = {
-              [UserRole.ADMIN]: 'Quản trị viên (Admin)',
-              [UserRole.SUBADMIN]: 'Phó quản trị (Sub-Admin)',
-              [UserRole.TEAM_LEADER]: 'Trưởng nhóm / Tổ trưởng',
-              [UserRole.ONEDOOR]: 'Cán bộ Một cửa',
-              [UserRole.EMPLOYEE]: 'Chuyên viên'
-            };
-            setToast({
-              type: 'info' as any,
-              message: `Quyền hạn tài khoản của bạn vừa được quản trị viên đồng bộ thành: ${roleNameMap[dbUser.role] || dbUser.role}`
-            });
-          }
+        if (dbUser.active === false) {
+          console.warn(`🔒 Tài khoản [${dbUser.username}] đã bị vô hiệu hóa bởi Quản trị viên.`);
+          setCurrentUser(null);
+          sessionStorage.removeItem('current_user_session');
+          setToast({
+            type: 'error' as any,
+            message: 'Tài khoản của bạn đã bị vô hiệu hóa hoặc khóa bởi Quản trị viên.'
+          });
+          return;
         }
+
+        enrichUserWithEmployees(dbUser, employees).then(fullyEnriched => {
+          const isRoleChanged = fullyEnriched.role !== currentUser.role;
+          const isNameChanged = fullyEnriched.name !== currentUser.name;
+          const isEmpChanged = fullyEnriched.employeeId !== currentUser.employeeId;
+          const isPassChanged = fullyEnriched.password !== currentUser.password;
+          const isActiveChanged = fullyEnriched.active !== currentUser.active;
+
+          if (isRoleChanged || isNameChanged || isEmpChanged || isPassChanged || isActiveChanged) {
+            console.log(`🔒 Thắt chặt phân quyền & Họ tên: Đã đồng bộ [${fullyEnriched.username}]: ${currentUser.name} -> ${fullyEnriched.name}`);
+            setCurrentUser(fullyEnriched);
+            sessionStorage.setItem('current_user_session', JSON.stringify(fullyEnriched));
+
+            if (isRoleChanged) {
+              const roleNameMap: Record<string, string> = {
+                [UserRole.ADMIN]: 'Quản trị viên (Admin)',
+                [UserRole.SUBADMIN]: 'Phó quản trị (Sub-Admin)',
+                [UserRole.TEAM_LEADER]: 'Trưởng nhóm / Tổ trưởng',
+                [UserRole.ONEDOOR]: 'Cán bộ Một cửa',
+                [UserRole.EMPLOYEE]: 'Chuyên viên'
+              };
+              setToast({
+                type: 'info' as any,
+                message: `Quyền hạn tài khoản của bạn vừa được quản trị viên đồng bộ từ CSDL thành: ${roleNameMap[fullyEnriched.role] || fullyEnriched.role}`
+              });
+            }
+          }
+        });
       }
     }
-  }, [users, currentUser]);
+  }, [users, employees, currentUser]);
 
   // Khi có phiên bản mới hoặc admin phát hành bản mới, tự động mở lại popup cập nhật ngay lập tức
   useEffect(() => {
@@ -1170,21 +1235,21 @@ function App() {
   const handleConfirmSignBatch = async () => {
       if (!canPerformAction) return;
       if (selectedRecordIds.size === 0) { alert("Vui lòng chọn ít nhất một hồ sơ để ký duyệt."); return; }
-      const pendingSign = recordFilterProps.filteredRecords.filter(r => r.status === RecordStatus.PENDING_SIGN && selectedRecordIds.has(r.id));
-      if (pendingSign.length === 0) { alert("Các hồ sơ được chọn không ở trạng thái chờ ký."); return; }
+      const selectedList = records.filter(r => selectedRecordIds.has(r.id));
+      if (selectedList.length === 0) { alert("Không tìm thấy hồ sơ được chọn."); return; }
       
-      setSignApprovalTargetRecords(pendingSign);
+      setSignApprovalTargetRecords(selectedList);
       setIsSignApprovalModalOpen(true);
   };
 
-  const handleExecuteSignApproval = async (targetRecords: RecordFile[], newComponents: DossierComponentItem[]) => {
+  const handleExecuteSignApproval = async (targetRecords: RecordFile[], newComponents?: DossierComponentItem[]) => {
       const nowStr = new Date().toISOString();
       const updatedTargets = targetRecords.map(r => ({
           ...r,
           status: RecordStatus.SIGNED,
           approvalDate: nowStr,
           completedDate: null,
-          dossierComponents: newComponents,
+          ...(newComponents ? { dossierComponents: newComponents } : {}),
           statusLogs: createStatusLog(r, RecordStatus.SIGNED, 'Ký duyệt')
       }));
 

@@ -23,9 +23,10 @@ const HandoverOfficeModal: React.FC<HandoverOfficeModalProps> = ({
   const [selectedDrafterId, setSelectedDrafterId] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const isSingle = records.length === 1;
   const initialRecord = records[0] || null;
   const initialComponents: DossierComponentItem[] = useMemo(() => {
-    if (!initialRecord?.dossierComponents) return [];
+    if (!initialRecord?.dossierComponents || !isSingle) return [];
     if (Array.isArray(initialRecord.dossierComponents)) return initialRecord.dossierComponents;
     if (typeof initialRecord.dossierComponents === 'string') {
       try {
@@ -36,7 +37,7 @@ const HandoverOfficeModal: React.FC<HandoverOfficeModalProps> = ({
       }
     }
     return [];
-  }, [initialRecord]);
+  }, [initialRecord, isSingle]);
 
   const [components, setComponents] = useState<DossierComponentItem[]>(initialComponents);
 
@@ -76,7 +77,7 @@ const HandoverOfficeModal: React.FC<HandoverOfficeModalProps> = ({
     }
     setIsSubmitting(true);
     try {
-      await onConfirm(selectedDrafterId, components);
+      await onConfirm(selectedDrafterId, isSingle ? components : undefined);
       onClose();
     } catch (err) {
       console.error('Error during handover:', err);
@@ -88,7 +89,7 @@ const HandoverOfficeModal: React.FC<HandoverOfficeModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fade-in">
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-2xl w-full overflow-hidden flex flex-col max-h-[90vh] animate-fade-in-up">
+      <div className={`bg-white rounded-2xl shadow-2xl border border-slate-200 ${isSingle ? 'max-w-2xl' : 'max-w-lg'} w-full overflow-hidden flex flex-col max-h-[90vh] animate-fade-in-up`}>
         {/* Header */}
         <div className="p-4 bg-gradient-to-r from-sky-600 to-blue-700 text-white flex justify-between items-center shrink-0">
           <div className="flex items-center gap-2.5">
@@ -97,7 +98,7 @@ const HandoverOfficeModal: React.FC<HandoverOfficeModalProps> = ({
             </div>
             <div>
               <h3 className="font-bold text-base leading-tight">
-                Biên Tập Bản Đồ
+                Biên Tập Bản Đồ {isSingle ? `(${initialRecord?.code})` : `(${records.length} hồ sơ)`}
               </h3>
               <p className="text-xs text-sky-100 mt-0.5">
                 Hoàn thành đo thực địa & giao chuyên viên biên tập
@@ -180,15 +181,17 @@ const HandoverOfficeModal: React.FC<HandoverOfficeModalProps> = ({
             </div>
           </div>
 
-          {/* Thành phần hồ sơ & Tệp đính kèm (Biên tập bản đồ) */}
-          <DossierComponentSection
-            recordCode={initialRecord?.code || 'HS'}
-            department="Tổ Đo đạc"
-            stage="Biên tập bản đồ"
-            components={components}
-            onChange={setComponents}
-            title="Thành phần hồ sơ & Tệp đính kèm"
-          />
+          {/* Thành phần hồ sơ & Tệp đính kèm (Biên tập bản đồ - chỉ áp dụng khi giao 1 hồ sơ đơn lẻ) */}
+          {isSingle && (
+            <DossierComponentSection
+              recordCode={initialRecord?.code || 'HS'}
+              department="Tổ Đo đạc"
+              stage="Biên tập bản đồ"
+              components={components}
+              onChange={setComponents}
+              title="Thành phần hồ sơ & Tệp đính kèm"
+            />
+          )}
         </div>
 
         {/* Footer */}

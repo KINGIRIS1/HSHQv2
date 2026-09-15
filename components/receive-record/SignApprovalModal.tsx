@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { X, FileCheck, CheckCircle, AlertCircle, Clock, User, FileText } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { X, FileCheck, CheckCircle } from 'lucide-react';
 import { RecordFile, DossierComponentItem } from '../../types';
 import DossierComponentSection from './DossierComponentSection';
 
@@ -8,7 +8,7 @@ interface SignApprovalModalProps {
   onClose: () => void;
   record?: RecordFile | null;
   records?: RecordFile[];
-  onConfirm: (targetRecords: RecordFile[], newComponents: DossierComponentItem[]) => Promise<void> | void;
+  onConfirm: (targetRecords: RecordFile[], newComponents?: DossierComponentItem[]) => Promise<void> | void;
 }
 
 export const SignApprovalModal: React.FC<SignApprovalModalProps> = ({
@@ -26,11 +26,12 @@ export const SignApprovalModal: React.FC<SignApprovalModalProps> = ({
     return [];
   }, [record, records]);
 
+  const isMultiple = effectiveRecords.length > 1;
   const primaryRecord = effectiveRecords[0] || null;
 
-  // Parse initial components from the primary record
+  // Thành phần hồ sơ cho trường hợp ký đơn lẻ 1 hồ sơ
   const initialComponents: DossierComponentItem[] = useMemo(() => {
-    if (!primaryRecord) return [];
+    if (!primaryRecord || isMultiple) return [];
     if (Array.isArray(primaryRecord.dossierComponents)) return primaryRecord.dossierComponents;
     if (typeof primaryRecord.dossierComponents === 'string') {
       try {
@@ -41,20 +42,20 @@ export const SignApprovalModal: React.FC<SignApprovalModalProps> = ({
       }
     }
     return [];
-  }, [primaryRecord]);
+  }, [primaryRecord, isMultiple]);
 
   const [components, setComponents] = useState<DossierComponentItem[]>(initialComponents);
 
-  React.useEffect(() => {
+  useEffect(() => {
     setComponents(initialComponents);
   }, [initialComponents]);
 
-  if (!isOpen || effectiveRecords.length === 0 || !primaryRecord) return null;
+  if (!isOpen || effectiveRecords.length === 0) return null;
 
   const handleConfirmSign = async () => {
     setIsSubmitting(true);
     try {
-      await onConfirm(effectiveRecords, components);
+      await onConfirm(effectiveRecords, isMultiple ? undefined : components);
       onClose();
     } catch (err) {
       console.error('Lỗi khi ký duyệt hồ sơ:', err);
@@ -64,11 +65,9 @@ export const SignApprovalModal: React.FC<SignApprovalModalProps> = ({
     }
   };
 
-  const isMultiple = effectiveRecords.length > 1;
-
   return (
     <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fade-in">
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-2xl w-full overflow-hidden flex flex-col max-h-[90vh] animate-fade-in-up">
+      <div className={`bg-white rounded-2xl shadow-2xl border border-slate-200 ${isMultiple ? 'max-w-md' : 'max-w-2xl'} w-full overflow-hidden flex flex-col max-h-[90vh] animate-fade-in-up`}>
         {/* Header */}
         <div className="p-4 bg-gradient-to-r from-purple-700 to-indigo-800 text-white flex justify-between items-center shrink-0">
           <div className="flex items-center gap-2.5">
@@ -77,10 +76,10 @@ export const SignApprovalModal: React.FC<SignApprovalModalProps> = ({
             </div>
             <div>
               <h3 className="font-bold text-base leading-tight">
-                {isMultiple ? `Ký duyệt đợt (${effectiveRecords.length} hồ sơ)` : `Ký duyệt hồ sơ: ${primaryRecord.code}`}
+                {isMultiple ? `Ký duyệt ${effectiveRecords.length} hồ sơ` : `Ký duyệt hồ sơ: ${primaryRecord?.code}`}
               </h3>
               <p className="text-xs text-purple-200 mt-0.5">
-                Xác nhận phê duyệt & đính kèm tài liệu đã ký trước khi chuyển Chờ bàn giao
+                {isMultiple ? `Ký duyệt đợt ${effectiveRecords.length} hồ sơ` : `Đính kèm kết quả & ký duyệt hồ sơ`}
               </p>
             </div>
           </div>
@@ -93,51 +92,30 @@ export const SignApprovalModal: React.FC<SignApprovalModalProps> = ({
         </div>
 
         {/* Body */}
-        <div className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1">
-          {/* Tóm tắt thông tin hồ sơ */}
+        <div className="p-5 space-y-4 overflow-y-auto flex-1 text-slate-700">
           {isMultiple ? (
-            <div className="bg-purple-50/60 border border-purple-200/80 rounded-xl p-3 text-xs text-slate-700 space-y-2">
-              <div className="font-bold text-purple-900">
-                Danh sách {effectiveRecords.length} hồ sơ đang được ký duyệt:
+            /* KÝ HÀNG LOẠT: Chỉ hiển thị duy nhất thông điệp "Ký duyệt X hồ sơ", bỏ toàn bộ danh sách, tóm tắt và đính kèm */
+            <div className="py-4 text-center">
+              <div className="text-base font-bold text-purple-900">
+                Ký duyệt {effectiveRecords.length} hồ sơ
               </div>
-              <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto pr-1">
-                {effectiveRecords.map((r) => (
-                  <span
-                    key={r.id}
-                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white border border-purple-200 text-purple-900 font-mono font-bold text-xs shadow-2xs"
-                  >
-                    {r.code}
-                    {r.customerName && <span className="font-normal text-slate-500 text-[11px] truncate max-w-[120px]">({r.customerName})</span>}
-                  </span>
-                ))}
-              </div>
+              <p className="text-xs text-slate-500 mt-1">
+                Xác nhận chuyển trạng thái Đã ký duyệt cho tất cả {effectiveRecords.length} hồ sơ đã chọn.
+              </p>
             </div>
           ) : (
-            <div className="bg-purple-50/60 border border-purple-200/80 rounded-xl p-3 text-xs text-slate-700 grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <div>
-                <span className="text-slate-500">Chủ sử dụng / Người nộp:</span>{' '}
-                <strong className="text-slate-800">{primaryRecord.customerName || '---'}</strong>
-              </div>
-              <div>
-                <span className="text-slate-500">Loại thủ tục:</span>{' '}
-                <strong className="text-purple-700">{primaryRecord.recordType || '---'}</strong>
-              </div>
-              <div className="sm:col-span-2">
-                <span className="text-slate-500">Nội dung yêu cầu:</span>{' '}
-                <span className="text-slate-800">{primaryRecord.content || '---'}</span>
-              </div>
+            /* KÝ ĐƠN LẺ (1 hồ sơ): Bỏ tóm tắt thông tin hồ sơ, chỉ hiển thị Khối đính kèm kết quả / Thành phần hồ sơ */
+            <div>
+              <DossierComponentSection
+                recordCode={primaryRecord?.code || 'HS'}
+                department="Ban Lãnh đạo"
+                stage="Ký duyệt"
+                components={components}
+                onChange={setComponents}
+                title="Thành phần hồ sơ & Tệp đính kèm kết quả"
+              />
             </div>
           )}
-
-          {/* Khối Thành phần hồ sơ & Tệp đính kèm với nút "Thêm mới" */}
-          <DossierComponentSection
-            recordCode={primaryRecord.code || 'HS'}
-            department="Ban Lãnh đạo"
-            stage="Ký duyệt"
-            components={components}
-            onChange={setComponents}
-            title="Thành phần hồ sơ & Tệp đính kèm ký duyệt"
-          />
         </div>
 
         {/* Footer */}
@@ -157,7 +135,7 @@ export const SignApprovalModal: React.FC<SignApprovalModalProps> = ({
             className="px-5 py-2 bg-purple-700 hover:bg-purple-800 text-white rounded-xl font-bold text-xs cursor-pointer transition-all shadow-xs flex items-center gap-1.5 disabled:opacity-50"
           >
             <CheckCircle size={15} />
-            {isSubmitting ? 'Đang xử lý...' : 'Xác nhận'}
+            {isSubmitting ? 'Đang ký duyệt...' : `Xác nhận Ký duyệt${isMultiple ? ` (${effectiveRecords.length})` : ''}`}
           </button>
         </div>
       </div>
@@ -166,3 +144,4 @@ export const SignApprovalModal: React.FC<SignApprovalModalProps> = ({
 };
 
 export default SignApprovalModal;
+

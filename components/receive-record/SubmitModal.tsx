@@ -17,9 +17,11 @@ interface SubmitModalProps {
 const SubmitModal: React.FC<SubmitModalProps> = ({ isOpen, onClose, records, onConfirm, users, employees, isCheckMode }) => {
     const [selectedDirector, setSelectedDirector] = useState<string>('');
 
+    const isSingle = records.length === 1;
     const initialRecord = records[0] || null;
+
     const initialComponents: DossierComponentItem[] = useMemo(() => {
-        if (!initialRecord?.dossierComponents) return [];
+        if (!initialRecord?.dossierComponents || !isSingle) return [];
         if (Array.isArray(initialRecord.dossierComponents)) return initialRecord.dossierComponents;
         if (typeof initialRecord.dossierComponents === 'string') {
             try {
@@ -30,7 +32,7 @@ const SubmitModal: React.FC<SubmitModalProps> = ({ isOpen, onClose, records, onC
             }
         }
         return [];
-    }, [initialRecord]);
+    }, [initialRecord, isSingle]);
 
     const [components, setComponents] = useState<DossierComponentItem[]>(initialComponents);
 
@@ -80,17 +82,17 @@ const SubmitModal: React.FC<SubmitModalProps> = ({ isOpen, onClose, records, onC
             alert(isCheckMode ? 'Vui lòng chọn người kiểm tra.' : 'Vui lòng chọn người được trình ký.');
             return;
         }
-        onConfirm(selectedDirector, components);
+        onConfirm(selectedDirector, isSingle ? components : undefined);
         setSelectedDirector('');
     };
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 backdrop-blur-sm animate-fade-in">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col transform transition-all animate-fade-in-up">
+            <div className={`bg-white rounded-2xl shadow-2xl w-full ${isSingle ? 'max-w-2xl' : 'max-w-lg'} max-h-[90vh] overflow-hidden flex flex-col transform transition-all animate-fade-in-up`}>
                 <div className={`${isCheckMode ? 'bg-orange-600' : 'bg-indigo-600'} p-4 flex justify-between items-center text-white shrink-0`}>
                     <h2 className="text-lg font-bold flex items-center gap-2">
                         <FileSignature size={20} />
-                        {isCheckMode ? 'Trình Kiểm Tra' : 'Trình Ký Duyệt'}
+                        {isCheckMode ? 'Trình Kiểm Tra' : 'Trình Ký Duyệt'} {isSingle ? `(${initialRecord?.code})` : `(${records.length} hồ sơ)`}
                     </h2>
                     <button onClick={onClose} className={`${isCheckMode ? 'text-orange-200' : 'text-indigo-200'} hover:text-white transition-colors cursor-pointer`}>
                         <X size={24} />
@@ -100,7 +102,10 @@ const SubmitModal: React.FC<SubmitModalProps> = ({ isOpen, onClose, records, onC
                 <div className="p-5 overflow-y-auto flex-1 space-y-4">
                     <div>
                         <p className="text-gray-700 mb-2 font-medium">
-                            Bạn đang {isCheckMode ? 'trình kiểm tra' : 'trình ký'} <span className={`font-bold ${isCheckMode ? 'text-orange-600' : 'text-indigo-600'}`}>{records.length}</span> hồ sơ.
+                            {isSingle 
+                                ? `Trình ${isCheckMode ? 'kiểm tra' : 'ký duyệt'} hồ sơ ${initialRecord?.code}` 
+                                : `Trình ${isCheckMode ? 'kiểm tra' : 'ký duyệt'} ${records.length} hồ sơ`
+                            }
                         </p>
                         <p className="text-sm text-gray-500 mb-3">
                             Vui lòng chọn {isCheckMode ? 'Tổ trưởng/Tổ phó' : 'Giám đốc/Phó giám đốc'} để {isCheckMode ? 'trình kiểm tra' : 'trình ký'}:
@@ -140,15 +145,19 @@ const SubmitModal: React.FC<SubmitModalProps> = ({ isOpen, onClose, records, onC
                         </div>
                     </div>
 
-                    {/* Thành phần hồ sơ & Tệp đính kèm dưới bảng chọn người */}
-                    <DossierComponentSection
-                        recordCode={initialRecord?.code || 'HS'}
-                        department={isCheckMode ? 'Tổ Đo đạc' : 'Ban Lãnh đạo'}
-                        stage={isCheckMode ? 'Trình kiểm tra' : 'Trình ký'}
-                        components={components}
-                        onChange={setComponents}
-                        title={`Thành phần hồ sơ & Tệp đính kèm (${isCheckMode ? 'Trình kiểm tra' : 'Trình ký'})`}
-                    />
+                    {/* Đối với chuyển bước đơn lẻ 1 hồ sơ: Hiển thị khối Thành phần hồ sơ & Tệp đính kèm kết quả */}
+                    {isSingle && (
+                        <div className="pt-2 border-t border-gray-100">
+                            <DossierComponentSection
+                                recordCode={initialRecord?.code || 'HS'}
+                                department={isCheckMode ? 'Tổ Đo đạc' : 'Ban Lãnh đạo'}
+                                stage={isCheckMode ? 'Trình kiểm tra' : 'Trình ký'}
+                                components={components}
+                                onChange={setComponents}
+                                title={`Thành phần hồ sơ & Tệp đính kèm (${isCheckMode ? 'Trình kiểm tra' : 'Trình ký'})`}
+                            />
+                        </div>
+                    )}
                 </div>
 
                 <div className="flex justify-end gap-3 p-4 border-t border-gray-100 bg-gray-50 shrink-0">

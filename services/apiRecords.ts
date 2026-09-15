@@ -31,7 +31,7 @@ const RECORD_DB_COLUMNS = [
  * - Nhóm 3.x (Đăng ký đất đai, Cấp giấy, Đăng ký biến động) -> dangky_records
  */
 export const getTargetTable = (record: Partial<RecordFile>): 'dangky_records' | 'land_records' | 'luutru_records' => {
-    // 0. Ưu tiên tuyệt đối nếu sourceTable đã được chỉ định (như Module Đo đạc - Test chỉ định dangky_records)
+    // 0. Ưu tiên tuyệt đối nếu sourceTable đã được chỉ định (như Module Cấp giấy hoặc Module Đo đạc - Test chỉ định dangky_records)
     if (record.sourceTable === 'dangky_records') return 'dangky_records';
     if (record.sourceTable === 'luutru_records' || record.sourceTable === 'archive_records') return 'luutru_records';
     if (record.sourceTable === 'land_records') return 'land_records';
@@ -39,13 +39,15 @@ export const getTargetTable = (record: Partial<RecordFile>): 'dangky_records' | 
     const rawType = String(record.recordType || record.content || '').trim();
     const code = String(record.code || '').trim();
     const shortType = getShortRecordType(rawType);
+    const groupStr = String(record.group || '').trim();
 
-    // 1. Phân loại theo tiền tố mã thủ tục nghiêm ngặt (không dùng từ khóa)
+    // 1. Phân loại theo tiền tố mã thủ tục nghiêm ngặt
     // Nhóm 1.x -> Tổ Lưu trữ (luutru_records)
     if (
         shortType.startsWith('1.') ||
         rawType.startsWith('1.') ||
         code.startsWith('1.') ||
+        groupStr.startsWith('1.') ||
         isArchiveRecordType(record.recordType) ||
         isArchiveRecordType(record.content)
     ) {
@@ -56,7 +58,11 @@ export const getTargetTable = (record: Partial<RecordFile>): 'dangky_records' | 
     if (
         shortType.startsWith('3.') ||
         rawType.startsWith('3.') ||
-        code.startsWith('3.')
+        code.startsWith('3.') ||
+        groupStr.startsWith('3.') ||
+        groupStr.includes('Đăng ký') ||
+        groupStr.includes('Cấp GCN') ||
+        groupStr.includes('Cấp giấy')
     ) {
         return 'dangky_records';
     }
@@ -65,7 +71,8 @@ export const getTargetTable = (record: Partial<RecordFile>): 'dangky_records' | 
     if (
         shortType.startsWith('2.') ||
         rawType.startsWith('2.') ||
-        code.startsWith('2.')
+        code.startsWith('2.') ||
+        groupStr.startsWith('2.')
     ) {
         return 'land_records';
     }
@@ -74,8 +81,13 @@ export const getTargetTable = (record: Partial<RecordFile>): 'dangky_records' | 
     if (record.id || record.code) {
         const cached: RecordFile[] = getFromCache(CACHE_KEYS.RECORDS, []);
         const found = cached.find(r => (record.id && r.id === record.id) || (record.code && r.code === record.code));
-        if (found && (found.recordType || found.content)) {
-            return getTargetTable(found);
+        if (found) {
+            if (found.sourceTable === 'dangky_records') return 'dangky_records';
+            if (found.sourceTable === 'luutru_records') return 'luutru_records';
+            if (found.sourceTable === 'land_records') return 'land_records';
+            if (found.recordType || found.content) {
+                return getTargetTable(found);
+            }
         }
     }
 
@@ -586,17 +598,6 @@ export const createRecordApi = async (record: RecordFile): Promise<RecordFile | 
             const res = await supabase.from(targetTable).insert([fallbackPayload]).select();
             data = res.data;
             error = res.error;
-        }
-
-        // 3. Fallback sang bảng land_records nếu bảng chuyên biệt (luutru_records / dangky_records) bị lỗi cấu trúc hoặc phân quyền
-        if (error && targetTable !== 'land_records') {
-            console.warn(`⚠️ [Fallback Table] Bảng ${targetTable} gặp lỗi (${error.message || error.code}). Chuyển hướng lưu an toàn sang bảng land_records...`);
-            const landFallbackPayload = sanitizePayloadFor22P02({ ...payload });
-            const landRes = await supabase.from('land_records').insert([landFallbackPayload]).select();
-            if (!landRes.error && landRes.data && landRes.data.length > 0) {
-                data = landRes.data;
-                error = null;
-            }
         }
         
         if (error) throw error;
@@ -1164,18 +1165,10 @@ export const forceUpdateRecordsBatchApi = async (records: RecordFile[], onProgre
                         });
                         const { error: fallbackError } = await supabase.from(table).upsert(fallbackPayload);
                         if (fallbackError) {
-                            if (table === 'dangky_records' && (fallbackError.code === '42P01' || fallbackError.code === 'PGRST205')) {
-                                await supabase.from('land_records').upsert(fallbackPayload);
-                            } else {
-                                throw fallbackError;
-                            }
+                            throw fallbackError;
                         }
                     } else if (upsertError) {
-                        if (table === 'dangky_records' && (upsertError.code === '42P01' || upsertError.code === 'PGRST205')) {
-                            await supabase.from('land_records').upsert(upChunk);
-                        } else {
-                            throw upsertError;
-                        }
+                        throw upsertError;
                     }
                 }
             };
@@ -1258,10 +1251,6 @@ export const updateRecordsBatchById = async (updates: Partial<RecordFile>[], onP
                 const { error: fallbackError } = await supabase.from(table).upsert(fallbackPayload);
                 if (fallbackError) throw fallbackError;
             } else if (error) {
-                if (table === 'dangky_records' && (error.code === '42P01' || error.code === 'PGRST205')) {
-                    await supabase.from('land_records').upsert(payload);
-                    return;
-                }
                 throw error;
             }
         };
@@ -1313,9 +1302,8 @@ export const bulkUpdateDangKyRecordsApi = async (records: RecordFile[]): Promise
             const { error } = await query;
             if (error) {
                 console.warn(`⚠️ [bulkUpdateDangKyRecordsApi] Error updating record ${r.id || r.code} in ${targetTable}:`, error);
-                await supabase.from('dangky_records').update(payload).or(`id.eq.${r.id},code.eq.${r.code}`);
-                await supabase.from('land_records').update(payload).or(`id.eq.${r.id},code.eq.${r.code}`);
-                await supabase.from('luutru_records').update(payload).or(`id.eq.${r.id},code.eq.${r.code}`);
+                // Thử lại duy nhất trên targetTable đã chỉ định
+                await supabase.from(targetTable).update(payload).or(`id.eq.${r.id},code.eq.${r.code}`);
             } else {
                 purgeRecordFromOtherTables(r.id, r.code, targetTable);
             }

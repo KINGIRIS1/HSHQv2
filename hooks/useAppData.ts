@@ -3,7 +3,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { RecordFile, Employee, User, UserRole, RecordStatus, Holiday, RolePermissions, DepartmentPermissions, DEFAULT_ROLE_PERMISSIONS } from '../types';
 import { fetchRecords, fetchEmployees, fetchUsers, fetchUpdateInfo, fetchHolidays,
     createRecordApi, updateRecordApi, deleteRecordApi, deleteRecordsBatchApi, createRecordsBatchApi,
-    saveEmployeeApi, deleteEmployeeApi, saveUserApi, deleteUserApi, deleteAllDataApi, getSystemSetting
+    saveEmployeeApi, deleteEmployeeApi, saveUserApi, deleteUserApi, deleteAllDataApi, getSystemSetting,
+    enrichUsersList
 } from '../services/api';
 import { supabase } from '../services/supabaseClient';
 import { mapRecordFromDb, getFromCache, CACHE_KEYS } from '../services/apiCore';
@@ -111,7 +112,8 @@ export const useAppData = (currentUser: User | null) => {
                 setEmployees(empData);
             }
             if (Array.isArray(userData) && userData.length > 0) {
-                setUsers(userData);
+                const enrichedUsers = await enrichUsersList(userData, empData || employees);
+                setUsers(enrichedUsers);
             }
             if (Array.isArray(holidayData)) {
                 setHolidays(holidayData);

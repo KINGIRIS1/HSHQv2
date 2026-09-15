@@ -724,10 +724,8 @@ export const mapUserToDb = (u: User) => ({
     password: u.password,
     name: u.name,
     role: u.role,
-    employeeId: u.employeeId || null,
     employee_id: u.employeeId || null,
-    active: u.active !== undefined ? u.active : true,
-    is_active: u.active !== undefined ? u.active : true
+    active: u.active !== undefined ? u.active : true
 });
 
 export const mapUserFromDb = (u: any): User => {
