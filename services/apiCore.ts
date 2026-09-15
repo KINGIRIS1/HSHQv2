@@ -742,6 +742,7 @@ export const mapEmployeeToDb = (e: Employee) => {
         name: e.name,
         department: cleanDept,
         position: cleanPos,
+        managedWards: wardsStr,
         managed_wards: wardsStr
     };
 };

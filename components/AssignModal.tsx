@@ -52,6 +52,14 @@ const DEPARTMENTS_CONFIG: DeptConfig[] = [
         matchKeys: ['ban giám đốc', 'giám đốc', 'lãnh đạo'],
         icon: <Shield size={16} />,
         colorClass: 'text-rose-600 bg-rose-50 border-rose-200'
+    },
+    {
+        id: 'ALL',
+        label: 'Tất cả nhân sự',
+        subtitle: 'Danh sách toàn thể cán bộ đơn vị...',
+        matchKeys: [],
+        icon: <Layers size={16} />,
+        colorClass: 'text-slate-700 bg-slate-100 border-slate-300'
     }
 ];
 

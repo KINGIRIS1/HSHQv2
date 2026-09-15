@@ -87,19 +87,35 @@ export const fetchEmployees = async (): Promise<Employee[]> => {
                             (e.name || '').trim().toLowerCase() === empName.toLowerCase()
                         );
                         if (!exists) {
-                            const userRoleStr = String(mappedUser.role).toUpperCase();
-                            let defaultDept = 'Tổ Hành chính';
-                            if (userRoleStr === 'SURVEYOR' || userRoleStr === 'STAFF') defaultDept = 'Tổ Đo đạc';
-                            else if (userRoleStr === 'ARCHIVE_STAFF') defaultDept = 'Tổ Lưu trữ';
-                            else if (userRoleStr === 'SUBADMIN' || userRoleStr === 'ADMIN') defaultDept = 'Ban Giám đốc';
+                            // Đối soát với MOCK_EMPLOYEES danh sách chuẩn để lấy phòng ban & địa bàn chính xác
+                            const mockMatch = MOCK_EMPLOYEES.find(m => 
+                                m.id.toLowerCase() === empId.toLowerCase() || 
+                                m.name.toLowerCase() === empName.toLowerCase()
+                            );
 
-                            cloudEmps.push({
-                                id: empId,
-                                name: empName,
-                                department: normalizeDepartment(defaultDept),
-                                position: normalizePosition(userRoleStr === 'SUBADMIN' || userRoleStr === 'ADMIN' ? 'Tổ Trưởng' : 'Nhân viên'),
-                                managedWards: []
-                            });
+                            if (mockMatch) {
+                                cloudEmps.push({
+                                    id: empId,
+                                    name: empName,
+                                    department: mockMatch.department,
+                                    position: mockMatch.position,
+                                    managedWards: mockMatch.managedWards || []
+                                });
+                            } else {
+                                const userRoleStr = String(mappedUser.role).toUpperCase();
+                                let defaultDept = 'Tổ Đo đạc';
+                                if (userRoleStr === 'ARCHIVE_STAFF') defaultDept = 'Tổ Lưu trữ';
+                                else if (userRoleStr === 'SUBADMIN' || userRoleStr === 'ADMIN') defaultDept = 'Ban Giám đốc';
+                                else if (userRoleStr === 'ONEDOOR') defaultDept = 'Tổ Hành chính';
+
+                                cloudEmps.push({
+                                    id: empId,
+                                    name: empName,
+                                    department: normalizeDepartment(defaultDept),
+                                    position: normalizePosition(userRoleStr === 'SUBADMIN' || userRoleStr === 'ADMIN' ? 'Tổ Trưởng' : 'Nhân viên'),
+                                    managedWards: []
+                                });
+                            }
                         }
                     }
                 });
@@ -108,6 +124,30 @@ export const fetchEmployees = async (): Promise<Employee[]> => {
             console.warn("Lỗi tự động tổng hợp danh sách nhân viên từ danh sách Users:", e);
         }
     }
+
+    // Luôn bảo đảm các nhân viên chuẩn trong MOCK_EMPLOYEES có mặt đầy đủ
+    MOCK_EMPLOYEES.forEach(mockEmp => {
+        const found = cloudEmps.find(e => 
+            (e.id || '').trim().toLowerCase() === mockEmp.id.toLowerCase() || 
+            (e.name || '').trim().toLowerCase() === mockEmp.name.toLowerCase()
+        );
+        if (!found) {
+            cloudEmps.push(mockEmp);
+        } else {
+            // Nếu nhân viên có trong cloudEmps nhưng phòng ban bị rỗng hoặc mặc định Hành chính, cập nhật sang tổ chuyên môn chuẩn
+            if (!found.department || found.department === 'Tổ Hành chính') {
+                if (mockEmp.department !== 'Tổ Hành chính') {
+                    found.department = mockEmp.department;
+                }
+            }
+            if ((!found.position || found.position === 'Nhân viên') && mockEmp.position !== 'Nhân viên') {
+                found.position = mockEmp.position;
+            }
+            if ((!found.managedWards || found.managedWards.length === 0) && (mockEmp.managedWards && mockEmp.managedWards.length > 0)) {
+                found.managedWards = mockEmp.managedWards;
+            }
+        }
+    });
 
     if (cloudEmps.length > 0) {
         saveToCache(CACHE_KEYS.EMPLOYEES, cloudEmps);
@@ -144,23 +184,45 @@ export const saveEmployeeApi = async (employee: Employee, isUpdate: boolean): Pr
     }
 
     try {
-        const payload = mapEmployeeToDb(cleanEmp);
+        const wardsArr = Array.isArray(cleanEmp.managedWards) ? cleanEmp.managedWards : [];
+        const wardsStr = JSON.stringify(wardsArr);
         
-        // 1. Thử lưu vào bảng employees SQL
+        // 1. Thử lưu vào bảng employees SQL (thử payload chuẩn managedWards trước, nếu không được thử managed_wards)
         try {
+            const payloadManagedWards = {
+                id: cleanEmp.id,
+                name: cleanEmp.name,
+                department: cleanEmp.department,
+                position: cleanEmp.position,
+                managedWards: wardsStr
+            };
+            
+            let saveErr: any = null;
             if (isUpdate) {
-                const { error } = await supabase.from('employees').update(payload).eq('id', cleanEmp.id);
-                if (error) {
-                    console.warn("Lỗi update bảng employees:", error);
-                }
+                const res = await supabase.from('employees').update(payloadManagedWards).eq('id', cleanEmp.id);
+                saveErr = res.error;
             } else {
-                const { error } = await supabase.from('employees').insert([payload]);
-                if (error) {
-                    console.warn("Lỗi insert bảng employees:", error);
+                const res = await supabase.from('employees').insert([payloadManagedWards]);
+                saveErr = res.error;
+            }
+
+            // Nếu schema CSDL dùng tên cột managed_wards dạng snake_case
+            if (saveErr && (saveErr.code === 'PGRST204' || String(saveErr.message).includes('managedWards'))) {
+                const payloadSnakeCase = {
+                    id: cleanEmp.id,
+                    name: cleanEmp.name,
+                    department: cleanEmp.department,
+                    position: cleanEmp.position,
+                    managed_wards: wardsStr
+                };
+                if (isUpdate) {
+                    await supabase.from('employees').update(payloadSnakeCase).eq('id', cleanEmp.id);
+                } else {
+                    await supabase.from('employees').insert([payloadSnakeCase]);
                 }
             }
         } catch (dbErr) {
-            console.warn("Lưu trực tiếp bảng SQL employees gặp lỗi (vẫn tiếp tục đồng bộ vào system_settings):", dbErr);
+            console.warn("Lưu trực tiếp bảng SQL employees gặp lỗi (vẫn tiếp tục đồng bộ vào system_settings và bộ nhớ):", dbErr);
         }
 
         // 2. ĐỒNG BỘ 100% VÀO system_settings ('employees_config') ĐỂ BẢO ĐẢM TẢI ĐƯỢC TRÊN MỌI THIẾT BỊ / TRÌNH DUYỆT MỚI

@@ -360,55 +360,44 @@ export const isRecordType11 = (recordOrType: Partial<RecordFile> | string | null
 };
 
 export const MOCK_EMPLOYEES: Employee[] = [
-  { 
-    id: 'emp1', 
-    name: 'Nguyễn Văn A', 
-    department: 'Tổ Đo đạc', 
-    position: 'Tổ trưởng',
-    managedWards: ['Tân Quan'] 
-  },
-  { 
-    id: 'emp2', 
-    name: 'Trần Thị B', 
-    department: 'Tổ Cấp giấy', 
-    position: 'Chuyên viên',
-    managedWards: ['Minh Đức', 'Tân Khai'] 
-  },
-  { 
-    id: 'emp3', 
-    name: 'Lê Văn C', 
-    department: 'Ban Giám đốc', 
-    position: 'Phó Giám đốc',
-    managedWards: [] 
-  },
-  { 
-    id: 'emp4', 
-    name: 'Phạm Thị D', 
-    department: 'Tổ Lưu trữ', 
-    position: 'Tổ trưởng',
-    managedWards: [] 
-  },
-  { 
-    id: 'emp5', 
-    name: 'Hoàng Văn E', 
-    department: 'Tổ Lưu trữ', 
-    position: 'Chuyên viên',
-    managedWards: [] 
-  },
-  {
-    id: 'emp6',
-    name: 'Nguyễn Văn Thắng',
-    department: 'Tổ Hành chính',
-    position: 'Tổ trưởng',
-    managedWards: []
-  },
-  {
-    id: 'emp7',
-    name: 'Trần Thị Mai',
-    department: 'Tổ Hành chính',
-    position: 'Chuyên viên (Một cửa)',
-    managedWards: []
-  }
+  // Ban Giám đốc
+  { id: 'NV021', name: 'Huỳnh Duy', department: 'Ban Giám đốc', position: 'Giám đốc', managedWards: ['Tân Khai', 'Minh Đức', 'Tân Hưng', 'Tân Quan'] },
+  { id: 'NV022', name: 'Ngô Thị Hồng', department: 'Ban Giám đốc', position: 'Phó Giám đốc', managedWards: ['Tân Khai', 'Minh Đức', 'Tân Hưng', 'Tân Quan'] },
+  { id: 'NV023', name: 'Nguyễn Viết Tính', department: 'Ban Giám đốc', position: 'Phó Giám đốc', managedWards: ['Tân Khai', 'Minh Đức', 'Tân Hưng', 'Tân Quan'] },
+
+  // Tổ Đo đạc
+  { id: 'NV1', name: 'Vũ Văn Đản', department: 'Tổ Đo đạc', position: 'Tổ phó', managedWards: ['Tân Khai', 'Minh Đức', 'Tân Hưng', 'Tân Quan'] },
+  { id: 'NV16', name: 'Trần Mạnh Hải', department: 'Tổ Đo đạc', position: 'Nhân viên', managedWards: ['Tân Khai', 'Minh Đức', 'Tân Hưng', 'Tân Quan'] },
+  { id: 'NV4', name: 'Phan Hoàng Thiên Phú', department: 'Tổ Đo đạc', position: 'Nhân viên', managedWards: ['Tân Khai', 'Minh Đức', 'Tân Hưng', 'Tân Quan'] },
+  { id: 'NV5', name: 'Lê Văn Dũng', department: 'Tổ Đo đạc', position: 'Nhân viên', managedWards: ['Tân Khai', 'Minh Đức', 'Tân Hưng', 'Tân Quan'] },
+  { id: 'NV6', name: 'Lê Duy Linh', department: 'Tổ Đo đạc', position: 'Nhân viên', managedWards: ['Tân Khai', 'Minh Đức', 'Tân Hưng', 'Tân Quan'] },
+  { id: 'NV7', name: 'Lê Thanh Hòa', department: 'Tổ Đo đạc', position: 'Nhân viên', managedWards: ['Tân Khai', 'Minh Đức', 'Tân Hưng', 'Tân Quan'] },
+  { id: 'NV8', name: 'Ngô Khánh Duy', department: 'Tổ Đo đạc', position: 'Nhân viên', managedWards: ['Tân Khai', 'Minh Đức', 'Tân Hưng', 'Tân Quan'] },
+  { id: 'NV9', name: 'Phạm Trí Hiếu', department: 'Tổ Đo đạc', position: 'Nhân viên', managedWards: ['Tân Khai', 'Minh Đức', 'Tân Hưng', 'Tân Quan'] },
+  { id: 'NV2', name: 'Kiều Công Kiên', department: 'Tổ Đo đạc', position: 'Nhân viên', managedWards: ['Tân Khai', 'Minh Đức', 'Tân Hưng', 'Tân Quan'] },
+  { id: 'NV3', name: 'Nguyễn Hoàng Nam', department: 'Tổ Đo đạc', position: 'Nhân viên', managedWards: ['Tân Khai', 'Minh Đức', 'Tân Hưng', 'Tân Quan'] },
+  { id: 'NV35', name: 'Nguyễn Tam Công', department: 'Tổ Đo đạc', position: 'Nhân viên', managedWards: ['Tân Khai', 'Minh Đức', 'Tân Hưng', 'Tân Quan'] },
+  { id: 'NV999', name: 'Nguyễn Thế Long', department: 'Tổ Đo đạc', position: 'Nhân viên', managedWards: ['Tân Khai', 'Minh Đức', 'Tân Hưng', 'Tân Quan'] },
+
+  // Tổ Lưu trữ
+  { id: 'NV016', name: 'Nguyễn Thị Sương', department: 'Tổ Lưu trữ', position: 'Tổ phó', managedWards: ['Tân Khai', 'Minh Đức', 'Tân Hưng', 'Tân Quan'] },
+  { id: 'NV13', name: 'Phạm Bá Thanh', department: 'Tổ Lưu trữ', position: 'Nhân viên', managedWards: ['Tân Khai', 'Minh Đức', 'Tân Hưng', 'Tân Quan'] },
+  { id: 'NV018', name: 'Hồ Ngọc Thắng', department: 'Tổ Lưu trữ', position: 'Nhân viên', managedWards: ['Tân Khai', 'Minh Đức', 'Tân Hưng', 'Tân Quan'] },
+  { id: 'NV017', name: 'Nguyễn Xuân Tình', department: 'Tổ Lưu trữ', position: 'Nhân viên', managedWards: ['Tân Khai', 'Minh Đức', 'Tân Hưng', 'Tân Quan'] },
+  { id: 'NV019', name: 'Võ Hà Vui', department: 'Tổ Lưu trữ', position: 'Nhân viên', managedWards: ['Tân Khai', 'Minh Đức', 'Tân Hưng', 'Tân Quan'] },
+  { id: 'NV020', name: 'Nguyễn Ngọc Lộc', department: 'Tổ Lưu trữ', position: 'Nhân viên', managedWards: ['Tân Khai', 'Minh Đức', 'Tân Hưng', 'Tân Quan'] },
+
+  // Tổ Cấp giấy
+  { id: 'NV321', name: 'Nguyễn Thị Mỹ Quý', department: 'Tổ Cấp giấy', position: 'Nhân viên', managedWards: ['Tân Khai', 'Minh Đức', 'Tân Hưng', 'Tân Quan'] },
+
+  // Tổ Hành chính & Một cửa
+  { id: 'NV14', name: 'Lê Văn Tuấn Anh', department: 'Tổ Hành chính', position: 'Nhân viên', managedWards: ['Minh Đức'] },
+  { id: 'NV11', name: 'Nguyễn Văn Hiếu', department: 'Tổ Hành chính', position: 'Nhân viên', managedWards: ['Tân Khai'] },
+  { id: 'NV10', name: 'Nguyễn Ất Hợi', department: 'Tổ Hành chính', position: 'Nhân viên', managedWards: ['Tân Quan'] },
+  { id: 'NV215', name: 'Trần Mạnh Hòa', department: 'Tổ Hành chính', position: 'Nhân viên', managedWards: ['Tân Khai'] },
+  { id: 'NV497', name: 'Nguyễn Hữu Trí', department: 'Tổ Hành chính', position: 'Nhân viên', managedWards: ['Tân Hưng'] },
+  { id: 'NV15', name: 'Trần Quốc Thuận', department: 'Tổ Hành chính', position: 'Nhân viên', managedWards: ['Tân Khai'] },
+  { id: 'NV919', name: 'Nguyễn Tài Tình', department: 'Tổ Hành chính', position: 'Nhân viên', managedWards: ['Tân Khai', 'Minh Đức', 'Tân Hưng', 'Tân Quan'] }
 ];
 
 export const MOCK_USERS: User[] = [

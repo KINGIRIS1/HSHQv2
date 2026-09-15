@@ -244,15 +244,40 @@ export const CloudDatabaseInspector: React.FC<CloudDatabaseInspectorProps> = ({ 
               </div>
 
               {/* Instructions / SQL Hint */}
-              <div className="bg-purple-50/60 border border-purple-100 rounded-xl p-4 text-xs text-purple-900 space-y-2">
+              <div className="bg-purple-50/60 border border-purple-100 rounded-xl p-4 text-xs text-purple-900 space-y-3">
                 <div className="font-bold flex items-center gap-1.5 text-purple-800">
-                  <ShieldCheck className="w-4 h-4 text-purple-600" /> Hướng dẫn kiểm tra và tạo bảng trên Supabase SQL Editor:
+                  <ShieldCheck className="w-4 h-4 text-purple-600" /> Mã lệnh SQL tối ưu hệ thống & cấp quyền (Chạy trên Supabase SQL Editor):
                 </div>
                 <p className="text-purple-700">
-                  Nếu bảng <code className="bg-white px-1.5 py-0.5 rounded border border-purple-200 font-mono text-purple-900">dangky_records</code> chưa được tạo trên Supabase, bạn có thể vào mục <strong>SQL Editor</strong> trên trang quản lý Supabase và chạy lệnh khởi tạo:
+                  Để đảm bảo tính năng <strong>Phân công giao việc</strong> và <strong>Cấu hình nhân sự, bảng đăng ký</strong> đồng bộ tức thì lên Cloud cho toàn bộ đơn vị, hãy copy đoạn mã SQL bên dưới và chạy tại mục <strong>SQL Editor</strong> trên Supabase:
                 </p>
-                <pre className="bg-gray-900 text-gray-100 p-3 rounded-lg font-mono text-[11px] overflow-x-auto">
-{`CREATE TABLE IF NOT EXISTS dangky_records (
+                <pre className="bg-gray-900 text-gray-100 p-3.5 rounded-lg font-mono text-[11px] overflow-x-auto leading-relaxed select-all">
+{`-- 1. BẢNG NHÂN VIÊN & ĐỊA BÀN PHỤ TRÁCH
+CREATE TABLE IF NOT EXISTS employees (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    department TEXT DEFAULT 'Tổ Đo đạc',
+    position TEXT DEFAULT 'Nhân viên',
+    "managedWards" TEXT,
+    managed_wards TEXT
+);
+ALTER TABLE employees ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Public full access employees" ON employees;
+CREATE POLICY "Public full access employees" ON employees FOR ALL TO anon USING (true) WITH CHECK (true);
+
+-- 2. BẢNG CẤU HÌNH HỆ THỐNG (SYSTEM SETTINGS)
+CREATE TABLE IF NOT EXISTS system_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
+);
+ALTER TABLE system_settings ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Public full access system_settings" ON system_settings;
+CREATE POLICY "Public full access system_settings" ON system_settings FOR ALL TO anon USING (true) WITH CHECK (true);
+
+-- 3. BẢNG HỒ SƠ ĐĂNG KÝ (DANGKY_RECORDS)
+CREATE TABLE IF NOT EXISTS dangky_records (
     id TEXT PRIMARY KEY,
     code TEXT NOT NULL UNIQUE,
     "customerName" TEXT NOT NULL,
@@ -264,7 +289,10 @@ export const CloudDatabaseInspector: React.FC<CloudDatabaseInspectorProps> = ({ 
     "recordType" TEXT,
     "receivedDate" TIMESTAMP,
     status TEXT DEFAULT 'RECEIVED'
-);`}
+);
+ALTER TABLE dangky_records ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Public full access dangky_records" ON dangky_records;
+CREATE POLICY "Public full access dangky_records" ON dangky_records FOR ALL TO anon USING (true) WITH CHECK (true);`}
                 </pre>
               </div>
 
