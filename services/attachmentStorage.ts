@@ -1,4 +1,6 @@
 import { AttachedFileMeta, AttachmentDocType } from '../types';
+import { supabase, isConfigured } from './supabaseClient';
+import { getSystemSetting, saveSystemSetting } from './apiSystem';
 
 export type DriveToastType = 'success' | 'warning' | 'error' | 'info';
 export type DriveToastCallback = (item: { type: DriveToastType; title: string; message: string }) => void;
@@ -193,9 +195,12 @@ export const generateStandardizedFileName = (
   return `${abbr} ${idx}_${sanitizedCode}.${ext}`;
 };
 
-// --- QUẢN LÝ ĐƯỜNG DẪN GOOGLE DRIVE LƯU DỮ LIỆU TIẾP NHẬN ---
+// --- QUẢN LÝ ĐƯỜNG DẪN GOOGLE DRIVE LƯU DỮ LIỆU TIẾP NHẬN (DÙNG CHUNG TOÀN HỆ THỐNG QUA CLOUD) ---
 export const GOOGLE_DRIVE_INCOMING_URL_KEY = 'setting_google_drive_incoming_url';
 export const GOOGLE_DRIVE_SCRIPT_URL_KEY = 'setting_google_drive_script_url';
+
+let cachedIncomingUrl: string | null = null;
+let cachedScriptUrl: string | null = null;
 
 export const extractGoogleDriveFolderId = (url: string): string => {
   if (!url) return '';
@@ -203,30 +208,6 @@ export const extractGoogleDriveFolderId = (url: string): string => {
   if (match && match[1]) return match[1];
   if (/^[a-zA-Z0-9_-]{20,}$/.test(url.trim())) return url.trim();
   return '';
-};
-
-export const getGoogleDriveIncomingUrl = (): string => {
-  try {
-    return localStorage.getItem(GOOGLE_DRIVE_INCOMING_URL_KEY) || '';
-  } catch {
-    return '';
-  }
-};
-
-export const setGoogleDriveIncomingUrl = (url: string): void => {
-  try {
-    localStorage.setItem(GOOGLE_DRIVE_INCOMING_URL_KEY, url.trim());
-  } catch (e) {
-    console.error('Không thể lưu đường dẫn Google Drive:', e);
-  }
-};
-
-export const getGoogleDriveScriptUrl = (): string => {
-  try {
-    return localStorage.getItem(GOOGLE_DRIVE_SCRIPT_URL_KEY) || '';
-  } catch {
-    return '';
-  }
 };
 
 export const cleanGoogleDriveScriptUrl = (url: string): string => {
@@ -243,14 +224,137 @@ export const cleanGoogleDriveScriptUrl = (url: string): string => {
   return cleaned;
 };
 
-export const setGoogleDriveScriptUrl = (url: string): void => {
+export const getGoogleDriveIncomingUrl = (): string => {
+  if (cachedIncomingUrl !== null && cachedIncomingUrl !== '') {
+    return cachedIncomingUrl;
+  }
   try {
-    const cleanUrl = cleanGoogleDriveScriptUrl(url);
-    localStorage.setItem(GOOGLE_DRIVE_SCRIPT_URL_KEY, cleanUrl);
-  } catch (e) {
-    console.error('Không thể lưu WebApp Script Google Drive:', e);
+    const val = localStorage.getItem(GOOGLE_DRIVE_INCOMING_URL_KEY) || 
+                localStorage.getItem(`sys_setting_${GOOGLE_DRIVE_INCOMING_URL_KEY}`) || '';
+    if (val) cachedIncomingUrl = val;
+    return val;
+  } catch {
+    return cachedIncomingUrl || '';
   }
 };
+
+export const setGoogleDriveIncomingUrl = (url: string): void => {
+  const cleanUrl = url ? url.trim() : '';
+  cachedIncomingUrl = cleanUrl;
+  try {
+    localStorage.setItem(GOOGLE_DRIVE_INCOMING_URL_KEY, cleanUrl);
+    localStorage.setItem(`sys_setting_${GOOGLE_DRIVE_INCOMING_URL_KEY}`, cleanUrl);
+  } catch (e) {
+    console.error('Không thể lưu đường dẫn Google Drive vào localStorage:', e);
+  }
+  // Đồng bộ ngầm lên Cloud Database (Supabase system_settings)
+  saveSystemSetting(GOOGLE_DRIVE_INCOMING_URL_KEY, cleanUrl).catch((err) => {
+    console.warn('Lỗi lưu GOOGLE_DRIVE_INCOMING_URL lên Cloud:', err);
+  });
+};
+
+export const getGoogleDriveScriptUrl = (): string => {
+  if (cachedScriptUrl !== null && cachedScriptUrl !== '') {
+    return cachedScriptUrl;
+  }
+  try {
+    const val = localStorage.getItem(GOOGLE_DRIVE_SCRIPT_URL_KEY) || 
+                localStorage.getItem(`sys_setting_${GOOGLE_DRIVE_SCRIPT_URL_KEY}`) || '';
+    if (val) cachedScriptUrl = val;
+    return val;
+  } catch {
+    return cachedScriptUrl || '';
+  }
+};
+
+export const setGoogleDriveScriptUrl = (url: string): void => {
+  const cleanUrl = cleanGoogleDriveScriptUrl(url);
+  cachedScriptUrl = cleanUrl;
+  try {
+    localStorage.setItem(GOOGLE_DRIVE_SCRIPT_URL_KEY, cleanUrl);
+    localStorage.setItem(`sys_setting_${GOOGLE_DRIVE_SCRIPT_URL_KEY}`, cleanUrl);
+  } catch (e) {
+    console.error('Không thể lưu WebApp Script Google Drive vào localStorage:', e);
+  }
+  // Đồng bộ ngầm lên Cloud Database (Supabase system_settings)
+  saveSystemSetting(GOOGLE_DRIVE_SCRIPT_URL_KEY, cleanUrl).catch((err) => {
+    console.warn('Lỗi lưu GOOGLE_DRIVE_SCRIPT_URL lên Cloud:', err);
+  });
+};
+
+/**
+ * Tải và đồng bộ cấu hình Google Drive từ Cloud Supabase (system_settings)
+ * Đảm bảo mọi máy tính / tài khoản đều nhận cùng 1 cấu hình sau khi cài đặt 1 lần.
+ */
+export const syncGoogleDriveConfigFromCloud = async (): Promise<{ incomingUrl: string; scriptUrl: string }> => {
+  try {
+    const [cloudIncoming, cloudScript] = await Promise.all([
+      getSystemSetting(GOOGLE_DRIVE_INCOMING_URL_KEY),
+      getSystemSetting(GOOGLE_DRIVE_SCRIPT_URL_KEY)
+    ]);
+
+    if (cloudIncoming !== null && cloudIncoming !== undefined && cloudIncoming.trim() !== '') {
+      cachedIncomingUrl = cloudIncoming.trim();
+      try {
+        localStorage.setItem(GOOGLE_DRIVE_INCOMING_URL_KEY, cachedIncomingUrl);
+      } catch {}
+    }
+
+    if (cloudScript !== null && cloudScript !== undefined && cloudScript.trim() !== '') {
+      cachedScriptUrl = cleanGoogleDriveScriptUrl(cloudScript);
+      try {
+        localStorage.setItem(GOOGLE_DRIVE_SCRIPT_URL_KEY, cachedScriptUrl);
+      } catch {}
+    }
+
+    return {
+      incomingUrl: getGoogleDriveIncomingUrl(),
+      scriptUrl: getGoogleDriveScriptUrl()
+    };
+  } catch (err) {
+    console.warn("Lỗi syncGoogleDriveConfigFromCloud:", err);
+    return {
+      incomingUrl: getGoogleDriveIncomingUrl(),
+      scriptUrl: getGoogleDriveScriptUrl()
+    };
+  }
+};
+
+/**
+ * Lưu toàn bộ cấu hình Google Drive lên Cloud Database (Supabase) và LocalStorage
+ */
+export const saveGoogleDriveConfig = async (incomingUrl: string, scriptUrl: string): Promise<boolean> => {
+  const cleanIncoming = (incomingUrl || '').trim();
+  const cleanScript = cleanGoogleDriveScriptUrl(scriptUrl || '');
+
+  cachedIncomingUrl = cleanIncoming;
+  cachedScriptUrl = cleanScript;
+
+  try {
+    localStorage.setItem(GOOGLE_DRIVE_INCOMING_URL_KEY, cleanIncoming);
+    localStorage.setItem(GOOGLE_DRIVE_SCRIPT_URL_KEY, cleanScript);
+    localStorage.setItem(`sys_setting_${GOOGLE_DRIVE_INCOMING_URL_KEY}`, cleanIncoming);
+    localStorage.setItem(`sys_setting_${GOOGLE_DRIVE_SCRIPT_URL_KEY}`, cleanScript);
+  } catch (e) {
+    console.error('Không thể lưu cấu hình Google Drive vào localStorage:', e);
+  }
+
+  try {
+    const [resIncoming, resScript] = await Promise.all([
+      saveSystemSetting(GOOGLE_DRIVE_INCOMING_URL_KEY, cleanIncoming),
+      saveSystemSetting(GOOGLE_DRIVE_SCRIPT_URL_KEY, cleanScript)
+    ]);
+    return resIncoming && resScript;
+  } catch (err) {
+    console.error('Lỗi lưu Google Drive config lên Cloud Supabase:', err);
+    return false;
+  }
+};
+
+// Tự kích hoạt đồng bộ khi nạp module ở client
+if (typeof window !== 'undefined') {
+  syncGoogleDriveConfigFromCloud().catch(() => {});
+}
 
 /**
  * Kiểm tra sức khỏe kết nối Google Apps Script Web App thông qua GET request (Health Check)

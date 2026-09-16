@@ -14,6 +14,7 @@ import { getPendingSyncCount, syncPendingRecordsToCloud, generateStandardUUID } 
 import { DEFAULT_WARDS as STATIC_WARDS, APP_VERSION, MOCK_EMPLOYEES, MOCK_USERS } from '../constants';
 import { migrateUnbatchedRecords, deduplicateRecords } from '../utils/appHelpers';
 import { connectionManager } from '../services/connectionService';
+import { syncGoogleDriveConfigFromCloud } from '../services/attachmentStorage';
 
 export const useAppData = (currentUser: User | null) => {
     // Khởi tạo danh sách hồ sơ ban đầu (sẽ được nạp tức thì từ IndexedDB & Cloud)
@@ -68,7 +69,8 @@ export const useAppData = (currentUser: User | null) => {
                 safeFetch(fetchUpdateInfo(), { version: null, url: null }, 5000),
                 safeFetch(fetchHolidays(), getFromCache(CACHE_KEYS.HOLIDAYS, []), 5000),
                 safeFetch(getSystemSetting('role_permissions'), null, 5000),
-                safeFetch(getSystemSetting('department_permissions'), null, 5000)
+                safeFetch(getSystemSetting('department_permissions'), null, 5000),
+                safeFetch(syncGoogleDriveConfigFromCloud(), null, 5000)
             ]);
 
             if (Array.isArray(empData) && empData.length > 0) {
