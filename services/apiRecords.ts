@@ -1,6 +1,6 @@
 import { supabase, isConfigured } from './supabaseClient';
 import { RecordFile, RecordStatus } from '../types';
-import { MOCK_RECORDS, API_BASE_URL, isArchiveRecordType, getShortRecordType } from '../constants';
+import { MOCK_RECORDS, API_BASE_URL, isArchiveRecordType, getShortRecordType, isSurveyRecordType, getSurveyRecordPrefix, isCertificateRecordType } from '../constants';
 import { logError, getFromCache, saveToCache, CACHE_KEYS, sanitizeData, sanitizePayloadFor22P02, sanitizePayloadForDateErrors, normalizeCode, mapRecordFromDb, keepOnlyDate } from './apiCore';
 import { getIndexedDBItem } from './storageService';
 import { addPendingRecord, removePendingRecord, getPendingRecords, syncPendingRecordsToCloud, generateStandardUUID, isValidUUID } from './syncQueueService';
@@ -393,19 +393,16 @@ export const getShortCode = (ward: string) => {
     return 'CT';
 };
 
-export const getNextGlobalRecordCode = async (dateStr: string, isArchive = false, recordType = ''): Promise<string> => {
+export const getNextGlobalRecordCode = async (
+    dateStr: string, 
+    isArchive = false, 
+    recordType = '', 
+    receivedBy = ''
+): Promise<string> => {
     const rType = (recordType || '').toLowerCase();
     const isLT = isArchive || rType.startsWith('1.') || rType.includes('1.1') || rType.includes('1.2') || rType.includes('sao lục') || rType.includes('công văn') || rType.includes('cung cấp') || rType.includes('lưu trữ');
-
-    if (!isConfigured) {
-        const d = new Date(dateStr);
-        const yy = d.getFullYear().toString().slice(-2);
-        const mm = ('0' + (d.getMonth() + 1)).slice(-2);
-        const dd = ('0' + d.getDate()).slice(-2);
-        const datePrefix = `${yy}${mm}${dd}`;
-        const prefix = isLT ? 'LT-' : '';
-        return `${prefix}${datePrefix}-${Math.floor(Math.random() * 1000).toString().padStart(4, '0')}`;
-    }
+    const isCert = !isLT && isCertificateRecordType(recordType);
+    const isSurvey = !isLT && !isCert && isSurveyRecordType(recordType);
 
     const d = new Date(dateStr);
     const year = d.getFullYear().toString();
@@ -413,9 +410,30 @@ export const getNextGlobalRecordCode = async (dateStr: string, isArchive = false
     const mm = ('0' + (d.getMonth() + 1)).slice(-2);
     const dd = ('0' + d.getDate()).slice(-2);
     const datePrefix = `${yy}${mm}${dd}`;
+
+    if (!isConfigured) {
+        let prefix = '';
+        if (isLT) {
+            prefix = 'LT-';
+        } else if (isCert) {
+            return `H19.151.11.22-${datePrefix}-${Math.floor(Math.random() * 1000).toString().padStart(4, '0')}`;
+        } else if (isSurvey) {
+            const p2 = getSurveyRecordPrefix(receivedBy);
+            prefix = p2 ? `${p2}-` : '';
+        }
+        return `${prefix}${datePrefix}-${Math.floor(Math.random() * 1000).toString().padStart(4, '0')}`;
+    }
     
-    // Tách riêng bộ đếm cho Hồ sơ Lưu trữ / 1.1, 1.2 (isLT = true) và Hồ sơ Đo đạc khác
-    const key = isLT ? `archive_record_counter_${year}` : `record_counter_${year}`;
+    // Tách riêng bộ đếm cho:
+    // 1. Hồ sơ Lưu trữ (isLT = true): archive_record_counter_${year}
+    // 2. Hồ sơ Cấp giấy (isCert = true): certificate_record_counter_${year} (Cấu trúc: H19.151.11.22-yymmdd-xxxx)
+    // 3. Hồ sơ Đo đạc (isSurvey = true): survey_record_counter_${year} (Phương án 1: Bộ đếm chung theo năm, qua năm mới tự động lấy lại 0001)
+    // 4. Hồ sơ khác: record_counter_${year}
+    const key = isLT 
+        ? `archive_record_counter_${year}` 
+        : (isCert 
+            ? `certificate_record_counter_${year}` 
+            : (isSurvey ? `survey_record_counter_${year}` : `record_counter_${year}`));
     let nextSeq = 1;
     let success = false;
     let attempts = 0;
@@ -429,6 +447,22 @@ export const getNextGlobalRecordCode = async (dateStr: string, isArchive = false
             if (data && data.value) {
                 currentVal = parseInt(data.value, 10);
                 if (isNaN(currentVal)) currentVal = 0;
+            } else if (isCert) {
+                // Nếu chưa có certificate_record_counter_${year}, khởi tạo theo số lượng hồ sơ cấp giấy hiện có
+                try {
+                    const { count } = await supabase.from('dangky_records').select('*', { count: 'exact', head: true });
+                    if (count && count > 0) {
+                        currentVal = count;
+                    }
+                } catch (_) {}
+            } else if (isSurvey) {
+                // Nếu chưa có survey_record_counter_${year}, kiểm tra xem có record_counter_${year} đang chạy không
+                // để kế thừa số lượng hồ sơ đo đạc trong năm 2026 hiện tại
+                const { data: legacyData } = await supabase.from('system_settings').select('value').eq('key', `record_counter_${year}`).single();
+                if (legacyData && legacyData.value) {
+                    currentVal = parseInt(legacyData.value, 10);
+                    if (isNaN(currentVal)) currentVal = 0;
+                }
             }
 
             nextSeq = currentVal + 1;
@@ -464,8 +498,17 @@ export const getNextGlobalRecordCode = async (dateStr: string, isArchive = false
     }
 
     const seqStr = nextSeq.toString().padStart(4, '0');
-    // Với hồ sơ lưu trữ / 1.1, 1.2 có tiền tố LT-YYMMDD-XXXX
-    return isLT ? `LT-${datePrefix}-${seqStr}` : `${datePrefix}-${seqStr}`;
+    if (isLT) {
+        return `LT-${datePrefix}-${seqStr}`;
+    }
+    if (isCert) {
+        return `H19.151.11.22-${datePrefix}-${seqStr}`;
+    }
+    if (isSurvey) {
+        const prefix2 = getSurveyRecordPrefix(receivedBy);
+        return prefix2 ? `${prefix2}-${datePrefix}-${seqStr}` : `${datePrefix}-${seqStr}`;
+    }
+    return `${datePrefix}-${seqStr}`;
 };
 
 // --- CACHE SYNCHRONIZATION HELPERS ---
@@ -543,14 +586,26 @@ export const createRecordApi = async (record: RecordFile): Promise<RecordFile | 
 
     let recordToSave: RecordFile = record;
     try {
-        let finalCode = record.code;
-        const isGeneratedFormat = finalCode && (/^[A-ZĐ]{2,3}-\d{6}-\d{3,4}$/.test(finalCode) || /^\d{6}-\d{3,4}$/.test(finalCode));
-        
+        let finalCode = record.code ? record.code.trim() : '';
         const targetTable = getTargetTable(recordToSave);
         const isArchive = targetTable === 'luutru_records';
+        const isCert = targetTable === 'dangky_records' || isCertificateRecordType(recordToSave);
 
-        if (!finalCode || finalCode.includes('?') || isGeneratedFormat) {
-            finalCode = await getNextGlobalRecordCode(record.receivedDate || new Date().toISOString(), isArchive);
+        // NGUYÊN TẮC QUAN TRỌNG: Ưu tiên tuyệt đối mã hồ sơ do người dùng nhập vào tại tất cả các module chuyên môn (Đo đạc, Lưu trữ, Cấp giấy...).
+        // Chỉ khi người dùng KHÔNG nhập mã (để trống, khoảng trắng, hoặc ký hiệu tạm '?' / 'HS'), hệ thống mới tự sinh mã mới.
+        const isInvalidOrEmptyCode = !finalCode || 
+                                     finalCode.includes('?') || 
+                                     finalCode.toUpperCase() === 'HS' || 
+                                     finalCode === '--' ||
+                                     finalCode.toLowerCase() === 'chưa có mã';
+
+        if (isInvalidOrEmptyCode) {
+            finalCode = await getNextGlobalRecordCode(
+                record.receivedDate || new Date().toISOString(), 
+                isArchive,
+                record.recordType || '',
+                record.receivedBy || ''
+            );
         }
         
         // Luôn đảm bảo id là chuẩn UUID RFC4122 để không bị lỗi 22P02 của PostgreSQL

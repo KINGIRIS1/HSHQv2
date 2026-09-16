@@ -263,6 +263,7 @@ export interface RecordFile {
   // Phân loại bảng Cloud Database
   sourceTable?: 'dangky_records' | 'land_records' | 'archive_records' | 'luutru_records';
   _isOfflineSaved?: boolean;
+  _isManualCode?: boolean;
 
   // Tệp tài liệu đính kèm tiếp nhận đầu vào
   attachedFiles?: AttachedFileMeta[];

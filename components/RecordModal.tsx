@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { RecordFile, RecordStatus, Employee, User, UserRole, AttachedDocItem, DossierComponentItem, AttachedFileMeta } from '../types';
 import AutoResizeTextarea from './AutoResizeTextarea';
-import { GROUPS, EXTENDED_RECORD_TYPES, STATUS_LABELS, SELECTABLE_STATUSES, ARCHIVE_SELECTABLE_STATUSES, SURVEY_SELECTABLE_STATUSES, getShortRecordType, getWardLabel, getNormalizedWard, isArchiveRecordType } from '../constants';
+import { GROUPS, EXTENDED_RECORD_TYPES, STATUS_LABELS, SELECTABLE_STATUSES, ARCHIVE_SELECTABLE_STATUSES, SURVEY_SELECTABLE_STATUSES, getShortRecordType, getWardLabel, getNormalizedWard, isArchiveRecordType, isSurveyRecordType, getSurveyRecordPrefix, isCertificateRecordType } from '../constants';
 import { X, Save, Lock, User as UserIcon, MapPin, FileText, Calendar, FileCheck, ChevronDown, ChevronUp, Paperclip, Upload, Eye, Download, ExternalLink, Loader2, CheckCircle2, Plus } from 'lucide-react';
 import { calculateDeadlineHelper, getDepartmentForRecord, isProcedure2_3, syncRecordStatusTransition, getPureBatchNumber, groupEmployeesByDepartment, isFieldWorkProcedure, isOfficeOnlySurveyProcedure, deriveActualSurveyStatus, getDerivedStatusFromDates, cleanFutureMilestoneDates } from '../utils/appHelpers';
 import { fetchContracts } from '../services/api';
@@ -183,7 +183,14 @@ interface RecordModalProps {
   records?: RecordFile[];
 }
 
-const generateRecordCode = (dateStr: string, recordsList: RecordFile[] = [], isArchive: boolean = false, recordType: string = '') => {
+const generateRecordCode = (
+    dateStr: string, 
+    recordsList: RecordFile[] = [], 
+    isArchive: boolean = false, 
+    recordType: string = '',
+    receivedBy: string = '',
+    employeesList: Employee[] = []
+) => {
     const d = new Date(dateStr || new Date());
     const year = d.getFullYear().toString();
     const yy = year.slice(-2);
@@ -193,24 +200,40 @@ const generateRecordCode = (dateStr: string, recordsList: RecordFile[] = [], isA
 
     const rType = (recordType || '').toLowerCase();
     const isLT = isArchive || rType.startsWith('1.') || rType.includes('1.1') || rType.includes('1.2') || rType.includes('sao lục') || rType.includes('công văn') || rType.includes('cung cấp') || rType.includes('lưu trữ');
+    const isCert = !isLT && isCertificateRecordType(recordType);
 
     let maxSeq = 0;
     recordsList.forEach((r) => {
         if (!r.code) return;
-        const cleanCode = r.code.startsWith('LT-') ? r.code.replace('LT-', '') : (r.code.startsWith('HQ-') ? r.code.replace('HQ-', '') : r.code);
+        const cleanCode = r.code
+            .replace(/^H19\.151\.11\.22-/, '')
+            .replace(/^(LT|HQ|TK|TQ|TH|MD|MĐ)-/, '');
         const parts = cleanCode.split('-');
         if (parts.length >= 2) {
             const rDate = parts[0];
             const rSeq = parts[1];
             if (rDate && rDate.substring(0, 2) === yy) {
                 const seqNum = parseInt(rSeq, 10);
-                if (!isNaN(seqNum) && seqNum > maxSeq) maxSeq = seqNum;
+                if (!isNaN(seqNum) && seqNum < 50000 && seqNum > maxSeq) maxSeq = seqNum;
             }
         }
     });
 
     const nextSeq = (maxSeq + 1).toString().padStart(4, '0');
-    return isLT ? `LT-${datePrefix}-${nextSeq}` : `${datePrefix}-${nextSeq}`;
+    if (isLT) {
+        return `LT-${datePrefix}-${nextSeq}`;
+    }
+    if (isCert) {
+        return `H19.151.11.22-${datePrefix}-${nextSeq}`;
+    }
+
+    const isSurvey = isSurveyRecordType(recordType);
+    if (isSurvey) {
+        const prefix2 = getSurveyRecordPrefix(receivedBy, employeesList);
+        return prefix2 ? `${prefix2}-${datePrefix}-${nextSeq}` : `${datePrefix}-${nextSeq}`;
+    }
+
+    return `${datePrefix}-${nextSeq}`;
 };
 
 const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, initialData, employees, currentUser, wards, currentView, holidays, records }) => {
@@ -359,15 +382,17 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
             };
             determinePrice();
         } else {
+            const initialRecBy = currentUser?.employeeId || '';
+            const defaultRecType = isTestMeasurementView ? '3.1 Đăng ký biến động quyền sử dụng đất, quyền sở hữu tài sản gắn liền với đất' : '';
             setFormData({
               ...defaultState,
-              recordType: '',
+              recordType: defaultRecType,
               receivedDate: new Date().toISOString(),
-              deadline: '',
+              deadline: defaultRecType ? calculateDeadlineHelper(defaultRecType, new Date().toISOString().split('T')[0], holidays || []) : '',
               price: undefined,
               status: RecordStatus.RECEIVED,
-              code: generateRecordCode(new Date().toISOString(), records, currentView === 'archive'),
-              receivedBy: currentUser?.employeeId || ''
+              code: generateRecordCode(new Date().toISOString(), records, currentView === 'archive', defaultRecType, initialRecBy, employees),
+              receivedBy: initialRecBy
             });
             setAttachedDocs([]);
             setAuthCccd('');
@@ -777,9 +802,10 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
           updated.group = norm;
         }
       }
-      if (field === 'recordType' || field === 'receivedDate') {
+      if (field === 'recordType' || field === 'receivedDate' || field === 'receivedBy') {
         const rType = field === 'recordType' ? value : prev.recordType;
         const rDate = field === 'receivedDate' ? value : prev.receivedDate;
+        const rRecBy = field === 'receivedBy' ? value : prev.receivedBy;
         if (rType && rDate) {
           updated.deadline = calculateDeadlineHelper(rType, String(rDate).split('T')[0], holidays || []);
         } else if (!rType) {
@@ -787,14 +813,19 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
           updated.price = undefined;
           updated.returnedPrice = undefined;
         }
-        if (field === 'recordType') {
-          if (!initialData) {
-            updated.code = generateRecordCode(String(rDate || new Date().toISOString()), records, currentView === 'archive', String(value || ''));
-          }
-          if (!value) {
-            updated.price = undefined;
-            updated.returnedPrice = undefined;
-          }
+        if (!initialData) {
+          updated.code = generateRecordCode(
+            String(rDate || new Date().toISOString()), 
+            records, 
+            currentView === 'archive', 
+            String(rType || ''),
+            String(rRecBy || currentUser?.employeeId || ''),
+            employees
+          );
+        }
+        if (field === 'recordType' && !value) {
+          updated.price = undefined;
+          updated.returnedPrice = undefined;
         }
       }
       return updated;
@@ -841,7 +872,13 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <div className="md:col-span-1">
                             <label className="block text-xs font-bold text-gray-700 mb-1">Mã hồ sơ <span className="text-red-500">*</span></label>
-                            <input type="text" required className="w-full border border-gray-300 rounded-md px-3 py-2 bg-gray-50 font-bold text-blue-700" value={val(formData.code)} onChange={(e) => handleChange('code', e.target.value)} />
+                            <input 
+                                type="text" 
+                                required 
+                                className="w-full border border-gray-300 rounded-md px-3 py-2 font-bold text-blue-700 bg-white" 
+                                value={val(formData.code)} 
+                                onChange={(e) => handleChange('code', e.target.value)} 
+                            />
                         </div>
                         <div className="md:col-span-3">
                             <label className="block text-xs font-bold text-gray-700 mb-1">

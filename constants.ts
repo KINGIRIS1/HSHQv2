@@ -359,6 +359,84 @@ export const isRecordType11 = (recordOrType: Partial<RecordFile> | string | null
   return t.startsWith('1.1') || short.startsWith('1.1');
 };
 
+// Kiểm tra hồ sơ có thuộc module Đo đạc (nhóm 2.x) hay không
+export const isSurveyRecordType = (recordOrType: Partial<RecordFile> | string | null | undefined): boolean => {
+  if (!recordOrType) return true;
+  const str = typeof recordOrType === 'string' 
+    ? recordOrType 
+    : String(recordOrType.recordType || recordOrType.content || '');
+  const t = str.trim();
+  if (t.startsWith('1.') || isArchiveRecordType(str)) return false;
+  if (t.startsWith('3.') || t.includes('cấp gcn') || t.includes('đăng ký biến động') || t.includes('biến động') || t.includes('cấp giấy')) return false;
+  return true;
+};
+
+// Kiểm tra hồ sơ có thuộc module Cấp giấy / Đăng ký đất đai (nhóm 3.x) hay không
+export const isCertificateRecordType = (recordOrType: Partial<RecordFile> | string | null | undefined): boolean => {
+  if (!recordOrType) return false;
+  const str = typeof recordOrType === 'string' 
+    ? recordOrType 
+    : String(recordOrType.recordType || recordOrType.content || '');
+  const t = str.trim();
+  const short = getShortRecordType(str);
+  if (t.startsWith('3.') || short.startsWith('3.')) return true;
+  const lower = str.toLowerCase();
+  return lower.includes('cấp gcn') || 
+         lower.includes('đăng ký biến động') || 
+         lower.includes('biến động') || 
+         lower.includes('cấp giấy') ||
+         lower.includes('chuyển quyền') ||
+         lower.includes('thế chấp') ||
+         lower.includes('cấp đổi') ||
+         lower.includes('cấp lại') ||
+         lower.includes('gia hạn') ||
+         lower.includes('đính chính');
+};
+
+// Hàm lấy tiền tố mã hồ sơ đo đạc theo địa bàn của người phân công tiếp nhận
+// Quy tắc: Nếu người tiếp nhận được phân công TRÊN 1 địa bàn (> 1 xã) -> không lấy tiền tố.
+// Chỉ lấy tiền tố 2 chữ cái (TK, TQ, TH, MD) nếu người tiếp nhận được phân công ĐÚNG 1 địa bàn.
+export const getSurveyRecordPrefix = (
+  receivedBy: string | null | undefined,
+  employeesList: Employee[] = []
+): string => {
+  if (!receivedBy) return '';
+  const empList = (employeesList && employeesList.length > 0) ? employeesList : MOCK_EMPLOYEES;
+  let target = receivedBy.trim().toLowerCase();
+
+  const USERNAME_MAP: Record<string, string> = {
+    anhlvt: 'nv14',
+    hieunv: 'nv11',
+    hoina: 'nv10',
+    hoatm: 'nv215',
+    trinh: 'nv497',
+    thuantq: 'nv15',
+    admin: 'nv919'
+  };
+  if (USERNAME_MAP[target]) {
+    target = USERNAME_MAP[target];
+  }
+  
+  const emp = empList.find(e => 
+    (e.id && e.id.toLowerCase() === target) ||
+    (e.name && e.name.toLowerCase() === target)
+  );
+
+  // Nếu không tìm thấy hoặc người đó được phân công TRÊN 1 địa bàn (ví dụ 4 xã hoặc > 1 xã)
+  if (!emp || !emp.managedWards || emp.managedWards.length !== 1) {
+    return '';
+  }
+
+  // Nếu người đó được phân công ĐÚNG 1 địa bàn:
+  const singleWard = emp.managedWards[0].trim().toLowerCase();
+  if (singleWard.includes('khai')) return 'TK';
+  if (singleWard.includes('quan')) return 'TQ';
+  if (singleWard.includes('hưng') || singleWard.includes('hung')) return 'TH';
+  if (singleWard.includes('đức') || singleWard.includes('duc')) return 'MD';
+  
+  return '';
+};
+
 export const MOCK_EMPLOYEES: Employee[] = [
   // Ban Giám đốc
   { id: 'NV021', name: 'Huỳnh Duy', department: 'Ban Giám đốc', position: 'Giám đốc', managedWards: ['Tân Khai', 'Minh Đức', 'Tân Hưng', 'Tân Quan'] },
