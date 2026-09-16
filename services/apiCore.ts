@@ -334,6 +334,30 @@ export const sanitizeData = (data: any, allowedColumns: string[]) => {
             clean[field] = keepOnlyDate(clean[field]);
         }
     });
+
+    // Boolean fields: Chuyển đổi chuỗi rỗng "" hoặc "null" thành null để tránh lỗi 22P02 trên PostgreSQL
+    const booleanFields = ['needsMapCorrection', 'deadlineReminded', 'isHandedOver', 'is_handover', 'active'];
+    booleanFields.forEach(field => {
+        if (clean[field] !== undefined) {
+            const val = clean[field];
+            if (val === '' || val === null || val === undefined || val === 'null' || val === 'undefined') {
+                clean[field] = null;
+            } else if (typeof val === 'boolean') {
+                clean[field] = val;
+            } else if (typeof val === 'string') {
+                const str = val.trim().toLowerCase();
+                if (str === 'true' || str === '1' || str === 't') {
+                    clean[field] = true;
+                } else if (str === 'false' || str === '0' || str === 'f') {
+                    clean[field] = false;
+                } else {
+                    clean[field] = null;
+                }
+            } else if (typeof val === 'number') {
+                clean[field] = val === 1 ? true : (val === 0 ? false : null);
+            }
+        }
+    });
     
     const sanitized: any = {};
     allowedColumns.forEach(col => {
@@ -424,6 +448,30 @@ export const sanitizePayloadFor22P02 = (payload: any): any => {
                     const num = parseFloat(cleanDigits);
                     clean[k] = isNaN(num) ? null : num;
                 }
+            }
+        }
+    });
+
+    // 3. Chuyển đổi các cột boolean bị dính chuỗi rỗng "" hoặc "null"
+    const booleanFields = ['needsMapCorrection', 'deadlineReminded', 'isHandedOver', 'is_handover', 'active'];
+    booleanFields.forEach(field => {
+        if (clean[field] !== undefined) {
+            const val = clean[field];
+            if (val === '' || val === null || val === undefined || val === 'null' || val === 'undefined') {
+                clean[field] = null;
+            } else if (typeof val === 'boolean') {
+                clean[field] = val;
+            } else if (typeof val === 'string') {
+                const str = val.trim().toLowerCase();
+                if (str === 'true' || str === '1' || str === 't') {
+                    clean[field] = true;
+                } else if (str === 'false' || str === '0' || str === 'f') {
+                    clean[field] = false;
+                } else {
+                    clean[field] = null;
+                }
+            } else if (typeof val === 'number') {
+                clean[field] = val === 1 ? true : (val === 0 ? false : null);
             }
         }
     });

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { RecordFile, Employee, User, Holiday, RecordStatus, RolePermissions, DepartmentPermissions } from '../types';
-import { getNormalizedWard } from '../constants';
+import { getNormalizedWard, isArchiveRecordType, isCertificateRecordType, getSurveyRecordPrefix } from '../constants';
 import { PlusCircle, FileSpreadsheet, LayoutList, Settings, RotateCcw, RefreshCw, Search, CalendarClock } from 'lucide-react';
 import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../services/docxService';
 import * as XLSX from 'xlsx-js-style';
@@ -142,7 +142,7 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, onDelet
       return 'CT';
   };
 
-  const calculateNextCode = (wardName: string, dateStr: string, recordTypeOrCodes?: string | string[], existingCodes: string[] = []) => {
+  const calculateNextCode = (wardName: string, dateStr: string, recordTypeOrCodes?: string | string[], existingCodes: string[] = [], receivedBy?: string) => {
     if (!dateStr) return '';
 
     let recordType = '';
@@ -162,23 +162,51 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, onDelet
     const datePrefix = `${yy}${mm}${dd}`;
     
     const rType = (recordType || '').toLowerCase();
-    const isArchive = rType.startsWith('1.') || rType.includes('1.1') || rType.includes('1.2') || rType.includes('sao lục') || rType.includes('công văn') || rType.includes('cung cấp') || rType.includes('lưu trữ');
+    const isLT = isArchiveRecordType(recordType) || rType.startsWith('1.') || rType.includes('1.1') || rType.includes('1.2') || rType.includes('sao lục') || rType.includes('công văn') || rType.includes('cung cấp') || rType.includes('lưu trữ');
+    const isCert = !isLT && (isCertificateRecordType(recordType) || rType.startsWith('3.'));
     
     let maxSeq = 0;
     
     const checkSeq = (code: string | undefined | null) => {
         if (!code) return;
-        const isCodeArchive = code.startsWith('LT-');
-        if (isArchive !== isCodeArchive) return;
-
-        const cleanCode = isCodeArchive ? code.replace('LT-', '') : (code.startsWith('HQ-') ? code.replace('HQ-', '') : code);
-        const parts = cleanCode.split('-');
-        if (parts.length === 2 || parts.length === 3) {
-            const rDate = parts.length === 2 ? parts[0] : parts[1];
-            const rSeq = parts.length === 2 ? parts[1] : parts[2];
-            if (rDate.substring(0, 2) === yy) {
-                const seqNum = parseInt(rSeq, 10);
-                if (!isNaN(seqNum) && seqNum > maxSeq) maxSeq = seqNum;
+        const cleanCode = code.trim();
+        
+        if (isLT) {
+            if (cleanCode.startsWith('LT-')) {
+                const parts = cleanCode.replace(/^LT-/, '').split('-');
+                if (parts.length >= 2) {
+                    const rDate = parts[0];
+                    const rSeq = parts[1];
+                    if (rDate && rDate.substring(0, 2) === yy) {
+                        const seqNum = parseInt(rSeq, 10);
+                        if (!isNaN(seqNum) && seqNum < 50000 && seqNum > maxSeq) maxSeq = seqNum;
+                    }
+                }
+            }
+        } else if (isCert) {
+            if (cleanCode.startsWith('H19.151.11.22-')) {
+                const parts = cleanCode.replace(/^H19\.151\.11\.22-/, '').split('-');
+                if (parts.length >= 2) {
+                    const rDate = parts[0];
+                    const rSeq = parts[1];
+                    if (rDate && rDate.substring(0, 2) === yy) {
+                        const seqNum = parseInt(rSeq, 10);
+                        if (!isNaN(seqNum) && seqNum < 50000 && seqNum > maxSeq) maxSeq = seqNum;
+                    }
+                }
+            }
+        } else {
+            if (!cleanCode.startsWith('LT-') && !cleanCode.startsWith('H19.151.11.22-')) {
+                const stripped = cleanCode.replace(/^(HQ|TK|TQ|TH|MD|MĐ)-/, '');
+                const parts = stripped.split('-');
+                if (parts.length >= 2) {
+                    const rDate = parts[0];
+                    const rSeq = parts[1];
+                    if (rDate && rDate.substring(0, 2) === yy) {
+                        const seqNum = parseInt(rSeq, 10);
+                        if (!isNaN(seqNum) && seqNum < 50000 && seqNum > maxSeq) maxSeq = seqNum;
+                    }
+                }
             }
         }
     };
@@ -187,7 +215,16 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, onDelet
     extraCodes.forEach(checkSeq);
 
     const nextSeq = (maxSeq + 1).toString().padStart(4, '0');
-    return isArchive ? `LT-${datePrefix}-${nextSeq}` : `${datePrefix}-${nextSeq}`;
+    if (isLT) {
+        return `LT-${datePrefix}-${nextSeq}`;
+    }
+    if (isCert) {
+        return `H19.151.11.22-${datePrefix}-${nextSeq}`;
+    }
+
+    const recBy = receivedBy || currentUser?.employeeId || currentUser?.username || '';
+    const prefix2 = getSurveyRecordPrefix(recBy, employees);
+    return prefix2 ? `${prefix2}-${datePrefix}-${nextSeq}` : `${datePrefix}-${nextSeq}`;
   };
 
   // --- LOGIC TÍNH HẠN TRẢ ---

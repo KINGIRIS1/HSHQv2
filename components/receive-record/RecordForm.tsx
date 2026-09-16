@@ -68,7 +68,7 @@ interface RecordFormProps {
   records: RecordFile[];
   holidays: Holiday[];
   calculateDeadline: (type: string, date: string) => string;
-  generateCode: (ward: string, date: string, recordType?: string) => string;
+  generateCode: (ward: string, date: string, recordType?: string, existingCodes?: string[], receivedBy?: string) => string;
   onPrint?: (data: Partial<RecordFile>) => void;
   initialData?: RecordFile | null;
   onCancelEdit?: () => void;
@@ -128,13 +128,14 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
 
   useEffect(() => {
     if (!initialData) {
-        const newCode = generateCode(processingWard, formData.receivedDate || '', formData.recordType || undefined);
+        const recBy = formData.receivedBy || currentUser?.employeeId || currentUser?.username || '';
+        const newCode = generateCode(processingWard, formData.receivedDate || '', formData.recordType || undefined, [], recBy);
         setFormData(prev => {
             if (prev.code === newCode) return prev;
             return { ...prev, code: newCode };
         });
     }
-  }, [processingWard, formData.receivedDate, formData.recordType, records, initialData]);
+  }, [processingWard, formData.receivedDate, formData.recordType, formData.receivedBy, records, initialData]);
 
   const handleChange = (field: keyof RecordFile, value: any) => {
     setFormData(prev => {
@@ -145,13 +146,18 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
             finalValue = `${value}T${padTime(nowTime.getHours())}:${padTime(nowTime.getMinutes())}:${padTime(nowTime.getSeconds())}`;
         }
         const newData = { ...prev, [field]: finalValue };
-        if (field === 'recordType' || field === 'receivedDate') {
-            const rType = field === 'recordType' ? (field === 'recordType' ? finalValue : prev.recordType) : prev.recordType;
-            const rDate = field === 'receivedDate' ? (field === 'receivedDate' ? finalValue : prev.receivedDate) : prev.receivedDate;
+        if (field === 'recordType' || field === 'receivedDate' || field === 'receivedBy') {
+            const rType = field === 'recordType' ? finalValue : prev.recordType;
+            const rDate = field === 'receivedDate' ? finalValue : prev.receivedDate;
+            const rRecBy = field === 'receivedBy' ? finalValue : prev.receivedBy;
             if (rType && rDate) {
                 newData.deadline = calculateDeadline(rType, rDate);
             } else if (!rType) {
                 newData.deadline = '';
+            }
+            if (!initialData) {
+                const recBy = rRecBy || currentUser?.employeeId || currentUser?.username || '';
+                newData.code = generateCode(processingWard, rDate || '', rType || undefined, [], recBy);
             }
         }
         
