@@ -1108,24 +1108,28 @@ const runBackgroundSyncQueue = async () => {
         }
 
         if (hasChanges) {
-          const updatedRecord: any = {
-            ...record,
+          const attachmentFields = {
             attachedFiles: syncedAttachedFiles,
-            otherDocs: typeof record.otherDocs === 'string' ? JSON.stringify(syncedAttachedDocs) : syncedAttachedDocs,
+            otherDocs: Array.isArray(syncedAttachedDocs) ? JSON.stringify(syncedAttachedDocs) : (typeof syncedAttachedDocs === 'string' ? syncedAttachedDocs : ''),
             dossierComponents: syncedDossierComponents,
           };
 
-          // Lưu vào CSDL Supabase
+          // Lưu vào CSDL Supabase (chỉ cập nhật các trường tệp đính kèm, không ghi đè trạng thái hồ sơ)
           try {
-            const { updateRecordApi } = await import('./apiRecords');
-            await updateRecordApi(updatedRecord);
+            const { updateRecordFieldsApi } = await import('./apiRecords');
+            await updateRecordFieldsApi(record.id, attachmentFields);
           } catch (dbErr) {
             console.warn('Cập nhật database sau khi đồng bộ Drive:', dbErr);
           }
 
+          const updatedRecordForUI = {
+            id: record.id,
+            ...attachmentFields
+          };
+
           // Phát sự kiện để cập nhật UI ngay lập tức
           if (typeof window !== 'undefined') {
-            window.dispatchEvent(new CustomEvent('RECORD_ATTACHMENTS_UPDATED', { detail: updatedRecord }));
+            window.dispatchEvent(new CustomEvent('RECORD_ATTACHMENTS_UPDATED', { detail: updatedRecordForUI }));
           }
 
           notifyDriveToast('success', 'Đã lưu Google Drive', `Đã đồng bộ thành công các tệp của hồ sơ ${finalCode} lên Google Drive.`);

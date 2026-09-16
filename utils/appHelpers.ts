@@ -1442,16 +1442,31 @@ export function syncRecordStatusTransition(
 export function deduplicateRecords<T extends { id?: string }>(records: T[]): T[] {
     if (!Array.isArray(records) || records.length === 0) return [];
     const uniqueMap = new Map<string, T>();
+    const getTs = (obj: any): number => {
+        let maxT = 0;
+        if (obj?.updatedAt) maxT = Math.max(maxT, new Date(obj.updatedAt).getTime() || 0);
+        if (Array.isArray(obj?.statusLogs) && obj.statusLogs.length > 0) {
+            obj.statusLogs.forEach((l: any) => {
+                if (l?.changedAt) maxT = Math.max(maxT, new Date(l.changedAt).getTime() || 0);
+            });
+        }
+        return maxT;
+    };
+
     for (const r of records) {
         if (!r || !r.id) continue;
         if (!uniqueMap.has(r.id)) {
             uniqueMap.set(r.id, r);
         } else {
             const existing = uniqueMap.get(r.id)!;
-            uniqueMap.set(r.id, {
-                ...r,
-                ...existing
-            });
+            const existingTime = getTs(existing);
+            const newTime = getTs(r);
+
+            if (newTime >= existingTime) {
+                uniqueMap.set(r.id, { ...existing, ...r });
+            } else {
+                uniqueMap.set(r.id, { ...r, ...existing });
+            }
         }
     }
     return Array.from(uniqueMap.values());

@@ -3,7 +3,7 @@ import { RecordFile, RecordStatus } from '../types';
 import { MOCK_RECORDS, API_BASE_URL, isArchiveRecordType, getShortRecordType, isSurveyRecordType, getSurveyRecordPrefix, isCertificateRecordType } from '../constants';
 import { logError, getFromCache, saveToCache, CACHE_KEYS, sanitizeData, sanitizePayloadFor22P02, sanitizePayloadForDateErrors, normalizeCode, mapRecordFromDb, keepOnlyDate } from './apiCore';
 import { getIndexedDBItem } from './storageService';
-import { addPendingRecord, removePendingRecord, getPendingRecords, syncPendingRecordsToCloud, generateStandardUUID, isValidUUID } from './syncQueueService';
+import { addPendingRecord, removePendingRecord, getPendingRecords, getPendingSyncItems, syncPendingRecordsToCloud, generateStandardUUID, isValidUUID } from './syncQueueService';
 
 const RECORD_DB_COLUMNS = [
     'id', 'code', 'customerName', 'phoneNumber', 'cccd', 'customerAddress', 'ward', 'landPlot', 'mapSheet', 
@@ -333,17 +333,43 @@ export const fetchRecords = async (onProgress?: TierProgressCallback): Promise<R
         }
     });
 
-    // 2. [QUAN TRỌNG NHẤT] Hợp nhất ngay các hồ sơ đang chờ đồng bộ (Sync Queue)
-    // Đảm bảo mọi hồ sơ vừa tiếp nhận hoặc lưu offline KHÔNG BAO GIỜ bị biến mất hay bị ghi đè!
-    const pendingRecords = await getPendingRecords();
-    pendingRecords.forEach(pending => {
-        if (pending && pending.id) {
-            uniqueMap.set(pending.id, { ...(uniqueMap.get(pending.id) || {}), ...pending, _isOfflineSaved: true });
+    // 2. [QUAN TRỌNG NHẤT] Hợp nhất các hồ sơ đang chờ đồng bộ (Sync Queue)
+    // Đảm bảo không ghi đè dữ liệu Cloud mới hơn bằng bản ghi pending cũ (như khi vừa lui bước rồi tiến lên Đã giao 1 cửa)
+    const pendingItems = await getPendingSyncItems();
+    for (const item of pendingItems) {
+        const pending = item.record;
+        if (!pending || !pending.id) continue;
+        const cloudRecord = uniqueMap.get(pending.id);
+        if (cloudRecord) {
+            const getRecordTime = (r: RecordFile): number => {
+                let maxT = 0;
+                if ((r as any).updatedAt) maxT = Math.max(maxT, new Date((r as any).updatedAt).getTime() || 0);
+                if (Array.isArray(r.statusLogs) && r.statusLogs.length > 0) {
+                    r.statusLogs.forEach((l: any) => {
+                        if (l?.changedAt) maxT = Math.max(maxT, new Date(l.changedAt).getTime() || 0);
+                    });
+                }
+                return maxT;
+            };
+            const cloudTime = getRecordTime(cloudRecord);
+            const pendingTime = Math.max(
+                getRecordTime(pending),
+                item.queuedAt ? new Date(item.queuedAt).getTime() : 0
+            );
+
+            if (cloudTime > pendingTime) {
+                console.log(`[SyncEngine] Gỡ bỏ bản ghi pending lỗi thời của ${pending.code || pending.id} do Cloud đã có dữ liệu mới hơn.`);
+                await removePendingRecord(pending.id, pending.code);
+                continue;
+            }
+            uniqueMap.set(pending.id, { ...cloudRecord, ...pending, _isOfflineSaved: true });
+        } else {
+            uniqueMap.set(pending.id, { ...pending, _isOfflineSaved: true });
         }
-    });
+    }
 
     const finalRecords = Array.from(uniqueMap.values());
-    console.log(`[FetchRecords] Đã nạp thành công ${finalRecords.length} hồ sơ (trong đó có ${pendingRecords.length} hồ sơ chờ đồng bộ)`);
+    console.log(`[FetchRecords] Đã nạp thành công ${finalRecords.length} hồ sơ (trong đó có ${pendingItems.length} hồ sơ chờ đồng bộ)`);
 
     if (finalRecords.length > 0) {
         saveToCache(CACHE_KEYS.RECORDS, finalRecords);
@@ -351,7 +377,7 @@ export const fetchRecords = async (onProgress?: TierProgressCallback): Promise<R
     onProgress?.(3, finalRecords, true);
 
     // 3. Kích hoạt đồng bộ ngầm tự động nếu có hồ sơ tồn đọng
-    if (pendingRecords.length > 0) {
+    if (pendingItems.length > 0) {
         setTimeout(() => {
             syncPendingRecordsToCloud(createRecordApi, updateRecordApi);
         }, 1200);

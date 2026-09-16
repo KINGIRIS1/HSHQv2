@@ -106,16 +106,20 @@ export const addPendingRecord = async (
 };
 
 /**
- * Xóa hồ sơ đã đồng bộ thành công khỏi hàng đợi
+ * Xóa hồ sơ đã đồng bộ thành công khỏi hàng đợi (dựa vào ID hoặc mã hồ sơ)
  */
-export const removePendingRecord = async (recordId: string): Promise<void> => {
-    if (!recordId) return;
+export const removePendingRecord = async (recordId: string, recordCode?: string): Promise<void> => {
+    if (!recordId && !recordCode) return;
     try {
         const currentItems = await getPendingSyncItems();
-        const filtered = currentItems.filter(item => item.record.id !== recordId);
+        const filtered = currentItems.filter(item => {
+            if (recordId && item.record.id === recordId) return false;
+            if (recordCode && item.record.code && item.record.code === recordCode) return false;
+            return true;
+        });
         if (filtered.length !== currentItems.length) {
             await savePendingSyncItems(filtered);
-            console.log(`[SyncQueue] Đã hoàn tất đồng bộ và gỡ hồ sơ ${recordId} khỏi hàng đợi. Còn lại: ${filtered.length}`);
+            console.log(`[SyncQueue] Đã hoàn tất đồng bộ và gỡ hồ sơ ${recordId || recordCode} khỏi hàng đợi. Còn lại: ${filtered.length}`);
         }
     } catch (e) {
         console.error('Lỗi khi xóa khỏi sync queue:', e);
