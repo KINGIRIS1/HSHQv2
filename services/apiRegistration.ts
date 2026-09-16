@@ -1,6 +1,8 @@
 import { supabase } from './supabaseClient';
 import { RecordFile, RecordStatusLog, DossierComponentItem, AttachedFileMeta, RecordStatus } from '../types';
 import { connectionManager } from './connectionService';
+import { sanitizeData, isBlankRecord } from './apiCore';
+import { getTargetTable, RECORD_DB_COLUMNS } from './apiRecords';
 
 /**
  * Service chuyên trách 100% độc lập cho bảng dangky_records (Tổ Đăng ký / Cấp giấy)
@@ -203,7 +205,43 @@ export const fetchDangkyRecords = async (): Promise<RecordFile[]> => {
       throw error;
     }
 
-    return (data || []).map(mapDangkyRecordFromDb);
+    const mapped = (data || []).map(mapDangkyRecordFromDb);
+
+    // Tự động phân loại và di chuyển các hồ sơ bị phân nhầm vào dangky_records
+    const misplacedForLuutru = mapped.filter(r => getTargetTable(r) === 'luutru_records');
+    const misplacedForLand = mapped.filter(r => getTargetTable(r) === 'land_records');
+
+    // Tự động phát hiện các dòng hoàn toàn trống rác
+    const blankRecords = mapped.filter(r => isBlankRecord(r));
+
+    const blankIds = new Set(blankRecords.map(r => r.id).filter(Boolean));
+    const misplacedIds = new Set([
+      ...misplacedForLuutru.map(r => r.id),
+      ...misplacedForLand.map(r => r.id)
+    ].filter(Boolean));
+
+    if (misplacedForLuutru.length > 0 || misplacedForLand.length > 0 || blankIds.size > 0) {
+      console.log(`[DangKy Auto-Fix] Phát hiện ${misplacedForLuutru.length} nhầm Lưu trữ, ${misplacedForLand.length} nhầm Đo đạc, ${blankIds.size} dòng trống. Đang tự động xử lý...`);
+      setTimeout(async () => {
+        try {
+          if (misplacedForLuutru.length > 0) {
+            await supabase.from('luutru_records').upsert(misplacedForLuutru.map(r => sanitizeData(r, RECORD_DB_COLUMNS)));
+            await supabase.from(TABLE_NAME).delete().in('id', misplacedForLuutru.map(r => r.id));
+          }
+          if (misplacedForLand.length > 0) {
+            await supabase.from('land_records').upsert(misplacedForLand.map(r => sanitizeData(r, RECORD_DB_COLUMNS)));
+            await supabase.from(TABLE_NAME).delete().in('id', misplacedForLand.map(r => r.id));
+          }
+          if (blankIds.size > 0) {
+            await supabase.from(TABLE_NAME).delete().in('id', Array.from(blankIds));
+          }
+        } catch (cleanErr) {
+          console.error("[DangKy Auto-Fix] Lỗi khi dọn dẹp bản ghi nhầm/trống:", cleanErr);
+        }
+      }, 300);
+    }
+
+    return mapped.filter(r => !blankIds.has(r.id) && !misplacedIds.has(r.id));
   } catch (err) {
     console.error(`[DangKy API] Lỗi khi tải danh sách hồ sơ:`, err);
     connectionManager.reportNetworkError('fetchDangkyRecords', err);

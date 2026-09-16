@@ -12,6 +12,7 @@ interface BulkImportProps {
   calculateNextCode: (ward: string, date: string, existingCodes: string[]) => string;
   onPreview: (record: Partial<RecordFile>) => void;
   currentUser?: any;
+  records?: RecordFile[];
 }
 
 interface BulkRecordItem extends Partial<RecordFile> {
@@ -19,7 +20,7 @@ interface BulkRecordItem extends Partial<RecordFile> {
     isSaved: boolean;
 }
 
-const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calculateNextCode, onPreview, currentUser }) => {
+const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calculateNextCode, onPreview, currentUser, records = [] }) => {
   const [bulkRecords, setBulkRecords] = useState<BulkRecordItem[]>([]);
   const [showNoticeModal, setShowNoticeModal] = useState<boolean>(true);
   const bulkFileInputRef = useRef<HTMLInputElement>(null);
@@ -132,7 +133,7 @@ const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calc
 
               if (!recordType) {
                   const lower = rawType.toLowerCase();
-                  if (lower.includes('1.2') || lower.includes('công văn') || lower.includes('cong van') || lower.includes('cung cấp tài liệu')) recordType = '1.2 Công văn';
+                  if (lower.startsWith('1.2') || lower.includes('công văn') || lower.includes('cong van') || lower.includes('cung cấp tài liệu')) recordType = '1.2 Công văn';
                   else if (lower.includes('trích lục')) recordType = '2.1 Trích lục';
                   else if (lower.includes('chỉnh lý') || lower.includes('hiến đường')) recordType = 'Trích đo chỉnh lý bản đồ địa chính';
                   else if (lower.includes('số thửa') || lower.includes('cập nhật') || lower.includes('cập nhập') || lower.includes('2.6') || lower.includes('duyệt đơn')) recordType = '2.3 Duyệt đơn';
@@ -272,28 +273,36 @@ const BulkImport: React.FC<BulkImportProps> = ({ onSave, calculateDeadline, calc
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 text-sm">
-                        {bulkRecords.length > 0 ? bulkRecords.map((item, idx) => (
-                            <tr key={item.tempId} className={`hover:bg-blue-50/30 ${item.isSaved ? 'bg-green-50' : ''}`}>
-                                <td className="p-3 text-center text-gray-400">{idx + 1}</td>
-                                <td className="p-3">
-                                    <div className="flex gap-1">
-                                        <input type="text" className={`w-full border rounded px-2 py-1 text-sm font-mono ${item.code ? 'border-blue-300 text-blue-700 font-bold' : 'border-gray-300 bg-gray-50'}`} placeholder="Chưa có mã" value={item.code || ''} onChange={(e) => updateBulkRecord(idx, 'code', e.target.value)} readOnly={item.isSaved} />
-                                        {!item.isSaved && <button onClick={() => handleGenerateBulkCode(idx)} className="p-1.5 bg-blue-100 text-blue-600 rounded hover:bg-blue-200" title="Tạo mã"><Wand2 size={14} /></button>}
-                                    </div>
-                                </td>
+                        {bulkRecords.length > 0 ? bulkRecords.map((item, idx) => {
+                            const isDuplicateInSoftware = !!item.code && records.some(r => String(r.code || '').trim().toUpperCase() === String(item.code).trim().toUpperCase());
+                            return (
+                                <tr key={item.tempId} className={`hover:bg-blue-50/30 ${item.isSaved ? 'bg-green-50' : isDuplicateInSoftware ? 'bg-red-50/60' : ''}`}>
+                                    <td className="p-3 text-center text-gray-400">{idx + 1}</td>
+                                    <td className="p-3">
+                                        <div className="flex flex-col gap-1">
+                                            <div className="flex gap-1">
+                                                <input type="text" className={`w-full border rounded px-2 py-1 text-sm font-mono ${isDuplicateInSoftware ? 'border-red-400 bg-red-100 text-red-700 font-bold' : item.code ? 'border-blue-300 text-blue-700 font-bold' : 'border-gray-300 bg-gray-50'}`} placeholder="Chưa có mã" value={item.code || ''} onChange={(e) => updateBulkRecord(idx, 'code', e.target.value)} readOnly={item.isSaved} />
+                                                {!item.isSaved && <button onClick={() => handleGenerateBulkCode(idx)} className="p-1.5 bg-blue-100 text-blue-600 rounded hover:bg-blue-200" title="Tạo mã"><Wand2 size={14} /></button>}
+                                            </div>
+                                            {isDuplicateInSoftware && !item.isSaved && (
+                                                <span className="text-[10px] text-red-600 font-bold">⚠️ Trùng mã phần mềm</span>
+                                            )}
+                                        </div>
+                                    </td>
                                 <td className="p-3"><input type="text" className="w-full border border-gray-300 rounded px-2 py-1 text-sm" value={item.customerName ?? ''} onChange={(e) => updateBulkRecord(idx, 'customerName', e.target.value)} readOnly={item.isSaved} /></td>
                                 <td className="p-3"><select className="w-full border border-gray-300 rounded px-2 py-1 text-sm outline-none" value={item.recordType ? getShortRecordType(item.recordType) : ''} onChange={(e) => updateBulkRecord(idx, 'recordType', e.target.value)} disabled={item.isSaved}> {EXTENDED_RECORD_TYPES.map(t => <option key={t} value={t}>{t}</option>)} </select></td>
                                 <td className="p-3"><input type="text" className="w-full border border-gray-300 rounded px-2 py-1 text-sm" value={item.ward ?? ''} onChange={(e) => updateBulkRecord(idx, 'ward', e.target.value)} readOnly={item.isSaved} /></td>
                                 <td className="p-3"><input type="date" className="w-full border border-gray-300 rounded px-2 py-1 text-sm" value={dateVal(item.deadline)} onChange={(e) => updateBulkRecord(idx, 'deadline', e.target.value)} readOnly={item.isSaved} /></td>
                                 <td className="p-3 text-center">
                                     <div className="flex justify-center gap-2">
-                                        {item.isSaved ? <span className="flex items-center gap-1 text-green-600 font-bold px-3 py-1 bg-green-100 rounded text-xs"><Check size={14} /> Đã lưu</span> : <button onClick={() => handleSaveBulkRecord(idx)} disabled={!item.code} className="flex items-center gap-1 bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700 disabled:opacity-50 text-xs font-bold"><Save size={14} /> Lưu</button>}
+                                         {item.isSaved ? <span className="flex items-center gap-1 text-green-600 font-bold px-3 py-1 bg-green-100 rounded text-xs"><Check size={14} /> Đã lưu</span> : <button onClick={() => handleSaveBulkRecord(idx)} disabled={!item.code} className="flex items-center gap-1 bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700 disabled:opacity-50 text-xs font-bold"><Save size={14} /> Lưu</button>}
                                         <button onClick={() => onPreview(item)} className="p-1.5 text-purple-600 border border-purple-200 rounded hover:bg-purple-50" title="In biên nhận"><Printer size={16} /></button>
                                         {!item.isSaved && <button onClick={() => removeBulkRecord(idx)} className="p-1.5 text-red-500 hover:bg-red-50 rounded" title="Xóa dòng"><X size={16} /></button>}
                                     </div>
                                 </td>
                             </tr>
-                        )) : <tr><td colSpan={7} className="p-12 text-center text-gray-400 italic">Chưa có dữ liệu.</td></tr>}
+                        );
+                    }) : <tr><td colSpan={7} className="p-12 text-center text-gray-400 italic">Chưa có dữ liệu.</td></tr>}
                     </tbody>
                 </table>
             </div>

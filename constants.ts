@@ -226,8 +226,21 @@ export const RECORD_TYPES = [
   '2.3 Duyệt đơn',
   '2.4 Cắm mốc',
   '2.5 Tách-Hợp thửa',
-  '3.1 Đăng ký biến động',
-  '3.2 Cấp GCN'
+  '3.1.1 Chuyển quyền',
+  '3.1.2 Phân chia quyền',
+  '3.1.3 Theo Bản án / QĐ',
+  '3.2.1 Cấp đổi',
+  '3.2.2 Cấp đổi (có thuế)',
+  '3.3.1 Cấp lại',
+  '3.3.2 Cấp lại (có thuế)',
+  '3.4.1 Tách - hợp thửa',
+  '3.4.2 Tách thửa CQ',
+  '3.5.1 Gia hạn',
+  '3.6.1 Chuyển mục đích',
+  '3.7.1 Đính chính',
+  '3.7.2 Đổi thông tin',
+  '3.8.1 Đăng ký GDBD',
+  '3.8.2 Xóa ĐK GDBD'
 ];
 
 // Danh sách loại hồ sơ MỞ RỘNG (Dùng cho form Thêm mới trong "Tất cả hồ sơ" - Admin/Nội bộ)
@@ -284,17 +297,40 @@ export const getShortRecordType = (type: string | null | undefined): string => {
   // 2. Nhóm 2.x - Đo đạc bản đồ
   if (t.startsWith('2.1') || t === 'trích lục' || t === 'trích lục quy hoạch' || t === 'trích lục qh') return '2.1 Trích lục';
   if (t.startsWith('2.2') || t === '2.3 trích đo' || t === 'trích đo') return '2.2 Trích đo';
-  if (t.startsWith('2.3') || t.startsWith('2.6') || t === 'cung cấp số thửa đất' || t === 'cung cấp số thửa' || t === 'cc số thửa' || t === 'cập nhập số thửa' || t === 'cập nhật số thửa' || t === 'cn số thửa' || t.includes('duyệt đơn') || t.includes('duyet don') || t.includes('số thửa') || t.includes('so thua') || t.includes('duyệt đơn & cung cấp số thửa') || t.includes('duyệt đơn-số thửa')) return '2.3 Duyệt đơn';
+  if (t.startsWith('2.3') || t.startsWith('2.6') || t === 'cung cấp số thửa đất' || t === 'cung cấp số thửa' || t === 'cc số thửa' || t === 'cập nhập số thửa' || t === 'cập nhật số thửa' || t === 'cn số thửa' || t.includes('duyệt đơn & cung cấp số thửa') || t.includes('duyệt đơn-số thửa')) return '2.3 Duyệt đơn';
   if (t.startsWith('2.4') || t === 'cắm mốc' || t === 'trích đo cắm mốc') return '2.4 Cắm mốc';
   if (t.startsWith('2.5') || t === 'tách thửa' || t === 'tách-hợp thửa' || t === 'trích đo tách - hợp thửa') return '2.5 Tách-Hợp thửa';
   if (t.startsWith('2.')) return type;
 
-  // 3. Nhóm 3.x - Đăng ký đất đai / Biến động / Cấp giấy
-  if (t.startsWith('3.1')) return '3.1 Đăng ký biến động';
-  if (t.startsWith('3.2')) return '3.2 Cấp GCN';
+  // 3. Nhóm 3.x - Cấp giấy / Đăng ký đất đai
+  if (t.startsWith('3.1.1') || t.includes('3.1.1')) return '3.1.1 Chuyển quyền';
+  if (t.startsWith('3.1.2') || t.includes('3.1.2') || t.includes('thỏa thuận vợ chồng') || t.includes('phân chia quyền')) return '3.1.2 Phân chia quyền';
+  if (t.startsWith('3.1.3') || t.includes('3.1.3') || t.includes('bản án') || t.includes('thi hành án')) return '3.1.3 Theo Bản án / QĐ';
+  if (t.startsWith('3.2.1') || t.includes('3.2.1')) return '3.2.1 Cấp đổi';
+  if (t.startsWith('3.2.2') || t.includes('3.2.2') || (t.includes('cấp đổi') && t.includes('thuế'))) return '3.2.2 Cấp đổi (có thuế)';
+  if (t.startsWith('3.3.1') || t.includes('3.3.1')) return '3.3.1 Cấp lại';
+  if (t.startsWith('3.3.2') || t.includes('3.3.2') || (t.includes('cấp lại') && t.includes('thuế'))) return '3.3.2 Cấp lại (có thuế)';
+  if (t.startsWith('3.4.1') || t.includes('3.4.1') || (t.includes('tách') && t.includes('hợp') && !t.includes('cq'))) return '3.4.1 Tách - hợp thửa';
+  if (t.startsWith('3.4.2') || t.includes('3.4.2') || (t.includes('tách') && t.includes('cq'))) return '3.4.2 Tách thửa CQ';
+  if (t.startsWith('3.5.1') || t.includes('3.5.1') || t.includes('gia hạn')) return '3.5.1 Gia hạn';
+  if (t.startsWith('3.6.1') || t.includes('3.6.1') || t.includes('chuyển mục đích')) return '3.6.1 Chuyển mục đích';
+  if (t.startsWith('3.7.1') || t.includes('3.7.1') || t.includes('đính chính')) return '3.7.1 Đính chính';
+  if (t.startsWith('3.7.2') || t.includes('3.7.2') || t.includes('đổi thông tin') || t.includes('thay đổi thông tin')) return '3.7.2 Đổi thông tin';
+  if (t.startsWith('3.8.1') || t.includes('3.8.1') || t.includes('đăng ký gdbd') || t.includes('thế chấp')) return '3.8.1 Đăng ký GDBD';
+  if (t.startsWith('3.8.2') || t.includes('3.8.2') || t.includes('xóa đk gdbd') || t.includes('xóa thế chấp') || t.includes('giải chấp')) return '3.8.2 Xóa ĐK GDBD';
+
+  // Fallbacks cho các mã 3.x cũ
+  if (t.startsWith('3.1') || t.includes('chuyển quyền') || t.includes('chuyển nhượng') || t.includes('tặng cho') || t.includes('thừa kế') || t.includes('biến động')) return '3.1.1 Chuyển quyền';
+  if (t.startsWith('3.2') || t.includes('cấp đổi')) return '3.2.1 Cấp đổi';
+  if (t.startsWith('3.3') || t.includes('cấp lại')) return '3.3.1 Cấp lại';
+  if (t.startsWith('3.4')) return '3.4.1 Tách - hợp thửa';
+  if (t.startsWith('3.5')) return '3.5.1 Gia hạn';
+  if (t.startsWith('3.6')) return '3.6.1 Chuyển mục đích';
+  if (t.startsWith('3.7')) return '3.7.1 Đính chính';
+  if (t.startsWith('3.8')) return '3.8.1 Đăng ký GDBD';
   if (t.startsWith('3.')) return type;
 
-  // Fallbacks for legacy other categories
+  // Fallbacks for legacy keyword matching
   if (t.includes('cung cấp tài liệu đất đai') || t.includes('cung cấp dữ liệu') || t.includes('sao lục') || t.includes('sao luc') || t.includes('cc dl đđ')) return '1.1 Sao lục';
   if (t.includes('trích lục quy hoạch')) return '2.1 Trích lục';
   if (t.includes('cung cấp số thửa đất') || t.includes('số thửa') || t.includes('cập nhập số thửa') || t.includes('cập nhật số thửa') || t.includes('2.6') || t.includes('duyệt đơn')) return '2.3 Duyệt đơn';
@@ -304,13 +340,11 @@ export const getShortRecordType = (type: string | null | undefined): string => {
   if (t.includes('cắm mốc')) return '2.4 Cắm mốc';
   if (t.includes('trích lục')) return '2.1 Trích lục';
   if (t.includes('tách thửa') || t.includes('hợp thửa')) return '2.5 Tách-Hợp thửa';
-  if (t.includes('đăng ký biến động') || t.includes('biến động')) return '3.1 Đăng ký biến động';
-  if (t.includes('đăng ký đất đai') || t.includes('cấp giấy') || t.includes('cấp đổi')) return '3.2 Cấp GCN';
+  if (t.includes('cấp gcn') || t.includes('cấp giấy')) return '3.2.1 Cấp đổi';
 
   // Legacy fallback
-  if (t.includes('thi hành án')) return 'Thi hành án';
-  if (t.includes('tòa án')) return 'Tòa án';
-  if (t.includes('cmd')) return 'CMD';
+  if (t.includes('thi hành án')) return '3.1.3 Theo Bản án / QĐ';
+  if (t.includes('tòa án')) return '3.1.3 Theo Bản án / QĐ';
 
   return type; // Trả về nguyên bản nếu không khớp quy tắc rút gọn
 };
@@ -326,8 +360,24 @@ export const getFullRecordType = (type: string | null | undefined): string => {
   if (short === '2.3 Duyệt đơn') return '2.3 Duyệt đơn & Cung cấp số thửa đất';
   if (short === '2.4 Cắm mốc') return '2.4 Trích đo Cắm mốc ranh giới thửa đất';
   if (short === '2.5 Tách-Hợp thửa') return '2.5 Trích đo Tách thửa - Hợp thửa đất';
-  if (short === '3.1 Đăng ký biến động') return '3.1 Đăng ký biến động quyền sử dụng đất';
-  if (short === '3.2 Cấp GCN') return '3.2 Đăng ký cấp đổi, cấp lại Giấy chứng nhận';
+
+  // Nhóm 3.x Cấp giấy (tên đầy đủ trên Biên nhận & Giấy hẹn)
+  if (short === '3.1.1 Chuyển quyền') return '3.1.1 Chuyển nhượng, Tặng cho, Thừa kế QSDĐ, QSH tài sản';
+  if (short === '3.1.2 Phân chia quyền') return '3.1.2 Chuyển quyền theo thỏa thuận vợ chồng, phân chia quyền của hộ gia đình';
+  if (short === '3.1.3 Theo Bản án / QĐ') return '3.1.3 Chuyển quyền theo Bản án Tòa án, Quyết định Thi hành án dân sự';
+  if (short === '3.2.1 Cấp đổi') return '3.2.1 Cấp đổi GCN (ố nhòe, rách nát, thêm tên vợ/chồng, không đổi diện tích)';
+  if (short === '3.2.2 Cấp đổi (có thuế)') return '3.2.2 Cấp đổi GCN do đo đạc lập bản đồ chính quy (thay đổi kích thước/diện tích)';
+  if (short === '3.3.1 Cấp lại') return '3.3.1 Cấp lại Giấy chứng nhận do bị mất';
+  if (short === '3.3.2 Cấp lại (có thuế)') return '3.3.2 Cấp lại Giấy chứng nhận do bị mất (có thay đổi diện tích/kích thước)';
+  if (short === '3.4.1 Tách - hợp thửa') return '3.4.1 Tách thửa đất hoặc Hợp thửa đất không đổi người sử dụng đất';
+  if (short === '3.4.2 Tách thửa CQ') return '3.4.2 Tách thửa đất đồng thời thực hiện thủ tục Chuyển quyền';
+  if (short === '3.5.1 Gia hạn') return '3.5.1 Xác nhận tiếp tục sử dụng đất nông nghiệp khi hết hạn';
+  if (short === '3.6.1 Chuyển mục đích') return '3.6.1 Chuyển mục đích sử dụng đất không phải xin phép';
+  if (short === '3.7.1 Đính chính') return '3.7.1 Đính chính Giấy chứng nhận đã cấp có sai sót';
+  if (short === '3.7.2 Đổi thông tin') return '3.7.2 ĐKBĐ thay đổi thông tin cá nhân (CCCD, Họ tên, địa chỉ thửa...)';
+  if (short === '3.8.1 Đăng ký GDBD') return '3.8.1 Đăng ký Giao dịch bảo đảm (Thế chấp)';
+  if (short === '3.8.2 Xóa ĐK GDBD') return '3.8.2 Xóa đăng ký Giao dịch bảo đảm (Xóa thế chấp)';
+
   return type;
 };
 
@@ -367,17 +417,28 @@ export const isSurveyRecordType = (recordOrType: Partial<RecordFile> | string | 
     : String(recordOrType.recordType || recordOrType.content || '');
   const t = str.trim();
   if (t.startsWith('1.') || isArchiveRecordType(str)) return false;
-  if (t.startsWith('3.') || t.includes('cấp gcn') || t.includes('đăng ký biến động') || t.includes('biến động') || t.includes('cấp giấy')) return false;
+  if (t.startsWith('3.') || isCertificateRecordType(str)) return false;
   return true;
 };
 
 // Kiểm tra hồ sơ có thuộc module Cấp giấy / Đăng ký đất đai (nhóm 3.x) hay không
 export const isCertificateRecordType = (recordOrType: Partial<RecordFile> | string | null | undefined): boolean => {
   if (!recordOrType) return false;
+
+  if (typeof recordOrType === 'object' && recordOrType !== null) {
+    if (recordOrType.sourceTable === 'luutru_records' || recordOrType.sourceTable === 'archive_records') return false;
+    const code = String(recordOrType.code || '').trim();
+    if (code.toUpperCase().startsWith('LT-') || code.startsWith('1.')) return false;
+    const dept = String((recordOrType as any).department || '').toLowerCase();
+    if (dept.includes('lưu trữ') || dept.includes('luu tru')) return false;
+  }
+
   const str = typeof recordOrType === 'string' 
     ? recordOrType 
     : String(recordOrType.recordType || recordOrType.content || '');
   const t = str.trim();
+  if (t.startsWith('1.') || isArchiveRecordType(str)) return false;
+
   const short = getShortRecordType(str);
   if (t.startsWith('3.') || short.startsWith('3.')) return true;
   const lower = str.toLowerCase();

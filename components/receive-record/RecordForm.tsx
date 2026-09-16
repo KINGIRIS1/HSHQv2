@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { RecordFile, Holiday, RecordStatus, User, Employee, AttachedDocItem, AttachedFileMeta } from '../../types';
 import AutoResizeTextarea from '../AutoResizeTextarea';
-import { RECORD_TYPES, EXTENDED_RECORD_TYPES, getShortRecordType, getWardLabel } from '../../constants';
+import { RECORD_TYPES, EXTENDED_RECORD_TYPES, getShortRecordType, getWardLabel, isCertificateRecordType } from '../../constants';
 import { getDepartmentForRecord } from '../../utils/appHelpers';
 import { preparePendingSingleAttachment, uploadPendingAttachmentsToDrive, enqueueRecordForBackgroundDriveSync, processAndSaveSingleAttachment, previewAttachment, downloadAttachment, isAllowedDocFile, isPreviewableFile } from '../../services/attachmentStorage';
 import { Save, User as UserIcon, Calendar, MapPin, FileCheck, Loader2, Printer, RotateCcw, XCircle, CheckCircle, AlertCircle, X, Phone, FileText, BookOpen, Clock, Hash, ChevronDown, ChevronUp, Plus, Paperclip, Eye, Download, CheckCircle2 } from 'lucide-react';
@@ -344,6 +344,8 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
   const dateVal = (v: any) => { if (!v) return ''; const str = String(v); return str.includes('T') ? str.split('T')[0] : str; };
 
   const isCongVan = formData.recordType ? getShortRecordType(formData.recordType) === '1.2 Công văn' : false;
+  const isCapGiay = isCertificateRecordType(formData.recordType) || (formData.recordType ? getShortRecordType(formData.recordType).startsWith('3.') : false);
+  const isCodeEditable = !!initialData || isCapGiay;
 
   return (
     <form onSubmit={handleSubmit} className="w-full max-w-[2200px] mx-auto space-y-4 2xl:space-y-6 animate-fade-in relative pb-4">
@@ -382,8 +384,17 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
                 </div>
 
                 <div>
-                    <label className={labelClass}>Mã hồ sơ</label>
-                    <input type="text" readOnly={!initialData} className={`${inputClass} font-mono ${initialData ? 'bg-white font-bold text-blue-700' : 'bg-slate-100 text-slate-500 cursor-not-allowed'}`} value={formData.code || ''} onChange={(e) => initialData && handleChange('code', e.target.value)} />
+                    <label className={`${labelClass} flex items-center justify-between`}>
+                        <span>Mã hồ sơ</span>
+                        {isCapGiay && !initialData && <span className="text-[10px] text-blue-600 font-semibold bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">Cho phép sửa</span>}
+                    </label>
+                    <input 
+                        type="text" 
+                        readOnly={!isCodeEditable} 
+                        className={`${inputClass} font-mono ${isCodeEditable ? 'bg-white font-bold text-blue-700 border-blue-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-400' : 'bg-slate-100 text-slate-500 cursor-not-allowed'}`} 
+                        value={formData.code || ''} 
+                        onChange={(e) => isCodeEditable && handleChange('code', e.target.value)} 
+                    />
                 </div>
 
                 <div>

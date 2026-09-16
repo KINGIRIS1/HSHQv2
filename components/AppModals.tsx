@@ -189,6 +189,7 @@ const AppModals: React.FC<AppModalsProps> = (props) => {
                 onImport={props.handleImportRecords} 
                 employees={props.employees} 
                 initialMode={props.importModalMode}
+                records={props.records}
             />
             
             <AssignModal 

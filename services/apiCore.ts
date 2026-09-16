@@ -289,6 +289,37 @@ export const keepOnlyDateTime = (val: any): string | null => {
     return null;
 };
 
+export const isBlankRecord = (r: any): boolean => {
+    if (!r) return true;
+    const customerName = String(r.customerName || '').trim().toLowerCase();
+    const content = String(r.content || '').trim().toLowerCase();
+    const address = String(r.address || r.customerAddress || '').trim().toLowerCase();
+    const phone = String(r.phoneNumber || '').trim();
+    const cccd = String(r.cccd || '').trim();
+    const landPlot = String(r.landPlot || '').trim();
+    const mapSheet = String(r.mapSheet || '').trim();
+    const issueNum = String(r.issueNumber || '').trim();
+    const entryNum = String(r.entryNumber || '').trim();
+    const notes = String(r.notes || r.privateNotes || '').trim();
+    const receivedBy = String(r.receivedBy || '').trim();
+
+    const isInvalidCustomer = !customerName || 
+      customerName === 'chưa có' || 
+      customerName === 'chưa nhập' || 
+      customerName === 'trống' || 
+      customerName === 'n/a' || 
+      customerName === 'undefined' || 
+      customerName === 'null' ||
+      customerName === 'chưa cập nhật' ||
+      customerName === '0' ||
+      customerName === 'test';
+
+    const hasNoLandInfo = (!landPlot || landPlot === '0') && (!mapSheet || mapSheet === '0');
+    const hasNoDetails = !phone && !cccd && !address && !issueNum && !entryNum && !notes && (!content || content.length < 3) && !receivedBy;
+
+    return isInvalidCustomer && hasNoLandInfo && hasNoDetails;
+};
+
 export const sanitizeData = (data: any, allowedColumns: string[]) => {
     const clean: any = { ...data };
     const numberFields = [

@@ -201,7 +201,7 @@ const generateRecordCode = (
     const datePrefix = `${yy}${mm}${dd}`;
 
     const rType = (recordType || '').toLowerCase();
-    const isLT = isArchive || isArchiveRecordType(recordType) || rType.startsWith('1.') || rType.includes('1.1') || rType.includes('1.2') || rType.includes('sao lục') || rType.includes('công văn') || rType.includes('cung cấp') || rType.includes('lưu trữ');
+    const isLT = isArchive || isArchiveRecordType(recordType) || rType.startsWith('1.');
     const isCert = !isLT && (isCertView || isCertificateRecordType(recordType) || rType.startsWith('3.'));
 
     let maxSeq = 0;
@@ -424,14 +424,11 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
         } else {
             const initialRecBy = currentUser?.employeeId || '';
             let defaultRecType = '';
-            if (isArchiveView) {
-              defaultRecType = '1.1 Cung cấp thông tin, dữ liệu đất đai';
-            }
             setFormData({
               ...defaultState,
               recordType: defaultRecType,
               receivedDate: new Date().toISOString(),
-              deadline: defaultRecType ? calculateDeadlineHelper(defaultRecType, new Date().toISOString().split('T')[0], holidays || []) : '',
+              deadline: '',
               price: undefined,
               status: RecordStatus.RECEIVED,
               code: generateRecordCode(

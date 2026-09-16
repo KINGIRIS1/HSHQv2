@@ -1,6 +1,6 @@
 
 import { RecordFile, RecordStatus, Employee, User } from '../types';
-import { DEFAULT_HOLIDAYS, isArchiveRecordType } from '../constants';
+import { DEFAULT_HOLIDAYS, isArchiveRecordType, getShortRecordType } from '../constants';
 
 // --- HÀM TIỆN ÍCH XỬ LÝ CHUỖI TIẾNG VIỆT ---
 export function removeVietnameseTones(str: string): string {
@@ -179,19 +179,50 @@ export const calculateDeadlineHelper = (type: string, receivedDateStr: string, h
     if (!receivedDateStr) return '';
     let daysToAdd = 30; 
     const lowerType = (type || '').toLowerCase();
+    const short = getShortRecordType(type);
 
-    if (lowerType.includes('1.1') || lowerType.includes('cung cấp tài liệu đất đai') || lowerType.includes('cung cấp dữ liệu') ||
-        lowerType.includes('2.1') || lowerType.includes('trích lục') || 
-        lowerType.includes('quy hoạch')) {
+    if (short === '3.8.2 Xóa ĐK GDBD' || lowerType.includes('3.8.2') || lowerType.includes('xóa đk gdbd') || lowerType.includes('xóa thế chấp') || lowerType.includes('giải chấp')) {
+        daysToAdd = 1;
+    } else if (short === '3.8.1 Đăng ký GDBD' || lowerType.includes('3.8.1') || lowerType.includes('đăng ký gdbd') || lowerType.includes('thế chấp')) {
+        daysToAdd = 3;
+    } else if (
+        short === '3.6.1 Chuyển mục đích' || short === '3.7.1 Đính chính' || short === '3.7.2 Đổi thông tin' ||
+        lowerType.includes('3.6.1') || lowerType.includes('3.7.1') || lowerType.includes('3.7.2') ||
+        lowerType.includes('chuyển mục đích') || lowerType.includes('đính chính') || lowerType.includes('đổi thông tin')
+    ) {
+        daysToAdd = 7;
+    } else if (
+        short === '3.2.1 Cấp đổi' || short === '3.3.1 Cấp lại' || short === '1.1 Sao lục' || short === '1.2 Công văn' || short === '2.1 Trích lục' ||
+        lowerType.includes('3.2.1') || lowerType.includes('3.3.1') || lowerType.startsWith('1.1') || lowerType.startsWith('1.2') || lowerType.startsWith('2.1') ||
+        lowerType.includes('sao lục') || lowerType.includes('công văn') || lowerType.includes('trích lục')
+    ) {
         daysToAdd = 10;
-    } else if (lowerType.includes('2.3') || lowerType.includes('duyệt đơn') || lowerType.includes('duyet don') || lowerType.includes('số thửa') || lowerType.includes('so thua') || lowerType.includes('cung cấp số thửa') || lowerType.includes('cập nhật số thửa') || lowerType.includes('cập nhập số thửa') || lowerType.includes('2.6')) {
+    } else if (
+        short === '3.5.1 Gia hạn' || short === '2.3 Duyệt đơn' ||
+        lowerType.includes('3.5.1') || lowerType.includes('gia hạn') ||
+        lowerType.includes('2.3') || lowerType.includes('duyệt đơn') || lowerType.includes('số thửa')
+    ) {
         daysToAdd = 12;
-    } else if (lowerType.includes('trích đo chỉnh lý') || lowerType.includes('chỉnh lý bản đồ')) {
+    } else if (
+        short === '3.1.1 Chuyển quyền' || short === '3.1.2 Phân chia quyền' || short === '3.1.3 Theo Bản án / QĐ' ||
+        lowerType.includes('3.1.1') || lowerType.includes('3.1.2') || lowerType.includes('3.1.3') ||
+        lowerType.includes('chuyển quyền') || lowerType.includes('phân chia')
+    ) {
+        daysToAdd = 13;
+    } else if (
+        short === '3.2.2 Cấp đổi (có thuế)' || short === '3.3.2 Cấp lại (có thuế)' ||
+        lowerType.includes('3.2.2') || lowerType.includes('3.3.2')
+    ) {
         daysToAdd = 15;
+    } else if (
+        short === '3.4.1 Tách - hợp thửa' || short === '3.4.2 Tách thửa CQ' ||
+        lowerType.includes('3.4.1') || lowerType.includes('3.4.2')
+    ) {
+        daysToAdd = 17;
     } else if (lowerType.includes('2.2') || lowerType.includes('trích đo') || 
                lowerType.includes('2.4') || lowerType.includes('cắm mốc') || 
                lowerType.includes('2.5') || lowerType.includes('tách') || lowerType.includes('hợp') ||
-               lowerType.includes('đo đạc') || lowerType.includes('tách thửa')) {
+               lowerType.includes('đo đạc')) {
         daysToAdd = 30;
     }
     

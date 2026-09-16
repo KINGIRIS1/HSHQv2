@@ -13,10 +13,11 @@ interface ImportModalProps {
   onImport: (records: RecordFile[], mode: 'create' | 'update', onProgress?: (processed: number, total: number) => void) => Promise<boolean>;
   employees: Employee[];
   initialMode?: 'create' | 'update';
+  records?: RecordFile[];
 }
 
-const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, employees, initialMode }) => {
-  type PreviewRecord = RecordFile & { _errors?: string[] };
+const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, employees, initialMode, records = [] }) => {
+  type PreviewRecord = RecordFile & { _errors?: string[]; _isDuplicateCode?: boolean; _isDupInSoftware?: boolean; _isDupInFile?: boolean };
   const [previewData, setPreviewData] = useState<PreviewRecord[]>([]);
   const [fileName, setFileName] = useState('');
   const [holidays, setHolidays] = useState<Holiday[]>([]);
@@ -28,6 +29,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
 
   const [progress, setProgress] = useState<{ processed: number, total: number } | null>(null);
   const [showNoticeModal, setShowNoticeModal] = useState(false);
+  const [showDuplicatePromptModal, setShowDuplicatePromptModal] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -352,20 +354,13 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
             }
 
             record.id = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substr(2, 9);
-            
-            if (mode === 'create') {
-                if (!record.customerName) errors.push("Thiếu tên Chủ sử dụng.");
-                if (!record.recordType) errors.push("Thiếu Loại hồ sơ.");
-            } else {
-                if (!record.code) errors.push("Thiếu Mã HS (Bắt buộc để cập nhật).");
-            }
-
             record._errors = errors;
             mappedRecords.push(record);
         }
 
         const { migratedRecords } = migrateUnbatchedRecords(mappedRecords as RecordFile[]);
-        setPreviewData(migratedRecords as PreviewRecord[]);
+        const validated = validateRecords(migratedRecords as PreviewRecord[], mode, records);
+        setPreviewData(validated);
         setLoading(false);
 
       } catch (error) {
@@ -375,6 +370,118 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
       }
     };
     reader.readAsArrayBuffer(file);
+  };
+
+  const validateRecords = (
+    items: PreviewRecord[], 
+    currentMode: 'create' | 'update', 
+    existingRecords: RecordFile[] = []
+  ): PreviewRecord[] => {
+    const existingCodeSet = new Set(
+      existingRecords.map(r => String(r.code || '').trim().toUpperCase()).filter(Boolean)
+    );
+
+    const fileCodeCounts = new Map<string, number>();
+    items.forEach(r => {
+      if (r.code) {
+        const cUpper = String(r.code).trim().toUpperCase();
+        fileCodeCounts.set(cUpper, (fileCodeCounts.get(cUpper) || 0) + 1);
+      }
+    });
+
+    return items.map(record => {
+      const errors: string[] = [];
+      let isDupInSoftware = false;
+      let isDupInFile = false;
+
+      if (currentMode === 'create') {
+        if (!record.customerName) errors.push("Thiếu tên Chủ sử dụng.");
+        if (!record.recordType) errors.push("Thiếu Loại hồ sơ.");
+        
+        if (record.code) {
+          const cUpper = String(record.code).trim().toUpperCase();
+          if (existingCodeSet.has(cUpper)) {
+            isDupInSoftware = true;
+            errors.push(`Trùng mã hồ sơ "${record.code}" với hồ sơ đã có trong phần mềm.`);
+          }
+          if ((fileCodeCounts.get(cUpper) || 0) > 1) {
+            isDupInFile = true;
+            errors.push(`Trùng mã hồ sơ "${record.code}" bị lặp lại trong file Excel.`);
+          }
+        }
+      } else {
+        if (!record.code) errors.push("Thiếu Mã HS (Bắt buộc để cập nhật).");
+      }
+
+      // Preserve non-code errors like date parsing errors
+      const otherErrors = (record._errors || []).filter(e => 
+        !e.includes("Trùng mã hồ sơ") && 
+        !e.includes("Thiếu tên") && 
+        !e.includes("Thiếu Loại") && 
+        !e.includes("Thiếu Mã HS")
+      );
+      
+      const combinedErrors = Array.from(new Set([...otherErrors, ...errors]));
+
+      return {
+        ...record,
+        _errors: combinedErrors,
+        _isDuplicateCode: isDupInSoftware || isDupInFile,
+        _isDupInSoftware: isDupInSoftware,
+        _isDupInFile: isDupInFile
+      };
+    });
+  };
+
+  const handleModeSwitch = (newMode: 'create' | 'update') => {
+    setMode(newMode);
+    setViewFilter('all');
+    if (previewData.length > 0) {
+      setPreviewData(validateRecords(previewData, newMode, records));
+    }
+  };
+
+  const handleAutoFixDuplicateCodes = () => {
+    const existingCodeSet = new Set(
+      (records || []).map(r => String(r.code || '').trim().toUpperCase()).filter(Boolean)
+    );
+
+    const updated = previewData.map(r => {
+      if (r._isDuplicateCode || (mode === 'create' && !r.code)) {
+        const baseCode = r.code ? String(r.code).trim() : 'HS';
+        let suffix = 1;
+        let newCode = `${baseCode}-${suffix}`;
+        while (
+          existingCodeSet.has(newCode.toUpperCase()) || 
+          previewData.some(p => p.id !== r.id && String(p.code || '').trim().toUpperCase() === newCode.toUpperCase())
+        ) {
+          suffix++;
+          newCode = `${baseCode}-${suffix}`;
+        }
+        existingCodeSet.add(newCode.toUpperCase());
+        return { ...r, code: newCode };
+      }
+      return r;
+    });
+
+    setPreviewData(validateRecords(updated, mode, records));
+    setShowDuplicatePromptModal(false);
+  };
+
+  const handleSkipDuplicateRecords = () => {
+    const filtered = previewData.filter(r => !r._isDuplicateCode);
+    setPreviewData(validateRecords(filtered, mode, records));
+    setShowDuplicatePromptModal(false);
+  };
+
+  const handleSwitchToUpdateMode = () => {
+    handleModeSwitch('update');
+    setShowDuplicatePromptModal(false);
+  };
+
+  const handleCodeChange = (id: string, newCode: string) => {
+    const updated = previewData.map(p => p.id === id ? { ...p, code: newCode } : p);
+    setPreviewData(validateRecords(updated, mode, records));
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -389,10 +496,23 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
     if (file) processFile(file);
   };
 
-  const handleSave = async () => {
+  const handleSave = async (skipDuplicateCheck = false) => {
+      const duplicates = previewData.filter(r => r._isDuplicateCode);
+      if (mode === 'create' && duplicates.length > 0 && !skipDuplicateCheck) {
+        setShowDuplicatePromptModal(true);
+        return;
+      }
+
+      const recordsToImport = mode === 'create' ? previewData.filter(r => !r._errors?.length) : previewData;
+
+      if (recordsToImport.length === 0) {
+        alert("Không có hồ sơ hợp lệ nào để nhập!");
+        return;
+      }
+
       setLoading(true);
-      setProgress({ processed: 0, total: previewData.length });
-      const success = await onImport(previewData, mode, (processed, total) => {
+      setProgress({ processed: 0, total: recordsToImport.length });
+      const success = await onImport(recordsToImport, mode, (processed, total) => {
           setProgress({ processed, total });
       });
       setLoading(false);
@@ -549,7 +669,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
           {/* Left Side: Segmented control tabs */}
           <div className="bg-slate-200/70 p-1 rounded-xl flex items-center gap-1 border border-slate-200/60 shadow-inner">
             <button 
-              onClick={() => { setMode('update'); setPreviewData([]); setFileName(''); setViewFilter('all'); }}
+              onClick={() => handleModeSwitch('update')}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-xs transition-all cursor-pointer ${
                 mode === 'update' 
                   ? 'bg-white text-blue-700 shadow-xs border border-slate-200/60' 
@@ -560,7 +680,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
             </button>
 
             <button 
-              onClick={() => { setMode('create'); setPreviewData([]); setFileName(''); setViewFilter('all'); }}
+              onClick={() => handleModeSwitch('create')}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-xs transition-all cursor-pointer ${
                 mode === 'create' 
                   ? 'bg-white text-blue-700 shadow-xs border border-slate-200/60' 
@@ -639,6 +759,41 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
                 )}
               </div>
 
+              {/* Alert Banner for Duplicate Codes */}
+              {mode === 'create' && previewData.some(r => r._isDuplicateCode) && (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3.5 flex flex-wrap items-center justify-between gap-3 shadow-xs animate-fade-in">
+                  <div className="flex items-center gap-2.5 text-amber-900 text-xs font-bold">
+                    <AlertTriangle size={18} className="text-amber-600 shrink-0" />
+                    <span>
+                      Phát hiện <strong className="text-red-600 font-extrabold text-sm">{previewData.filter(r => r._isDuplicateCode).length}</strong> hồ sơ có <strong>Mã hồ sơ đã tồn tại</strong> trong phần mềm hoặc lặp lại trong file.
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button 
+                      onClick={handleAutoFixDuplicateCodes} 
+                      className="bg-amber-600 hover:bg-amber-700 text-white font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
+                      title="Tự động thêm hậu tố (-1, -2...) để cấp mã mới duy nhất"
+                    >
+                      🪄 Tự đổi mã mới
+                    </button>
+                    <button 
+                      onClick={handleSkipDuplicateRecords} 
+                      className="bg-slate-700 hover:bg-slate-800 text-white font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
+                      title="Loại bỏ các dòng bị trùng mã ra khỏi danh sách nhập"
+                    >
+                      🚫 Bỏ qua dòng trùng
+                    </button>
+                    <button 
+                      onClick={handleSwitchToUpdateMode} 
+                      className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
+                      title="Chuyển sang chế độ Cập nhật dữ liệu theo mã hồ sơ"
+                    >
+                      🔄 Chuyển Cập nhật
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Data Table */}
               <div className="flex-1 overflow-auto rounded-xl border border-slate-200">
                 <table className="w-full text-left border-collapse">
@@ -663,7 +818,19 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
                             return (
                                 <tr key={originalIdx} className={`hover:bg-blue-50/50 ${hasError ? 'bg-red-50/50' : ''}`}>
                                     <td className="p-3 text-xs font-semibold text-slate-400">{originalIdx}</td>
-                                    <td className="p-3 font-medium text-blue-600 whitespace-nowrap">{record.code}</td>
+                                    <td className="p-3 font-medium whitespace-nowrap">
+                                        <input 
+                                            type="text"
+                                            className={`px-2.5 py-1 border rounded-lg text-xs font-mono font-bold w-40 outline-none transition-all ${
+                                              record._isDuplicateCode 
+                                                ? 'border-red-400 bg-red-100/80 text-red-700 focus:ring-2 focus:ring-red-300 font-extrabold' 
+                                                : 'border-slate-300 bg-white text-blue-700 focus:border-blue-500'
+                                            }`}
+                                            value={record.code || ''}
+                                            onChange={(e) => handleCodeChange(record.id, e.target.value)}
+                                            placeholder="Nhập mã HS..."
+                                        />
+                                    </td>
                                     {activePreviewColumns.map(col => (
                                         <td key={col.key} className="p-3 whitespace-nowrap">
                                             {col.render(record)}
@@ -736,8 +903,8 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
             )}
             
             <button 
-                onClick={handleSave} 
-                disabled={previewData.length === 0 || previewData.some(r => r._errors?.length) || loading} 
+                onClick={() => handleSave(false)} 
+                disabled={previewData.length === 0 || loading} 
                 className="bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl px-6 py-2.5 text-xs flex items-center gap-2 shadow-md hover:shadow-lg transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none cursor-pointer"
             >
                 {loading ? (
@@ -749,7 +916,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
                     <>
                         <Check size={16} /> 
                         {mode === 'create' 
-                          ? `Tiếp nhận ${previewData.length} hồ sơ` 
+                          ? `Tiếp nhận ${previewData.filter(r => !r._errors?.length).length}/${previewData.length} hồ sơ` 
                           : `Cập nhật ${previewData.length} hồ sơ`
                         }
                     </>
@@ -759,6 +926,64 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
         </div>
 
       </div>
+
+      {/* MODAL CẢNH BÁO TRÙNG MÃ HỒ SƠ KHI BẤM LƯU */}
+      {showDuplicatePromptModal && (
+        <div className="fixed inset-0 z-[160] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-lg w-full p-6 animate-scale-up space-y-4">
+            <div className="flex items-center gap-3 pb-3 border-b border-slate-100">
+              <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center shrink-0">
+                <AlertTriangle size={24} />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-800 text-base">
+                  Phát hiện Trùng Mã Hồ Sơ
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Có {previewData.filter(r => r._isDuplicateCode).length} hồ sơ trong file trùng mã đã có trong hệ thống hoặc bị lặp.
+                </p>
+              </div>
+            </div>
+
+            <div className="text-sm text-slate-700 leading-relaxed space-y-2 bg-amber-50/70 p-3.5 rounded-xl border border-amber-200/80">
+              <p className="font-semibold text-amber-900">Bạn muốn xử lý các dòng bị trùng mã như thế nào?</p>
+              <p className="text-xs text-slate-600">
+                Nếu tự đổi mã mới, hệ thống sẽ tự sinh suffix (-1, -2...) để cấp mã duy nhất không trùng lặp.
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-2 pt-2">
+              <button
+                onClick={handleAutoFixDuplicateCodes}
+                className="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-2.5 px-4 rounded-xl text-xs flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
+              >
+                🪄 1. Tự động đổi mã mới duy nhất & Tiếp tục nhập
+              </button>
+
+              <button
+                onClick={handleSkipDuplicateRecords}
+                className="w-full bg-slate-700 hover:bg-slate-800 text-white font-bold py-2.5 px-4 rounded-xl text-xs flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
+              >
+                🚫 2. Bỏ qua các dòng trùng mã (Chỉ nhập các dòng hợp lệ)
+              </button>
+
+              <button
+                onClick={handleSwitchToUpdateMode}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-4 rounded-xl text-xs flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
+              >
+                🔄 3. Chuyển sang chế độ Cập nhật dữ liệu
+              </button>
+
+              <button
+                onClick={() => setShowDuplicatePromptModal(false)}
+                className="w-full bg-white hover:bg-slate-100 text-slate-600 border border-slate-300 font-bold py-2.5 px-4 rounded-xl text-xs flex items-center justify-center gap-2 transition-all cursor-pointer mt-1"
+              >
+                ✖️ Hủy / Quay lại chỉnh sửa thủ công
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* MODAL HƯỚNG DẪN CHẾ ĐỘ CẬP NHẬT THÔNG MINH */}
       {showNoticeModal && (

@@ -162,7 +162,7 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, onDelet
     const datePrefix = `${yy}${mm}${dd}`;
     
     const rType = (recordType || '').toLowerCase();
-    const isLT = isArchiveRecordType(recordType) || rType.startsWith('1.') || rType.includes('1.1') || rType.includes('1.2') || rType.includes('sao lục') || rType.includes('công văn') || rType.includes('cung cấp') || rType.includes('lưu trữ');
+    const isLT = isArchiveRecordType(recordType) || rType.startsWith('1.');
     const isCert = !isLT && (isCertificateRecordType(recordType) || rType.startsWith('3.'));
     
     let maxSeq = 0;

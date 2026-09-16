@@ -1,11 +1,11 @@
 import { supabase, isConfigured } from './supabaseClient';
 import { RecordFile, RecordStatus } from '../types';
 import { MOCK_RECORDS, API_BASE_URL, isArchiveRecordType, getShortRecordType, isSurveyRecordType, getSurveyRecordPrefix, isCertificateRecordType } from '../constants';
-import { logError, getFromCache, saveToCache, CACHE_KEYS, sanitizeData, sanitizePayloadFor22P02, sanitizePayloadForDateErrors, normalizeCode, mapRecordFromDb, keepOnlyDate } from './apiCore';
+import { logError, getFromCache, saveToCache, CACHE_KEYS, sanitizeData, sanitizePayloadFor22P02, sanitizePayloadForDateErrors, normalizeCode, mapRecordFromDb, keepOnlyDate, isBlankRecord } from './apiCore';
 import { getIndexedDBItem } from './storageService';
 import { addPendingRecord, removePendingRecord, getPendingRecords, getPendingSyncItems, syncPendingRecordsToCloud, generateStandardUUID, isValidUUID } from './syncQueueService';
 
-const RECORD_DB_COLUMNS = [
+export const RECORD_DB_COLUMNS = [
     'id', 'code', 'customerName', 'phoneNumber', 'cccd', 'customerAddress', 'ward', 'landPlot', 'mapSheet', 
     'area', 'address', 'group', 'content', 'recordType', 'receivedDate', 'receivedBy', 'deadline', 
     'assignedDate', 'submissionDate', 'approvalDate', 'completedDate', 'status', 'assignedTo', 'submittedTo', 'checkedBy',
@@ -31,7 +31,7 @@ const RECORD_DB_COLUMNS = [
  * - Nhóm 3.x (Đăng ký đất đai, Cấp giấy, Đăng ký biến động) -> dangky_records
  */
 export const getTargetTable = (record: Partial<RecordFile>): 'dangky_records' | 'land_records' | 'luutru_records' => {
-    // 0. Ưu tiên tuyệt đối nếu sourceTable đã được chỉ định (như Module Cấp giấy hoặc Module Đo đạc - Test chỉ định dangky_records)
+    // 0. Ưu tiên tuyệt đối nếu sourceTable đã được chỉ định (như Module Cấp giấy hoặc Module Lưu trữ)
     if (record.sourceTable === 'dangky_records') return 'dangky_records';
     if (record.sourceTable === 'luutru_records' || record.sourceTable === 'archive_records') return 'luutru_records';
     if (record.sourceTable === 'land_records') return 'land_records';
@@ -40,13 +40,26 @@ export const getTargetTable = (record: Partial<RecordFile>): 'dangky_records' | 
     const code = String(record.code || '').trim();
     const shortType = getShortRecordType(rawType);
     const groupStr = String(record.group || '').trim();
+    const deptStr = String((record as any).department || '').trim().toLowerCase();
 
-    // 1. Phân loại theo tiền tố mã thủ tục nghiêm ngặt
-    // Nhóm 1.x -> Tổ Lưu trữ (luutru_records)
+    // 1. Phân loại theo phòng ban/bộ phận nếu có
+    if (deptStr.includes('lưu trữ') || deptStr.includes('luu tru')) {
+        return 'luutru_records';
+    }
+    if (deptStr.includes('đăng ký') || deptStr.includes('cấp giấy') || deptStr.includes('dang ky') || deptStr.includes('cap giay')) {
+        return 'dangky_records';
+    }
+    if (deptStr.includes('đo đạc') || deptStr.includes('do dac')) {
+        return 'land_records';
+    }
+
+    // 2. Phân loại theo tiền tố mã thủ tục hoặc mã hồ sơ nghiêm ngặt
+    // Nhóm 1.x / Mã LT- -> Tổ Lưu trữ (luutru_records)
     if (
         shortType.startsWith('1.') ||
         rawType.startsWith('1.') ||
         code.startsWith('1.') ||
+        code.toUpperCase().startsWith('LT-') ||
         groupStr.startsWith('1.') ||
         isArchiveRecordType(record.recordType) ||
         isArchiveRecordType(record.content)
@@ -72,7 +85,8 @@ export const getTargetTable = (record: Partial<RecordFile>): 'dangky_records' | 
         shortType.startsWith('2.') ||
         rawType.startsWith('2.') ||
         code.startsWith('2.') ||
-        groupStr.startsWith('2.')
+        groupStr.startsWith('2.') ||
+        groupStr.includes('Đo đạc')
     ) {
         return 'land_records';
     }
@@ -304,23 +318,62 @@ export const fetchRecords = async (onProgress?: TierProgressCallback): Promise<R
         .map(mapRecordFromDb)
         .filter((r): r is RecordFile => !!r && getTargetTable(r) !== 'dangky_records');
 
-    if (misplacedInDangky.length > 0) {
-        console.log(`[Auto-Fix] Phát hiện ${misplacedInDangky.length} hồ sơ nằm sai trong dangky_records. Đang tự động chuyển dời...`);
+    // Tự động phát hiện và di chuyển các hồ sơ bị phân nhầm vào land_records (ví dụ hồ sơ Lưu trữ 1.x / mã LT-)
+    const misplacedInLand = land
+        .map(mapRecordFromDb)
+        .filter((r): r is RecordFile => !!r && getTargetTable(r) !== 'land_records');
+
+    // Tự động phát hiện các dòng hoàn toàn trống rác trong land_records, dangky_records, luutru_records
+    const blankInLandIds = new Set(
+        land.map(mapRecordFromDb).filter((r): r is RecordFile => !!r && isBlankRecord(r)).map(r => r.id)
+    );
+    const blankInDangkyIds = new Set(
+        dangky.map(mapRecordFromDb).filter((r): r is RecordFile => !!r && isBlankRecord(r)).map(r => r.id)
+    );
+    const blankInLuutruIds = new Set(
+        luutru.map(mapRecordFromDb).filter((r): r is RecordFile => !!r && isBlankRecord(r)).map(r => r.id)
+    );
+    const allBlankIds = new Set([...blankInLandIds, ...blankInDangkyIds, ...blankInLuutruIds]);
+
+    if (misplacedInDangky.length > 0 || misplacedInLand.length > 0 || allBlankIds.size > 0) {
+        console.log(`[Auto-Fix] Phát hiện ${misplacedInDangky.length} sai ở dangky, ${misplacedInLand.length} sai ở land_records, ${allBlankIds.size} dòng trống. Đang tự động xử lý...`);
         setTimeout(async () => {
             try {
-                const landFixes = misplacedInDangky.filter(r => getTargetTable(r) === 'land_records');
-                const luutruFixes = misplacedInDangky.filter(r => getTargetTable(r) === 'luutru_records');
+                const landFixesFromDangky = misplacedInDangky.filter(r => getTargetTable(r) === 'land_records');
+                const luutruFixesFromDangky = misplacedInDangky.filter(r => getTargetTable(r) === 'luutru_records');
 
-                if (landFixes.length > 0) {
-                    await supabase.from('land_records').upsert(landFixes.map(r => sanitizeData(r, RECORD_DB_COLUMNS)));
-                    await purgeBatchFromOtherTables(landFixes.map(r => r.id), landFixes.map(r => r.code), 'land_records');
+                if (landFixesFromDangky.length > 0) {
+                    await supabase.from('land_records').upsert(landFixesFromDangky.map(r => sanitizeData(r, RECORD_DB_COLUMNS)));
+                    await purgeBatchFromOtherTables(landFixesFromDangky.map(r => r.id), landFixesFromDangky.map(r => r.code), 'land_records');
                 }
-                if (luutruFixes.length > 0) {
-                    await supabase.from('luutru_records').upsert(luutruFixes.map(r => sanitizeData(r, RECORD_DB_COLUMNS)));
-                    await purgeBatchFromOtherTables(luutruFixes.map(r => r.id), luutruFixes.map(r => r.code), 'luutru_records');
+                if (luutruFixesFromDangky.length > 0) {
+                    await supabase.from('luutru_records').upsert(luutruFixesFromDangky.map(r => sanitizeData(r, RECORD_DB_COLUMNS)));
+                    await purgeBatchFromOtherTables(luutruFixesFromDangky.map(r => r.id), luutruFixesFromDangky.map(r => r.code), 'luutru_records');
+                }
+
+                const luutruFixesFromLand = misplacedInLand.filter(r => getTargetTable(r) === 'luutru_records');
+                const dangkyFixesFromLand = misplacedInLand.filter(r => getTargetTable(r) === 'dangky_records');
+
+                if (luutruFixesFromLand.length > 0) {
+                    await supabase.from('luutru_records').upsert(luutruFixesFromLand.map(r => sanitizeData(r, RECORD_DB_COLUMNS)));
+                    await purgeBatchFromOtherTables(luutruFixesFromLand.map(r => r.id), luutruFixesFromLand.map(r => r.code), 'luutru_records');
+                }
+                if (dangkyFixesFromLand.length > 0) {
+                    await supabase.from('dangky_records').upsert(dangkyFixesFromLand.map(r => sanitizeData(r, RECORD_DB_COLUMNS)));
+                    await purgeBatchFromOtherTables(dangkyFixesFromLand.map(r => r.id), dangkyFixesFromLand.map(r => r.code), 'dangky_records');
+                }
+
+                if (blankInLandIds.size > 0) {
+                    await supabase.from('land_records').delete().in('id', Array.from(blankInLandIds));
+                }
+                if (blankInDangkyIds.size > 0) {
+                    await supabase.from('dangky_records').delete().in('id', Array.from(blankInDangkyIds));
+                }
+                if (blankInLuutruIds.size > 0) {
+                    await supabase.from('luutru_records').delete().in('id', Array.from(blankInLuutruIds));
                 }
             } catch (err) {
-                console.error("[Auto-Fix Misplaced Records] Lỗi khi chuyển dời:", err);
+                console.error("[Auto-Fix Misplaced/Blank Records] Lỗi khi xử lý:", err);
             }
         }, 300);
     }
@@ -328,7 +381,7 @@ export const fetchRecords = async (onProgress?: TierProgressCallback): Promise<R
     const rawList = [...dangky, ...land, ...luutru];
     rawList.forEach(item => {
         const mapped = mapRecordFromDb(item);
-        if (mapped && mapped.id) {
+        if (mapped && mapped.id && !allBlankIds.has(mapped.id)) {
             uniqueMap.set(mapped.id, mapped);
         }
     });
@@ -427,7 +480,7 @@ export const getNextGlobalRecordCode = async (
     wardName = ''
 ): Promise<string> => {
     const rType = (recordType || '').toLowerCase();
-    const isLT = isArchive || rType.startsWith('1.') || rType.includes('1.1') || rType.includes('1.2') || rType.includes('sao lục') || rType.includes('công văn') || rType.includes('cung cấp') || rType.includes('lưu trữ');
+    const isLT = isArchive || isArchiveRecordType(recordType) || rType.startsWith('1.');
     const isCert = !isLT && isCertificateRecordType(recordType);
     const isSurvey = !isLT && !isCert && isSurveyRecordType(recordType);
 
