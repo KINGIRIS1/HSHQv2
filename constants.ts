@@ -397,43 +397,65 @@ export const isCertificateRecordType = (recordOrType: Partial<RecordFile> | stri
 // Quy tắc: Nếu người tiếp nhận được phân công TRÊN 1 địa bàn (> 1 xã) -> không lấy tiền tố.
 // Chỉ lấy tiền tố 2 chữ cái (TK, TQ, TH, MD) nếu người tiếp nhận được phân công ĐÚNG 1 địa bàn.
 export const getSurveyRecordPrefix = (
-  receivedBy: string | null | undefined,
-  employeesList: Employee[] = []
+  receivedBy?: string | null,
+  employeesList: Employee[] = [],
+  wardName?: string | null
 ): string => {
-  if (!receivedBy) return '';
-  const empList = (employeesList && employeesList.length > 0) ? employeesList : MOCK_EMPLOYEES;
-  let target = receivedBy.trim().toLowerCase();
+  if (receivedBy) {
+    const empList = (employeesList && employeesList.length > 0) ? employeesList : MOCK_EMPLOYEES;
+    let target = receivedBy.trim().toLowerCase();
 
-  const USERNAME_MAP: Record<string, string> = {
-    anhlvt: 'nv14',
-    hieunv: 'nv11',
-    hoina: 'nv10',
-    hoatm: 'nv215',
-    trinh: 'nv497',
-    thuantq: 'nv15',
-    admin: 'nv919'
-  };
-  if (USERNAME_MAP[target]) {
-    target = USERNAME_MAP[target];
+    const USERNAME_MAP: Record<string, string> = {
+      anhlvt: 'nv14',
+      hieunv: 'nv11',
+      hoina: 'nv10',
+      hoatm: 'nv215',
+      trinh: 'nv497',
+      thuantq: 'nv15',
+      admin: 'nv919'
+    };
+    if (USERNAME_MAP[target]) {
+      target = USERNAME_MAP[target];
+    }
+    
+    const emp = empList.find(e => 
+      (e.id && e.id.toLowerCase() === target) ||
+      (e.name && e.name.toLowerCase() === target)
+    );
+
+    if (emp && emp.managedWards && emp.managedWards.length === 1) {
+      const singleWard = emp.managedWards[0].trim().toLowerCase();
+      if (singleWard.includes('khai')) return 'TK';
+      if (singleWard.includes('quan')) return 'TQ';
+      if (singleWard.includes('hưng') || singleWard.includes('hung')) return 'TH';
+      if (singleWard.includes('đức') || singleWard.includes('duc')) return 'MD';
+      if (singleWard.includes('chơn thành') || singleWard.includes('chonthanh')) return 'CT';
+      if (singleWard.includes('nha bích') || singleWard.includes('nhabich')) return 'NB';
+      if (singleWard.includes('lập') || singleWard.includes('lap')) return 'ML';
+      if (singleWard.includes('thắng') || singleWard.includes('thang')) return 'MT';
+      if (singleWard.includes('quang minh')) return 'QM';
+      if (singleWard.includes('thành tâm')) return 'TT';
+      if (singleWard.includes('minh long') || singleWard.includes('minhlong')) return 'MLO';
+      if (singleWard.includes('minh hưng') || singleWard.includes('minhhung')) return 'MH';
+    }
   }
-  
-  const emp = empList.find(e => 
-    (e.id && e.id.toLowerCase() === target) ||
-    (e.name && e.name.toLowerCase() === target)
-  );
 
-  // Nếu không tìm thấy hoặc người đó được phân công TRÊN 1 địa bàn (ví dụ 4 xã hoặc > 1 xã)
-  if (!emp || !emp.managedWards || emp.managedWards.length !== 1) {
-    return '';
+  if (wardName) {
+    const w = wardName.trim().toLowerCase();
+    if (w.includes('khai')) return 'TK';
+    if (w.includes('quan')) return 'TQ';
+    if (w.includes('hưng') || w.includes('hung')) return 'TH';
+    if (w.includes('đức') || w.includes('duc')) return 'MD';
+    if (w.includes('chơn thành') || w.includes('chonthanh')) return 'CT';
+    if (w.includes('nha bích') || w.includes('nhabich')) return 'NB';
+    if (w.includes('lập') || w.includes('lap')) return 'ML';
+    if (w.includes('thắng') || w.includes('thang')) return 'MT';
+    if (w.includes('quang minh')) return 'QM';
+    if (w.includes('thành tâm')) return 'TT';
+    if (w.includes('minh long') || w.includes('minhlong')) return 'MLO';
+    if (w.includes('minh hưng') || w.includes('minhhung')) return 'MH';
   }
 
-  // Nếu người đó được phân công ĐÚNG 1 địa bàn:
-  const singleWard = emp.managedWards[0].trim().toLowerCase();
-  if (singleWard.includes('khai')) return 'TK';
-  if (singleWard.includes('quan')) return 'TQ';
-  if (singleWard.includes('hưng') || singleWard.includes('hung')) return 'TH';
-  if (singleWard.includes('đức') || singleWard.includes('duc')) return 'MD';
-  
   return '';
 };
 

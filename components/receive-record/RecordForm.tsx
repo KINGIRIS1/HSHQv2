@@ -129,13 +129,14 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
   useEffect(() => {
     if (!initialData) {
         const recBy = formData.receivedBy || currentUser?.employeeId || currentUser?.username || '';
-        const newCode = generateCode(processingWard, formData.receivedDate || '', formData.recordType || undefined, [], recBy);
+        const currentWard = formData.ward || processingWard;
+        const newCode = generateCode(currentWard, formData.receivedDate || '', formData.recordType || undefined, [], recBy);
         setFormData(prev => {
             if (prev.code === newCode) return prev;
             return { ...prev, code: newCode };
         });
     }
-  }, [processingWard, formData.receivedDate, formData.recordType, formData.receivedBy, records, initialData]);
+  }, [processingWard, formData.ward, formData.receivedDate, formData.recordType, formData.receivedBy, records, initialData]);
 
   const handleChange = (field: keyof RecordFile, value: any) => {
     setFormData(prev => {
@@ -146,10 +147,11 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
             finalValue = `${value}T${padTime(nowTime.getHours())}:${padTime(nowTime.getMinutes())}:${padTime(nowTime.getSeconds())}`;
         }
         const newData = { ...prev, [field]: finalValue };
-        if (field === 'recordType' || field === 'receivedDate' || field === 'receivedBy') {
+        if (field === 'recordType' || field === 'receivedDate' || field === 'receivedBy' || field === 'ward') {
             const rType = field === 'recordType' ? finalValue : prev.recordType;
             const rDate = field === 'receivedDate' ? finalValue : prev.receivedDate;
             const rRecBy = field === 'receivedBy' ? finalValue : prev.receivedBy;
+            const rWard = field === 'ward' ? finalValue : (prev.ward || processingWard);
             if (rType && rDate) {
                 newData.deadline = calculateDeadline(rType, rDate);
             } else if (!rType) {
@@ -157,7 +159,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
             }
             if (!initialData) {
                 const recBy = rRecBy || currentUser?.employeeId || currentUser?.username || '';
-                newData.code = generateCode(processingWard, rDate || '', rType || undefined, [], recBy);
+                newData.code = generateCode(rWard || processingWard, rDate || '', rType || undefined, [], recBy);
             }
         }
         

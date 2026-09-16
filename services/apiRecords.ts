@@ -397,7 +397,8 @@ export const getNextGlobalRecordCode = async (
     dateStr: string, 
     isArchive = false, 
     recordType = '', 
-    receivedBy = ''
+    receivedBy = '',
+    wardName = ''
 ): Promise<string> => {
     const rType = (recordType || '').toLowerCase();
     const isLT = isArchive || rType.startsWith('1.') || rType.includes('1.1') || rType.includes('1.2') || rType.includes('sao lục') || rType.includes('công văn') || rType.includes('cung cấp') || rType.includes('lưu trữ');
@@ -418,7 +419,7 @@ export const getNextGlobalRecordCode = async (
         } else if (isCert) {
             return `H19.151.11.22-${datePrefix}-${Math.floor(Math.random() * 1000).toString().padStart(4, '0')}`;
         } else if (isSurvey) {
-            const p2 = getSurveyRecordPrefix(receivedBy);
+            const p2 = getSurveyRecordPrefix(receivedBy, [], wardName);
             prefix = p2 ? `${p2}-` : '';
         }
         return `${prefix}${datePrefix}-${Math.floor(Math.random() * 1000).toString().padStart(4, '0')}`;
@@ -505,7 +506,7 @@ export const getNextGlobalRecordCode = async (
         return `H19.151.11.22-${datePrefix}-${seqStr}`;
     }
     if (isSurvey) {
-        const prefix2 = getSurveyRecordPrefix(receivedBy);
+        const prefix2 = getSurveyRecordPrefix(receivedBy, [], wardName);
         return prefix2 ? `${prefix2}-${datePrefix}-${seqStr}` : `${datePrefix}-${seqStr}`;
     }
     return `${datePrefix}-${seqStr}`;
@@ -604,7 +605,8 @@ export const createRecordApi = async (record: RecordFile): Promise<RecordFile | 
                 record.receivedDate || new Date().toISOString(), 
                 isArchive,
                 record.recordType || '',
-                record.receivedBy || ''
+                record.receivedBy || '',
+                record.ward || ''
             );
         }
         

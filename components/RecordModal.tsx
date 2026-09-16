@@ -190,7 +190,8 @@ const generateRecordCode = (
     recordType: string = '',
     receivedBy: string = '',
     employeesList: Employee[] = [],
-    isCertView: boolean = false
+    isCertView: boolean = false,
+    wardName: string = ''
 ) => {
     const d = new Date(dateStr || new Date());
     const year = d.getFullYear().toString();
@@ -234,7 +235,7 @@ const generateRecordCode = (
             }
         } else {
             if (!code.startsWith('LT-') && !code.startsWith('H19.151.11.22-')) {
-                const cleanCode = code.replace(/^(HQ|TK|TQ|TH|MD|MĐ)-/, '');
+                const cleanCode = code.replace(/^(HQ|TK|TQ|TH|MD|MĐ|MH|CT|NB|ML|MT|QM|TT|MLO)-/, '');
                 const parts = cleanCode.split('-');
                 if (parts.length >= 2) {
                     const rDate = parts[0];
@@ -256,7 +257,7 @@ const generateRecordCode = (
         return `H19.151.11.22-${datePrefix}-${nextSeq}`;
     }
 
-    const prefix2 = getSurveyRecordPrefix(receivedBy, employeesList);
+    const prefix2 = getSurveyRecordPrefix(receivedBy, employeesList, wardName);
     return prefix2 ? `${prefix2}-${datePrefix}-${nextSeq}` : `${datePrefix}-${nextSeq}`;
 };
 
@@ -427,7 +428,8 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                 defaultRecType, 
                 initialRecBy, 
                 employees,
-                isTestMeasurementView
+                isTestMeasurementView,
+                (initialData as RecordFile | null | undefined)?.ward || ''
               ),
               receivedBy: initialRecBy
             });
@@ -839,10 +841,11 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
           updated.group = norm;
         }
       }
-      if (field === 'recordType' || field === 'receivedDate' || field === 'receivedBy') {
+      if (field === 'recordType' || field === 'receivedDate' || field === 'receivedBy' || field === 'ward') {
         const rType = field === 'recordType' ? value : prev.recordType;
         const rDate = field === 'receivedDate' ? value : prev.receivedDate;
         const rRecBy = field === 'receivedBy' ? value : prev.receivedBy;
+        const rWard = field === 'ward' ? value : prev.ward;
         if (rType && rDate) {
           updated.deadline = calculateDeadlineHelper(rType, String(rDate).split('T')[0], holidays || []);
         } else if (!rType) {
@@ -858,7 +861,8 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
             String(rType || ''),
             String(rRecBy || currentUser?.employeeId || ''),
             employees,
-            isTestMeasurementView
+            isTestMeasurementView,
+            String(rWard || '')
           );
         }
         if (field === 'recordType' && !value) {
