@@ -1,5 +1,6 @@
 import { supabase, isConfigured } from './supabaseClient';
 import { logError, getFromCache, saveToCache, sanitizeData, sanitizePayloadFor22P02 } from './apiCore';
+import { updateArchiveCounterIfHigher } from './apiRecords';
 import { RecordFile, RecordStatus } from '../types';
 import { isArchiveRecordType, getShortRecordType } from '../constants';
 import { setIndexedDBItem, getIndexedDBItem } from './storageService';
@@ -205,9 +206,11 @@ export const mapArchiveRecordToLuutruDb = (r: Partial<ArchiveRecord>): any => {
     else if (rawSt === 'withdrawn') status = RecordStatus.WITHDRAWN;
     else if (rawSt === 'rejected') status = RecordStatus.REJECTED;
 
+    const effectiveCode = r.so_hieu || d.code || (r as any).code || '';
     const payload = {
         id: r.id || (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substr(2, 9)),
-        code: r.so_hieu || d.code || '',
+        code: effectiveCode,
+        so_hieu: effectiveCode,
         customerName: r.noi_nhan_gui || d.customerName || '',
         content: r.trich_yeu || d.content || '',
         receivedDate: r.ngay_thang || d.receivedDate || null,
@@ -575,7 +578,11 @@ export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise
             }
 
             if (error) throw error;
-            return data && data.length > 0 ? mapLuutruDbToArchiveRecord(data[0]) : null;
+            const resRec = data && data.length > 0 ? mapLuutruDbToArchiveRecord(data[0]) : null;
+            if (resRec && resRec.so_hieu && resRec.so_hieu.startsWith('LT-')) {
+                updateArchiveCounterIfHigher(resRec.so_hieu, resRec.ngay_thang);
+            }
+            return resRec;
         } else {
             let { data, error } = await supabase.from('luutru_records').insert([payload]).select();
             
@@ -595,7 +602,11 @@ export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise
             }
 
             if (error) throw error;
-            return data && data.length > 0 ? mapLuutruDbToArchiveRecord(data[0]) : null;
+            const resRec = data && data.length > 0 ? mapLuutruDbToArchiveRecord(data[0]) : null;
+            if (resRec && resRec.so_hieu && resRec.so_hieu.startsWith('LT-')) {
+                updateArchiveCounterIfHigher(resRec.so_hieu, resRec.ngay_thang);
+            }
+            return resRec;
         }
     } catch (error: any) {
         logError("saveArchiveRecord", error);

@@ -205,17 +205,32 @@ const generateRecordCode = (
     const isCert = !isLT && (isCertView || isCertificateRecordType(recordType) || rType.startsWith('3.'));
 
     let maxSeq = 0;
+    if (isLT) {
+        let archiveCountInYear = 0;
+        (recordsList || []).forEach((r: RecordFile) => {
+            if (isArchiveRecordType(r.recordType) || (r as any).sourceTable === 'luutru_records') {
+                const rDate = r.receivedDate || (r as any).created_at || '';
+                const yr = rDate.slice(0, 4);
+                if (!yr || yr === year || yr === '20' + yy) {
+                    archiveCountInYear++;
+                }
+            }
+        });
+        if (archiveCountInYear > maxSeq) maxSeq = archiveCountInYear;
+        if (yy === '26' && maxSeq < 186) maxSeq = 186;
+    }
+
     (recordsList || []).forEach((r) => {
         if (!r.code) return;
         const code = r.code.trim();
         
         if (isLT) {
-            if (code.startsWith('LT-') || isArchiveRecordType(r.recordType)) {
+            if (code.startsWith('LT-')) {
                 const parts = code.replace(/^LT-/, '').split('-');
                 if (parts.length >= 2) {
                     const rDate = parts[0];
                     const rSeq = parts[1];
-                    if (rDate && rDate.substring(0, 2) === yy) {
+                    if (rDate && (rDate.substring(0, 2) === yy || rDate === year || rDate.startsWith(yy))) {
                         const seqNum = parseInt(rSeq, 10);
                         if (!isNaN(seqNum) && seqNum < 50000 && seqNum > maxSeq) maxSeq = seqNum;
                     }

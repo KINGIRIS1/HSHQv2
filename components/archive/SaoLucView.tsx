@@ -275,23 +275,35 @@ const SaoLucView: React.FC<SaoLucViewProps> = ({ currentUser, wards = ['Tân Qua
 
     const generateLTHoSoCode = (recordsList: ArchiveRecord[]) => {
         const d = new Date();
-        const yy = d.getFullYear().toString().slice(-2);
+        const year = d.getFullYear().toString();
+        const yy = year.slice(-2);
         const mm = ('0' + (d.getMonth() + 1)).slice(-2);
         const dd = ('0' + d.getDate()).slice(-2);
         const datePrefix = `${yy}${mm}${dd}`;
 
         let maxSeq = 0;
+        let archiveCountInYear = 0;
+        (recordsList || []).forEach(r => {
+            const rDate = r.ngay_thang || (r as any).created_at || r.data?.receivedDate || '';
+            const yr = rDate.slice(0, 4);
+            if (!yr || yr === year || yr === '20' + yy) {
+                archiveCountInYear++;
+            }
+        });
+        if (archiveCountInYear > maxSeq) maxSeq = archiveCountInYear;
+        if (yy === '26' && maxSeq < 186) maxSeq = 186;
+
         recordsList.forEach((r) => {
-            const code = r.so_hieu || '';
-            if (!code) return;
-            const cleanCode = code.startsWith('LT-') ? code.replace('LT-', '') : code;
+            const code = (r.so_hieu || (r as any).code || r.data?.code || '').trim();
+            if (!code || !code.startsWith('LT-')) return;
+            const cleanCode = code.replace(/^LT-/, '');
             const parts = cleanCode.split('-');
             if (parts.length >= 2) {
                 const rDate = parts[0];
                 const rSeq = parts[1];
-                if (rDate && rDate.substring(0, 2) === yy) {
+                if (rDate && (rDate.substring(0, 2) === yy || rDate === year || rDate.startsWith(yy))) {
                     const seqNum = parseInt(rSeq, 10);
-                    if (!isNaN(seqNum) && seqNum > maxSeq) maxSeq = seqNum;
+                    if (!isNaN(seqNum) && seqNum < 50000 && seqNum > maxSeq) maxSeq = seqNum;
                 }
             }
         });

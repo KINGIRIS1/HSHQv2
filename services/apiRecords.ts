@@ -466,6 +466,45 @@ export const getNextGlobalRecordCode = async (
                 }
             }
 
+            if (isLT) {
+                // Tối thiểu là 186 hồ sơ hiện tại của năm 2026 trong module Lưu trữ
+                if ((year === '2026' || yy === '26') && currentVal < 186) {
+                    currentVal = 186;
+                }
+                try {
+                    const { count } = await supabase.from('luutru_records').select('*', { count: 'exact', head: true });
+                    if (count && count > currentVal) currentVal = count;
+                } catch (_) {}
+
+                // Tự động kiểm tra số thứ tự lớn nhất trong năm từ luutru_records để đảm bảo tính liên tục của số dài theo năm
+                try {
+                    const { data: maxRows } = await supabase
+                        .from('luutru_records')
+                        .select('code')
+                        .ilike('code', `LT-${yy}%`)
+                        .order('code', { ascending: false })
+                        .limit(50);
+                    if (maxRows && maxRows.length > 0) {
+                        for (const row of maxRows) {
+                            const c = (row.code || '').trim();
+                            if (c.startsWith('LT-')) {
+                                const parts = c.replace(/^LT-/, '').split('-');
+                                if (parts.length >= 2) {
+                                    const rDate = parts[0];
+                                    const rSeq = parts[1];
+                                    if (rDate && (rDate.substring(0, 2) === yy || rDate === year || rDate.startsWith(yy))) {
+                                        const seq = parseInt(rSeq, 10);
+                                        if (!isNaN(seq) && seq < 50000 && seq > currentVal) {
+                                            currentVal = seq;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } catch (_) {}
+            }
+
             nextSeq = currentVal + 1;
 
             if (data) {
@@ -510,6 +549,43 @@ export const getNextGlobalRecordCode = async (
         return prefix2 ? `${prefix2}-${datePrefix}-${seqStr}` : `${datePrefix}-${seqStr}`;
     }
     return `${datePrefix}-${seqStr}`;
+};
+
+/**
+ * Tự động cập nhật bộ đếm archive_record_counter_${year} nếu mã hồ sơ lưu trữ có số thứ tự lớn hơn
+ */
+export const updateArchiveCounterIfHigher = async (code?: string | null, dateStr?: string) => {
+    if (!isConfigured || !code || !code.startsWith('LT-')) return;
+    try {
+        const parts = code.trim().replace(/^LT-/, '').split('-');
+        if (parts.length < 2) return;
+        const rDate = parts[0];
+        const rSeq = parts[1];
+        const seq = parseInt(rSeq, 10);
+        if (isNaN(seq) || seq <= 0 || seq >= 50000) return;
+
+        let year = '';
+        if (rDate.length === 4 && /^\d{4}$/.test(rDate)) {
+            year = rDate;
+        } else if (rDate.length >= 2 && /^\d+$/.test(rDate.substring(0, 2))) {
+            year = '20' + rDate.substring(0, 2);
+        } else if (dateStr) {
+            year = new Date(dateStr).getFullYear().toString();
+        } else {
+            year = new Date().getFullYear().toString();
+        }
+
+        const key = `archive_record_counter_${year}`;
+        const { data } = await supabase.from('system_settings').select('value').eq('key', key).single();
+        const currentVal = data?.value ? parseInt(data.value, 10) : 0;
+        if (seq > currentVal) {
+            if (data) {
+                await supabase.from('system_settings').update({ value: seq.toString() }).eq('key', key);
+            } else {
+                await supabase.from('system_settings').insert([{ key, value: seq.toString() }]);
+            }
+        }
+    } catch (_) {}
 };
 
 // --- CACHE SYNCHRONIZATION HELPERS ---
@@ -661,6 +737,10 @@ export const createRecordApi = async (record: RecordFile): Promise<RecordFile | 
 
         const result = mapRecordFromDb({ ...recordToSave, ...(data?.[0] || {}), sourceTable: targetTable }) as RecordFile;
         if (result) {
+            // Cập nhật bộ đếm số dài theo năm nếu là hồ sơ lưu trữ
+            if (isArchive || (result.code && result.code.startsWith('LT-'))) {
+                updateArchiveCounterIfHigher(result.code, result.receivedDate || undefined);
+            }
             // Gỡ khỏi hàng đợi chờ đồng bộ vì đã lên Cloud thành công 100%
             await removePendingRecord(result.id);
             syncCacheOnCreate(result);
