@@ -189,7 +189,8 @@ const generateRecordCode = (
     isArchive: boolean = false, 
     recordType: string = '',
     receivedBy: string = '',
-    employeesList: Employee[] = []
+    employeesList: Employee[] = [],
+    isCertView: boolean = false
 ) => {
     const d = new Date(dateStr || new Date());
     const year = d.getFullYear().toString();
@@ -199,22 +200,50 @@ const generateRecordCode = (
     const datePrefix = `${yy}${mm}${dd}`;
 
     const rType = (recordType || '').toLowerCase();
-    const isLT = isArchive || rType.startsWith('1.') || rType.includes('1.1') || rType.includes('1.2') || rType.includes('sao lục') || rType.includes('công văn') || rType.includes('cung cấp') || rType.includes('lưu trữ');
-    const isCert = !isLT && isCertificateRecordType(recordType);
+    const isLT = isArchive || isArchiveRecordType(recordType) || rType.startsWith('1.') || rType.includes('1.1') || rType.includes('1.2') || rType.includes('sao lục') || rType.includes('công văn') || rType.includes('cung cấp') || rType.includes('lưu trữ');
+    const isCert = !isLT && (isCertView || isCertificateRecordType(recordType) || rType.startsWith('3.'));
 
     let maxSeq = 0;
-    recordsList.forEach((r) => {
+    (recordsList || []).forEach((r) => {
         if (!r.code) return;
-        const cleanCode = r.code
-            .replace(/^H19\.151\.11\.22-/, '')
-            .replace(/^(LT|HQ|TK|TQ|TH|MD|MĐ)-/, '');
-        const parts = cleanCode.split('-');
-        if (parts.length >= 2) {
-            const rDate = parts[0];
-            const rSeq = parts[1];
-            if (rDate && rDate.substring(0, 2) === yy) {
-                const seqNum = parseInt(rSeq, 10);
-                if (!isNaN(seqNum) && seqNum < 50000 && seqNum > maxSeq) maxSeq = seqNum;
+        const code = r.code.trim();
+        
+        if (isLT) {
+            if (code.startsWith('LT-') || isArchiveRecordType(r.recordType)) {
+                const parts = code.replace(/^LT-/, '').split('-');
+                if (parts.length >= 2) {
+                    const rDate = parts[0];
+                    const rSeq = parts[1];
+                    if (rDate && rDate.substring(0, 2) === yy) {
+                        const seqNum = parseInt(rSeq, 10);
+                        if (!isNaN(seqNum) && seqNum < 50000 && seqNum > maxSeq) maxSeq = seqNum;
+                    }
+                }
+            }
+        } else if (isCert) {
+            if (code.startsWith('H19.151.11.22-') || isCertificateRecordType(r.recordType)) {
+                const parts = code.replace(/^H19\.151\.11\.22-/, '').split('-');
+                if (parts.length >= 2) {
+                    const rDate = parts[0];
+                    const rSeq = parts[1];
+                    if (rDate && rDate.substring(0, 2) === yy) {
+                        const seqNum = parseInt(rSeq, 10);
+                        if (!isNaN(seqNum) && seqNum < 50000 && seqNum > maxSeq) maxSeq = seqNum;
+                    }
+                }
+            }
+        } else {
+            if (!code.startsWith('LT-') && !code.startsWith('H19.151.11.22-')) {
+                const cleanCode = code.replace(/^(HQ|TK|TQ|TH|MD|MĐ)-/, '');
+                const parts = cleanCode.split('-');
+                if (parts.length >= 2) {
+                    const rDate = parts[0];
+                    const rSeq = parts[1];
+                    if (rDate && rDate.substring(0, 2) === yy) {
+                        const seqNum = parseInt(rSeq, 10);
+                        if (!isNaN(seqNum) && seqNum < 50000 && seqNum > maxSeq) maxSeq = seqNum;
+                    }
+                }
             }
         }
     });
@@ -227,13 +256,8 @@ const generateRecordCode = (
         return `H19.151.11.22-${datePrefix}-${nextSeq}`;
     }
 
-    const isSurvey = isSurveyRecordType(recordType);
-    if (isSurvey) {
-        const prefix2 = getSurveyRecordPrefix(receivedBy, employeesList);
-        return prefix2 ? `${prefix2}-${datePrefix}-${nextSeq}` : `${datePrefix}-${nextSeq}`;
-    }
-
-    return `${datePrefix}-${nextSeq}`;
+    const prefix2 = getSurveyRecordPrefix(receivedBy, employeesList);
+    return prefix2 ? `${prefix2}-${datePrefix}-${nextSeq}` : `${datePrefix}-${nextSeq}`;
 };
 
 const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, initialData, employees, currentUser, wards, currentView, holidays, records }) => {
@@ -383,7 +407,12 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
             determinePrice();
         } else {
             const initialRecBy = currentUser?.employeeId || '';
-            const defaultRecType = isTestMeasurementView ? '3.1 Đăng ký biến động quyền sử dụng đất, quyền sở hữu tài sản gắn liền với đất' : '';
+            let defaultRecType = '';
+            if (isTestMeasurementView) {
+              defaultRecType = '3.1 Đăng ký biến động quyền sử dụng đất, quyền sở hữu tài sản gắn liền với đất';
+            } else if (isArchiveView) {
+              defaultRecType = '1.1 Cung cấp thông tin, dữ liệu đất đai';
+            }
             setFormData({
               ...defaultState,
               recordType: defaultRecType,
@@ -391,7 +420,15 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
               deadline: defaultRecType ? calculateDeadlineHelper(defaultRecType, new Date().toISOString().split('T')[0], holidays || []) : '',
               price: undefined,
               status: RecordStatus.RECEIVED,
-              code: generateRecordCode(new Date().toISOString(), records, currentView === 'archive', defaultRecType, initialRecBy, employees),
+              code: generateRecordCode(
+                new Date().toISOString(), 
+                records, 
+                isArchiveView, 
+                defaultRecType, 
+                initialRecBy, 
+                employees,
+                isTestMeasurementView
+              ),
               receivedBy: initialRecBy
             });
             setAttachedDocs([]);
@@ -817,10 +854,11 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
           updated.code = generateRecordCode(
             String(rDate || new Date().toISOString()), 
             records, 
-            currentView === 'archive', 
+            isArchiveView, 
             String(rType || ''),
             String(rRecBy || currentUser?.employeeId || ''),
-            employees
+            employees,
+            isTestMeasurementView
           );
         }
         if (field === 'recordType' && !value) {
