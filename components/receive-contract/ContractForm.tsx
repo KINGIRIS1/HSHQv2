@@ -695,7 +695,12 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
       onPrint(currentData as any, type);
   };
 
-  const handleChange = (k: keyof Contract, v: any) => setFormData(p => ({ ...p, [k]: v }));
+  const handleChange = (k: keyof Contract, v: any) => {
+    if (k === 'code') {
+      setIsManual(true);
+    }
+    setFormData(p => ({ ...p, [k]: v }));
+  };
   
   const availableServices = (() => {
       const services = priceList.map(p => p.serviceName).filter((v, i, a) => a.indexOf(v) === i);
@@ -859,18 +864,28 @@ const ContractForm: React.FC<ContractFormProps> = ({ initialData, onSave, onPrin
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                 <div className="p-3.5 space-y-3.5">
                     {/* Basic Info */}
-                    <div className={`grid ${mode === 'liquidation' || (!initialData || (contracts && !contracts.some(c => c.id === initialData.id))) ? 'grid-cols-1' : 'grid-cols-2'} gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200`}>
-                        {mode !== 'liquidation' && initialData && contracts && contracts.some(c => c.id === initialData.id) && (
+                    <div className={`grid ${mode === 'liquidation' ? 'grid-cols-1' : 'grid-cols-2'} gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200`}>
+                        {mode !== 'liquidation' && (
                             <div>
                                 <div className="flex justify-between items-center mb-1">
-                                    <label className={labelClass}>Mã Hợp Đồng (HĐKT)</label>
+                                    <label className={labelClass}>Mã Hợp Đồng (Nhập tay / Tự động)</label>
+                                    {onOpenGetNumberModal && (
+                                        <button
+                                            type="button"
+                                            onClick={onOpenGetNumberModal}
+                                            className="text-[11px] font-bold text-purple-600 hover:text-purple-800 bg-purple-50 hover:bg-purple-100 px-2 py-0.5 rounded border border-purple-200 flex items-center gap-1 transition-all"
+                                        >
+                                            <Wand2 size={12} /> Lấy số
+                                        </button>
+                                    )}
                                 </div>
                                 <div>
                                     <input 
                                         type="text" 
-                                        readOnly={true} 
-                                        className={`${inputClass} font-mono font-bold text-purple-700 bg-slate-100 cursor-not-allowed`} 
+                                        className={`${inputClass} font-mono font-bold text-purple-700 bg-white border-purple-300 focus:border-purple-500`} 
                                         value={formData.code ?? ''} 
+                                        onChange={e => handleChange('code', e.target.value)}
+                                        placeholder="Để trống để tự động cấp số..."
                                     />
                                 </div>
                             </div>

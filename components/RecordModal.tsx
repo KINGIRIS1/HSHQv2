@@ -294,6 +294,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
   const [authCccd, setAuthCccd] = useState('');
   const [authAddress, setAuthAddress] = useState('');
   const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [isManualCode, setIsManualCode] = useState<boolean>(false);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -422,6 +423,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
             };
             determinePrice();
         } else {
+            setIsManualCode(false);
             const initialRecBy = currentUser?.employeeId || '';
             let defaultRecType = '';
             setFormData({
@@ -696,6 +698,9 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
   };
 
   const handleChange = (field: keyof RecordFile, value: any) => {
+    if (field === 'code') {
+      setIsManualCode(true);
+    }
     setFormData(prev => {
       let updated = { ...prev, [field]: value };
       
@@ -863,7 +868,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
           updated.price = undefined;
           updated.returnedPrice = undefined;
         }
-        if (!initialData) {
+        if (!initialData && !isManualCode) {
           updated.code = generateRecordCode(
             String(rDate || new Date().toISOString()), 
             records, 

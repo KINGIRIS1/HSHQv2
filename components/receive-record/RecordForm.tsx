@@ -95,6 +95,8 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
     issueNumber: '', entryNumber: '', issueDate: '', residentialArea: 0
   });
 
+  const [isManualCode, setIsManualCode] = useState<boolean>(false);
+
   const [attachedDocs, setAttachedDocs] = useState<AttachedDocItem[]>([]);
   const [uploadingDocIdx, setUploadingDocIdx] = useState<number | null>(null);
   const docFileInputRefs = useRef<{ [key: number]: HTMLInputElement | null }>({});
@@ -127,7 +129,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
   }, [notification]);
 
   useEffect(() => {
-    if (!initialData) {
+    if (!initialData && !isManualCode) {
         const recBy = formData.receivedBy || currentUser?.employeeId || currentUser?.username || '';
         const currentWard = formData.ward || processingWard;
         const newCode = generateCode(currentWard, formData.receivedDate || '', formData.recordType || undefined, [], recBy);
@@ -136,9 +138,13 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
             return { ...prev, code: newCode };
         });
     }
-  }, [processingWard, formData.ward, formData.receivedDate, formData.recordType, formData.receivedBy, records, initialData]);
+  }, [processingWard, formData.ward, formData.receivedDate, formData.recordType, formData.receivedBy, records, initialData, isManualCode]);
 
   const handleChange = (field: keyof RecordFile, value: any) => {
+    if (field === 'code') {
+      setIsManualCode(true);
+    }
+
     setFormData(prev => {
         let finalValue = value;
         if (field === 'receivedDate' && value && !value.includes('T')) {
@@ -157,7 +163,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
             } else if (!rType) {
                 newData.deadline = '';
             }
-            if (!initialData) {
+            if (!initialData && !isManualCode) {
                 const recBy = rRecBy || currentUser?.employeeId || currentUser?.username || '';
                 newData.code = generateCode(rWard || processingWard, rDate || '', rType || undefined, [], recBy);
             }
@@ -329,6 +335,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
           recordType: '', status: RecordStatus.RECEIVED,
           issueNumber: '', entryNumber: '', issueDate: '', residentialArea: 0
       });
+      setIsManualCode(false);
       setAttachedDocs([]);
       setAuthCccd('');
       setAuthAddress('');
@@ -345,7 +352,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
 
   const isCongVan = formData.recordType ? getShortRecordType(formData.recordType) === '1.2 Công văn' : false;
   const isCapGiay = isCertificateRecordType(formData.recordType) || (formData.recordType ? getShortRecordType(formData.recordType).startsWith('3.') : false);
-  const isCodeEditable = !!initialData || isCapGiay;
+  const isCodeEditable = true; // Ưu tiên cho phép người dùng tự do nhập/sửa mã hồ sơ khi nhập mới
 
   return (
     <form onSubmit={handleSubmit} className="w-full max-w-[2200px] mx-auto space-y-4 2xl:space-y-6 animate-fade-in relative pb-4">

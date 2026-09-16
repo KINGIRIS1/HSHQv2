@@ -462,6 +462,24 @@ export const getSurveyRecordPrefix = (
   employeesList: Employee[] = [],
   wardName?: string | null
 ): string => {
+  // 1. Ưu tiên kiểm tra theo tên Xã/Phường được chọn trên form
+  if (wardName) {
+    const w = wardName.trim().toLowerCase();
+    if (w.includes('khai')) return 'TK';
+    if (w.includes('quan')) return 'TQ';
+    if (w.includes('hưng') || w.includes('hung')) return 'TH';
+    if (w.includes('đức') || w.includes('duc')) return 'MD';
+    if (w.includes('chơn thành') || w.includes('chonthanh')) return 'CT';
+    if (w.includes('nha bích') || w.includes('nhabich')) return 'NB';
+    if (w.includes('lập') || w.includes('lap')) return 'ML';
+    if (w.includes('thắng') || w.includes('thang')) return 'MT';
+    if (w.includes('quang minh')) return 'QM';
+    if (w.includes('thành tâm')) return 'TT';
+    if (w.includes('minh long') || w.includes('minhlong')) return 'MLO';
+    if (w.includes('minh hưng') || w.includes('minhhung')) return 'MH';
+  }
+
+  // 2. Nếu chưa chọn Xã/Phường, kiểm tra địa bàn do Cán bộ phụ trách (chỉ nếu phụ trách đúng 1 xã)
   if (receivedBy) {
     const empList = (employeesList && employeesList.length > 0) ? employeesList : MOCK_EMPLOYEES;
     let target = receivedBy.trim().toLowerCase();
@@ -499,22 +517,6 @@ export const getSurveyRecordPrefix = (
       if (singleWard.includes('minh long') || singleWard.includes('minhlong')) return 'MLO';
       if (singleWard.includes('minh hưng') || singleWard.includes('minhhung')) return 'MH';
     }
-  }
-
-  if (wardName) {
-    const w = wardName.trim().toLowerCase();
-    if (w.includes('khai')) return 'TK';
-    if (w.includes('quan')) return 'TQ';
-    if (w.includes('hưng') || w.includes('hung')) return 'TH';
-    if (w.includes('đức') || w.includes('duc')) return 'MD';
-    if (w.includes('chơn thành') || w.includes('chonthanh')) return 'CT';
-    if (w.includes('nha bích') || w.includes('nhabich')) return 'NB';
-    if (w.includes('lập') || w.includes('lap')) return 'ML';
-    if (w.includes('thắng') || w.includes('thang')) return 'MT';
-    if (w.includes('quang minh')) return 'QM';
-    if (w.includes('thành tâm')) return 'TT';
-    if (w.includes('minh long') || w.includes('minhlong')) return 'MLO';
-    if (w.includes('minh hưng') || w.includes('minhhung')) return 'MH';
   }
 
   return '';

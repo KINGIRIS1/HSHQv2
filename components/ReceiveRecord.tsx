@@ -238,7 +238,7 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, onDelet
     }
 
     const recBy = receivedBy || currentUser?.employeeId || currentUser?.username || '';
-    const prefix2 = getSurveyRecordPrefix(recBy, employees);
+    const prefix2 = getSurveyRecordPrefix(recBy, employees, wardName);
     return prefix2 ? `${prefix2}-${datePrefix}-${nextSeq}` : `${datePrefix}-${nextSeq}`;
   };
 
