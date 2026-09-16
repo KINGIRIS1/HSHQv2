@@ -175,27 +175,89 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col h-full overflow-hidden animate-fade-in-up">
         {/* HEADER */}
-        <div className="p-4 border-b border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gray-50 shrink-0">
-          <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2 tracking-tight">
+        <div className="p-3.5 sm:p-4 border-b border-gray-200 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-3 bg-gray-50 shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
             <UserIcon className="text-blue-600" size={20} />
-            Quản Lý Nhân Sự
-          </h2>
-          {/* Tabs Control */}
-          <div className="flex bg-white rounded-xl p-1 border border-gray-200 shadow-sm w-full sm:w-auto overflow-x-auto no-scrollbar">
-            <button 
-                onClick={() => setActiveTab('list')}
-                className={`flex-1 sm:flex-none px-4 py-2 text-sm font-medium rounded-lg transition-all flex items-center justify-center gap-2 whitespace-nowrap ${activeTab === 'list' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-50'}`}
-            >
-                <List size={16} /> Danh sách
-            </button>
-            <button 
-                onClick={() => setActiveTab('detail')}
-                className={`flex-1 sm:flex-none px-4 py-2 text-sm font-medium rounded-lg transition-all flex items-center justify-center gap-2 whitespace-nowrap ${activeTab === 'detail' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-50'}`}
-            >
-                {isNew ? <Plus size={16} /> : <Edit2 size={16} />}
-                {isNew ? 'Thêm mới' : 'Chi tiết'}
-            </button>
+            <h2 className="text-lg font-semibold text-gray-800 tracking-tight whitespace-nowrap">
+              Quản Lý Nhân Sự
+            </h2>
           </div>
+
+          {/* CONTROLS RIGHT ALIGNED */}
+          {activeTab === 'list' ? (
+            <div className="flex flex-wrap items-center justify-end gap-2 w-full xl:w-auto">
+              {/* Hidden file input */}
+              <input 
+                type="file" 
+                ref={fileInputRef}
+                onChange={handleImportExcel}
+                accept=".xlsx, .xls"
+                className="hidden"
+              />
+
+              {/* Tìm kiếm */}
+              <div className="relative flex-1 sm:flex-none sm:w-52 md:w-60">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                <input 
+                  type="text" 
+                  placeholder="Tìm tên, mã NV, chức vụ..." 
+                  className="w-full pl-9 pr-3 py-1.5 border border-gray-200 rounded-xl text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white shadow-xs transition-all"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+
+              {/* Bộ lọc */}
+              <div className="flex items-center shrink-0">
+                <select 
+                  value={selectedDeptFilter}
+                  onChange={(e) => setSelectedDeptFilter(e.target.value)}
+                  className="border border-gray-200 rounded-xl px-2.5 py-1.5 text-xs font-medium text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 bg-white shadow-xs cursor-pointer max-w-[170px]"
+                >
+                  <option value="ALL">-- Tất cả phòng ban --</option>
+                  {DEPARTMENTS.map(dept => (
+                    <option key={dept} value={dept}>{dept}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Nút Mẫu */}
+              <button 
+                onClick={handleDownloadSample} 
+                className="px-2.5 py-1.5 bg-white border border-gray-300 rounded-xl text-xs font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-1 shadow-xs transition-colors whitespace-nowrap cursor-pointer"
+                title="Tải tệp Excel mẫu"
+              >
+                <Download size={14} /> Mẫu
+              </button>
+
+              {/* Nút Nhập Excel */}
+              <button 
+                onClick={() => fileInputRef.current?.click()} 
+                className="px-2.5 py-1.5 bg-green-600 text-white rounded-xl text-xs font-medium hover:bg-green-700 flex items-center gap-1 shadow-xs transition-colors whitespace-nowrap cursor-pointer"
+                title="Nhập dữ liệu nhân sự từ Excel"
+              >
+                <FileSpreadsheet size={14} /> Nhập Excel
+              </button>
+
+              {/* Nút Thêm NV */}
+              <button 
+                onClick={handleAddNewClick} 
+                className="px-3 py-1.5 bg-blue-600 text-white rounded-xl text-xs font-semibold hover:bg-blue-700 flex items-center gap-1 shadow-xs transition-colors whitespace-nowrap cursor-pointer"
+                title="Thêm nhân viên mới"
+              >
+                <Plus size={14} /> Thêm NV
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 ml-auto">
+              <button 
+                onClick={() => setActiveTab('list')}
+                className="px-3 py-1.5 bg-white border border-gray-300 text-gray-700 rounded-xl text-xs font-semibold hover:bg-gray-50 flex items-center gap-1 shadow-xs transition-colors cursor-pointer"
+              >
+                Quay lại danh sách
+              </button>
+            </div>
+          )}
         </div>
 
         {/* CONTENT */}
@@ -204,52 +266,6 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
             {/* TAB 1: DANH SÁCH */}
             {activeTab === 'list' && (
                 <div className="h-full flex flex-col">
-                    <div className="p-4 bg-white border-b border-gray-200 flex flex-col md:flex-row justify-between items-center gap-3 shrink-0">
-                        <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full md:w-auto flex-1 max-w-2xl">
-                            <div className="relative flex-1 w-full">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                                <input 
-                                    type="text" 
-                                    placeholder="Tìm tên, mã NV, chức vụ..." 
-                                    className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm transition-all"
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                />
-                            </div>
-                            <div className="w-full sm:w-auto flex items-center gap-1.5 shrink-0">
-                                <Filter size={15} className="text-gray-400 hidden sm:block" />
-                                <select 
-                                    value={selectedDeptFilter}
-                                    onChange={(e) => setSelectedDeptFilter(e.target.value)}
-                                    className="w-full sm:w-auto border border-gray-200 rounded-xl px-3 py-2 text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 bg-white shadow-sm cursor-pointer"
-                                >
-                                    <option value="ALL">-- Tất cả phòng ban --</option>
-                                    {DEPARTMENTS.map(dept => (
-                                        <option key={dept} value={dept}>{dept}</option>
-                                    ))}
-                                </select>
-                            </div>
-                        </div>
-                        <div className="flex gap-2 w-full md:w-auto overflow-x-auto no-scrollbar pb-1 md:pb-0 justify-end">
-                            <input 
-                                type="file" 
-                                ref={fileInputRef}
-                                onChange={handleImportExcel}
-                                accept=".xlsx, .xls"
-                                className="hidden"
-                            />
-                            <button onClick={handleDownloadSample} className="px-3 py-2 bg-white border border-gray-300 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-1 shadow-sm transition-colors whitespace-nowrap">
-                                <Download size={14} /> Mẫu
-                            </button>
-                            <button onClick={() => fileInputRef.current?.click()} className="px-3 py-2 bg-green-600 text-white rounded-xl text-sm font-medium hover:bg-green-700 flex items-center gap-1 shadow-sm transition-colors whitespace-nowrap">
-                                <FileSpreadsheet size={14} /> Nhập Excel
-                            </button>
-                            <button onClick={handleAddNewClick} className="px-4 py-2 bg-white text-emerald-600 border border-emerald-200 rounded-xl text-sm font-semibold hover:bg-emerald-50 flex items-center gap-1 shadow-sm transition-colors whitespace-nowrap ml-auto sm:ml-0">
-                                <Plus size={14} /> Thêm NV
-                            </button>
-                        </div>
-                    </div>
-                    
                     <div className="flex-1 overflow-y-auto p-4">
                         {filteredEmployees.length > 0 ? (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">

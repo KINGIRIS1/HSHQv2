@@ -715,8 +715,9 @@ export const deleteUserApi = async (username: string): Promise<boolean> => {
 
     if (isConfigured) {
         try {
-            const { error } = await supabase.from('users').delete().eq('username', username);
-            if (error) console.warn("deleteUserApi table users error:", error);
+            const { error: err1 } = await supabase.from('users').delete().eq('username', username);
+            const { error: err2 } = await supabase.from('users').delete().ilike('username', cleanU);
+            if (err1 && err2) console.warn("deleteUserApi table users error:", err1, err2);
         } catch (error) {
             logError("deleteUserApi", error, true);
         }

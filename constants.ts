@@ -506,27 +506,6 @@ export const MOCK_USERS: User[] = [
     password: '123',
     name: 'Administrator',
     role: UserRole.ADMIN
-  },
-  {
-    username: 'manager',
-    password: '123',
-    name: 'Phó Giám Đốc',
-    role: UserRole.SUBADMIN,
-    employeeId: 'emp3'
-  },
-  {
-    username: 'nv_a',
-    password: '123',
-    name: 'Nguyễn Văn A',
-    role: UserRole.EMPLOYEE,
-    employeeId: 'emp1'
-  },
-  {
-    username: 'nv_b',
-    password: '123',
-    name: 'Trần Thị B',
-    role: UserRole.EMPLOYEE,
-    employeeId: 'emp2'
   }
 ];
 
