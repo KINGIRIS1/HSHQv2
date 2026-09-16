@@ -424,9 +424,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
         } else {
             const initialRecBy = currentUser?.employeeId || '';
             let defaultRecType = '';
-            if (isTestMeasurementView) {
-              defaultRecType = '3.1 Đăng ký biến động quyền sử dụng đất, quyền sở hữu tài sản gắn liền với đất';
-            } else if (isArchiveView) {
+            if (isArchiveView) {
               defaultRecType = '1.1 Cung cấp thông tin, dữ liệu đất đai';
             }
             setFormData({
