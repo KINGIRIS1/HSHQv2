@@ -229,17 +229,37 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, onDelet
     combinedRecords.forEach((r: RecordFile) => checkSeq(r.code));
     extraCodes.forEach(checkSeq);
 
-    const nextSeq = (maxSeq + 1).toString().padStart(4, '0');
-    if (isLT) {
-        return `LT-${datePrefix}-${nextSeq}`;
-    }
-    if (isCert) {
-        return `H19.151.11.22-${datePrefix}-${nextSeq}`;
-    }
+    const existingCodeSet = new Set<string>();
+    combinedRecords.forEach(r => {
+        if (r && r.code) existingCodeSet.add(r.code.trim().toLowerCase());
+    });
+    extraCodes.forEach(c => {
+        if (c) existingCodeSet.add(c.trim().toLowerCase());
+    });
 
     const recBy = receivedBy || currentUser?.employeeId || currentUser?.username || '';
     const prefix2 = getSurveyRecordPrefix(recBy, employees, wardName);
-    return prefix2 ? `${prefix2}-${datePrefix}-${nextSeq}` : `${datePrefix}-${nextSeq}`;
+
+    let currentSeq = maxSeq + 1;
+    let candidateCode = '';
+
+    while (true) {
+        const seqStr = currentSeq.toString().padStart(4, '0');
+        if (isLT) {
+            candidateCode = `LT-${datePrefix}-${seqStr}`;
+        } else if (isCert) {
+            candidateCode = `H19.151.11.22-${datePrefix}-${seqStr}`;
+        } else {
+            candidateCode = prefix2 ? `${prefix2}-${datePrefix}-${seqStr}` : `${datePrefix}-${seqStr}`;
+        }
+
+        if (!existingCodeSet.has(candidateCode.toLowerCase())) {
+            break;
+        }
+        currentSeq++;
+    }
+
+    return candidateCode;
   };
 
   // --- LOGIC TÍNH HẠN TRẢ ---

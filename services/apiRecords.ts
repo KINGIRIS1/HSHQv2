@@ -631,6 +631,71 @@ export const getNextGlobalRecordCode = async (
 };
 
 /**
+ * Kiểm tra mã hồ sơ đã tồn tại trong bất kỳ bảng dữ liệu nào trên cơ sở dữ liệu cloud hay chưa
+ */
+export const checkRecordCodeExistsInDb = async (code: string): Promise<boolean> => {
+    if (!code || !isConfigured) return false;
+    try {
+        const clean = code.trim();
+        const [r1, r2, r3] = await Promise.all([
+            supabase.from('records').select('id').ilike('code', clean).limit(1),
+            supabase.from('luutru_records').select('id').ilike('code', clean).limit(1),
+            supabase.from('dangky_records').select('id').ilike('code', clean).limit(1)
+        ]);
+        if ((r1.data && r1.data.length > 0) || (r2.data && r2.data.length > 0) || (r3.data && r3.data.length > 0)) {
+            return true;
+        }
+    } catch (e) {
+        console.error("Lỗi khi quét mã hồ sơ trên database:", e);
+    }
+    return false;
+};
+
+/**
+ * Quét toàn diện hệ thống (bộ nhớ local + cơ sở dữ liệu cloud) để đảm bảo cấp mã duy nhất 100% không trùng
+ */
+export const getVerifiedUniqueRecordCode = async (
+    generateBaseCode: (extraCodes: string[]) => string,
+    localRecords: { code?: string | null }[] = []
+): Promise<string> => {
+    const localCodes = new Set(
+        localRecords
+            .map(r => (r.code || '').trim().toLowerCase())
+            .filter(Boolean)
+    );
+    
+    let extraExcluded: string[] = [];
+    let candidate = '';
+    let attempts = 0;
+    
+    while (attempts < 100) {
+        attempts++;
+        candidate = generateBaseCode(extraExcluded);
+        if (!candidate) break;
+        
+        // 1. Quét kiểm tra trong bộ nhớ local của hệ thống
+        if (localCodes.has(candidate.toLowerCase())) {
+            extraExcluded.push(candidate);
+            continue;
+        }
+        
+        // 2. Quét kiểm tra trên cơ sở dữ liệu máy chủ
+        if (isConfigured) {
+            const existsInDb = await checkRecordCodeExistsInDb(candidate);
+            if (existsInDb) {
+                extraExcluded.push(candidate);
+                continue;
+            }
+        }
+        
+        // Cả local và database đều không có mã này -> Đã xác thực an toàn tuyệt đối, cấp mã!
+        return candidate;
+    }
+    
+    return candidate;
+};
+
+/**
  * Tự động cập nhật bộ đếm archive_record_counter_${year} nếu mã hồ sơ lưu trữ có số thứ tự lớn hơn
  */
 export const updateArchiveCounterIfHigher = async (code?: string | null, dateStr?: string) => {

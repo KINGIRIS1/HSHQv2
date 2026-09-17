@@ -4,6 +4,7 @@ import { RecordFile, Holiday, RecordStatus, User, Employee, AttachedDocItem, Att
 import AutoResizeTextarea from '../AutoResizeTextarea';
 import { RECORD_TYPES, EXTENDED_RECORD_TYPES, getShortRecordType, getWardLabel, isCertificateRecordType } from '../../constants';
 import { getDepartmentForRecord } from '../../utils/appHelpers';
+import { getVerifiedUniqueRecordCode, checkRecordCodeExistsInDb } from '../../services/apiRecords';
 import { preparePendingSingleAttachment, uploadPendingAttachmentsToDrive, enqueueRecordForBackgroundDriveSync, processAndSaveSingleAttachment, previewAttachment, downloadAttachment, isAllowedDocFile, isPreviewableFile } from '../../services/attachmentStorage';
 import { Save, User as UserIcon, Calendar, MapPin, FileCheck, Loader2, Printer, RotateCcw, XCircle, CheckCircle, AlertCircle, X, Phone, FileText, BookOpen, Clock, Hash, ChevronDown, ChevronUp, Plus, Paperclip, Eye, Download, CheckCircle2 } from 'lucide-react';
 
@@ -284,13 +285,59 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
     }
     const isCongVan = formData.recordType ? getShortRecordType(formData.recordType) === '1.2 Công văn' : false;
     const isDeadlineRequired = !isCongVan;
-    if (!formData.code || !formData.customerName || (isDeadlineRequired && !formData.deadline)) { 
+    const isCapGiayRecord = isCertificateRecordType(formData.recordType) || (formData.recordType ? getShortRecordType(formData.recordType).startsWith('3.') : false);
+
+    if ((isCapGiayRecord && !formData.code) || !formData.customerName || (isDeadlineRequired && !formData.deadline)) { 
         setNotification({ type: 'error', message: "Vui lòng điền các trường bắt buộc (*) trước khi lưu." });
         return; 
     }
+
     setLoading(true);
 
-    const finalCode = (formData.code || 'HS').trim();
+    const recBy = formData.receivedBy || currentUser?.employeeId || currentUser?.name || currentUser?.username || '';
+    const currentWard = formData.ward || processingWard;
+    const rDate = formData.receivedDate || todayStr;
+    const rType = formData.recordType || '';
+
+    let finalCode = '';
+
+    if (!isCapGiayRecord && !initialData) {
+        // Chỉ cấp khi quét toàn bộ hệ thống (bộ nhớ + cơ sở dữ liệu) không có mã nào trùng mới cấp số hồ sơ và in biên nhận
+        finalCode = await getVerifiedUniqueRecordCode(
+            (extraCodes) => generateCode(currentWard, rDate, rType, extraCodes, recBy),
+            records || []
+        );
+    } else {
+        // Đối với thủ tục Cấp giấy hoặc khi đang sửa:
+        finalCode = (formData.code || '').trim();
+        if (!finalCode) {
+            finalCode = await getVerifiedUniqueRecordCode(
+                (extraCodes) => generateCode(currentWard, rDate, rType, extraCodes, recBy),
+                records || []
+            );
+        } else {
+            // Quét kiểm tra trùng mã hồ sơ trên hệ thống local và DB
+            const isLocalDup = (records || []).some(r => {
+                if (initialData?.id && r.id === initialData.id) return false;
+                return (r.code || '').trim().toLowerCase() === finalCode.toLowerCase();
+            });
+            const isDbDup = !initialData && (await checkRecordCodeExistsInDb(finalCode));
+            if (isLocalDup || isDbDup) {
+                setLoading(false);
+                setNotification({
+                    type: 'error',
+                    message: `Mã hồ sơ "${finalCode}" đã tồn tại trên hệ thống. Vui lòng kiểm tra lại!`
+                });
+                return;
+            }
+        }
+    }
+
+    if (!finalCode) {
+        setLoading(false);
+        setNotification({ type: 'error', message: "Không thể cấp mã hồ sơ. Vui lòng kiểm tra lại thông tin tiếp nhận." });
+        return;
+    }
 
     const updatedFormData: Partial<RecordFile> = {
       ...formData,
@@ -304,7 +351,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
         ...updatedFormData, 
         id: formData.id || Math.random().toString(36).substr(2, 9), 
         status: formData.status || RecordStatus.RECEIVED,
-        receivedBy: formData.receivedBy || currentUser?.employeeId || currentUser?.name || currentUser?.username || '' 
+        receivedBy: recBy 
     } as RecordFile;
 
     const savedRecord = await onSave(recordToSave);
@@ -352,6 +399,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
 
   const isCongVan = formData.recordType ? getShortRecordType(formData.recordType) === '1.2 Công văn' : false;
   const isCapGiay = isCertificateRecordType(formData.recordType) || (formData.recordType ? getShortRecordType(formData.recordType).startsWith('3.') : false);
+  const shouldHideCode = !isCapGiay && !initialData;
   const isCodeEditable = true; // Ưu tiên cho phép người dùng tự do nhập/sửa mã hồ sơ khi nhập mới
 
   return (
@@ -373,7 +421,11 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
 
         {/* HÀNG 1: LOẠI HỒ SƠ, MÃ HỒ SƠ, NGÀY NHẬN, HẸN TRẢ (MỞ HẾT KHỔ GỘP THÀNH 1 HÀNG) */}
         <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200 shadow-xs">
-            <div className={`grid grid-cols-1 sm:grid-cols-2 ${isCongVan ? 'lg:grid-cols-3 xl:grid-cols-3' : 'lg:grid-cols-4 xl:grid-cols-4'} gap-3 items-end`}>
+            <div className={`grid grid-cols-1 sm:grid-cols-2 ${
+                shouldHideCode 
+                    ? (isCongVan ? 'lg:grid-cols-2 xl:grid-cols-2' : 'lg:grid-cols-3 xl:grid-cols-3') 
+                    : (isCongVan ? 'lg:grid-cols-3 xl:grid-cols-3' : 'lg:grid-cols-4 xl:grid-cols-4')
+            } gap-3 items-end`}>
                 <div>
                     <label className={`${labelClass} uppercase flex items-center gap-1.5`}>
                         <span className="p-1 bg-blue-100 text-blue-600 rounded-md"><FileCheck size={14} /></span>
@@ -390,19 +442,21 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
                     </select>
                 </div>
 
-                <div>
-                    <label className={`${labelClass} flex items-center justify-between`}>
-                        <span>Mã hồ sơ</span>
-                        {isCapGiay && !initialData && <span className="text-[10px] text-blue-600 font-semibold bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">Cho phép sửa</span>}
-                    </label>
-                    <input 
-                        type="text" 
-                        readOnly={!isCodeEditable} 
-                        className={`${inputClass} font-mono ${isCodeEditable ? 'bg-white font-bold text-blue-700 border-blue-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-400' : 'bg-slate-100 text-slate-500 cursor-not-allowed'}`} 
-                        value={formData.code || ''} 
-                        onChange={(e) => isCodeEditable && handleChange('code', e.target.value)} 
-                    />
-                </div>
+                {!shouldHideCode && (
+                    <div>
+                        <label className={`${labelClass} flex items-center justify-between`}>
+                            <span>Mã hồ sơ</span>
+                            {isCapGiay && !initialData && <span className="text-[10px] text-blue-600 font-semibold bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">Cho phép sửa</span>}
+                        </label>
+                        <input 
+                            type="text" 
+                            readOnly={!isCodeEditable} 
+                            className={`${inputClass} font-mono ${isCodeEditable ? 'bg-white font-bold text-blue-700 border-blue-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-400' : 'bg-slate-100 text-slate-500 cursor-not-allowed'}`} 
+                            value={formData.code || ''} 
+                            onChange={(e) => isCodeEditable && handleChange('code', e.target.value)} 
+                        />
+                    </div>
+                )}
 
                 <div>
                     <label className={labelClass}>Ngày nhận</label>
