@@ -1250,7 +1250,7 @@ function App() {
       const candidates = selectedRecordIds.size > 0 ? records.filter(r => selectedRecordIds.has(r.id)) : recordFilterProps.filteredRecords;
       const recordsToExport = selectedRecordIds.size > 0 
           ? candidates 
-          : candidates.filter(r => r.status === RecordStatus.SIGNED || ((r.status === RecordStatus.REJECTED || r.status === RecordStatus.WITHDRAWN) && !r.exportBatch) || r.status === RecordStatus.HANDOVER);
+          : candidates.filter(r => r.status === RecordStatus.SIGNED || r.status === RecordStatus.PENDING_HANDOVER || ((r.status === RecordStatus.REJECTED || r.status === RecordStatus.WITHDRAWN) && !r.exportBatch) || r.status === RecordStatus.HANDOVER);
       if (recordsToExport.length === 0) return;
       const updatesToApply = recordsToExport.map(r => {
           const nextStatus = r.status === RecordStatus.WITHDRAWN ? RecordStatus.WITHDRAWN : r.status === RecordStatus.REJECTED ? RecordStatus.REJECTED : RecordStatus.HANDOVER;
@@ -1258,17 +1258,19 @@ function App() {
           const actualHandoverWard = (handoverWard === 'SAME_AS_WARD' || !handoverWard) ? r.ward : handoverWard;
           return { ...r, exportBatch: pureBatch, exportDate: batchDate, status: nextStatus, completedDate: r.completedDate || nowStr, handoverWard: actualHandoverWard, statusLogs };
       });
-      setRecords(prev => prev.map(r => {
-          const updated = updatesToApply.find(u => u.id === r.id);
-          return updated ? updated : r;
-      }));
-      const results = await Promise.all(updatesToApply.map(r => updateRecordApi(r)));
-      if (results.some(res => res === null)) {
-          loadData(); // Revert on failure
-          return;
-      }
+
+      // Cập nhật giao diện tức thời với O(1) Map
+      const updateMap = new Map<string, RecordFile>();
+      updatesToApply.forEach(u => updateMap.set(u.id, u));
+      setRecords(prev => prev.map(r => updateMap.get(r.id) || r));
+
+      // Đẩy hàng loạt qua updateRecordsBatchById (RAM + Cache + CSDL)
+      updateRecordsBatchById(updatesToApply).catch(err => {
+          console.error("Lỗi khi chốt đợt xuất giao 1 cửa:", err);
+      });
+
       setSelectedRecordIds(new Set()); 
-      setToast({ type: 'success', message: `Đã chốt danh sách ${batchNumber} thành công.` });
+      setToast({ type: 'success', message: `Đã chốt danh sách ${batchNumber} (${updatesToApply.length} hồ sơ) thành công.` });
       setExportModalType("handover");
       setIsExportModalOpen(true);
   };
@@ -1290,17 +1292,19 @@ function App() {
               statusLogs
           };
       });
-      setRecords(prev => prev.map(r => {
-          const updated = updatesToApply.find(u => u.id === r.id);
-          return updated ? updated : r;
-      }));
-      const results = await Promise.all(updatesToApply.map(r => updateRecordApi(r)));
-      if (results.some(res => res === null)) {
-          loadData();
-          return;
-      }
+
+      // Cập nhật giao diện tức thời với O(1) Map
+      const updateMap = new Map<string, RecordFile>();
+      updatesToApply.forEach(u => updateMap.set(u.id, u));
+      setRecords(prev => prev.map(r => updateMap.get(r.id) || r));
+
+      // Đẩy hàng loạt qua updateRecordsBatchById
+      updateRecordsBatchById(updatesToApply).catch(err => {
+          console.error("Lỗi khi chốt đợt trả kết quả:", err);
+      });
+
       setSelectedRecordIds(new Set());
-      setToast({ type: 'success', message: `Đã chốt danh sách bàn giao ĐỢT ${batchNumber} về ${deptName} thành công.` });
+      setToast({ type: 'success', message: `Đã chốt danh sách bàn giao ĐỢT ${batchNumber} (${updatesToApply.length} hồ sơ) về ${deptName} thành công.` });
   };
 
   const handleConfirmSignBatch = async () => {

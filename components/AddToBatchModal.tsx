@@ -31,8 +31,8 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
   // State xác nhận danh sách chỉnh lý
   const [needsCorrectionConfirm, setNeedsCorrectionConfirm] = useState(false);
 
-  // Ngày hiện tại cho đợt mới (YYYY-MM-DD)
-  const todayStr = new Date().toISOString().split('T')[0];
+  // Ngày hiện tại cho đợt mới (YYYY-MM-DD theo giờ địa phương, tránh lệch múi giờ UTC)
+  const todayStr = useMemo(() => formatDateKey(new Date()), []);
 
   const availableWards = useMemo(() => {
     const list = wards && wards.length > 0 ? wards : GROUPS;
@@ -51,15 +51,15 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
   const nextBatchInfo = useMemo(() => {
       let maxBatch = 0;
       records.forEach(r => {
-          if (!r.exportDate || !r.exportDate.startsWith(todayStr)) return;
+          if (!r.exportDate) return;
+          const rDateObj = parseSafeDate(r.exportDate);
+          const rDateKey = rDateObj ? formatDateKey(rDateObj) : String(r.exportDate).split('T')[0];
+          if (rDateKey !== todayStr) return;
 
           if (r.exportBatch) {
-              const batchStr = String(r.exportBatch);
-              const match = batchStr.match(/Đợt\s*(\d+)/i) || batchStr.match(/^(\d+)$/);
-              if (match && match[1]) {
-                  const num = parseInt(match[1], 10);
-                  if (num > maxBatch) maxBatch = num;
-              }
+              const rawNum = getPureBatchNumber(r.exportBatch);
+              const num = rawNum ? parseInt(rawNum, 10) : 0;
+              if (num && num > maxBatch) maxBatch = num;
           }
       });
 

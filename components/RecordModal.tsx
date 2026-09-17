@@ -588,7 +588,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
     const finalCode = (formData.code || 'HS').trim();
 
     if (duplicateRecord) {
-      alert(`⚠️ LỖI TRÙNG MÃ HỒ SƠ:\n\nMã "${finalCode}" đã tồn tại trên hệ thống cho hồ sơ:\n• Chủ sử dụng: ${duplicateRecord.customerName || 'Chưa tên'}\n• Địa chỉ: ${duplicateRecord.customerAddress || 'Không địa chỉ'}\n• Người tiếp nhận: ${duplicateRecord.receivedBy || '---'}\n\nVui lòng bấm "⚡ Tạo mã mới" hoặc thay đổi mã khác trước khi lưu!`);
+      alert(`⚠️ LỖI TRÙNG MÃ HỒ SƠ:\n\nMã "${finalCode}" đã tồn tại trên hệ thống cho hồ sơ:\n• Chủ sử dụng: ${duplicateRecord.customerName || 'Chưa tên'}\n• Địa chỉ: ${duplicateRecord.customerAddress || 'Không địa chỉ'}\n• Người tiếp nhận: ${duplicateRecord.receivedBy || '---'}\n\nVui lòng thay đổi mã khác trước khi lưu!`);
       return;
     }
 
@@ -1013,32 +1013,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                                     onChange={(e) => handleChange('code', e.target.value)} 
                                     placeholder="VD: HQ-260917-0001"
                                 />
-                                {duplicateRecord && (
-                                    <button
-                                        type="button"
-                                        onClick={handleRegenerateUniqueCode}
-                                        title="Tự động cấp mã duy nhất không trùng"
-                                        className="absolute right-1 top-1/2 -translate-y-1/2 px-2 py-1 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded text-[11px] shadow-sm transition-colors flex items-center gap-1"
-                                    >
-                                        ⚡ Tạo mã mới
-                                    </button>
-                                )}
                             </div>
-                            {duplicateRecord && (
-                                <div className="mt-1.5 p-2 bg-red-50 border border-red-200 rounded-md text-xs text-red-800 space-y-1">
-                                    <div className="font-bold text-red-900 flex items-center gap-1">
-                                        ⚠️ Mã hồ sơ đã được sử dụng!
-                                    </div>
-                                    <div className="text-[11px] text-red-700 leading-tight">
-                                        • <strong>Chủ đất:</strong> {duplicateRecord.customerName || 'Chưa tên'} ({duplicateRecord.customerAddress || 'Không địa chỉ'})
-                                        <br />
-                                        • <strong>Người tiếp nhận:</strong> {duplicateRecord.receivedBy || '---'} | <strong>Ngày TN:</strong> {duplicateRecord.receivedDate ? duplicateRecord.receivedDate.split('T')[0] : '---'}
-                                    </div>
-                                    <p className="text-[10px] italic text-red-600 font-medium">
-                                        👉 Vui lòng nhấn <strong>"Tạo mã mới"</strong> hoặc sửa thành mã khác để lưu.
-                                    </p>
-                                </div>
-                            )}
                         </div>
                         <div className="md:col-span-3">
                             <label className="block text-xs font-bold text-gray-700 mb-1">

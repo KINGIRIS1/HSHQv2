@@ -904,6 +904,13 @@ export const createRecordApi = async (record: RecordFile): Promise<RecordFile | 
 };
 
 export const updateRecordApi = async (record: RecordFile): Promise<RecordFile | null> => {
+    // 1. ĐỒNG BỘ TỨC THỜI VÀO RAM VÀ BỘ NHỚ ĐỆM (INSTANT CACHE SYNC)
+    const memIdx = MOCK_RECORDS.findIndex(r => r.id === record.id);
+    if (memIdx !== -1) {
+        MOCK_RECORDS[memIdx] = { ...MOCK_RECORDS[memIdx], ...record };
+    }
+    syncCacheOnUpdate(record);
+
     if (!isConfigured) {
         await addPendingRecord(record, 'UPDATE');
         syncCacheOnUpdate({ ...record, _isOfflineSaved: true });
@@ -1480,34 +1487,47 @@ export const forceUpdateRecordsBatchApi = async (records: RecordFile[], onProgre
 
 // Cập nhật hàng loạt hồ sơ an toàn bằng ID (Phòng tránh trùng mã hồ sơ)
 export const updateRecordsBatchById = async (updates: Partial<RecordFile>[], onProgress?: (processed: number, total: number) => void): Promise<{ success: boolean; count: number }> => {
+    if (!updates || updates.length === 0) return { success: true, count: 0 };
+
+    // 1. ĐỒNG BỘ NGAY VÀO RAM VÀ BỘ NHỚ ĐỆM (INSTANT CACHE & MEMORY SYNC)
+    // Đảm bảo giao diện và bộ nhớ cache lập tức khóa trạng thái mới, không bị giật lùi kể cả khi mạng chậm
+    updates.forEach(up => {
+        const idx = MOCK_RECORDS.findIndex(r => r.id === up.id);
+        if (idx !== -1) {
+            MOCK_RECORDS[idx] = { ...MOCK_RECORDS[idx], ...up } as RecordFile;
+        }
+    });
+    syncCacheOnBatchUpdate(updates);
+
     if (!isConfigured) {
-        let count = 0;
-        updates.forEach(up => {
-            const idx = MOCK_RECORDS.findIndex(r => r.id === up.id);
-            if (idx !== -1) {
-                MOCK_RECORDS[idx] = { ...MOCK_RECORDS[idx], ...up } as RecordFile;
-                count++;
-            }
-        });
         saveToCache(CACHE_KEYS.RECORDS, MOCK_RECORDS);
         if (onProgress) onProgress(updates.length, updates.length);
-        return { success: true, count };
+        return { success: true, count: updates.length };
     }
 
     try {
-        const rows = updates.map(u => sanitizeData(u, RECORD_DB_COLUMNS));
+        // 2. TÌM BẢNG VÀ GHÉP DỮ LIỆU ĐẦY ĐỦ (Tránh phán đoán sai bảng do updates chỉ chứa một phần trường)
+        const idToExistingMap = new Map<string, RecordFile>();
+        MOCK_RECORDS.forEach(r => idToExistingMap.set(r.id, r));
+
+        const fullMergedUpdates: RecordFile[] = updates.map(u => {
+            const existing = u.id ? idToExistingMap.get(u.id) : undefined;
+            return { ...(existing || {}), ...u } as RecordFile;
+        });
+
         const landRows: any[] = [];
         const dangkyRows: any[] = [];
         const luutruRows: any[] = [];
 
-        updates.forEach((u, idx) => {
+        fullMergedUpdates.forEach(u => {
             const table = getTargetTable(u);
+            const sanitizedRow = sanitizeData(u, RECORD_DB_COLUMNS);
             if (table === 'luutru_records') {
-                luutruRows.push(rows[idx]);
+                luutruRows.push(sanitizedRow);
             } else if (table === 'dangky_records') {
-                dangkyRows.push(rows[idx]);
+                dangkyRows.push(sanitizedRow);
             } else {
-                landRows.push(rows[idx]);
+                landRows.push(sanitizedRow);
             }
         });
 
@@ -1519,6 +1539,13 @@ export const updateRecordsBatchById = async (updates: Partial<RecordFile>[], onP
                 console.warn(`⚠️ [22P02 Fallback] Retrying updateRecordsBatchById on ${table} with 22P02 sanitized payload...`);
                 const fallback22P02Rows = sanitizePayloadFor22P02(payload);
                 const res = await supabase.from(table).upsert(fallback22P02Rows);
+                error = res.error;
+            }
+
+            if (error && (error.code === '22007' || error.code === '22008' || String(error.message || '').includes('date') || String(error.message || '').includes('timestamp'))) {
+                console.warn(`⚠️ [Date Fallback] Retrying updateRecordsBatchById on ${table} with date sanitized payload...`);
+                const fallbackDateRows = payload.map(r => sanitizePayloadForDateErrors(r));
+                const res = await supabase.from(table).upsert(fallbackDateRows);
                 error = res.error;
             }
 
@@ -1536,12 +1563,25 @@ export const updateRecordsBatchById = async (updates: Partial<RecordFile>[], onP
             }
         };
 
-        await Promise.all([
+        const results = await Promise.allSettled([
             upsertIntoTable('land_records', landRows),
             upsertIntoTable('dangky_records', dangkyRows),
             upsertIntoTable('luutru_records', luutruRows)
         ]);
 
+        // Nếu bảng nào gặp lỗi mạng hoặc lỗi Supabase, tự động đẩy hồ sơ vào hàng đợi Offline Sync để tự động thử lại
+        results.forEach((res, index) => {
+            if (res.status === 'rejected') {
+                const table = index === 0 ? 'land_records' : index === 1 ? 'dangky_records' : 'luutru_records';
+                const rows = index === 0 ? landRows : index === 1 ? dangkyRows : luutruRows;
+                console.warn(`⚠️ Cập nhật bảng ${table} thất bại, đang xếp ${rows.length} hồ sơ vào hàng đợi tự động đồng bộ:`, res.reason);
+                rows.forEach(r => {
+                    addPendingRecord(r as RecordFile, 'UPDATE', table).catch(e => console.error("Error adding to sync queue:", e));
+                });
+            }
+        });
+
+        // Dọn dẹp bản ghi trùng ở bảng khác
         if (landRows.length > 0) {
             purgeBatchFromOtherTables(landRows.map(r => r.id), landRows.map(r => r.code), 'land_records');
         }
@@ -1552,11 +1592,15 @@ export const updateRecordsBatchById = async (updates: Partial<RecordFile>[], onP
             purgeBatchFromOtherTables(luutruRows.map(r => r.id), luutruRows.map(r => r.code), 'luutru_records');
         }
         
-        syncCacheOnBatchUpdate(updates);
+        await syncCacheOnBatchUpdate(fullMergedUpdates);
         if (onProgress) onProgress(updates.length, updates.length);
         return { success: true, count: updates.length };
     } catch (error) {
         logError("updateRecordsBatchById", error);
+        // Ngay cả khi có ngoại lệ chung, vẫn xếp toàn bộ updates vào Sync Queue để không mất dữ liệu
+        updates.forEach(u => {
+            addPendingRecord(u as RecordFile, 'UPDATE').catch(e => console.error(e));
+        });
         return { success: false, count: 0 };
     }
 };

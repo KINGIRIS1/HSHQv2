@@ -252,15 +252,25 @@ export const useAppData = (currentUser: User | null) => {
                 if (recData && Array.isArray(recData)) {
                     const { migratedRecords } = migrateUnbatchedRecords(deduplicateRecords(recData));
                     setRecords(prev => {
+                        // Nếu trong prev có bản ghi đang offline / pending sync, bảo toàn bản ghi đó không để poll đè lên
+                        const offlineMap = new Map<string, RecordFile>();
+                        prev.forEach(r => {
+                            if (r._isOfflineSaved) offlineMap.set(r.id, r);
+                        });
+
+                        const reconciledRecords = offlineMap.size > 0
+                            ? migratedRecords.map(r => offlineMap.get(r.id) || r)
+                            : migratedRecords;
+
                         // Prevent unnecessary re-renders if data has not changed
-                        if (prev.length === migratedRecords.length) {
+                        if (prev.length === reconciledRecords.length) {
                             const isSame = prev.every((r, idx) => {
-                                const m = migratedRecords[idx];
+                                const m = reconciledRecords[idx];
                                 return m && r.id === m.id && r.status === m.status && r.assignedTo === m.assignedTo && r.deadline === m.deadline;
                             });
                             if (isSame) return prev;
                         }
-                        return migratedRecords;
+                        return reconciledRecords;
                     });
                 }
             }).catch(err => {

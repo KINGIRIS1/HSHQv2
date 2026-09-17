@@ -601,49 +601,64 @@ export const mapRecordFromDb = (item: any): any => {
     r.officeAssignedDate = keepOnlyDate(val(r.officeAssignedDate, r.officeassigneddate, r.office_assigned_date));
     r.officeCompletedDate = keepOnlyDate(val(r.officeCompletedDate, r.officecompleteddate, r.office_completed_date));
 
-    // Tự động chuẩn hóa nếu trạng thái bị lệch so với tiến trình thực tế
+    // TỰ ĐỘNG CHUẨN HÓA TRẠNG THÁI: ƯU TIÊN TUYỆT ĐỐI TRẠNG THÁI CHÍNH THỨC TRONG CSDL
     const currentStatus = (r.status || '').trim();
     const isArchive = isArchiveRecordType(r.recordType) || r.sourceTable === 'luutru_records';
     const isOfficeProcedure = isOfficeOnlySurveyProcedure(r.recordType);
 
-    if (currentStatus === RecordStatus.WITHDRAWN || currentStatus === RecordStatus.REJECTED) {
-        r.status = currentStatus as RecordStatus;
-    } else if (r.resultReturnedDate) {
-        r.status = RecordStatus.RETURNED;
-    } else if (r.completedDate && (!currentStatus || currentStatus === RecordStatus.RETURNED || currentStatus === RecordStatus.HANDOVER || currentStatus === RecordStatus.RECEIVED || currentStatus === RecordStatus.ASSIGNED || currentStatus === RecordStatus.FIELD_WORK || currentStatus === RecordStatus.OFFICE_WORK || currentStatus === RecordStatus.PENDING_CHECK || currentStatus === RecordStatus.PENDING_SIGN || currentStatus === RecordStatus.SIGNED)) {
-        r.status = RecordStatus.HANDOVER;
-    } else if (r.approvalDate && (!currentStatus || currentStatus === RecordStatus.RECEIVED || currentStatus === RecordStatus.ASSIGNED || currentStatus === RecordStatus.FIELD_WORK || currentStatus === RecordStatus.OFFICE_WORK || currentStatus === RecordStatus.PENDING_CHECK || currentStatus === RecordStatus.PENDING_SIGN)) {
-        r.status = RecordStatus.SIGNED;
-    } else if ((r.submissionDate || r.submittedTo || r.checkedDate) && (!currentStatus || currentStatus === RecordStatus.RECEIVED || currentStatus === RecordStatus.ASSIGNED || currentStatus === RecordStatus.FIELD_WORK || currentStatus === RecordStatus.OFFICE_WORK || currentStatus === RecordStatus.PENDING_CHECK)) {
-        r.status = RecordStatus.PENDING_SIGN;
-    } else if ((r.pendingCheckDate || r.checkedBy) && (!currentStatus || currentStatus === RecordStatus.RECEIVED || currentStatus === RecordStatus.ASSIGNED || currentStatus === RecordStatus.FIELD_WORK || currentStatus === RecordStatus.OFFICE_WORK)) {
-        r.status = RecordStatus.PENDING_CHECK;
-    } else if (currentStatus && Object.values(RecordStatus).includes(currentStatus as RecordStatus)) {
-        r.status = currentStatus as RecordStatus;
-    } else if (!isArchive) {
-        // Module Đo đạc: Bỏ hoàn toàn trạng thái "Đang thực hiện" -> Chuyển sang Đo đạc thực địa hoặc Biên tập bản đồ
-        if (isOfficeProcedure) {
-            // Thủ tục 2.1, 2.3: Nếu đã giao việc (có assignedTo/drafterId/officeAssignedDate) hoặc có trạng thái thuộc nhóm giao việc -> Biên tập bản đồ
-            if (r.assignedTo || r.drafterId || r.officeAssignedDate || ['ASSIGNED', 'IN_PROGRESS', 'OFFICE_WORK', 'FIELD_WORK', 'COMPLETED_WORK', 'GIAO_HS'].includes(currentStatus)) {
-                r.status = RecordStatus.OFFICE_WORK;
-            } else {
-                r.status = RecordStatus.RECEIVED;
-            }
-        } else if (['ASSIGNED', 'IN_PROGRESS', 'FIELD_WORK', 'OFFICE_WORK', 'COMPLETED_WORK', 'GIAO_HS'].includes(currentStatus) || r.assignedTo || r.surveyorId) {
-            if (r.officeAssignedDate || r.drafterId || currentStatus === RecordStatus.OFFICE_WORK) {
+    // NGUYÊN TẮC BẢO TOÀN: Nếu hồ sơ đã có trạng thái chuẩn hợp lệ trong DB, TUYỆT ĐỐI TÔN TRỌNG trạng thái đó!
+    // Không bao giờ cho phép các cột ngày tháng cũ tự ý ghi đè làm giật lùi/đảo ngược trạng thái vừa chuyển.
+    if (currentStatus && Object.values(RecordStatus).includes(currentStatus as RecordStatus)) {
+        if (!isArchive && currentStatus === RecordStatus.IN_PROGRESS) {
+            // Chỉ chuẩn hóa riêng trường hợp trạng thái cũ IN_PROGRESS của hồ sơ Đo đạc
+            if (isOfficeProcedure || r.officeAssignedDate || r.drafterId) {
                 r.status = RecordStatus.OFFICE_WORK;
             } else {
                 r.status = RecordStatus.FIELD_WORK;
             }
         } else {
-            r.status = RecordStatus.RECEIVED;
+            r.status = currentStatus as RecordStatus;
         }
     } else {
-        // Module Lưu trữ: Khôi phục lại trạng thái "Đang thực hiện" nếu đã giao việc
-        if (['ASSIGNED', 'IN_PROGRESS', 'COMPLETED_WORK', 'GIAO_HS'].includes(currentStatus) || r.assignedTo) {
-            r.status = RecordStatus.IN_PROGRESS;
+        // CHỈ SUY ĐOÁN THEO MỐC TIẾN TRÌNH KHI HỒ SƠ CHƯA CÓ TRẠNG THÁI (TRỐNG HOẶC KHÔNG HỢP LỆ)
+        if (currentStatus === RecordStatus.WITHDRAWN || currentStatus === RecordStatus.REJECTED) {
+            r.status = currentStatus as RecordStatus;
+        } else if (r.resultReturnedDate) {
+            r.status = RecordStatus.RETURNED;
+        } else if (r.completedDate || r.exportDate) {
+            r.status = RecordStatus.HANDOVER;
+        } else if (r.approvalDate) {
+            r.status = RecordStatus.SIGNED;
+        } else if (r.submissionDate || r.submittedTo) {
+            r.status = RecordStatus.PENDING_SIGN;
+        } else if (r.pendingCheckDate || r.checkedBy) {
+            r.status = RecordStatus.PENDING_CHECK;
+        } else if (r.completedWorkDate || r.officeCompletedDate) {
+            r.status = RecordStatus.COMPLETED_WORK;
+        } else if (!isArchive) {
+            // Module Đo đạc: Xác định bước thực tế theo người được phân công
+            if (isOfficeProcedure) {
+                if (r.assignedTo || r.drafterId || r.officeAssignedDate || ['ASSIGNED', 'IN_PROGRESS', 'OFFICE_WORK', 'FIELD_WORK', 'COMPLETED_WORK', 'GIAO_HS'].includes(currentStatus)) {
+                    r.status = RecordStatus.OFFICE_WORK;
+                } else {
+                    r.status = RecordStatus.RECEIVED;
+                }
+            } else if (['ASSIGNED', 'IN_PROGRESS', 'FIELD_WORK', 'OFFICE_WORK', 'COMPLETED_WORK', 'GIAO_HS'].includes(currentStatus) || r.assignedTo || r.surveyorId) {
+                if (r.officeAssignedDate || r.drafterId || currentStatus === RecordStatus.OFFICE_WORK) {
+                    r.status = RecordStatus.OFFICE_WORK;
+                } else {
+                    r.status = RecordStatus.FIELD_WORK;
+                }
+            } else {
+                r.status = RecordStatus.RECEIVED;
+            }
         } else {
-            r.status = RecordStatus.RECEIVED;
+            // Module Lưu trữ: Khôi phục lại trạng thái "Đang thực hiện" nếu đã giao việc
+            if (['ASSIGNED', 'IN_PROGRESS', 'COMPLETED_WORK', 'GIAO_HS'].includes(currentStatus) || r.assignedTo) {
+                r.status = RecordStatus.IN_PROGRESS;
+            } else {
+                r.status = RecordStatus.RECEIVED;
+            }
         }
     }
 

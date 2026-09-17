@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import * as XLSX from 'xlsx-js-style';
 import { RecordFile, RecordStatus } from '../types';
 import { isArchiveRecordType, getShortRecordType } from '../constants';
-import { formatBatchName, cleanSyncNotes } from '../utils/appHelpers';
+import { formatBatchName, cleanSyncNotes, getPureBatchNumber, formatDateKey, parseSafeDate } from '../utils/appHelpers';
 import { X, FileDown, Calendar, Layers, Printer, Eye } from 'lucide-react';
 
 interface ExportModalProps {
@@ -54,18 +54,21 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, typ
 
     categoryRecords.forEach(r => {
       if (type === 'handover') {
-          // Logic cho Giao 1 cửa
-          if (r.status === RecordStatus.HANDOVER || r.status === RecordStatus.SIGNED || r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED || r.exportBatch) {
+          // Logic cho Giao 1 cửa (Hỗ trợ cả SIGNED, PENDING_HANDOVER, HANDOVER, WITHDRAWN, REJECTED)
+          if (r.status === RecordStatus.HANDOVER || r.status === RecordStatus.SIGNED || r.status === RecordStatus.PENDING_HANDOVER || r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED || r.exportBatch) {
               if (r.exportBatch && r.exportDate) {
-                  const dateStr = r.exportDate.split('T')[0];
-                  const key = `${dateStr}_${r.exportBatch}`;
+                  const rDateObj = parseSafeDate(r.exportDate);
+                  const dateStr = rDateObj ? formatDateKey(rDateObj) : r.exportDate.split('T')[0];
+                  const pureBatch = getPureBatchNumber(r.exportBatch) || String(r.exportBatch).trim();
+                  const key = `${dateStr}_${pureBatch}`;
                   if (!batches[key]) {
-                      batches[key] = { date: dateStr, batch: r.exportBatch, count: 0 };
+                      batches[key] = { date: dateStr, batch: pureBatch, count: 0 };
                   }
                   batches[key].count++;
               } else if (r.status === RecordStatus.HANDOVER) {
                   // Fallback cho những hồ sơ thiếu exportBatch (Chưa chốt đợt hoặc nhập từ Excel)
-                  const dateStr = (r.completedDate || r.receivedDate || new Date().toISOString()).split('T')[0];
+                  const rDateObj = parseSafeDate(r.completedDate || r.receivedDate);
+                  const dateStr = rDateObj ? formatDateKey(rDateObj) : (r.completedDate || r.receivedDate || new Date().toISOString()).split('T')[0];
                   const key = `${dateStr}_NOT_BATCHED`;
                   if (!batches[key]) {
                       batches[key] = { date: dateStr, batch: 'Lẻ (Chưa tạo đợt)', count: 0 };
@@ -77,7 +80,8 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, typ
           // Logic cho Trình Ký: Dựa vào ngày tiếp nhận (receivedDate) để gom nhóm
           // Lấy các hồ sơ đang Chờ ký hoặc Đã ký (nhưng chưa giao)
           if (r.status === RecordStatus.PENDING_SIGN || r.status === RecordStatus.SIGNED) {
-             const dateStr = r.receivedDate ? r.receivedDate.split('T')[0] : null;
+             const rDateObj = parseSafeDate(r.receivedDate);
+             const dateStr = rDateObj ? formatDateKey(rDateObj) : (r.receivedDate ? r.receivedDate.split('T')[0] : null);
              if (!dateStr) return;
              const key = `date_${dateStr}`;
              if (!batches[key]) {
@@ -135,12 +139,15 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, typ
         
         recordsToExport = categoryRecords.filter(r => {
             if (batchStr === 'NOT_BATCHED') {
-                const rDateObj = (r.completedDate || r.receivedDate || new Date().toISOString()).split('T')[0];
-                return r.status === RecordStatus.HANDOVER && !r.exportBatch && rDateObj === dateStr;
+                const rDateObj = parseSafeDate(r.completedDate || r.receivedDate);
+                const rDateStr = rDateObj ? formatDateKey(rDateObj) : (r.completedDate || r.receivedDate || new Date().toISOString()).split('T')[0];
+                return r.status === RecordStatus.HANDOVER && !r.exportBatch && rDateStr === dateStr;
             } else {
-                const rDateObj = r.exportDate ? r.exportDate.split('T')[0] : '';
-                const matchDate = !dateStr || rDateObj === dateStr;
-                const matchBatch = String(r.exportBatch ?? '').trim() === String(batchStr ?? '').trim();
+                const rDateObj = parseSafeDate(r.exportDate);
+                const rDateStr = rDateObj ? formatDateKey(rDateObj) : (r.exportDate ? r.exportDate.split('T')[0] : '');
+                const matchDate = !dateStr || rDateStr === dateStr;
+                const rPureBatch = getPureBatchNumber(r.exportBatch) || String(r.exportBatch ?? '').trim();
+                const matchBatch = String(rPureBatch) === String(batchStr).trim();
                 return matchDate && matchBatch;
             }
         });
