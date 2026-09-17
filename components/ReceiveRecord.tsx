@@ -212,7 +212,7 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, onDelet
             }
         } else {
             if (!cleanCode.startsWith('LT-') && !cleanCode.startsWith('H19.151.11.22-')) {
-                const stripped = cleanCode.replace(/^(HQ|TK|TQ|TH|MD|MĐ)-/, '');
+                const stripped = cleanCode.replace(/^(HQ|TK|TQ|TH|MD|MĐ|MH|CT|NB|ML|MT|QM|TT|MLO)-/, '');
                 const parts = stripped.split('-');
                 if (parts.length >= 2) {
                     const rDate = parts[0];

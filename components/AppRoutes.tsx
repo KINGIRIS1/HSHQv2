@@ -16,6 +16,7 @@ import {
   SELECTABLE_STATUSES,
   SURVEY_SELECTABLE_STATUSES,
   ARCHIVE_SELECTABLE_STATUSES,
+  CAP_GIAY_SELECTABLE_STATUSES,
   getNormalizedWard,
 } from "../constants";
 import { COLUMN_DEFS, removeVietnameseTones, matchDepartmentKey, groupEmployeesByDepartment } from "../utils/appHelpers";
@@ -550,7 +551,9 @@ const AppRoutes: React.FC<AppRoutesProps> = (props) => {
     const isSpecializedTab = !["all_records", "archive_records", "test_records"].includes(currentView);
     const isAllRecordsTab = currentView === "all_records" || currentView === "archive_records" || currentView === "test_records";
 
-    const statusFilterOptions = (isMeasurementView || isTestMeasurementView)
+    const statusFilterOptions = isTestMeasurementView
+      ? CAP_GIAY_SELECTABLE_STATUSES
+      : isMeasurementView
       ? SURVEY_SELECTABLE_STATUSES.filter(item => item.key !== RecordStatus.IN_PROGRESS)
       : isArchiveMeasurementView
       ? ARCHIVE_SELECTABLE_STATUSES

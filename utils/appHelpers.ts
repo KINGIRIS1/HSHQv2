@@ -1,6 +1,7 @@
 
 import { RecordFile, RecordStatus, Employee, User } from '../types';
-import { DEFAULT_HOLIDAYS, isArchiveRecordType, getShortRecordType } from '../constants';
+import { DEFAULT_HOLIDAYS, isArchiveRecordType, getShortRecordType, isCertificateRecordType } from '../constants';
+import { CAP_GIAY_STEP_ORDER } from './capGiayStateMachine';
 
 // --- HÀM TIỆN ÍCH XỬ LÝ CHUỖI TIẾNG VIỆT ---
 export function removeVietnameseTones(str: string): string {
@@ -499,14 +500,20 @@ export function processAssignmentTimelineCheck(
       updates.officeAssignedDate = newAssignedDateStr;
     }
   } else if (!record.status || record.status === RecordStatus.RECEIVED || record.status === RecordStatus.ASSIGNED) {
-    if (isFieldWorkProcedure(record.recordType)) {
+    const isCapGiay = isCertificateRecordType(record.recordType || '') || (record as any).sourceTable === 'dangky_records' || record.group === '3. Đăng ký đất đai, cấp GCN';
+    if (isCapGiay) {
+      // Module Cấp giấy: Tiếp nhận hồ sơ -> Chờ thẩm định (APPRAISAL)
+      updates.status = RecordStatus.APPRAISAL;
+      updates.appraisalDate = record.appraisalDate || newAssignedDateStr;
+      updates.assignedTo = newEmployeeId;
+    } else if (isFieldWorkProcedure(record.recordType)) {
       // Thủ tục 2.2, 2.4, 2.5: Tổ Đo đạc - Đo thực địa (Ngoại nghiệp)
       updates.status = RecordStatus.FIELD_WORK;
       updates.surveyorId = newEmployeeId;
       updates.surveyAssignedDate = newAssignedDateStr;
       updates.fieldAssignedDate = newAssignedDateStr;
     } else {
-      // Thủ tục nhóm 1.x (Lưu trữ), nhóm 3.x (Đăng ký cấp giấy) và các thủ tục khác: Đang thực hiện
+      // Thủ tục nhóm 1.x (Lưu trữ) và các thủ tục khác: Đang thực hiện
       updates.status = RecordStatus.IN_PROGRESS;
     }
   } else if (record.status === RecordStatus.FIELD_WORK || isFieldWorkProcedure(record.recordType)) {
@@ -1115,7 +1122,16 @@ export interface StatusTransitionOptions {
         completedDate?: string | null;
         exportDate?: string | null;
         resultReturnedDate?: string | null;
+        appraisalDate?: string | null;
+        taxTransferDate?: string | null;
+        taxKv7Date?: string | null;
+        taxPaymentDate?: string | null;
+        printCertDate?: string | null;
+        pendingHandoverDate?: string | null;
+        supplementRequestDate?: string | null;
+        supplementReturnedDate?: string | null;
     };
+    notes?: string | null;
     exportBatch?: number | string | null;
     exportDate?: string | null;
     handoverWard?: string | null;
@@ -1150,6 +1166,14 @@ export function getDerivedStatusFromDates(
     record: Partial<RecordFile>,
     options?: { isArchive?: boolean }
 ): RecordStatus {
+    // Module Cấp giấy không tự suy luận từ mốc ngày cũ (bảo đảm sạch dữ liệu và không lazy migration)
+    const isCapGiay = isCertificateRecordType(record.recordType || '') || 
+        (record as any).sourceTable === 'dangky_records' || 
+        record.group === '3. Đăng ký đất đai, cấp GCN';
+    if (isCapGiay) {
+        return (record.status as RecordStatus) || RecordStatus.RECEIVED;
+    }
+
     const isArchive = options?.isArchive ?? (
         isArchiveRecordType(record.recordType || '') || 
         ((record as any).department && String((record as any).department).toLowerCase().includes('lưu trữ')) ||
@@ -1228,6 +1252,66 @@ export function cleanFutureMilestoneDates(
     targetStatus: RecordStatus
 ): Partial<RecordFile> {
     const cleaned = { ...record };
+
+    const isCapGiay = isCertificateRecordType(record.recordType || '') || 
+        (record as any).sourceTable === 'dangky_records' || 
+        record.group === '3. Đăng ký đất đai, cấp GCN';
+
+    if (isCapGiay) {
+        const cgRank = CAP_GIAY_STEP_ORDER[targetStatus] ?? 0;
+        if (targetStatus === RecordStatus.WITHDRAWN || targetStatus === RecordStatus.REJECTED) {
+            cleaned.resultReturnedDate = null as any;
+            cleaned.receiverName = null as any;
+            cleaned.receiptNumber = null as any;
+            cleaned.returnedPrice = null as any;
+            return cleaned;
+        }
+        if (cgRank < 11) {
+            cleaned.resultReturnedDate = null as any;
+            cleaned.receiverName = null as any;
+            cleaned.receiptNumber = null as any;
+            cleaned.returnedPrice = null as any;
+        }
+        if (cgRank < 10) {
+            cleaned.completedDate = null as any;
+            cleaned.exportDate = null as any;
+            cleaned.exportBatch = null as any;
+            cleaned.is_handover = false;
+            cleaned.handover_date = null as any;
+            cleaned.handoverWard = null as any;
+        }
+        if (cgRank < 9) {
+            cleaned.pendingHandoverDate = null as any;
+        }
+        if (cgRank < 8) {
+            cleaned.submissionDate = null as any;
+            cleaned.submittedTo = null as any;
+            cleaned.approvalDate = null as any;
+        }
+        if (cgRank < 7) {
+            cleaned.pendingCheckDate = null as any;
+            cleaned.checkedBy = null as any;
+            cleaned.checkedDate = null as any;
+        }
+        if (cgRank < 6) {
+            cleaned.printCertDate = null as any;
+        }
+        if (cgRank < 5) {
+            cleaned.taxPaymentDate = null as any;
+        }
+        if (cgRank < 4) {
+            cleaned.taxKv7Date = null as any;
+        }
+        if (cgRank < 3) {
+            cleaned.taxTransferDate = null as any;
+        }
+        if (cgRank < 2) {
+            cleaned.appraisalDate = null as any;
+            cleaned.assignedTo = null as any;
+        }
+        return cleaned;
+    }
+
     const rank = STATUS_RANK[targetStatus] ?? 0;
 
     if (targetStatus === RecordStatus.WITHDRAWN || targetStatus === RecordStatus.REJECTED) {
@@ -1367,6 +1451,23 @@ export function syncRecordStatusTransition(
             }
         } else if (newStatus === RecordStatus.COMPLETED_WORK) {
             updates.completedWorkDate = options?.customDates?.completedWorkDate || currentRecord.completedWorkDate || effectiveTargetDate;
+        } else if (newStatus === RecordStatus.APPRAISAL) {
+            updates.appraisalDate = options?.customDates?.appraisalDate || currentRecord.appraisalDate || effectiveTargetDate;
+            if (options?.assignedTo) updates.assignedTo = options.assignedTo;
+        } else if (newStatus === RecordStatus.TAX_TRANSFER) {
+            updates.taxTransferDate = options?.customDates?.taxTransferDate || currentRecord.taxTransferDate || effectiveTargetDate;
+        } else if (newStatus === RecordStatus.PENDING_TAX_KV7) {
+            updates.taxKv7Date = options?.customDates?.taxKv7Date || currentRecord.taxKv7Date || effectiveTargetDate;
+        } else if (newStatus === RecordStatus.PENDING_TAX_PAYMENT) {
+            updates.taxPaymentDate = options?.customDates?.taxPaymentDate || currentRecord.taxPaymentDate || effectiveTargetDate;
+        } else if (newStatus === RecordStatus.PENDING_PRINT_CERT) {
+            updates.printCertDate = options?.customDates?.printCertDate || currentRecord.printCertDate || effectiveTargetDate;
+        } else if (newStatus === RecordStatus.PENDING_HANDOVER) {
+            updates.pendingHandoverDate = options?.customDates?.pendingHandoverDate || currentRecord.pendingHandoverDate || effectiveTargetDate;
+        } else if (newStatus === RecordStatus.PENDING_SUPPLEMENT) {
+            updates.previousStatus = currentRecord.status || RecordStatus.RECEIVED;
+            updates.supplementRequestDate = options?.customDates?.supplementRequestDate || currentRecord.supplementRequestDate || effectiveTargetDate;
+            if (options?.notes) updates.pendingSupplementReason = options.notes;
         } else if (newStatus === RecordStatus.PENDING_CHECK) {
             updates.pendingCheckDate = options?.customDates?.pendingCheckDate || currentRecord.pendingCheckDate || effectiveTargetDate;
             if (options?.checkedBy) {

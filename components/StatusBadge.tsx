@@ -26,6 +26,12 @@ const StatusBadge: React.FC<StatusBadgeProps> = ({ status }) => {
     [RecordStatus.PENDING_SUPPLEMENT]: 'bg-pink-500',
     [RecordStatus.WITHDRAWN]: 'bg-slate-400',
     [RecordStatus.REJECTED]: 'bg-rose-500',
+    [RecordStatus.APPRAISAL]: 'bg-blue-500 animate-pulse',
+    [RecordStatus.TAX_TRANSFER]: 'bg-indigo-500',
+    [RecordStatus.PENDING_TAX_KV7]: 'bg-violet-500',
+    [RecordStatus.PENDING_TAX_PAYMENT]: 'bg-amber-500',
+    [RecordStatus.PENDING_PRINT_CERT]: 'bg-teal-500',
+    [RecordStatus.PENDING_HANDOVER]: 'bg-cyan-500 animate-pulse',
   };
 
   const label = STATUS_LABELS[normalizedStatus] || String(status || 'Chưa xác định');

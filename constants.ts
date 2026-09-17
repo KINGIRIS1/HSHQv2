@@ -46,7 +46,32 @@ export const STATUS_LABELS: Record<RecordStatus, string> = {
   [RecordStatus.RETURNED]: 'Đã trả kết quả',
   [RecordStatus.WITHDRAWN]: 'CSD rút hồ sơ',
   [RecordStatus.REJECTED]: 'Trả hồ sơ',
+
+  // Nhãn hiển thị cho Module Cấp giấy
+  [RecordStatus.APPRAISAL]: 'Chờ thẩm định',
+  [RecordStatus.TAX_TRANSFER]: 'Chờ chuyển thuế',
+  [RecordStatus.PENDING_TAX_KV7]: 'Chờ thuế khu vực 7',
+  [RecordStatus.PENDING_TAX_PAYMENT]: 'Chờ Giấy nộp tiền',
+  [RecordStatus.PENDING_PRINT_CERT]: 'Chờ in giấy chứng nhận',
+  [RecordStatus.PENDING_HANDOVER]: 'Chờ bàn giao',
 };
+
+export const CAP_GIAY_SELECTABLE_STATUSES: { key: RecordStatus; label: string }[] = [
+  { key: RecordStatus.RECEIVED, label: 'Tiếp nhận hồ sơ' },
+  { key: RecordStatus.APPRAISAL, label: 'Chờ thẩm định' },
+  { key: RecordStatus.TAX_TRANSFER, label: 'Chờ chuyển thuế' },
+  { key: RecordStatus.PENDING_TAX_KV7, label: 'Chờ thuế khu vực 7' },
+  { key: RecordStatus.PENDING_TAX_PAYMENT, label: 'Chờ Giấy nộp tiền' },
+  { key: RecordStatus.PENDING_PRINT_CERT, label: 'Chờ in giấy chứng nhận' },
+  { key: RecordStatus.PENDING_CHECK, label: 'Chờ kiểm tra' },
+  { key: RecordStatus.PENDING_SIGN, label: 'Chờ ký duyệt' },
+  { key: RecordStatus.PENDING_HANDOVER, label: 'Chờ bàn giao' },
+  { key: RecordStatus.HANDOVER, label: 'Đã giao 1 cửa' },
+  { key: RecordStatus.RETURNED, label: 'Đã trả kết quả' },
+  { key: RecordStatus.PENDING_SUPPLEMENT, label: 'Chờ bổ sung' },
+  { key: RecordStatus.WITHDRAWN, label: 'Csd rút hồ sơ' },
+  { key: RecordStatus.REJECTED, label: 'Huỷ hồ sơ' },
+];
 
 export const SELECTABLE_STATUSES: { key: RecordStatus; label: string }[] = [
   { key: RecordStatus.RECEIVED, label: 'Tiếp nhận mới' },
@@ -95,7 +120,7 @@ export const STATUS_COLORS: Record<RecordStatus, string> = {
   [RecordStatus.IN_PROGRESS]: 'bg-yellow-100 text-yellow-800',
   [RecordStatus.FIELD_WORK]: 'bg-sky-100 text-sky-800 border border-sky-200',
   [RecordStatus.OFFICE_WORK]: 'bg-indigo-100 text-indigo-800 border border-indigo-200',
-  [RecordStatus.COMPLETED_WORK]: 'bg-cyan-100 text-cyan-800', // MỚI: Đã bổ sung
+  [RecordStatus.COMPLETED_WORK]: 'bg-cyan-100 text-cyan-800',
   [RecordStatus.PENDING_SUPPLEMENT]: 'bg-amber-100 text-amber-900 border border-amber-300 font-bold',
   [RecordStatus.PENDING_CHECK]: 'bg-orange-100 text-orange-800',
   [RecordStatus.PENDING_SIGN]: 'bg-purple-100 text-purple-800',
@@ -104,6 +129,14 @@ export const STATUS_COLORS: Record<RecordStatus, string> = {
   [RecordStatus.RETURNED]: 'bg-emerald-100 text-emerald-800 border border-emerald-200 font-bold',
   [RecordStatus.WITHDRAWN]: 'bg-slate-600 text-white',
   [RecordStatus.REJECTED]: 'bg-red-100 text-red-800',
+
+  // Màu sắc riêng cho các trạng thái Cấp giấy
+  [RecordStatus.APPRAISAL]: 'bg-blue-100 text-blue-800 border border-blue-200',
+  [RecordStatus.TAX_TRANSFER]: 'bg-indigo-100 text-indigo-800 border border-indigo-200',
+  [RecordStatus.PENDING_TAX_KV7]: 'bg-violet-100 text-violet-800 border border-violet-200',
+  [RecordStatus.PENDING_TAX_PAYMENT]: 'bg-amber-100 text-amber-800 border border-amber-200',
+  [RecordStatus.PENDING_PRINT_CERT]: 'bg-teal-100 text-teal-800 border border-teal-200',
+  [RecordStatus.PENDING_HANDOVER]: 'bg-cyan-100 text-cyan-800 border border-cyan-200',
 };
 
 // Hàm chuẩn hóa và chuyển đổi mọi định dạng trạng thái về RecordStatus chuẩn
@@ -183,7 +216,32 @@ export const mapStatusToRecordStatus = (s: string | undefined | null): RecordSta
     case 'rejected':
     case 'trả hồ sơ':
     case 'từ chối':
+    case 'huỷ hồ sơ':
+    case 'hủy hồ sơ':
       return RecordStatus.REJECTED;
+    case 'appraisal':
+    case 'chờ thẩm định':
+    case 'thẩm định':
+      return RecordStatus.APPRAISAL;
+    case 'tax_transfer':
+    case 'chờ chuyển thuế':
+    case 'chuyển thuế':
+      return RecordStatus.TAX_TRANSFER;
+    case 'pending_tax_kv7':
+    case 'chờ thuế khu vực 7':
+    case 'thuế khu vực 7':
+      return RecordStatus.PENDING_TAX_KV7;
+    case 'pending_tax_payment':
+    case 'chờ giấy nộp tiền':
+    case 'giấy nộp tiền':
+      return RecordStatus.PENDING_TAX_PAYMENT;
+    case 'pending_print_cert':
+    case 'chờ in giấy chứng nhận':
+    case 'in giấy chứng nhận':
+    case 'in gcn':
+      return RecordStatus.PENDING_PRINT_CERT;
+    case 'pending_handover':
+      return RecordStatus.PENDING_HANDOVER;
     default:
       for (const [key, val] of Object.entries(STATUS_LABELS)) {
         if (val.toLowerCase() === lower) {
@@ -462,24 +520,7 @@ export const getSurveyRecordPrefix = (
   employeesList: Employee[] = [],
   wardName?: string | null
 ): string => {
-  // 1. Ưu tiên kiểm tra theo tên Xã/Phường được chọn trên form
-  if (wardName) {
-    const w = wardName.trim().toLowerCase();
-    if (w.includes('khai')) return 'TK';
-    if (w.includes('quan')) return 'TQ';
-    if (w.includes('hưng') || w.includes('hung')) return 'TH';
-    if (w.includes('đức') || w.includes('duc')) return 'MD';
-    if (w.includes('chơn thành') || w.includes('chonthanh')) return 'CT';
-    if (w.includes('nha bích') || w.includes('nhabich')) return 'NB';
-    if (w.includes('lập') || w.includes('lap')) return 'ML';
-    if (w.includes('thắng') || w.includes('thang')) return 'MT';
-    if (w.includes('quang minh')) return 'QM';
-    if (w.includes('thành tâm')) return 'TT';
-    if (w.includes('minh long') || w.includes('minhlong')) return 'MLO';
-    if (w.includes('minh hưng') || w.includes('minhhung')) return 'MH';
-  }
-
-  // 2. Nếu chưa chọn Xã/Phường, kiểm tra địa bàn do Cán bộ phụ trách (chỉ nếu phụ trách đúng 1 xã)
+  // 1. Ưu tiên kiểm tra Cán bộ phân công tiếp nhận
   if (receivedBy) {
     const empList = (employeesList && employeesList.length > 0) ? employeesList : MOCK_EMPLOYEES;
     let target = receivedBy.trim().toLowerCase();
@@ -499,10 +540,17 @@ export const getSurveyRecordPrefix = (
     
     const emp = empList.find(e => 
       (e.id && e.id.toLowerCase() === target) ||
-      (e.name && e.name.toLowerCase() === target)
+      (e.name && e.name.toLowerCase() === target) ||
+      ((e as any).username && (e as any).username.toLowerCase() === target)
     );
 
-    if (emp && emp.managedWards && emp.managedWards.length === 1) {
+    if (emp && emp.managedWards && emp.managedWards.length > 0) {
+      // Nếu Cán bộ phụ trách TRÊN 1 địa bàn (> 1 xã) -> BỎ MÃ ĐỊA BÀN ở đầu mã hồ sơ!
+      if (emp.managedWards.length > 1) {
+        return '';
+      }
+
+      // Nếu Cán bộ phụ trách ĐÚNG 1 địa bàn -> Lấy mã địa bàn của xã duy nhất đó
       const singleWard = emp.managedWards[0].trim().toLowerCase();
       if (singleWard.includes('khai')) return 'TK';
       if (singleWard.includes('quan')) return 'TQ';
@@ -517,6 +565,23 @@ export const getSurveyRecordPrefix = (
       if (singleWard.includes('minh long') || singleWard.includes('minhlong')) return 'MLO';
       if (singleWard.includes('minh hưng') || singleWard.includes('minhhung')) return 'MH';
     }
+  }
+
+  // 2. Nếu không chọn Người tiếp nhận hoặc Cán bộ không có cấu hình địa bàn, mới lấy theo tên Xã/Phường trên form
+  if (wardName) {
+    const w = wardName.trim().toLowerCase();
+    if (w.includes('khai')) return 'TK';
+    if (w.includes('quan')) return 'TQ';
+    if (w.includes('hưng') || w.includes('hung')) return 'TH';
+    if (w.includes('đức') || w.includes('duc')) return 'MD';
+    if (w.includes('chơn thành') || w.includes('chonthanh')) return 'CT';
+    if (w.includes('nha bích') || w.includes('nhabich')) return 'NB';
+    if (w.includes('lập') || w.includes('lap')) return 'ML';
+    if (w.includes('thắng') || w.includes('thang')) return 'MT';
+    if (w.includes('quang minh')) return 'QM';
+    if (w.includes('thành tâm')) return 'TT';
+    if (w.includes('minh long') || w.includes('minhlong')) return 'MLO';
+    if (w.includes('minh hưng') || w.includes('minhhung')) return 'MH';
   }
 
   return '';

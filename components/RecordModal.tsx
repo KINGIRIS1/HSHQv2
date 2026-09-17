@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { RecordFile, RecordStatus, Employee, User, UserRole, AttachedDocItem, DossierComponentItem, AttachedFileMeta } from '../types';
 import AutoResizeTextarea from './AutoResizeTextarea';
-import { GROUPS, EXTENDED_RECORD_TYPES, STATUS_LABELS, SELECTABLE_STATUSES, ARCHIVE_SELECTABLE_STATUSES, SURVEY_SELECTABLE_STATUSES, getShortRecordType, getWardLabel, getNormalizedWard, isArchiveRecordType, isSurveyRecordType, getSurveyRecordPrefix, isCertificateRecordType } from '../constants';
+import { GROUPS, EXTENDED_RECORD_TYPES, STATUS_LABELS, SELECTABLE_STATUSES, ARCHIVE_SELECTABLE_STATUSES, SURVEY_SELECTABLE_STATUSES, CAP_GIAY_SELECTABLE_STATUSES, getShortRecordType, getWardLabel, getNormalizedWard, isArchiveRecordType, isSurveyRecordType, getSurveyRecordPrefix, isCertificateRecordType } from '../constants';
 import { X, Save, Lock, User as UserIcon, MapPin, FileText, Calendar, FileCheck, ChevronDown, ChevronUp, Paperclip, Upload, Eye, Download, ExternalLink, Loader2, CheckCircle2, Plus } from 'lucide-react';
 import { calculateDeadlineHelper, getDepartmentForRecord, isProcedure2_3, syncRecordStatusTransition, getPureBatchNumber, groupEmployeesByDepartment, isFieldWorkProcedure, isOfficeOnlySurveyProcedure, deriveActualSurveyStatus, getDerivedStatusFromDates, cleanFutureMilestoneDates } from '../utils/appHelpers';
 import { fetchContracts } from '../services/api';
@@ -264,16 +264,29 @@ const generateRecordCode = (
         }
     });
 
-    const nextSeq = (maxSeq + 1).toString().padStart(4, '0');
-    if (isLT) {
-        return `LT-${datePrefix}-${nextSeq}`;
-    }
-    if (isCert) {
-        return `H19.151.11.22-${datePrefix}-${nextSeq}`;
+    const prefix2 = getSurveyRecordPrefix(receivedBy, employeesList, wardName);
+    const existingCodeSet = new Set((recordsList || []).map(r => (r.code || '').trim().toLowerCase()));
+
+    let currentSeq = maxSeq + 1;
+    let finalCandidate = '';
+
+    while (true) {
+        const seqStr = currentSeq.toString().padStart(4, '0');
+        if (isLT) {
+            finalCandidate = `LT-${datePrefix}-${seqStr}`;
+        } else if (isCert) {
+            finalCandidate = `H19.151.11.22-${datePrefix}-${seqStr}`;
+        } else {
+            finalCandidate = prefix2 ? `${prefix2}-${datePrefix}-${seqStr}` : `${datePrefix}-${seqStr}`;
+        }
+
+        if (!existingCodeSet.has(finalCandidate.toLowerCase())) {
+            break;
+        }
+        currentSeq++;
     }
 
-    const prefix2 = getSurveyRecordPrefix(receivedBy, employeesList, wardName);
-    return prefix2 ? `${prefix2}-${datePrefix}-${nextSeq}` : `${datePrefix}-${nextSeq}`;
+    return finalCandidate;
 };
 
 const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, initialData, employees, currentUser, wards, currentView, holidays, records }) => {
@@ -311,6 +324,16 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
   const isOneDoor = currentUser.role === UserRole.ONEDOOR;
   const canEditResult = (hasAdminRights || isOneDoor) && isEdit;
 
+  const duplicateRecord = useMemo(() => {
+    const codeToTest = (formData.code || '').trim().toLowerCase();
+    if (!codeToTest || codeToTest === 'hs') return null;
+    if (!records || records.length === 0) return null;
+    return records.find(r => {
+      if (initialData?.id && r.id === initialData.id) return false;
+      return (r.code || '').trim().toLowerCase() === codeToTest;
+    }) || null;
+  }, [formData.code, records, initialData]);
+
   const isArchiveView = [
     "archive_records",
     "archive_assign_tasks",
@@ -344,6 +367,21 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
     "test_handover_list",
     "test_director_completed",
   ].includes(currentView || "");
+
+  const handleRegenerateUniqueCode = () => {
+    setIsManualCode(false);
+    const newCode = generateRecordCode(
+      formData.receivedDate || new Date().toISOString(),
+      records,
+      isArchiveView,
+      formData.recordType || '',
+      formData.receivedBy || currentUser?.employeeId || '',
+      employees,
+      isTestMeasurementView,
+      formData.ward || ''
+    );
+    setFormData(prev => ({ ...prev, code: newCode }));
+  };
 
   // Tất cả các thủ tục / loại hồ sơ khi nhập mới hoặc cập nhật
   let allowedRecordTypes: string[] = EXTENDED_RECORD_TYPES;
@@ -549,6 +587,11 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
 
     const finalCode = (formData.code || 'HS').trim();
 
+    if (duplicateRecord) {
+      alert(`⚠️ LỖI TRÙNG MÃ HỒ SƠ:\n\nMã "${finalCode}" đã tồn tại trên hệ thống cho hồ sơ:\n• Chủ sử dụng: ${duplicateRecord.customerName || 'Chưa tên'}\n• Địa chỉ: ${duplicateRecord.customerAddress || 'Không địa chỉ'}\n• Người tiếp nhận: ${duplicateRecord.receivedBy || '---'}\n\nVui lòng bấm "⚡ Tạo mã mới" hoặc thay đổi mã khác trước khi lưu!`);
+      return;
+    }
+
     const cleanAttachedDocs: AttachedDocItem[] = [...attachedDocs];
     const cleanDossierComponents: DossierComponentItem[] = [...dossierComponents];
 
@@ -624,7 +667,15 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
             approvalDate: finalData.approvalDate,
             completedDate: finalData.completedDate,
             exportDate: finalData.exportDate,
-            resultReturnedDate: finalData.resultReturnedDate
+            resultReturnedDate: finalData.resultReturnedDate,
+            appraisalDate: finalData.appraisalDate,
+            taxTransferDate: finalData.taxTransferDate,
+            taxKv7Date: finalData.taxKv7Date,
+            taxPaymentDate: finalData.taxPaymentDate,
+            printCertDate: finalData.printCertDate,
+            pendingHandoverDate: finalData.pendingHandoverDate,
+            supplementRequestDate: finalData.supplementRequestDate,
+            supplementReturnedDate: finalData.supplementReturnedDate
         },
         exportBatch: finalData.exportBatch,
         exportDate: finalData.exportDate,
@@ -654,7 +705,15 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
         'approvalDate',
         'completedDate',
         'exportDate',
-        'resultReturnedDate'
+        'resultReturnedDate',
+        'appraisalDate',
+        'taxTransferDate',
+        'taxKv7Date',
+        'taxPaymentDate',
+        'printCertDate',
+        'pendingHandoverDate',
+        'supplementRequestDate',
+        'supplementReturnedDate'
     ] as const;
 
     for (const df of dateFields) {
@@ -897,13 +956,16 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
     return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
   };
 
+  const isCapGiay = isCertificateRecordType(formData.recordType || '') || ((formData as any).sourceTable === 'dangky_records') || formData.group === '3. Đăng ký đất đai, cấp GCN';
   const isArchive = isArchiveRecordType(formData.recordType || '') || (getDepartmentForRecord(formData as RecordFile).toLowerCase().includes('lưu trữ'));
   const isCongVan = formData.recordType ? getShortRecordType(formData.recordType) === '1.2 Công văn' : false;
   const recTypeLower = (formData.recordType || '').toLowerCase();
-  const showMsr = !isArchive && (recTypeLower.includes('trích đo') || recTypeLower.includes('đo đạc') || recTypeLower.includes('đo') || recTypeLower.includes('tách thửa') || (!recTypeLower.includes('trích đo') && !recTypeLower.includes('trích lục')));
-  const showExc = !isArchive && (recTypeLower.includes('trích lục') || (!recTypeLower.includes('trích đo') && !recTypeLower.includes('trích lục')));
+  const showMsr = !isArchive && !isCapGiay && (recTypeLower.includes('trích đo') || recTypeLower.includes('đo đạc') || recTypeLower.includes('đo') || recTypeLower.includes('tách thửa') || (!recTypeLower.includes('trích đo') && !recTypeLower.includes('trích lục')));
+  const showExc = !isArchive && !isCapGiay && (recTypeLower.includes('trích lục') || (!recTypeLower.includes('trích đo') && !recTypeLower.includes('trích lục')));
 
-  const statusSelectOptions = isArchive
+  const statusSelectOptions = isCapGiay
+    ? CAP_GIAY_SELECTABLE_STATUSES
+    : isArchive
     ? ARCHIVE_SELECTABLE_STATUSES
     : SURVEY_SELECTABLE_STATUSES.filter(item => item.key !== RecordStatus.IN_PROGRESS);
 
@@ -928,14 +990,55 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                     <h3 className="text-sm font-bold text-blue-800 uppercase mb-4 flex items-center gap-2 border-b pb-2"><Calendar size={16} /> Thông tin chung</h3>
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <div className="md:col-span-1">
-                            <label className="block text-xs font-bold text-gray-700 mb-1">Mã hồ sơ <span className="text-red-500">*</span></label>
-                            <input 
-                                type="text" 
-                                required 
-                                className="w-full border border-gray-300 rounded-md px-3 py-2 font-bold text-blue-700 bg-white" 
-                                value={val(formData.code)} 
-                                onChange={(e) => handleChange('code', e.target.value)} 
-                            />
+                            <div className="flex items-center justify-between mb-1">
+                                <label className="block text-xs font-bold text-gray-700">
+                                    Mã hồ sơ <span className="text-red-500">*</span>
+                                </label>
+                                {duplicateRecord && (
+                                    <span className="text-[10px] font-bold text-red-600 bg-red-100 px-1.5 py-0.5 rounded animate-pulse">
+                                        TRÙNG MÃ
+                                    </span>
+                                )}
+                            </div>
+                            <div className="relative">
+                                <input 
+                                    type="text" 
+                                    required 
+                                    className={`w-full border rounded-md px-3 py-2 font-bold font-mono text-sm ${
+                                        duplicateRecord 
+                                            ? 'border-red-500 bg-red-50 text-red-900 focus:ring-2 focus:ring-red-200' 
+                                            : 'border-gray-300 text-blue-700 bg-white'
+                                    }`} 
+                                    value={val(formData.code)} 
+                                    onChange={(e) => handleChange('code', e.target.value)} 
+                                    placeholder="VD: HQ-260917-0001"
+                                />
+                                {duplicateRecord && (
+                                    <button
+                                        type="button"
+                                        onClick={handleRegenerateUniqueCode}
+                                        title="Tự động cấp mã duy nhất không trùng"
+                                        className="absolute right-1 top-1/2 -translate-y-1/2 px-2 py-1 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded text-[11px] shadow-sm transition-colors flex items-center gap-1"
+                                    >
+                                        ⚡ Tạo mã mới
+                                    </button>
+                                )}
+                            </div>
+                            {duplicateRecord && (
+                                <div className="mt-1.5 p-2 bg-red-50 border border-red-200 rounded-md text-xs text-red-800 space-y-1">
+                                    <div className="font-bold text-red-900 flex items-center gap-1">
+                                        ⚠️ Mã hồ sơ đã được sử dụng!
+                                    </div>
+                                    <div className="text-[11px] text-red-700 leading-tight">
+                                        • <strong>Chủ đất:</strong> {duplicateRecord.customerName || 'Chưa tên'} ({duplicateRecord.customerAddress || 'Không địa chỉ'})
+                                        <br />
+                                        • <strong>Người tiếp nhận:</strong> {duplicateRecord.receivedBy || '---'} | <strong>Ngày TN:</strong> {duplicateRecord.receivedDate ? duplicateRecord.receivedDate.split('T')[0] : '---'}
+                                    </div>
+                                    <p className="text-[10px] italic text-red-600 font-medium">
+                                        👉 Vui lòng nhấn <strong>"Tạo mã mới"</strong> hoặc sửa thành mã khác để lưu.
+                                    </p>
+                                </div>
+                            )}
                         </div>
                         <div className="md:col-span-3">
                             <label className="block text-xs font-bold text-gray-700 mb-1">

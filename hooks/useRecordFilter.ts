@@ -149,7 +149,15 @@ export const useRecordFilter = (
                 }
                 return false;
             });
-        } else if (currentView === 'measurement_field' || currentView === 'test_measurement_field') {
+        } else if (currentView === 'test_measurement_field') {
+            result = result.filter(r => r.status === RecordStatus.APPRAISAL);
+        } else if (currentView === 'test_measurement_office') {
+            result = result.filter(r => 
+                r.status === RecordStatus.TAX_TRANSFER || 
+                r.status === RecordStatus.PENDING_TAX_KV7 || 
+                r.status === RecordStatus.PENDING_TAX_PAYMENT
+            );
+        } else if (currentView === 'measurement_field') {
             result = result.filter(r => {
                 // Thủ tục 2.1, 2.3 (Nội nghiệp trực tiếp / Trích lục / Duyệt đơn) KHÔNG thuộc Đo đạc thực địa
                 if (isOfficeOnlySurveyProcedure(r.recordType)) return false;
@@ -169,7 +177,7 @@ export const useRecordFilter = (
                 if (r.status === RecordStatus.OFFICE_WORK) return false;
                 return true;
             });
-        } else if (currentView === 'measurement_office' || currentView === 'test_measurement_office') {
+        } else if (currentView === 'measurement_office') {
             result = result.filter(r => {
                 // Hồ sơ thuộc bước Biên tập bản đồ
                 if (r.completedDate || r.exportBatch || r.exportDate || r.resultReturnedDate || r.approvalDate) return false;
@@ -207,9 +215,10 @@ export const useRecordFilter = (
             result = result.filter(r => r.submittedTo === currentUser?.employeeId && r.status !== RecordStatus.PENDING_SIGN && r.status !== RecordStatus.RECEIVED && r.status !== RecordStatus.ASSIGNED && r.status !== RecordStatus.IN_PROGRESS && r.status !== RecordStatus.FIELD_WORK && r.status !== RecordStatus.OFFICE_WORK && r.status !== RecordStatus.COMPLETED_WORK);
         } else if (currentView === 'handover_list' || currentView === 'archive_handover_list' || currentView === 'test_handover_list') {
             if (handoverTab === 'today') {
-                // Tab chờ giao: Bao gồm Đã ký HOẶC (Đã rút VÀ chưa có đợt xuất) HOẶC Hồ sơ trả (REJECTED)
+                // Tab chờ giao: Bao gồm Đã ký HOẶC PENDING_HANDOVER HOẶC (Đã rút VÀ chưa có đợt xuất) HOẶC Hồ sơ trả (REJECTED)
                 result = result.filter(r => 
                     r.status === RecordStatus.SIGNED || 
+                    r.status === RecordStatus.PENDING_HANDOVER ||
                     ((r.status === RecordStatus.REJECTED || r.status === RecordStatus.WITHDRAWN) && !r.exportBatch)
                 );
             } else if (handoverTab === 'returned') {
@@ -243,7 +252,7 @@ export const useRecordFilter = (
         } else if (currentView === 'assign_tasks' || currentView === 'archive_assign_tasks' || currentView === 'test_assign_tasks') {
             result = result.filter(r => {
                 // Đã bàn giao 1 cửa, đã trả kết quả, đã rút, đã trả thì không ở Chưa giao
-                if (r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED || r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED || r.status === RecordStatus.SIGNED) return false;
+                if (r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED || r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED || r.status === RecordStatus.SIGNED || r.status === RecordStatus.PENDING_HANDOVER) return false;
                 // Đã chuyển bước ký / kiểm tra / xuất đợt
                 if (r.submissionDate || r.submittedTo || r.approvalDate || r.exportBatch || r.exportDate || r.resultReturnedDate || r.pendingCheckDate || r.checkedDate || r.checkedBy) return false;
                 // Nếu đã giao cho cán bộ thì chuyển sang Đang thực hiện
@@ -432,7 +441,15 @@ export const useRecordFilter = (
                         if ((r.pendingCheckDate || r.checkedBy || r.checkedDate) && !(r.submissionDate || r.submittedTo || r.approvalDate || r.exportBatch || r.completedDate || r.resultReturnedDate)) return true;
                         return false;
                     });
-                } else if (currentView === 'measurement_field' || currentView === 'test_measurement_field') {
+                } else if (currentView === 'test_measurement_field') {
+                    candidates = candidates.filter(r => r.status === RecordStatus.APPRAISAL);
+                } else if (currentView === 'test_measurement_office') {
+                    candidates = candidates.filter(r => 
+                        r.status === RecordStatus.TAX_TRANSFER || 
+                        r.status === RecordStatus.PENDING_TAX_KV7 || 
+                        r.status === RecordStatus.PENDING_TAX_PAYMENT
+                    );
+                } else if (currentView === 'measurement_field') {
                     candidates = candidates.filter(r => {
                         if (isOfficeOnlySurveyProcedure(r.recordType)) return false;
                         const isAssigned = Boolean(r.assignedTo && r.assignedTo.trim() !== '');
@@ -446,7 +463,7 @@ export const useRecordFilter = (
                         if (r.status === RecordStatus.OFFICE_WORK) return false;
                         return true;
                     });
-                } else if (currentView === 'measurement_office' || currentView === 'test_measurement_office') {
+                } else if (currentView === 'measurement_office') {
                     candidates = candidates.filter(r => {
                         if (r.completedDate || r.exportBatch || r.exportDate || r.resultReturnedDate || r.approvalDate) return false;
                         if (r.submissionDate || r.submittedTo) return false;
@@ -482,7 +499,7 @@ export const useRecordFilter = (
                     candidates = candidates.filter(r => r.submittedTo === currentUser?.employeeId && r.status !== RecordStatus.PENDING_SIGN && r.status !== RecordStatus.RECEIVED && r.status !== RecordStatus.ASSIGNED && r.status !== RecordStatus.IN_PROGRESS && r.status !== RecordStatus.FIELD_WORK && r.status !== RecordStatus.OFFICE_WORK && r.status !== RecordStatus.COMPLETED_WORK);
                 } else if (currentView === 'assign_tasks' || currentView === 'archive_assign_tasks' || currentView === 'test_assign_tasks') {
                     candidates = candidates.filter(r => {
-                        if (r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED || r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED || r.status === RecordStatus.SIGNED) return false;
+                        if (r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED || r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED || r.status === RecordStatus.SIGNED || r.status === RecordStatus.PENDING_HANDOVER) return false;
                         if (r.submissionDate || r.submittedTo || r.approvalDate || r.exportBatch || r.exportDate || r.resultReturnedDate || r.pendingCheckDate || r.checkedDate || r.checkedBy) return false;
                         if (r.assignedTo && r.assignedTo.trim() !== '') return false;
                         return true;

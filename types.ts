@@ -14,7 +14,15 @@ export enum RecordStatus {
   HANDOVER = 'HANDOVER',         // Giao 1 cửa (Hoàn thành nội bộ)
   RETURNED = 'RETURNED',         // Đã trả kết quả (Hoàn thành trả dân)
   WITHDRAWN = 'WITHDRAWN',       // CSD rút hồ sơ (Kết thúc)
-  REJECTED = 'REJECTED'          // Hồ sơ trả (Trả về OneDoor)
+  REJECTED = 'REJECTED',         // Hồ sơ trả (Trả về OneDoor)
+
+  // Trạng thái độc lập dành riêng cho Module Cấp giấy
+  APPRAISAL = 'APPRAISAL',                     // Chờ thẩm định
+  TAX_TRANSFER = 'TAX_TRANSFER',               // Chờ chuyển thuế
+  PENDING_TAX_KV7 = 'PENDING_TAX_KV7',         // Chờ thuế khu vực 7
+  PENDING_TAX_PAYMENT = 'PENDING_TAX_PAYMENT', // Chờ Giấy nộp tiền
+  PENDING_PRINT_CERT = 'PENDING_PRINT_CERT',   // Chờ in giấy chứng nhận
+  PENDING_HANDOVER = 'PENDING_HANDOVER'        // Chờ bàn giao
 }
 
 export enum UserRole {
@@ -268,6 +276,25 @@ export interface RecordFile {
   // Tệp tài liệu đính kèm tiếp nhận đầu vào
   attachedFiles?: AttachedFileMeta[];
   dossierComponents?: DossierComponentItem[] | string | null;
+
+  // Dữ liệu phục vụ cơ chế tạm dừng & bổ sung hồ sơ
+  previousStatus?: RecordStatus | string | null;
+  supplementRequestedAt?: string | null;
+  supplementRequestedBy?: string | null;
+  supplementReason?: string | null;
+  supplementCompletedAt?: string | null;
+  supplementConfirmedBy?: string | null;
+  supplementRequestDate?: string | null;
+  supplementReturnedDate?: string | null;
+  pendingSupplementReason?: string | null;
+
+  // Cột mốc riêng cho Module Cấp giấy
+  appraisalDate?: string | null;
+  taxTransferDate?: string | null;
+  taxKv7Date?: string | null;
+  taxPaymentDate?: string | null;
+  printCertDate?: string | null;
+  pendingHandoverDate?: string | null;
 }
 
 export type AttachmentDocType = 'GCN' | 'DON' | 'VBUQ' | 'BANVE' | 'BIENBAN' | 'TAICHINH' | 'PHIEU_KT' | 'TO_TRINH' | 'TLKHAC';

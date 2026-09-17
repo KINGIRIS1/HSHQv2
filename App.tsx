@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { RecordFile, RecordStatus, Employee, User, UserRole, Message, RecordStatusLog } from './types';
-import { DEFAULT_WARDS as STATIC_WARDS, isArchiveRecordType, STATUS_LABELS, APP_VERSION } from './constants';
+import { DEFAULT_WARDS as STATIC_WARDS, isArchiveRecordType, isCertificateRecordType, STATUS_LABELS, APP_VERSION } from './constants';
+import { getCapGiayNextMainStatus, resumeFromSupplement } from './utils/capGiayStateMachine';
 import Login from './components/Login'; 
 import MainLayout from './components/layout/MainLayout';
 import AppRoutes from './components/AppRoutes';
@@ -1125,6 +1126,67 @@ function App() {
   }, [handoverOfficeTargetRecords, currentUser]);
 
   const advanceStatus = useCallback(async (record: RecordFile) => {
+      const isCapGiay = isCertificateRecordType(record.recordType) || record.sourceTable === 'dangky_records' || record.group === '3. Đăng ký đất đai, cấp GCN';
+      if (isCapGiay) {
+          // Xử lý State Machine Cấp giấy 14 bước
+          if (record.status === RecordStatus.RECEIVED) {
+              setAssignTargetRecords([record]);
+              setIsAssignModalOpen(true);
+              return;
+          }
+          if (record.status === RecordStatus.PENDING_SUPPLEMENT) {
+              // Khôi phục từ trạng thái chờ bổ sung về lại bước trước đó
+              const { nextStatus, updates } = resumeFromSupplement(record);
+              const synced = syncRecordStatusTransition(record, nextStatus, {
+                  userName: currentUser?.name || currentUser?.username || 'Hệ thống',
+                  userId: currentUser?.id,
+                  notes: 'Hoàn thành bổ sung, chuyển tiếp hồ sơ'
+              });
+              const updatedRecord = { ...record, ...updates, ...synced };
+              setRecords(prev => prev.map(r => r.id === record.id ? updatedRecord : r));
+              setToast({ type: 'success', message: `Hồ sơ đã được khôi phục về bước: ${STATUS_LABELS[nextStatus as RecordStatus] || nextStatus}` });
+              updateRecordApi(updatedRecord).catch(err => {
+                  console.error("advanceStatus supplement resume error:", err);
+              });
+              return;
+          }
+          if (record.status === RecordStatus.PENDING_CHECK) {
+              setSubmitTargetRecords([record]);
+              setIsSubmitModalOpen(true);
+              return;
+          }
+          if (record.status === RecordStatus.PENDING_SIGN) {
+              setSignApprovalTargetRecords([record]);
+              setIsSignApprovalModalOpen(true);
+              return;
+          }
+          if (record.status === RecordStatus.PENDING_HANDOVER) {
+              setSelectedRecordIds(new Set([record.id]));
+              setIsAddToBatchModalOpen(true);
+              return;
+          }
+          if (record.status === RecordStatus.HANDOVER) {
+              setReturnRecord(record);
+              setIsReturnModalOpen(true);
+              return;
+          }
+
+          const nextStatus = getCapGiayNextMainStatus(record.status as RecordStatus);
+          if (nextStatus) {
+              const updates = syncRecordStatusTransition(record, nextStatus, {
+                  userName: currentUser?.name || currentUser?.username || 'Hệ thống',
+                  userId: currentUser?.id
+              });
+              const updatedRecord = { ...record, ...updates };
+              setRecords(prev => prev.map(r => r.id === record.id ? updatedRecord : r));
+              setToast({ type: 'success', message: `Đã chuyển hồ sơ sang: ${STATUS_LABELS[nextStatus as RecordStatus] || nextStatus}` });
+              updateRecordApi(updatedRecord).catch(err => {
+                  console.error("advanceStatus background error:", err);
+              });
+          }
+          return;
+      }
+
       if (record.status === RecordStatus.RECEIVED) { 
           setAssignTargetRecords([record]); 
           setIsAssignModalOpen(true); 
@@ -1253,14 +1315,20 @@ function App() {
 
   const handleExecuteSignApproval = async (targetRecords: RecordFile[], newComponents?: DossierComponentItem[]) => {
       const nowStr = new Date().toISOString();
-      const updatedTargets = targetRecords.map(r => ({
-          ...r,
-          status: RecordStatus.SIGNED,
-          approvalDate: nowStr,
-          completedDate: null,
-          ...(newComponents ? { dossierComponents: newComponents } : {}),
-          statusLogs: createStatusLog(r, RecordStatus.SIGNED, 'Ký duyệt')
-      }));
+      const updatedTargets = targetRecords.map(r => {
+          const isCapGiay = isCertificateRecordType(r.recordType) || r.sourceTable === 'dangky_records' || r.group === '3. Đăng ký đất đai, cấp GCN';
+          const nextStatus = isCapGiay ? RecordStatus.PENDING_HANDOVER : RecordStatus.SIGNED;
+          const statusNote = isCapGiay ? 'Ký duyệt - Chờ bàn giao' : 'Ký duyệt';
+          return {
+              ...r,
+              status: nextStatus,
+              approvalDate: nowStr,
+              pendingHandoverDate: isCapGiay ? nowStr : r.pendingHandoverDate,
+              completedDate: null,
+              ...(newComponents ? { dossierComponents: newComponents } : {}),
+              statusLogs: createStatusLog(r, nextStatus, statusNote)
+          };
+      });
 
       // Cập nhật giao diện tức thì 0 giây với O(1) Map
       const updateMap = new Map<string, RecordFile>();
@@ -1449,9 +1517,10 @@ function App() {
               newStatus = RecordStatus.WITHDRAWN;
               internalLogNote = `[TRẢ CSD RÚT HS - ${formattedReturnDate}] Lý do: ${reason} (Người trả: ${userLabel})`;
           } else {
-              newStatus = RecordStatus.IN_PROGRESS;
+              const isCapGiay = isCertificateRecordType(r.recordType) || r.sourceTable === 'dangky_records' || r.group === '3. Đăng ký đất đai, cấp GCN';
+              newStatus = isCapGiay ? RecordStatus.APPRAISAL : RecordStatus.IN_PROGRESS;
               const prevStatusLabel = STATUS_LABELS[r.status] || r.status;
-              internalLogNote = `[TRẢ VỀ CÁN BỘ THỤ LÝ - ${formattedReturnDate}] Trả từ bước "${prevStatusLabel}" về Đang thực hiện. Lý do: ${reason} (Người trả: ${userLabel})`;
+              internalLogNote = `[TRẢ VỀ CÁN BỘ THỤ LÝ - ${formattedReturnDate}] Trả từ bước "${prevStatusLabel}" về ${isCapGiay ? 'Chờ thẩm định' : 'Đang thực hiện'}. Lý do: ${reason} (Người trả: ${userLabel})`;
           }
 
           const existingNotes = r.privateNotes || '';
@@ -1470,7 +1539,8 @@ function App() {
           const synced = syncRecordStatusTransition(r, newStatus, {
               userName: userLabel,
               userId: currentUser?.id,
-              targetDate: targetDateISO
+              targetDate: targetDateISO,
+              notes: reason
           });
 
           return {
