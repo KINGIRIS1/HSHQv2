@@ -25,7 +25,7 @@ export const RECORD_DB_COLUMNS = [
     'drafterId', 'officeAssignedDate', 'officeCompletedDate',
     'attachedFiles', 'dossierComponents',
     'appraisalDate', 'postingDate', 'postingEndDate', 'taxTransferDate', 'taxKv7Date', 'taxPaymentDate', 'printCertDate', 'pendingHandoverDate',
-    'sourceTable', 'previousStatus', 'supplementReason', 'supplementRequestDate', 'supplementReturnedDate', 'updated_at'
+    'previousStatus', 'supplementReason', 'supplementRequestDate', 'supplementReturnedDate', 'updated_at'
 ];
 
 /**
@@ -216,7 +216,8 @@ const OPTIONAL_NEW_COLUMNS = [
     'statusLogs', 'archiveHandoverDate', 'archiveHandoverBatch',
     'surveyorId', 'surveyAssignedDate', 'fieldAssignedDate', 'fieldCompletedDate',
     'drafterId', 'officeAssignedDate', 'officeCompletedDate',
-    'exportBatch', 'exportDate', 'handoverWard', 'attachedFiles', 'dossierComponents'
+    'exportBatch', 'exportDate', 'handoverWard', 'attachedFiles', 'dossierComponents',
+    'sourceTable', 'previousStatus', 'supplementReason', 'supplementRequestDate', 'supplementReturnedDate'
 ];
 
 const fetchTableRecords = async (

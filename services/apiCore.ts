@@ -403,10 +403,13 @@ export const sanitizeData = (data: any, allowedColumns: string[]) => {
     
     const sanitized: any = {};
     allowedColumns.forEach(col => {
-        if (clean.hasOwnProperty(col) && clean[col] !== undefined) {
+        if (col !== 'sourceTable' && col !== '_isOfflineSaved' && col !== '_isManualCode' && clean.hasOwnProperty(col) && clean[col] !== undefined) {
             sanitized[col] = clean[col];
         }
     });
+    delete sanitized.sourceTable;
+    delete sanitized._isOfflineSaved;
+    delete sanitized._isManualCode;
     return sanitized;
 };
 
