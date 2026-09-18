@@ -57,9 +57,9 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
     return null;
   }, [targetRecords, records]);
 
-  // Tính số đợt tiếp theo trong ngày hôm nay một cách chuẩn xác, liên tục, không nhảy cóc cho riêng từng module/tab
+  // Tính số đợt tiếp theo trong ngày hôm nay một cách chuẩn xác, liên tục, không nhảy cóc cho toàn hệ thống
   const nextBatchInfo = useMemo(() => {
-      const { nextNum } = calculateNextBatchNumberForDate(records, todayStr, moduleKey);
+      const { nextNum } = calculateNextBatchNumberForDate(records, todayStr, null);
       const todayFmt = formatDateDDMMYYYY(todayStr);
       const fullBatchName = `Đợt ${nextNum} - Ngày ${todayFmt}`;
 
@@ -68,14 +68,13 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
           batchName: fullBatchName,
           date: new Date().toISOString()
       };
-  }, [records, todayStr, moduleKey]);
+  }, [records, todayStr]);
 
-  // Danh sách đợt đã có của riêng Tab/Module hiện tại
+  // Danh sách đợt đã có của toàn bộ hệ thống (dùng chung cho mọi module)
   const historyBatches = useMemo(() => {
       const batches: Record<string, { label: string, date: string, count: number, fullDate: string, timestamp: number }> = {};
       
       records.forEach(r => {
-          if (moduleKey && getRecordModuleKey(r) !== moduleKey) return;
           if (r.exportBatch && String(r.exportBatch).trim() !== '' && String(r.exportBatch) !== 'NOT_BATCHED') {
               const rawDate = r.exportDate || r.completedDate || r.receivedDate;
               const datePart = rawDate ? String(rawDate).split('T')[0] : '';
@@ -155,7 +154,7 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
           }
           return b.label.localeCompare(a.label, undefined, { numeric: true });
       });
-  }, [records, moduleKey]);
+  }, [records]);
 
   const selectExistingMode = () => {
       setMode('existing');

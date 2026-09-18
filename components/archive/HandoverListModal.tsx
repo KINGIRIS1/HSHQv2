@@ -23,7 +23,7 @@ const HandoverListModal: React.FC<HandoverListModalProps> = ({ isOpen, onClose, 
     }, [isOpen, selectedDate]);
 
     const loadLists = async (date: string) => {
-        const lists = await fetchListsByDate(type, date);
+        const lists = await fetchListsByDate('global', date);
         setExistingLists(lists);
         
         // Auto-generate next list name
