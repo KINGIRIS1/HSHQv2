@@ -189,14 +189,24 @@ export const RegistrationModuleView: React.FC<RegistrationModuleViewProps> = ({
   // Danh sách hồ sơ đang được chọn
   const selectedRecordsList = records.filter((r) => selectedIds.has(r.id));
 
-  // Thống kê nhanh theo sub-tabs
+  // Thống kê nhanh theo sub-tabs quy trình Cấp giấy
   const stats = {
     all: records.length,
     unassigned: records.filter((r) => !r.assignedTo || r.status === RecordStatus.RECEIVED).length,
-    processing: records.filter((r) => r.status === RecordStatus.IN_PROGRESS || r.status === RecordStatus.ASSIGNED).length,
+    appraisal: records.filter((r) => r.status === RecordStatus.APPRAISAL).length,
+    tax: records.filter(
+      (r) =>
+        r.status === RecordStatus.TAX_TRANSFER ||
+        r.status === RecordStatus.PENDING_TAX_KV7 ||
+        r.status === RecordStatus.PENDING_TAX_PAYMENT
+    ).length,
+    print_cert: records.filter((r) => r.status === RecordStatus.PENDING_PRINT_CERT).length,
     pending_check: records.filter((r) => r.status === RecordStatus.PENDING_CHECK).length,
     pending_sign: records.filter((r) => r.status === RecordStatus.PENDING_SIGN).length,
-    signed: records.filter((r) => r.status === RecordStatus.SIGNED).length,
+    signed: records.filter(
+      (r) => r.status === RecordStatus.SIGNED || r.status === RecordStatus.PENDING_HANDOVER
+    ).length,
+    supplement: records.filter((r) => r.status === RecordStatus.PENDING_SUPPLEMENT).length,
     handed_over: records.filter((r) => r.isHandedOver || r.status === RecordStatus.HANDOVER).length,
     returned: records.filter((r) => r.status === RecordStatus.RETURNED).length,
   };
@@ -257,11 +267,14 @@ export const RegistrationModuleView: React.FC<RegistrationModuleViewProps> = ({
         {[
           { id: 'all', label: 'Tất cả hồ sơ', count: stats.all },
           { id: 'unassigned', label: 'Chờ phân công', count: stats.unassigned },
-          { id: 'processing', label: 'Đang xử lý', count: stats.processing },
+          { id: 'appraisal', label: 'Thẩm định', count: stats.appraisal },
+          { id: 'tax', label: 'Chuyển thuế / KV7 / GNT', count: stats.tax },
+          { id: 'print_cert', label: 'Chờ in GCN', count: stats.print_cert },
           { id: 'pending_check', label: 'Chờ kiểm tra', count: stats.pending_check },
           { id: 'pending_sign', label: 'Chờ ký duyệt', count: stats.pending_sign },
-          { id: 'signed', label: 'Đã ký duyệt', count: stats.signed },
-          { id: 'handed_over', label: 'Đã bàn giao', count: stats.handed_over },
+          { id: 'signed', label: 'Đã ký / Chờ giao', count: stats.signed },
+          { id: 'supplement', label: 'Chờ bổ sung', count: stats.supplement },
+          { id: 'handed_over', label: 'Đã giao 1 cửa', count: stats.handed_over },
           { id: 'returned', label: 'Đã trả kết quả', count: stats.returned },
         ].map((tab) => (
           <button
@@ -619,6 +632,7 @@ export const RegistrationModuleView: React.FC<RegistrationModuleViewProps> = ({
         record={viewingRecord}
         onSave={handleSaveRecord}
         employees={employees}
+        currentUser={currentUser}
       />
 
       <RegistrationAssignModal

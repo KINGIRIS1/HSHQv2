@@ -49,6 +49,7 @@ export const STATUS_LABELS: Record<RecordStatus, string> = {
 
   // Nhãn hiển thị cho Module Cấp giấy
   [RecordStatus.APPRAISAL]: 'Chờ thẩm định',
+  [RecordStatus.PENDING_POSTING]: 'Chờ niêm yết (30 ngày)',
   [RecordStatus.TAX_TRANSFER]: 'Chờ chuyển thuế',
   [RecordStatus.PENDING_TAX_KV7]: 'Chờ thuế khu vực 7',
   [RecordStatus.PENDING_TAX_PAYMENT]: 'Chờ Giấy nộp tiền',
@@ -59,6 +60,7 @@ export const STATUS_LABELS: Record<RecordStatus, string> = {
 export const CAP_GIAY_SELECTABLE_STATUSES: { key: RecordStatus; label: string }[] = [
   { key: RecordStatus.RECEIVED, label: 'Tiếp nhận hồ sơ' },
   { key: RecordStatus.APPRAISAL, label: 'Chờ thẩm định' },
+  { key: RecordStatus.PENDING_POSTING, label: 'Chờ niêm yết (30 ngày)' },
   { key: RecordStatus.TAX_TRANSFER, label: 'Chờ chuyển thuế' },
   { key: RecordStatus.PENDING_TAX_KV7, label: 'Chờ thuế khu vực 7' },
   { key: RecordStatus.PENDING_TAX_PAYMENT, label: 'Chờ Giấy nộp tiền' },
@@ -132,6 +134,7 @@ export const STATUS_COLORS: Record<RecordStatus, string> = {
 
   // Màu sắc riêng cho các trạng thái Cấp giấy
   [RecordStatus.APPRAISAL]: 'bg-blue-100 text-blue-800 border border-blue-200',
+  [RecordStatus.PENDING_POSTING]: 'bg-amber-100 text-amber-800 border border-amber-200',
   [RecordStatus.TAX_TRANSFER]: 'bg-indigo-100 text-indigo-800 border border-indigo-200',
   [RecordStatus.PENDING_TAX_KV7]: 'bg-violet-100 text-violet-800 border border-violet-200',
   [RecordStatus.PENDING_TAX_PAYMENT]: 'bg-amber-100 text-amber-800 border border-amber-200',
@@ -223,6 +226,11 @@ export const mapStatusToRecordStatus = (s: string | undefined | null): RecordSta
     case 'chờ thẩm định':
     case 'thẩm định':
       return RecordStatus.APPRAISAL;
+    case 'pending_posting':
+    case 'chờ niêm yết':
+    case 'đang niêm yết':
+    case 'niêm yết':
+      return RecordStatus.PENDING_POSTING;
     case 'tax_transfer':
     case 'chờ chuyển thuế':
     case 'chuyển thuế':

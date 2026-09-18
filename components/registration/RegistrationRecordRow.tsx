@@ -10,9 +10,11 @@ import {
   Trash2,
   UserCheck,
   Eye,
+  AlertTriangle,
 } from 'lucide-react';
 import { RecordFile, Employee, RecordStatus, DossierComponentItem } from '../../types';
 import StatusBadge from '../StatusBadge';
+import { getRegistrationWorkflowCategory, getStepSlaInfo } from '../../utils/registrationWorkflows';
 
 interface RegistrationRecordRowProps {
   record: RecordFile;
@@ -118,9 +120,37 @@ export const RegistrationRecordRow: React.FC<RegistrationRecordRowProps> = ({
         </span>
       </td>
 
-      {/* Nội dung hồ sơ */}
-      <td className="py-2.5 px-3 text-slate-600 max-w-[220px] truncate" title={record.content || record.recordType || ''}>
-        {record.content || record.recordType || '—'}
+      {/* Nội dung hồ sơ & Quy trình */}
+      <td className="py-2.5 px-3 text-slate-600 max-w-[240px]">
+        {(() => {
+          const cat = getRegistrationWorkflowCategory(record.recordType);
+          const catBadges: Record<string, { label: string; cls: string }> = {
+            tax_transfer: { label: 'Có thuế', cls: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
+            fast_track: { label: 'Không thuế', cls: 'bg-slate-100 text-slate-700 border-slate-200' },
+            gdbd: { label: 'Thế chấp/GDBD', cls: 'bg-amber-50 text-amber-800 border-amber-200' },
+            lost_cert: { label: 'Mất GCN', cls: 'bg-rose-50 text-rose-700 border-rose-200' },
+            split_plot: { label: 'Tách/Hợp', cls: 'bg-teal-50 text-teal-800 border-teal-200' },
+          };
+          const badge = catBadges[cat] || catBadges.tax_transfer;
+
+          return (
+            <div className="flex flex-col gap-0.5">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold border ${badge.cls}`}>
+                  {badge.label}
+                </span>
+                <span className="text-[11px] font-bold text-slate-800 truncate" title={record.recordType || ''}>
+                  {record.recordType || 'Đăng ký đất đai'}
+                </span>
+              </div>
+              {record.content && (
+                <span className="text-[11px] text-slate-500 truncate" title={record.content}>
+                  {record.content}
+                </span>
+              )}
+            </div>
+          );
+        })()}
       </td>
 
       {/* Cán bộ thụ lý */}
@@ -174,7 +204,49 @@ export const RegistrationRecordRow: React.FC<RegistrationRecordRowProps> = ({
 
       {/* Trạng thái */}
       <td className="py-2.5 px-3 text-center">
-        <StatusBadge status={record.status} />
+        <div className="flex flex-col items-center">
+          <StatusBadge status={record.status} />
+          {(() => {
+            const sla = getStepSlaInfo(record);
+            if (!sla || sla.status === 'completed' || sla.status === 'waiting') return null;
+            if (sla.step.isTaxPhase) {
+              return (
+                <span className="mt-1 inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[10px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200" title="Khâu liên thông thuế: Không tính vào thời hạn giải quyết của Chi nhánh">
+                  <span>Thuế (Không tính hạn)</span>
+                </span>
+              );
+            }
+            if (sla.step.isPostingPhase) {
+              return (
+                <span className="mt-1 inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[10px] font-semibold bg-amber-50 text-amber-800 border border-amber-200" title="Khâu niêm yết tại UBND xã 30 ngày: Không tính vào thời hạn giải quyết của Chi nhánh">
+                  <span>Niêm yết xã (Không tính hạn)</span>
+                </span>
+              );
+            }
+            if (sla.durationHours === 0) return null;
+            if (sla.status === 'overdue') {
+              return (
+                <span className="mt-1 inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200" title={`Khâu ${sla.step.label} đã quá hạn ${sla.overdueLabel}`}>
+                  <AlertTriangle size={10} className="text-rose-600" />
+                  <span>Trễ khâu {sla.overdueLabel.replace('Trễ ', '')}</span>
+                </span>
+              );
+            }
+            if (sla.status === 'warning') {
+              return (
+                <span className="mt-1 inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[10px] font-medium bg-amber-50 text-amber-700 border border-amber-200" title={`Khâu ${sla.step.label} còn ${sla.remainingLabel}`}>
+                  <Clock size={10} className="text-amber-600" />
+                  <span>Còn {sla.remainingLabel}</span>
+                </span>
+              );
+            }
+            return (
+              <span className="mt-0.5 inline-block text-[10px] text-slate-400 font-medium">
+                Khâu: {sla.durationLabel}
+              </span>
+            );
+          })()}
+        </div>
       </td>
 
       {/* Nút thao tác */}

@@ -60,14 +60,34 @@ export const useRegistrationFilter = ({ records }: UseRegistrationFilterProps) =
     switch (activeSubTab) {
       case 'unassigned':
         return records.filter((r) => !r.assignedTo || r.status === RecordStatus.RECEIVED);
+      case 'appraisal':
+        return records.filter((r) => r.status === RecordStatus.APPRAISAL);
+      case 'tax':
+        return records.filter(
+          (r) =>
+            r.status === RecordStatus.TAX_TRANSFER ||
+            r.status === RecordStatus.PENDING_TAX_KV7 ||
+            r.status === RecordStatus.PENDING_TAX_PAYMENT
+        );
+      case 'print_cert':
+        return records.filter((r) => r.status === RecordStatus.PENDING_PRINT_CERT);
       case 'processing':
-        return records.filter((r) => r.status === RecordStatus.IN_PROGRESS || r.status === RecordStatus.ASSIGNED);
+        return records.filter(
+          (r) =>
+            r.status === RecordStatus.IN_PROGRESS ||
+            r.status === RecordStatus.ASSIGNED ||
+            r.status === RecordStatus.APPRAISAL
+        );
       case 'pending_check':
         return records.filter((r) => r.status === RecordStatus.PENDING_CHECK);
       case 'pending_sign':
         return records.filter((r) => r.status === RecordStatus.PENDING_SIGN);
       case 'signed':
-        return records.filter((r) => r.status === RecordStatus.SIGNED);
+        return records.filter(
+          (r) => r.status === RecordStatus.SIGNED || r.status === RecordStatus.PENDING_HANDOVER
+        );
+      case 'supplement':
+        return records.filter((r) => r.status === RecordStatus.PENDING_SUPPLEMENT);
       case 'handed_over':
         return records.filter((r) => r.isHandedOver || r.status === RecordStatus.HANDOVER);
       case 'returned':

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import * as XLSX from 'xlsx-js-style';
 import { RecordFile, RecordStatus, Employee, Holiday } from '../types';
-import { RECORD_TYPES, STATUS_LABELS, STATUS_COLORS, getShortRecordType, isArchiveRecordType } from '../constants';
+import { RECORD_TYPES, STATUS_LABELS, STATUS_COLORS, getShortRecordType, isArchiveRecordType, isCertificateRecordType } from '../constants';
 import { fetchHolidays } from '../services/api';
 import { keepOnlyDate } from '../services/apiCore';
 import { X, Upload, FileSpreadsheet, Save, Loader2, Check, RefreshCw, PlusCircle, AlertTriangle } from 'lucide-react';
@@ -243,15 +243,27 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
                 record.deadline = calculateDeadline(record.recordType, record.receivedDate);
             }
 
-            const exportBatchRaw = getVal(['ĐỢT', 'BATCH', 'exportbatch', 'export_batch', 'exportBatch']);
+            const exportBatchRaw = getVal(['ĐỢT', 'BATCH', 'exportbatch', 'export_batch', 'exportBatch', 'ĐỢT XUẤT', 'DOT XUAT', 'DOT', 'ĐỢT BÀN GIAO', 'ĐỢT GIAO 1 CỬA', 'ĐỢT GIAO', 'ĐỢT XUẤT HỒ SƠ', 'ĐỢT GIAO MỘT CỬA']);
             if (exportBatchRaw !== undefined) {
                 const numStr = String(exportBatchRaw).replace(/[^0-9]/g, '');
-                if (numStr) record.exportBatch = parseInt(numStr, 10);
+                if (numStr) {
+                    record.exportBatch = parseInt(numStr, 10);
+                } else if (String(exportBatchRaw).trim() !== '') {
+                    record.exportBatch = String(exportBatchRaw).trim();
+                }
             }
 
-            const exportDateRaw = getVal(['NGÀY XUẤT', 'EXPORT DATE', 'exportdate', 'export_date', 'exportDate']);
+            const exportDateRaw = getVal(['NGÀY XUẤT', 'EXPORT DATE', 'exportdate', 'export_date', 'exportDate', 'NGÀY XUẤT HỒ SƠ', 'NGÀY XUẤT GIAO 1 CỬA', 'NGÀY BÀN GIAO', 'NGÀY GIAO 1 CỬA', 'NGÀY BÀN GIAO 1 CỬA', 'NGÀY GIAO MỘT CỬA', 'NGÀY BÀN GIAO MỘT CỬA', 'NGÀY TRẢ KẾT QUẢ', 'NGÀY XUẤT ĐỢT']);
             if (exportDateRaw !== undefined) {
                 record.exportDate = parseExcelDate(exportDateRaw, 'Ngày xuất', errors);
+            }
+
+            // Đồng bộ và tự động bù ngày xuất / ngày hoàn thành nếu có đợt xuất
+            if (record.exportBatch && !record.exportDate) {
+                record.exportDate = record.completedDate || record.approvalDate || record.resultReturnedDate || record.receivedDate;
+            }
+            if (record.exportDate && !record.completedDate) {
+                record.completedDate = record.exportDate;
             }
 
             const assigneeRaw = getVal(['NGƯỜI XỬ LÝ', 'NHÂN VIÊN', 'assignedto', 'assigned_to', 'assignedTo', 'NV XỬ LÝ']);
@@ -279,30 +291,30 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
                     explicitStatus = RecordStatus.RETURNED;
                 } else if (sStr.includes('KÝ DUYỆT') || sStr.includes('ĐÃ KÝ') || sStr.includes('SIGNED') || sStr.includes('LÃNH ĐẠO KÝ') || sStr.includes('ĐÃ KÝ DUYỆT')) {
                     explicitStatus = RecordStatus.SIGNED;
-                } else if (sStr.includes('CHỜ KÝ') || sStr.includes('PENDING_SIGN') || sStr.includes('TRÌNH KÝ') || sStr.includes('CHỜ KÝ DUYỆT') || sStr.includes('ĐÃ KIỂM TRA') || sStr.includes('CHECKED') || sStr.includes('ĐÃ KT') || sStr.includes('KIỂM TRA XONG') || sStr.includes('ĐÃ DUYỆT')) {
+                } else if (sStr.includes('TRÌNH KÝ') || sStr.includes('CHỜ KÝ') || sStr.includes('PENDING_SIGN') || sStr.includes('CHỜ KÝ DUYỆT') || sStr.includes('ĐÃ KIỂM TRA') || sStr.includes('CHECKED') || sStr.includes('ĐÃ KT') || sStr.includes('KIỂM TRA XONG') || sStr.includes('ĐÃ DUYỆT')) {
                     explicitStatus = RecordStatus.PENDING_SIGN;
-                } else if (sStr.includes('CHỜ KIỂM TRA') || sStr.includes('PENDING_CHECK') || sStr.includes('TRÌNH KIỂM TRA') || sStr.includes('CHỜ KT')) {
+                } else if (sStr.includes('KIỂM TRA') || sStr.includes('PENDING_CHECK') || sStr.includes('TRÌNH KIỂM TRA') || sStr.includes('CHỜ KT')) {
                     explicitStatus = RecordStatus.PENDING_CHECK;
                 } else if (sStr.includes('ĐÃ THỰC HIỆN') || sStr.includes('THỰC HIỆN XONG') || sStr.includes('COMPLETED_WORK') || sStr.includes('ĐO ĐẠC XONG') || sStr.includes('HOÀN THÀNH ĐO')) {
                     explicitStatus = RecordStatus.COMPLETED_WORK;
                 } else if (sStr.includes('NỘI NGHIỆP') || sStr.includes('BIÊN TẬP') || sStr.includes('OFFICE_WORK') || sStr.includes('XỬ LÝ NỘI NGHIỆP')) {
                     explicitStatus = RecordStatus.OFFICE_WORK;
-                } else if (sStr.includes('NGOẠI NGHIỆP') || sStr.includes('FIELD_WORK') || sStr.includes('ĐI ĐO') || sStr.includes('ĐO NGOẠI NGHIỆP')) {
+                } else if (sStr.includes('NGOẠI NGHIỆP') || sStr.includes('FIELD_WORK') || sStr.includes('ĐI ĐO') || sStr.includes('ĐO NGOẠI NGHIỆP') || sStr.includes('ĐO ĐẠC')) {
                     explicitStatus = RecordStatus.FIELD_WORK;
                 } else if (sStr.includes('GIAO NHÂN VIÊN') || sStr.includes('PASSED_TO') || sStr.includes('ASSIGNED') || sStr.includes('GIAO VIỆC') || sStr.includes('ĐÃ GIAO VIỆC') || sStr.includes('PHÂN CÔNG') || (sStr.includes('ĐÃ GIAO') && !sStr.includes('1 CỬA'))) {
                     explicitStatus = RecordStatus.ASSIGNED;
-                } else if (sStr.includes('ĐANG') || sStr.includes('PROGRESS')) {
-                    explicitStatus = RecordStatus.IN_PROGRESS;
                 } else if (sStr.includes('RÚT') || sStr.includes('WITHDRAWN')) {
                     explicitStatus = RecordStatus.WITHDRAWN;
                 } else if (sStr.includes('TỪ CHỐI') || sStr.includes('BỊ TRẢ') || sStr.includes('REJECTED')) {
                     explicitStatus = RecordStatus.REJECTED;
                 } else if (sStr.includes('TIẾP NHẬN') || sStr.includes('RECEIVED') || sStr.includes('MỚI NHẬN') || sStr.includes('CHƯA GIAO') || sStr.includes('ĐÃ NHẬN')) {
                     explicitStatus = RecordStatus.RECEIVED;
+                } else if (sStr.includes('ĐANG') || sStr.includes('PROGRESS')) {
+                    explicitStatus = RecordStatus.IN_PROGRESS;
                 }
             }
 
-            if (explicitStatus !== undefined) {
+            if (explicitStatus !== undefined && explicitStatus !== RecordStatus.IN_PROGRESS) {
                 record.status = explicitStatus;
                 
                 const nowStr = new Date().toISOString();
@@ -318,14 +330,14 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
                     if (!record.pendingCheckDate) record.pendingCheckDate = nowStr;
                 } else if (explicitStatus === RecordStatus.COMPLETED_WORK) {
                     if (!record.completedWorkDate) record.completedWorkDate = nowStr;
-                } else if (explicitStatus === RecordStatus.ASSIGNED || explicitStatus === RecordStatus.IN_PROGRESS) {
+                } else if (explicitStatus === RecordStatus.ASSIGNED) {
                     if (!record.assignedDate) record.assignedDate = nowStr;
                 }
             } else {
-                // Tự động suy luận trạng thái dựa trên các mốc tiến trình (khi file không có cột Trạng thái)
+                // Tự động suy luận trạng thái dựa trên các mốc tiến trình (khi file không có cột Trạng thái hoặc là "Đang thực hiện")
                 if (record.resultReturnedDate) {
                     record.status = RecordStatus.RETURNED;
-                } else if (record.completedDate) {
+                } else if (record.exportBatch || record.exportDate || record.completedDate) {
                     record.status = RecordStatus.HANDOVER;
                 } else if (record.approvalDate) {
                     record.status = RecordStatus.SIGNED;
@@ -335,25 +347,42 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
                     record.status = RecordStatus.PENDING_CHECK;
                 } else if (record.completedWorkDate) {
                     record.status = RecordStatus.COMPLETED_WORK;
-                } else if (record.assignedTo || record.assignedDate) {
+                } else if (record.officeAssignedDate || (isOfficeOnlySurveyProcedure(record.recordType) && (record.assignedTo || record.assignedDate))) {
+                    record.status = RecordStatus.OFFICE_WORK;
+                    if (record.assignedTo && !record.drafterId) record.drafterId = record.assignedTo;
+                    if (record.assignedDate && !record.officeAssignedDate) record.officeAssignedDate = record.assignedDate;
+                } else if (record.fieldAssignedDate || (record.assignedTo || record.assignedDate)) {
                     const isArch = isArchiveRecordType(record.recordType);
                     if (isArch) {
-                        record.status = RecordStatus.ASSIGNED;
+                        record.status = RecordStatus.IN_PROGRESS;
                     } else if (isOfficeOnlySurveyProcedure(record.recordType)) {
                         record.status = RecordStatus.OFFICE_WORK;
-                        if (record.assignedTo && !record.drafterId) record.drafterId = record.assignedTo;
-                        if (record.assignedDate && !record.officeAssignedDate) record.officeAssignedDate = record.assignedDate;
                     } else {
                         record.status = RecordStatus.FIELD_WORK;
                         if (record.assignedTo && !record.surveyorId) record.surveyorId = record.assignedTo;
                         if (record.assignedDate && !record.fieldAssignedDate) record.fieldAssignedDate = record.assignedDate;
                     }
+                } else if (explicitStatus === RecordStatus.IN_PROGRESS) {
+                    record.status = isArchiveRecordType(record.recordType) ? RecordStatus.IN_PROGRESS : (isOfficeOnlySurveyProcedure(record.recordType) ? RecordStatus.OFFICE_WORK : RecordStatus.FIELD_WORK);
                 } else if (mode === 'create') {
                     record.status = RecordStatus.RECEIVED;
                 }
             }
 
             record.id = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substr(2, 9);
+            
+            const rTypeStr = String(record.recordType || '').trim();
+            if (isCertificateRecordType(rTypeStr) || rTypeStr.startsWith('3.')) {
+                record.sourceTable = 'dangky_records';
+                record.group = '3. Đăng ký đất đai, cấp GCN';
+            } else if (isArchiveRecordType(rTypeStr) || rTypeStr.startsWith('1.')) {
+                record.sourceTable = 'luutru_records';
+                record.group = '1. Cung cấp thông tin, dữ liệu đất đai';
+            } else {
+                record.sourceTable = 'land_records';
+                record.group = '2. Đo đạc bản đồ';
+            }
+
             record._errors = errors;
             mappedRecords.push(record);
         }
@@ -393,6 +422,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
       const errors: string[] = [];
       let isDupInSoftware = false;
       let isDupInFile = false;
+      let notFoundInSoftware = false;
 
       if (currentMode === 'create') {
         if (!record.customerName) errors.push("Thiếu tên Chủ sử dụng.");
@@ -410,7 +440,15 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
           }
         }
       } else {
-        if (!record.code) errors.push("Thiếu Mã HS (Bắt buộc để cập nhật).");
+        if (!record.code) {
+          errors.push("Thiếu Mã HS (Bắt buộc để cập nhật).");
+        } else {
+          const cUpper = String(record.code).trim().toUpperCase();
+          if (!existingCodeSet.has(cUpper)) {
+            notFoundInSoftware = true;
+            errors.push(`⚠️ Mã hồ sơ "${record.code}" chưa có trên phần mềm (Không thể cập nhật).`);
+          }
+        }
       }
 
       // Preserve non-code errors like date parsing errors
@@ -418,7 +456,8 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
         !e.includes("Trùng mã hồ sơ") && 
         !e.includes("Thiếu tên") && 
         !e.includes("Thiếu Loại") && 
-        !e.includes("Thiếu Mã HS")
+        !e.includes("Thiếu Mã HS") &&
+        !e.includes("chưa có trên phần mềm")
       );
       
       const combinedErrors = Array.from(new Set([...otherErrors, ...errors]));
@@ -428,7 +467,8 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
         _errors: combinedErrors,
         _isDuplicateCode: isDupInSoftware || isDupInFile,
         _isDupInSoftware: isDupInSoftware,
-        _isDupInFile: isDupInFile
+        _isDupInFile: isDupInFile,
+        _notFoundInSoftware: notFoundInSoftware
       };
     });
   };
@@ -789,6 +829,27 @@ const ImportModal: React.FC<ImportModalProps> = ({ isOpen, onClose, onImport, em
                       title="Chuyển sang chế độ Cập nhật dữ liệu theo mã hồ sơ"
                     >
                       🔄 Chuyển Cập nhật
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Alert Banner for Non-existent Records in Update mode */}
+              {mode === 'update' && previewData.some(r => (r as any)._notFoundInSoftware) && (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-3.5 flex flex-wrap items-center justify-between gap-3 shadow-xs animate-fade-in">
+                  <div className="flex items-center gap-2.5 text-red-900 text-xs font-bold">
+                    <AlertTriangle size={18} className="text-red-600 shrink-0" />
+                    <span>
+                      Phát hiện <strong className="text-red-700 font-extrabold text-sm">{previewData.filter(r => (r as any)._notFoundInSoftware).length}</strong> hồ sơ <strong>chưa có trên phần mềm</strong> (Chưa tồn tại mã để cập nhật).
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button 
+                      onClick={() => handleModeSwitch('create')} 
+                      className="bg-red-600 hover:bg-red-700 text-white font-bold px-3.5 py-1.5 rounded-lg text-xs flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
+                      title="Chuyển toàn bộ danh sách sang chế độ Nhập mới để thêm mới hồ sơ"
+                    >
+                      <PlusCircle size={15} /> Chuyển sang "Nhập mới" (Tạo mới)
                     </button>
                   </div>
                 </div>

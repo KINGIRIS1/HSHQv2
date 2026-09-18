@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { RecordFile, RecordStatus, User } from '../types';
 import { getWardLabel, GROUPS } from '../constants';
-import { formatDateDDMMYYYY, formatBatchName, parseSafeDate, formatDateKey, getPureBatchNumber } from '../utils/appHelpers';
+import { formatDateDDMMYYYY, formatBatchName, parseSafeDate, formatDateKey, getPureBatchNumber, calculateNextBatchNumberForDate } from '../utils/appHelpers';
 import { fetchChinhLyRecords } from '../services/apiUtilities';
 
 interface AddToBatchModalProps {
@@ -47,23 +47,9 @@ const AddToBatchModal: React.FC<AddToBatchModalProps> = ({
     return targetRecords.map(r => `${r.id}_${r.needsMapCorrection ? 1 : 0}`).join(',');
   }, [isOpen, targetRecords]);
 
-  // Tính số đợt tiếp theo trong ngày hôm nay
+  // Tính số đợt tiếp theo trong ngày hôm nay một cách chuẩn xác, liên tục, không nhảy cóc
   const nextBatchInfo = useMemo(() => {
-      let maxBatch = 0;
-      records.forEach(r => {
-          if (!r.exportDate) return;
-          const rDateObj = parseSafeDate(r.exportDate);
-          const rDateKey = rDateObj ? formatDateKey(rDateObj) : String(r.exportDate).split('T')[0];
-          if (rDateKey !== todayStr) return;
-
-          if (r.exportBatch) {
-              const rawNum = getPureBatchNumber(r.exportBatch);
-              const num = rawNum ? parseInt(rawNum, 10) : 0;
-              if (num && num > maxBatch) maxBatch = num;
-          }
-      });
-
-      const nextNum = maxBatch + 1;
+      const { nextNum } = calculateNextBatchNumberForDate(records, todayStr);
       const todayFmt = formatDateDDMMYYYY(todayStr);
       const fullBatchName = `Đợt ${nextNum} - Ngày ${todayFmt}`;
 

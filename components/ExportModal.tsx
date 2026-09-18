@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import * as XLSX from 'xlsx-js-style';
 import { RecordFile, RecordStatus } from '../types';
-import { isArchiveRecordType, getShortRecordType } from '../constants';
+import { isArchiveRecordType, getShortRecordType, mapStatusToRecordStatus } from '../constants';
 import { formatBatchName, cleanSyncNotes, getPureBatchNumber, formatDateKey, parseSafeDate } from '../utils/appHelpers';
 import { X, FileDown, Calendar, Layers, Printer, Eye } from 'lucide-react';
 
@@ -48,33 +48,53 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, typ
     return records;
   }, [records, recordCategory]);
 
+  // Helper lấy ngày xuất hiệu lực và chuẩn hóa ngày dạng YYYY-MM-DD
+  const getRecordEffectiveExportDate = (r: RecordFile): string => {
+      const raw = r.exportDate || (r as any).data?.ngay_hoan_thanh || r.completedDate || r.resultReturnedDate || r.approvalDate || r.receivedDate || new Date().toISOString();
+      const parsed = parseSafeDate(raw);
+      return parsed ? formatDateKey(parsed) : String(raw).split('T')[0];
+  };
+
+  // Helper lấy thông tin đợt của hồ sơ một cách nhất quán tuyệt đối
+  const getRecordBatchInfo = (r: RecordFile): { isBatched: boolean; batchStr: string; dateStr: string } => {
+      const dateStr = getRecordEffectiveExportDate(r);
+      const rawBatch = r.exportBatch || (r as any).data?.danh_sach;
+      const isBatched = Boolean(rawBatch !== null && rawBatch !== undefined && String(rawBatch).trim() !== '' && String(rawBatch) !== 'NOT_BATCHED');
+      if (isBatched) {
+          const pure = getPureBatchNumber(rawBatch) || String(rawBatch).trim();
+          return { isBatched: true, batchStr: pure, dateStr };
+      }
+      return { isBatched: false, batchStr: 'NOT_BATCHED', dateStr };
+  };
+
   // 1. Tổng hợp danh sách các đợt (Batch Options)
   const batchOptions = useMemo(() => {
     const batches: Record<string, { date: string, batch: number | string, count: number }> = {};
 
     categoryRecords.forEach(r => {
       if (type === 'handover') {
-          // Logic cho Giao 1 cửa (Hỗ trợ cả SIGNED, PENDING_HANDOVER, HANDOVER, WITHDRAWN, REJECTED)
-          if (r.status === RecordStatus.HANDOVER || r.status === RecordStatus.SIGNED || r.status === RecordStatus.PENDING_HANDOVER || r.status === RecordStatus.WITHDRAWN || r.status === RecordStatus.REJECTED || r.exportBatch) {
-              if (r.exportBatch && r.exportDate) {
-                  const rDateObj = parseSafeDate(r.exportDate);
-                  const dateStr = rDateObj ? formatDateKey(rDateObj) : r.exportDate.split('T')[0];
-                  const pureBatch = getPureBatchNumber(r.exportBatch) || String(r.exportBatch).trim();
-                  const key = `${dateStr}_${pureBatch}`;
-                  if (!batches[key]) {
-                      batches[key] = { date: dateStr, batch: pureBatch, count: 0 };
-                  }
-                  batches[key].count++;
-              } else if (r.status === RecordStatus.HANDOVER) {
-                  // Fallback cho những hồ sơ thiếu exportBatch (Chưa chốt đợt hoặc nhập từ Excel)
-                  const rDateObj = parseSafeDate(r.completedDate || r.receivedDate);
-                  const dateStr = rDateObj ? formatDateKey(rDateObj) : (r.completedDate || r.receivedDate || new Date().toISOString()).split('T')[0];
-                  const key = `${dateStr}_NOT_BATCHED`;
-                  if (!batches[key]) {
-                      batches[key] = { date: dateStr, batch: 'Lẻ (Chưa tạo đợt)', count: 0 };
-                  }
-                  batches[key].count++;
+          const normStatus = mapStatusToRecordStatus(r.status);
+          const { isBatched, batchStr, dateStr } = getRecordBatchInfo(r);
+
+          // Điều kiện hiển thị cho danh sách bàn giao 1 cửa:
+          // 1. Hồ sơ đã được xếp vào đợt xuất cụ thể (isBatched)
+          // 2. Hoặc nếu chưa tạo đợt (Lẻ), hồ sơ BẮT BUỘC phải thực sự ở trạng thái đã giao 1 cửa (HANDOVER, RETURNED, hoặc isHandedOver)
+          // Tuyệt đối KHÔNG gom các hồ sơ chỉ mới ở bước Đã ký (SIGNED), Chờ ký (PENDING_SIGN), Chờ bàn giao (PENDING_HANDOVER),... vào mục Lẻ (Chưa tạo đợt)
+          const isEligible = isBatched || 
+              normStatus === RecordStatus.HANDOVER || 
+              normStatus === RecordStatus.RETURNED || 
+              Boolean(r.isHandedOver);
+
+          if (isEligible) {
+              const key = `${dateStr}_${batchStr}`;
+              if (!batches[key]) {
+                  batches[key] = { 
+                      date: dateStr, 
+                      batch: isBatched ? batchStr : 'Lẻ (Chưa tạo đợt)', 
+                      count: 0 
+                  };
               }
+              batches[key].count++;
           }
       } else if (type === 'check_list') {
           // Logic cho Trình Ký: Dựa vào ngày tiếp nhận (receivedDate) để gom nhóm
@@ -138,18 +158,17 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, typ
         const batchStr = parts.slice(1).join('_');
         
         recordsToExport = categoryRecords.filter(r => {
-            if (batchStr === 'NOT_BATCHED') {
-                const rDateObj = parseSafeDate(r.completedDate || r.receivedDate);
-                const rDateStr = rDateObj ? formatDateKey(rDateObj) : (r.completedDate || r.receivedDate || new Date().toISOString()).split('T')[0];
-                return r.status === RecordStatus.HANDOVER && !r.exportBatch && rDateStr === dateStr;
-            } else {
-                const rDateObj = parseSafeDate(r.exportDate);
-                const rDateStr = rDateObj ? formatDateKey(rDateObj) : (r.exportDate ? r.exportDate.split('T')[0] : '');
-                const matchDate = !dateStr || rDateStr === dateStr;
-                const rPureBatch = getPureBatchNumber(r.exportBatch) || String(r.exportBatch ?? '').trim();
-                const matchBatch = String(rPureBatch) === String(batchStr).trim();
-                return matchDate && matchBatch;
-            }
+            const normStatus = mapStatusToRecordStatus(r.status);
+            const info = getRecordBatchInfo(r);
+            if (info.dateStr !== dateStr || info.batchStr !== batchStr) return false;
+
+            // Nếu có đợt xuất cụ thể: hợp lệ
+            if (info.isBatched) return true;
+
+            // Nếu là hồ sơ Lẻ (Chưa tạo đợt): Bắt buộc phải thực sự ở trạng thái đã giao 1 cửa hoặc đã trả kết quả
+            return normStatus === RecordStatus.HANDOVER || 
+                   normStatus === RecordStatus.RETURNED || 
+                   Boolean(r.isHandedOver);
         });
 
         if (recordCategory === 'archive') {

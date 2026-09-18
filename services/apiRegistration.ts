@@ -107,6 +107,16 @@ export const mapDangkyRecordFromDb = (dbItem: any): RecordFile => {
     reminderDate: dbItem.reminderDate || '',
     lastRemindedAt: dbItem.lastRemindedAt || '',
     deadlineReminded: Boolean(dbItem.deadlineReminded),
+    appraisalDate: dbItem.appraisalDate || '',
+    postingDate: dbItem.postingDate || '',
+    postingEndDate: dbItem.postingEndDate || '',
+    taxTransferDate: dbItem.taxTransferDate || '',
+    taxKv7Date: dbItem.taxKv7Date || '',
+    taxPaymentDate: dbItem.taxPaymentDate || '',
+    printCertDate: dbItem.printCertDate || '',
+    pendingHandoverDate: dbItem.pendingHandoverDate || '',
+    previousStatus: dbItem.previousStatus || '',
+    supplementReason: dbItem.supplementReason || '',
     statusLogs,
     dossierComponents,
     attachedFiles,
@@ -178,6 +188,16 @@ export const mapDangkyRecordToDb = (record: Partial<RecordFile>): Record<string,
   if (record.reminderDate !== undefined) payload.reminderDate = record.reminderDate || null;
   if (record.lastRemindedAt !== undefined) payload.lastRemindedAt = record.lastRemindedAt || null;
   if (record.deadlineReminded !== undefined) payload.deadlineReminded = Boolean(record.deadlineReminded);
+  if (record.appraisalDate !== undefined) payload.appraisalDate = record.appraisalDate || null;
+  if (record.postingDate !== undefined) payload.postingDate = record.postingDate || null;
+  if (record.postingEndDate !== undefined) payload.postingEndDate = record.postingEndDate || null;
+  if (record.taxTransferDate !== undefined) payload.taxTransferDate = record.taxTransferDate || null;
+  if (record.taxKv7Date !== undefined) payload.taxKv7Date = record.taxKv7Date || null;
+  if (record.taxPaymentDate !== undefined) payload.taxPaymentDate = record.taxPaymentDate || null;
+  if (record.printCertDate !== undefined) payload.printCertDate = record.printCertDate || null;
+  if (record.pendingHandoverDate !== undefined) payload.pendingHandoverDate = record.pendingHandoverDate || null;
+  if (record.previousStatus !== undefined) payload.previousStatus = record.previousStatus;
+  if (record.supplementReason !== undefined) payload.supplementReason = record.supplementReason;
 
   if (record.statusLogs !== undefined) payload.statusLogs = record.statusLogs;
   if (record.dossierComponents !== undefined) payload.dossierComponents = record.dossierComponents;

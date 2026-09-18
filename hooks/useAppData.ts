@@ -4,7 +4,7 @@ import { RecordFile, Employee, User, UserRole, RecordStatus, Holiday, RolePermis
 import { fetchRecords, fetchEmployees, fetchUsers, fetchUpdateInfo, fetchHolidays,
     createRecordApi, updateRecordApi, deleteRecordApi, deleteRecordsBatchApi, createRecordsBatchApi,
     saveEmployeeApi, deleteEmployeeApi, saveUserApi, deleteUserApi, deleteAllDataApi, getSystemSetting,
-    enrichUsersList, enrichUserWithEmployees
+    enrichUsersList, enrichUserWithEmployees, RECENTLY_UPDATED_RECORDS, markRecordsRecentlyUpdated
 } from '../services/api';
 import { supabase } from '../services/supabaseClient';
 import { mapRecordFromDb, getFromCache, CACHE_KEYS } from '../services/apiCore';
@@ -15,6 +15,29 @@ import { DEFAULT_WARDS as STATIC_WARDS, APP_VERSION, MOCK_EMPLOYEES, MOCK_USERS 
 import { migrateUnbatchedRecords, deduplicateRecords } from '../utils/appHelpers';
 import { connectionManager } from '../services/connectionService';
 import { syncGoogleDriveConfigFromCloud } from '../services/attachmentStorage';
+
+/**
+ * Hàm đối chiếu bảo vệ dữ liệu cục bộ:
+ * Đảm bảo các hồ sơ đang lưu ngoại tuyến HOẶC vừa được người dùng thao tác chuyển bước trong 45s
+ * KHÔNG bao giờ bị tiến trình tải nền hoặc đồng bộ từ máy chủ giật lùi trạng thái.
+ */
+const reconcileWithProtectedRecords = (incomingRecords: RecordFile[], currentPrev: RecordFile[]): RecordFile[] => {
+    const now = Date.now();
+    const protectedMap = new Map<string, RecordFile>();
+    currentPrev.forEach(r => {
+        if (r._isOfflineSaved) {
+            protectedMap.set(r.id, r);
+        } else {
+            const recent = RECENTLY_UPDATED_RECORDS.get(r.id);
+            if (recent && (now - recent.updatedAt < 45000)) {
+                protectedMap.set(r.id, { ...r, ...recent.record });
+            }
+        }
+    });
+
+    if (protectedMap.size === 0) return incomingRecords;
+    return incomingRecords.map(r => protectedMap.get(r.id) || r);
+};
 
 export const useAppData = (currentUser: User | null) => {
     // Khởi tạo danh sách hồ sơ ban đầu (sẽ được nạp tức thì từ IndexedDB & Cloud)
@@ -130,7 +153,7 @@ export const useAppData = (currentUser: User | null) => {
                         partialList.forEach(r => { if (r.id) map.set(r.id, r); });
                         const merged = Array.from(map.values());
                         const { migratedRecords } = migrateUnbatchedRecords(deduplicateRecords(merged));
-                        return migratedRecords;
+                        return reconcileWithProtectedRecords(migratedRecords, prev);
                     });
                 }
             }).then(recData => {
@@ -138,14 +161,14 @@ export const useAppData = (currentUser: User | null) => {
                     const { migratedRecords } = migrateUnbatchedRecords(deduplicateRecords(recData));
                     setRecords(prev => {
                         if (prev.length <= migratedRecords.length || prev.length === 0) {
-                            return migratedRecords;
+                            return reconcileWithProtectedRecords(migratedRecords, prev);
                         }
                         const map = new Map<string, RecordFile>();
                         prev.forEach(r => { if (r.id) map.set(r.id, r); });
                         migratedRecords.forEach(r => { if (r.id) map.set(r.id, r); });
                         const merged = Array.from(map.values());
                         const { migratedRecords: mRecs } = migrateUnbatchedRecords(deduplicateRecords(merged));
-                        return mRecs;
+                        return reconcileWithProtectedRecords(mRecs, prev);
                     });
                 }
             }).catch(async (err) => {
@@ -252,21 +275,14 @@ export const useAppData = (currentUser: User | null) => {
                 if (recData && Array.isArray(recData)) {
                     const { migratedRecords } = migrateUnbatchedRecords(deduplicateRecords(recData));
                     setRecords(prev => {
-                        // Nếu trong prev có bản ghi đang offline / pending sync, bảo toàn bản ghi đó không để poll đè lên
-                        const offlineMap = new Map<string, RecordFile>();
-                        prev.forEach(r => {
-                            if (r._isOfflineSaved) offlineMap.set(r.id, r);
-                        });
-
-                        const reconciledRecords = offlineMap.size > 0
-                            ? migratedRecords.map(r => offlineMap.get(r.id) || r)
-                            : migratedRecords;
+                        // Khóa bảo vệ đối chiếu: không cho phép polling nền đè lùi các hồ sơ vừa được người dùng thao tác
+                        const reconciledRecords = reconcileWithProtectedRecords(migratedRecords, prev);
 
                         // Prevent unnecessary re-renders if data has not changed
                         if (prev.length === reconciledRecords.length) {
                             const isSame = prev.every((r, idx) => {
                                 const m = reconciledRecords[idx];
-                                return m && r.id === m.id && r.status === m.status && r.assignedTo === m.assignedTo && r.deadline === m.deadline;
+                                return m && r.id === m.id && r.status === m.status && r.assignedTo === m.assignedTo && r.deadline === m.deadline && r.exportBatch === m.exportBatch && r.exportDate === m.exportDate;
                             });
                             if (isSame) return prev;
                         }
@@ -287,6 +303,21 @@ export const useAppData = (currentUser: User | null) => {
         // Chạy migration ngầm nếu còn bản ghi lưu trữ tồn đọng trong land_records
         migrateArchiveRecordsFromLandRecords().catch(e => console.warn("Archive migration error:", e));
 
+        const handleRealtimeUpdate = (newRow: any, table: 'land_records' | 'luutru_records' | 'dangky_records') => {
+            const updated = mapRecordFromDb({ ...newRow, sourceTable: table }) as RecordFile;
+            setRecords(prev => {
+                const now = Date.now();
+                const recent = RECENTLY_UPDATED_RECORDS.get(newRow.id);
+                if (recent && (now - recent.updatedAt < 20000)) {
+                    // Nếu ở client vừa thao tác chuyển bước trong 20s mà payload máy chủ trả về có trạng thái khác, ưu tiên trạng thái client
+                    if (updated.status !== recent.record.status) {
+                        return prev.map(r => r.id === newRow.id ? { ...r, ...updated, ...recent.record } : r);
+                    }
+                }
+                return prev.map(r => r.id === newRow.id ? { ...r, ...updated } : r);
+            });
+        };
+
         const landRecordsChannel = supabase.channel('land_records_changes')
             .on(
                 'postgres_changes',
@@ -301,9 +332,7 @@ export const useAppData = (currentUser: User | null) => {
             .on(
                 'postgres_changes',
                 { event: 'UPDATE', schema: 'public', table: 'land_records' },
-                (payload) => {
-                    setRecords(prev => prev.map(r => r.id === payload.new.id ? { ...r, ...mapRecordFromDb({ ...payload.new, sourceTable: 'land_records' }) } as RecordFile : r));
-                }
+                (payload) => handleRealtimeUpdate(payload.new, 'land_records')
             )
             .on(
                 'postgres_changes',
@@ -328,9 +357,7 @@ export const useAppData = (currentUser: User | null) => {
             .on(
                 'postgres_changes',
                 { event: 'UPDATE', schema: 'public', table: 'luutru_records' },
-                (payload) => {
-                    setRecords(prev => prev.map(r => r.id === payload.new.id ? { ...r, ...mapRecordFromDb({ ...payload.new, sourceTable: 'luutru_records' }) } as RecordFile : r));
-                }
+                (payload) => handleRealtimeUpdate(payload.new, 'luutru_records')
             )
             .on(
                 'postgres_changes',
@@ -355,9 +382,7 @@ export const useAppData = (currentUser: User | null) => {
             .on(
                 'postgres_changes',
                 { event: 'UPDATE', schema: 'public', table: 'dangky_records' },
-                (payload) => {
-                    setRecords(prev => prev.map(r => r.id === payload.new.id ? { ...r, ...mapRecordFromDb({ ...payload.new, sourceTable: 'dangky_records' }) } as RecordFile : r));
-                }
+                (payload) => handleRealtimeUpdate(payload.new, 'dangky_records')
             )
             .on(
                 'postgres_changes',

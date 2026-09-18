@@ -629,11 +629,93 @@ export function getPureBatchNumber(batch: number | string | null | undefined): s
     if (!batch && batch !== 0) return '';
     const bStr = String(batch).trim();
     if (!bStr) return '';
-    const match = bStr.match(/(\d+)/);
-    if (match && match[1]) {
-        return `${parseInt(match[1], 10)}`;
+
+    // 1. Nếu là dạng "Đợt X" hoặc "Dot X" (ví dụ "Đợt 1", "Đợt 02", "Dot 3")
+    const dotMatch = bStr.match(/^Đợt\s*0*(\d+)/i) || bStr.match(/^Dot\s*0*(\d+)/i);
+    if (dotMatch && dotMatch[1]) {
+        const n = parseInt(dotMatch[1], 10);
+        // Chặn các số ngoại lai như năm 2024, 2025, 2026 hoặc số quá lớn > 500
+        if (n > 0 && n <= 500) {
+            return String(n);
+        }
     }
-    return bStr;
+
+    // 2. Nếu là chuỗi số nguyên thuần túy (VD: "1", "2", "01")
+    const pureNumMatch = bStr.match(/^0*(\d+)$/);
+    if (pureNumMatch && pureNumMatch[1]) {
+        const n = parseInt(pureNumMatch[1], 10);
+        // Nếu là năm như 2023, 2024, 2025, 2026 -> không phải số đợt!
+        if (n >= 1900 && n <= 2100) return '';
+        if (n > 0 && n <= 500) {
+            return String(n);
+        }
+    }
+
+    // 3. Nếu là dạng chuỗi có chứa ngày tháng (VD: "Đợt 1 - Ngày 15/03/2026" hoặc "1-15/03/2026")
+    const prefixMatch = bStr.match(/^(?:Đợt\s*)?0*(\d{1,3})[-_\s/]/i);
+    if (prefixMatch && prefixMatch[1]) {
+        const n = parseInt(prefixMatch[1], 10);
+        if (n > 0 && n <= 500) {
+            return String(n);
+        }
+    }
+
+    // 4. Tìm kiếm từ khóa "Đợt X" ở bất kỳ vị trí nào trong chuỗi
+    const anyDotMatch = bStr.match(/Đợt\s*0*(\d+)/i);
+    if (anyDotMatch && anyDotMatch[1]) {
+        const n = parseInt(anyDotMatch[1], 10);
+        if (n > 0 && n <= 500) {
+            return String(n);
+        }
+    }
+
+    return '';
+}
+
+/**
+ * Thuật toán tính số đợt kế tiếp trong ngày theo thứ tự liên tục (1, 2, 3...)
+ * Không bao giờ bị nhảy cóc, tự động lấp đầy các khoảng trống nếu có.
+ */
+export function calculateNextBatchNumberForDate(records: RecordFile[], targetDateStr?: string | null): { nextNum: number; existingBatches: number[] } {
+    const targetDate = targetDateStr ? parseSafeDate(targetDateStr) : new Date();
+    const targetKey = targetDate ? formatDateKey(targetDate) : formatDateKey(new Date());
+
+    const batchNumbersSet = new Set<number>();
+
+    records.forEach(r => {
+        const rawDate = r.exportDate || (r as any).data?.ngay_hoan_thanh || r.completedWorkDate || r.completedDate;
+        if (!rawDate) return;
+        const d = parseSafeDate(rawDate);
+        if (!d || formatDateKey(d) !== targetKey) return;
+
+        const rawBatch = r.exportBatch || (r as any).data?.danh_sach;
+        if (!rawBatch || String(rawBatch).trim() === '' || String(rawBatch) === 'NOT_BATCHED') return;
+
+        const pureStr = getPureBatchNumber(rawBatch);
+        if (pureStr) {
+            const num = parseInt(pureStr, 10);
+            if (num > 0 && num <= 500) {
+                batchNumbersSet.add(num);
+            }
+        }
+    });
+
+    const sortedBatches = Array.from(batchNumbersSet).sort((a, b) => a - b);
+
+    // Tính số đợt tiếp theo liên tục:
+    // Nếu chưa có đợt nào trong ngày -> bắt đầu từ 1
+    // Nếu đã có các đợt -> tìm số tự nhiên liên tục tiếp theo
+    let nextNum = 1;
+    if (sortedBatches.length > 0) {
+        for (let i = 1; i <= sortedBatches[sortedBatches.length - 1] + 1; i++) {
+            if (!batchNumbersSet.has(i)) {
+                nextNum = i;
+                break;
+            }
+        }
+    }
+
+    return { nextNum, existingBatches: sortedBatches };
 }
 
 export function formatBatchName(batch: number | string | null | undefined, _deptName?: string, dateStr?: string | null): string {
@@ -765,27 +847,47 @@ export function migrateUnbatchedRecords(records: RecordFile[]): { migratedRecord
             }
         }
 
-        const isHandedOver = r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED || Boolean((r as any).is_handover);
-        const missingBatch = !currentBatch || String(currentBatch).trim() === '' || currentBatch === 'NOT_BATCHED';
-
-        if (isHandedOver && missingBatch) {
+        // Tự động bù ngày xuất nếu hồ sơ có đợt xuất nhưng bị thiếu ngày xuất
+        let exportDate = r.exportDate;
+        if (currentBatch && currentBatch !== 'NOT_BATCHED' && (!exportDate || String(exportDate).trim() === '')) {
+            const rawDate = r.completedDate || r.approvalDate || r.resultReturnedDate || r.receivedDate || new Date().toISOString();
+            exportDate = rawDate;
             hasChanges = true;
-            const rawDate = r.exportDate || r.completedDate || r.receivedDate || new Date().toISOString();
-            const defaultBatchNum = getFallbackBatchNum(rawDate);
-
-            return {
-                ...r,
-                exportBatch: defaultBatchNum,
-                exportDate: r.exportDate || rawDate,
-                completedDate: r.completedDate || rawDate,
-                status: r.status === RecordStatus.HANDOVER || r.status === RecordStatus.RETURNED ? r.status : RecordStatus.HANDOVER
-            };
         }
 
-        if (currentBatch !== r.exportBatch) {
+        // Đồng bộ trạng thái sang HANDOVER nếu hồ sơ đã có đợt xuất (trừ khi là rút/từ chối/trả dân)
+        let status = r.status;
+        if (currentBatch && currentBatch !== 'NOT_BATCHED') {
+            if (status !== RecordStatus.WITHDRAWN && status !== RecordStatus.REJECTED && status !== RecordStatus.RETURNED) {
+                if (status !== RecordStatus.HANDOVER) {
+                    status = RecordStatus.HANDOVER;
+                    hasChanges = true;
+                }
+            }
+        }
+
+        const isHandedOver = status === RecordStatus.HANDOVER || status === RecordStatus.RETURNED || Boolean((r as any).is_handover);
+        const missingBatch = !currentBatch || String(currentBatch).trim() === '' || currentBatch === 'NOT_BATCHED';
+
+        // TUYỆT ĐỐI KHÔNG TỰ ĐỘNG GÁN SỐ ĐỢT VÀO HỒ SƠ CHƯA CÓ ĐỢT
+        // Để hồ sơ ở trạng thái Lẻ (Chưa tạo đợt), chỉ tạo đợt khi người dùng chủ động bấm Chốt đợt
+        if (isHandedOver && missingBatch) {
+            if (r.exportBatch) {
+                hasChanges = true;
+                return {
+                    ...r,
+                    exportBatch: null,
+                    status: status
+                };
+            }
+        }
+
+        if (currentBatch !== r.exportBatch || exportDate !== r.exportDate || status !== r.status) {
             return {
                 ...r,
-                exportBatch: currentBatch
+                exportBatch: currentBatch,
+                exportDate: exportDate,
+                status: status
             };
         }
 
@@ -1078,7 +1180,7 @@ export function deriveActualSurveyStatus(record: Partial<RecordFile>): RecordSta
     }
 
     const recType = record.recordType || '';
-    const isArchive = isArchiveRecordType(recType);
+    const isArchive = isArchiveRecordType(recType) || (record as any).sourceTable === 'luutru_records';
 
     // 7. Đang xử lý nội nghiệp / Biên tập bản đồ
     if (record.officeAssignedDate || (!isArchive && isOfficeOnlySurveyProcedure(recType) && (record.assignedDate || record.assignedTo))) {
@@ -1093,6 +1195,11 @@ export function deriveActualSurveyStatus(record: Partial<RecordFile>): RecordSta
     // 9. Đang thực hiện (Lưu trữ)
     if (isArchive && (record.assignedDate || record.assignedTo)) {
         return RecordStatus.IN_PROGRESS;
+    }
+
+    // Đối với hồ sơ Đo đạc: không được để ở dạng IN_PROGRESS chung chung
+    if (!isArchive && record.status === RecordStatus.IN_PROGRESS) {
+        return isOfficeOnlySurveyProcedure(recType) ? RecordStatus.OFFICE_WORK : RecordStatus.FIELD_WORK;
     }
 
     return record.status || RecordStatus.RECEIVED;
@@ -1336,6 +1443,7 @@ export function cleanFutureMilestoneDates(
         cleaned.exportDate = null as any;
         cleaned.exportBatch = null as any;
         cleaned.is_handover = false;
+        cleaned.isHandedOver = false;
         cleaned.handover_date = null as any;
         cleaned.handoverWard = null as any;
     }

@@ -321,7 +321,7 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
                 if (initialData?.id && r.id === initialData.id) return false;
                 return (r.code || '').trim().toLowerCase() === finalCode.toLowerCase();
             });
-            const isDbDup = !initialData && (await checkRecordCodeExistsInDb(finalCode));
+            const isDbDup = await checkRecordCodeExistsInDb(finalCode, initialData?.id);
             if (isLocalDup || isDbDup) {
                 setLoading(false);
                 setNotification({
@@ -347,8 +347,22 @@ const RecordForm: React.FC<RecordFormProps> = ({ onSave, wards, records, holiday
       dossierComponents: formData.dossierComponents,
     };
 
+    const recType = updatedFormData.recordType || '';
+    let autoSourceTable: 'dangky_records' | 'luutru_records' | 'land_records' = 'land_records';
+    let autoGroup = '2. Đo đạc bản đồ';
+
+    if (isCertificateRecordType(recType) || String(recType).trim().startsWith('3.')) {
+        autoSourceTable = 'dangky_records';
+        autoGroup = '3. Đăng ký đất đai, cấp GCN';
+    } else if (String(recType).trim().startsWith('1.') || recType.toLowerCase().includes('sao lục') || recType.toLowerCase().includes('công văn')) {
+        autoSourceTable = 'luutru_records';
+        autoGroup = '1. Cung cấp thông tin, dữ liệu đất đai';
+    }
+
     const recordToSave: RecordFile = { 
         ...updatedFormData, 
+        sourceTable: updatedFormData.sourceTable || autoSourceTable,
+        group: updatedFormData.group || autoGroup,
         id: formData.id || Math.random().toString(36).substr(2, 9), 
         status: formData.status || RecordStatus.RECEIVED,
         receivedBy: recBy 

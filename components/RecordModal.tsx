@@ -3,6 +3,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { RecordFile, RecordStatus, Employee, User, UserRole, AttachedDocItem, DossierComponentItem, AttachedFileMeta } from '../types';
 import AutoResizeTextarea from './AutoResizeTextarea';
 import { GROUPS, EXTENDED_RECORD_TYPES, STATUS_LABELS, SELECTABLE_STATUSES, ARCHIVE_SELECTABLE_STATUSES, SURVEY_SELECTABLE_STATUSES, CAP_GIAY_SELECTABLE_STATUSES, getShortRecordType, getWardLabel, getNormalizedWard, isArchiveRecordType, isSurveyRecordType, getSurveyRecordPrefix, isCertificateRecordType } from '../constants';
+import { extractRecordSequence, checkRecordCodeExistsInDb } from '../services/apiRecords';
 import { X, Save, Lock, User as UserIcon, MapPin, FileText, Calendar, FileCheck, ChevronDown, ChevronUp, Paperclip, Upload, Eye, Download, ExternalLink, Loader2, CheckCircle2, Plus } from 'lucide-react';
 import { calculateDeadlineHelper, getDepartmentForRecord, isProcedure2_3, syncRecordStatusTransition, getPureBatchNumber, groupEmployeesByDepartment, isFieldWorkProcedure, isOfficeOnlySurveyProcedure, deriveActualSurveyStatus, getDerivedStatusFromDates, cleanFutureMilestoneDates } from '../utils/appHelpers';
 import { fetchContracts } from '../services/api';
@@ -204,86 +205,27 @@ const generateRecordCode = (
     const isLT = isArchive || isArchiveRecordType(recordType) || rType.startsWith('1.');
     const isCert = !isLT && (isCertView || isCertificateRecordType(recordType) || rType.startsWith('3.'));
 
-    let maxSeq = 0;
-    if (isLT) {
-        let archiveCountInYear = 0;
-        (recordsList || []).forEach((r: RecordFile) => {
-            if (isArchiveRecordType(r.recordType) || (r as any).sourceTable === 'luutru_records') {
-                const rDate = r.receivedDate || (r as any).created_at || '';
-                const yr = rDate.slice(0, 4);
-                if (!yr || yr === year || yr === '20' + yy) {
-                    archiveCountInYear++;
-                }
-            }
-        });
-        if (archiveCountInYear > maxSeq) maxSeq = archiveCountInYear;
-        if (yy === '26' && maxSeq < 186) maxSeq = 186;
-    }
-
-    (recordsList || []).forEach((r) => {
-        if (!r.code) return;
-        const code = r.code.trim();
-        
-        if (isLT) {
-            if (code.startsWith('LT-')) {
-                const parts = code.replace(/^LT-/, '').split('-');
-                if (parts.length >= 2) {
-                    const rDate = parts[0];
-                    const rSeq = parts[1];
-                    if (rDate && (rDate.substring(0, 2) === yy || rDate === year || rDate.startsWith(yy))) {
-                        const seqNum = parseInt(rSeq, 10);
-                        if (!isNaN(seqNum) && seqNum < 50000 && seqNum > maxSeq) maxSeq = seqNum;
-                    }
-                }
-            }
-        } else if (isCert) {
-            if (code.startsWith('H19.151.11.22-') || isCertificateRecordType(r.recordType)) {
-                const parts = code.replace(/^H19\.151\.11\.22-/, '').split('-');
-                if (parts.length >= 2) {
-                    const rDate = parts[0];
-                    const rSeq = parts[1];
-                    if (rDate && rDate.substring(0, 2) === yy) {
-                        const seqNum = parseInt(rSeq, 10);
-                        if (!isNaN(seqNum) && seqNum < 50000 && seqNum > maxSeq) maxSeq = seqNum;
-                    }
-                }
-            }
-        } else {
-            if (!code.startsWith('LT-') && !code.startsWith('H19.151.11.22-')) {
-                const cleanCode = code.replace(/^(HQ|TK|TQ|TH|MD|MĐ|MH|CT|NB|ML|MT|QM|TT|MLO)-/, '');
-                const parts = cleanCode.split('-');
-                if (parts.length >= 2) {
-                    const rDate = parts[0];
-                    const rSeq = parts[1];
-                    if (rDate && rDate.substring(0, 2) === yy) {
-                        const seqNum = parseInt(rSeq, 10);
-                        if (!isNaN(seqNum) && seqNum < 50000 && seqNum > maxSeq) maxSeq = seqNum;
-                    }
-                }
-            }
-        }
-    });
-
     const prefix2 = getSurveyRecordPrefix(receivedBy, employeesList, wardName);
     const existingCodeSet = new Set((recordsList || []).map(r => (r.code || '').trim().toLowerCase()));
 
-    let currentSeq = maxSeq + 1;
+    let codeBase = '';
+    if (isLT) {
+        codeBase = `LT-${datePrefix}-`;
+    } else if (isCert) {
+        codeBase = `H19.151.11.22-${datePrefix}-`;
+    } else {
+        codeBase = prefix2 ? `${prefix2}-${datePrefix}-` : `${datePrefix}-`;
+    }
+
     let finalCandidate = '';
-
-    while (true) {
-        const seqStr = currentSeq.toString().padStart(4, '0');
-        if (isLT) {
-            finalCandidate = `LT-${datePrefix}-${seqStr}`;
-        } else if (isCert) {
-            finalCandidate = `H19.151.11.22-${datePrefix}-${seqStr}`;
-        } else {
-            finalCandidate = prefix2 ? `${prefix2}-${datePrefix}-${seqStr}` : `${datePrefix}-${seqStr}`;
-        }
-
+    let attempts = 0;
+    while (attempts < 500) {
+        attempts++;
+        const rand4 = Math.floor(1000 + Math.random() * 9000).toString();
+        finalCandidate = `${codeBase}${rand4}`;
         if (!existingCodeSet.has(finalCandidate.toLowerCase())) {
             break;
         }
-        currentSeq++;
     }
 
     return finalCandidate;
@@ -590,6 +532,14 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
     if (duplicateRecord) {
       alert(`⚠️ LỖI TRÙNG MÃ HỒ SƠ:\n\nMã "${finalCode}" đã tồn tại trên hệ thống cho hồ sơ:\n• Chủ sử dụng: ${duplicateRecord.customerName || 'Chưa tên'}\n• Địa chỉ: ${duplicateRecord.customerAddress || 'Không địa chỉ'}\n• Người tiếp nhận: ${duplicateRecord.receivedBy || '---'}\n\nVui lòng thay đổi mã khác trước khi lưu!`);
       return;
+    }
+
+    if (finalCode && finalCode.toUpperCase() !== 'HS' && finalCode !== '--') {
+      const isDbDup = await checkRecordCodeExistsInDb(finalCode, initialData?.id);
+      if (isDbDup) {
+        alert(`⚠️ LỖI TRÙNG MÃ HỒ SƠ:\n\nMã "${finalCode}" đã tồn tại trên cơ sở dữ liệu đám mây.\n\nVui lòng thay đổi mã khác trước khi lưu!`);
+        return;
+      }
     }
 
     const cleanAttachedDocs: AttachedDocItem[] = [...attachedDocs];
@@ -1011,7 +961,7 @@ const RecordModal: React.FC<RecordModalProps> = ({ isOpen, onClose, onSubmit, in
                                     }`} 
                                     value={val(formData.code)} 
                                     onChange={(e) => handleChange('code', e.target.value)} 
-                                    placeholder="VD: HQ-260917-0001"
+                                    placeholder="VD: HQ-260917-4821"
                                 />
                             </div>
                         </div>

@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { RecordFile, Employee, User, Holiday, RecordStatus, RolePermissions, DepartmentPermissions } from '../types';
 import { getNormalizedWard, isArchiveRecordType, isCertificateRecordType, getSurveyRecordPrefix } from '../constants';
+import { extractRecordSequence } from '../services/apiRecords';
 import { PlusCircle, FileSpreadsheet, LayoutList, Settings, RotateCcw, RefreshCw, Search, CalendarClock } from 'lucide-react';
 import { generateDocxBlobAsync, hasTemplate, STORAGE_KEYS } from '../services/docxService';
 import * as XLSX from 'xlsx-js-style';
@@ -164,70 +165,18 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, onDelet
     const rType = (recordType || '').toLowerCase();
     const isLT = isArchiveRecordType(recordType) || rType.startsWith('1.');
     const isCert = !isLT && (isCertificateRecordType(recordType) || rType.startsWith('3.'));
-    
-    let maxSeq = 0;
 
+    const recBy = receivedBy || currentUser?.employeeId || currentUser?.username || '';
+    const prefix2 = getSurveyRecordPrefix(recBy, employees, wardName);
+
+    let codeBase = '';
     if (isLT) {
-        let archiveCountInYear = 0;
-        combinedRecords.forEach((r: RecordFile) => {
-            if (isArchiveRecordType(r.recordType) || (r as any).sourceTable === 'luutru_records') {
-                const rDate = r.receivedDate || (r as any).created_at || '';
-                const yr = rDate.slice(0, 4);
-                if (!yr || yr === year || yr === '20' + yy) {
-                    archiveCountInYear++;
-                }
-            }
-        });
-        if (archiveCountInYear > maxSeq) maxSeq = archiveCountInYear;
-        if (yy === '26' && maxSeq < 186) maxSeq = 186;
+        codeBase = `LT-${datePrefix}-`;
+    } else if (isCert) {
+        codeBase = `H19.151.11.22-${datePrefix}-`;
+    } else {
+        codeBase = prefix2 ? `${prefix2}-${datePrefix}-` : `${datePrefix}-`;
     }
-    
-    const checkSeq = (code: string | undefined | null) => {
-        if (!code) return;
-        const cleanCode = code.trim();
-        
-        if (isLT) {
-            if (cleanCode.startsWith('LT-')) {
-                const parts = cleanCode.replace(/^LT-/, '').split('-');
-                if (parts.length >= 2) {
-                    const rDate = parts[0];
-                    const rSeq = parts[1];
-                    if (rDate && (rDate.substring(0, 2) === yy || rDate === year || rDate.startsWith(yy))) {
-                        const seqNum = parseInt(rSeq, 10);
-                        if (!isNaN(seqNum) && seqNum < 50000 && seqNum > maxSeq) maxSeq = seqNum;
-                    }
-                }
-            }
-        } else if (isCert) {
-            if (cleanCode.startsWith('H19.151.11.22-')) {
-                const parts = cleanCode.replace(/^H19\.151\.11\.22-/, '').split('-');
-                if (parts.length >= 2) {
-                    const rDate = parts[0];
-                    const rSeq = parts[1];
-                    if (rDate && rDate.substring(0, 2) === yy) {
-                        const seqNum = parseInt(rSeq, 10);
-                        if (!isNaN(seqNum) && seqNum < 50000 && seqNum > maxSeq) maxSeq = seqNum;
-                    }
-                }
-            }
-        } else {
-            if (!cleanCode.startsWith('LT-') && !cleanCode.startsWith('H19.151.11.22-')) {
-                const stripped = cleanCode.replace(/^(HQ|TK|TQ|TH|MD|MĐ|MH|CT|NB|ML|MT|QM|TT|MLO)-/, '');
-                const parts = stripped.split('-');
-                if (parts.length >= 2) {
-                    const rDate = parts[0];
-                    const rSeq = parts[1];
-                    if (rDate && rDate.substring(0, 2) === yy) {
-                        const seqNum = parseInt(rSeq, 10);
-                        if (!isNaN(seqNum) && seqNum < 50000 && seqNum > maxSeq) maxSeq = seqNum;
-                    }
-                }
-            }
-        }
-    };
-
-    combinedRecords.forEach((r: RecordFile) => checkSeq(r.code));
-    extraCodes.forEach(checkSeq);
 
     const existingCodeSet = new Set<string>();
     combinedRecords.forEach(r => {
@@ -237,26 +186,15 @@ const ReceiveRecord: React.FC<ReceiveRecordProps> = ({ onSave, onDelete, onDelet
         if (c) existingCodeSet.add(c.trim().toLowerCase());
     });
 
-    const recBy = receivedBy || currentUser?.employeeId || currentUser?.username || '';
-    const prefix2 = getSurveyRecordPrefix(recBy, employees, wardName);
-
-    let currentSeq = maxSeq + 1;
     let candidateCode = '';
-
-    while (true) {
-        const seqStr = currentSeq.toString().padStart(4, '0');
-        if (isLT) {
-            candidateCode = `LT-${datePrefix}-${seqStr}`;
-        } else if (isCert) {
-            candidateCode = `H19.151.11.22-${datePrefix}-${seqStr}`;
-        } else {
-            candidateCode = prefix2 ? `${prefix2}-${datePrefix}-${seqStr}` : `${datePrefix}-${seqStr}`;
-        }
-
+    let attempts = 0;
+    while (attempts < 500) {
+        attempts++;
+        const rand4 = Math.floor(1000 + Math.random() * 9000).toString();
+        candidateCode = `${codeBase}${rand4}`;
         if (!existingCodeSet.has(candidateCode.toLowerCase())) {
             break;
         }
-        currentSeq++;
     }
 
     return candidateCode;

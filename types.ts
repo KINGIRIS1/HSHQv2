@@ -18,6 +18,7 @@ export enum RecordStatus {
 
   // Trạng thái độc lập dành riêng cho Module Cấp giấy
   APPRAISAL = 'APPRAISAL',                     // Chờ thẩm định
+  PENDING_POSTING = 'PENDING_POSTING',         // Đang niêm yết tại xã (30 ngày)
   TAX_TRANSFER = 'TAX_TRANSFER',               // Chờ chuyển thuế
   PENDING_TAX_KV7 = 'PENDING_TAX_KV7',         // Chờ thuế khu vực 7
   PENDING_TAX_PAYMENT = 'PENDING_TAX_PAYMENT', // Chờ Giấy nộp tiền
@@ -290,6 +291,8 @@ export interface RecordFile {
 
   // Cột mốc riêng cho Module Cấp giấy
   appraisalDate?: string | null;
+  postingDate?: string | null;       // Ngày phát hành công văn gửi UBND xã niêm yết
+  postingEndDate?: string | null;    // Ngày hết hạn 30 ngày niêm yết tại xã
   taxTransferDate?: string | null;
   taxKv7Date?: string | null;
   taxPaymentDate?: string | null;

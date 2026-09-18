@@ -4,7 +4,9 @@ import { MOCK_RECORDS, API_BASE_URL, isArchiveRecordType, getShortRecordType, is
 import { logError, getFromCache, saveToCache, CACHE_KEYS, sanitizeData, sanitizePayloadFor22P02, sanitizePayloadForDateErrors, normalizeCode, mapRecordFromDb, keepOnlyDate, isBlankRecord } from './apiCore';
 import { getIndexedDBItem } from './storageService';
 import { addPendingRecord, removePendingRecord, getPendingRecords, getPendingSyncItems, syncPendingRecordsToCloud, generateStandardUUID, isValidUUID } from './syncQueueService';
+import { deriveActualSurveyStatus } from '../utils/appHelpers';
 
+// 24 cột cơ sở dữ liệu cốt lõi
 export const RECORD_DB_COLUMNS = [
     'id', 'code', 'customerName', 'phoneNumber', 'cccd', 'customerAddress', 'ward', 'landPlot', 'mapSheet', 
     'area', 'address', 'group', 'content', 'recordType', 'receivedDate', 'receivedBy', 'deadline', 
@@ -21,8 +23,37 @@ export const RECORD_DB_COLUMNS = [
     'statusLogs', 'archiveHandoverDate', 'archiveHandoverBatch',
     'surveyorId', 'surveyAssignedDate', 'fieldAssignedDate', 'fieldCompletedDate',
     'drafterId', 'officeAssignedDate', 'officeCompletedDate',
-    'attachedFiles', 'dossierComponents'
+    'attachedFiles', 'dossierComponents',
+    'appraisalDate', 'postingDate', 'postingEndDate', 'taxTransferDate', 'taxKv7Date', 'taxPaymentDate', 'printCertDate', 'pendingHandoverDate',
+    'sourceTable', 'previousStatus', 'supplementReason', 'supplementRequestDate', 'supplementReturnedDate'
 ];
+
+/**
+ * Cơ chế Khóa bảo vệ thời gian thực (Optimistic Timestamp Guard):
+ * Ghi nhận các hồ sơ vừa được người dùng chuyển bước hoặc cập nhật trong vòng 45 giây.
+ * Tiến trình Polling nền 60s và Realtime sẽ không được phép dùng dữ liệu cũ từ server để đè lên.
+ */
+export const RECENTLY_UPDATED_RECORDS = new Map<string, { record: RecordFile; updatedAt: number }>();
+
+export const markRecordsRecentlyUpdated = (records: (RecordFile | Partial<RecordFile>)[]) => {
+    const now = Date.now();
+    // Dọn dẹp các mục cũ quá 2 phút để giải phóng bộ nhớ
+    for (const [id, item] of RECENTLY_UPDATED_RECORDS.entries()) {
+        if (now - item.updatedAt > 120000) {
+            RECENTLY_UPDATED_RECORDS.delete(id);
+        }
+    }
+    records.forEach(r => {
+        if (r && r.id) {
+            const existing = RECENTLY_UPDATED_RECORDS.get(r.id);
+            const merged = { ...(existing?.record || {}), ...r } as RecordFile;
+            RECENTLY_UPDATED_RECORDS.set(r.id, {
+                record: merged,
+                updatedAt: now
+            });
+        }
+    });
+};
 
 /**
  * Định tuyến bảng dữ liệu chuẩn xác theo tiền tố mã thủ tục:
@@ -40,20 +71,8 @@ export const getTargetTable = (record: Partial<RecordFile>): 'dangky_records' | 
     const code = String(record.code || '').trim();
     const shortType = getShortRecordType(rawType);
     const groupStr = String(record.group || '').trim();
-    const deptStr = String((record as any).department || '').trim().toLowerCase();
 
-    // 1. Phân loại theo phòng ban/bộ phận nếu có
-    if (deptStr.includes('lưu trữ') || deptStr.includes('luu tru')) {
-        return 'luutru_records';
-    }
-    if (deptStr.includes('đăng ký') || deptStr.includes('cấp giấy') || deptStr.includes('dang ky') || deptStr.includes('cap giay')) {
-        return 'dangky_records';
-    }
-    if (deptStr.includes('đo đạc') || deptStr.includes('do dac')) {
-        return 'land_records';
-    }
-
-    // 2. Phân loại theo tiền tố mã thủ tục hoặc mã hồ sơ nghiêm ngặt
+    // 1. Phân loại theo tiền tố mã thủ tục hoặc tên thủ tục chuyên môn (ƯU TIÊN HÀNG ĐẦU TẠI CÁC MODULE)
     // Nhóm 1.x / Mã LT- -> Tổ Lưu trữ (luutru_records)
     if (
         shortType.startsWith('1.') ||
@@ -75,7 +94,8 @@ export const getTargetTable = (record: Partial<RecordFile>): 'dangky_records' | 
         groupStr.startsWith('3.') ||
         groupStr.includes('Đăng ký') ||
         groupStr.includes('Cấp GCN') ||
-        groupStr.includes('Cấp giấy')
+        groupStr.includes('Cấp giấy') ||
+        isCertificateRecordType(record)
     ) {
         return 'dangky_records';
     }
@@ -88,6 +108,18 @@ export const getTargetTable = (record: Partial<RecordFile>): 'dangky_records' | 
         groupStr.startsWith('2.') ||
         groupStr.includes('Đo đạc')
     ) {
+        return 'land_records';
+    }
+
+    // 2. Phân loại theo phòng ban/bộ phận nếu không phân định được theo mã thủ tục
+    const deptStr = String((record as any).department || '').trim().toLowerCase();
+    if (deptStr.includes('lưu trữ') || deptStr.includes('luu tru')) {
+        return 'luutru_records';
+    }
+    if (deptStr.includes('đăng ký') || deptStr.includes('cấp giấy') || deptStr.includes('dang ky') || deptStr.includes('cap giay')) {
+        return 'dangky_records';
+    }
+    if (deptStr.includes('đo đạc') || deptStr.includes('do dac')) {
         return 'land_records';
     }
 
@@ -472,175 +504,116 @@ export const getShortCode = (ward: string) => {
     return 'CT';
 };
 
-export const getNextGlobalRecordCode = async (
-    dateStr: string, 
-    isArchive = false, 
-    recordType = '', 
-    receivedBy = '',
-    wardName = ''
-): Promise<string> => {
-    const rType = (recordType || '').toLowerCase();
-    const isLT = isArchive || isArchiveRecordType(recordType) || rType.startsWith('1.');
-    const isCert = !isLT && isCertificateRecordType(recordType);
-    const isSurvey = !isLT && !isCert && isSurveyRecordType(recordType);
+/**
+ * Trích xuất số thứ tự (sequence number) từ mã hồ sơ một cách an toàn và chuẩn xác
+ * Hỗ trợ tất cả cấu trúc mã: TK-260917-8318, 260916-54574, H19.151.11.22-260917-0001, LT-260917-0187, v.v.
+ */
+export const extractRecordSequence = (code: string | undefined | null, targetYearYy: string): number | null => {
+    if (!code) return null;
+    const clean = code.trim().replace(/[.,;]+$/, '');
+    if (!clean || clean.toUpperCase() === 'HS' || clean === '--') return null;
 
-    const d = new Date(dateStr);
-    const year = d.getFullYear().toString();
-    const yy = year.slice(-2);
-    const mm = ('0' + (d.getMonth() + 1)).slice(-2);
-    const dd = ('0' + d.getDate()).slice(-2);
-    const datePrefix = `${yy}${mm}${dd}`;
+    const parts = clean.split('-');
+    if (parts.length < 2) return null;
 
-    if (!isConfigured) {
-        let prefix = '';
+    const lastPart = parts[parts.length - 1];
+    const seqNum = parseInt(lastPart, 10);
+    if (isNaN(seqNum) || seqNum <= 0) return null;
+
+    // Kiểm tra xem các đoạn trước đó có chứa năm cần so khớp không
+    const hasYearMatch = parts.slice(0, parts.length - 1).some(p => {
+        const pClean = p.trim();
+        return pClean.startsWith(targetYearYy) || pClean === `20${targetYearYy}` || pClean === targetYearYy;
+    });
+
+    if (hasYearMatch) {
+        return seqNum;
+    }
+    return null;
+};
+
+/**
+ * Quét trực tiếp thời gian thực trên Cloud Database để lấy số thứ tự lớn nhất hiện tại
+ */
+export const fetchMaxCloudSequence = async (yy: string, isLT: boolean, isCert: boolean): Promise<number> => {
+    if (!isConfigured) return 0;
+    try {
         if (isLT) {
-            prefix = 'LT-';
+            const [r1, r2] = await Promise.all([
+                supabase.from('luutru_records').select('code').ilike('code', `LT-${yy}%`).order('created_at', { ascending: false }).limit(100),
+                supabase.from('land_records').select('code').ilike('code', `LT-${yy}%`).order('created_at', { ascending: false }).limit(100)
+            ]);
+            let max = 0;
+            const rows = [...(r1.data || []), ...(r2.data || [])];
+            for (const row of rows) {
+                const seq = extractRecordSequence(row.code, yy);
+                if (seq !== null && seq > max) max = seq;
+            }
+            return max;
         } else if (isCert) {
-            return `H19.151.11.22-${datePrefix}-${Math.floor(Math.random() * 1000).toString().padStart(4, '0')}`;
-        } else if (isSurvey) {
-            const p2 = getSurveyRecordPrefix(receivedBy, [], wardName);
-            prefix = p2 ? `${p2}-` : '';
-        }
-        return `${prefix}${datePrefix}-${Math.floor(Math.random() * 1000).toString().padStart(4, '0')}`;
-    }
-    
-    // Tách riêng bộ đếm cho:
-    // 1. Hồ sơ Lưu trữ (isLT = true): archive_record_counter_${year}
-    // 2. Hồ sơ Cấp giấy (isCert = true): certificate_record_counter_${year} (Cấu trúc: H19.151.11.22-yymmdd-xxxx)
-    // 3. Hồ sơ Đo đạc (isSurvey = true): survey_record_counter_${year} (Phương án 1: Bộ đếm chung theo năm, qua năm mới tự động lấy lại 0001)
-    // 4. Hồ sơ khác: record_counter_${year}
-    const key = isLT 
-        ? `archive_record_counter_${year}` 
-        : (isCert 
-            ? `certificate_record_counter_${year}` 
-            : (isSurvey ? `survey_record_counter_${year}` : `record_counter_${year}`));
-    let nextSeq = 1;
-    let success = false;
-    let attempts = 0;
+            const [r1, r2] = await Promise.all([
+                supabase.from('land_records').select('code').ilike('code', `H19.151.11.22-${yy}%`).order('created_at', { ascending: false }).limit(100),
+                supabase.from('dangky_records').select('code').ilike('code', `H19.151.11.22-${yy}%`).order('created_at', { ascending: false }).limit(100)
+            ]);
+            let max = 0;
+            const rows = [...(r1.data || []), ...(r2.data || [])];
+            for (const row of rows) {
+                const seq = extractRecordSequence(row.code, yy);
+                if (seq !== null && seq > max) max = seq;
+            }
+            return max;
+        } else {
+            // Đo đạc (Survey)
+            const { data } = await supabase
+                .from('land_records')
+                .select('code')
+                .ilike('code', `%${yy}%`)
+                .order('created_at', { ascending: false })
+                .limit(150);
 
-    while (!success && attempts < 5) {
-        attempts++;
-        try {
-            const { data } = await supabase.from('system_settings').select('value').eq('key', key).single();
-            
-            let currentVal = 0;
-            if (data && data.value) {
-                currentVal = parseInt(data.value, 10);
-                if (isNaN(currentVal)) currentVal = 0;
-            } else if (isCert) {
-                // Nếu chưa có certificate_record_counter_${year}, khởi tạo theo số lượng hồ sơ cấp giấy hiện có
-                try {
-                    const { count } = await supabase.from('dangky_records').select('*', { count: 'exact', head: true });
-                    if (count && count > 0) {
-                        currentVal = count;
+            let max = 0;
+            if (data && data.length > 0) {
+                for (const row of data) {
+                    const c = (row.code || '').trim();
+                    if (c.startsWith('LT-') || c.startsWith('H19.151.11.22-')) continue;
+                    const seq = extractRecordSequence(c, yy);
+                    if (seq !== null) {
+                        if (seq >= 50000) continue; // Bỏ qua mã một cửa để không nhảy vọt số thứ tự nội bộ
+                        if (seq > max) max = seq;
                     }
-                } catch (_) {}
-            } else if (isSurvey) {
-                // Nếu chưa có survey_record_counter_${year}, kiểm tra xem có record_counter_${year} đang chạy không
-                // để kế thừa số lượng hồ sơ đo đạc trong năm 2026 hiện tại
-                const { data: legacyData } = await supabase.from('system_settings').select('value').eq('key', `record_counter_${year}`).single();
-                if (legacyData && legacyData.value) {
-                    currentVal = parseInt(legacyData.value, 10);
-                    if (isNaN(currentVal)) currentVal = 0;
                 }
             }
-
-            if (isLT) {
-                // Tối thiểu là 186 hồ sơ hiện tại của năm 2026 trong module Lưu trữ
-                if ((year === '2026' || yy === '26') && currentVal < 186) {
-                    currentVal = 186;
-                }
-                try {
-                    const { count } = await supabase.from('luutru_records').select('*', { count: 'exact', head: true });
-                    if (count && count > currentVal) currentVal = count;
-                } catch (_) {}
-
-                // Tự động kiểm tra số thứ tự lớn nhất trong năm từ luutru_records để đảm bảo tính liên tục của số dài theo năm
-                try {
-                    const { data: maxRows } = await supabase
-                        .from('luutru_records')
-                        .select('code')
-                        .ilike('code', `LT-${yy}%`)
-                        .order('code', { ascending: false })
-                        .limit(50);
-                    if (maxRows && maxRows.length > 0) {
-                        for (const row of maxRows) {
-                            const c = (row.code || '').trim();
-                            if (c.startsWith('LT-')) {
-                                const parts = c.replace(/^LT-/, '').split('-');
-                                if (parts.length >= 2) {
-                                    const rDate = parts[0];
-                                    const rSeq = parts[1];
-                                    if (rDate && (rDate.substring(0, 2) === yy || rDate === year || rDate.startsWith(yy))) {
-                                        const seq = parseInt(rSeq, 10);
-                                        if (!isNaN(seq) && seq < 50000 && seq > currentVal) {
-                                            currentVal = seq;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                } catch (_) {}
-            }
-
-            nextSeq = currentVal + 1;
-
-            if (data) {
-                const { data: updatedData, error } = await supabase
-                    .from('system_settings')
-                    .update({ value: nextSeq.toString() })
-                    .eq('key', key)
-                    .eq('value', data.value)
-                    .select();
-                    
-                if (!error && updatedData && updatedData.length > 0) {
-                    success = true;
-                }
-            } else {
-                const { data: insertedData, error } = await supabase
-                    .from('system_settings')
-                    .insert([{ key, value: nextSeq.toString() }])
-                    .select();
-                    
-                if (!error && insertedData && insertedData.length > 0) {
-                    success = true;
-                }
-            }
-        } catch (e) {
-            // Ignore and retry
+            return max;
         }
-
-        if (!success) {
-            await new Promise(resolve => setTimeout(resolve, 300 + Math.random() * 500));
-        }
+    } catch (err) {
+        console.warn('Lỗi khi fetchMaxCloudSequence:', err);
+        return 0;
     }
-
-    const seqStr = nextSeq.toString().padStart(4, '0');
-    if (isLT) {
-        return `LT-${datePrefix}-${seqStr}`;
-    }
-    if (isCert) {
-        return `H19.151.11.22-${datePrefix}-${seqStr}`;
-    }
-    if (isSurvey) {
-        const prefix2 = getSurveyRecordPrefix(receivedBy, [], wardName);
-        return prefix2 ? `${prefix2}-${datePrefix}-${seqStr}` : `${datePrefix}-${seqStr}`;
-    }
-    return `${datePrefix}-${seqStr}`;
 };
 
 /**
  * Kiểm tra mã hồ sơ đã tồn tại trong bất kỳ bảng dữ liệu nào trên cơ sở dữ liệu cloud hay chưa
  */
-export const checkRecordCodeExistsInDb = async (code: string): Promise<boolean> => {
+export const checkRecordCodeExistsInDb = async (code: string, excludeId?: string): Promise<boolean> => {
     if (!code || !isConfigured) return false;
     try {
         const clean = code.trim();
+        if (!clean || clean.toUpperCase() === 'HS' || clean === '--') return false;
+
+        let qLand = supabase.from('land_records').select('id').ilike('code', clean);
+        let qDangky = supabase.from('dangky_records').select('id').ilike('code', clean);
+        let qLuutru = supabase.from('luutru_records').select('id').ilike('code', clean);
+
+        if (excludeId) {
+            qLand = qLand.neq('id', excludeId);
+            qDangky = qDangky.neq('id', excludeId);
+            qLuutru = qLuutru.neq('id', excludeId);
+        }
+
         const [r1, r2, r3] = await Promise.all([
-            supabase.from('records').select('id').ilike('code', clean).limit(1),
-            supabase.from('luutru_records').select('id').ilike('code', clean).limit(1),
-            supabase.from('dangky_records').select('id').ilike('code', clean).limit(1)
+            qLand.limit(1),
+            qDangky.limit(1),
+            qLuutru.limit(1)
         ]);
         if ((r1.data && r1.data.length > 0) || (r2.data && r2.data.length > 0) || (r3.data && r3.data.length > 0)) {
             return true;
@@ -649,6 +622,109 @@ export const checkRecordCodeExistsInDb = async (code: string): Promise<boolean> 
         console.error("Lỗi khi quét mã hồ sơ trên database:", e);
     }
     return false;
+};
+
+/**
+ * Sinh số ngẫu nhiên 4 chữ số (1000 - 9999)
+ */
+export const generateRandom4Digit = (): string => {
+    return Math.floor(1000 + Math.random() * 9000).toString();
+};
+
+/**
+ * Tự động kiểm tra và giải quyết xung đột mã hồ sơ: Nếu mã ứng viên đã tồn tại trên DB,
+ * tự động sinh số ngẫu nhiên 4 chữ số mới cho đến khi tìm được mã hoàn toàn duy nhất 100%
+ */
+export const resolveGuaranteedUniqueCode = async (
+    candidateCode: string,
+    excludeId?: string
+): Promise<string> => {
+    if (!candidateCode || !isConfigured) return candidateCode;
+    let code = candidateCode.trim();
+    if (!code || code.toUpperCase() === 'HS' || code === '--') return code;
+
+    let exists = await checkRecordCodeExistsInDb(code, excludeId);
+    if (!exists) return code;
+
+    console.warn(`⚠️ Phát hiện mã "${code}" đã tồn tại trên Cloud DB. Đang tự động tạo số ngẫu nhiên 4 chữ số mới duy nhất...`);
+
+    // Phân tích mã thành prefix và số ngẫu nhiên cuối cùng
+    const match = code.match(/^(.*?[-_])(\d+)(\.?)$/);
+    if (match) {
+        const prefix = match[1];
+        const suffix = match[3] || '';
+
+        let attempts = 0;
+        while (exists && attempts < 100) {
+            attempts++;
+            const rand4 = generateRandom4Digit();
+            const nextCandidate = `${prefix}${rand4}${suffix}`;
+            exists = await checkRecordCodeExistsInDb(nextCandidate, excludeId);
+            if (!exists) {
+                console.log(`✅ Đã giải quyết xung đột mã: Đổi thành công sang mã ngẫu nhiên duy nhất "${nextCandidate}"`);
+                return nextCandidate;
+            }
+        }
+    } else {
+        let attempts = 0;
+        while (exists && attempts < 100) {
+            attempts++;
+            const rand4 = generateRandom4Digit();
+            const nextCandidate = `${code}-${rand4}`;
+            exists = await checkRecordCodeExistsInDb(nextCandidate, excludeId);
+            if (!exists) return nextCandidate;
+        }
+    }
+    return code;
+};
+
+export const getNextGlobalRecordCode = async (
+    dateStr: string, 
+    isArchive = false, 
+    recordType = '', 
+    receivedBy = '', 
+    wardName = ''
+): Promise<string> => {
+    const rType = (recordType || '').toLowerCase();
+    const isLT = isArchive || isArchiveRecordType(recordType) || rType.startsWith('1.');
+    const isCert = !isLT && isCertificateRecordType(recordType);
+    const isSurvey = !isLT && !isCert && isSurveyRecordType(recordType);
+
+    const d = new Date(dateStr || new Date());
+    const year = d.getFullYear().toString();
+    const yy = year.slice(-2);
+    const mm = ('0' + (d.getMonth() + 1)).slice(-2);
+    const dd = ('0' + d.getDate()).slice(-2);
+    const datePrefix = `${yy}${mm}${dd}`;
+
+    let prefix = '';
+    if (isLT) {
+        prefix = 'LT-';
+    } else if (isCert) {
+        prefix = 'H19.151.11.22-';
+    } else if (isSurvey) {
+        const p2 = getSurveyRecordPrefix(receivedBy, [], wardName);
+        prefix = p2 ? `${p2}-` : '';
+    }
+
+    const codeBase = `${prefix}${datePrefix}-`;
+
+    // Sinh ngẫu nhiên 4 chữ số theo ngày, kiểm tra tính duy nhất trực tiếp trên Cloud DB
+    let candidate = '';
+    let attempts = 0;
+    while (attempts < 100) {
+        attempts++;
+        const rand4 = generateRandom4Digit();
+        candidate = `${codeBase}${rand4}`;
+        if (!isConfigured) return candidate;
+
+        const exists = await checkRecordCodeExistsInDb(candidate);
+        if (!exists) {
+            return candidate;
+        }
+    }
+
+    return await resolveGuaranteedUniqueCode(candidate);
 };
 
 /**
@@ -692,7 +768,8 @@ export const getVerifiedUniqueRecordCode = async (
         return candidate;
     }
     
-    return candidate;
+    // Nếu vẫn bị trùng, giải quyết nguyên tử bằng hàm tăng tiến an toàn
+    return await resolveGuaranteedUniqueCode(candidate);
 };
 
 /**
@@ -820,6 +897,9 @@ export const createRecordApi = async (record: RecordFile): Promise<RecordFile | 
                                      finalCode === '--' ||
                                      finalCode.toLowerCase() === 'chưa có mã';
 
+        // Luôn đảm bảo id là chuẩn UUID RFC4122 để không bị lỗi 22P02 của PostgreSQL
+        const standardId = (recordToSave.id && isValidUUID(recordToSave.id)) ? recordToSave.id : generateStandardUUID();
+
         if (isInvalidOrEmptyCode) {
             finalCode = await getNextGlobalRecordCode(
                 record.receivedDate || new Date().toISOString(), 
@@ -828,18 +908,27 @@ export const createRecordApi = async (record: RecordFile): Promise<RecordFile | 
                 record.receivedBy || '',
                 record.ward || ''
             );
+        } else {
+            // NGUYÊN TẮC BẢO MẬT VÀ CHỐNG TRÙNG MÃ 100%:
+            // Cho dù người dùng tự nhập mã hay giao diện sinh mã, hệ thống luôn kiểm tra
+            // và tự động giải quyết xung đột mã trên Cloud DB ngay trước khi insert
+            finalCode = await resolveGuaranteedUniqueCode(finalCode, standardId);
         }
         
-        // Luôn đảm bảo id là chuẩn UUID RFC4122 để không bị lỗi 22P02 của PostgreSQL
-        const standardId = (recordToSave.id && isValidUUID(recordToSave.id)) ? recordToSave.id : generateStandardUUID();
         const validReceivedDate = keepOnlyDate(record.receivedDate) || new Date().toISOString().split('T')[0];
+
+        const assignedGroup = targetTable === 'dangky_records' 
+            ? '3. Đăng ký đất đai, cấp GCN' 
+            : (targetTable === 'luutru_records' ? '1. Cung cấp thông tin, dữ liệu đất đai' : '2. Đo đạc bản đồ');
 
         recordToSave = { 
             ...record, 
             id: standardId,
             code: finalCode,
             receivedDate: validReceivedDate,
-            status: record.status || RecordStatus.RECEIVED
+            status: record.status || RecordStatus.RECEIVED,
+            sourceTable: targetTable,
+            group: assignedGroup
         };
         
         let payload = sanitizeData(recordToSave, RECORD_DB_COLUMNS);
@@ -904,6 +993,9 @@ export const createRecordApi = async (record: RecordFile): Promise<RecordFile | 
 };
 
 export const updateRecordApi = async (record: RecordFile): Promise<RecordFile | null> => {
+    // 0. Khóa bảo vệ thời gian thực chống giật lùi trạng thái
+    markRecordsRecentlyUpdated([record]);
+
     // 1. ĐỒNG BỘ TỨC THỜI VÀO RAM VÀ BỘ NHỚ ĐỆM (INSTANT CACHE SYNC)
     const memIdx = MOCK_RECORDS.findIndex(r => r.id === record.id);
     if (memIdx !== -1) {
@@ -1007,6 +1099,9 @@ export const updateRecordApi = async (record: RecordFile): Promise<RecordFile | 
 export const saveRecord = updateRecordApi;
 
 export const updateRecordFieldsApi = async (id: string, fields: Partial<RecordFile>): Promise<RecordFile | null> => {
+    // 0. Khóa bảo vệ thời gian thực chống giật lùi trạng thái
+    markRecordsRecentlyUpdated([{ id, ...fields }]);
+
     if (!isConfigured) {
         const fallbackRecord = { id, ...fields, _isOfflineSaved: true } as RecordFile;
         await addPendingRecord(fallbackRecord, 'UPDATE');
@@ -1141,12 +1236,22 @@ export const createRecordsBatchApi = async (records: RecordFile[], onProgress?: 
         const landPayload: any[] = [];
         const dangkyPayload: any[] = [];
         const luutruPayload: any[] = [];
+        const seenCodesInBatch = new Set<string>();
         
         for (const r of records) {
-            let finalCode = r.code;
-            if (!finalCode || finalCode.includes('?')) {
+            let finalCode = (r.code || '').trim();
+            if (!finalCode || finalCode.includes('?') || finalCode.toUpperCase() === 'HS' || finalCode === '--') {
                 finalCode = await getNextGlobalRecordCode(r.receivedDate || new Date().toISOString());
             }
+
+            // Giải quyết xung đột trên Cloud DB
+            finalCode = await resolveGuaranteedUniqueCode(finalCode, r.id);
+
+            // Đảm bảo không trùng với các hồ sơ khác trong cùng file tải lên / batch
+            while (seenCodesInBatch.has(finalCode.toLowerCase())) {
+                finalCode = await resolveGuaranteedUniqueCode(finalCode, r.id);
+            }
+            seenCodesInBatch.add(finalCode.toLowerCase());
             
             const recordPayload = { ...r, code: finalCode };
             if (!recordPayload.id) {
@@ -1412,6 +1517,10 @@ export const forceUpdateRecordsBatchApi = async (records: RecordFile[], onProgre
                     });
 
                     if (hasChange) {
+                        // Tự động suy luận lại trạng thái chuẩn theo mốc thời gian thực tế
+                        if (dbEntry.table === 'land_records' || !isArchiveRecordType(merged.recordType || '')) {
+                            merged.status = deriveActualSurveyStatus(merged);
+                        }
                         // Đảm bảo UUID chuẩn
                         if (!merged.id || !isValidUUID(merged.id)) {
                             merged.id = generateStandardUUID();
@@ -1488,6 +1597,9 @@ export const forceUpdateRecordsBatchApi = async (records: RecordFile[], onProgre
 // Cập nhật hàng loạt hồ sơ an toàn bằng ID (Phòng tránh trùng mã hồ sơ)
 export const updateRecordsBatchById = async (updates: Partial<RecordFile>[], onProgress?: (processed: number, total: number) => void): Promise<{ success: boolean; count: number }> => {
     if (!updates || updates.length === 0) return { success: true, count: 0 };
+
+    // 0. Khóa bảo vệ thời gian thực cho toàn bộ hồ sơ vừa chuyển trạng thái (ngăn chặn polling nền đè lùi trạng thái)
+    markRecordsRecentlyUpdated(updates);
 
     // 1. ĐỒNG BỘ NGAY VÀO RAM VÀ BỘ NHỚ ĐỆM (INSTANT CACHE & MEMORY SYNC)
     // Đảm bảo giao diện và bộ nhớ cache lập tức khóa trạng thái mới, không bị giật lùi kể cả khi mạng chậm

@@ -89,8 +89,8 @@ export const mapArchiveDbToRecordFile = (row: any): RecordFile => {
         authorizedBy: row.authorizedBy || null,
         authDocType: row.authDocType || null,
         otherDocs: row.otherDocs || null,
-        exportBatch: row.exportBatch || null,
-        exportDate: row.exportDate || null,
+        exportBatch: row.exportBatch || row.data?.danh_sach || null,
+        exportDate: row.exportDate || row.completedWorkDate || (row.data?.ngay_hoan_thanh) || null,
         handoverWard: row.handoverWard || null,
         measurementNumber: row.measurementNumber || null,
         excerptNumber: row.excerptNumber || null,
@@ -201,8 +201,8 @@ export const mapArchiveRecordToLuutruDb = (r: Partial<ArchiveRecord>): any => {
     else if (rawSt === 'checked') status = RecordStatus.PENDING_SIGN;
     else if (rawSt === 'pending_sign') status = RecordStatus.PENDING_SIGN;
     else if (rawSt === 'signed') status = RecordStatus.SIGNED;
-    else if (rawSt === 'completed') status = RecordStatus.RETURNED;
-    else if (rawSt === 'handover') status = RecordStatus.HANDOVER;
+    else if (rawSt === 'completed' || rawSt === 'handover') status = RecordStatus.HANDOVER;
+    else if (rawSt === 'returned') status = RecordStatus.RETURNED;
     else if (rawSt === 'withdrawn') status = RecordStatus.WITHDRAWN;
     else if (rawSt === 'rejected') status = RecordStatus.REJECTED;
 
@@ -240,8 +240,8 @@ export const mapArchiveRecordToLuutruDb = (r: Partial<ArchiveRecord>): any => {
         phoneNumber: d.phoneNumber || null,
         cccd: d.cccd || null,
         customerAddress: d.customerAddress || null,
-        exportBatch: r.exportBatch || d.exportBatch || null,
-        exportDate: d.exportDate || null,
+        exportBatch: r.exportBatch || d.exportBatch || d.danh_sach || null,
+        exportDate: d.exportDate || d.ngay_hoan_thanh || null,
         resultReturnedDate: d.resultReturnedDate || null,
         receiverName: d.receiverName || null,
         receiptNumber: d.receiptNumber || null,
