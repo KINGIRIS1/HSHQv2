@@ -14,7 +14,7 @@ import { DEFAULT_VISIBLE_COLUMNS, confirmAction, COLUMN_DEFS, processAssignmentT
 import { exportReportToExcel, exportReturnedListToExcel } from './utils/excelExport';
 import { generateReport } from './services/geminiService';
 import { syncTemplatesFromCloud } from './services/docxService'; 
-import { updateRecordApi, updateRecordFieldsApi, saveEmployeeApi, saveUserApi, forceUpdateRecordsBatchApi, updateRecordsBatchById, logSystemEvent } from './services/api';
+import { updateRecordApi, updateRecordFieldsApi, saveEmployeeApi, saveUserApi, forceUpdateRecordsBatchApi, updateRecordsBatchById, logSystemEvent, markRecordsRecentlyUpdated } from './services/api';
 import { migrateArchiveRecordsFromLandRecords, createArchiveBatch, getOrGenerateDailyHighestBatch } from './services/apiArchive';
 import { ReturnOptionType } from './components/RejectReturnStepModal';
 import * as XLSX from 'xlsx-js-style';
@@ -1400,14 +1400,16 @@ function App() {
 
       const updateMap = new Map<string, RecordFile>();
       updatesToApply.forEach(u => updateMap.set(u.id, u));
+      markRecordsRecentlyUpdated(updatesToApply);
       setRecords(prev => prev.map(r => updateMap.get(r.id) || r));
 
       const recordIds = updatesToApply.map(u => u.id);
-      await createArchiveBatch(pureBatch, recordIds, 'global', batchDate);
-
-      updateRecordsBatchById(updatesToApply).catch(err => {
-          console.error("Lỗi khi chốt đợt xuất giao 1 cửa chung:", err);
-      });
+      
+      // Chạy đồng thời cập nhật DB chính và lưu đợt xuất
+      await Promise.allSettled([
+          updateRecordsBatchById(updatesToApply),
+          createArchiveBatch(pureBatch, recordIds, 'global', batchDate)
+      ]);
 
       setSelectedRecordIds(new Set()); 
       setToast({ type: 'success', message: `Đã chốt danh sách giao 1 cửa chung "${pureBatch}" (${updatesToApply.length} hồ sơ) thành công.` });
@@ -1477,6 +1479,7 @@ function App() {
       // Cập nhật giao diện tức thì 0 giây với O(1) Map
       const updateMap = new Map<string, RecordFile>();
       updatedTargets.forEach(u => updateMap.set(u.id, u));
+      markRecordsRecentlyUpdated(updatedTargets);
       setRecords(prev => prev.map(r => updateMap.get(r.id) || r));
 
       setSelectedRecordIds(new Set());

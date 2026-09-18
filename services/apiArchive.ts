@@ -1058,33 +1058,63 @@ export const createArchiveBatch = async (
 
         if (recordIds.length > 0 && isConfigured) {
             // Update luutru_records
-            await updateArchiveRecordsBatch(recordIds, {
-                status: 'completed',
-                exportBatch: finalBatchName,
-                data: {
+            try {
+                await updateArchiveRecordsBatch(recordIds, {
+                    status: 'completed',
+                    exportBatch: finalBatchName,
+                    data: {
+                        exportBatch: finalBatchName,
+                        exportDate: handoverDate,
+                        ngay_hoan_thanh: handoverDate,
+                        danh_sach: finalBatchName,
+                        updated_at: nowIso
+                    }
+                });
+            } catch (err) {
+                console.warn('⚠️ updateArchiveRecordsBatch inside createArchiveBatch safely caught:', err);
+            }
+
+            // Update land_records (thử cả camelCase và snake_case)
+            try {
+                const { error: err1 } = await supabase.from('land_records').update({
                     exportBatch: finalBatchName,
                     exportDate: handoverDate,
-                    ngay_hoan_thanh: handoverDate,
-                    danh_sach: finalBatchName,
-                    updated_at: nowIso
+                    updated_at: nowIso,
+                    status: 'HANDOVER'
+                }).in('id', recordIds);
+                
+                if (err1) {
+                    await supabase.from('land_records').update({
+                        export_batch: finalBatchName,
+                        export_date: handoverDate,
+                        updated_at: nowIso,
+                        status: 'HANDOVER'
+                    }).in('id', recordIds);
                 }
-            });
+            } catch (err) {
+                console.warn('⚠️ land_records update inside createArchiveBatch safely caught:', err);
+            }
 
-            // Update land_records
-            await supabase.from('land_records').update({
-                export_batch: finalBatchName,
-                export_date: handoverDate,
-                updated_at: nowIso,
-                status: 'HANDOVER'
-            }).in('id', recordIds);
+            // Update dangky_records (thử cả camelCase và snake_case)
+            try {
+                const { error: err2 } = await supabase.from('dangky_records').update({
+                    exportBatch: finalBatchName,
+                    exportDate: handoverDate,
+                    updated_at: nowIso,
+                    status: 'HANDOVER'
+                }).in('id', recordIds);
 
-            // Update dangky_records
-            await supabase.from('dangky_records').update({
-                export_batch: finalBatchName,
-                export_date: handoverDate,
-                updated_at: nowIso,
-                status: 'HANDOVER'
-            }).in('id', recordIds);
+                if (err2) {
+                    await supabase.from('dangky_records').update({
+                        export_batch: finalBatchName,
+                        export_date: handoverDate,
+                        updated_at: nowIso,
+                        status: 'HANDOVER'
+                    }).in('id', recordIds);
+                }
+            } catch (err) {
+                console.warn('⚠️ dangky_records update inside createArchiveBatch safely caught:', err);
+            }
         }
 
         return { success: true, batchName: finalBatchName, count: recordIds.length };
