@@ -1,5 +1,6 @@
 import { RecordStatus, RecordFile } from '../types';
-import { getShortRecordType } from '../constants';
+import { getShortRecordType, DEFAULT_HOLIDAYS } from '../constants';
+import { parseSafeDate, formatDateKey, getSolarDateFromLunar, calculateDeadlineHelper } from './appHelpers';
 
 export type RegistrationWorkflowCategory = 
   | 'tax_transfer'   // Có nghĩa vụ tài chính (chuyển thuế, chờ GNT)
@@ -1095,5 +1096,180 @@ export const getStepSlaInfo = (
     overdueLabel: isOverdue ? `Trễ ${formatWorkingHours(overdueHours)}` : '',
     percent,
     startTime,
+  };
+};
+
+/**
+ * Cấu trúc ngày hẹn giải quyết (2 Giai đoạn: Hẹn lấy TB Thuế và Hẹn Trả kết quả GCN)
+ */
+export interface AppointmentInfo {
+  phase: 'tax_notice' | 'final_result';
+  label: string;
+  shortLabel: string;
+  appointmentDate: string; // YYYY-MM-DD
+  formattedAppointmentDate: string; // DD/MM/YYYY
+  badgeColor: string;
+  description: string;
+  isTaxPhase: boolean;
+  isPostingPhase: boolean;
+}
+
+/**
+ * Định dạng chuỗi ngày YYYY-MM-DD thành DD/MM/YYYY
+ */
+export const formatDateToVN = (dateStr: string | null | undefined): string => {
+  if (!dateStr) return '—';
+  if (dateStr.includes('/')) return dateStr;
+  const d = parseSafeDate(dateStr);
+  if (!d) return dateStr;
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  return `${day}/${month}/${year}`;
+};
+
+/**
+ * Cộng số ngày lịch (calendar days) từ một mốc ngày
+ */
+export const addCalendarDays = (startDateStr: string | Date | null | undefined, daysToAdd: number): string => {
+  if (!startDateStr) return '';
+  const start = parseSafeDate(startDateStr) || new Date();
+  const d = new Date(start.getTime());
+  d.setDate(d.getDate() + daysToAdd);
+  return formatDateKey(d);
+};
+
+/**
+ * Cộng số ngày làm việc hành chính (bỏ qua Thứ 7, Chủ Nhật và các ngày nghỉ lễ)
+ */
+export const addWorkingDays = (
+  startDateStr: string | Date | null | undefined,
+  daysToAdd: number,
+  holidays: any[] = DEFAULT_HOLIDAYS
+): string => {
+  if (!startDateStr) return '';
+  const parsedStart = parseSafeDate(startDateStr);
+  if (!parsedStart) return '';
+  
+  const startDate = new Date(parsedStart.getTime());
+  let currentDate = new Date(startDate.getTime());
+  
+  const holidaySet = new Set<string>();
+  const currentYear = startDate.getFullYear();
+  const yearsToCheck = [currentYear, currentYear + 1];
+
+  const effectiveHolidays = (Array.isArray(holidays) && holidays.length > 0) ? holidays : DEFAULT_HOLIDAYS;
+
+  if (effectiveHolidays && effectiveHolidays.length > 0) {
+    effectiveHolidays.forEach(h => {
+      yearsToCheck.forEach(year => {
+        if (h.isLunar) {
+          const solarDate = getSolarDateFromLunar(h.day, h.month, year);
+          if (solarDate) holidaySet.add(formatDateKey(solarDate));
+        } else {
+          const solarDate = new Date(year, h.month - 1, h.day);
+          holidaySet.add(formatDateKey(solarDate));
+        }
+      });
+    });
+  }
+
+  let count = 0;
+  while (count < daysToAdd) {
+    currentDate.setDate(currentDate.getDate() + 1);
+    const dayOfWeek = currentDate.getDay();
+    const dateString = formatDateKey(currentDate);
+    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+    const isHoliday = holidaySet.has(dateString);
+
+    if (!isWeekend && !isHoliday) {
+      count++;
+    }
+  }
+
+  return formatDateKey(currentDate);
+};
+
+/**
+ * Tính toán Ngày hẹn trả kết quả theo nghiệp vụ 2 giai đoạn (Hẹn TB Thuế & Hẹn Trả GCN)
+ */
+export const getAppointmentInfo = (
+  record: RecordFile,
+  holidays: any[] = DEFAULT_HOLIDAYS
+): AppointmentInfo => {
+  const category = getRegistrationWorkflowCategory(record.recordType);
+  const isTaxCategory = category === 'tax_transfer' || category === 'lost_cert_tax';
+  const receivedDate = record.receivedDate || formatDateKey(new Date());
+
+  const isTaxPaid = Boolean(record.taxPaymentDate);
+  const postTaxStatuses = [
+    RecordStatus.PENDING_PRINT_CERT,
+    RecordStatus.PENDING_CHECK,
+    RecordStatus.PENDING_SIGN,
+    RecordStatus.SIGNED,
+    RecordStatus.HANDOVER,
+    RecordStatus.RETURNED,
+  ];
+  const isPostTaxStatus = postTaxStatuses.includes(record.status);
+
+  // Giai đoạn 1: Hồ sơ có thuế nhưng chưa nộp thuế (chờ TB thuế / chờ nộp tiền)
+  if (isTaxCategory && !isTaxPaid && !isPostTaxStatus) {
+    let appDate = '';
+    let desc = '';
+
+    if (category === 'lost_cert_tax') {
+      // 3.3.2 Cấp lại có thuế: 30 ngày niêm yết xã + 5 ngày làm việc xác định thuế
+      const postingEndDate = record.postingEndDate || addCalendarDays(receivedDate, 30);
+      appDate = addWorkingDays(postingEndDate, 5, holidays);
+      desc = 'Ngày hẹn dự kiến lấy Thông báo thuế (Bao gồm 30 ngày niêm yết tại UBND xã + 5 ngày làm việc xác định thuế)';
+    } else {
+      // 3.1.x, 3.2.2, 3.4.2, 3.6.1... các thủ tục có thuế thông thường: 5 ngày làm việc
+      appDate = addWorkingDays(receivedDate, 5, holidays);
+      desc = 'Ngày hẹn dự kiến lấy Thông báo thuế (5 ngày làm việc từ ngày tiếp nhận hồ sơ)';
+    }
+
+    return {
+      phase: 'tax_notice',
+      label: 'Ngày hẹn lấy Thông báo thuế (Dự kiến)',
+      shortLabel: 'Hẹn lấy TB Thuế',
+      appointmentDate: appDate,
+      formattedAppointmentDate: formatDateToVN(appDate),
+      badgeColor: 'bg-indigo-100 text-indigo-800 border-indigo-300',
+      description: desc,
+      isTaxPhase: true,
+      isPostingPhase: category === 'lost_cert_tax' && record.status === RecordStatus.PENDING_POSTING,
+    };
+  }
+
+  // Giai đoạn 2: Đã nộp tiền thuế (hoặc Hồ sơ thuộc luồng Không phát sinh thuế) -> Trả kết quả GCN
+  let appDate = '';
+  let desc = '';
+
+  if (isTaxCategory) {
+    // Đã nộp thuế: Tính từ ngày nộp thuế + 10 ngày làm việc xử lý còn lại của VPĐK
+    const baseDate = record.taxPaymentDate || record.printCertDate || receivedDate;
+    appDate = addWorkingDays(baseDate, 10, holidays);
+    desc = 'Ngày hẹn dự kiến Trả kết quả Giấy chứng nhận (10 ngày làm việc sau khi công dân nộp Giấy nộp tiền thuế)';
+  } else if (category === 'lost_cert') {
+    // 3.3.1 Cấp lại không thuế: 30 ngày niêm yết xã + 10 ngày làm việc VPĐK
+    const postingEndDate = record.postingEndDate || addCalendarDays(receivedDate, 30);
+    appDate = addWorkingDays(postingEndDate, 10, holidays);
+    desc = 'Ngày hẹn dự kiến Trả kết quả (Bao gồm 30 ngày niêm yết tại UBND xã + 10 ngày làm việc của Chi nhánh)';
+  } else {
+    // Thủ tục không thuế tiêu chuẩn (Chuyển quyền không thuế, Cấp đổi không thuế, Thế chấp...)
+    appDate = record.deadline || calculateDeadlineHelper(record.recordType || '', receivedDate, holidays);
+    desc = 'Ngày hẹn dự kiến Trả kết quả theo quy định Chi nhánh';
+  }
+
+  return {
+    phase: 'final_result',
+    label: 'Ngày hẹn Trả kết quả (Dự kiến)',
+    shortLabel: 'Hẹn trả GCN',
+    appointmentDate: appDate,
+    formattedAppointmentDate: formatDateToVN(appDate),
+    badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+    description: desc,
+    isTaxPhase: false,
+    isPostingPhase: category === 'lost_cert' && record.status === RecordStatus.PENDING_POSTING,
   };
 };

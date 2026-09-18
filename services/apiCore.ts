@@ -123,9 +123,10 @@ export const logError = (context: string, error: any, silent: boolean = false) =
             connectionManager.reportNetworkError(context, error);
         }
     } else if (code === '42P01' || code === 'PGRST205' || (typeof msg === 'string' && msg.includes('schema cache'))) {
-        console.error(`❌ Lỗi tại ${context}: Bảng dữ liệu chưa tồn tại trên Supabase! (Code: ${code || 'PGRST205'})`);
+        const missingTable = context.includes('Contract') ? 'contracts' : (context.includes('DangKy') ? 'dangky_records' : 'luutru_records');
+        console.error(`❌ Lỗi tại ${context}: Bảng dữ liệu '${missingTable}' chưa tồn tại trên Supabase! (Code: ${code || 'PGRST205'})`);
         if (!silent) {
-            alert(`LỖI BẢNG DỮ LIỆU: Bảng '${context.includes('Contract') ? 'contracts' : 'luutru_records'}' chưa tồn tại trên Supabase!\n\nVui lòng truy cập SQL Editor trên trang quản trị Supabase và chạy file SQL tạo bảng tương ứng.`);
+            alert(`LỖI BẢNG DỮ LIỆU: Bảng '${missingTable}' chưa được tạo trên Supabase!\n\nVui lòng truy cập SQL Editor trên Supabase và chạy lệnh SQL tạo bảng tương ứng.\n\nHoặc vào giao diện "Quản lý / Kiểm tra Database" trong hệ thống để xem mã SQL khởi tạo đầy đủ.`);
         }
     } else if (code === '22P02') {
         console.error(`❌ Lỗi tại ${context}: Định dạng dữ liệu không khớp kiểu cột Supabase (Lỗi 22P02). Hệ thống sẽ tự động xử lý ép kiểu an toàn.`);

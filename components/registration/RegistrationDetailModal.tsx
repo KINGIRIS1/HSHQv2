@@ -21,6 +21,7 @@ import { RegistrationWorkflowStepper } from './RegistrationWorkflowStepper';
 import {
   getRegistrationWorkflow,
   WorkflowStep,
+  getAppointmentInfo,
 } from '../../utils/registrationWorkflows';
 
 interface RegistrationDetailModalProps {
@@ -304,6 +305,31 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
                       />
                     </div>
                   </div>
+
+                  {/* Thẻ thông tin Ngày hẹn trả theo giai đoạn quy trình */}
+                  {(() => {
+                    const appInfo = getAppointmentInfo(formData);
+                    return (
+                      <div className={`p-3 rounded-xl border flex flex-col gap-1 ${
+                        appInfo.phase === 'tax_notice'
+                          ? 'bg-indigo-50/80 border-indigo-200 text-indigo-900'
+                          : 'bg-emerald-50/80 border-emerald-200 text-emerald-900'
+                      }`}>
+                        <div className="flex items-center justify-between text-xs font-bold">
+                          <span className="flex items-center gap-1.5">
+                            <Clock size={14} className={appInfo.phase === 'tax_notice' ? 'text-indigo-600' : 'text-emerald-600'} />
+                            <span>{appInfo.label}</span>
+                          </span>
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                            appInfo.phase === 'tax_notice' ? 'bg-indigo-200 text-indigo-900' : 'bg-emerald-200 text-emerald-900'
+                          }`}>
+                            {appInfo.formattedAppointmentDate}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-600 mt-0.5">{appInfo.description}</p>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* Nhật ký trạng thái */}

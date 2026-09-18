@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { RecordFile, Employee, RecordStatus, DossierComponentItem } from '../../types';
 import StatusBadge from '../StatusBadge';
-import { getRegistrationWorkflowCategory, getStepSlaInfo } from '../../utils/registrationWorkflows';
+import { getRegistrationWorkflowCategory, getStepSlaInfo, getAppointmentInfo } from '../../utils/registrationWorkflows';
 
 interface RegistrationRecordRowProps {
   record: RecordFile;
@@ -184,22 +184,30 @@ export const RegistrationRecordRow: React.FC<RegistrationRecordRowProps> = ({
 
       {/* Ngày tiếp nhận & Hạn giải quyết */}
       <td className="py-2.5 px-3 text-slate-600">
-        <div className="flex flex-col text-[11px]">
-          <span className="flex items-center gap-1">
-            <Calendar size={11} className="text-slate-400" />
-            {record.receivedDate || '—'}
-          </span>
-          {record.deadline && (
-            <span
-              className={`flex items-center gap-1 font-bold ${
-                isOverdue ? 'text-red-600' : 'text-slate-500'
-              }`}
-            >
-              <Clock size={11} />
-              {record.deadline} {isOverdue && '(Quá hạn)'}
-            </span>
-          )}
-        </div>
+        {(() => {
+          const appInfo = getAppointmentInfo(record);
+          return (
+            <div className="flex flex-col text-[11px] gap-0.5">
+              <span className="flex items-center gap-1 text-slate-500">
+                <Calendar size={11} className="text-slate-400" />
+                <span>Nhận: {record.receivedDate || '—'}</span>
+              </span>
+              <span
+                className={`flex items-center gap-1 font-bold ${
+                  appInfo.phase === 'tax_notice'
+                    ? 'text-indigo-700'
+                    : isOverdue
+                    ? 'text-red-600'
+                    : 'text-emerald-700'
+                }`}
+                title={appInfo.description}
+              >
+                <Clock size={11} className={appInfo.phase === 'tax_notice' ? 'text-indigo-600' : 'text-emerald-600'} />
+                <span>{appInfo.shortLabel}: {appInfo.formattedAppointmentDate}</span>
+              </span>
+            </div>
+          );
+        })()}
       </td>
 
       {/* Trạng thái */}

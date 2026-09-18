@@ -20,6 +20,7 @@ import {
   getNextWorkflowStep,
   getPrevWorkflowStep,
   getStepSlaInfo,
+  getAppointmentInfo,
 } from '../../utils/registrationWorkflows';
 
 interface RegistrationWorkflowStepperProps {
@@ -367,7 +368,9 @@ export const RegistrationWorkflowStepper: React.FC<RegistrationWorkflowStepperPr
       </div>
 
       {/* Footer chi tiết tiến độ & SLA của bước hiện tại */}
-      {currentStep && (
+      {currentStep && (() => {
+        const appInfo = getAppointmentInfo(record);
+        return (
         <div className="px-4 py-3 bg-slate-50/90 border-t border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
           <div className="flex items-start sm:items-center gap-2.5">
             <div className="p-1.5 rounded-md bg-blue-50 text-blue-700 mt-0.5 sm:mt-0">
@@ -411,6 +414,29 @@ export const RegistrationWorkflowStepper: React.FC<RegistrationWorkflowStepperPr
                 )}
               </div>
               <p className="text-slate-600 mt-0.5">{currentStep.description}</p>
+            </div>
+          </div>
+
+          {/* Hộp Ngày hẹn trả (2 Giai đoạn: TB Thuế & Tra GCN) */}
+          <div className={`min-w-[210px] flex flex-col gap-1 shrink-0 p-2.5 rounded-lg border shadow-2xs ${
+            appInfo.phase === 'tax_notice' ? 'bg-indigo-50/90 border-indigo-200' : 'bg-emerald-50/90 border-emerald-200'
+          }`}>
+            <div className="flex justify-between items-center text-[11px] font-bold">
+              <span className={`flex items-center gap-1 ${appInfo.phase === 'tax_notice' ? 'text-indigo-900' : 'text-emerald-900'}`}>
+                <Clock size={13} className={appInfo.phase === 'tax_notice' ? 'text-indigo-600' : 'text-emerald-600'} />
+                {appInfo.shortLabel}
+              </span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded font-semibold ${
+                appInfo.phase === 'tax_notice' ? 'bg-indigo-200/80 text-indigo-900' : 'bg-emerald-200/80 text-emerald-900'
+              }`}>
+                {appInfo.phase === 'tax_notice' ? 'GĐ 1: Thuế' : 'GĐ 2: Trả GCN'}
+              </span>
+            </div>
+            <div className={`text-xs font-bold ${appInfo.phase === 'tax_notice' ? 'text-indigo-800' : 'text-emerald-800'}`}>
+              {appInfo.formattedAppointmentDate}
+            </div>
+            <div className="text-[10px] text-slate-500 italic line-clamp-1" title={appInfo.description}>
+              {appInfo.label}
             </div>
           </div>
 
@@ -488,7 +514,8 @@ export const RegistrationWorkflowStepper: React.FC<RegistrationWorkflowStepperPr
             </div>
           )}
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 };
