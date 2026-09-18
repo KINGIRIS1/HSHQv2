@@ -7,12 +7,12 @@ import { toTitleCase } from '../../utils/appHelpers';
 interface ExportHandoverModalProps {
     isOpen: boolean;
     onClose: () => void;
-    records: ArchiveRecord[];
-    type: 'saoluc' | 'congvan';
+    records: any[];
+    type?: string;
     wards?: string[];
 }
 
-const ExportHandoverModal: React.FC<ExportHandoverModalProps> = ({ isOpen, onClose, records, type, wards }) => {
+const ExportHandoverModal: React.FC<ExportHandoverModalProps> = ({ isOpen, onClose, records, type = 'global', wards }) => {
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
     const [selectedWard, setSelectedWard] = useState<string>('all');
     const [selectedBatch, setSelectedBatch] = useState<string>('all');
@@ -33,36 +33,53 @@ const ExportHandoverModal: React.FC<ExportHandoverModalProps> = ({ isOpen, onClo
         }
     }, [isOpen]);
 
-    // Update available batches based on date and ward
+    // Helper to extract batch name from record
+    const getRecordBatch = (r: any): string => {
+        return r.exportBatch || r.export_batch || r.data?.exportBatch || r.data?.danh_sach || '';
+    };
+
+    // Helper to extract export date from record
+    const getRecordDate = (r: any): string => {
+        const d = r.exportDate || r.export_date || r.completedDate || r.completedWorkDate || r.data?.ngay_hoan_thanh || r.data?.exportDate || '';
+        return d.split('T')[0];
+    };
+
+    // Update available batches based on date and ward across all records
     useEffect(() => {
         const batches = new Set<string>();
         records.forEach(r => {
-            // Filter by type and completed status
-            if (r.type !== type || r.status !== 'completed') return;
-            
-            // Filter by date (ngay_hoan_thanh)
-            if ((r.data?.ngay_hoan_thanh || '').split('T')[0] !== selectedDate) return;
+            const bName = getRecordBatch(r);
+            if (!bName) return;
 
-            // Filter by ward (if applicable and selected)
-            if (type === 'saoluc' && selectedWard !== 'all') {
-                if (r.data?.xa_phuong !== selectedWard) return;
+            const rDate = getRecordDate(r);
+            if (rDate && rDate !== selectedDate) return;
+
+            if (selectedWard !== 'all') {
+                const w = r.ward || r.data?.xa_phuong || r.handoverWard || '';
+                if (w !== selectedWard) return;
             }
 
-            if (r.data?.danh_sach) {
-                batches.add(r.data.danh_sach);
-            }
+            batches.add(bName);
         });
         setAvailableBatches(Array.from(batches).sort());
         setSelectedBatch('all'); // Reset batch selection
-    }, [selectedDate, selectedWard, records, type]);
+    }, [selectedDate, selectedWard, records]);
 
     const handleExport = async () => {
-        // Filter records to export
+        // Filter records to export across all modules
         const exportData = records.filter(r => {
-            if (r.type !== type || r.status !== 'completed') return false;
-            if ((r.data?.ngay_hoan_thanh || '').split('T')[0] !== selectedDate) return false;
-            if (type === 'saoluc' && selectedWard !== 'all' && r.data?.xa_phuong !== selectedWard) return false;
-            if (selectedBatch !== 'all' && r.data?.danh_sach !== selectedBatch) return false;
+            const bName = getRecordBatch(r);
+            if (!bName) return false;
+
+            const rDate = getRecordDate(r);
+            if (rDate && rDate !== selectedDate) return false;
+
+            if (selectedWard !== 'all') {
+                const w = r.ward || r.data?.xa_phuong || r.handoverWard || '';
+                if (w !== selectedWard) return false;
+            }
+
+            if (selectedBatch !== 'all' && bName !== selectedBatch) return false;
             return true;
         });
 
@@ -73,13 +90,15 @@ const ExportHandoverModal: React.FC<ExportHandoverModalProps> = ({ isOpen, onClo
 
         setIsExporting(true);
         setExportProgress(15);
-        setExportStatusText('Đang lọc và chuẩn bị dữ liệu...');
+        setExportStatusText('Đang lọc và chuẩn bị dữ liệu liên module...');
         await new Promise(resolve => setTimeout(resolve, 40));
 
         // Sort by Batch then by ID (or custom order)
         exportData.sort((a, b) => {
-            if (a.data?.danh_sach !== b.data?.danh_sach) {
-                return (a.data?.danh_sach || '').localeCompare(b.data?.danh_sach || '');
+            const bA = getRecordBatch(a);
+            const bB = getRecordBatch(b);
+            if (bA !== bB) {
+                return bA.localeCompare(bB);
             }
             return 0;
         });
@@ -87,9 +106,9 @@ const ExportHandoverModal: React.FC<ExportHandoverModalProps> = ({ isOpen, onClo
         await generateExcel(exportData);
     };
 
-    const generateExcel = async (data: ArchiveRecord[]) => {
+    const generateExcel = async (data: any[]) => {
         setExportProgress(30);
-        setExportStatusText('Đang khởi tạo mẫu bảng Excel...');
+        setExportStatusText('Đang khởi tạo mẫu bảng Excel bàn giao chung...');
         await new Promise(resolve => setTimeout(resolve, 30));
 
         const wb = XLSX.utils.book_new();
@@ -104,7 +123,7 @@ const ExportHandoverModal: React.FC<ExportHandoverModalProps> = ({ isOpen, onClo
         wsData.push(['Độc lập - Tự do - Hạnh phúc']);
         wsData.push(['']); // Empty row
 
-        const title = type === 'saoluc' ? 'DANH SÁCH BÀN GIAO HỒ SƠ SAO LỤC' : 'DANH SÁCH BÀN GIAO CÔNG VĂN';
+        const title = 'DANH SÁCH BÀN GIAO HỒ SƠ TỔNG HỢP GIAO 1 CỬA';
         wsData.push([title]);
         wsData.push([`NGÀY ${day < 10 ? '0' + day : day} THÁNG ${month < 10 ? '0' + month : month} NĂM ${year}`]);
         
@@ -112,9 +131,8 @@ const ExportHandoverModal: React.FC<ExportHandoverModalProps> = ({ isOpen, onClo
             ? (/^đợt/i.test(selectedBatch) ? selectedBatch.toUpperCase() : `ĐỢT: ${selectedBatch}`) 
             : 'TẤT CẢ CÁC ĐỢT';
         
-        // Add Ward name to title if selected
         let fullBatchTitle = `${batchText} - TỔNG SỐ HỒ SƠ: ${data.length}`;
-        if (type === 'saoluc' && selectedWard !== 'all') {
+        if (selectedWard !== 'all') {
             fullBatchTitle = `${selectedWard.toUpperCase()} - ${fullBatchTitle}`;
         }
 
@@ -125,34 +143,50 @@ const ExportHandoverModal: React.FC<ExportHandoverModalProps> = ({ isOpen, onClo
         const headers = [
             'STT', 
             'Mã Hồ Sơ', 
-            type === 'saoluc' ? 'Chủ Sử Dụng' : 'Cơ quan phát hành',
-            'Địa Chỉ (Xã)', 
+            'Chủ Sử Dụng / Đơn Vị',
+            'Địa Chỉ (Xã/Phường)', 
             'Thửa', 
             'Tờ', 
-            'Loại Hồ Sơ', 
+            'Loại Hồ Sơ / Phân Hệ', 
             'Hẹn Trả', 
-            'Ngày nhận hồ sơ', 
-            'Ký tên', 
+            'Ngày Nhận', 
+            'Ký Tên', 
             'Ghi Chú'
         ];
         wsData.push(headers);
 
-        // 3. Data Rows with progressive yielding
+        // 3. Data Rows
         const total = data.length;
         for (let index = 0; index < total; index++) {
             const r = data[index];
+            const recordCode = r.recordCode || r.so_hieu || r.soDoc || r.id || '';
+            const ownerName = r.ownerName || r.noi_nhan_gui || r.data?.chu_su_dung || r.borrowerName || '';
+            const wardName = r.ward || r.data?.xa_phuong || r.handoverWard || '';
+            const landParcel = r.landParcel || r.data?.thua_dat || '';
+            const mapSheet = r.mapSheet || r.data?.to_ban_do || '';
+            
+            let moduleName = 'Hồ sơ';
+            if (r.recordType === 'survey' || r.type === 'survey' || r.sourceTable === 'land_records') moduleName = 'Đo đạc';
+            else if (r.recordType === 'certificate' || r.type === 'certificate' || r.sourceTable === 'dangky_records') moduleName = 'Cấp giấy';
+            else if (r.type === 'saoluc') moduleName = 'Sao lục';
+            else if (r.type === 'congvan') moduleName = 'Công văn';
+            else if (r.type === 'vaoso') moduleName = 'Vào sổ';
+            else if (r.recordType) moduleName = r.recordType;
+
+            const appointmentDate = r.appointmentDate || r.data?.hen_tra || '';
+
             wsData.push([
                 index + 1,
-                r.so_hieu,
-                toTitleCase(r.noi_nhan_gui),
-                r.data?.xa_phuong || '',
-                r.data?.thua_dat || '',
-                r.data?.to_ban_do || '',
-                type === 'saoluc' ? 'Sao lục' : 'Công văn',
-                r.data?.hen_tra ? r.data.hen_tra.split('-').reverse().join('/') : '',
-                '', // Ngày nhận hồ sơ (Empty)
-                '', // Ký tên (Empty)
-                ''  // Ghi Chú (Empty)
+                recordCode,
+                toTitleCase(ownerName),
+                wardName,
+                landParcel,
+                mapSheet,
+                moduleName,
+                appointmentDate ? appointmentDate.split('T')[0].split('-').reverse().join('/') : '',
+                '', // Ký tên / Ngày nhận
+                '', 
+                r.notes || ''
             ]);
 
             if (index % 40 === 0 || index === total - 1) {

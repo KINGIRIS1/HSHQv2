@@ -15,7 +15,7 @@ import { exportReportToExcel, exportReturnedListToExcel } from './utils/excelExp
 import { generateReport } from './services/geminiService';
 import { syncTemplatesFromCloud } from './services/docxService'; 
 import { updateRecordApi, updateRecordFieldsApi, saveEmployeeApi, saveUserApi, forceUpdateRecordsBatchApi, updateRecordsBatchById, logSystemEvent } from './services/api';
-import { migrateArchiveRecordsFromLandRecords, createArchiveBatch } from './services/apiArchive';
+import { migrateArchiveRecordsFromLandRecords, createArchiveBatch, getOrGenerateDailyHighestBatch } from './services/apiArchive';
 import { ReturnOptionType } from './components/RejectReturnStepModal';
 import * as XLSX from 'xlsx-js-style';
 import { CheckCircle, AlertTriangle } from 'lucide-react';
@@ -1346,13 +1346,58 @@ function App() {
   };
 
   const executeBatchExport = async (batchNumber: number | string, batchDate: string, handoverWard?: string) => {
-      if (currentView === 'luu_tru') {
-          return exportArchiveBatch(String(batchNumber), batchDate);
-      } else if (currentView === 'cap_giay' || currentView === 'dangkydai') {
-          return exportCertificateBatch(batchNumber, batchDate, handoverWard);
-      } else {
-          return exportSurveyBatch(batchNumber, batchDate, handoverWard);
+      const nowStr = new Date().toISOString();
+      let pureBatch = getPureBatchNumber(batchNumber) || String(batchNumber).trim();
+      if (!pureBatch) {
+          pureBatch = await getOrGenerateDailyHighestBatch('global', batchDate);
       }
+      
+      const candidates = selectedRecordIds.size > 0 ? rawRecords.filter(r => selectedRecordIds.has(r.id)) : recordFilterProps.filteredRecords;
+      const recordsToExport = candidates.filter(r => 
+          r.status === RecordStatus.SIGNED || 
+          r.status === RecordStatus.PENDING_HANDOVER || 
+          (r.status as string) === 'completed' ||
+          ((r.status === RecordStatus.REJECTED || r.status === RecordStatus.WITHDRAWN) && !r.exportBatch) || 
+          r.status === RecordStatus.HANDOVER
+      );
+
+      if (recordsToExport.length === 0) {
+          setToast({ type: 'error', message: 'Vui lòng chọn hoặc lọc các hồ sơ để chốt xuất giao 1 cửa.' });
+          return;
+      }
+
+      const updatesToApply = recordsToExport.map(r => {
+          const nextStatus = r.status === RecordStatus.WITHDRAWN ? RecordStatus.WITHDRAWN : r.status === RecordStatus.REJECTED ? RecordStatus.REJECTED : RecordStatus.HANDOVER;
+          const existingLogs = Array.isArray(r.statusLogs) ? r.statusLogs : [];
+          const newLog: RecordStatusLog = {
+              id: `${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+              recordId: r.id,
+              previousStatus: r.status,
+              newStatus: nextStatus,
+              changedBy: currentUser?.name || currentUser?.username || 'Hệ thống',
+              changedAt: nowStr,
+              note: `Chốt xuất giao 1 cửa chung - ${pureBatch}`
+          };
+          const statusLogs = [...existingLogs, newLog];
+          const actualHandoverWard = (handoverWard === 'SAME_AS_WARD' || !handoverWard) ? r.ward : handoverWard;
+          return { ...r, exportBatch: pureBatch, exportDate: batchDate, status: nextStatus, completedDate: r.completedDate || nowStr, handoverWard: actualHandoverWard, updated_at: nowStr, statusLogs };
+      });
+
+      const updateMap = new Map<string, RecordFile>();
+      updatesToApply.forEach(u => updateMap.set(u.id, u));
+      setRecords(prev => prev.map(r => updateMap.get(r.id) || r));
+
+      const recordIds = updatesToApply.map(u => u.id);
+      await createArchiveBatch(pureBatch, recordIds, 'global', batchDate);
+
+      updateRecordsBatchById(updatesToApply).catch(err => {
+          console.error("Lỗi khi chốt đợt xuất giao 1 cửa chung:", err);
+      });
+
+      setSelectedRecordIds(new Set()); 
+      setToast({ type: 'success', message: `Đã chốt danh sách giao 1 cửa chung "${pureBatch}" (${updatesToApply.length} hồ sơ) thành công.` });
+      setExportModalType("handover");
+      setIsExportModalOpen(true);
   };
 
   const executeReturnBatchHandover = async (batchNumber: number, batchDate: string, deptName: string) => {

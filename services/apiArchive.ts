@@ -858,11 +858,11 @@ export const fetchLuutruHandoverBatches = async (): Promise<Array<{ batch: strin
     }
 };
 
-export const fetchListsByDate = async (type: 'saoluc' | 'congvan' | 'vaoso', date: string): Promise<string[]> => {
+export const fetchListsByDate = async (type: string | undefined, date: string): Promise<string[]> => {
     if (!isConfigured) {
         const lists = new Set<string>();
         MOCK_ARCHIVE.forEach(r => {
-            if ((r.type === type || !type) && r.data?.danh_sach) {
+            if (r.data?.danh_sach) {
                 if (!date || r.data?.ngay_hoan_thanh === date || r.data?.exportDate === date) {
                     lists.add(r.data.danh_sach);
                 }
@@ -872,28 +872,74 @@ export const fetchListsByDate = async (type: 'saoluc' | 'congvan' | 'vaoso', dat
     }
 
     try {
-        const { data, error } = await supabase
+        const lists = new Set<string>();
+        const cleanDate = date && date.includes('T') ? date.split('T')[0] : date;
+
+        // Query luutru_records
+        const { data: luutruData } = await supabase
             .from('luutru_records')
             .select('completedWorkDate, exportBatch, exportDate, data')
             .not('exportBatch', 'is', null);
 
-        if (error) return [];
-
-        const lists = new Set<string>();
-        data?.forEach((r: any) => {
+        luutruData?.forEach((r: any) => {
             const batchVal = r.exportBatch || r.data?.exportBatch || r.data?.danh_sach;
             const dateVal = r.exportDate || r.completedWorkDate || r.data?.ngay_hoan_thanh || r.data?.exportDate;
-            
             if (batchVal) {
-                if (!date || (dateVal && dateVal.startsWith(date))) {
+                if (!cleanDate || (dateVal && dateVal.startsWith(cleanDate))) {
                     lists.add(String(batchVal).trim());
                 }
             }
         });
-        
+
+        // Query land_records
+        const { data: landData } = await supabase
+            .from('land_records')
+            .select('completed_date, export_batch, export_date')
+            .not('export_batch', 'is', null);
+
+        landData?.forEach((r: any) => {
+            const batchVal = r.export_batch || r.exportBatch;
+            const dateVal = r.export_date || r.exportDate || r.completed_date;
+            if (batchVal) {
+                if (!cleanDate || (dateVal && dateVal.startsWith(cleanDate))) {
+                    lists.add(String(batchVal).trim());
+                }
+            }
+        });
+
+        // Query dangky_records
+        const { data: dangkyData } = await supabase
+            .from('dangky_records')
+            .select('completed_date, export_batch, export_date')
+            .not('export_batch', 'is', null);
+
+        dangkyData?.forEach((r: any) => {
+            const batchVal = r.export_batch || r.exportBatch;
+            const dateVal = r.export_date || r.exportDate || r.completed_date;
+            if (batchVal) {
+                if (!cleanDate || (dateVal && dateVal.startsWith(cleanDate))) {
+                    lists.add(String(batchVal).trim());
+                }
+            }
+        });
+
+        // Query archive_batches table
+        const { data: batchesData } = await supabase
+            .from('archive_batches')
+            .select('batch_name, created_at');
+
+        batchesData?.forEach((b: any) => {
+            if (b.batch_name) {
+                const createdDate = b.created_at ? b.created_at.split('T')[0] : '';
+                if (!cleanDate || (createdDate && createdDate.startsWith(cleanDate))) {
+                    lists.add(String(b.batch_name).trim());
+                }
+            }
+        });
+
         return Array.from(lists).sort();
     } catch (error) {
-        logError(`fetchListsByDate-${type}`, error, true);
+        logError(`fetchListsByDate-global`, error, true);
         return [];
     }
 };
@@ -909,12 +955,12 @@ export interface ArchiveBatchItem {
 }
 
 export const getOrGenerateDailyHighestBatch = async (
-    type: 'saoluc' | 'congvan' | 'vaoso' | 'archive' | string,
+    type: string = 'global',
     targetDateStr: string = new Date().toISOString().split('T')[0]
 ): Promise<string> => {
     try {
         const cleanDate = targetDateStr.includes('T') ? targetDateStr.split('T')[0] : targetDateStr;
-        const lists = await fetchListsByDate(type as any, cleanDate);
+        const lists = await fetchListsByDate(type, cleanDate);
         let maxNum = 0;
         lists.forEach(batchStr => {
             const match = batchStr.match(/Đợt\s*(\d+)/i) || batchStr.match(/(\d+)/);
@@ -931,7 +977,7 @@ export const getOrGenerateDailyHighestBatch = async (
 };
 
 export const autoAssignDailyHighestBatchToUnbatchedRecords = async (
-    type: 'saoluc' | 'congvan' | 'vaoso' | 'archive' | string,
+    type: string = 'global',
     targetDateStr?: string
 ): Promise<{ batchName: string; updatedCount: number }> => {
     if (!isConfigured) return { batchName: 'Đợt 1', updatedCount: 0 };
@@ -985,7 +1031,7 @@ export const autoAssignDailyHighestBatchToUnbatchedRecords = async (
 export const createArchiveBatch = async (
     batchName: string,
     recordIds: string[],
-    moduleType: string = 'archive',
+    moduleType: string = 'global',
     handoverDate: string = new Date().toISOString().split('T')[0]
 ): Promise<{ success: boolean; batchName: string; count: number }> => {
     try {
@@ -1010,7 +1056,8 @@ export const createArchiveBatch = async (
             }
         }
 
-        if (recordIds.length > 0) {
+        if (recordIds.length > 0 && isConfigured) {
+            // Update luutru_records
             await updateArchiveRecordsBatch(recordIds, {
                 status: 'completed',
                 exportBatch: finalBatchName,
@@ -1022,6 +1069,22 @@ export const createArchiveBatch = async (
                     updated_at: nowIso
                 }
             });
+
+            // Update land_records
+            await supabase.from('land_records').update({
+                export_batch: finalBatchName,
+                export_date: handoverDate,
+                updated_at: nowIso,
+                status: 'HANDOVER'
+            }).in('id', recordIds);
+
+            // Update dangky_records
+            await supabase.from('dangky_records').update({
+                export_batch: finalBatchName,
+                export_date: handoverDate,
+                updated_at: nowIso,
+                status: 'HANDOVER'
+            }).in('id', recordIds);
         }
 
         return { success: true, batchName: finalBatchName, count: recordIds.length };
