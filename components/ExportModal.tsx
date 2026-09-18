@@ -77,20 +77,15 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, typ
           const { isBatched, batchStr, dateStr } = getRecordBatchInfo(r);
 
           // Điều kiện hiển thị cho danh sách bàn giao 1 cửa:
-          // 1. Hồ sơ đã được xếp vào đợt xuất cụ thể (isBatched)
-          // 2. Hoặc nếu chưa tạo đợt (Lẻ), hồ sơ BẮT BUỘC phải thực sự ở trạng thái đã giao 1 cửa (HANDOVER, RETURNED, hoặc isHandedOver)
-          // Tuyệt đối KHÔNG gom các hồ sơ chỉ mới ở bước Đã ký (SIGNED), Chờ ký (PENDING_SIGN), Chờ bàn giao (PENDING_HANDOVER),... vào mục Lẻ (Chưa tạo đợt)
-          const isEligible = isBatched || 
-              normStatus === RecordStatus.HANDOVER || 
-              normStatus === RecordStatus.RETURNED || 
-              Boolean(r.isHandedOver);
+          // BẮT BUỘC hồ sơ đã được xếp vào đợt xuất cụ thể (isBatched)
+          const isEligible = isBatched;
 
           if (isEligible) {
               const key = `${dateStr}_${batchStr}`;
               if (!batches[key]) {
                   batches[key] = { 
                       date: dateStr, 
-                      batch: isBatched ? batchStr : 'Lẻ (Chưa tạo đợt)', 
+                      batch: batchStr, 
                       count: 0 
                   };
               }
@@ -162,13 +157,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, typ
             const info = getRecordBatchInfo(r);
             if (info.dateStr !== dateStr || info.batchStr !== batchStr) return false;
 
-            // Nếu có đợt xuất cụ thể: hợp lệ
-            if (info.isBatched) return true;
-
-            // Nếu là hồ sơ Lẻ (Chưa tạo đợt): Bắt buộc phải thực sự ở trạng thái đã giao 1 cửa hoặc đã trả kết quả
-            return normStatus === RecordStatus.HANDOVER || 
-                   normStatus === RecordStatus.RETURNED || 
-                   Boolean(r.isHandedOver);
+            return info.isBatched;
         });
 
         if (recordCategory === 'archive') {
@@ -179,15 +168,11 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, typ
             title = `DANH SÁCH BÀN GIAO HỒ SƠ 1 CỬA`;
         }
 
-        const displayBatch = batchStr === 'NOT_BATCHED' 
-            ? 'CHƯA TẠO ĐỢT' 
-            : (/^đợt/i.test(batchStr) ? batchStr.toUpperCase() : `ĐỢT ${batchStr}`.toUpperCase());
+        const displayBatch = /^đợt/i.test(batchStr) ? batchStr.toUpperCase() : `ĐỢT ${batchStr}`.toUpperCase();
         subTitle = `${displayBatch}  -  TỔNG SỐ HỒ SƠ: ${recordsToExport.length}`;
         const safeDate = dateStr.replace(/-/g, '');
         const catPrefix = recordCategory === 'archive' ? 'Luu_Tru_' : recordCategory === 'measurement' ? 'Do_Dac_' : '';
-        const cleanBatchNameForFile = batchStr === 'NOT_BATCHED' 
-            ? 'Le' 
-            : (/^đợt/i.test(batchStr) ? batchStr : `Dot_${batchStr}`).replace(/[\/\s\-]+/g, '_');
+        const cleanBatchNameForFile = (/^đợt/i.test(batchStr) ? batchStr : `Dot_${batchStr}`).replace(/[\/\s\-]+/g, '_');
         fileName = `Giao_1_Cua_${catPrefix}${cleanBatchNameForFile}_${safeDate}`;
 
     } else {
@@ -515,9 +500,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, typ
                             {batchOptions.map(opt => (
                                 <option key={opt.key} value={opt.key}>
                                     {type === 'handover' 
-                                      ? (opt.batch === 'Lẻ (Chưa tạo đợt)' 
-                                          ? `Lẻ (Chưa tạo đợt) - Ngày ${formatDate(opt.date)} (${opt.count} HS)`
-                                          : `${formatBatchName(opt.batch, '', opt.date)} (${opt.count} HS)`)
+                                      ? `${formatBatchName(opt.batch, '', opt.date)} (${opt.count} HS)`
                                       : `Ngày tiếp nhận: ${formatDate(opt.date)} (${opt.count} HS)`
                                     }
                                 </option>

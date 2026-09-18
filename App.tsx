@@ -769,6 +769,10 @@ function App() {
           return;
       }
 
+      const autoBatchForHandover = (field === 'status' && value === RecordStatus.HANDOVER) 
+          ? await getOrGenerateDailyHighestBatch('global', new Date().toISOString().split('T')[0]) 
+          : '';
+
       const updatedTargets = selectedRecords.map(r => {
           let recordUpdates: any = {};
 
@@ -826,6 +830,9 @@ function App() {
                   recordUpdates.exportDate = targetDateStr;
                   recordUpdates.completedDate = targetDateStr;
                   recordUpdates.handover_date = targetDateStr;
+                  if (!r.exportBatch || String(r.exportBatch).trim() === '') {
+                      recordUpdates.exportBatch = autoBatchForHandover || 'Đợt 1';
+                  }
               } else if (value === RecordStatus.RETURNED) {
                   recordUpdates.resultReturnedDate = targetDateStr;
               } else if (value === RecordStatus.REJECTED || value === RecordStatus.WITHDRAWN) {
@@ -977,7 +984,15 @@ function App() {
           updates = { ...getUpdatesForStatusChange(value as RecordStatus, undefined, record, extraUpdates), ...(extraUpdates || {}) };
           updates.statusLogs = createStatusLog(record, value, extraUpdates?.logNote || 'Cập nhật trạng thái');
           
-          if (value === RecordStatus.PENDING_SIGN) {
+          if (value === RecordStatus.HANDOVER) {
+              if (!record.exportBatch || String(record.exportBatch).trim() === '') {
+                  const todayStr = new Date().toISOString().split('T')[0];
+                  const autoBatch = await getOrGenerateDailyHighestBatch('global', todayStr);
+                  updates.exportBatch = autoBatch;
+                  updates.exportDate = record.exportDate || todayStr;
+                  updates.completedDate = record.completedDate || nowStr;
+              }
+          } else if (value === RecordStatus.PENDING_SIGN) {
               updates.completedWorkDate = record.completedWorkDate || nowStr;
               updates.checkedDate = record.checkedDate || nowStr;
           } else if (value === RecordStatus.PENDING_CHECK) {
