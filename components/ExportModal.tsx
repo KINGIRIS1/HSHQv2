@@ -22,22 +22,16 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, records, typ
   const [isExporting, setIsExporting] = useState<boolean>(false);
   const [exportProgress, setExportProgress] = useState<number>(0);
 
-  // Initialize category based on currentView
+  // Always initialize category to 'all' so batches from all modules are visible together
   useEffect(() => {
     if (isOpen) {
       setIsExporting(false);
       setExportProgress(0);
-      if (currentView?.startsWith('archive_')) {
-        setRecordCategory('archive');
-      } else if (currentView === 'handover_list' || currentView === 'all_records' || currentView === 'completed_list' || currentView === 'check_list') {
-        setRecordCategory('measurement');
-      } else {
-        setRecordCategory('all');
-      }
+      setRecordCategory('all');
     }
-  }, [isOpen, currentView]);
+  }, [isOpen]);
 
-  // Filter records by category
+  // Filter records by category (defaults to 'all' for unified batch viewing across modules)
   const categoryRecords = useMemo(() => {
     if (recordCategory === 'archive') {
       return records.filter(r => isArchiveRecordType(r.recordType));
