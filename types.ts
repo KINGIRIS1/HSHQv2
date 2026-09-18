@@ -205,6 +205,10 @@ export interface RecordFile {
   approvalDate?: string | null;   // Ngày ký duyệt
   completedDate?: string | null; 
   
+  // Trạng thái quay lại sau bổ sung
+  supplementReturnStatus?: RecordStatus | string | null;
+
+  // Trạng thái và phân công
   status: RecordStatus;   
   assignedTo?: string | null;    
 

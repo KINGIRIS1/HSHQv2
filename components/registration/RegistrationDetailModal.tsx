@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { RecordFile, Employee, User as AppUser, RecordStatus, RecordStatusLog } from '../../types';
 import { RegistrationWorkflowStepper } from './RegistrationWorkflowStepper';
+import { validateCapGiayTransition } from '../../utils/capGiayStateMachine';
 import {
   getRegistrationWorkflow,
   WorkflowStep,
@@ -74,6 +75,17 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
     updatedFields?: Partial<RecordFile>,
     note?: string
   ) => {
+    setErrorMsg('');
+    const val = validateCapGiayTransition(
+      formData.status,
+      newStatus,
+      formData.previousStatus || formData.supplementReturnStatus
+    );
+    if (!val.valid) {
+      setErrorMsg(val.reason || 'Chuyển trạng thái không hợp lệ theo quy trình Cấp giấy.');
+      return;
+    }
+
     const now = new Date().toISOString();
     const today = now.substring(0, 10);
     const newLog: RecordStatusLog = {
@@ -231,38 +243,11 @@ export const RegistrationDetailModal: React.FC<RegistrationDetailModalProps> = (
           {/* TAB 1: TIẾN ĐỘ & TRẠNG THÁI */}
           {activeTab === 'status' && (
             <div className="space-y-5">
-              {/* Khối các nút chuyển trạng thái của quy trình */}
-              <div className="bg-slate-50/70 p-4 rounded-xl border border-slate-200 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-blue-900 uppercase tracking-wider block">
-                    Các bước quy trình áp dụng cho hồ sơ này ({workflow.title})
-                  </span>
-                  <span className="text-[11px] text-slate-500">
-                    Bấm để chuyển trực tiếp đến bước tương ứng
-                  </span>
-                </div>
-
-                <div className="flex flex-wrap gap-2 pt-1">
-                  {workflow.steps.map((st) => {
-                    const isCurrent = formData.status === st.key;
-                    return (
-                      <button
-                        key={st.key}
-                        type="button"
-                        onClick={() => handleStatusChange(st.key)}
-                        className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                          isCurrent
-                            ? 'bg-blue-600 text-white shadow-md ring-2 ring-blue-300'
-                            : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-100 hover:border-slate-400'
-                        }`}
-                      >
-                        {isCurrent && <CheckCircle2 size={13} />}
-                        <span>{st.label}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+              {/* Quy trình & Thanh tiến độ điều khiển */}
+              <RegistrationWorkflowStepper
+                record={formData}
+                onChangeStatus={handleStatusChange}
+              />
 
               {/* Thông tin Cán bộ và Hạn giải quyết */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

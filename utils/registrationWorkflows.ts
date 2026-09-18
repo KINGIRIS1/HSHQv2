@@ -131,9 +131,9 @@ const TAX_TRANSFER_WORKFLOW: RegistrationWorkflowConfig = {
       durationLabel: '4 giờ',
     },
     {
-      key: RecordStatus.SIGNED,
-      label: 'Đã ký / Chờ bàn giao',
-      shortLabel: 'Đã ký',
+      key: RecordStatus.PENDING_HANDOVER,
+      label: 'Chờ bàn giao',
+      shortLabel: 'Chờ bàn giao',
       description: 'Lãnh đạo đã ký duyệt, vào sổ cấp GCN và chuẩn bị bàn giao Một cửa',
       dateField: 'approvalDate',
       badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-300',
@@ -218,9 +218,9 @@ const FAST_TRACK_WORKFLOW: RegistrationWorkflowConfig = {
       durationLabel: '4 giờ',
     },
     {
-      key: RecordStatus.SIGNED,
-      label: 'Đã ký / Chờ bàn giao',
-      shortLabel: 'Đã ký',
+      key: RecordStatus.PENDING_HANDOVER,
+      label: 'Chờ bàn giao',
+      shortLabel: 'Chờ bàn giao',
       description: 'Đã ký duyệt, đóng dấu và chuyển sổ theo dõi',
       dateField: 'approvalDate',
       badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-300',
@@ -272,11 +272,11 @@ const GDBD_WORKFLOW: RegistrationWorkflowConfig = {
       durationLabel: '4 giờ',
     },
     {
-      key: RecordStatus.IN_PROGRESS,
-      label: 'Thụ lý & Tra cứu ngăn chặn',
-      shortLabel: 'Tra cứu & Vào sổ',
+      key: RecordStatus.APPRAISAL,
+      label: 'Chờ thẩm định & Tra cứu ngăn chặn',
+      shortLabel: 'Tra cứu & Thẩm định',
       description: 'Tra cứu cơ sở dữ liệu ngăn chặn, cập nhật vào sổ theo dõi đăng ký biện pháp bảo đảm',
-      dateField: 'completedWorkDate',
+      dateField: 'appraisalDate',
       badgeColor: 'bg-blue-100 text-blue-800 border-blue-300',
       durationHours: 8,
       durationDays: 1,
@@ -294,9 +294,9 @@ const GDBD_WORKFLOW: RegistrationWorkflowConfig = {
       durationLabel: '4 giờ',
     },
     {
-      key: RecordStatus.SIGNED,
-      label: 'Đã ký / Chờ bàn giao',
-      shortLabel: 'Đã ký',
+      key: RecordStatus.PENDING_HANDOVER,
+      label: 'Chờ bàn giao',
+      shortLabel: 'Chờ bàn giao',
       description: 'Đã đóng dấu hoàn tất, chuẩn bị giao kết quả',
       dateField: 'approvalDate',
       badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-300',
@@ -349,25 +349,14 @@ const LOST_CERT_WORKFLOW: RegistrationWorkflowConfig = {
     },
     {
       key: RecordStatus.APPRAISAL,
-      label: 'Thẩm định & Phát hành niêm yết',
-      shortLabel: 'Phát hành niêm yết',
-      description: 'Kiểm tra hồ sơ gốc và gửi công văn đề nghị UBND cấp xã niêm yết công khai mất GCN',
+      label: 'Thẩm định & Niêm yết 30 ngày',
+      shortLabel: 'Thẩm định & Niêm yết',
+      description: 'Kiểm tra hồ sơ gốc, gửi công văn đề nghị UBND cấp xã niêm yết công khai mất GCN (30 ngày)',
       dateField: 'appraisalDate',
       badgeColor: 'bg-blue-100 text-blue-800 border-blue-300',
       durationHours: 8,
       durationDays: 1,
-      durationLabel: '1 ngày',
-    },
-    {
-      key: RecordStatus.PENDING_POSTING,
-      label: 'Thời gian niêm yết tại xã (30 ngày)',
-      shortLabel: 'Đang niêm yết',
-      description: 'Niêm yết công khai 30 ngày tại trụ sở UBND xã/phường nơi có đất (Không tính vào thời gian VPĐK)',
-      dateField: 'postingDate',
-      badgeColor: 'bg-amber-100 text-amber-800 border-amber-300',
-      durationHours: 0,
-      durationDays: 0,
-      durationLabel: '30 ngày (Không tính hạn)',
+      durationLabel: '1 ngày (+30 ngày niêm yết)',
       isPostingPhase: true,
     },
     {
@@ -404,9 +393,9 @@ const LOST_CERT_WORKFLOW: RegistrationWorkflowConfig = {
       durationLabel: '4 giờ',
     },
     {
-      key: RecordStatus.SIGNED,
-      label: 'Đã ký / Vào sổ',
-      shortLabel: 'Đã ký',
+      key: RecordStatus.PENDING_HANDOVER,
+      label: 'Chờ bàn giao',
+      shortLabel: 'Chờ bàn giao',
       description: 'Đã ký duyệt xong, vào sổ cấp GCN và đóng dấu',
       dateField: 'approvalDate',
       badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-300',
@@ -459,25 +448,14 @@ const LOST_CERT_TAX_WORKFLOW: RegistrationWorkflowConfig = {
     },
     {
       key: RecordStatus.APPRAISAL,
-      label: 'Thẩm định & Phát hành niêm yết',
-      shortLabel: 'Phát hành niêm yết',
-      description: 'Kiểm tra hồ sơ gốc và gửi công văn đề nghị UBND cấp xã niêm yết công khai mất GCN',
+      label: 'Thẩm định & Niêm yết 30 ngày',
+      shortLabel: 'Thẩm định & Niêm yết',
+      description: 'Kiểm tra hồ sơ gốc, gửi công văn đề nghị UBND cấp xã niêm yết công khai mất GCN (30 ngày)',
       dateField: 'appraisalDate',
       badgeColor: 'bg-blue-100 text-blue-800 border-blue-300',
       durationHours: 8,
       durationDays: 1,
-      durationLabel: '1 ngày',
-    },
-    {
-      key: RecordStatus.PENDING_POSTING,
-      label: 'Thời gian niêm yết tại xã (30 ngày)',
-      shortLabel: 'Đang niêm yết',
-      description: 'Niêm yết công khai 30 ngày tại UBND xã nơi có đất (Không tính vào thời gian VPĐK)',
-      dateField: 'postingDate',
-      badgeColor: 'bg-amber-100 text-amber-800 border-amber-300',
-      durationHours: 0,
-      durationDays: 0,
-      durationLabel: '30 ngày (Không tính hạn)',
+      durationLabel: '1 ngày (+30 ngày niêm yết)',
       isPostingPhase: true,
     },
     {
@@ -550,9 +528,9 @@ const LOST_CERT_TAX_WORKFLOW: RegistrationWorkflowConfig = {
       durationLabel: '4 giờ',
     },
     {
-      key: RecordStatus.SIGNED,
-      label: 'Đã ký / Vào sổ',
-      shortLabel: 'Đã ký',
+      key: RecordStatus.PENDING_HANDOVER,
+      label: 'Chờ bàn giao',
+      shortLabel: 'Chờ bàn giao',
       description: 'Đã ký duyệt xong, vào sổ cấp GCN và đóng dấu',
       dateField: 'approvalDate',
       badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-300',
@@ -648,9 +626,9 @@ const SPLIT_PLOT_WORKFLOW: RegistrationWorkflowConfig = {
       durationLabel: '4 giờ',
     },
     {
-      key: RecordStatus.SIGNED,
-      label: 'Đã ký / Chờ bàn giao',
-      shortLabel: 'Đã ký',
+      key: RecordStatus.PENDING_HANDOVER,
+      label: 'Chờ bàn giao',
+      shortLabel: 'Chờ bàn giao',
       description: 'Đã ký duyệt xong, chuẩn bị bàn giao',
       dateField: 'approvalDate',
       badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-300',
@@ -777,12 +755,19 @@ export const getRegistrationWorkflow = (type: string | undefined | null): Regist
  * Lấy vị trí index của trạng thái hiện tại trong chuỗi quy trình
  */
 export const getWorkflowStepIndex = (currentStatus: RecordStatus, steps: WorkflowStep[]): number => {
-  // Chuẩn hóa trạng thái PENDING_HANDOVER tương đương SIGNED
   let mapped = currentStatus;
-  if (mapped === RecordStatus.PENDING_HANDOVER) {
-    mapped = RecordStatus.SIGNED;
+  if (mapped === RecordStatus.SIGNED) {
+    mapped = RecordStatus.PENDING_HANDOVER;
   }
-  return steps.findIndex((s) => s.key === mapped);
+  if (mapped === RecordStatus.PENDING_POSTING) {
+    mapped = RecordStatus.APPRAISAL;
+  }
+  if (mapped === RecordStatus.IN_PROGRESS || mapped === RecordStatus.ASSIGNED) {
+    mapped = RecordStatus.APPRAISAL;
+  }
+  const idx = steps.findIndex((s) => s.key === mapped);
+  if (idx !== -1) return idx;
+  return 0;
 };
 
 /**

@@ -13,6 +13,7 @@ import {
   CheckCircle,
 } from 'lucide-react';
 import { RecordFile, RecordStatus, RecordStatusLog } from '../../types';
+import { isCapGiayStatus } from '../../utils/capGiayStateMachine';
 import {
   getRegistrationWorkflow,
   WorkflowStep,
@@ -111,6 +112,7 @@ export const RegistrationWorkflowStepper: React.FC<RegistrationWorkflowStepperPr
       RecordStatus.PENDING_SUPPLEMENT,
       {
         previousStatus: currentStatus,
+        supplementReturnStatus: currentStatus,
         supplementReason: reason,
         supplementRequestDate: today,
       },
@@ -120,15 +122,23 @@ export const RegistrationWorkflowStepper: React.FC<RegistrationWorkflowStepperPr
 
   // Khôi phục từ trạng thái bổ sung
   const handleResumeFromSupplement = () => {
-    const defaultResume = workflow.steps[1]?.key || RecordStatus.PENDING_PRINT_CERT;
     const resumeStatus =
-      (record.previousStatus as RecordStatus) || defaultResume;
+      (record.supplementReturnStatus as RecordStatus) || (record.previousStatus as RecordStatus);
+
+    if (!resumeStatus || !isCapGiayStatus(resumeStatus)) {
+      window.alert('Không thể xác định trạng thái trước đó để phục hồi hồ sơ. Vui lòng kiểm tra lại lịch sử hồ sơ hoặc liên hệ Admin!');
+      return;
+    }
+
     onChangeStatus(
       resumeStatus,
       {
         supplementReturnedDate: new Date().toISOString().substring(0, 10),
+        supplementCompletedAt: new Date().toISOString(),
+        previousStatus: undefined,
+        supplementReturnStatus: undefined,
       },
-      `Hoàn thành bổ sung, tiếp tục xử lý tại bước: ${resumeStatus}`
+      `Hoàn thành bổ sung, tiếp tục xử lý tại đúng bước: ${resumeStatus}`
     );
   };
 
@@ -277,8 +287,7 @@ export const RegistrationWorkflowStepper: React.FC<RegistrationWorkflowStepperPr
               <React.Fragment key={step.key}>
                 {/* Step Item */}
                 <div
-                  className="flex flex-col items-center text-center relative z-10 group cursor-pointer max-w-[115px]"
-                  onClick={() => !readOnly && handleStepTransition(step)}
+                  className="flex flex-col items-center text-center relative z-10 group max-w-[115px]"
                   title={`${step.label} (Định mức: ${step.durationLabel}): ${step.description}`}
                 >
                   {/* Circle Indicator */}

@@ -223,7 +223,10 @@ export const CAP_GIAY_STEP_ORDER: Record<string, number> = {
 export const getCapGiayNextMainStatus = getNextCapGiayStatus;
 
 export function resumeFromSupplement(record: RecordFile): { nextStatus: RecordStatus; updates: Partial<RecordFile> } {
-  const targetStatus = (record.previousStatus as RecordStatus) || RecordStatus.APPRAISAL;
+  const targetStatus = (record.supplementReturnStatus as RecordStatus) || (record.previousStatus as RecordStatus);
+  if (!targetStatus || !isCapGiayStatus(targetStatus)) {
+    throw new Error('Không xác định được trạng thái trước đó (previousStatus / supplementReturnStatus) để phục hồi hồ sơ.');
+  }
   const now = new Date().toISOString();
   return {
     nextStatus: targetStatus,
@@ -232,6 +235,7 @@ export function resumeFromSupplement(record: RecordFile): { nextStatus: RecordSt
       supplementCompletedAt: now,
       supplementReturnedDate: now,
       previousStatus: undefined,
+      supplementReturnStatus: undefined,
     },
   };
 }

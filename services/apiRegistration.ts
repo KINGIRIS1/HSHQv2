@@ -385,7 +385,7 @@ export const assignDangkyRecordsBatch = async (
     .update({
       assignedTo,
       assignedDate,
-      status: RecordStatus.IN_PROGRESS,
+      status: RecordStatus.APPRAISAL,
       updatedAt: new Date().toISOString(),
     })
     .in('id', recordIds);
