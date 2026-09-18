@@ -533,6 +533,22 @@ export const fetchArchiveRecords = async (type: 'saoluc' | 'vaoso' | 'congvan'):
             }
         });
         const result = Array.from(uniqueMap.values());
+
+        // Kiểm tra và tự động gộp các đợt lẻ chưa tạo đợt vào đợt lớn nhất theo ngày xuất
+        const unbatchedCandidates = result.filter(r => {
+            const isDone = r.status === 'completed' || Boolean(r.data?.ngay_hoan_thanh) || Boolean(r.data?.exportDate);
+            const noBatch = !r.exportBatch || String(r.exportBatch).trim() === '';
+            return isDone && noBatch;
+        });
+
+        if (unbatchedCandidates.length > 0) {
+            autoAssignDailyHighestBatchToUnbatchedRecords(type).then(res => {
+                if (res.updatedCount > 0) {
+                    console.log(`⚡ [Auto-Batch] Đã tự động gom ${res.updatedCount} hồ sơ lẻ vào ${res.batchName}`);
+                }
+            }).catch(e => console.warn('Auto-batch background warn:', e));
+        }
+
         saveToCache(CACHE_KEY_ARCHIVE, result);
         return result;
     } catch (error: any) {
@@ -598,6 +614,19 @@ export const saveArchiveRecord = async (record: Partial<ArchiveRecord>): Promise
                     }
                 };
             }
+        }
+
+        const isDone = fullRecord.status === 'completed' || (fullRecord as any).status === 'HANDOVER' || (fullRecord as any).status === 'signed';
+        const hasNoBatch = !fullRecord.exportBatch && (!fullRecord.data || !fullRecord.data.exportBatch) && (!fullRecord.data || !fullRecord.data.danh_sach);
+        if (isDone && hasNoBatch) {
+            const targetDate = (fullRecord as any).exportDate || fullRecord.data?.exportDate || fullRecord.data?.ngay_hoan_thanh || new Date().toISOString().split('T')[0];
+            const autoBatchName = await getOrGenerateDailyHighestBatch(fullRecord.type || 'archive', targetDate);
+            fullRecord.exportBatch = autoBatchName;
+            if (!fullRecord.data) fullRecord.data = {};
+            fullRecord.data.exportBatch = autoBatchName;
+            fullRecord.data.danh_sach = autoBatchName;
+            fullRecord.data.exportDate = targetDate;
+            fullRecord.data.ngay_hoan_thanh = targetDate;
         }
 
         const payload = mapArchiveRecordToLuutruDb(fullRecord);
@@ -740,6 +769,19 @@ export const updateArchiveRecordsBatch = async (ids: string[], updates: Partial<
         if (fetchError) throw fetchError;
         if (!currentRecords || currentRecords.length === 0) return true;
 
+        const isDoneBatch = updates.status === 'completed' || (updates as any).status === 'HANDOVER';
+        const hasNoBatchInUpdates = !updates.exportBatch && (!updates.data || !updates.data.exportBatch) && (!updates.data || !updates.data.danh_sach);
+        if (isDoneBatch && hasNoBatchInUpdates) {
+            const dateVal = (updates as any).exportDate || updates.data?.exportDate || updates.data?.ngay_hoan_thanh || new Date().toISOString().split('T')[0];
+            const autoBatch = await getOrGenerateDailyHighestBatch('archive', dateVal);
+            updates.exportBatch = autoBatch;
+            if (!updates.data) updates.data = {};
+            updates.data.exportBatch = autoBatch;
+            updates.data.danh_sach = autoBatch;
+            updates.data.exportDate = dateVal;
+            updates.data.ngay_hoan_thanh = dateVal;
+        }
+
         const updatedPayloads = currentRecords.map(r => {
             const currentArch = mapLuutruDbToArchiveRecord(r);
             const mergedArch: ArchiveRecord = {
@@ -866,6 +908,80 @@ export interface ArchiveBatchItem {
     record_count?: number;
 }
 
+export const getOrGenerateDailyHighestBatch = async (
+    type: 'saoluc' | 'congvan' | 'vaoso' | 'archive' | string,
+    targetDateStr: string = new Date().toISOString().split('T')[0]
+): Promise<string> => {
+    try {
+        const cleanDate = targetDateStr.includes('T') ? targetDateStr.split('T')[0] : targetDateStr;
+        const lists = await fetchListsByDate(type as any, cleanDate);
+        let maxNum = 0;
+        lists.forEach(batchStr => {
+            const match = batchStr.match(/Đợt\s*(\d+)/i) || batchStr.match(/(\d+)/);
+            if (match) {
+                const num = parseInt(match[1], 10);
+                if (!isNaN(num) && num > maxNum) maxNum = num;
+            }
+        });
+        return `Đợt ${maxNum + 1}`;
+    } catch (error) {
+        logError('getOrGenerateDailyHighestBatch', error, true);
+        return 'Đợt 1';
+    }
+};
+
+export const autoAssignDailyHighestBatchToUnbatchedRecords = async (
+    type: 'saoluc' | 'congvan' | 'vaoso' | 'archive' | string,
+    targetDateStr?: string
+): Promise<{ batchName: string; updatedCount: number }> => {
+    if (!isConfigured) return { batchName: 'Đợt 1', updatedCount: 0 };
+    try {
+        const { data: records, error } = await supabase
+            .from('luutru_records')
+            .select('*');
+
+        if (error || !records || records.length === 0) return { batchName: 'Đợt 1', updatedCount: 0 };
+
+        const unbatchedRecords = records.filter(r => {
+            const st = String(r.status || '').toLowerCase();
+            const isCompleted = st === 'completed' || st === 'handover' || st === 'handed_over' || st === 'giao_1_cua' || Boolean(r.completedWorkDate) || Boolean(r.exportDate);
+            const batchVal = r.exportBatch || r.export_batch || r.data?.exportBatch || r.data?.danh_sach;
+            const isUnbatched = !batchVal || String(batchVal).trim() === '';
+            return isCompleted && isUnbatched;
+        });
+
+        if (unbatchedRecords.length === 0) {
+            return { batchName: 'Không có hồ sơ lẻ', updatedCount: 0 };
+        }
+
+        const recordsByDate = new Map<string, any[]>();
+        unbatchedRecords.forEach(r => {
+            let recDate = r.exportDate || r.completedWorkDate || r.receivedDate || r.data?.ngay_hoan_thanh || targetDateStr || new Date().toISOString().split('T')[0];
+            if (recDate.includes('T')) recDate = recDate.split('T')[0];
+            const list = recordsByDate.get(recDate) || [];
+            list.push(r);
+            recordsByDate.set(recDate, list);
+        });
+
+        let totalUpdated = 0;
+        let lastBatchName = 'Đợt 1';
+
+        for (const [dateStr, dateRecords] of recordsByDate.entries()) {
+            const highestBatchName = await getOrGenerateDailyHighestBatch(type, dateStr);
+            const unbatchedIds = dateRecords.map(r => r.id);
+            const res = await createArchiveBatch(highestBatchName, unbatchedIds, type, dateStr);
+            totalUpdated += res.count;
+            lastBatchName = res.batchName;
+        }
+
+        memoryArchiveRecordsCache = null;
+        return { batchName: lastBatchName, updatedCount: totalUpdated };
+    } catch (err) {
+        logError('autoAssignDailyHighestBatchToUnbatchedRecords', err, true);
+        return { batchName: 'Đợt 1', updatedCount: 0 };
+    }
+};
+
 export const createArchiveBatch = async (
     batchName: string,
     recordIds: string[],
@@ -877,12 +993,7 @@ export const createArchiveBatch = async (
         let finalBatchName = batchName ? batchName.trim() : '';
         
         if (!finalBatchName) {
-            const existingBatches = await fetchLuutruHandoverBatches();
-            const numbers = existingBatches
-                .map(b => parseInt(b.batch.replace(/\D/g, ''), 10))
-                .filter(n => !isNaN(n));
-            const maxNum = numbers.length > 0 ? Math.max(...numbers) : 0;
-            finalBatchName = `Đợt ${maxNum + 1}`;
+            finalBatchName = await getOrGenerateDailyHighestBatch(moduleType, handoverDate);
         }
 
         if (isConfigured) {

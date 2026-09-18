@@ -46,11 +46,8 @@ const HandoverListModal: React.FC<HandoverListModalProps> = ({ isOpen, onClose, 
 
     const handleConfirm = () => {
         if (mode === 'new') {
-            if (!newListName.trim()) {
-                alert('Vui lòng nhập tên danh sách mới');
-                return;
-            }
-            onConfirm(newListName.trim(), selectedDate);
+            const finalName = newListName.trim() || `Đợt 1`;
+            onConfirm(finalName, selectedDate);
         } else {
             if (!selectedList) {
                 alert('Vui lòng chọn danh sách');
